@@ -6362,6 +6362,55 @@
         }
       }
     },
+    "/tasks/{task_name}/knowledge/archive": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Download a task's knowledge directory as a zip",
+        "description": "The task's ``index.md``, examples and figures, zipped under ``<task_name>/``.\n\nThe zip is the starting point of a knowledge draft: edit it locally and\nupload it from the evaluation dialog. Raises 404 when the task has no\nknowledge directory.",
+        "operationId": "downloadTaskKnowledgeArchive",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{task_name}/evaluation-prompts": {
       "get": {
         "tags": [
@@ -6514,333 +6563,6 @@
             }
           }
         }
-      }
-    },
-    "/knowledge/files/tree": {
-      "get": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Get file tree of the knowledge directory",
-        "operationId": "getKnowledgeFileTree",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/FileTreeNode"
-                  },
-                  "type": "array",
-                  "title": "Response Getknowledgefiletree"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/knowledge/files/content": {
-      "get": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Get knowledge file content for editing",
-        "operationId": "getKnowledgeFileContent",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Getknowledgefilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Save knowledge file content",
-        "operationId": "saveKnowledgeFileContent",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaveFileRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Saveknowledgefilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/knowledge/files/image": {
-      "get": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Get an image from the knowledge directory",
-        "operationId": "getKnowledgeFileImage",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "image/*": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/knowledge/files/validate": {
-      "post": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Validate file content (YAML/JSON)",
-        "operationId": "validateKnowledgeFileContent",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ValidateFileRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Validateknowledgefilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/knowledge/files/git/status": {
-      "get": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Get Git status of the knowledge directory",
-        "operationId": "getKnowledgeGitStatus",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Getknowledgegitstatus"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/knowledge/files/git/pull": {
-      "post": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Pull the latest knowledge from its Git repository",
-        "operationId": "gitPullKnowledge",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Gitpullknowledge"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/knowledge/files/git/push": {
-      "post": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Open a pull request with the knowledge changes",
-        "operationId": "gitPushKnowledge",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GitPushRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Gitpushknowledge"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
       }
     },
     "/task-files/settings": {
@@ -8721,6 +8443,71 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TaskKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/knowledge-drafts/{draft_id}/archive": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Download the zip a task-knowledge draft was uploaded as",
+        "description": "The uploaded zip, byte for byte, so the knowledge a run read can be reused.",
+        "operationId": "downloadKnowledgeDraftArchive",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }

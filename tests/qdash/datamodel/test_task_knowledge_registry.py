@@ -57,36 +57,6 @@ def test_registry_is_cached_while_the_json_is_unchanged(knowledge_repo: Path) ->
     assert tk.get_task_knowledge("CheckT1") is first
 
 
-def test_regenerate_runs_the_repository_generator(knowledge_repo: Path) -> None:
-    (knowledge_repo / "generate.py").write_text(
-        "import json, sys\n"
-        "out = sys.argv[sys.argv.index('--output') + 1]\n"
-        "json.dump({'CheckT1': "
-        + json.dumps(_entry("CheckT1", "generated"))
-        + "}, open(out, 'w'))\n",
-        encoding="utf-8",
-    )
-
-    output = tk.regenerate_task_knowledge_json(knowledge_repo)
-
-    assert output == knowledge_repo / "task-knowledge.json"
-    assert json.loads(output.read_text())["CheckT1"]["background"] == "generated"
-
-
-def test_regenerate_reports_a_failing_generator(knowledge_repo: Path) -> None:
-    (knowledge_repo / "generate.py").write_text(
-        "import sys; print('boom', file=sys.stderr); sys.exit(3)\n", encoding="utf-8"
-    )
-
-    with pytest.raises(RuntimeError, match="boom"):
-        tk.regenerate_task_knowledge_json(knowledge_repo)
-
-
-def test_regenerate_requires_the_generator(knowledge_repo: Path) -> None:
-    with pytest.raises(RuntimeError, match=r"generate\.py not found"):
-        tk.regenerate_task_knowledge_json(knowledge_repo)
-
-
 def test_previous_format_entries_still_load(knowledge_repo: Path) -> None:
     (knowledge_repo / "task-knowledge.json").write_text(
         json.dumps(

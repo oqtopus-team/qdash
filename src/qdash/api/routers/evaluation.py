@@ -12,6 +12,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from fastapi.security import (
     HTTPAuthorizationCredentials,  # noqa: TC002 - FastAPI resolves annotations
 )
@@ -246,3 +247,22 @@ def get_knowledge_draft_knowledge(
 ) -> TaskKnowledgeResponse:
     """The draft in the shape of `GET /tasks/{name}/knowledge`, for the Agent Runtime."""
     return knowledge_response(drafts.get(ctx.project_id, draft_id).knowledge)
+
+
+@router.get(
+    "/evaluations/knowledge-drafts/{draft_id}/archive",
+    summary="Download the zip a task-knowledge draft was uploaded as",
+    operation_id="downloadKnowledgeDraftArchive",
+    response_class=FileResponse,
+    responses={
+        200: {"content": {"application/zip": {"schema": {"type": "string", "format": "binary"}}}}
+    },
+)
+def download_knowledge_draft_archive(
+    draft_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    drafts: Annotated[KnowledgeDraftStore, Depends(get_knowledge_draft_store)],
+) -> FileResponse:
+    """The uploaded zip, byte for byte, so the knowledge a run read can be reused."""
+    path, filename = drafts.archive(ctx.project_id, draft_id)
+    return FileResponse(path, media_type="application/zip", filename=filename)

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
+import zipfile
 from typing import TYPE_CHECKING
 
 import pytest
@@ -157,3 +159,46 @@ def test_a_missing_generator_is_a_503(store: kds.KnowledgeDraftStore, config_dir
         store.create("proj-1", make_zip(RABI), filename="rabi.zip", uploaded_by="alice")
 
     assert exc_info.value.status_code == 503
+
+
+def test_a_downloaded_task_archive_uploads_as_the_same_knowledge(
+    store: kds.KnowledgeDraftStore, tmp_path: Path
+) -> None:
+    task_dir = tmp_path / "repo" / "one_qubit_coarse" / "CheckRabi"
+    (task_dir / "examples").mkdir(parents=True)
+    (task_dir / "index.md").write_text(INDEX, encoding="utf-8")
+    (task_dir / "examples" / "short.md").write_text("The decay is too fast.", encoding="utf-8")
+    (task_dir / "examples" / "short.png").write_bytes(PNG)
+    # Left out of the archive: files a draft may not hold, dotfiles, links.
+    (task_dir / "generate_figure.py").write_text("print()", encoding="utf-8")
+    (task_dir / ".DS_Store").write_bytes(b"x")
+    (task_dir / "linked.md").symlink_to(tmp_path / "repo")
+
+    data = kds.task_archive(task_dir)
+
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        assert sorted(archive.namelist()) == [
+            "CheckRabi/examples/short.md",
+            "CheckRabi/examples/short.png",
+            "CheckRabi/index.md",
+        ]
+    draft = store.create("proj-1", data, filename="CheckRabi.zip", uploaded_by="alice")
+    assert draft.warnings == []
+    assert [e.id for e in draft.knowledge.examples] == ["short"]
+
+
+def test_a_drafts_archive_is_the_upload_under_its_file_name(
+    store: kds.KnowledgeDraftStore,
+) -> None:
+    data = make_zip(RABI)
+    draft = store.create("proj-1", data, filename="dir/rabi.zip", uploaded_by="alice")
+
+    path, name = store.archive("proj-1", draft.draft_id)
+
+    assert path.read_bytes() == data
+    assert name == "rabi.zip"
+    unnamed = store.create("proj-1", make_zip({"index.md": INDEX}), filename="", uploaded_by="a")
+    assert store.archive("proj-1", unnamed.draft_id)[1] == "CheckRabi.zip"
+    with pytest.raises(HTTPException) as exc_info:
+        store.archive("proj-2", draft.draft_id)
+    assert exc_info.value.status_code == 404

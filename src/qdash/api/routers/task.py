@@ -35,7 +35,7 @@ from qdash.api.schemas.task import (
 )
 from qdash.api.services.catalog_task_run import resolve_catalog_task, run_catalog_task
 from qdash.api.services.flow_service import FlowService
-from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore
+from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore, task_archive
 from qdash.api.services.pi_chat_service import QDashAuth
 from qdash.api.services.pi_evaluation_service import (
     EvaluationRuntimeError,
@@ -43,6 +43,7 @@ from qdash.api.services.pi_evaluation_service import (
 )
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_service import TaskService
+from qdash.datamodel.task_knowledge import get_task_knowledge as lookup_task_knowledge
 
 router = APIRouter()
 
@@ -189,6 +190,36 @@ def get_task_knowledge_markdown(
     """
     content = service.get_task_knowledge_markdown(task_name)
     return Response(content=content, media_type="text/markdown; charset=utf-8")
+
+
+@router.get(
+    "/tasks/{task_name}/knowledge/archive",
+    summary="Download a task's knowledge directory as a zip",
+    operation_id="downloadTaskKnowledgeArchive",
+    response_class=Response,
+    responses={
+        200: {"content": {"application/zip": {"schema": {"type": "string", "format": "binary"}}}}
+    },
+)
+def download_task_knowledge_archive(task_name: str) -> Response:
+    """The task's ``index.md``, examples and figures, zipped under ``<task_name>/``.
+
+    The zip is the starting point of a knowledge draft: edit it locally and
+    upload it from the evaluation dialog. Raises 404 when the task has no
+    knowledge directory.
+    """
+    knowledge = lookup_task_knowledge(task_name)
+    task_dir = knowledge.task_dir() if knowledge else None
+    if task_dir is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task '{task_name}' does not have a knowledge directory",
+        )
+    return Response(
+        content=task_archive(task_dir),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{task_dir.name}.zip"'},
+    )
 
 
 @router.get(

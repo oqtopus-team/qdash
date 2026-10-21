@@ -4,7 +4,7 @@ Copilot's behaviour comes from three kinds of knowledge that live in three place
 
 | Kind | Examples | Home | How QDash gets it |
 | --- | --- | --- | --- |
-| Facts about calibration tasks | Background per task (`index.md` with a fixed template: intro, Expected plot, Common failures, Parameters to extract; laid out by calibtasks package) and expert-labeled example plots | [qdash-task-knowledge](https://github.com/qiqb-osaka/qdash-task-knowledge), cloned into `config/task-knowledge` | The repository's `generate.py` builds `task-knowledge.json` (figures by path, not embedded); the API serves it to the chat prompt, the evaluation reference, and the `qdash_get_task_knowledge` tool. The Knowledge page edits it. |
+| Facts about calibration tasks | Background per task (`index.md` with a fixed template: intro, Expected plot, Common failures, Parameters to extract; laid out by calibtasks package) and expert-labeled example plots | [qdash-task-knowledge](https://github.com/qiqb-osaka/qdash-task-knowledge), cloned into `config/task-knowledge` | The repository's `generate.py` builds `task-knowledge.json` (figures by path, not embedded); the API serves it to the chat prompt, the evaluation reference, and the `qdash_get_task_knowledge` tool. The Knowledge page shows it read-only. |
 | Tools and procedures | Tool definitions, "which tool for which question", diagnosis workflows, agent-session workflows | [pi-qdash](https://github.com/oqtopus-team/pi-qdash) (`extensions/`, `skills/`) | Installed into the Agent Runtime image at a pinned version (`agent-runtime/Dockerfile`) |
 | Product behaviour | Persona, approval cards, `ask_user`, output language, turn budgets, model catalog | This repository | `agent-runtime/src/prompt.ts`, `config/copilot/*.yaml` |
 

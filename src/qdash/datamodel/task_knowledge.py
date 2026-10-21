@@ -403,9 +403,8 @@ def _build_registry(json_path: Path) -> dict[str, TaskKnowledge]:
 
 
 # The registry follows the JSON file on disk: it is rebuilt whenever the file's
-# identity (path, mtime, size) changes, so a save through the knowledge editor,
-# a pull, or ``task knowledge-pull`` on the host reaches every API worker
-# without a restart.
+# identity (path, mtime, size) changes, so ``task knowledge-pull`` on the host
+# reaches every API worker without a restart.
 _REGISTRY_CACHE: tuple[tuple[str, int, int] | None, dict[str, TaskKnowledge]] = (None, {})
 _WARNED_MISSING = False
 
@@ -427,36 +426,6 @@ def _registry() -> dict[str, TaskKnowledge]:
     registry = _build_registry(json_path)
     _REGISTRY_CACHE = (key, registry)
     return registry
-
-
-def regenerate_task_knowledge_json(repo_dir: Path | None = None) -> Path:
-    """Rebuild ``task-knowledge.json`` from the markdown sources with the repo's own generator.
-
-    The knowledge repository ships ``generate.py`` (the same script its CI runs on
-    merge); running it after an edit makes the edit visible to the API and the
-    runtime before a pull request is merged. Returns the JSON path.
-    """
-    import subprocess
-    import sys
-
-    repo_dir = repo_dir or _resolve_repo_dir()
-    if repo_dir is None:
-        raise RuntimeError("task-knowledge repository directory not found")
-    generator = repo_dir / "generate.py"
-    if not generator.is_file():
-        raise RuntimeError(f"generate.py not found in {repo_dir}")
-    output = repo_dir / "task-knowledge.json"
-    result = subprocess.run(  # noqa: S603 -- fixed argv: the repo's own generator, no user input
-        [sys.executable, "-I", str(generator), "--output", str(output)],
-        cwd=repo_dir,
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "generate.py failed")
-    return output
 
 
 def parse_task_dir(task_dir: Path, *, category: str = "") -> tuple[TaskKnowledge | None, list[str]]:

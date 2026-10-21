@@ -49,12 +49,18 @@ concern project-wide policy.
 
 ## Reuse the Finding
 
-Move a conclusion into **Knowledge** when it should guide future analysis of the same task.
-Update the task background, expected plot, common failures, or parameters to extract, then preview
-the evaluation prompts before saving.
+Move a conclusion into the task's knowledge when it should guide future analysis of the same
+task. **Knowledge** is read-only: changes go through the task-knowledge repository, so one person's
+edit does not change what everyone else's evaluations and chats read.
 
-Use the repository actions in **Knowledge** to pull reviewed changes or create a pull request for
-other deployments. Keep the task title and required section headings unchanged.
+1. On **Knowledge**, open the task and select **Download zip**.
+2. Update the task background, expected plot, common failures, parameters to extract, or
+   examples in the unzipped `index.md` and `examples/`. Keep the task title and required section
+   headings unchanged.
+3. Zip the folder again and evaluate with it as a knowledge draft; see
+   [Try a Knowledge Change Before Proposing It](./ai-evaluations.md#try-a-knowledge-change-before-proposing-it).
+4. Propose the change as a pull request to the task-knowledge repository. After it merges, the
+   operator runs `task knowledge-pull` to update the deployment.
 
 ## Request an AI Review
 

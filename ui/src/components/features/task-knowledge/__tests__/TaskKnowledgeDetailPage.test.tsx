@@ -4,43 +4,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TaskKnowledgeDetailPage } from "../TaskKnowledgeDetailPage";
 
-const { axiosGet, saveContent, getContent, projectState } = vi.hoisted(() => ({
+const { axiosGet, downloadArchive, toastError } = vi.hoisted(() => ({
   axiosGet: vi.fn(),
-  saveContent: vi.fn(),
-  getContent: vi.fn(),
-  projectState: { canEdit: true },
+  downloadArchive: vi.fn(),
+  toastError: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("@/contexts/ProjectContext", () => ({ useProject: () => projectState }));
+vi.mock("@/contexts/ProjectContext", () => ({ useProject: () => ({ canEdit: false }) }));
 vi.mock("@/lib/api/custom-instance", () => ({
   AXIOS_INSTANCE: { get: axiosGet },
   customInstance: vi.fn(),
 }));
+vi.mock("@/client/task/task", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/client/task/task")>()),
+  downloadTaskKnowledgeArchive: downloadArchive,
+}));
 vi.mock("@/components/ui/Toast", () => ({
-  useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
+  useToast: () => ({ success: vi.fn(), error: toastError, info: vi.fn() }),
 }));
 vi.mock("@/components/ui/MarkdownContent", () => ({
   MarkdownContent: ({ content }: { content: string }) => <pre>{content}</pre>,
 }));
-vi.mock("@/components/ui/MarkdownEditor", () => ({
-  MarkdownEditor: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <textarea aria-label="knowledge" value={value} onChange={(e) => onChange(e.target.value)} />
-  ),
-}));
-vi.mock("@/components/ui/FileDiffReviewDialog", () => ({ FileDiffReviewDialog: () => null }));
-vi.mock("@/lib/fileWorkspace", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/fileWorkspace")>();
-  return {
-    ...actual,
-    KNOWLEDGE_WORKSPACE: {
-      ...actual.KNOWLEDGE_WORKSPACE,
-      getContent,
-      saveContent,
-      getGitStatus: async () => ({ is_git_repo: true, branch: "main", commit: "abc12345" }),
-    },
-  };
-});
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -52,18 +37,12 @@ function renderPage() {
 }
 
 beforeEach(() => {
-  projectState.canEdit = true;
   axiosGet.mockImplementation(async (url: string) => {
     if (url.endsWith("/knowledge/markdown")) return { data: "# CheckT1\n\nrendered" };
-    return { data: { category: "td-characterization", cases: [] } };
+    return { data: { category: "one_qubit_coarse", examples: [] } };
   });
-  getContent.mockResolvedValue({
-    content: "# CheckT1\n\nsource",
-    base_content: "# CheckT1\n\nsource",
-    is_saved_change: false,
-    path: "td-characterization/CheckT1/index.md",
-  });
-  saveContent.mockResolvedValue({ message: "ok", path: "td-characterization/CheckT1/index.md" });
+  window.URL.createObjectURL = vi.fn(() => "blob:knowledge");
+  window.URL.revokeObjectURL = vi.fn();
 });
 
 afterEach(() => {
@@ -72,44 +51,40 @@ afterEach(() => {
 });
 
 describe("TaskKnowledgeDetailPage", () => {
-  it("edits the task's index.md in the knowledge repository and saves it there", async () => {
-    renderPage();
-    await screen.findByText(/rendered/);
-
-    fireEvent.click(screen.getByRole("button", { name: /edit/i }));
-    const editor = await screen.findByLabelText("knowledge");
-    expect((editor as HTMLTextAreaElement).value).toBe("# CheckT1\n\nsource");
-    expect(getContent).toHaveBeenCalledWith("td-characterization/CheckT1/index.md");
-
-    fireEvent.change(editor, { target: { value: "# CheckT1\n\nsource edited" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-
-    await waitFor(() =>
-      expect(saveContent).toHaveBeenCalledWith(
-        "td-characterization/CheckT1/index.md",
-        "# CheckT1\n\nsource edited",
-      ),
-    );
-    // Back to the rendered view once saved.
-    await screen.findByText(/rendered/);
-    expect(screen.queryByLabelText("knowledge")).toBeNull();
-  });
-
-  it("links the file browser to the task's folder", async () => {
-    renderPage();
-    await screen.findByText(/rendered/);
-
-    expect(screen.getByRole("link", { name: /files/i }).getAttribute("href")).toBe(
-      "/knowledge/files?path=td-characterization%2FCheckT1%2Findex.md",
-    );
-  });
-
-  it("keeps viewers read-only", async () => {
-    projectState.canEdit = false;
+  it("shows the published knowledge without editing controls", async () => {
     renderPage();
     await screen.findByText(/rendered/);
 
     expect(screen.queryByRole("button", { name: /edit/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /create pr/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /files/i })).toBeNull();
+  });
+
+  it("downloads the task's directory as a zip to start a draft from", async () => {
+    const blob = new Blob(["zip"], { type: "application/zip" });
+    downloadArchive.mockResolvedValue({ data: blob });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    renderPage();
+    await screen.findByText(/rendered/);
+
+    fireEvent.click(screen.getByRole("button", { name: /download zip/i }));
+
+    await waitFor(() => expect(click).toHaveBeenCalled());
+    expect(downloadArchive).toHaveBeenCalledWith("CheckT1");
+    expect(window.URL.createObjectURL).toHaveBeenCalledWith(blob);
+    expect((click.mock.instances[0] as unknown as HTMLAnchorElement).download).toBe("CheckT1.zip");
+    click.mockRestore();
+  });
+
+  it("reports a failed download", async () => {
+    downloadArchive.mockRejectedValue(
+      new Error("Task 'CheckT1' does not have a knowledge directory"),
+    );
+    renderPage();
+    await screen.findByText(/rendered/);
+
+    fireEvent.click(screen.getByRole("button", { name: /download zip/i }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
   });
 });

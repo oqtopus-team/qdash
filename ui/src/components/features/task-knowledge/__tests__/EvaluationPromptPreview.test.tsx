@@ -4,8 +4,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EvaluationPromptPreview } from "../EvaluationPromptPreview";
 
-const { customInstance } = vi.hoisted(() => ({ customInstance: vi.fn() }));
+const { customInstance, projectState } = vi.hoisted(() => ({
+  customInstance: vi.fn(),
+  projectState: { canEdit: false },
+}));
 vi.mock("@/lib/api/custom-instance", () => ({ customInstance }));
+vi.mock("@/contexts/ProjectContext", () => ({ useProject: () => projectState }));
+
+const DRAFT = {
+  draft_id: "ab".repeat(32),
+  task_name: "CheckRabi",
+  filename: "rabi.zip",
+  uploaded_by: "alice",
+  created_at: "2026-10-21T00:00:00Z",
+  warnings: [],
+  reference: { statuses: { SUCCESS: "ok" }, parameters: {} },
+  example_count: 1,
+  figure_count: 1,
+};
 
 const PREVIEW = {
   task_name: "CheckRabi",
@@ -34,18 +50,28 @@ function renderPreview(exampleCount = 0) {
 }
 
 beforeEach(() => {
+  projectState.canEdit = false;
   customInstance.mockImplementation(
     async (config: { url: string; params?: Record<string, unknown> }) => ({
-      data: config.params?.with_examples
-        ? {
-            ...PREVIEW,
-            with_examples: true,
-            examples: [
-              { id: "e1", title: "TLS", outcome: "suboptimal", status: "SHORT_T1", figures: [] },
-            ],
-            examples_used: 1,
-          }
-        : PREVIEW,
+      data:
+        config.url === "/evaluations/knowledge-drafts"
+          ? DRAFT
+          : config.params?.with_examples
+            ? {
+                ...PREVIEW,
+                with_examples: true,
+                examples: [
+                  {
+                    id: "e1",
+                    title: "TLS",
+                    outcome: "suboptimal",
+                    status: "SHORT_T1",
+                    figures: [],
+                  },
+                ],
+                examples_used: 1,
+              }
+            : PREVIEW,
     }),
   );
 });
@@ -103,5 +129,31 @@ describe("EvaluationPromptPreview", () => {
     renderPreview();
     fireEvent.click(screen.getByRole("button", { name: /preview/i }));
     await screen.findByText(/no reference/);
+  });
+
+  it("lets an editor build the prompts from a dropped knowledge draft", async () => {
+    projectState.canEdit = true;
+    renderPreview(0);
+    const file = new File(["zip"], "rabi.zip", { type: "application/zip" });
+    fireEvent.change(screen.getByTestId("knowledge-draft-input"), { target: { files: [file] } });
+    await screen.findByTestId("knowledge-draft");
+    // The draft has an example, so in-context is offered even though the shared task has none.
+    expect((screen.getByRole("button", { name: "In-context" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^preview$/i }));
+
+    await screen.findByText("fit_reliability");
+    expect(customInstance.mock.lastCall?.[0]).toMatchObject({
+      url: "/tasks/CheckRabi/evaluation-prompts",
+      params: { with_examples: false, knowledge_draft_id: "ab".repeat(32) },
+    });
+    expect(screen.getByText(/built from the draft/).textContent).toContain("rabi.zip");
+  });
+
+  it("offers no draft upload to viewers", () => {
+    renderPreview();
+    expect(screen.queryByTestId("knowledge-draft-input")).toBeNull();
   });
 });

@@ -180,6 +180,11 @@ exactly as the published entry would, warnings included. The resulting `TaskKnow
 its figures inside the draft directory. Without the checkout's `generate.py` the upload answers
 503.
 
+`GET /evaluations/knowledge-drafts/{id}/archive` returns `draft.zip` byte for byte under its
+uploaded file name, so the knowledge a run read can be downloaded from the run's page and
+uploaded again as the same draft. `task_archive` builds the zip a draft starts from: the published task directory under one
+folder, holding only the file types a draft accepts, so a download uploads again unchanged.
+
 A run names the draft with `knowledge_draft_id`; the run stores it with the zip's file name
 (`knowledge_draft_name`). The API refuses a draft of another task and a draft in planner mode,
 because the planner's `qcal_evaluate` call is filled with the shared knowledge. The runtime
@@ -219,10 +224,12 @@ fit quality, success and verdict. There is no compare API.
 ## Changing it
 
 **A task's reference.** Edit the task's `index.md` in the knowledge repository, within its
-template, and evaluate the edited directory as a knowledge draft against a run on the shared
-knowledge before proposing it. The Knowledge page's **Evaluation prompts** panel shows what the
-shared reference turns into. Updating a deployment means moving the `config/task-knowledge`
-checkout.
+template; the Knowledge page's **Download zip** (`GET /tasks/{task_name}/knowledge/archive`)
+gives the published directory to start from. Evaluate the edited directory as a knowledge draft
+against a run on the shared knowledge before proposing it; the **Evaluation prompts** panel
+previews the shared reference or a dropped draft. The Knowledge page does not write: updating a
+deployment means merging into the repository and moving the `config/task-knowledge` checkout
+(`task knowledge-pull`).
 
 **A demonstration.** Add `examples/<slug>.md` with a figure, `outcome`, and the QCalEval labels
 (`status` from the task's criteria, `suggested_range`, `parameters`), then regenerate
@@ -263,8 +270,8 @@ context, examples, preview), `tests/qdash/datamodel/test_task_knowledge_registry
 | `src/qdash/datamodel/evaluation.py` | The evaluation record |
 | `src/qdash/api/services/evaluation_service.py` | Runs: selection, background execution, chat recording, verdicts |
 | `src/qdash/api/services/pi_evaluation_service.py` | The runtime calls |
-| `src/qdash/api/services/knowledge_draft_service.py` | `KnowledgeDraftStore`: storing, validating and reading knowledge drafts |
-| `src/qdash/api/routers/evaluation.py`, `routers/task.py` | `/evaluations/*` (runs, knowledge drafts), `/tasks/{task_name}/knowledge`, `/tasks/{task_name}/evaluation-prompts` |
+| `src/qdash/api/services/knowledge_draft_service.py` | `KnowledgeDraftStore`: storing, validating and reading knowledge drafts; `task_archive` |
+| `src/qdash/api/routers/evaluation.py`, `routers/task.py` | `/evaluations/*` (runs, knowledge drafts), `/tasks/{task_name}/knowledge`, `/tasks/{task_name}/knowledge/archive`, `/tasks/{task_name}/evaluation-prompts` |
 | `ui/src/components/features/evaluations/` | Request modal with the knowledge draft picker (`KnowledgeDraftPicker.tsx`), run list and detail, compare page |
-| `ui/src/components/features/task-knowledge/EvaluationPromptPreview.tsx` | The Knowledge page's prompt panel |
+| `ui/src/components/features/task-knowledge/EvaluationPromptPreview.tsx` | The Knowledge page's prompt panel, with a draft drop for editors |
 | `config/copilot/evaluation.yaml` | The evaluation model and its decoding settings |

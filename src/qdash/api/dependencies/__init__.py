@@ -504,31 +504,6 @@ def get_file_service() -> FileService:
 
 
 @cached_dependency_provider
-def get_knowledge_file_service() -> FileService:
-    """The task knowledge repository as an editable git workspace.
-
-    A save regenerates ``task-knowledge.json`` with the repository's own
-    generator so the edit reaches the copilot and evaluations at once; the
-    generated file is left out of pushes because the repository's CI rebuilds it.
-    """
-    from qdash.common.config.loader import ConfigLoader
-    from qdash.datamodel.task_knowledge import regenerate_task_knowledge_json
-
-    repo_dir = (ConfigLoader.get_config_dir() / "task-knowledge").resolve()
-
-    def after_save() -> None:
-        regenerate_task_knowledge_json(repo_dir)
-
-    return FileService(
-        repo_dir,
-        label="knowledge",
-        repo_url_env="KNOWLEDGE_REPO_URL",
-        after_save=after_save,
-        push_exclude=("task-knowledge.json",),
-    )
-
-
-@cached_dependency_provider
 def get_reanalysis_service() -> ReanalysisService:
     """Get the spectroscopy-reanalysis service instance."""
     return ReanalysisService()

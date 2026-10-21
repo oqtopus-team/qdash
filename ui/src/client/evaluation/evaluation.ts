@@ -731,3 +731,97 @@ export function useGetKnowledgeDraftKnowledge<TData = Awaited<ReturnType<typeof 
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+/**
+ * The uploaded zip, byte for byte, so the knowledge a run read can be reused.
+ * @summary Download the zip a task-knowledge draft was uploaded as
+ */
+export const downloadKnowledgeDraftArchive = (
+    draftId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<Blob>(
+      {url: `/evaluations/knowledge-drafts/${draftId}/archive`, method: 'GET',
+        responseType: 'blob', signal
+    },
+      options);
+    }
+
+
+
+
+export const getDownloadKnowledgeDraftArchiveQueryKey = (draftId: string,) => {
+    return [
+    `/evaluations/knowledge-drafts/${draftId}/archive`
+    ] as const;
+    }
+
+
+export const getDownloadKnowledgeDraftArchiveQueryOptions = <TData = Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>, TError = HTTPValidationError>(draftId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadKnowledgeDraftArchiveQueryKey(draftId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>> = ({ signal }) => downloadKnowledgeDraftArchive(draftId, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: draftId !== null && draftId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type DownloadKnowledgeDraftArchiveQueryResult = NonNullable<Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>>
+export type DownloadKnowledgeDraftArchiveQueryError = HTTPValidationError
+
+
+export function useDownloadKnowledgeDraftArchive<TData = Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>, TError = HTTPValidationError>(
+ draftId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>,
+          TError,
+          Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDownloadKnowledgeDraftArchive<TData = Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>, TError = HTTPValidationError>(
+ draftId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>,
+          TError,
+          Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDownloadKnowledgeDraftArchive<TData = Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>, TError = HTTPValidationError>(
+ draftId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Download the zip a task-knowledge draft was uploaded as
+ */
+
+export function useDownloadKnowledgeDraftArchive<TData = Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>, TError = HTTPValidationError>(
+ draftId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadKnowledgeDraftArchive>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getDownloadKnowledgeDraftArchiveQueryOptions(draftId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}

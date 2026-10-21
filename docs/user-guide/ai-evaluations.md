@@ -12,9 +12,12 @@ The evaluation uses the selected task's reference in **Knowledge**. Before evalu
 or failure mode:
 
 1. Open **Knowledge** and select the task.
-2. Review its expected plot, common failures, and parameters to extract.
-3. Add or update expert-labeled examples if you plan to use **In-context** evaluation.
-4. Open **Evaluation prompts** to preview the reference the model will receive.
+2. Review its expected plot, common failures, parameters to extract, and expert-labeled examples
+   (used by **In-context** evaluation).
+3. Open **Evaluation prompts** and select **Preview** to read the prompts the model will receive.
+
+**Knowledge** is read-only. To evaluate with a changed reference or new examples, use a knowledge
+draft as described below.
 
 ## Start an Evaluation
 
@@ -43,10 +46,10 @@ run.
 Evaluate against a knowledge draft to see how an edited reference changes the judgments. The
 draft is read only by the run you start with it; **Knowledge** stays the same for everyone.
 
-1. Zip the task's directory: `index.md` and, for **In-context** evaluation, `examples/` with
-   its figures. The zip holds one task, either at the top or in one folder named after the
-   task. It may contain only `.md`, `.png`, `.jpg`, `.jpeg` and `.webp` files, up to 200 files,
-   20 MB zipped and 50 MB unpacked.
+1. On **Knowledge**, open the task and select **Download zip**. Edit `index.md` and
+   `examples/` in the unzipped folder, then zip the folder again. The zip holds one task, either
+   at the top or in one folder named after the task. It may contain only `.md`, `.png`, `.jpg`,
+   `.jpeg` and `.webp` files, up to 200 files, 20 MB zipped and 50 MB unpacked.
 2. Start an evaluation of that task as described above.
 3. Drop the zip on **Knowledge**, or select that area to choose the file. The dialog shows the
    draft's statuses, parameters and example count, and lists any format warnings. A zip for a
@@ -55,6 +58,14 @@ draft is read only by the run you start with it; **Knowledge** stays the same fo
    shared knowledge.
 5. Compare the run with one that used the shared knowledge. The **Knowledge** row shows which
    run used the draft.
+
+The run's page shows the draft under **Knowledge**. Select **Download zip** there to get the
+zip exactly as it was uploaded, to inspect what the run read, propose it, or start the next
+edit from it.
+
+To read the prompts a draft turns into before evaluating, open the task in **Knowledge**, drop
+the zip on the draft area under **Evaluation prompts**, then select **Preview**. Only project
+editors can upload a draft.
 
 When the draft improves the judgments, propose the change to the task-knowledge repository.
 

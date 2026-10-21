@@ -157,6 +157,28 @@ def _extract(data: bytes, dest: Path) -> Path:
     return task_dir
 
 
+def task_archive(task_dir: Path) -> bytes:
+    """A task's knowledge directory as a zip a draft upload accepts.
+
+    The entries sit under one folder named after the directory and hold only
+    the file types a draft may contain, so downloading, editing and uploading
+    again round-trips.
+    """
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(task_dir.rglob("*")):
+            relative = path.relative_to(task_dir)
+            if (
+                path.is_symlink()
+                or not path.is_file()
+                or _is_junk(PurePosixPath(relative.as_posix()))
+                or path.suffix.lower() not in ALLOWED_SUFFIXES
+            ):
+                continue
+            archive.write(path, f"{task_dir.name}/{relative.as_posix()}")
+    return buffer.getvalue()
+
+
 @lru_cache(maxsize=32)
 def _parse(task_dir: Path, category: str) -> tuple[TaskKnowledge | None, tuple[str, ...]]:
     """A stored draft's knowledge; drafts never change, so one parse per worker."""
@@ -234,6 +256,25 @@ class KnowledgeDraftStore:
             shutil.rmtree(staging, ignore_errors=True)
         logger.info("knowledge draft %s for %s stored by %s", draft_id, knowledge.name, uploaded_by)
         return self.get(project_id, draft_id)
+
+    def archive(self, project_id: str, draft_id: str) -> tuple[Path, str]:
+        """The zip a draft was uploaded as, and the file name to save it under.
+
+        The bytes are the upload's own (their SHA-256 is the draft id), so a
+        run's knowledge can be inspected or uploaded again exactly. 404 when
+        the project holds no such draft.
+        """
+        draft = self.get(project_id, draft_id)
+        path = self._drafts_dir(project_id) / draft_id / "draft.zip"
+        if not path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"knowledge draft {draft_id} not found",
+            )
+        name = Path(draft.filename).name if draft.filename else ""
+        if not name.lower().endswith(".zip"):
+            name = f"{draft.task_name or 'knowledge-draft'}.zip"
+        return path, name
 
     def get(self, project_id: str, draft_id: str) -> KnowledgeDraft:
         """A stored draft of the project; 404 when the project holds no such draft."""

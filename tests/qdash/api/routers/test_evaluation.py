@@ -835,3 +835,21 @@ def test_a_draft_must_match_the_task_and_run_directly(
     assert response.status_code == status_code, response.text
     assert detail in response.json()["detail"]
     assert service.launched == []
+
+
+def test_a_drafts_zip_downloads_as_uploaded(test_client, project, drafts):
+    data = make_zip(RABI)
+    draft_id = test_client.post(
+        "/evaluations/knowledge-drafts",
+        headers=HEADERS,
+        files={"file": ("rabi v2.zip", data, "application/zip")},
+    ).json()["draft_id"]
+
+    response = test_client.get(f"/evaluations/knowledge-drafts/{draft_id}/archive", headers=HEADERS)
+
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"] == "application/zip"
+    assert response.headers["content-disposition"] == "attachment; filename*=utf-8''rabi%20v2.zip"
+    assert response.content == data
+    missing = test_client.get(f"/evaluations/knowledge-drafts/{'0' * 64}/archive", headers=HEADERS)
+    assert missing.status_code == 404

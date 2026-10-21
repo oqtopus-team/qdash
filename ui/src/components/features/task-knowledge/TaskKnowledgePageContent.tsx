@@ -1,16 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FolderTree, Image as ImageIcon, Tag } from "lucide-react";
-import {
-  GitWorkspaceToolbar,
-  PullRequestBanner,
-} from "@/components/features/files/GitWorkspaceToolbar";
-import { useGitWorkspace } from "@/components/features/files/useGitWorkspace";
-import { useProject } from "@/contexts/ProjectContext";
-import { KNOWLEDGE_WORKSPACE } from "@/lib/fileWorkspace";
+import { Image as ImageIcon, Tag } from "lucide-react";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -65,8 +57,6 @@ function TaskCard({ item }: { item: TaskKnowledgeSummaryResponse }) {
 export function TaskKnowledgePageContent() {
   const { data: resp, isLoading } = useListTaskKnowledge();
   const [searchInput, setSearchInput] = useState("");
-  const { canEdit } = useProject();
-  const git = useGitWorkspace(KNOWLEDGE_WORKSPACE);
 
   const categories = resp?.data?.categories ?? {};
 
@@ -106,31 +96,8 @@ export function TaskKnowledgePageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Knowledge"
-        description="The background of each calibration task and its expert-labeled example plots, laid out like the calibtasks packages. Edits apply here at once; a pull request shares them."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {canEdit && (
-              <Link href={KNOWLEDGE_WORKSPACE.editorPath} className="btn btn-sm btn-ghost gap-1">
-                <FolderTree size={16} />
-                Browse files
-              </Link>
-            )}
-            {canEdit && (
-              <GitWorkspaceToolbar
-                status={git.status}
-                onPull={git.pull}
-                onPush={() => git.push()}
-                isPulling={git.isPulling}
-                isPushing={git.isPushing}
-                pushTitle="Create a pull request with the saved knowledge changes"
-              />
-            )}
-          </div>
-        }
+        description="The background of each calibration task and its expert-labeled example plots, laid out like the calibtasks packages, as published in the task-knowledge repository. To try a change, download a task as a zip and upload the edited zip as a knowledge draft in an AI evaluation."
       />
-      <div className="mb-4 -mx-4 sm:mx-0 sm:rounded-lg sm:overflow-hidden">
-        <PullRequestBanner pr={git.prResult} onDismiss={git.dismissPr} />
-      </div>
 
       {/* Search bar */}
       <div className="mb-6">

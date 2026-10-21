@@ -77,7 +77,6 @@ PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(settings.router, tags=("settings",)),
     RouterRegistration(chip.router, tags=("chip",)),
     RouterRegistration(task.router, tags=("task",)),
-    RouterRegistration(file.knowledge_router, tags=("knowledge",)),
     RouterRegistration(task_file.router, tags=("task-file",)),
     RouterRegistration(task_result.router, tags=("task-result",)),
     RouterRegistration(evaluation.router, tags=("evaluation",)),
