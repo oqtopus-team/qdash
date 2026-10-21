@@ -91,15 +91,17 @@ The suffix is not predefined; choose one that identifies the endpoint or its pur
 the exact variable names in `base_url: env:...` and `api_key_env`. The supplied templates use
 `CHAT` and `EVALUATION`.
 
-Give each endpoint a matching provider ID with the form `openai-compatible-<suffix>`. Provider
-IDs are namespaces in the generated Pi configuration, so endpoints with different base URLs
-must not share an ID. The supplied templates use `openai-compatible-chat` and
+Give each endpoint a matching identifier with the form `openai-compatible-<suffix>` in its
+`provider` field. This value is an endpoint identifier, not the serving software name: Pi uses it
+as a key in the generated configuration. Endpoints with different base URLs must not share an
+identifier. The supplied templates use `openai-compatible-chat` and
 `openai-compatible-evaluation`.
 
 The default chat model also appears in `evaluation_models`, which makes its evaluation role
-explicit. When the same provider ID and model name appear in both lists, the runtime keeps the
-full definition from `chat_models`. Qwen reasoning models receive the Qwen chat-template thinking
-format on that model only; other models sharing the provider keep their own response format.
+explicit. When the same endpoint identifier and model name appear in both lists, the runtime keeps
+the full definition from `chat_models`. Qwen reasoning models receive the Qwen chat-template
+thinking format on that model only; other models sharing the endpoint keep their own response
+format.
 
 YAML string values support shell-style environment variable references such
 as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be supplied
