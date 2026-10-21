@@ -886,3 +886,41 @@ def test_workflow_dispatch_reserves_whole_chip_while_single_task_stays_scoped(
             resources=() if workflow else ("mux:0",),
             exclusive=workflow,
         )
+
+
+def _patch_prefect_settings(
+    monkeypatch: pytest.MonkeyPatch, *, prefect_ui_url: str, prefect_port: int = 4200
+) -> None:
+    """Patch flow_service settings with the given Prefect UI URL and port."""
+    monkeypatch.setattr(
+        flow_service,
+        "get_settings",
+        lambda: SimpleNamespace(prefect_ui_url=prefect_ui_url, prefect_port=prefect_port),
+    )
+
+
+def test_build_flow_run_url_defaults_to_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An empty prefect_ui_url falls back to localhost with the Prefect port."""
+    _patch_prefect_settings(monkeypatch, prefect_ui_url="", prefect_port=4300)
+
+    assert flow_service._build_flow_run_url("run-1") == "http://localhost:4300/runs/flow-run/run-1"
+
+
+def test_build_flow_run_url_uses_configured_ui_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A configured prefect_ui_url is used as the base of the flow run URL."""
+    _patch_prefect_settings(monkeypatch, prefect_ui_url="https://prefect.example.com")
+
+    assert (
+        flow_service._build_flow_run_url("run-1")
+        == "https://prefect.example.com/runs/flow-run/run-1"
+    )
+
+
+def test_build_flow_run_url_trims_trailing_slash(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Whitespace and trailing slashes on prefect_ui_url are trimmed."""
+    _patch_prefect_settings(monkeypatch, prefect_ui_url=" https://prefect.example.com/ ")
+
+    assert (
+        flow_service._build_flow_run_url("run-1")
+        == "https://prefect.example.com/runs/flow-run/run-1"
+    )

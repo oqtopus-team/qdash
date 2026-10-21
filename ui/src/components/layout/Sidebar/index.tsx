@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   BookOpen,
@@ -27,10 +27,21 @@ import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { DARK_THEMES } from "@/constants/themes";
+import { resolvePrefectUrl } from "@/lib/prefectUrl";
 import { getNavigationSections } from "@/components/layout/navigation";
 import type { NavItem, NavSection } from "@/components/layout/navigation";
 
-const PREFECT_URL = process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
+/** No-op subscription; the page location does not change during the session. */
+const subscribeNoop = () => () => {};
+
+/** Resolves the Prefect UI URL from the browser location, with an SSR-safe fallback. */
+function usePrefectUrl(): string {
+  return useSyncExternalStore(
+    subscribeNoop,
+    () => resolvePrefectUrl(window.location),
+    () => resolvePrefectUrl(),
+  );
+}
 
 type ExternalNavItem = {
   href: string;
@@ -180,6 +191,7 @@ export function Sidebar() {
   const mobileNavRef = useRef<HTMLElement>(null);
   const { isOpen, isMobileOpen, toggleSidebar, setMobileSidebarOpen } = useSidebar();
   const { canEdit } = useProject();
+  const prefectUrl = usePrefectUrl();
   const { user, logout: authLogout } = useAuth();
   const { theme, setTheme } = useTheme();
   const { data: unreadNotificationsResponse } = useUnreadNotificationCount();
@@ -258,7 +270,7 @@ export function Sidebar() {
       icon: BookOpen,
     },
     {
-      href: `${PREFECT_URL}/dashboard`,
+      href: `${prefectUrl}/dashboard`,
       label: "Prefect",
       title: "Prefect",
       icon: Workflow,

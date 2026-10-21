@@ -92,6 +92,7 @@ services:
       - "${PREFECT_PORT:-4200}:4200"
     environment:
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - PREFECT_UI_API_URL=${PREFECT_UI_API_URL:-/api}
     depends_on:
       postgres:
         condition: service_healthy
@@ -280,7 +281,8 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_ENV: ${ENV}
         NEXT_PUBLIC_DEFAULT_THEME: ${NEXT_PUBLIC_DEFAULT_THEME:-light}
-        NEXT_PUBLIC_PREFECT_URL: ${NEXT_PUBLIC_PREFECT_URL}
+        NEXT_PUBLIC_PREFECT_URL: ${NEXT_PUBLIC_PREFECT_URL:-}
+        NEXT_PUBLIC_PREFECT_PORT: ${PREFECT_PORT:-4200}
         INTERNAL_API_URL: http://api:${API_PORT:-5715}
         NEXT_PUBLIC_COPILOT_ENABLED: ${NEXT_PUBLIC_COPILOT_ENABLED:-}
     restart: always

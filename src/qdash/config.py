@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     client_url: str = ""
     api_cors_origins: tuple[str, ...] = ()
     prefect_api_url: str
+    prefect_ui_url: str = ""
     slack_bot_token: str = ""
     slack_channel_id: str = ""
     slack_forum_notification: bool = False

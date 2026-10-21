@@ -64,6 +64,15 @@ def _to_deployment_service_path(file_path: Path) -> Path:
     return to_container_user_flow_path(file_path, runtime_user_flows_dir=USER_FLOWS_DIR)
 
 
+def _build_flow_run_url(flow_run_id: str) -> str:
+    """Build the browser-facing Prefect UI URL for a flow run."""
+    settings = get_settings()
+    base = settings.prefect_ui_url.strip().rstrip("/")
+    if not base:
+        base = f"http://localhost:{settings.prefect_port}"
+    return f"{base}/runs/flow-run/{flow_run_id}"
+
+
 TEMPLATES_DIR = resolve_workflow_templates_dir()
 TEMPLATES_METADATA_FILE = TEMPLATES_DIR / "templates.json"
 FLOW_HELPERS_DIR = resolve_workflow_service_dir()
@@ -426,9 +435,7 @@ class FlowService:
                 )
 
                 flow_run_id = str(flow_run.id)
-                flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
-                )
+                flow_run_url = _build_flow_run_url(flow_run_id)
 
                 logger.info(f"Flow run created: {flow_run_id}")
         except Exception as e:
@@ -565,9 +572,7 @@ class FlowService:
                 )
 
                 flow_run_id = str(flow_run.id)
-                flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
-                )
+                flow_run_url = _build_flow_run_url(flow_run_id)
 
                 logger.info(f"Single-task flow run created: {flow_run_id}")
         except Exception as e:
@@ -666,9 +671,7 @@ class FlowService:
                     parameters=parameters,
                 )
                 flow_run_id = str(flow_run.id)
-                flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
-                )
+                flow_run_url = _build_flow_run_url(flow_run_id)
                 logger.info(f"Pipeline flow run created: {flow_run_id}")
         except Exception as e:
             self._release_execution_lock(project_id, claimed_execution_id)
@@ -743,7 +746,7 @@ class FlowService:
         return ExecuteFlowResponse(
             execution_id=operation_id,
             flow_run_id=operation_id,
-            flow_run_url=f"http://localhost:{settings.prefect_port}/runs/flow-run/{operation_id}",
+            flow_run_url=_build_flow_run_url(operation_id),
             qdash_ui_url=f"http://localhost:{settings.ui_port}/",
             message=f"Agent candidate commit '{commit_id}' queued for backend application",
         )
