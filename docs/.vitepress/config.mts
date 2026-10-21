@@ -156,7 +156,6 @@ export default withMermaid(
                 { text: "Contracts", link: "/developer-guide/api/contracts" },
                 { text: "Code Structure", link: "/developer-guide/api/structure" },
                 { text: "Testing", link: "/developer-guide/api/testing" },
-                { text: "Endpoint Testing", link: "/developer-guide/api/endpoint-testing" },
               ],
             },
             {
