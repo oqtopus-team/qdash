@@ -65,14 +65,16 @@ flow returning to CR calibration must run `Configure` to restore the CR layout.
 `CheckAdaptiveEFChevron` deliberately ignores persisted anharmonicity when selecting its initial search
 frequency. If Qubex has an explicit `control_frequency_ef`, the task uses it. Otherwise it uses
 `18 / 19 * control_frequency`, matching Qubex's `E_J / E_C = 50` fallback when anharmonicity is
-unset. Qubit spectroscopy may still display an f12 estimate for diagnosis, but it does not publish
-that estimate as calibrated anharmonicity.
+unset. Its initial EF drive amplitude is `control_amplitude / sqrt(2)`, matching Qubex's default
+scaling from the calibrated GE control amplitude. Qubit spectroscopy may still display an f12
+estimate for diagnosis, but it does not publish that estimate as calibrated anharmonicity.
 
 `CheckAdaptiveFHChevron` requires the `ge-ef-fh` layout, a calibrated GE HPI pulse, and a calibrated EF pi
 pulse. It uses the configured `control_frequency_fh` as its initial search frequency when present.
 Otherwise it derives the initial frequency from the measured GE and EF transition frequencies
-without reading persisted anharmonicity. The task is available for explicit task lists but is not
-part of the `ef_calibration` template.
+without reading persisted anharmonicity. Its initial FH drive amplitude is
+`control_amplitude / sqrt(3)`, matching Qubex's default scaling. The task is available for explicit
+task lists but is not part of the `ef_calibration` template.
 
 The `ef_calibration` template keeps all EF tasks in one synchronized `CustomOneQubit` step. It
 starts from existing GE control and readout frequencies and readout amplitude, then runs

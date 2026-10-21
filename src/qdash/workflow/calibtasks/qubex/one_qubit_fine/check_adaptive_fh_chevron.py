@@ -33,7 +33,10 @@ class CheckAdaptiveFHChevron(QubexTask):
         "control_frequency_ef": InputParameterSpec.required_database(
             fallback_parameter_names=("ef_frequency",), unit="GHz"
         ),
-        "control_amplitude": InputParameterSpec.required_database(unit="a.u."),
+        "control_amplitude": InputParameterSpec.required_database(
+            unit="a.u.",
+            description="Calibrated GE amplitude used to derive the initial FH drive amplitude",
+        ),
         "hpi_amplitude": InputParameterSpec.required_database(unit="a.u."),
         "hpi_duration": InputParameterSpec.required_database(unit="ns"),
         "ef_pi_amplitude": InputParameterSpec.required_database(unit="a.u."),

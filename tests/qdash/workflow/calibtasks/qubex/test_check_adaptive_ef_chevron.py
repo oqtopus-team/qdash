@@ -24,6 +24,7 @@ def _task() -> CheckAdaptiveEFChevron:
     task = CheckAdaptiveEFChevron()
     for name, value in {
         "control_frequency": 5.001,
+        "control_amplitude": 0.12,
         "hpi_amplitude": 0.1,
         "hpi_duration": 32.0,
         "readout_frequency": 6.1,
@@ -55,7 +56,7 @@ def _result(frequency=4.72, ratio=8.5, figures=None) -> RunResult:
     )
 
 
-def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monkeypatch) -> None:
+def test_run_passes_ef_seed_sweeps_and_qubex_default_amplitude(monkeypatch) -> None:
     task = _task()
     exp = MagicMock()
     exp.get_qubit_label.return_value = "Q00"
@@ -82,13 +83,14 @@ def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monk
     kwargs = estimate.call_args.kwargs
     assert kwargs["targets"] == ["Q00"]
     assert kwargs["frequencies"]["Q00"] == pytest.approx(4.72)
-    assert kwargs["amplitudes"] == {"Q00": 0.0625}
+    assert kwargs["amplitudes"] == {"Q00": pytest.approx(0.12 / np.sqrt(2))}
     np.testing.assert_allclose(kwargs["final_detuning_range"], np.linspace(-0.05, 0.05, 41))
     assert list(kwargs["final_time_range"]) == list(range(0, 257, 8))
     assert kwargs["n_shots"] == 256
     assert kwargs["shot_interval"] == task.run_parameters["interval"].get_value()
     assert kwargs["plot"] is False and kwargs["save_image"] is False
     assert result.raw_result is estimate.return_value
+    exp.params.control_amplitude.__setitem__.assert_called_once_with("Q00", 0.12)
     exp.params.readout_amplitude.__setitem__.assert_called_once_with("Q00", 0.031)
     exp.modified_frequencies.assert_called_once_with({"Q00_ge": 5.001, "Q00_read": 6.1})
 

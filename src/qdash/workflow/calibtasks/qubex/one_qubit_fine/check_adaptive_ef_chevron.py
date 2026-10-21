@@ -28,7 +28,11 @@ from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
 class CheckAdaptiveEFChevron(QubexTask):
-    """Adaptively measure f_ef and alpha = f_ef - f_ge using Qubex GE pulses."""
+    """Adaptively measure f_ef and alpha = f_ef - f_ge using a stored Qubex GE pulse.
+
+    The recorded HPI inputs enforce the calibration prerequisite. Qubex resolves the actual
+    preparation waveform from the synchronized session when it constructs each sequence.
+    """
 
     name: str = "CheckAdaptiveEFChevron"
     task_type: str = "qubit"
@@ -36,11 +40,12 @@ class CheckAdaptiveEFChevron(QubexTask):
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("qubit_frequency",), unit="GHz"
         ),
+        "control_amplitude": InputParameterSpec.required_database(
+            unit="a.u.",
+            description="Calibrated GE amplitude used to derive the initial EF drive amplitude",
+        ),
         "hpi_amplitude": InputParameterSpec.required_database(unit="a.u."),
         "hpi_duration": InputParameterSpec.required_database(unit="ns"),
-        "ef_control_amplitude": InputParameterSpec.database_or_default(
-            default=0.0625, unit="a.u.", description="EF drive pulse amplitude"
-        ),
         "readout_amplitude": InputParameterSpec.required_database(unit="a.u."),
         "readout_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("resonator_frequency",), unit="GHz"
@@ -131,9 +136,9 @@ class CheckAdaptiveEFChevron(QubexTask):
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         require_ef_configuration(exp, label)
-        readout_amp_param = self.input_parameters["readout_amplitude"]
-        if readout_amp_param is not None:
-            exp.params.readout_amplitude[label] = readout_amp_param.value
+        control_amplitude = self._get_calibration_value("control_amplitude")
+        exp.params.control_amplitude[label] = control_amplitude
+        exp.params.readout_amplitude[label] = self._get_calibration_value("readout_amplitude")
         ge_frequency = self._get_calibration_value("control_frequency")
         configured_ef_frequency = exp.quantum_system.get_qubit(label).control_frequency_ef_value
         if configured_ef_frequency is not None and math.isfinite(configured_ef_frequency):
@@ -152,7 +157,7 @@ class CheckAdaptiveEFChevron(QubexTask):
                 exp=exp,
                 targets=[label],
                 frequencies={label: ef_frequency},
-                amplitudes={label: self._get_calibration_value("ef_control_amplitude")},
+                amplitudes={label: control_amplitude / math.sqrt(2)},
                 final_detuning_range=self.run_parameters["detuning_range"].get_value(),
                 final_time_range=self.run_parameters["time_range"].get_value(),
                 n_shots=self.run_parameters["shots"].get_value(),

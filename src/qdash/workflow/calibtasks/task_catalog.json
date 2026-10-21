@@ -588,9 +588,16 @@
       },
       {
         "class_name": "CheckAdaptiveEFChevron",
-        "description": "Adaptively measure f_ef and alpha = f_ef - f_ge using Qubex GE pulses.",
+        "description": "Adaptively measure f_ef and alpha = f_ef - f_ge using a stored Qubex GE pulse.\n\nThe recorded HPI inputs enforce the calibration prerequisite. Qubex resolves the actual\npreparation waveform from the synchronized session when it constructs each sequence.",
         "file_path": "one_qubit_fine/check_adaptive_ef_chevron.py",
         "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "description": "Calibrated GE amplitude used to derive the initial EF drive amplitude",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
           "control_frequency": {
             "default_value": null,
             "fallback_parameter_names": [
@@ -598,13 +605,6 @@
             ],
             "resolution": "database_required",
             "unit": "GHz",
-            "user_override": "allowed"
-          },
-          "ef_control_amplitude": {
-            "default_value": 0.0625,
-            "description": "EF drive pulse amplitude",
-            "resolution": "database_or_default",
-            "unit": "a.u.",
             "user_override": "allowed"
           },
           "hpi_amplitude": {
@@ -691,6 +691,7 @@
         "input_parameters": {
           "control_amplitude": {
             "default_value": null,
+            "description": "Calibrated GE amplitude used to derive the initial FH drive amplitude",
             "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
