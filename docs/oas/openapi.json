@@ -6327,7 +6327,7 @@
           "task"
         ],
         "summary": "Get raw markdown for a task knowledge entry",
-        "description": "Get raw markdown content for a task knowledge entry.\n\nReturns the index.md content with image references replaced\nby inline base64 data URIs for self-contained rendering.",
+        "description": "Get raw markdown content for a task knowledge entry.\n\nReturns the task.md content with image references replaced\nby inline base64 data URIs for self-contained rendering.",
         "operationId": "getTaskKnowledgeMarkdown",
         "security": [
           {
@@ -6368,7 +6368,7 @@
           "task"
         ],
         "summary": "Download a task's knowledge directory as a zip",
-        "description": "The task's ``index.md``, examples and figures, zipped under ``<task_name>/``.\n\nThe zip is the starting point of a knowledge draft: edit it locally and\nupload it from the evaluation dialog. Raises 404 when the task has no\nknowledge directory.",
+        "description": "The task's ``task.md``, examples and figures, zipped under ``<task_name>/``.\n\nThe zip is the starting point of a knowledge draft: edit it locally and\nupload it from the evaluation dialog. Raises 404 when the task has no\nknowledge directory.",
         "operationId": "downloadTaskKnowledgeArchive",
         "security": [
           {
@@ -8124,6 +8124,134 @@
         }
       }
     },
+    "/evaluations/runs/{run_id}/retry": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Retry unfinished calibration evaluations",
+        "description": "Reset failed, interrupted or cancelled items and execute them again.",
+        "operationId": "retryEvaluationRun",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetryEvaluationRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/runs/{run_id}/cancel": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Cancel a calibration evaluation run",
+        "description": "Cancel evaluations in this run that have not completed.",
+        "operationId": "cancelEvaluationRun",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationRunSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/evaluations": {
       "get": {
         "tags": [
@@ -8250,6 +8378,72 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/{evaluation_id}/figures/{sha256}": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get a snapshotted evaluation figure",
+        "description": "The exact image bytes supplied to the model for this evaluation.",
+        "operationId": "getEvaluationFigure",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "evaluation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evaluation Id"
+            }
+          },
+          {
+            "name": "sha256",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sha256"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -19510,6 +19704,30 @@
             "title": "Knowledge Sha256",
             "description": "SHA-256 of the host-supplied reference text"
           },
+          "reference_requested": {
+            "type": "boolean",
+            "title": "Reference Requested",
+            "description": "Whether the host attempted to load a task reference",
+            "default": true
+          },
+          "reference_used": {
+            "type": "boolean",
+            "title": "Reference Used",
+            "description": "Whether a task reference was actually included in the prompt",
+            "default": false
+          },
+          "examples_requested": {
+            "type": "boolean",
+            "title": "Examples Requested",
+            "description": "Whether in-context examples were requested",
+            "default": false
+          },
+          "examples_used": {
+            "type": "integer",
+            "title": "Examples Used",
+            "description": "Number of in-context examples actually included in the prompt",
+            "default": 0
+          },
           "figures": {
             "items": {
               "$ref": "#/components/schemas/EvaluationFigureModel"
@@ -19580,7 +19798,9 @@
               "pending",
               "running",
               "completed",
-              "failed"
+              "failed",
+              "interrupted",
+              "cancelled"
             ],
             "title": "Status"
           },
@@ -19673,6 +19893,22 @@
                 "type": "null"
               }
             ]
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationVerdictModel"
+            },
+            "type": "array",
+            "title": "Verdicts",
+            "description": "Current verdict from each reviewer"
+          },
+          "verdict_history": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationVerdictModel"
+            },
+            "type": "array",
+            "title": "Verdict History",
+            "description": "Immutable verdict changes"
           }
         },
         "type": "object",
@@ -20133,7 +20369,9 @@
             "type": "string",
             "enum": [
               "running",
-              "completed"
+              "completed",
+              "interrupted",
+              "cancelled"
             ],
             "title": "Status"
           },
@@ -20148,6 +20386,18 @@
           "failed_count": {
             "type": "integer",
             "title": "Failed Count"
+          },
+          "interrupted_count": {
+            "type": "integer",
+            "title": "Interrupted Count",
+            "description": "Evaluations interrupted by worker loss",
+            "default": 0
+          },
+          "cancelled_count": {
+            "type": "integer",
+            "title": "Cancelled Count",
+            "description": "Evaluations cancelled by a user",
+            "default": 0
           },
           "pending_count": {
             "type": "integer",
@@ -20196,6 +20446,18 @@
             "title": "Disagree Count",
             "description": "Evaluations a person disagreed with"
           },
+          "reference_used_count": {
+            "type": "integer",
+            "title": "Reference Used Count",
+            "description": "Completed evaluations that actually used a task reference",
+            "default": 0
+          },
+          "examples_used_count": {
+            "type": "integer",
+            "title": "Examples Used Count",
+            "description": "Completed evaluations that actually used in-context examples",
+            "default": 0
+          },
           "model": {
             "anyOf": [
               {
@@ -20207,6 +20469,14 @@
             ],
             "title": "Model"
           },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models",
+            "description": "All evaluation models represented in the run"
+          },
           "evaluator": {
             "anyOf": [
               {
@@ -20216,6 +20486,14 @@
                 "type": "null"
               }
             ]
+          },
+          "evaluators": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluatorModel"
+            },
+            "type": "array",
+            "title": "Evaluators",
+            "description": "All evaluator builds represented in the run"
           }
         },
         "type": "object",
@@ -20268,6 +20546,21 @@
             ],
             "title": "Note",
             "description": "Why, in the person's words"
+          },
+          "issues": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "parameter_extraction",
+                "diagnosis",
+                "recommendation",
+                "insufficient_evidence",
+                "other"
+              ]
+            },
+            "type": "array",
+            "title": "Issues",
+            "description": "Parts of the evaluation the reviewer disputed"
           },
           "username": {
             "type": "string",
@@ -22449,7 +22742,7 @@
           "figure_count": {
             "type": "integer",
             "title": "Figure Count",
-            "description": "Figures of index.md and the examples"
+            "description": "Figures of task.md and the examples"
           }
         },
         "type": "object",
@@ -26779,6 +27072,24 @@
         "title": "ResolvedPipelineTargets",
         "description": "The starting targets after chip lookup."
       },
+      "RetryEvaluationRunResponse": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/EvaluationRunSummary"
+          },
+          "retried": {
+            "type": "integer",
+            "title": "Retried"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run",
+          "retried"
+        ],
+        "title": "RetryEvaluationRunResponse",
+        "description": "A run reset for another attempt."
+      },
       "SaveFileRequest": {
         "properties": {
           "path": {
@@ -27269,6 +27580,21 @@
             ],
             "title": "Note",
             "description": "Why"
+          },
+          "issues": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "parameter_extraction",
+                "diagnosis",
+                "recommendation",
+                "insufficient_evidence",
+                "other"
+              ]
+            },
+            "type": "array",
+            "title": "Issues",
+            "description": "Parts of the evaluation that are wrong"
           }
         },
         "type": "object",

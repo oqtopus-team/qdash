@@ -139,7 +139,7 @@ describe("EvaluationComparePageContent", () => {
     expect(screen.getByText("Compare runs · CheckT1 · 64Qv1")).toBeTruthy();
     const examples = screen.getByTestId("setting-examples");
     expect(within(examples).getByText("Zero-shot")).toBeTruthy();
-    expect(within(examples).getByText("In-context")).toBeTruthy();
+    expect(within(examples).getByText("In-context requested · 0/2 used")).toBeTruthy();
     expect(examples.className).toContain("bg-warning");
     expect(screen.getByTestId("setting-chip").className).not.toContain("bg-warning");
     // The reference each run's records carry is a setting too; here it was edited in between.
@@ -151,7 +151,7 @@ describe("EvaluationComparePageContent", () => {
 
     const table = screen.getByTestId("compare-table");
     expect(within(table).getByText("same")).toBeTruthy();
-    expect(within(table).getByText("differs")).toBeTruthy();
+    expect(within(table).getByText("decision differs")).toBeTruthy();
     expect(within(table).getAllByText("fit unreliable")).toHaveLength(1);
 
     // Only differences hides the row that agrees.

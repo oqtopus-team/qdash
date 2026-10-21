@@ -127,6 +127,7 @@ describe("EvaluationCard", () => {
       planner: undefined,
     });
     expect(screen.getByText("prose")).toBeTruthy();
+    expect(screen.getByLabelText("incomplete evaluation")).toBeTruthy();
     expect(screen.getByText("fallback model")).toBeTruthy();
     expect(screen.getByText("The oscillation decays as expected.")).toBeTruthy();
     expect(screen.queryByText("What Copilot did")).toBeNull();
@@ -221,7 +222,7 @@ describe("EvaluationCard", () => {
     renderCard();
     fireEvent.click(screen.getByRole("button", { name: /Disagree/ }));
     expect(mutate).toHaveBeenCalledWith(
-      { evaluationId: "ev_1", data: { agree: false, note: null } },
+      { evaluationId: "ev_1", data: { agree: false, note: null, issues: [] } },
       expect.anything(),
     );
 
@@ -237,7 +238,7 @@ describe("EvaluationCard", () => {
     expect(screen.getByText(/“Tail ignored”/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Disagree/ }));
     expect(mutate).toHaveBeenLastCalledWith(
-      { evaluationId: "ev_1", data: { agree: null, note: null } },
+      { evaluationId: "ev_1", data: { agree: null, note: null, issues: [] } },
       expect.anything(),
     );
   });

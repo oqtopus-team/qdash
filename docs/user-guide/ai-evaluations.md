@@ -41,6 +41,11 @@ Choose the evaluation settings before confirming:
 Review the request summary, then confirm. QDash records the selected targets as one evaluation
 run.
 
+Select **Cancel** on an active run to stop its unfinished evaluations. If a worker stops during
+a run, QDash marks evaluations that remain unfinished for 30 minutes as interrupted. Select
+**Retry unfinished** to run failed, interrupted, or cancelled evaluations again without repeating
+the completed ones.
+
 ## Try a Knowledge Change Before Proposing It
 
 Evaluate against a knowledge draft to see how an edited reference changes the judgments. The
@@ -76,11 +81,14 @@ Open **AI Evaluations** and select a run. Each evaluated target shows the model'
 plot, outcome, significance, fit quality, extracted parameters, and status.
 
 An evaluation is complete only when every required answer is present. A missing answer leaves it
-incomplete and excludes it from completed totals.
+incomplete and excludes it from the run's **Complete** count.
 
 Expand **Prompt sent to the model** to inspect the exact text and figures used for one target. The
 run-level **Prompt** panel summarizes the reference version, example count, and prompt consistency
-across the run.
+across the run. QDash distinguishes requested inputs from inputs actually used, so a missing
+reference or an **In-context** request that found no examples is visible on the evaluation. New
+evaluations keep immutable copies of input figures up to 10 MB each. Older records and larger
+figures fall back to the current result and knowledge figures and warn when their hashes changed.
 
 Each evaluation shows its largest prompt in tokens, images included, and how much of the
 model's context window it filled with the answer; **Tokens** in the **Prompt** panel shows the
@@ -90,9 +98,12 @@ with a larger window.
 
 ## Record Agreement
 
-Select **Agree** or **Disagree** on each evaluation after checking the underlying result. Add a
-note when the verdict needs context. The run's agreement rate reflects these human decisions, so
-do not mark agreement based only on whether the model reported success.
+Select **Agree** or **Disagree** on each evaluation after checking the underlying result. For a
+disagreement, classify whether the problem is parameter extraction, diagnosis, recommendation,
+insufficient evidence, or another issue. Add a note when the verdict needs context. QDash keeps
+each reviewer's current verdict and the review history. The run's agreement rate uses the most
+recent current verdict on each evaluation, so do not mark agreement based only on whether the
+model reported success.
 
 ## Compare Two Runs
 
@@ -102,7 +113,9 @@ Use a comparison to measure the effect of a prompt, model, example, or result ch
    open one run and select **Compare with…**.
 2. Review the highlighted setting differences and run totals.
 3. Enable **Only differences** to focus on missing or conflicting judgments.
-4. Expand a target to compare both diagnoses and the figure.
+4. Expand a target to compare both diagnoses and the figure. **Decision differs** means the
+   success, status, fit assessment, or outcome changed. **Content differs** means another diagnosis
+   field, such as an extracted parameter or recommendation, changed.
 5. Open **Prompt A vs B** when the prompt change may explain the outcome.
 
 A row marked as different results means the two runs judged different task results for that

@@ -29,6 +29,14 @@ export interface EvaluationInputModel {
   knowledge_chars?: EvaluationInputModelKnowledgeChars;
   /** SHA-256 of the host-supplied reference text */
   knowledge_sha256?: EvaluationInputModelKnowledgeSha256;
+  /** Whether the host attempted to load a task reference */
+  reference_requested?: boolean;
+  /** Whether a task reference was actually included in the prompt */
+  reference_used?: boolean;
+  /** Whether in-context examples were requested */
+  examples_requested?: boolean;
+  /** Number of in-context examples actually included in the prompt */
+  examples_used?: number;
   figures?: EvaluationFigureModel[];
   /** Labeled examples shown before the figure; empty for a zero-shot evaluation */
   examples?: EvaluationExampleModel[];

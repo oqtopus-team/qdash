@@ -107,6 +107,8 @@ export interface FigureRecord {
   sha256: string;
   mime_type: string;
   bytes: number;
+  /** Exact bytes for durable, content-addressed storage by QDash. */
+  data?: string;
 }
 
 export interface EvaluateResult {
@@ -236,7 +238,12 @@ function sha256(bytes: Buffer | string): string {
 /** Hash and size of one base64-encoded figure. */
 export function figureRecord(image: { data: string; mimeType: string }): FigureRecord {
   const bytes = Buffer.from(image.data, "base64");
-  return { sha256: sha256(bytes), mime_type: image.mimeType, bytes: bytes.length };
+  return {
+    sha256: sha256(bytes),
+    mime_type: image.mimeType,
+    bytes: bytes.length,
+    data: image.data,
+  };
 }
 
 function stringField(value: unknown, key: string): string | undefined {

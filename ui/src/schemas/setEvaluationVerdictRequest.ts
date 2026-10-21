@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { SetEvaluationVerdictRequestAgree } from './setEvaluationVerdictRequestAgree';
+import type { SetEvaluationVerdictRequestIssuesItem } from './setEvaluationVerdictRequestIssuesItem';
 import type { SetEvaluationVerdictRequestNote } from './setEvaluationVerdictRequestNote';
 
 /**
@@ -16,4 +17,6 @@ export interface SetEvaluationVerdictRequest {
   agree: SetEvaluationVerdictRequestAgree;
   /** Why */
   note?: SetEvaluationVerdictRequestNote;
+  /** Parts of the evaluation that are wrong */
+  issues?: SetEvaluationVerdictRequestIssuesItem[];
 }

@@ -26,7 +26,6 @@ import type { EvaluationItem, EvaluationRunSummary } from "@/schemas";
 import { EvaluationCard } from "./EvaluationCard";
 import {
   type CompareRow,
-  type RowOutcome,
   type RunSide,
   joinEvaluations,
   runSettings,
@@ -91,6 +90,10 @@ function RunHeadline({ side, run }: { side: Side; run: EvaluationRunSummary }) {
           {run.completed_count}/{run.total} done
         </span>
         {run.failed_count > 0 && <span className="text-error">{run.failed_count} failed</span>}
+        {(run.interrupted_count ?? 0) > 0 && (
+          <span className="text-warning">{run.interrupted_count} interrupted</span>
+        )}
+        {(run.cancelled_count ?? 0) > 0 && <span>{run.cancelled_count} cancelled</span>}
         {runTimingLabel(run) && <span>{runTimingLabel(run)}</span>}
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
@@ -206,10 +209,49 @@ function JudgementCells({ item }: { item: EvaluationItem | null }) {
   );
 }
 
-function OutcomeBadge({ outcome }: { outcome: RowOutcome }) {
+function OutcomeBadge({ outcome, difference }: Pick<CompareRow, "outcome" | "difference">) {
   if (outcome === "same") return <span className="badge badge-sm badge-ghost">same</span>;
-  if (outcome === "differs") return <span className="badge badge-sm badge-warning">differs</span>;
+  if (outcome === "differs")
+    return (
+      <span className="badge badge-sm badge-warning">
+        {difference === "decision" ? "decision differs" : "content differs"}
+      </span>
+    );
   return <span className="text-xs text-base-content/40">n/a</span>;
+}
+
+function DiagnosisDiff({ row }: { row: CompareRow }) {
+  const [open, setOpen] = useState(false);
+  const diagnosisA = row.a ? diagnosisOf(row.a) : null;
+  const diagnosisB = row.b ? diagnosisOf(row.b) : null;
+  if (!diagnosisA || !diagnosisB) return null;
+  return (
+    <details
+      className="text-sm"
+      onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}
+    >
+      <summary className="cursor-pointer font-medium text-primary">
+        Diagnosis A vs B
+        <span className="ml-2 text-xs font-normal text-base-content/60">
+          {row.outcome === "same"
+            ? "identical"
+            : row.difference === "decision"
+              ? "decision differs"
+              : "supporting content differs"}
+        </span>
+      </summary>
+      {open && (
+        <div className="mt-2">
+          <PierreDiffViewer
+            filename="diagnosis.json"
+            oldContent={`${JSON.stringify(diagnosisA, null, 2)}\n`}
+            newContent={`${JSON.stringify(diagnosisB, null, 2)}\n`}
+            layout="split"
+          />
+        </div>
+      )}
+    </details>
+  );
 }
 
 /**
@@ -279,6 +321,7 @@ function ExpandedRow({ row }: { row: CompareRow }) {
   return (
     <tr className="bg-base-200/30">
       <td colSpan={9} className="space-y-4 p-3">
+        <DiagnosisDiff row={row} />
         <PromptDiff row={row} />
         <div className="grid gap-4 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
           <div className="rounded-lg border border-base-300 bg-base-200/40 p-3">
@@ -403,8 +446,8 @@ export function EvaluationComparePageContent() {
             {dataA && ` · ${dataA.run.task_name} · ${dataA.run.chip_id}`}
           </h1>
           <p className="mt-1 text-xs text-base-content/50">
-            The same results judged twice, entity by entity. Outcome compares the status, fit
-            assessment, outcome and success where both sides answered.
+            The same results judged twice, entity by entity. Comparison includes the complete
+            structured diagnosis and distinguishes decision changes from supporting-content changes.
           </p>
         </div>
       </div>
@@ -574,7 +617,7 @@ export function EvaluationComparePageContent() {
                         <JudgementCells item={row.a} />
                         <JudgementCells item={row.b} />
                         <td className="border-l border-base-300">
-                          <OutcomeBadge outcome={row.outcome} />
+                          <OutcomeBadge outcome={row.outcome} difference={row.difference} />
                         </td>
                       </tr>
                       {open && <ExpandedRow row={row} />}

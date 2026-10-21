@@ -5,6 +5,7 @@ import type { EvaluationItem, EvaluationRunSummary } from "@/schemas";
 import {
   compareHref,
   compareQids,
+  diagnosisDifference,
   joinEvaluations,
   rowOutcome,
   runSettings,
@@ -67,7 +68,7 @@ describe("evaluationCompare", () => {
     expect(["0-10", "0-2"].sort(compareQids)).toEqual(["0-2", "0-10"]);
   });
 
-  it("compares status, fit, outcome and success only when both sides answered", () => {
+  it("compares the full diagnosis and classifies decision and content changes", () => {
     const answered = (
       status: string,
       fit: string,
@@ -108,6 +109,36 @@ describe("evaluationCompare", () => {
       "differs",
     );
     expect(rowOutcome(item("Q1", { success: true }), item("Q1", { success: true }))).toBe("same");
+    expect(
+      rowOutcome(
+        item("Q1", {
+          ...answered("SUCCESS", "reliable", "expected", true),
+          parameter_extraction: { t1: 10 },
+        }),
+        item("Q1", {
+          ...answered("SUCCESS", "reliable", "expected", true),
+          parameter_extraction: { t1: 11 },
+        }),
+      ),
+    ).toBe("differs");
+    expect(
+      diagnosisDifference(
+        item("Q1", {
+          ...answered("SUCCESS", "reliable", "expected", true),
+          parameter_extraction: { t1: 10 },
+        }),
+        item("Q1", {
+          ...answered("SUCCESS", "reliable", "expected", true),
+          parameter_extraction: { t1: 11 },
+        }),
+      ),
+    ).toBe("content");
+    expect(
+      diagnosisDifference(
+        good,
+        item("Q1", answered("LOW_CONTRAST", "reliable", "expected", false)),
+      ),
+    ).toBe("decision");
   });
 
   it("joins the two runs by entity and keeps whether they judged the same result", () => {
@@ -149,7 +180,11 @@ describe("evaluationCompare", () => {
     );
     const byKey = Object.fromEntries(settings.map((setting) => [setting.key, setting]));
     expect(byKey.chip).toMatchObject({ a: "64Qv1", b: "64Qv1", differs: false });
-    expect(byKey.examples).toMatchObject({ a: "Zero-shot", b: "In-context", differs: true });
+    expect(byKey.examples).toMatchObject({
+      a: "Zero-shot",
+      b: "In-context requested · 0/2 used",
+      differs: true,
+    });
     expect(byKey.mode).toMatchObject({ a: "Fixed prompt", b: "Via Copilot", differs: true });
     expect(byKey.planner).toMatchObject({
       a: "-",

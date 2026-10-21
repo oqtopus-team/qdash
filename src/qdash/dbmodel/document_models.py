@@ -18,6 +18,7 @@ from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 from qdash.dbmodel.cryostat import CryostatDocument
 from qdash.dbmodel.evaluation import EvaluationDocument
+from qdash.dbmodel.evaluation_asset import EvaluationAssetDocument
 from qdash.dbmodel.evaluation_run import EvaluationRunDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
@@ -84,6 +85,7 @@ def document_models() -> list[Any]:
         TargetNoteDocument,
         EvaluationRunDocument,
         EvaluationDocument,
+        EvaluationAssetDocument,
         NoteEventDocument,
         NotificationDocument,
         CryostatDocument,

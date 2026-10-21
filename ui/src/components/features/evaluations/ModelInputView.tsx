@@ -107,11 +107,23 @@ interface LoadedFigure {
   matches: boolean | null;
 }
 
-function useSlotFigure(slot: FigureSlot, taskName: string) {
+function useSlotFigure(slot: FigureSlot, taskName: string, evaluationId: string) {
+  const snapshot = useQuery({
+    queryKey: ["evaluation-figure-snapshot", evaluationId, slot.sha256],
+    queryFn: async (): Promise<ArrayBuffer> => {
+      const response = await AXIOS_INSTANCE.get<ArrayBuffer>(
+        `/evaluations/${encodeURIComponent(evaluationId)}/figures/${encodeURIComponent(slot.sha256)}`,
+        { responseType: "arraybuffer" },
+      );
+      return response.data;
+    },
+    retry: false,
+    staleTime: Infinity,
+  });
   const knowledge = useQuery({
     queryKey: getGetTaskKnowledgeQueryKey(taskName),
     queryFn: () => getTaskKnowledge(taskName).then((response) => response.data),
-    enabled: slot.kind === "example" && !!taskName,
+    enabled: snapshot.isError && slot.kind === "example" && !!taskName,
     staleTime: 60_000,
   });
   const query = useQuery({
@@ -123,7 +135,7 @@ function useSlotFigure(slot: FigureSlot, taskName: string) {
       });
       return response.data;
     },
-    enabled: slot.kind === "query" && !!slot.path,
+    enabled: snapshot.isError && slot.kind === "query" && !!slot.path,
     staleTime: Infinity,
   });
   const loaded = useQuery({
@@ -132,10 +144,15 @@ function useSlotFigure(slot: FigureSlot, taskName: string) {
       slot.kind,
       slot.path,
       slot.sha256,
+      !!snapshot.data,
       !!knowledge.data,
       !!query.data,
     ],
     queryFn: async (): Promise<LoadedFigure | null> => {
+      if (snapshot.data) {
+        const blob = new Blob([snapshot.data], { type: slot.mimeType });
+        return { src: URL.createObjectURL(blob), matches: true };
+      }
       if (slot.kind === "example") {
         const figure = knowledge.data?.examples
           ?.flatMap((example) => example.figures ?? [])
@@ -156,11 +173,15 @@ function useSlotFigure(slot: FigureSlot, taskName: string) {
       };
     },
     enabled:
-      (slot.kind === "example" && !!knowledge.data) || (slot.kind === "query" && !!query.data),
+      !!snapshot.data ||
+      (snapshot.isError && slot.kind === "example" && !!knowledge.data) ||
+      (snapshot.isError && slot.kind === "query" && !!query.data),
     staleTime: Infinity,
   });
   const pending =
-    (slot.kind === "example" ? knowledge.isLoading : query.isLoading) || loaded.isLoading;
+    snapshot.isLoading ||
+    (snapshot.isError && (slot.kind === "example" ? knowledge.isLoading : query.isLoading)) ||
+    loaded.isLoading;
   return { figure: loaded.data ?? null, pending };
 }
 
@@ -171,7 +192,15 @@ function slotCaption(slot: FigureSlot): string {
   return slot.index === 0 ? "Figure to judge" : `Figure to judge ${slot.index + 1}`;
 }
 
-function FigureSlotView({ slot, taskName }: { slot: FigureSlot | null; taskName: string }) {
+function FigureSlotView({
+  slot,
+  taskName,
+  evaluationId,
+}: {
+  slot: FigureSlot | null;
+  taskName: string;
+  evaluationId: string;
+}) {
   if (!slot) {
     return (
       <div className="rounded-lg border border-dashed border-base-300 px-3 py-4 text-center text-xs text-base-content/50">
@@ -179,11 +208,19 @@ function FigureSlotView({ slot, taskName }: { slot: FigureSlot | null; taskName:
       </div>
     );
   }
-  return <KnownFigureSlot slot={slot} taskName={taskName} />;
+  return <KnownFigureSlot slot={slot} taskName={taskName} evaluationId={evaluationId} />;
 }
 
-function KnownFigureSlot({ slot, taskName }: { slot: FigureSlot; taskName: string }) {
-  const { figure, pending } = useSlotFigure(slot, taskName);
+function KnownFigureSlot({
+  slot,
+  taskName,
+  evaluationId,
+}: {
+  slot: FigureSlot;
+  taskName: string;
+  evaluationId: string;
+}) {
+  const { figure, pending } = useSlotFigure(slot, taskName, evaluationId);
   return (
     <figure className="rounded-lg border border-base-300 bg-base-100 p-2">
       <div className="flex h-48 items-center justify-center overflow-hidden rounded bg-white p-1">
@@ -225,10 +262,12 @@ export function ModelInputView({
   input,
   taskName,
   figurePaths,
+  evaluationId,
 }: {
   input: EvaluationInputModel;
   taskName: string;
   figurePaths: readonly string[];
+  evaluationId: string;
 }) {
   const parts = modelInputParts(input, figurePaths);
   return (
@@ -256,7 +295,12 @@ export function ModelInputView({
               {part.text}
             </pre>
           ) : (
-            <FigureSlotView key={index} slot={part.slot} taskName={taskName} />
+            <FigureSlotView
+              key={index}
+              slot={part.slot}
+              taskName={taskName}
+              evaluationId={evaluationId}
+            />
           ),
         )}
       </section>

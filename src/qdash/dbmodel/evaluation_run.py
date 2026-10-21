@@ -53,6 +53,9 @@ class EvaluationRunDocument(Document):
     requested_by: str = Field(..., description="Username that requested the run")
     requested_at: datetime = Field(default_factory=now)
     completed_at: datetime | None = Field(default=None)
+    heartbeat_at: datetime | None = Field(
+        default=None, description="Last proof that an API worker owns this run"
+    )
     status: EvaluationRunStatus = Field(default="running")
     total: int = Field(default=0, description="Evaluations in the run")
     completed_count: int = Field(default=0)

@@ -437,7 +437,7 @@ export function useListTaskKnowledge<TData = Awaited<ReturnType<typeof listTaskK
 /**
  * Get raw markdown content for a task knowledge entry.
  *
- * Returns the index.md content with image references replaced
+ * Returns the task.md content with image references replaced
  * by inline base64 data URIs for self-contained rendering.
  * @summary Get raw markdown for a task knowledge entry
  */
@@ -531,7 +531,7 @@ export function useGetTaskKnowledgeMarkdown<TData = Awaited<ReturnType<typeof ge
 
 
 /**
- * The task's ``index.md``, examples and figures, zipped under ``<task_name>/``.
+ * The task's ``task.md``, examples and figures, zipped under ``<task_name>/``.
  *
  * The zip is the starting point of a knowledge draft: edit it locally and
  * upload it from the evaluation dialog. Raises 404 when the task has no
