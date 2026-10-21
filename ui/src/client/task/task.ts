@@ -531,11 +531,110 @@ export function useGetTaskKnowledgeMarkdown<TData = Awaited<ReturnType<typeof ge
 
 
 /**
+ * The task's ``index.md``, examples and figures, zipped under ``<task_name>/``.
+ *
+ * The zip is the starting point of a knowledge draft: edit it locally and
+ * upload it from the evaluation dialog. Raises 404 when the task has no
+ * knowledge directory.
+ * @summary Download a task's knowledge directory as a zip
+ */
+export const downloadTaskKnowledgeArchive = (
+    taskName: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<Blob>(
+      {url: `/tasks/${taskName}/knowledge/archive`, method: 'GET',
+        responseType: 'blob', signal
+    },
+      options);
+    }
+
+
+
+
+export const getDownloadTaskKnowledgeArchiveQueryKey = (taskName: string,) => {
+    return [
+    `/tasks/${taskName}/knowledge/archive`
+    ] as const;
+    }
+
+
+export const getDownloadTaskKnowledgeArchiveQueryOptions = <TData = Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>, TError = HTTPValidationError>(taskName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadTaskKnowledgeArchiveQueryKey(taskName);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>> = ({ signal }) => downloadTaskKnowledgeArchive(taskName, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: taskName !== null && taskName !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type DownloadTaskKnowledgeArchiveQueryResult = NonNullable<Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>>
+export type DownloadTaskKnowledgeArchiveQueryError = HTTPValidationError
+
+
+export function useDownloadTaskKnowledgeArchive<TData = Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>, TError = HTTPValidationError>(
+ taskName: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>,
+          TError,
+          Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDownloadTaskKnowledgeArchive<TData = Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>, TError = HTTPValidationError>(
+ taskName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>,
+          TError,
+          Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useDownloadTaskKnowledgeArchive<TData = Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>, TError = HTTPValidationError>(
+ taskName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Download a task's knowledge directory as a zip
+ */
+
+export function useDownloadTaskKnowledgeArchive<TData = Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>, TError = HTTPValidationError>(
+ taskName: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadTaskKnowledgeArchive>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getDownloadTaskKnowledgeArchiveQueryOptions(taskName,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * The prompts the evaluation model would receive for a task.
  *
  * The Agent Runtime builds them the way a direct evaluation does, from the
- * task's reference in Knowledge (and its labeled examples when asked), as
- * the requesting user, without a figure or a model call.
+ * task's reference in Knowledge, or from an uploaded draft, and its labeled
+ * examples when asked, as the requesting user, without a figure or a model
+ * call.
  * @summary Preview the prompts an AI evaluation of a task would send
  */
 export const getTaskEvaluationPrompts = (

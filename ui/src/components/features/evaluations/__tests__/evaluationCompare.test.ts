@@ -169,6 +169,21 @@ describe("evaluationCompare", () => {
     expect(byKey.system_prompt).toMatchObject({ a: "-", b: "-", differs: false });
   });
 
+  it("flags a run against a knowledge draft, and two drafts that differ", () => {
+    const draft = (id: string, name: string) => ({
+      run: { ...run, knowledge_draft_id: id, knowledge_draft_name: name },
+    });
+    const shared = runSettings({ run }, draft("a".repeat(64), "rabi.zip"));
+    const knowledge = shared.find((setting) => setting.key === "knowledge");
+    expect(knowledge).toMatchObject({ a: "Shared", b: "Draft rabi.zip", differs: true });
+    // Same file name, different contents: still a different draft.
+    const renamed = runSettings(
+      draft("a".repeat(64), "rabi.zip"),
+      draft("b".repeat(64), "rabi.zip"),
+    );
+    expect(renamed.find((setting) => setting.key === "knowledge")?.differs).toBe(true);
+  });
+
   it("flags different prompts and references even when their labels match", () => {
     const withInput = (system_prompt: string, knowledge_sha256: string) => [
       item("Q1", null, {

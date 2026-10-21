@@ -20,7 +20,7 @@ import os
 import re
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -262,6 +262,9 @@ class TaskKnowledge(BaseModel):
     )
     examples: list[KnowledgeExample] = Field(default_factory=list)
 
+    # A draft's figures live in its own directory, not the shared repository.
+    _task_dir: Any = PrivateAttr(default=None)
+
     @model_validator(mode="before")
     @classmethod
     def _accept_previous_format(cls, data: Any) -> Any:
@@ -309,7 +312,9 @@ class TaskKnowledge(BaseModel):
     # --- figures on disk ---
 
     def task_dir(self) -> Path | None:
-        """The task's directory in the cloned knowledge repository, if present."""
+        """The task's directory: a draft's own, else the cloned knowledge repository's."""
+        if self._task_dir is not None:
+            return self._task_dir if self._task_dir.is_dir() else None
         repo_dir = _resolve_repo_dir()
         if repo_dir is None or not self.category:
             return None
@@ -398,9 +403,8 @@ def _build_registry(json_path: Path) -> dict[str, TaskKnowledge]:
 
 
 # The registry follows the JSON file on disk: it is rebuilt whenever the file's
-# identity (path, mtime, size) changes, so a save through the knowledge editor,
-# a pull, or ``task knowledge-pull`` on the host reaches every API worker
-# without a restart.
+# identity (path, mtime, size) changes, so ``task knowledge-pull`` on the host
+# reaches every API worker without a restart.
 _REGISTRY_CACHE: tuple[tuple[str, int, int] | None, dict[str, TaskKnowledge]] = (None, {})
 _WARNED_MISSING = False
 
@@ -424,34 +428,33 @@ def _registry() -> dict[str, TaskKnowledge]:
     return registry
 
 
-def regenerate_task_knowledge_json(repo_dir: Path | None = None) -> Path:
-    """Rebuild ``task-knowledge.json`` from the markdown sources with the repo's own generator.
+def parse_task_dir(task_dir: Path, *, category: str = "") -> tuple[TaskKnowledge | None, list[str]]:
+    """Parse one task directory with the knowledge repository's own generator.
 
-    The knowledge repository ships ``generate.py`` (the same script its CI runs on
-    merge); running it after an edit makes the edit visible to the API and the
-    runtime before a pull request is merged. Returns the JSON path.
+    The same parser builds ``task-knowledge.json``, so a draft reads exactly as
+    the published entry would. Returns the entry, ``None`` when the generator
+    rejects it, and the generator's warnings. Figures resolve inside
+    ``task_dir``.
     """
-    import subprocess
-    import sys
+    import importlib.util
 
-    repo_dir = repo_dir or _resolve_repo_dir()
-    if repo_dir is None:
-        raise RuntimeError("task-knowledge repository directory not found")
-    generator = repo_dir / "generate.py"
-    if not generator.is_file():
-        raise RuntimeError(f"generate.py not found in {repo_dir}")
-    output = repo_dir / "task-knowledge.json"
-    result = subprocess.run(  # noqa: S603 -- fixed argv: the repo's own generator, no user input
-        [sys.executable, "-I", str(generator), "--output", str(output)],
-        cwd=repo_dir,
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "generate.py failed")
-    return output
+    repo_dir = _resolve_repo_dir()
+    generator = repo_dir / "generate.py" if repo_dir is not None else None
+    if generator is None or not generator.is_file():
+        raise RuntimeError("generate.py not found in the task-knowledge repository")
+    spec = importlib.util.spec_from_file_location("_task_knowledge_generate", generator)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {generator}")
+    # A fresh module per call: the generator collects warnings in a module-level list.
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    entry = module._parse_task(task_dir, category)
+    warnings = [str(warning) for warning in getattr(module, "warnings", [])]
+    if not entry:
+        return None, warnings
+    knowledge = TaskKnowledge(**entry)
+    knowledge._task_dir = task_dir
+    return knowledge, warnings
 
 
 def get_task_knowledge(task_name: str) -> TaskKnowledge | None:

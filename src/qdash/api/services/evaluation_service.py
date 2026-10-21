@@ -49,6 +49,7 @@ from qdash.dbmodel.evaluation_run import EvaluationRunDocument
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
+    from qdash.api.services.knowledge_draft_service import KnowledgeDraft
     from qdash.api.services.pi_chat_service import QDashAuth
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
     from qdash.repository.chip import MongoChipRepository
@@ -131,6 +132,8 @@ def _summary(
         entity_type=run.entity_type,
         date=run.date,
         question=run.question,
+        knowledge_draft_id=run.knowledge_draft_id,
+        knowledge_draft_name=run.knowledge_draft_name,
         trigger=run.trigger,
         mode=run.mode,
         with_examples=run.with_examples,
@@ -311,7 +314,7 @@ class EvaluationService:
         date: str | None = None,
         task_ids: list[str] | None = None,
         qids: list[str] | None = None,
-        question: str | None = None,
+        knowledge_draft: KnowledgeDraft | None = None,
         trigger: str = "bulk",
         mode: str = "direct",
         with_examples: bool = False,
@@ -320,7 +323,8 @@ class EvaluationService:
         """Create a run over the latest evaluable result of `task` per entity.
 
         `task_ids` or `qids` narrow the run to named results or entities; the
-        rest are out of scope rather than skipped.
+        rest are out of scope rather than skipped. A `knowledge_draft` replaces
+        the shared knowledge of `task` for this run only.
         """
         if entity_type not in {"qubit", "coupling"}:
             raise HTTPException(
@@ -332,6 +336,17 @@ class EvaluationService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="trigger must be 'bulk', 'single' or 'chat' and mode 'direct' or 'planner'",
             )
+        if knowledge_draft is not None:
+            if knowledge_draft.task_name != task:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"the knowledge draft describes {knowledge_draft.task_name}, not {task}",
+                )
+            if mode != "direct":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="a knowledge draft can only be evaluated in direct mode",
+                )
         planner_model: str | None = None
         if mode == "planner":
             model, _ = planner_model_config()
@@ -360,7 +375,8 @@ class EvaluationService:
             task_name=task,
             entity_type=entity_type,
             date=effective_date,
-            question=(question or "").strip() or None,
+            knowledge_draft_id=knowledge_draft.draft_id if knowledge_draft else None,
+            knowledge_draft_name=knowledge_draft.filename if knowledge_draft else None,
             trigger=trigger,
             mode=mode,
             with_examples=with_examples,
@@ -516,6 +532,7 @@ class EvaluationService:
                 doc.task_id,
                 auth=auth,
                 question=run.question,
+                knowledge_draft_id=run.knowledge_draft_id,
                 mode=run.mode,
                 with_examples=run.with_examples,
                 model=model,

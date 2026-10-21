@@ -8,9 +8,10 @@ from typing import Any
 
 import pytest
 
-from qdash.api.dependencies import get_evaluation_service
+from qdash.api.dependencies import get_evaluation_service, get_knowledge_draft_store
 from qdash.api.main import app
 from qdash.api.services.evaluation_service import EvaluationService
+from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore
 from qdash.api.services.pi_chat_service import QDashAuth
 from qdash.api.services.pi_evaluation_service import EvaluationRuntimeError
 from qdash.datamodel.note import NoteModel
@@ -24,6 +25,7 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
 from qdash.repository.chip import MongoChipRepository
 from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
+from tests.qdash.api._knowledge_drafts import GENERATOR, RABI, make_zip
 
 HEADERS = {"Authorization": "Bearer eval_token", "X-Project-Id": "eval_project"}
 AUTH = QDashAuth(access_token="eval_token", project_id="eval_project")
@@ -222,7 +224,7 @@ def test_run_queues_the_latest_evaluable_result_per_qubit(test_client, service):
     response = test_client.post(
         "/evaluations/runs",
         headers=HEADERS,
-        json={"chip_id": "chip-1", "task": "CheckRabi", "question": "Is the fit trustworthy?"},
+        json={"chip_id": "chip-1", "task": "CheckRabi"},
     )
 
     assert response.status_code == 202, response.text
@@ -233,7 +235,8 @@ def test_run_queues_the_latest_evaluable_result_per_qubit(test_client, service):
     assert run["status"] == "running"
     assert run["total"] == 1
     assert run["pending_count"] == 1
-    assert run["question"] == "Is the fit trustworthy?"
+    assert run["question"] is None
+    assert (run["knowledge_draft_id"], run["knowledge_draft_name"]) == (None, None)
     assert (run["trigger"], run["mode"], run["planner_model"]) == ("bulk", "direct", None)
     assert run["requested_by"] == "eval_user"
     assert service.launched == [run["run_id"]]
@@ -254,12 +257,12 @@ def test_execution_records_what_the_model_saw_and_answered(test_client, service)
     run_id = test_client.post(
         "/evaluations/runs",
         headers=HEADERS,
-        json={"chip_id": "chip-1", "task": "CheckRabi", "question": "Why?"},
+        json={"chip_id": "chip-1", "task": "CheckRabi"},
     ).json()["run"]["run_id"]
 
     asyncio.run(service.execute_run(run_id, AUTH))
 
-    assert sorted(service.calls) == [("task-q0-new", "Why?"), ("task-q1", "Why?")]
+    assert sorted(service.calls) == [("task-q0-new", None), ("task-q1", None)]
     detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
     run = detail["run"]
     assert run["status"] == "completed"
@@ -274,7 +277,7 @@ def test_execution_records_what_the_model_saw_and_answered(test_client, service)
     assert good["status"] == "completed"
     assert good["input"]["context"] == "Task: CheckRabi\nTarget: Q00"
     assert good["input"]["prompt"].startswith("Reference for this experiment")
-    assert good["input"]["question"] == "Why?"
+    assert good["input"]["question"] is None
     assert good["input"]["knowledge_chars"] == 1534
     assert good["input"]["figures"][0]["bytes"] == 33088
     assert good["input"]["figures"][0]["path"] is None
@@ -724,3 +727,129 @@ def test_example_setting_reaches_runtime_and_records_are_persisted(
     assert detail["run"]["with_examples"] is with_examples
     assert detail["evaluations"][0]["status"] == "completed"
     assert detail["evaluations"][0]["input"]["examples"] == examples
+
+
+@pytest.fixture
+def drafts(tmp_path, monkeypatch):
+    """A draft store under tmp_path, parsing with a stand-in knowledge generator."""
+    repo = tmp_path / "config" / "task-knowledge"
+    repo.mkdir(parents=True)
+    (repo / "generate.py").write_text(GENERATOR, encoding="utf-8")
+    monkeypatch.setattr(
+        "qdash.common.config.loader.ConfigLoader.get_config_dir",
+        classmethod(lambda cls: tmp_path / "config"),
+    )
+    store = KnowledgeDraftStore(tmp_path / "calib_data")
+    app.dependency_overrides[get_knowledge_draft_store] = lambda: store
+    yield store
+    app.dependency_overrides.pop(get_knowledge_draft_store, None)
+
+
+def _upload(test_client, files: dict[str, bytes | str], filename: str = "rabi.zip"):
+    return test_client.post(
+        "/evaluations/knowledge-drafts",
+        headers=HEADERS,
+        files={"file": (filename, make_zip(files), "application/zip")},
+    )
+
+
+def test_a_knowledge_draft_is_uploaded_and_served_as_task_knowledge(test_client, project, drafts):
+    response = _upload(test_client, RABI)
+
+    assert response.status_code == 200, response.text
+    draft = response.json()
+    assert draft["task_name"] == "CheckRabi"
+    assert (draft["filename"], draft["uploaded_by"]) == ("rabi.zip", "eval_user")
+    assert draft["warnings"] == []
+    assert draft["reference"]["statuses"]["SUCCESS"] == "a damped cosine"
+    assert (draft["example_count"], draft["figure_count"]) == (1, 1)
+
+    meta = test_client.get(f"/evaluations/knowledge-drafts/{draft['draft_id']}", headers=HEADERS)
+    assert meta.json() == draft
+
+    knowledge = test_client.get(
+        f"/evaluations/knowledge-drafts/{draft['draft_id']}/knowledge", headers=HEADERS
+    ).json()
+    assert knowledge["name"] == "CheckRabi"
+    assert knowledge["examples"][0]["figures"][0]["mime_type"] == "image/png"
+    assert knowledge["examples"][0]["figures"][0]["base64_data"]
+
+    missing = test_client.get(f"/evaluations/knowledge-drafts/{'0' * 64}", headers=HEADERS)
+    assert missing.status_code == 404
+
+
+def test_an_unusable_zip_is_rejected_on_upload(test_client, project, drafts):
+    response = _upload(test_client, {"CheckRabi/index.md": "# CheckRabi", "CheckRabi/x.py": "x"})
+
+    assert response.status_code == 400
+    assert "files are allowed" in response.json()["detail"]
+
+
+def test_a_run_against_a_draft_records_it_and_sends_it_to_the_runtime(test_client, service, drafts):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    draft_id = _upload(test_client, RABI).json()["draft_id"]
+    calls: list[dict[str, Any]] = []
+
+    async def evaluate(task_id: str, **kwargs: Any):
+        calls.append(kwargs)
+        return {**RECORD, "task_id": task_id}
+
+    service._evaluate = evaluate
+    response = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={"chip_id": "chip-1", "task": "CheckRabi", "knowledge_draft_id": draft_id},
+    )
+    assert response.status_code == 202, response.text
+    run = response.json()["run"]
+    assert (run["knowledge_draft_id"], run["knowledge_draft_name"]) == (draft_id, "rabi.zip")
+
+    asyncio.run(service.execute_run(run["run_id"], AUTH))
+
+    assert [call["knowledge_draft_id"] for call in calls] == [draft_id]
+    detail = test_client.get(f"/evaluations/runs/{run['run_id']}", headers=HEADERS).json()
+    assert detail["run"]["knowledge_draft_id"] == draft_id
+    assert detail["evaluations"][0]["status"] == "completed"
+
+
+@pytest.mark.parametrize(
+    ("body", "status_code", "detail"),
+    [
+        ({"task": "CheckT1"}, 400, "describes CheckRabi, not CheckT1"),
+        ({"task": "CheckRabi", "mode": "planner"}, 400, "direct mode"),
+        ({"task": "CheckRabi", "knowledge_draft_id": "f" * 64}, 404, "not found"),
+    ],
+)
+def test_a_draft_must_match_the_task_and_run_directly(
+    test_client, service, drafts, body, status_code, detail
+):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    draft_id = _upload(test_client, RABI).json()["draft_id"]
+
+    response = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={"chip_id": "chip-1", "knowledge_draft_id": draft_id, **body},
+    )
+
+    assert response.status_code == status_code, response.text
+    assert detail in response.json()["detail"]
+    assert service.launched == []
+
+
+def test_a_drafts_zip_downloads_as_uploaded(test_client, project, drafts):
+    data = make_zip(RABI)
+    draft_id = test_client.post(
+        "/evaluations/knowledge-drafts",
+        headers=HEADERS,
+        files={"file": ("rabi v2.zip", data, "application/zip")},
+    ).json()["draft_id"]
+
+    response = test_client.get(f"/evaluations/knowledge-drafts/{draft_id}/archive", headers=HEADERS)
+
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"] == "application/zip"
+    assert response.headers["content-disposition"] == "attachment; filename*=utf-8''rabi%20v2.zip"
+    assert response.content == data
+    missing = test_client.get(f"/evaluations/knowledge-drafts/{'0' * 64}/archive", headers=HEADERS)
+    assert missing.status_code == 404

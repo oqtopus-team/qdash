@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type GetKnowledgeFileContentParams = {
-path: string;
-};
+/**
+ * The uploaded knowledge draft the run used, if any
+ */
+export type EvaluationRunSummaryKnowledgeDraftId = string | null;

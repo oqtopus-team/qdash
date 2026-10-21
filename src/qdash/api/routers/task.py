@@ -12,7 +12,12 @@ from fastapi.security import (
     HTTPAuthorizationCredentials,  # noqa: TC002 - FastAPI resolves annotations
 )
 
-from qdash.api.dependencies import get_flow_service, get_task_file_service, get_task_service
+from qdash.api.dependencies import (
+    get_flow_service,
+    get_knowledge_draft_store,
+    get_task_file_service,
+    get_task_service,
+)
 from qdash.api.lib.auth import bearer_scheme
 from qdash.api.lib.project import (
     ProjectContext,
@@ -30,6 +35,7 @@ from qdash.api.schemas.task import (
 )
 from qdash.api.services.catalog_task_run import resolve_catalog_task, run_catalog_task
 from qdash.api.services.flow_service import FlowService
+from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore, task_archive
 from qdash.api.services.pi_chat_service import QDashAuth
 from qdash.api.services.pi_evaluation_service import (
     EvaluationRuntimeError,
@@ -37,6 +43,7 @@ from qdash.api.services.pi_evaluation_service import (
 )
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_service import TaskService
+from qdash.datamodel.task_knowledge import get_task_knowledge as lookup_task_knowledge
 
 router = APIRouter()
 
@@ -186,6 +193,36 @@ def get_task_knowledge_markdown(
 
 
 @router.get(
+    "/tasks/{task_name}/knowledge/archive",
+    summary="Download a task's knowledge directory as a zip",
+    operation_id="downloadTaskKnowledgeArchive",
+    response_class=Response,
+    responses={
+        200: {"content": {"application/zip": {"schema": {"type": "string", "format": "binary"}}}}
+    },
+)
+def download_task_knowledge_archive(task_name: str) -> Response:
+    """The task's ``index.md``, examples and figures, zipped under ``<task_name>/``.
+
+    The zip is the starting point of a knowledge draft: edit it locally and
+    upload it from the evaluation dialog. Raises 404 when the task has no
+    knowledge directory.
+    """
+    knowledge = lookup_task_knowledge(task_name)
+    task_dir = knowledge.task_dir() if knowledge else None
+    if task_dir is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task '{task_name}' does not have a knowledge directory",
+        )
+    return Response(
+        content=task_archive(task_dir),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{task_dir.name}.zip"'},
+    )
+
+
+@router.get(
     "/tasks/{task_name}/evaluation-prompts",
     response_model=EvaluationPromptPreviewResponse,
     summary="Preview the prompts an AI evaluation of a task would send",
@@ -195,23 +232,34 @@ async def get_task_evaluation_prompts(
     task_name: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    drafts: Annotated[KnowledgeDraftStore, Depends(get_knowledge_draft_store)],
     with_examples: bool = Query(
         False, description="Lay out the task's labeled examples, as an in-context evaluation"
     ),
-    question: str | None = Query(None, description="A specific question to add"),
+    knowledge_draft_id: str | None = Query(
+        None, description="Build the prompts from this uploaded knowledge draft"
+    ),
 ) -> EvaluationPromptPreviewResponse:
     """The prompts the evaluation model would receive for a task.
 
     The Agent Runtime builds them the way a direct evaluation does, from the
-    task's reference in Knowledge (and its labeled examples when asked), as
-    the requesting user, without a figure or a model call.
+    task's reference in Knowledge, or from an uploaded draft, and its labeled
+    examples when asked, as the requesting user, without a figure or a model
+    call.
     """
+    if knowledge_draft_id:
+        draft = drafts.get(ctx.project_id, knowledge_draft_id)
+        if draft.task_name != task_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"the knowledge draft describes {draft.task_name}, not {task_name}",
+            )
     try:
         payload = await preview_evaluation_prompts(
             task_name,
             auth=QDashAuth(access_token=credentials.credentials, project_id=ctx.project_id),
             with_examples=with_examples,
-            question=(question or "").strip() or None,
+            knowledge_draft_id=knowledge_draft_id or None,
         )
     except EvaluationRuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc

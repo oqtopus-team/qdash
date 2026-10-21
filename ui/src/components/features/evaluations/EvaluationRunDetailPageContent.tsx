@@ -10,12 +10,14 @@ import { formatDateTime } from "@/lib/utils/datetime";
 import type { EvaluationItem, EvaluationRunSummary } from "@/schemas";
 
 import { EvaluationCard } from "./EvaluationCard";
+import { KnowledgeDraftDownloadButton } from "./KnowledgeDraftDownloadButton";
 import { compareHref } from "./evaluationCompare";
 import { promptProfile, rangeLabel, referenceLabel, systemPromptLabel } from "./evaluationPrompt";
 import { RunPicker } from "./RunPicker";
 import {
   agreementRate,
   evaluatorLabel,
+  knowledgeLabel,
   modeLabel,
   runDone,
   runIsActive,
@@ -212,6 +214,24 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
             value={run.mode === "planner" ? run.planner_model || "-" : modeLabel(run.mode)}
           />
         </div>
+        {run.knowledge_draft_id && (
+          <div className="mt-3 text-sm" data-testid="run-knowledge">
+            <span className="text-xs uppercase text-base-content/50">Knowledge</span>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-base-content/80">
+              {knowledgeLabel(run)}
+              <span className="font-mono text-xs text-base-content/50">
+                {run.knowledge_draft_id.slice(0, 12)}
+              </span>
+              <KnowledgeDraftDownloadButton
+                draftId={run.knowledge_draft_id}
+                filename={run.knowledge_draft_name || `${run.task_name}.zip`}
+              />
+              <span className="block w-full text-xs text-base-content/60">
+                Evaluated against an uploaded knowledge draft instead of the shared knowledge.
+              </span>
+            </p>
+          </div>
+        )}
         {run.question && (
           <div className="mt-3 text-sm">
             <span className="text-xs uppercase text-base-content/50">Question</span>

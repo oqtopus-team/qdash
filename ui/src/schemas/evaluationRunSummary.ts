@@ -9,6 +9,8 @@ import type { EvaluationRunSummaryCompletedAt } from './evaluationRunSummaryComp
 import type { EvaluationRunSummaryDate } from './evaluationRunSummaryDate';
 import type { EvaluationRunSummaryElapsedMs } from './evaluationRunSummaryElapsedMs';
 import type { EvaluationRunSummaryEvaluator } from './evaluationRunSummaryEvaluator';
+import type { EvaluationRunSummaryKnowledgeDraftId } from './evaluationRunSummaryKnowledgeDraftId';
+import type { EvaluationRunSummaryKnowledgeDraftName } from './evaluationRunSummaryKnowledgeDraftName';
 import type { EvaluationRunSummaryMode } from './evaluationRunSummaryMode';
 import type { EvaluationRunSummaryModel } from './evaluationRunSummaryModel';
 import type { EvaluationRunSummaryPlannerModel } from './evaluationRunSummaryPlannerModel';
@@ -26,6 +28,10 @@ export interface EvaluationRunSummary {
   entity_type: string;
   date?: EvaluationRunSummaryDate;
   question?: EvaluationRunSummaryQuestion;
+  /** The uploaded knowledge draft the run used, if any */
+  knowledge_draft_id?: EvaluationRunSummaryKnowledgeDraftId;
+  /** File name of that draft's zip */
+  knowledge_draft_name?: EvaluationRunSummaryKnowledgeDraftName;
   trigger: EvaluationRunSummaryTrigger;
   mode: EvaluationRunSummaryMode;
   with_examples?: boolean;

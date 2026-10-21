@@ -339,6 +339,41 @@ export async function fetchTaskExamples(
   return knowledge ? examplesOf(knowledge) : [];
 }
 
+/**
+ * An uploaded knowledge draft, as the user, in the shape of a task's
+ * knowledge response. A draft is asked for by id, so one the API does not
+ * serve is an error rather than an evaluation without knowledge.
+ */
+export async function fetchKnowledgeDraft(
+  connection: Pick<QDashConnection, "auth" | "baseUrl">,
+  draftId: string,
+  signal?: AbortSignal,
+  fetchImpl: typeof fetch = fetch,
+): Promise<TaskKnowledgeLike> {
+  const url = `${connection.baseUrl}/evaluations/knowledge-drafts/${encodeURIComponent(draftId)}/knowledge`;
+  const response = await fetchImpl(url, { headers: knowledgeHeaders(connection), signal });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") detail = `: ${body.detail}`;
+    } catch {
+      // The status says enough.
+    }
+    throw new Error(`HTTP ${response.status}${detail}`);
+  }
+  return (await response.json()) as TaskKnowledgeLike;
+}
+
+function knowledgeHeaders(connection: Pick<QDashConnection, "auth">): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${connection.auth.accessToken}`,
+    Accept: "application/json",
+  };
+  if (connection.auth.projectId) headers["X-Project-Id"] = connection.auth.projectId;
+  return headers;
+}
+
 async function fetchKnowledgeJson(
   connection: Pick<QDashConnection, "auth" | "baseUrl">,
   taskName: string,
@@ -346,13 +381,8 @@ async function fetchKnowledgeJson(
   fetchImpl: typeof fetch,
 ): Promise<TaskKnowledgeLike | undefined> {
   const url = `${connection.baseUrl}/tasks/${encodeURIComponent(taskName)}/knowledge`;
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${connection.auth.accessToken}`,
-    Accept: "application/json",
-  };
-  if (connection.auth.projectId) headers["X-Project-Id"] = connection.auth.projectId;
   try {
-    const response = await fetchImpl(url, { headers, signal });
+    const response = await fetchImpl(url, { headers: knowledgeHeaders(connection), signal });
     if (!response.ok) {
       if (response.status !== 404) {
         console.warn(`[agent-runtime] task knowledge for ${taskName}: HTTP ${response.status}`);

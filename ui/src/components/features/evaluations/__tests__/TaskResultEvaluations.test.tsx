@@ -8,6 +8,7 @@ const listEvaluations = vi.fn();
 vi.mock("@/client/evaluation/evaluation", () => ({
   useListEvaluations: (...args: unknown[]) => listEvaluations(...args),
   useCreateEvaluationRun: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCreateKnowledgeDraft: () => ({ mutateAsync: vi.fn(), isPending: false }),
   getListEvaluationRunsQueryKey: () => ["/evaluations/runs"],
   getListEvaluationsQueryKey: (params: unknown) => ["/evaluations", params],
   useSetEvaluationVerdict: () => ({ mutate: vi.fn(), isPending: false }),

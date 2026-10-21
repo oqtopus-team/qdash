@@ -1,8 +1,8 @@
-"""File routers: raw downloads plus the config and knowledge git workspaces.
+"""File routers: raw downloads plus the config git workspace.
 
-The two workspaces expose the same operations under ``/config/files`` and
-``/knowledge/files``; each is a :class:`FileService` over its own directory
-and GitHub repository.
+The workspace operations live under ``/config/files``, served by a
+:class:`FileService` over the Qubex config directory and its GitHub
+repository.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 
-from qdash.api.dependencies import get_file_service, get_knowledge_file_service
+from qdash.api.dependencies import get_file_service
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.file import (
@@ -185,11 +185,4 @@ router.include_router(
     _workspace_router(
         prefix="/config/files", label="config", operation_prefix="", get_service=get_file_service
     )
-)
-
-knowledge_router = _workspace_router(
-    prefix="/knowledge/files",
-    label="knowledge",
-    operation_prefix="Knowledge",
-    get_service=get_knowledge_file_service,
 )

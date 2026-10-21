@@ -6,6 +6,6 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type GetKnowledgeFileImageParams = {
-path: string;
-};
+export interface BodyCreateKnowledgeDraft {
+  file: Blob;
+}

@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Eye, RefreshCw } from "lucide-react";
 import { useGetTaskEvaluationPrompts } from "@/client/task/task";
 import { questionLabel } from "@/components/features/evaluations/evaluationDisplay";
+import { KnowledgeDraftPicker } from "@/components/features/evaluations/KnowledgeDraftPicker";
+import { useProject } from "@/contexts/ProjectContext";
+import type { KnowledgeDraftResponse } from "@/schemas";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 type Props = {
@@ -15,12 +18,15 @@ type Props = {
 /**
  * The prompts the evaluation model would receive for this task, built by the
  * Agent Runtime from the task's reference (and its labeled examples, in
- * context) without a figure or a model call. Fetched on demand, so editing
- * the knowledge and pressing the button shows what the edit turns into.
+ * context) without a figure or a model call. Fetched on demand. An editor can
+ * drop a zipped knowledge draft to see what an edit turns into before
+ * evaluating with it.
  */
 export function EvaluationPromptPreview({ taskName, exampleCount }: Props) {
+  const { canEdit } = useProject();
   const [withExamples, setWithExamples] = useState(false);
   const [requested, setRequested] = useState(false);
+  const [draft, setDraft] = useState<KnowledgeDraftResponse | null>(null);
   const {
     data: response,
     isFetching,
@@ -28,11 +34,11 @@ export function EvaluationPromptPreview({ taskName, exampleCount }: Props) {
     refetch,
   } = useGetTaskEvaluationPrompts(
     taskName,
-    { with_examples: withExamples },
+    { with_examples: withExamples, ...(draft ? { knowledge_draft_id: draft.draft_id } : {}) },
     { query: { enabled: requested, retry: false, staleTime: 0 } },
   );
   const data = response?.data;
-  const inContextDisabled = exampleCount === 0;
+  const inContextDisabled = (draft ? draft.example_count : exampleCount) === 0;
 
   const choose = (next: boolean) => {
     if (next === withExamples) return;
@@ -47,8 +53,15 @@ export function EvaluationPromptPreview({ taskName, exampleCount }: Props) {
             Evaluation prompts
           </h2>
           <p className="text-sm text-base-content/60">
-            What the evaluation model is sent for this task, one question at a time, built from the
-            reference above. <code className="font-mono">[figure]</code> marks where a plot goes.
+            What the evaluation model is sent for this task, one question at a time, built from{" "}
+            {draft ? (
+              <>
+                the draft <span className="font-mono">{draft.filename || "uploaded"}</span>
+              </>
+            ) : (
+              "the reference above"
+            )}
+            . <code className="font-mono">[figure]</code> marks where a plot goes.
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -94,6 +107,20 @@ export function EvaluationPromptPreview({ taskName, exampleCount }: Props) {
           </button>
         </div>
       </div>
+
+      {canEdit && (
+        <div className="mb-3">
+          <KnowledgeDraftPicker
+            taskName={taskName}
+            draft={draft}
+            onChange={(next) => {
+              setDraft(next);
+              if (next && next.example_count === 0) setWithExamples(false);
+            }}
+            disabled={isFetching}
+          />
+        </div>
+      )}
 
       {!requested && (
         <p className="text-sm text-base-content/50">

@@ -7,6 +7,6 @@
  */
 
 /**
- * A specific question for the evaluation model, on top of the diagnosis
+ * File name of that draft's zip
  */
-export type CreateEvaluationRunRequestQuestion = string | null;
+export type EvaluationRunSummaryKnowledgeDraftName = string | null;

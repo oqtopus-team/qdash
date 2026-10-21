@@ -36,6 +36,7 @@ async def evaluate_task_result(
     *,
     auth: QDashAuth,
     question: str | None = None,
+    knowledge_draft_id: str | None = None,
     max_figures: int | None = None,
     mode: str = "direct",
     with_examples: bool = False,
@@ -47,7 +48,9 @@ async def evaluate_task_result(
 
     `mode` is "direct" (the evidence and evaluation tools run as such) or
     "planner" (a planner turn on `model` calls them). Returns the runtime's
-    record (task, figures, knowledge, evaluation, evaluator, planner). Raises
+    record (task, figures, knowledge, evaluation, evaluator, planner). With
+    `knowledge_draft_id` the runtime reads that uploaded draft instead of the
+    task's shared knowledge. Raises
     `EvaluationRuntimeError` with the failing stage when the runtime answered
     with an error, and `httpx.HTTPError` when it could not be reached.
     """
@@ -56,6 +59,8 @@ async def evaluate_task_result(
         payload["with_examples"] = True
     if question:
         payload["question"] = question
+    if knowledge_draft_id:
+        payload["knowledge_draft_id"] = knowledge_draft_id
     if max_figures:
         payload["max_figures"] = max_figures
     if model:
@@ -81,14 +86,15 @@ async def preview_evaluation_prompts(
     *,
     auth: QDashAuth,
     with_examples: bool = False,
-    question: str | None = None,
+    knowledge_draft_id: str | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> dict[str, Any]:
     """Ask the runtime for the prompts an evaluation of `task_name` would send.
 
     The runtime builds them the way a direct evaluation does (the task's
     reference and, with `with_examples`, its labeled examples, fetched as the
-    given user) without a figure or a model call. Returns the runtime's
+    given user; from the uploaded draft when `knowledge_draft_id` names one)
+    without a figure or a model call. Returns the runtime's
     preview (`questions`, `model`, `knowledge`, `examples`, `examples_used`).
     Raises `EvaluationRuntimeError` with the failing stage when the runtime
     answered with an error, and `httpx.HTTPError` when it could not be reached.
@@ -96,8 +102,8 @@ async def preview_evaluation_prompts(
     payload: dict[str, Any] = {"task_name": task_name}
     if with_examples:
         payload["with_examples"] = True
-    if question:
-        payload["question"] = question
+    if knowledge_draft_id:
+        payload["knowledge_draft_id"] = knowledge_draft_id
     async with httpx.AsyncClient(
         timeout=PREVIEW_TIMEOUT, trust_env=False, transport=transport
     ) as client:

@@ -12,7 +12,7 @@ export type GetTaskEvaluationPromptsParams = {
  */
 with_examples?: boolean;
 /**
- * A specific question to add
+ * Build the prompts from this uploaded knowledge draft
  */
-question?: string | null;
+knowledge_draft_id?: string | null;
 };
