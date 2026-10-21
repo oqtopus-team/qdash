@@ -156,7 +156,6 @@ export default withMermaid(
               text: "API",
               collapsed: true,
               items: [
-                { text: "Overview", link: "/developer-guide/api/" },
                 { text: "Design Guidelines", link: "/developer-guide/api/design" },
                 { text: "Contracts", link: "/developer-guide/api/contracts" },
                 { text: "Code Structure", link: "/developer-guide/api/structure" },
@@ -168,7 +167,6 @@ export default withMermaid(
               text: "UI",
               collapsed: true,
               items: [
-                { text: "Overview", link: "/developer-guide/ui/" },
                 { text: "Architecture", link: "/developer-guide/ui/architecture" },
                 { text: "Guidelines", link: "/developer-guide/ui/guidelines" },
                 { text: "Components and State", link: "/developer-guide/ui/components" },
@@ -183,7 +181,6 @@ export default withMermaid(
               text: "Workflow",
               collapsed: true,
               items: [
-                { text: "Overview", link: "/developer-guide/workflow/" },
                 { text: "Quickstart", link: "/developer-guide/workflow/quickstart" },
                 { text: "Engine Architecture", link: "/developer-guide/workflow/engine-architecture" },
                 { text: "Services", link: "/developer-guide/workflow/services" },
@@ -198,7 +195,6 @@ export default withMermaid(
               text: "Copilot",
               collapsed: true,
               items: [
-                { text: "Overview", link: "/developer-guide/copilot/" },
                 { text: "Architecture", link: "/developer-guide/copilot/architecture" },
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },
                 { text: "Knowledge Layout", link: "/developer-guide/copilot/knowledge-layout" },
@@ -211,7 +207,6 @@ export default withMermaid(
               text: "Architecture Deep Dives",
               collapsed: true,
               items: [
-                { text: "Overview", link: "/developer-guide/architecture/" },
                 { text: "1-Qubit Scheduler", link: "/developer-guide/architecture/one-qubit-scheduler" },
                 { text: "Ordering Strategies", link: "/developer-guide/architecture/one-qubit-ordering-strategies" },
                 { text: "CR Scheduler", link: "/developer-guide/architecture/cr-scheduler" },

@@ -38,7 +38,6 @@ docs/
     conventions/           Rules that apply across the code: datetime, logging,
                            credential scanning
     api/  ui/  workflow/  copilot/
-      index.md             Entry point for each component
       ...                  Design, architecture, testing, and deep dives
     architecture/          Cross-component design: schedulers, topology,
                            provenance, notes, agent platform

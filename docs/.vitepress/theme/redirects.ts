@@ -4,8 +4,8 @@
  * sends it on from here. Paths are site-relative, without the base.
  */
 export const REDIRECTS: Record<string, string> = {
-  "/architecture/": "/developer-guide/architecture/",
-  "/architecture/README": "/developer-guide/architecture/",
+  "/architecture/": "/developer-guide/architecture",
+  "/architecture/README": "/developer-guide/architecture",
   "/architecture/cr-scheduler": "/developer-guide/architecture/cr-scheduler",
   "/architecture/notes": "/developer-guide/architecture/notes",
   "/architecture/one-qubit-ordering-plugins": "/developer-guide/architecture/one-qubit-ordering-strategies",
@@ -55,11 +55,16 @@ export const REDIRECTS: Record<string, string> = {
   "/reference/database-documents-execution": "/reference/database-structure",
   "/reference/database-indexes": "/reference/database-structure",
   "/developer-guide/api/testing-endpoints": "/developer-guide/api/endpoint-testing",
+  "/developer-guide/api/": "/developer-guide/api/design",
+  "/developer-guide/architecture/": "/developer-guide/architecture",
   "/developer-guide/architecture/one-qubit-ordering-plugins": "/developer-guide/architecture/one-qubit-ordering-strategies",
   "/developer-guide/copilot/llm-integration-patterns": "/developer-guide/copilot/architecture",
   "/developer-guide/copilot/sandbox": "/developer-guide/copilot/python-sandbox",
   "/developer-guide/copilot/streaming": "/developer-guide/copilot/chat-streaming",
   "/developer-guide/copilot/tool-result-compression": "/developer-guide/copilot/architecture",
+  "/developer-guide/copilot/": "/developer-guide/copilot/architecture",
+  "/developer-guide/ui/": "/developer-guide/ui/architecture",
+  "/developer-guide/workflow/": "/developer-guide/workflow/engine-architecture",
   "/developer-guide/workflow/testing-components": "/developer-guide/workflow/testing",
   "/developer-guide/workflow/testing-fixtures": "/developer-guide/workflow/testing",
   "/user-guide/authentication": "/user-guide/authentication-and-users",
