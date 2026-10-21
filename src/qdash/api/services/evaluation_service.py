@@ -3,23 +3,27 @@
 A run evaluates the latest result of one task for every qubit or coupling of
 a chip through the Pi Agent Runtime's planner-less `/evaluate` route, and
 stores one evaluation record per task result. The API process executes the
-run in the background with bounded concurrency; the records are the product,
-so a run interrupted by an API restart simply keeps its unfinished items as
-pending and can be requested again.
+run in the background with bounded concurrency; stale work is marked
+interrupted and can be retried without repeating completed evaluations.
 """
 
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
 import logging
 import os
 import re
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from bunnet import SortDirection
 from fastapi import HTTPException, status
+from pymongo.errors import DuplicateKeyError
 
 from qdash.api.schemas.evaluation import (
     EvaluationItem,
@@ -31,7 +35,7 @@ from qdash.api.services.pi_evaluation_service import (
     EvaluationRuntimeError,
     evaluate_task_result,
 )
-from qdash.common.utils.datetime import end_of_day, now, parse_date, start_of_day
+from qdash.common.utils.datetime import end_of_day, ensure_timezone, now, parse_date, start_of_day
 from qdash.copilot.config import load_copilot_config
 from qdash.datamodel.evaluation import (
     EvaluationCallModel,
@@ -40,15 +44,18 @@ from qdash.datamodel.evaluation import (
     EvaluationInputModel,
     EvaluationOutputModel,
     EvaluationPlannerModel,
+    EvaluationVerdictIssue,
     EvaluationVerdictModel,
     EvaluatorModel,
 )
 from qdash.dbmodel.evaluation import EvaluationDocument
+from qdash.dbmodel.evaluation_asset import EvaluationAssetDocument
 from qdash.dbmodel.evaluation_run import EvaluationRunDocument
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
+    from qdash.api.services.knowledge_draft_service import KnowledgeDraft
     from qdash.api.services.pi_chat_service import QDashAuth
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
     from qdash.repository.chip import MongoChipRepository
@@ -60,6 +67,11 @@ logger = logging.getLogger(__name__)
 # several requests concurrently; two keeps a 64-qubit run under twenty minutes
 # without starving the chat.
 DEFAULT_CONCURRENCY = int(os.environ.get("EVALUATION_CONCURRENCY", "2"))
+STALE_AFTER = timedelta(
+    seconds=max(60, int(os.environ.get("EVALUATION_STALE_AFTER_SECONDS", "1800")))
+)
+HEARTBEAT_SECONDS = max(5, int(os.environ.get("EVALUATION_HEARTBEAT_SECONDS", "30")))
+MAX_SNAPSHOT_BYTES = 10 * 1024 * 1024
 # A task result is evaluable once the calibration has stopped touching it.
 TERMINAL_STATUSES = frozenset({"completed", "failed"})
 TRIGGERS = frozenset({"bulk", "single", "chat"})
@@ -74,6 +86,45 @@ def planner_model_config() -> tuple[dict[str, str], str | None]:
         {"provider": model.provider, "name": model.name},
         thinking_level(config.model_copy(update={"model": model})),
     )
+
+
+def evaluation_model_config(requested: dict[str, str] | None) -> dict[str, str] | None:
+    """Resolve a requested evaluator against the configured evaluation model list."""
+    candidates = load_copilot_config().evaluation_models
+    if not candidates:
+        if requested is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="no evaluation models are configured",
+            )
+        return None
+    if requested is None:
+        default = candidates[0]
+        return {"provider": default.provider, "name": default.name}
+    selected = next(
+        (
+            candidate
+            for candidate in candidates
+            if candidate.provider == requested.get("provider")
+            and candidate.name == requested.get("name")
+        ),
+        None,
+    )
+    if selected is None:
+        identity = f"{requested.get('provider', '')}/{requested.get('name', '')}"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"evaluation model {identity} is not configured",
+        )
+    return {"provider": selected.provider, "name": selected.name}
+
+
+def _model_from_identity(identity: str | None) -> dict[str, str] | None:
+    """Parse a stored `provider/modelId`, preserving slashes in the model id."""
+    if not identity or "/" not in identity:
+        return None
+    provider, name = identity.split("/", 1)
+    return {"provider": provider, "name": name}
 
 
 @dataclass
@@ -117,6 +168,8 @@ def _to_item(
         evaluator=doc.evaluator,
         planner=doc.planner,
         verdict=doc.verdict,
+        verdicts=doc.verdicts,
+        verdict_history=doc.verdict_history,
     )
 
 
@@ -124,6 +177,18 @@ def _summary(
     run: EvaluationRunDocument, evaluations: list[EvaluationDocument]
 ) -> EvaluationRunSummary:
     completed = [doc for doc in evaluations if doc.status == "completed"]
+    models = sorted({doc.output.model for doc in completed if doc.output and doc.output.model})
+    evaluators_by_identity = {
+        (
+            doc.evaluator.name,
+            doc.evaluator.version,
+            doc.evaluator.source,
+            doc.evaluator.commit,
+        ): doc.evaluator
+        for doc in completed
+        if doc.evaluator
+    }
+    evaluators = list(evaluators_by_identity.values())
     return EvaluationRunSummary(
         run_id=run.run_id,
         chip_id=run.chip_id,
@@ -131,10 +196,13 @@ def _summary(
         entity_type=run.entity_type,
         date=run.date,
         question=run.question,
+        knowledge_draft_id=run.knowledge_draft_id,
+        knowledge_draft_name=run.knowledge_draft_name,
         trigger=run.trigger,
         mode=run.mode,
         with_examples=run.with_examples,
         planner_model=run.planner_model,
+        evaluation_model=run.evaluation_model,
         requested_by=run.requested_by,
         requested_at=run.requested_at,
         completed_at=run.completed_at,
@@ -142,6 +210,8 @@ def _summary(
         total=run.total,
         completed_count=run.completed_count,
         failed_count=run.failed_count,
+        interrupted_count=sum(1 for doc in evaluations if doc.status == "interrupted"),
+        cancelled_count=sum(1 for doc in evaluations if doc.status == "cancelled"),
         pending_count=sum(1 for doc in evaluations if doc.status in {"pending", "running"}),
         parsed_count=sum(1 for doc in completed if doc.output and doc.output.parsed),
         complete_count=sum(1 for doc in completed if doc.output and doc.output.complete),
@@ -154,14 +224,37 @@ def _summary(
         success_count=sum(1 for doc in completed if _success(doc)),
         agree_count=sum(1 for doc in evaluations if doc.verdict and doc.verdict.agree is True),
         disagree_count=sum(1 for doc in evaluations if doc.verdict and doc.verdict.agree is False),
-        model=run.model,
-        evaluator=run.evaluator,
+        reference_used_count=sum(1 for doc in completed if doc.input and doc.input.reference_used),
+        examples_used_count=sum(
+            1 for doc in completed if doc.input and doc.input.examples_used > 0
+        ),
+        model=models[0] if len(models) == 1 else None,
+        models=models,
+        evaluator=evaluators[0] if len(evaluators) == 1 else None,
+        evaluators=evaluators,
     )
 
 
-def _input_from_record(record: dict[str, Any], question: str | None) -> EvaluationInputModel:
+def _input_from_record(
+    record: dict[str, Any],
+    question: str | None,
+    *,
+    reference_requested: bool = True,
+    examples_requested: bool = False,
+) -> EvaluationInputModel:
     knowledge = record.get("knowledge") or {}
     evaluation = record.get("evaluation") or {}
+    examples = [
+        EvaluationExampleModel(
+            id=str(example.get("id") or ""),
+            title=str(example.get("title") or ""),
+            outcome=str(example.get("outcome") or ""),
+            status=str(example.get("status") or ""),
+            figures=_figures_from(example.get("figures")),
+        )
+        for example in record.get("examples") or []
+        if isinstance(example, dict)
+    ]
     return EvaluationInputModel(
         context=str(record.get("context") or ""),
         prompt=evaluation.get("prompt"),
@@ -169,18 +262,12 @@ def _input_from_record(record: dict[str, Any], question: str | None) -> Evaluati
         question=question,
         knowledge_chars=knowledge.get("chars"),
         knowledge_sha256=knowledge.get("sha256"),
+        reference_requested=reference_requested,
+        reference_used=bool(knowledge.get("sha256")),
+        examples_requested=examples_requested,
+        examples_used=len(examples),
         figures=_figures_from(record.get("figures")),
-        examples=[
-            EvaluationExampleModel(
-                id=str(example.get("id") or ""),
-                title=str(example.get("title") or ""),
-                outcome=str(example.get("outcome") or ""),
-                status=str(example.get("status") or ""),
-                figures=_figures_from(example.get("figures")),
-            )
-            for example in record.get("examples") or []
-            if isinstance(example, dict)
-        ],
+        examples=examples,
     )
 
 
@@ -195,6 +282,21 @@ def _figures_from(value: Any) -> list[EvaluationFigureModel]:
         for figure in value or []
         if isinstance(figure, dict)
     ]
+
+
+def _context_window(model: Any) -> int | None:
+    """The configured context window (`num_ctx`) of the `provider/name` that judged."""
+    if not isinstance(model, str) or not model:
+        return None
+    try:
+        config = load_copilot_config()
+    except Exception:
+        logger.warning("copilot config unavailable; context window of %s unknown", model)
+        return None
+    for candidate in [*config.evaluation_models, *config.chat_models, config.model]:
+        if f"{candidate.provider}/{candidate.name}" == model:
+            return candidate.num_ctx
+    return None
 
 
 def _output_from_record(record: dict[str, Any]) -> EvaluationOutputModel:
@@ -221,6 +323,8 @@ def _output_from_record(record: dict[str, Any]) -> EvaluationOutputModel:
         calls=_calls_from(evaluation.get("calls")),
         duration_ms=int(evaluation.get("duration_ms") or 0),
         usage=evaluation.get("usage") if isinstance(evaluation.get("usage"), dict) else None,
+        # Kept with the record: a later change to the config does not rewrite it.
+        context_window=_context_window(evaluation.get("model")),
     )
 
 
@@ -244,6 +348,9 @@ def _calls_from(value: Any) -> list[EvaluationCallModel]:
                 duration_ms=int(call.get("duration_ms") or 0),
                 stop_reason=call["stop_reason"],
                 structured=call.get("structured") is True,
+                input_tokens=(
+                    call.get("input_tokens") if isinstance(call.get("input_tokens"), int) else None
+                ),
                 output_tokens=(
                     call.get("output_tokens")
                     if isinstance(call.get("output_tokens"), int)
@@ -297,7 +404,7 @@ class EvaluationService:
         self._concurrency = max(1, concurrency)
         self._evaluate = evaluate
         # Background runs, referenced so the event loop does not drop them.
-        self._background: set[asyncio.Task[None]] = set()
+        self._background: dict[str, asyncio.Task[None]] = {}
 
     # --- selection -----------------------------------------------------------------------
 
@@ -311,16 +418,18 @@ class EvaluationService:
         date: str | None = None,
         task_ids: list[str] | None = None,
         qids: list[str] | None = None,
-        question: str | None = None,
+        knowledge_draft: KnowledgeDraft | None = None,
         trigger: str = "bulk",
         mode: str = "direct",
+        evaluation_model: dict[str, str] | None = None,
         with_examples: bool = False,
         requested_by: str,
     ) -> RunSelection:
         """Create a run over the latest evaluable result of `task` per entity.
 
         `task_ids` or `qids` narrow the run to named results or entities; the
-        rest are out of scope rather than skipped.
+        rest are out of scope rather than skipped. A `knowledge_draft` replaces
+        the shared knowledge of `task` for this run only.
         """
         if entity_type not in {"qubit", "coupling"}:
             raise HTTPException(
@@ -332,10 +441,22 @@ class EvaluationService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="trigger must be 'bulk', 'single' or 'chat' and mode 'direct' or 'planner'",
             )
+        if knowledge_draft is not None:
+            if knowledge_draft.task_name != task:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"the knowledge draft describes {knowledge_draft.task_name}, not {task}",
+                )
+            if mode != "direct":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="a knowledge draft can only be evaluated in direct mode",
+                )
         planner_model: str | None = None
         if mode == "planner":
             model, _ = planner_model_config()
             planner_model = f"{model['provider']}/{model['name']}"
+        selected_evaluation_model = evaluation_model_config(evaluation_model)
         # Taken before `qids` is rebound to the chip's entity ids below.
         chosen = set(qids or [])
         is_latest = date is None or date == "latest"
@@ -349,10 +470,36 @@ class EvaluationService:
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-        latest = self._latest_results(
-            project_id=project_id, chip_id=chip_id, task=task, qids=qids, date=effective_date
-        )
         requested = set(task_ids or [])
+        if requested:
+            targets = self._task_result_repo.find(
+                {
+                    "project_id": project_id,
+                    "chip_id": chip_id,
+                    "name": task,
+                    "task_id": {"$in": sorted(requested)},
+                    "qid": {"$in": qids},
+                }
+            )
+            if effective_date is not None:
+                parsed = parse_date(effective_date, "YYYYMMDD")
+                targets = [
+                    doc
+                    for doc in targets
+                    if start_of_day(parsed)
+                    <= (ensure_timezone(doc.start_at) or start_of_day(parsed))
+                    < end_of_day(parsed)
+                ]
+            targets.sort(key=lambda doc: (_natural_key(doc.qid or ""), doc.task_id))
+        else:
+            latest = self._latest_results(
+                project_id=project_id, chip_id=chip_id, task=task, qids=qids, date=effective_date
+            )
+            targets = [
+                latest[qid]
+                for qid in sorted(qids, key=_natural_key)
+                if qid in latest and (not chosen or qid in chosen)
+            ]
         run = EvaluationRunDocument(
             run_id=f"evr_{uuid.uuid4().hex}",
             project_id=project_id,
@@ -360,25 +507,30 @@ class EvaluationService:
             task_name=task,
             entity_type=entity_type,
             date=effective_date,
-            question=(question or "").strip() or None,
+            knowledge_draft_id=knowledge_draft.draft_id if knowledge_draft else None,
+            knowledge_draft_name=knowledge_draft.filename if knowledge_draft else None,
             trigger=trigger,
             mode=mode,
             with_examples=with_examples,
             planner_model=planner_model,
+            evaluation_model=(
+                f"{selected_evaluation_model['provider']}/{selected_evaluation_model['name']}"
+                if selected_evaluation_model
+                else None
+            ),
             requested_by=requested_by,
         )
         evaluations: list[EvaluationDocument] = []
         skipped: dict[str, str] = {}
-        for qid in sorted(qids, key=_natural_key):
-            if chosen and qid not in chosen:
-                continue
-            doc = latest.get(qid)
-            if doc is None:
-                # Out of scope, not skipped, when the caller named the task results.
-                if not requested:
+        if not requested:
+            for qid in sorted(qids, key=_natural_key):
+                if chosen and qid not in chosen:
+                    continue
+                if qid not in latest:
                     skipped[qid] = "no result"
-                continue
-            if requested and doc.task_id not in requested:
+        for doc in targets:
+            qid = doc.qid or ""
+            if chosen and qid not in chosen:
                 continue
             if doc.status not in TERMINAL_STATUSES:
                 skipped[qid] = f"status {doc.status}"
@@ -472,8 +624,14 @@ class EvaluationService:
     def launch(self, run_id: str, auth: QDashAuth) -> None:
         """Execute a run in the background of the current event loop."""
         task = asyncio.get_running_loop().create_task(self.execute_run(run_id, auth))
-        self._background.add(task)
-        task.add_done_callback(self._background.discard)
+        self._background[run_id] = task
+        task.add_done_callback(
+            lambda finished: (
+                self._background.pop(run_id, None)
+                if self._background.get(run_id) is finished
+                else None
+            )
+        )
 
     async def execute_run(self, run_id: str, auth: QDashAuth) -> None:
         """Evaluate every pending item of a run, a few at a time, then close the run."""
@@ -488,16 +646,39 @@ class EvaluationService:
         thinking: str | None = None
         if run.mode == "planner":
             model, thinking = planner_model_config()
+        evaluation_model = _model_from_identity(run.evaluation_model)
+        heartbeat = asyncio.create_task(self._heartbeat(run_id))
 
         async def one(doc: EvaluationDocument) -> None:
             async with semaphore:
-                await self._evaluate_one(doc, run, auth, model=model, thinking=thinking)
+                await self._evaluate_one(
+                    doc,
+                    run,
+                    auth,
+                    model=model,
+                    evaluation_model=evaluation_model,
+                    thinking=thinking,
+                )
                 self._refresh_run(run_id)
 
         try:
             await asyncio.gather(*(one(doc) for doc in pending))
         finally:
+            heartbeat.cancel()
+            with suppress(asyncio.CancelledError):
+                await heartbeat
             self._refresh_run(run_id)
+
+    @staticmethod
+    async def _heartbeat(run_id: str) -> None:
+        """Keep a durable lease fresh while this process owns a run."""
+        while True:
+            run = EvaluationRunDocument.find_one(EvaluationRunDocument.run_id == run_id).run()
+            if run is None or run.status != "running":
+                return
+            run.heartbeat_at = now()
+            run.save()
+            await asyncio.sleep(HEARTBEAT_SECONDS)
 
     async def _evaluate_one(
         self,
@@ -506,6 +687,7 @@ class EvaluationService:
         auth: QDashAuth,
         *,
         model: dict[str, str] | None = None,
+        evaluation_model: dict[str, str] | None = None,
         thinking: str | None = None,
     ) -> None:
         doc.status = "running"
@@ -516,9 +698,11 @@ class EvaluationService:
                 doc.task_id,
                 auth=auth,
                 question=run.question,
+                knowledge_draft_id=run.knowledge_draft_id,
                 mode=run.mode,
                 with_examples=run.with_examples,
                 model=model,
+                evaluation_model=evaluation_model,
                 thinking_level=thinking,
             )
         except EvaluationRuntimeError as exc:
@@ -528,7 +712,13 @@ class EvaluationService:
             logger.exception("evaluation %s of %s failed", doc.evaluation_id, doc.task_id)
             self._fail(doc, f"runtime: {exc}")
             return
-        doc.input = _input_from_record(record, run.question)
+        self._store_assets(doc.project_id, record)
+        doc.input = _input_from_record(
+            record,
+            run.question,
+            reference_requested=True,
+            examples_requested=run.with_examples,
+        )
         doc.output = _output_from_record(record)
         doc.evaluator = _evaluator_from_record(record)
         doc.planner = _planner_from_record(record)
@@ -558,10 +748,45 @@ class EvaluationService:
             run.model = run.model or (first.output.model if first.output else None)
             run.evaluator = run.evaluator or first.evaluator
         unfinished = any(doc.status in {"pending", "running"} for doc in evaluations)
-        if not unfinished and run.status != "completed":
+        if not unfinished and run.status == "running":
             run.status = "completed"
             run.completed_at = now()
         run.save()
+
+    @staticmethod
+    def _store_assets(project_id: str, record: dict[str, Any]) -> None:
+        """Persist exact figure bytes once, addressed by the recorded SHA-256."""
+        figures = list(record.get("figures") or [])
+        for example in record.get("examples") or []:
+            if isinstance(example, dict):
+                figures.extend(example.get("figures") or [])
+        for figure in figures:
+            if not isinstance(figure, dict) or not isinstance(figure.get("data"), str):
+                continue
+            try:
+                raw = base64.b64decode(figure["data"], validate=True)
+            except (ValueError, TypeError):
+                continue
+            sha256 = str(figure.get("sha256") or "")
+            if not raw or len(raw) > MAX_SNAPSHOT_BYTES:
+                continue
+            if hashlib.sha256(raw).hexdigest() != sha256:
+                logger.warning("discarding evaluation figure with a mismatched SHA-256")
+                continue
+            existing = EvaluationAssetDocument.find_one(
+                EvaluationAssetDocument.project_id == project_id,
+                EvaluationAssetDocument.sha256 == sha256,
+            ).run()
+            if existing is None:
+                # Another worker may persist the same content-addressed image first.
+                with suppress(DuplicateKeyError):
+                    EvaluationAssetDocument(
+                        project_id=project_id,
+                        sha256=sha256,
+                        mime_type=str(figure.get("mime_type") or "application/octet-stream"),
+                        bytes=len(raw),
+                        base64_data=figure["data"],
+                    ).insert()
 
     # --- chat ------------------------------------------------------------------------------
 
@@ -612,6 +837,7 @@ class EvaluationService:
         doc = docs[0]
         output = _output_from_record(record)
         evaluator = _evaluator_from_record(record)
+        self._store_assets(project_id, record)
         requested = now()
         run = EvaluationRunDocument(
             run_id=f"evr_{uuid.uuid4().hex}",
@@ -644,7 +870,12 @@ class EvaluationService:
             requested_at=requested,
             started_at=requested,
             completed_at=requested,
-            input=_input_from_record(record, None),
+            input=_input_from_record(
+                record,
+                None,
+                reference_requested=True,
+                examples_requested=bool(record.get("examples")),
+            ),
             output=output,
             evaluator=evaluator,
             planner=EvaluationPlannerModel(model=planner_model),
@@ -667,6 +898,12 @@ class EvaluationService:
 
     def summarize(self, run: EvaluationRunDocument) -> EvaluationRunSummary:
         """The run with counts derived from its evaluations."""
+        if self._reconcile_run(run):
+            refreshed = EvaluationRunDocument.find_one(
+                EvaluationRunDocument.run_id == run.run_id
+            ).run()
+            if refreshed is not None:
+                run = refreshed
         evaluations = EvaluationDocument.find(EvaluationDocument.run_id == run.run_id).to_list()
         return _summary(run, evaluations)
 
@@ -692,6 +929,13 @@ class EvaluationService:
         )
         if not runs:
             return []
+        for index, run in enumerate(runs):
+            if self._reconcile_run(run):
+                refreshed = EvaluationRunDocument.find_one(
+                    EvaluationRunDocument.run_id == run.run_id
+                ).run()
+                if refreshed is not None:
+                    runs[index] = refreshed
         by_run: dict[str, list[EvaluationDocument]] = {run.run_id: [] for run in runs}
         for doc in EvaluationDocument.find({"run_id": {"$in": list(by_run)}}).to_list():
             by_run.setdefault(doc.run_id, []).append(doc)
@@ -700,6 +944,8 @@ class EvaluationService:
     def get_run(self, *, project_id: str, run_id: str) -> EvaluationRunDetailResponse:
         """One run with its evaluations in entity order."""
         run = self._require_run(project_id, run_id)
+        if self._reconcile_run(run):
+            run = self._require_run(project_id, run_id)
         evaluations = EvaluationDocument.find(EvaluationDocument.run_id == run_id).to_list()
         evaluations.sort(key=lambda doc: _natural_key(doc.qid))
         figures = self._figures_of(project_id, [doc.task_id for doc in evaluations])
@@ -741,6 +987,7 @@ class EvaluationService:
         evaluation_id: str,
         agree: bool | None,
         note: str | None,
+        issues: list[EvaluationVerdictIssue],
         username: str,
     ) -> EvaluationItem:
         """Record a person's judgement; `agree=None` with no note clears it."""
@@ -754,13 +1001,119 @@ class EvaluationService:
                 detail=f"evaluation {evaluation_id} not found",
             )
         note = (note or "").strip() or None
-        doc.verdict = (
-            None
-            if agree is None and note is None
-            else EvaluationVerdictModel(agree=agree, note=note, username=username, updated_at=now())
+        event = EvaluationVerdictModel(
+            agree=agree, note=note, issues=issues, username=username, updated_at=now()
         )
+        prior_current = doc.verdicts or ([doc.verdict] if doc.verdict else [])
+        prior_history = doc.verdict_history or ([doc.verdict] if doc.verdict else [])
+        doc.verdict_history = [*prior_history, event]
+        current = [verdict for verdict in prior_current if verdict.username != username]
+        if agree is not None or note is not None or issues:
+            current.append(event)
+        doc.verdicts = current
+        doc.verdict = max(current, key=lambda verdict: verdict.updated_at) if current else None
         doc.save()
         return _to_item(doc)
+
+    def cancel_run(self, *, project_id: str, run_id: str) -> EvaluationRunSummary:
+        """Cancel unfinished evaluations and stop this worker's background task."""
+        run = self._require_run(project_id, run_id)
+        if run.status != "running":
+            return self.summarize(run)
+        completed_at = now()
+        for doc in EvaluationDocument.find(EvaluationDocument.run_id == run_id).to_list():
+            if doc.status in {"pending", "running"}:
+                doc.status = "cancelled"
+                doc.error = "cancelled by user"
+                doc.completed_at = completed_at
+                doc.save()
+        run.status = "cancelled"
+        run.completed_at = completed_at
+        run.save()
+        task = self._background.get(run_id)
+        if task is not None:
+            task.cancel()
+        self._refresh_run(run_id)
+        return self.summarize(run)
+
+    def retry_run(self, *, project_id: str, run_id: str) -> tuple[EvaluationRunSummary, int]:
+        """Reset failed, interrupted or cancelled items so the caller can relaunch the run."""
+        run = self._require_run(project_id, run_id)
+        active = self._background.get(run_id)
+        if active is not None and not active.done():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="run is still active")
+        retried = 0
+        for doc in EvaluationDocument.find(EvaluationDocument.run_id == run_id).to_list():
+            if doc.status not in {"failed", "interrupted", "cancelled"}:
+                continue
+            doc.status = "pending"
+            doc.started_at = None
+            doc.completed_at = None
+            doc.error = None
+            doc.save()
+            retried += 1
+        if retried == 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="run has no failed, interrupted or cancelled evaluations to retry",
+            )
+        run.status = "running"
+        run.completed_at = None
+        run.heartbeat_at = None
+        run.save()
+        self._refresh_run(run_id)
+        return self.summarize(run), retried
+
+    def evaluation_asset(
+        self, *, project_id: str, evaluation_id: str, sha256: str
+    ) -> tuple[bytes, str]:
+        """Return a snapshotted figure only when the evaluation references its hash."""
+        doc = EvaluationDocument.find_one(
+            EvaluationDocument.project_id == project_id,
+            EvaluationDocument.evaluation_id == evaluation_id,
+        ).run()
+        if doc is None or doc.input is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="figure not found")
+        referenced = {figure.sha256 for figure in doc.input.figures}
+        referenced.update(
+            figure.sha256 for example in doc.input.examples for figure in example.figures
+        )
+        if sha256 not in referenced:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="figure not found")
+        asset = EvaluationAssetDocument.find_one(
+            EvaluationAssetDocument.project_id == project_id,
+            EvaluationAssetDocument.sha256 == sha256,
+        ).run()
+        if asset is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="figure not found")
+        return base64.b64decode(asset.base64_data), asset.mime_type
+
+    def _reconcile_run(self, run: EvaluationRunDocument) -> bool:
+        """Close unfinished work that this process cannot own after its lease expires."""
+        if run.status != "running" or run.run_id in self._background:
+            return False
+        cutoff = now() - STALE_AFTER
+        heartbeat_at = ensure_timezone(run.heartbeat_at or run.requested_at)
+        if heartbeat_at is not None and heartbeat_at > cutoff:
+            return False
+        unfinished = EvaluationDocument.find(
+            {"run_id": run.run_id, "status": {"$in": ["pending", "running"]}}
+        ).to_list()
+        if not unfinished:
+            self._refresh_run(run.run_id)
+            return True
+        completed_at = now()
+        for doc in unfinished:
+            doc.status = "interrupted"
+            doc.error = "evaluation worker stopped before completion; retry the run"
+            doc.completed_at = completed_at
+            doc.save()
+        self._refresh_run(run.run_id)
+        refreshed = EvaluationRunDocument.find_one(EvaluationRunDocument.run_id == run.run_id).run()
+        if refreshed is not None:
+            refreshed.status = "interrupted"
+            refreshed.save()
+        return True
 
     def _require_run(self, project_id: str, run_id: str) -> EvaluationRunDocument:
         run = EvaluationRunDocument.find_one(

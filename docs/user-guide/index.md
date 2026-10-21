@@ -1,38 +1,39 @@
 # User Guide
 
-This guide is for people who set up, run, and use QDash: everything from starting the stack to
-reviewing a calibration result.
+Use this guide to operate a QDash deployment and complete calibration work in the application.
 
-## Set Up and Operate
+## Set Up and Operate QDash
 
-- [Setup](./setup.md): clone QDash, configure `.env` and Qubex, start Compose,
-  and sign in.
-- [Operations](./operations.md): start, stop, inspect logs, and handle common
-  local failures.
-- [System Updates](./system-updates.md): pull a new release and apply it. An
-  upgrade that changes stored data has its own page: [v1.8.0](./migrations/v1.8.0.md),
-  [project-scoped calibration](./migrations/project-scoped-calibration.md).
+Choose a backend in [Setup](./setup.md) to take a new installation from clone to sign-in. The
+[Fake backend](./setup/fake-backend.md) evaluates QDash without hardware; the
+[Qubex backend](./setup/qubex-backend.md) connects a supported control system.
 
-## Work in QDash
+After setup, use [Operations](./operations.md) to control and troubleshoot services and
+[System Updates](./system-updates.md) to deploy another stable release.
 
-Read in this order the first time; afterwards each page stands on its own.
+## Learn the Application
 
-- [Application Tour](./application-tour.md): the pages, what each is for, and who can do what.
-- [Authentication](./authentication.md) and [Projects and Sharing](./projects-and-sharing.md):
-  accounts, roles, and the project boundary that scopes everything else.
-- [Roles and Permissions](./permissions.md): what each system and project role can do.
-- [Dashboard](./dashboard.md): chip health at a glance.
-- [Running Calibrations](./running-calibrations.md) and [Task Parameters](./task-parameters.md):
-  workflows, one-off task runs, and how parameters are resolved.
-- [Data and Provenance](./data-and-provenance.md): the data views and how to trace a parameter
-  back to the measurement that produced it.
-- [Reviewing Results](./reviewing-results.md): notes, forum threads, knowledge, and AI
-  evaluations of task results.
-- [Copilot](./copilot.md) and [Agent Calibration](./agent-calibration.md): the chat assistant,
-  and bounded calibration runs driven by an agent.
-- [Cryostats and Cool-downs](./cryo.md) and
-  [Calibration Data Sharing](./calibration-data-sharing.md): the physical context and the
-  storage boundary of calibration data.
+Read [What is QDash?](./what-is-qdash.md) for the calibration model and watch the short demo.
+Use the [Application Tour](./application-tour.md) to find each page and its task-specific guide.
 
-Scripts and notebooks that read QDash data use the
-[Python client](../reference/clients/python.md) or the [TypeScript client](../reference/clients/typescript.md).
+## Complete Calibration Work
+
+| Goal | Guide |
+| --- | --- |
+| Run a workflow or one task | [Running Calibrations](./running-calibrations.md) |
+| Control inputs and saved outputs | [Task Parameters](./task-parameters.md) |
+| Scan chip health | [Dashboard](./dashboard.md) |
+| Investigate state, history, or provenance | [Calibration Data and Provenance](./data-and-provenance.md) |
+| Review, discuss, or hand off a result | [Reviewing and Sharing Results](./reviewing-results.md) |
+| Track cryostats, cool-downs, and wiring | [Cryostats and Cool-downs](./cryostats-and-cool-downs.md) |
+| Evaluate results with AI | [AI Evaluations](./ai-evaluations.md) |
+| Use assisted calibration | [AI Chat](./ai-chat.md) or [Agent Calibration](./agent-calibration.md) |
+
+## Manage Access
+
+Use [Authentication and Users](./authentication-and-users.md) for accounts and passwords,
+[Projects and Data Sharing](./projects-and-data-sharing.md) for membership, roles, and project
+boundaries.
+
+For automation, use the [Python client](../reference/clients/python.md) or
+[TypeScript client](../reference/clients/typescript.md).

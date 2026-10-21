@@ -35,6 +35,13 @@ class EvaluationRunDocument(Document):
     question: str | None = Field(
         default=None, description="Specific question asked on top of the standard diagnosis"
     )
+    knowledge_draft_id: str | None = Field(
+        default=None,
+        description="Uploaded knowledge draft evaluated against, instead of the shared one",
+    )
+    knowledge_draft_name: str | None = Field(
+        default=None, description="File name of that draft's zip"
+    )
     trigger: EvaluationTrigger = Field(default="bulk")
     mode: EvaluationMode = Field(default="direct")
     with_examples: bool = Field(
@@ -43,9 +50,15 @@ class EvaluationRunDocument(Document):
     planner_model: str | None = Field(
         default=None, description="provider/modelId of the planner, in planner mode"
     )
+    evaluation_model: str | None = Field(
+        default=None, description="Configured provider/modelId requested for every evaluation"
+    )
     requested_by: str = Field(..., description="Username that requested the run")
     requested_at: datetime = Field(default_factory=now)
     completed_at: datetime | None = Field(default=None)
+    heartbeat_at: datetime | None = Field(
+        default=None, description="Last proof that an API worker owns this run"
+    )
     status: EvaluationRunStatus = Field(default="running")
     total: int = Field(default=0, description="Evaluations in the run")
     completed_count: int = Field(default=0)

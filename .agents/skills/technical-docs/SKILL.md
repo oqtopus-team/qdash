@@ -54,6 +54,14 @@ Google style, applied to this repository:
 - **Tables for parallel structured items** (settings, questions, files, triggers), prose for
   argument. A table cell holds a phrase, not a paragraph; if cells grow past two lines, the
   content wants prose or its own section.
+- **Diagrams for relationships that prose hides.** Use a small Mermaid flowchart, sequence
+  diagram, state diagram, or class diagram when the reader must track at least three components,
+  branches, transitions, or parallel and sequential phases. For dense architecture and lifecycle
+  views that need deliberate layout, add a theme-aware SVG under `docs/diagrams/` and embed it as
+  `<Diagram name="..." caption="..." />`; follow the accessibility and styling rules in
+  `docs/developer-guide/docs-guidelines.md`. Keep labels concrete, explain the consequence in
+  nearby prose, and make the surrounding text sufficient for readers who cannot see the diagram.
+  Do not diagram a list, a single linear action, or the same information already clear in a table.
 - **Keep markdown compact.** Tables use `| --- |` separators without column padding; docs are
   not run through a formatter in CI, so match the surrounding file.
 
@@ -84,6 +92,8 @@ Read the page once as its reader, with these questions, and rewrite until every 
 - Does each paragraph add one thing the page did not already say?
 - Is the order the order the reader needs: what it is, how it behaves, how to change it, where
   the code is?
+- Would a compact diagram make a multi-component relationship, branch, state change, or execution
+  order faster to understand than the current prose? If so, add one and remove duplicated prose.
 - Would every example run, and does every path, symbol and label exist?
 - Can any sentence be deleted without losing a fact or a reason? Delete it.
 - Is the page still under about 400 lines? Past that, split by topic and link.

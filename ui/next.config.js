@@ -13,6 +13,8 @@ const nextConfig = {
       { source: "/files", destination: "/config", permanent: true },
       { source: "/task-knowledge", destination: "/knowledge", permanent: true },
       { source: "/task-knowledge/:taskName", destination: "/knowledge/:taskName", permanent: true },
+      // The knowledge file editor was removed: Knowledge is read-only.
+      { source: "/knowledge/files", destination: "/knowledge", permanent: false },
     ];
   },
   async rewrites() {

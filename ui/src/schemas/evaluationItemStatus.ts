@@ -14,4 +14,6 @@ export const EvaluationItemStatus = {
   running: 'running',
   completed: 'completed',
   failed: 'failed',
+  interrupted: 'interrupted',
+  cancelled: 'cancelled',
 } as const;

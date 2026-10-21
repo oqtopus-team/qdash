@@ -1,124 +1,101 @@
-# Database Structure
+# Database Collections
 
-QDash uses MongoDB via the Bunnet ODM with a project-centric multi-tenant model. The data model has two layers:
+QDash persists Bunnet documents in MongoDB; this page maps each collection to the class and module
+that define its fields and indexes.
 
-- **datamodel** (`src/qdash/datamodel/`) — Pydantic `BaseModel` for business logic; fields in [Data Models](./data-models.md)
-- **dbmodel** (`src/qdash/dbmodel/`) — Bunnet `Document` for database persistence; fields per collection in [Calibration Documents](./database-documents-calibration.md), [Execution Documents](./database-documents-execution.md) and [Collaboration Documents](./database-documents-collaboration.md)
+## Use the Code as the Schema
+
+`src/qdash/dbmodel/document_models.py` is the complete registration list used by API startup.
+Each document's `Settings.name` defines its collection, and `Settings.indexes` defines its managed
+indexes. The document class is the source of truth for fields, defaults, validation, and indexes.
+
+Related model layers serve different contracts:
+
+| Layer | Source | Contract |
+| --- | --- | --- |
+| Persisted MongoDB documents | `src/qdash/dbmodel/` | Stored fields, collection names, and indexes |
+| Domain models | `src/qdash/datamodel/` | Values shared by API, repositories, and workflow code |
+| HTTP schemas | `src/qdash/api/schemas/` | Request and response payloads |
+| Public API | [OpenAPI](./openapi.md) | Generated HTTP operations and schemas |
+
+Do not copy a field or index definition into documentation when the code can answer it directly.
+Explain lifecycle and ownership decisions in the Developer Guide instead.
+
+## Identity and Projects
+
+| Collection | Document | Module |
+| --- | --- | --- |
+| `user` | `UserDocument` | `user.py` |
+| `project` | `ProjectDocument` | `project.py` |
+| `project_membership` | `ProjectMembershipDocument` | `project_membership.py` |
+
+## Calibration and Hardware
+
+| Collection | Document | Module |
+| --- | --- | --- |
+| `backend` | `BackendDocument` | `backend.py` |
+| `chip` | `ChipDocument` | `chip.py` |
+| `qubit` | `QubitDocument` | `qubit.py` |
+| `coupling` | `CouplingDocument` | `coupling.py` |
+| `task` | `TaskDocument` | `task.py` |
+| `chip_history` | `ChipHistoryDocument` | `chip_history.py` |
+| `qubit_history` | `QubitHistoryDocument` | `qubit_history.py` |
+| `coupling_history` | `CouplingHistoryDocument` | `coupling_history.py` |
+| `cryostat` | `CryostatDocument` | `cryostat.py` |
+| `cooldown` | `CooldownDocument` | `cooldown.py` |
+| `cooldown_wiring_event` | `CooldownWiringEventDocument` | `cooldown_wiring_event.py` |
 
 The [Calibration Data Lifecycle](../developer-guide/workflow/calibration-data-lifecycle.md) explains
-which collections hold accepted values versus measurement history and how workflow outputs move
-between MongoDB, active execution state, and Qubex parameter files.
+how accepted parameters, task results, and history differ.
 
-## MongoDB Collections
+## Executions and Workflows
 
-Each document class links to the page that lists its fields, indexes and methods.
+| Collection | Document | Module |
+| --- | --- | --- |
+| `execution_history` | `ExecutionHistoryDocument` | `execution_history.py` |
+| `task_result_history` | `TaskResultHistoryDocument` | `task_result_history.py` |
+| `execution_counter` | `ExecutionCounterDocument` | `execution_counter.py` |
+| `execution_lock` | `ExecutionLockDocument` | `execution_lock.py` |
+| `calibration_note` | `CalibrationNoteDocument` | `calibration_note.py` |
+| `flows` | `FlowDocument` | `flow.py` |
+| `evaluation_run` | `EvaluationRunDocument` | `evaluation_run.py` |
+| `evaluation` | `EvaluationDocument` | `evaluation.py` |
+| `evaluation_asset` | `EvaluationAssetDocument` | `evaluation_asset.py` |
 
-| Collection            | Document Class                                                                               | Description                                                |
-| --------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `project`             | [ProjectDocument](./database-documents-collaboration.md#projectdocument)                     | Project metadata (owner-centric workspace)                 |
-| `project_membership`  | [ProjectMembershipDocument](./database-documents-collaboration.md#projectmembershipdocument) | User membership & role per project                         |
-| `chip`                | [ChipDocument](./database-documents-calibration.md#chipdocument)                             | Quantum chip configuration scoped to a project             |
-| `qubit`               | [QubitDocument](./database-documents-calibration.md#qubitdocument)                           | Individual qubit data                                      |
-| `coupling`            | [CouplingDocument](./database-documents-calibration.md#couplingdocument)                     | Qubit coupling information                                 |
-| `execution_history`   | [ExecutionHistoryDocument](./database-documents-execution.md#executionhistorydocument)       | Calibration execution history                              |
-| `task_result_history` | [TaskResultHistoryDocument](./database-documents-execution.md#taskresulthistorydocument)     | Task result history                                        |
-| `qubit_history`       | [QubitHistoryDocument](./database-documents-calibration.md#qubithistorydocument)             | Daily qubit snapshots                                      |
-| `chip_history`        | [ChipHistoryDocument](./database-documents-calibration.md#chiphistorydocument)               | Daily chip snapshots                                       |
-| `coupling_history`    | [CouplingHistoryDocument](./database-documents-calibration.md#couplinghistorydocument)       | Daily coupling snapshots                                   |
-| `task`                | [TaskDocument](./database-documents-calibration.md#taskdocument)                             | Task definitions                                           |
-| `backend`             | [BackendDocument](./database-documents-calibration.md#backenddocument)                       | Backend configurations (project scoped)                    |
-| `user`                | [UserDocument](./database-documents-collaboration.md#userdocument)                           | User authentication / default project bootstrap            |
-| `tag`                 | [TagDocument](./database-documents-collaboration.md#tagdocument)                             | Project-level tag management                               |
-| `execution_lock`      | [ExecutionLockDocument](./database-documents-execution.md#executionlockdocument)             | Exclusive execution lock                                   |
-| `execution_counter`   | [ExecutionCounterDocument](./database-documents-execution.md#executioncounterdocument)       | Execution ID counter                                       |
-| `calibration_note`    | [CalibrationNoteDocument](./database-documents-execution.md#calibrationnotedocument)         | Calibration notes (workflow internal)                      |
-| `flows`               | [FlowDocument](./database-documents-execution.md#flowdocument)                               | User-defined flows                                         |
-| `metric_note`         | [MetricNoteDocument](./database-documents-collaboration.md#metricnotedocument)               | Legacy dashboard metric notes scoped by cooldown/range     |
-| `chip_note`           | [ChipNoteDocument](./database-documents-collaboration.md#chipnotedocument)                   | Dashboard chip notes scoped by cooldown/range              |
-| `target_note`         | [TargetNoteDocument](./database-documents-collaboration.md#targetnotedocument)               | Dashboard pinned target summaries scoped by cooldown/range |
-| `note_event`          | [NoteEventDocument](./database-documents-collaboration.md#noteeventdocument)                 | Audit log for every note edit (write-through)              |
-| `forum_label`         | [ForumLabelDocument](./database-documents-collaboration.md#forumlabeldocument)               | Custom project-scoped forum labels                         |
-| `slack_forum_thread`  | [SlackForumThreadDocument](./database-documents-collaboration.md#slackforumthreaddocument)   | Slack message posted for each root forum thread            |
-| `cryostat`            | [CryostatDocument](./database-documents-calibration.md#cryostatdocument)                     | Cryostat (dilution refrigerator) entity                    |
-| `cooldown`            | [CooldownDocument](./database-documents-calibration.md#cooldowndocument)                     | One cool-down cycle of one cryostat                        |
-| `evaluation_run`      | [EvaluationRunDocument](./database-documents-execution.md#evaluationrundocument)             | One bulk calibration evaluation request                    |
-| `evaluation`          | [EvaluationDocument](./database-documents-execution.md#evaluationdocument)                   | One `qcal_evaluate` snapshot and its human verdict         |
+[Workflow Engine Architecture](../developer-guide/workflow/engine-architecture.md) explains the
+runtime lifecycle, reservations, and terminal state handling.
 
----
+## Notes, Forum, and Notifications
 
-## Entity Relationship Diagram (Conceptual)
+| Collection | Document | Module |
+| --- | --- | --- |
+| `tag` | `TagDocument` | `tag.py` |
+| `chip_note` | `ChipNoteDocument` | `chip_note.py` |
+| `metric_note` | `MetricNoteDocument` | `metric_note.py` |
+| `target_note` | `TargetNoteDocument` | `target_note.py` |
+| `note_event` | `NoteEventDocument` | `note_event.py` |
+| `forum_category` | `ForumCategoryDocument` | `forum.py` |
+| `forum_label` | `ForumLabelDocument` | `forum.py` |
+| `forum_post` | `ForumPostDocument` | `forum.py` |
+| `forum_counter` | `ForumCounterDocument` | `forum.py` |
+| `slack_forum_thread` | `SlackForumThreadDocument` | `slack_forum_thread.py` |
+| `notification` | `NotificationDocument` | `notification.py` |
+| `copilot_chat_session` | `CopilotChatSessionDocument` | `copilot_chat_session.py` |
 
-![Database ER Diagram](../diagrams/database-er.drawio.png)
+[Notes Architecture](../developer-guide/architecture/notes.md) explains current-state notes and
+their audit events.
 
-Other project-scoped collections (tasks, tags, backends, flows, counters, locks, histories) all reference `project_id`, ensuring a single sharing boundary per project.
+## Agent and Provenance
 
----
+| Collection | Document | Module |
+| --- | --- | --- |
+| `agent_sessions` | `AgentSessionDocument` | `agent_session.py` |
+| `agent_actions` | `AgentActionDocument` | `agent_session.py` |
+| `agent_candidate_commits` | `AgentCandidateCommitDocument` | `agent_session.py` |
+| `agent_campaign_commits` | `AgentCampaignCommitDocument` | `agent_session.py` |
+| `parameter_versions` | `ParameterVersionDocument` | `provenance.py` |
+| `provenance_relations` | `ProvenanceRelationDocument` | `provenance.py` |
+| `provenance_activities` | `ActivityDocument` | `provenance.py` |
 
-## Data Flow
-
-### During Calibration Execution
-
-0. Resolve `(project_id, user_id)` via **ProjectMembershipDocument** and ensure the role includes write permission
-1. Acquire per-project lock via **ExecutionLockDocument(project_id)**
-2. Generate execution ID from **ExecutionCounterDocument** (YYYYMMDD-NNN scoped by project/chip)
-3. Execute each task:
-   - Save task results to **TaskResultHistoryDocument** (with `execution_id` for linking)
-   - Update calibration data in **QubitDocument** / **CouplingDocument**
-   - Save history to **QubitHistoryDocument** / **CouplingHistoryDocument**
-4. Save execution metadata to **ExecutionHistoryDocument** (status, timing, notes only)
-5. Save chip snapshot to **ChipHistoryDocument**
-6. Release **ExecutionLock**
-
-### During Cancellation
-
-When a user cancels a running execution via the UI:
-
-1. UI sends `POST /executions/{flow_run_id}/cancel` with the Prefect flow run UUID
-2. API sets the Prefect flow run to `Cancelling` state via the Prefect client
-3. Prefect sends SIGTERM to the worker process running the flow
-4. Prefect triggers the `on_cancellation` hook registered on the `@flow` decorator
-5. The hook reads `flow_run_id` from the execution's `note` field to locate the execution
-6. All non-terminal tasks (running/scheduled/pending) are set to `cancelled`
-7. The execution status is set to `cancelled`
-8. The **ExecutionLock** is released
-
-> **Note**: The `flow_run_id` (Prefect UUID) is stored in `ExecutionHistoryDocument.note["flow_run_id"]`
-> at the start of each flow run. This bridges the QDash execution ID (`YYYYMMDD-NNN`) with
-> the Prefect flow run UUID, enabling the cancel operation.
-
-### Data Architecture (256+ Qubit Support)
-
-To avoid MongoDB's 16MB document limit with large qubit counts:
-
-```
-┌─────────────────────────┐
-│  ExecutionHistoryDoc    │  ← Metadata only (~2KB)
-│  - execution_id         │
-│  - status, timing       │
-│  - tags, note           │
-└───────────┬─────────────┘
-            │ execution_id
-            ▼
-┌─────────────────────────┐
-│  TaskResultHistoryDoc   │  ← Individual task results
-│  - task_id              │     (one doc per task)
-│  - execution_id (FK)    │
-│  - output_parameters    │
-└─────────────────────────┘
-
-┌─────────────────────────┐
-│  QubitDocument          │  ← Calibration data
-│  CouplingDocument       │     (persistent storage)
-└─────────────────────────┘
-```
-
----
-
-## Datetime
-
-Persisted timestamps are managed in **UTC**. Client display converts API UTC
-timestamps to the configured timezone, currently Asia/Tokyo.
-
-- `created_at`, `updated_at`: ISO8601 format
-- `recorded_date`: YYYYMMDD format in the configured calendar timezone
-- `calibrated_at`: ISO8601 format
+[Provenance Architecture](../developer-guide/architecture/provenance.md) explains version,
+relationship, and activity records.

@@ -45,11 +45,56 @@ next bringup task consumes the value measured in the current workflow instead of
 value. Adaptive Chevron, fixed-grid Chevron, and Ramsey produce a physical qubit-frequency result
 and also make it the next operating control frequency.
 
+### EF and FH frequency and configuration
+
+EF and FH calibration separate measured transitions from operational drive frequencies in the
+same way as GE calibration.
+
+| Task or task family | Frequency input | Frequency result | Published database parameters |
+| --- | --- | --- | --- |
+| `CheckAdaptiveEFChevron` | Configured `control_frequency_ef`; otherwise the Qubex missing-anharmonicity default derived from `control_frequency` | Measured EF transition and anharmonicity | `ef_frequency`, `control_frequency_ef`, `anharmonicity` |
+| `CheckEFRabi`, EF pulse creation, and EF readout classification | `control_frequency_ef`; fallback: `ef_frequency` | No transition-frequency result | None |
+| `CheckAdaptiveFHChevron` | Configured `control_frequency_fh`; otherwise `2 * control_frequency_ef - control_frequency` | Measured FH transition | `fh_frequency`, `control_frequency_fh` |
+
+`ConfigureEF` must run in the same worker session before an EF- or FH-dependent measurement. It
+loads and pushes either the `ge-ef-cr` layout, which is the default, or `ge-ef-fh`. EF tasks reject
+a session whose GE and EF targets are not available, and `CheckAdaptiveFHChevron` additionally requires an
+FH target. Ordinary `Configure` defaults to `ge-cr-cr`, even after an EF configuration task, so a
+flow returning to CR calibration must run `Configure` to restore the CR layout.
+
+`CheckAdaptiveEFChevron` deliberately ignores persisted anharmonicity when selecting its initial search
+frequency. If Qubex has an explicit `control_frequency_ef`, the task uses it. Otherwise it uses
+`18 / 19 * control_frequency`, matching Qubex's `E_J / E_C = 50` fallback when anharmonicity is
+unset. Its initial EF drive amplitude is `control_amplitude / sqrt(2)`, matching Qubex's default
+scaling from the calibrated GE control amplitude. Qubit spectroscopy may still display an f12
+estimate for diagnosis, but it does not publish that estimate as calibrated anharmonicity.
+
+`CheckAdaptiveFHChevron` requires the `ge-ef-fh` layout, a calibrated GE HPI pulse, and a calibrated EF pi
+pulse. It uses the configured `control_frequency_fh` as its initial search frequency when present.
+Otherwise it derives the initial frequency from the measured GE and EF transition frequencies
+without reading persisted anharmonicity. Its initial FH drive amplitude is
+`control_amplitude / sqrt(3)`, matching Qubex's default scaling. The task is available for explicit
+task lists but is not part of the `ef_calibration` template.
+
+The `ef_calibration` template keeps all EF tasks in one synchronized `CustomOneQubit` step. It
+starts from existing GE control and readout frequencies and readout amplitude, then runs
+`ConfigureEF`, calibrates GE Rabi and HPI, measures the EF transition, and calibrates EF pulses and
+three-state readout. `CheckAdaptiveEFChevron` therefore receives the HPI parameters created earlier in the
+same task list; a pre-existing HPI calibration is not required by the template.
+
+`CheckEFRabi` records the GE HPI inputs used by the task, but Qubex currently prepares the
+`|e>` state through `x180()`. `CheckAdaptiveFHChevron` likewise uses `x180()` for its GE and EF preparation
+pulses. For GE, that call can prefer a stored DRAG PI, PI, or DRAG HPI pulse over the restored HPI.
+For EF, a stored DRAG PI can take precedence over the restored EF PI. Existing calibration-note
+entries can therefore change state preparation even when the recorded task inputs match. Starting
+a new QDash execution does not remove those entries.
+
 ### Resonator and readout frequency
 
 | Task or task family | Readout-frequency input | Frequency result | Published database parameters |
 | --- | --- | --- | --- |
 | `CheckResonatorSpectroscopy` | Qubex spectroscopy sweep range; no calibrated readout-frequency input | Measured resonator frequency | `resonator_frequency`, `readout_frequency` |
+| `CheckCKP` | `readout_frequency` | Measured resonator frequency and photon-limited optimal drive | `resonator_frequency`, `readout_frequency` |
 | `CheckCoarseReadoutParams` | `readout_frequency`; fallback: `resonator_frequency` | Selected operational readout frequency | `readout_frequency` |
 | Other ordinary measurement and gate tasks | `readout_frequency`; fallback: `resonator_frequency` | No frequency result | None |
 
@@ -58,17 +103,20 @@ across readout frequencies and amplitudes. It does not replace `resonator_freque
 Resonator Spectroscopy deliberately publishes its measured resonance to both parameters, so a
 subsequent readout optimization starts from the newly measured device state.
 
-CKP is intended to update `resonator_frequency` only when its concrete task output is confirmed to
-represent a physical resonator-frequency estimate. This mapping is policy, not an implemented task
-contract in the current Qubex task set.
+`CheckCKP` runs Qubex's filtered CKP experiment. It publishes the fitted ground-state resonator
+frequency as `resonator_frequency` and the photon-limited optimum as `readout_frequency`. The task
+also publishes its fitted Purcell-filter parameters. It rejects every output when the fit R² is not
+finite and strictly greater than `0.7`, or when any required fitted value is invalid.
 
 Update targets are specified per output, not by classifying the entire task as exploration or calibration. Amplitude and other outputs retain their own declared destinations. In particular, Resonator Spectroscopy also produces `readout_amplitude`; maintaining the readout frequency does not imply that every readout setting remains unchanged.
 
 ### Replacement within the same parameter
 
-There is no automatic ranking of task names or calibration stages. With publication enabled, a validated Chevron result can replace a Ramsey result in `qubit_frequency`. Likewise, a validated Resonator Spectroscopy result can replace a CKP result in `resonator_frequency` when that mapping is confirmed.
-
-The execution UI explains the current source and the replacement before the run. Operators can choose measurement-only execution. This policy protects calibrated qubit frequencies from exploration updates; it does not guarantee that every accepted recalibration improves precision or device performance.
+There is no automatic ranking of task names or calibration stages. With publication enabled, a
+validated Chevron result can replace a Ramsey result in `qubit_frequency`. A validated Resonator
+Spectroscopy result can replace a CKP result in `resonator_frequency`, and a later CKP result can
+replace it again. This policy protects measured qubit frequencies from exploration updates; it does
+not guarantee that every accepted recalibration improves precision or device performance.
 
 ## Runtime frequency resolution
 
@@ -125,6 +173,7 @@ bringup as a recalibration operation.
 | Operation with publication enabled and validation passed | `resonator_frequency` | `readout_frequency` |
 | --- | --- | --- |
 | Resonator Spectroscopy | Update | Update to the measured resonance |
+| Filtered CKP | Update to the fitted ground-state resonance | Update to the photon-limited optimum |
 | Readout frequency optimization | Retain | Update to the optimized drive |
 
 Repeating Resonator Spectroscopy intentionally restores the measured resonance as the operational
@@ -184,7 +233,7 @@ YAML files represent accepted parameter values and the default drive configurati
 | `readout_frequency.yaml` | Accepted operational readout frequency |
 
 On accepted Chevron or Ramsey updates, update both `qubit_frequency.yaml` and
-`control_frequency.yaml`. On accepted Resonator Spectroscopy updates, update both
+`control_frequency.yaml`. On accepted Resonator Spectroscopy or CKP updates, update both
 `resonator_frequency.yaml` and `readout_frequency.yaml`. Readout optimization updates only
 `readout_frequency.yaml`.
 
@@ -192,43 +241,21 @@ Seed import is deliberately narrower: only operational frequency and amplitude f
 the calibration database. It cannot import `qubit_frequency.yaml` or
 `resonator_frequency.yaml`; experiments own those measured values.
 
-## Execution UX
+## Execution Controls and Results
 
-### Execution intent
+The Task Workbench starts with **Save calibrated outputs to DB** disabled. A run still records its
+measurements and artifacts, but its outputs do not become current calibration values. Enabling the
+control publishes validated outputs to every destination declared by the task and can update mapped
+YAML files when that integration is configured.
 
-Expose the execution purpose and update destinations in user-facing language rather than relying on an ambiguous “Update params” switch.
+**Run again** opens the same workbench with values from the source result. Saving outputs remains
+disabled until the operator enables it for that run. Input selection and output publication are
+independent; publishing an output does not bypass task validation.
 
-| Action | Input baseline | Default publication behavior |
-| --- | --- | --- |
-| Measure only | Current calibration state, plus permitted overrides | History only |
-| Calibrate and apply | Current calibration state, plus permitted overrides | Publish validated outputs to declared destinations |
-| Repeat with the same conditions | Recorded snapshot, plus permitted overrides | History only |
-| Bringup | Current calibration state and outputs from preceding steps | Publish validated outputs as tasks complete |
+The result's **Output Parameters** table shows **Calibration DB updated**, **Measurement only**, or
+**Partially updated** from the recorded destination metadata. For an applied value it shows the
+previous value, the new value, and each database destination. Historical `readout_frequency`
+records retain the task that produced them; QDash does not reinterpret an older spectroscopy,
+CKP, or optimization result as another parameter type.
 
-Keep measurement-only execution as the initial selection for Tasks quick runs. A new run using current settings and a snapshot re-execution must be distinguishable in navigation and labels. Publication is separate from input selection and from bypassing validation.
-
-### Before execution
-
-Show the update destinations and their current source task near the execution action. For spectroscopy that publishes exploration results, use explanatory text such as:
-
-> Updates the exploration frequency (`coarse_qubit_frequency`) and uses it as the new `control_frequency`. The measured `qubit_frequency` is retained.
-
-For Chevron replacing a Ramsey calibration:
-
-> Updates `qubit_frequency`. The current value comes from Ramsey. A validated result will replace it with this Chevron measurement.
-
-For Resonator Spectroscopy after readout optimization:
-
-> Updates `resonator_frequency` and resets `readout_frequency` to this measured resonance. Run readout optimization afterward to select a different operating frequency.
-
-List other updated outputs separately. Generate the source descriptions from the selected target's actual calibration metadata. Measurement-only runs must instead state that results are recorded without applying parameter updates. Keep the measurement-only choice near the action; routine execution does not require another confirmation dialog.
-
-### After execution
-
-Display execution outcome and publication outcome separately. For each output, show the measured value, whether it was applied, the previous accepted value where applicable, and the reason when it was not applied. Show the retained operating frequency and its source when an exploration result was updated.
-
-Use explicit outcomes such as “Applied,” “History only,” and “Not applied: validation failed.” A successful measurement alone does not mean the calibration database or YAML was updated. YAML synchronization failures must remain distinguishable from measurement failures.
-
-Existing historical `readout_frequency` records may originate from spectroscopy or optimization.
-Preserve their original provenance rather than retroactively treating them as
-`resonator_frequency` measurements.
+The user procedure is in [Task Parameters](../../user-guide/task-parameters.md).

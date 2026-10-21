@@ -180,6 +180,14 @@ export function modeLabel(mode: string): string {
   return mode === "planner" ? "Via Copilot" : "Fixed prompt";
 }
 
+/** Which knowledge a run read: the task's shared knowledge, or an uploaded draft by file name. */
+export function knowledgeLabel(
+  run: Pick<EvaluationRunSummary, "knowledge_draft_id" | "knowledge_draft_name">,
+): string {
+  if (!run.knowledge_draft_id) return "Shared";
+  return `Draft ${run.knowledge_draft_name || run.knowledge_draft_id.slice(0, 12)}`;
+}
+
 /** Whether labeled examples were shown before the figure, in QCalEval's terms. */
 export function examplesLabel(withExamples: boolean | undefined): string {
   return withExamples ? "In-context" : "Zero-shot";
@@ -221,7 +229,8 @@ export function runTimingLabel(
 
 /**
  * One model call as text: the question it asked, its duration and how it
- * ended, e.g. "fit_reliability 3.3 min (length)".
+ * ended, and its tokens when recorded, e.g.
+ * "fit_reliability 3.3 min (length), 3,210 in / 2,048 out".
  */
 export function callLabel(call: EvaluationCallModel): string {
   const how =
@@ -229,7 +238,68 @@ export function callLabel(call: EvaluationCallModel): string {
       ? "stop, incomplete"
       : call.stop_reason;
   const timing = `${formatDuration(call.duration_ms) ?? "?"} (${how})`;
-  return call.question ? `${call.question} ${timing}` : timing;
+  const tokens =
+    typeof call.input_tokens === "number" && typeof call.output_tokens === "number"
+      ? `, ${formatTokens(call.input_tokens)} in / ${formatTokens(call.output_tokens)} out`
+      : "";
+  return `${call.question ? `${call.question} ${timing}` : timing}${tokens}`;
+}
+
+/** A token count with thousands separators. */
+function formatTokens(count: number): string {
+  return count.toLocaleString("en-US");
+}
+
+/** Share of the context window past which a call is flagged as close to the limit. */
+const CONTEXT_WARNING_RATIO = 0.9;
+
+/**
+ * The largest model call of one or more evaluations, in tokens: the prompt it
+ * sent (images included) and, with its answer, how much of the judging
+ * model's context window it filled. Null when no call recorded its tokens.
+ */
+export interface TokenPeak {
+  /** Prompt tokens of the largest call. */
+  input: number;
+  /** Prompt plus answer tokens of the fullest call: what the context window has to hold. */
+  used: number;
+  contextWindow: number | null;
+  nearLimit: boolean;
+}
+
+export function tokenPeak(
+  outputs: ReadonlyArray<EvaluationOutputModel | null | undefined>,
+): TokenPeak | null {
+  let input: number | null = null;
+  let used = 0;
+  let contextWindow: number | null = null;
+  for (const output of outputs) {
+    if (!output) continue;
+    if (typeof output.context_window === "number") {
+      contextWindow = Math.min(contextWindow ?? output.context_window, output.context_window);
+    }
+    for (const call of output.calls ?? []) {
+      if (typeof call.input_tokens !== "number") continue;
+      input = Math.max(input ?? 0, call.input_tokens);
+      used = Math.max(used, call.input_tokens + (call.output_tokens ?? 0));
+    }
+  }
+  if (input === null) return null;
+  return {
+    input,
+    used,
+    contextWindow,
+    nearLimit: contextWindow !== null && used >= contextWindow * CONTEXT_WARNING_RATIO,
+  };
+}
+
+/** The largest prompt as text, against the context window when it is known. */
+export function tokenPeakLabel(peak: TokenPeak | null): string | null {
+  if (!peak) return null;
+  const prompt = `largest prompt ${formatTokens(peak.input)} tokens`;
+  return peak.contextWindow === null
+    ? prompt
+    : `${prompt} (${formatTokens(peak.used)} of ${formatTokens(peak.contextWindow)} with the answer)`;
 }
 
 export function formatDuration(ms: number | null | undefined): string | null {
@@ -239,11 +309,19 @@ export function formatDuration(ms: number | null | undefined): string | null {
   return `${(ms / 60_000).toFixed(1)} min`;
 }
 
-/** Finished evaluations of a run, done or failed. */
+/** Evaluations that reached any terminal state. */
 export function runDone(
-  run: Pick<EvaluationRunSummary, "completed_count" | "failed_count">,
+  run: Pick<
+    EvaluationRunSummary,
+    "completed_count" | "failed_count" | "interrupted_count" | "cancelled_count"
+  >,
 ): number {
-  return run.completed_count + run.failed_count;
+  return (
+    run.completed_count +
+    run.failed_count +
+    (run.interrupted_count ?? 0) +
+    (run.cancelled_count ?? 0)
+  );
 }
 
 /** Whether a run still has work in flight, so the page keeps polling. */

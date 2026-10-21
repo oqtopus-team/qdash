@@ -44,7 +44,10 @@ function evaluationResult(overrides = {}) {
   return {
     content: [{ type: "text", text: '{"fit_quality":"good","success":true}' }],
     details: {
-      model: { provider: "vllm", modelId: "nvidia/Ising-Calibration" },
+      model: {
+        provider: "openai-compatible-evaluation",
+        modelId: "nvidia/Ising-Calibration",
+      },
       diagnosis: { fit_quality: "good", success: true },
       prompt: "Reference for this experiment ...\nExperiment context:\nTask: CheckRabi",
     },
@@ -86,10 +89,17 @@ function deps(results, knowledge = REFERENCE) {
   };
 }
 
-test("evidence feeds the evaluation: task and target as context, figure bytes, task name and reference", async () => {
+test("evidence feeds the selected evaluation model: task, target, figure and reference", async () => {
   const d = deps({ [EVIDENCE_TOOL]: evidenceResult(), [EVALUATION_TOOL]: evaluationResult() });
 
-  const result = await evaluateTask({ taskId: "task-1", question: "Is the fit trustworthy?" }, d);
+  const result = await evaluateTask(
+    {
+      taskId: "task-1",
+      question: "Is the fit trustworthy?",
+      evaluationModel: "openai-compatible-evaluation/nvidia/Ising-Calibration",
+    },
+    d,
+  );
 
   assert.deepEqual(
     d.calls.map((call) => call.name),
@@ -110,6 +120,10 @@ test("evidence feeds the evaluation: task and target as context, figure bytes, t
     ].join("\n"),
   );
   assert.equal(evaluation.question, "Is the fit trustworthy?");
+  assert.equal(
+    evaluation.model,
+    "openai-compatible-evaluation/nvidia/Ising-Calibration",
+  );
   assert.equal(evaluation.task_name, "CheckRabi");
   assert.equal(evaluation.knowledge, REFERENCE.knowledge);
   assert.deepEqual(evaluation.criteria, PASSED_CRITERIA);
@@ -124,7 +138,10 @@ test("evidence feeds the evaluation: task and target as context, figure bytes, t
   assert.equal(result.context, evaluation.context);
   assert.equal(result.knowledge.chars, REFERENCE_IDENTITY.length);
   assert.equal(result.knowledge.sha256, createHash("sha256").update(REFERENCE_IDENTITY).digest("hex"));
-  assert.equal(result.evaluation.model, "vllm/nvidia/Ising-Calibration");
+  assert.equal(
+    result.evaluation.model,
+    "openai-compatible-evaluation/nvidia/Ising-Calibration",
+  );
   assert.equal(result.evaluation.fallback, false);
   assert.deepEqual(result.evaluation.diagnosis, { fit_quality: "good", success: true });
   assert.equal(result.evaluation.raw, null);
@@ -187,7 +204,10 @@ test("a prose answer is kept as raw, with no diagnosis", async () => {
   const prose = evaluationResult({
     content: [{ type: "text", text: "The Rabi oscillation decays as expected." }],
     details: {
-      model: { provider: "vllm", modelId: "nvidia/Ising-Calibration" },
+      model: {
+        provider: "openai-compatible-evaluation",
+        modelId: "nvidia/Ising-Calibration",
+      },
       fallback: true,
       diagnosis: null,
       raw: "The Rabi oscillation decays as expected.",
@@ -323,6 +343,7 @@ test("the host record captures what the host put into the call", () => {
   assert.equal(record.task_name, "CheckRabi");
   assert.equal(record.figures.length, 1);
   assert.equal(record.figures[0].bytes, 88);
+  assert.equal(record.figures[0].data, PNG);
   assert.equal(record.knowledge.chars, "Expect a damped cosine.\n{}".length);
   assert.equal(record.duration_ms, 1234);
 
@@ -334,7 +355,10 @@ test("the host record captures what the host put into the call", () => {
 
 test("a planner turn's qcal_evaluate result yields the same record as a direct evaluation", () => {
   const details = {
-    model: { provider: "vllm", modelId: "nvidia/Ising-Calibration" },
+    model: {
+      provider: "openai-compatible-evaluation",
+      modelId: "nvidia/Ising-Calibration",
+    },
     diagnosis: { fit_quality: "good", success: true },
     prompt: "Reference ...",
     host: hostRecord({ context: "Task: CheckRabi", task_name: "CheckRabi", images: [{ data: PNG, mimeType: "image/png" }] }, { knowledge: "ref" }, 900),
@@ -349,7 +373,10 @@ test("a planner turn's qcal_evaluate result yields the same record as a direct e
   assert.equal(record.context, "Task: CheckRabi");
   assert.equal(record.figures[0].bytes, 88);
   assert.equal(record.knowledge.chars, "ref\n{}".length);
-  assert.equal(record.evaluation.model, "vllm/nvidia/Ising-Calibration");
+  assert.equal(
+    record.evaluation.model,
+    "openai-compatible-evaluation/nvidia/Ising-Calibration",
+  );
   assert.deepEqual(record.evaluation.diagnosis, { fit_quality: "good", success: true });
   assert.equal(record.evaluation.duration_ms, 900);
   assert.equal(record.planner.answer, "Looks good.");
@@ -367,11 +394,20 @@ test("the planner instruction asks for examples only when the request does", () 
 });
 
 test("the planner instruction names both tools and passes the question on", () => {
-  const text = plannerInstruction("task-1", "Is the fit trustworthy?");
+  const text = plannerInstruction(
+    "task-1",
+    "Is the fit trustworthy?",
+    false,
+    "openai-compatible-evaluation/nvidia/Ising-Calibration",
+  );
   assert.match(text, /task result task-1/);
   assert.match(text, new RegExp(`First call ${EVIDENCE_TOOL}`));
   assert.match(text, new RegExp(`then ${EVALUATION_TOOL}`));
   assert.match(text, /Is the fit trustworthy\?/);
+  assert.match(
+    text,
+    /Pass model: "openai-compatible-evaluation\/nvidia\/Ising-Calibration"/,
+  );
   assert.doesNotMatch(plannerInstruction("task-1"), /Pass this question/);
   assert.match(text, /not the fitted metrics/);
   assert.match(text, /calibration_diagnosis/);
@@ -403,7 +439,10 @@ test("the planner outcome is the last qcal_evaluate result and the tools called"
 
 test("an incomplete answer keeps its text, the keys it lacks, and how it was asked", () => {
   const details = {
-    model: { provider: "vllm", modelId: "nvidia/Ising-Calibration" },
+    model: {
+      provider: "openai-compatible-evaluation",
+      modelId: "nvidia/Ising-Calibration",
+    },
     diagnosis: { technical_description: "only" },
     raw: '{"technical_description": "only"}',
     missing_keys: ["experimental_conclusion", "experimental_significance", "fit_quality", "parameter_extraction", "success"],
@@ -411,7 +450,7 @@ test("an incomplete answer keeps its text, the keys it lacks, and how it was ask
     structured: true,
     stop_reason: "stop",
     calls: [
-      { question: "technical_description", duration_ms: 195000, stop_reason: "length", structured: true, output_tokens: 2000, missing_keys: ["success"] },
+      { question: "technical_description", duration_ms: 195000, stop_reason: "length", structured: true, input_tokens: 1800, output_tokens: 2000, missing_keys: ["success"] },
       { duration_ms: 30000, stop_reason: "stop", structured: true, output_tokens: 300, missing_keys: [] },
       { bogus: true },
     ],
@@ -429,9 +468,12 @@ test("an incomplete answer keeps its text, the keys it lacks, and how it was ask
     duration_ms: 195000,
     stop_reason: "length",
     structured: true,
+    input_tokens: 1800,
     output_tokens: 2000,
     missing_keys: ["success"],
   });
+  // A call without token counts (an older evaluator) is kept without them.
+  assert.equal("input_tokens" in record.evaluation.calls[1], false);
   assert.deepEqual(record.evaluation.diagnosis, { technical_description: "only" });
   assert.equal(record.evaluation.raw, '{"technical_description": "only"}');
   assert.equal(record.evaluation.missing_keys.length, 5);
@@ -482,7 +524,10 @@ test("a prompt preview runs the evaluator dry with the task's reference and exam
     [EVALUATION_TOOL]: (args) => ({
       content: [{ type: "text", text: "## fit_reliability\n..." }],
       details: {
-        model: { provider: "vllm", modelId: "nvidia/Ising-Calibration" },
+        model: {
+          provider: "openai-compatible-evaluation",
+          modelId: "nvidia/Ising-Calibration",
+        },
         dry_run: true,
         questions: ["fit_reliability", "calibration_diagnosis"],
         prompts: { fit_reliability: `F: ${args.context}`, calibration_diagnosis: "C" },
@@ -505,7 +550,7 @@ test("a prompt preview runs the evaluator dry with the task's reference and exam
   assert.deepEqual(preview, {
     task_name: "CheckRabi",
     with_examples: true,
-    model: "vllm/nvidia/Ising-Calibration",
+    model: "openai-compatible-evaluation/nvidia/Ising-Calibration",
     questions: [
       { key: "fit_reliability", prompt: "F: Task CheckRabi." },
       { key: "calibration_diagnosis", prompt: "C" },
@@ -531,4 +576,48 @@ test("a prompt preview runs the evaluator dry with the task's reference and exam
   const failing = deps({ [EVALUATION_TOOL]: () => ({ content: [{ type: "text", text: "qcal_evaluate: boom" }], isError: true }) });
   await assert.rejects(previewEvaluationPrompts({ taskName: "CheckRabi" }, failing), (error) => error instanceof EvaluationError && error.stage === "evaluation" && /boom/.test(error.message));
   await assert.rejects(previewEvaluationPrompts({ taskName: "  " }, d), (error) => error instanceof EvaluationError && error.status === 400);
+});
+
+import { draftKnowledge } from "../src/evaluate.ts";
+
+const DRAFT = {
+  name: "CheckRabi",
+  prompt_text: "## Experiment: CheckRabi",
+  reference: { background: "This is a CheckRabi experiment: the draft's wording.", statuses: { SUCCESS: "clear oscillation" } },
+  examples: [
+    { id: "d1", title: "Draft example", outcome: "suboptimal", status: "SHORT_T1", diagnosis: "Short.", figures: [{ base64_data: PNG, mime_type: "image/png", path: "examples/d1.png" }] },
+  ],
+};
+
+test("an evaluation against a draft reads its reference and examples from one load of it", async () => {
+  let loads = 0;
+  const knowledge = draftKnowledge(async () => {
+    loads += 1;
+    return DRAFT;
+  });
+  const d = { ...deps({ [EVIDENCE_TOOL]: evidenceResult(), [EVALUATION_TOOL]: evaluationResult() }), ...knowledge };
+
+  const result = await evaluateTask({ taskId: "task-1", withExamples: true }, d);
+
+  assert.equal(loads, 1);
+  const evaluation = d.calls.find((call) => call.name === EVALUATION_TOOL).args;
+  assert.equal(evaluation.knowledge, "This is a CheckRabi experiment: the draft's wording.");
+  assert.deepEqual(evaluation.criteria.statuses, { SUCCESS: "clear oscillation" });
+  assert.deepEqual(evaluation.examples.map((e) => e.scenario), ["Draft example"]);
+  assert.deepEqual(result.examples.map((e) => [e.id, e.figures[0].path]), [["d1", "examples/d1.png"]]);
+});
+
+test("a draft that cannot be read fails the evaluation at the knowledge stage", async () => {
+  const knowledge = draftKnowledge(async () => {
+    throw new Error("HTTP 404: knowledge draft abc not found");
+  });
+  const d = { ...deps({ [EVIDENCE_TOOL]: evidenceResult(), [EVALUATION_TOOL]: evaluationResult() }), ...knowledge };
+
+  await assert.rejects(evaluateTask({ taskId: "task-1" }, d), (error) => {
+    assert.ok(error instanceof EvaluationError);
+    assert.equal(error.stage, "knowledge");
+    assert.equal(error.message, "knowledge draft: HTTP 404: knowledge draft abc not found");
+    return true;
+  });
+  assert.equal(d.calls.some((call) => call.name === EVALUATION_TOOL), false);
 });

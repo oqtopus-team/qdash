@@ -1,86 +1,79 @@
 # API Integration
 
-How UI code calls the backend: through the Orval-generated client and its TanStack Query hooks. The generation pipeline and the custom Axios instance are described in [architecture.md](./architecture.md#api-client-generation).
+UI code calls the backend through the Orval-generated TanStack Query client; authentication,
+project scope, cancellation, and response typing enter through the shared Axios instance.
 
-## Auto-Generated Client
+## Generation Boundary
 
-API client code is auto-generated from OpenAPI spec. **Never edit files in `src/client/` or `src/schemas/`**.
+`ui/orval.config.cjs` reads `docs/oas/openapi.json` and writes tag-split hooks to
+`ui/src/client/` and schemas to `ui/src/schemas/`. Both directories are generated and must not be
+edited manually.
+
+After a backend route or schema changes, run from the repository root:
 
 ```bash
-# Regenerate API client
 task generate
 ```
 
-## Using Generated Hooks
+Review the OpenAPI and generated TypeScript changes together. A surprising client diff usually
+means the backend contract needs another look.
+
+## Use Generated Queries
+
+Import a query hook from its generated tag module. The return value is an Axios response, so API
+content is under `data.data`:
 
 ```tsx
-import { useGetChipList } from "@/client/chip/chip";
-import type { ChipSummary } from "@/schemas";
+import { useListChips } from "@/client/chip/chip";
 
-export function ChipSelector() {
-  const { data, isLoading } = useGetChipList();
+const { data: response, isLoading, isError } = useListChips({
+  query: { staleTime: 30_000 },
+});
 
-  if (isLoading) return <LoadingSpinner />;
-
-  return (
-    <select>
-      {data?.chips.map((chip: ChipSummary) => (
-        <option key={chip.chip_id} value={chip.chip_id}>
-          {chip.chip_id}
-        </option>
-      ))}
-    </select>
-  );
-}
+const chips = response?.data.chips ?? [];
 ```
 
-## Type Annotations for Callbacks
+Pass TanStack Query options through the generated `query` property. Use `enabled` when required
+route or project input is not ready; do not send placeholder identifiers to the API.
 
-Always add explicit type annotations for mutation callbacks:
+## Use Generated Mutations
+
+Generated mutations accept their path parameters and request body in one object. Invalidate the
+generated query key after a successful mutation:
 
 ```tsx
-import { useMutation } from "@tanstack/react-query";
-import { executeFlow } from "@/client/flow/flow";
-import type { ExecuteFlowResponse } from "@/schemas";
-import type { AxiosResponse } from "axios";
+import { useQueryClient } from "@tanstack/react-query";
+import { getListChipsQueryKey, useCreateChip } from "@/client/chip/chip";
 
-// Good - Explicit types for callbacks
-const mutation = useMutation({
-  mutationFn: () => executeFlow(flowName),
-  onSuccess: (response: AxiosResponse<ExecuteFlowResponse>) => {
-    console.log("Execution started:", response.data.execution_id);
-  },
-  onError: (error: Error) => {
-    console.error("Failed to execute:", error.message);
+const queryClient = useQueryClient();
+const createChip = useCreateChip({
+  mutation: {
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: getListChipsQueryKey() }),
   },
 });
 
-// Bad - Implicit any types
-const mutation = useMutation({
-  mutationFn: () => executeFlow(flowName),
-  onSuccess: (response) => {
-    // 'response' implicitly has 'any' type
-    console.log(response.data.execution_id);
-  },
-});
+createChip.mutate({ data: request });
 ```
 
-## Array Method Type Annotations
+Invalidate every query whose server representation changed. Prefer exported generated query-key
+helpers over handwritten string keys.
 
-Add type annotations to array callbacks to avoid implicit `any`:
+## Shared Request Behavior
 
-```tsx
-import type { TaskInfo, ChipSummary } from "@/schemas";
+`ui/src/lib/api/custom-instance.ts` chooses `/api` by default and uses
+`NEXT_PUBLIC_API_URL` when configured. Its interceptor adds the bearer token and active project
+header. Its returned promise exposes cancellation for TanStack Query.
 
-// Good - Explicit types
-const activeChips = chips.filter(
-  (chip: ChipSummary) => chip.status === "active",
-);
-const chipNames = chips.map((chip: ChipSummary) => chip.chip_id);
-const hasTask = tasks.some((task: TaskInfo) => task.name === targetName);
+Feature code does not add those headers itself. A missing project or authorization error must be
+handled as an application state, not bypassed with another Axios instance.
 
-// Bad - Implicit any
-const activeChips = chips.filter((chip) => chip.status === "active");
-```
+## Add Feature Composition
 
-The compiler errors these rules prevent, with fixes: [testing.md](./testing.md#common-type-errors-and-fixes).
+Create a focused hook under `ui/src/hooks/` when a feature combines generated queries, derives a
+stable view model, or coordinates multiple invalidations. Keep transport and schema ownership in
+the generated client.
+
+Test request construction and invalidation in the owning feature or hook. Run `task generate`,
+`task test-ui`, and `task ci-ui` for a changed API contract.
+
+See [UI Architecture](./architecture.md#api-data-flow) for the full request path.

@@ -1,220 +1,112 @@
 # 1-Qubit Calibration Scheduler
 
-The 1-qubit scheduler generates optimized execution schedules for single-qubit calibration based on box (enclosure) constraints.
+`OneQubitScheduler` turns qubit or MUX targets into an execution order that respects wiring-box,
+MUX, and shared-module constraints.
 
-## Overview
+## Wiring Model
 
-### Purpose
+Each wiring entry names a MUX and its control, read-in, read-out, and pump modules. Module IDs whose
+base name ends in `A` or `B` determine the box classification of that MUX.
 
-The scheduler solves the parallel 1-qubit calibration scheduling problem:
+| Classification | Meaning | Scheduling consequence |
+| --- | --- | --- |
+| `A` | All recognized modules belong to Box A | Run in the A stage |
+| `B` | All recognized modules belong to Box B | Run in the B stage |
+| `MIXED` | Modules span both boxes, are unrecognized, or mapping is missing | Isolate from A and B stages |
 
-**Given:**
+Qubit-to-MUX mapping follows the hardware convention that MUX `N` owns qubits `4N` through
+`4N + 3`. Within a stage, different MUX groups may run in parallel, while qubits in the same MUX
+group run sequentially.
 
-- A set of qubits to calibrate
-- Hardware box constraints (Box A, Box B modules)
-- Wiring configuration defining MUX-to-module mappings
+MIXED MUXes need one additional constraint. MUXes that use the same Box B control-module base ID
+are placed in different sequential groups.
 
-**Output:**
-
-- A sequence of stages where each stage contains qubits that can execute without box conflicts
-- Within each stage, qubits execute sequentially (same box constraint)
-- Different stages can potentially execute in parallel (different boxes)
-
-### Key Features
-
-- **Box detection from wiring**: Automatically detects box type from module naming convention
-- **MUX grouping**: Groups qubits by their MUX's box dependencies
-- **Stage generation**: Creates execution stages for Box A, Box B, and Mixed qubits
-- **Flexible configuration**: Supports custom wiring configuration paths
-
-## Architecture
-
-### Box Detection
-
-Module names follow a naming convention that indicates box type:
-
-```
-Module names ending with 'A' → Box A (e.g., Q73A, R20A, S159A)
-Module names ending with 'B' → Box B (e.g., R21B, U10B, U13B)
+```mermaid
+flowchart LR
+    targets[Qubit or MUX targets] --> wiring[Classify from wiring]
+    wiring --> a[Box A stage]
+    wiring --> b[Box B stage]
+    wiring --> mixed[MIXED MUXes]
+    mixed --> shared[Separate shared Box B modules]
+    shared --> mixedStages[One or more MIXED stages]
+    a --> order[Execution order]
+    b --> order
+    mixedStages --> order
 ```
 
-### MUX Classification
+The result executes A, B, and then every MIXED stage. MUX groups inside one stage are parallel;
+the qubits inside each group remain sequential.
 
-Each MUX is classified based on the modules it uses:
+## Schedule Forms
 
-| Classification | Modules Used   | Example                               |
-| -------------- | -------------- | ------------------------------------- |
-| Box A          | Only A modules | MUX 1: ctrl=[Q73A-*], read_out=Q73A-8 |
-| Box B          | Only B modules | (rare in current configs)             |
-| Mixed          | Both A and B   | MUX 0: ctrl=[R21B-*], read_out=Q73A-1 |
+The scheduler exposes three forms for different execution APIs.
 
-### Conflict Rules
+| Method | Result | Use when |
+| --- | --- | --- |
+| `generate()` | `OneQubitScheduleResult` | Each MUX worker runs its qubits sequentially |
+| `generate_synchronized()` | `SynchronizedOneQubitScheduleResult` | All MUXes must finish position N before position N+1 starts |
+| `generate_simultaneous_spectroscopy_batches()` | `MuxBatchScheduleResult` | One spectroscopy call measures a whole selected batch |
 
-1. **Same box = Sequential**: Qubits using the same box type cannot execute in parallel
-2. **Different box = Can be parallel**: Qubits on different boxes can execute in parallel
-3. **Mixed = Conflicts with both**: MUXes using both box types conflict with Box A and Box B
+Each form has a corresponding `*_from_mux()` convenience method that expands MUX IDs and applies
+`exclude_qids` before scheduling.
 
-## Usage
-
-### Basic Usage
+### MUX-group schedule
 
 ```python
-from qdash.workflow.engine.scheduler import OneQubitScheduler
+from qdash.workflow.engine import OneQubitScheduler
 
 scheduler = OneQubitScheduler(chip_id="64Qv3")
+schedule = scheduler.generate_from_mux(
+    mux_ids=[0, 1, 2],
+    exclude_qids=["5"],
+)
 
-# Generate schedule from qubit IDs
-schedule = scheduler.generate(qids=["0", "1", "4", "5", "24", "25"])
-
-# Access stages
 for stage in schedule.stages:
-    print(f"Stage {stage.box_type}: {stage.qids}")
+    run_mux_groups_in_parallel(stage.parallel_groups)
 ```
 
-### Integration with Calibration Flow
+Stages are ordered A, B, then MIXED. Multiple MIXED stages can appear when shared Box B modules
+force sequential groups. `parallel_groups` is grouped by MUX and sorted by MUX ID.
 
-```python
-from prefect import flow
-from qdash.workflow.engine.scheduler import OneQubitScheduler
-from qdash.workflow.service import init_calibration, get_session, finish_calibration
+### Synchronized schedule
 
-@flow
-def calibrate_chip(username: str, chip_id: str, qids: list[str]):
-    # Generate schedule
-    scheduler = OneQubitScheduler(chip_id=chip_id)
-    schedule = scheduler.generate(qids=qids)
+`generate_synchronized()` emits a flat list of steps. Box stages remain sequential, and every
+`parallel_qids` list is one synchronization barrier. Checkerboard ordering is enabled by default;
+the exact ordering policy is described in
+[1-Qubit Ordering Strategies](./one-qubit-ordering-strategies.md).
 
-    # Execute each stage
-    for stage in schedule.stages:
-        # Each stage can be a separate execution session
-        session = init_calibration(
-            username, chip_id, stage.qids,
-            flow_name=f"1Q_Calibration_{stage.box_type}"
-        )
+### Simultaneous spectroscopy schedule
 
-        # Execute qubits sequentially within stage
-        for qid in stage.qids:
-            session.execute_task("CheckRabi", qid)
-            session.execute_task("CheckT1", qid)
+The spectroscopy API accepts `mode="local_index"` or `mode="all"`.
 
-        finish_calibration()
-```
+- `local_index` creates up to four steps based on `int(qid) % 4`.
+- `all` creates one step containing all selected qubits.
 
-### Workflow Template Integration
+This API reports box classification for observability but does not split the batch on A/B resource
+conflicts. Its caller and backend operation must support the selected simultaneous measurement.
 
-```python
-from dataclasses import dataclass
+## Invariants and Failure Behavior
 
-@dataclass
-class OneQubitStage:
-    """1-qubit calibration stage from scheduler."""
-    box_type: str
-    qids: list[str]
-    tasks: list[str]
+- An empty qubit or MUX selection raises `ValueError`; excluding every expanded qubit does too.
+- A missing wiring file raises `FileNotFoundError`.
+- An unmapped qubit is classified as MIXED conservatively.
+- Stage and MUX order are deterministic.
+- A result describes legal ordering only. It does not acquire a hardware reservation or execute a
+  backend call.
 
-# Use with scheduler
-scheduler = OneQubitScheduler(chip_id="64Qv3")
-result = scheduler.generate(qids=all_qubits)
+The high-level `OneQubitScheduledStrategy` consumes MUX-group schedules, while
+`OneQubitSynchronizedStrategy` consumes synchronized schedules. Both keep box stages sequential and
+delegate parallel worker creation to the service scheduling helpers.
 
-stages = [
-    OneQubitStage(
-        box_type=stage.box_type,
-        qids=stage.qids,
-        tasks=["CheckRabi", "CheckT1", "CheckT2Echo"]
-    )
-    for stage in result.stages
-]
-```
+## Source and Tests
 
-## Result Object
+- `workflow/engine/scheduler/one_qubit_scheduler.py` owns wiring classification and schedule
+  generation.
+- `workflow/engine/scheduler/one_qubit_types.py` defines the three result forms.
+- `workflow/engine/scheduler/one_qubit_plugins.py` defines ordering strategies.
+- `workflow/service/strategy.py` consumes schedules during calibration.
+- `tests/qdash/workflow/engine/scheduler/test_one_qubit_scheduler.py` covers classification,
+  grouping, synchronized steps, and spectroscopy modes.
 
-### OneQubitScheduleResult
-
-```python
-@dataclass
-class OneQubitScheduleResult:
-    stages: list[OneQubitStageInfo]  # Execution stages
-    metadata: dict[str, Any]          # Statistics
-    mux_box_map: dict[int, set[str]]  # MUX → box types
-    qid_to_mux: dict[str, int]        # Qubit → MUX mapping
-```
-
-### OneQubitStageInfo
-
-```python
-@dataclass
-class OneQubitStageInfo:
-    box_type: str       # "A", "B", or "MIXED"
-    qids: list[str]     # Qubit IDs (executed sequentially)
-    mux_ids: set[int]   # MUX IDs in this stage
-```
-
-### Metadata Fields
-
-- `total_qubits`: Total qubits scheduled
-- `box_a_count`: Qubits using Box A only
-- `box_b_count`: Qubits using Box B only
-- `mixed_count`: Qubits using both box types
-- `num_stages`: Number of execution stages
-- `chip_id`: Chip identifier
-
-## 64Qv3 Example
-
-For a 64-qubit chip with the standard wiring configuration:
-
-```
-MUX Layout (4×4 grid):
-┌──────┬──────┬──────┬──────┐
-│ MUX0 │ MUX1 │ MUX2 │ MUX3 │  ← Mixed, A, A, Mixed
-├──────┼──────┼──────┼──────┤
-│ MUX4 │ MUX5 │ MUX6 │ MUX7 │  ← Mixed, A, A, Mixed
-├──────┼──────┼──────┼──────┤
-│ MUX8 │ MUX9 │MUX10 │MUX11 │  ← A, A, Mixed, A
-├──────┼──────┼──────┼──────┤
-│MUX12 │MUX13 │MUX14 │MUX15 │  ← A, A, Mixed, A
-└──────┴──────┴──────┴──────┘
-```
-
-**Typical Stage Distribution:**
-
-```python
-scheduler = OneQubitScheduler(chip_id="64Qv3")
-schedule = scheduler.generate(qids=[str(i) for i in range(64)])
-
-# Results (varies by wiring config):
-# Stage 1 (Box A): ~32-40 qubits (MUXes 1,2,5,6,8,9,11,12,13,15)
-# Stage 2 (Mixed): ~24-32 qubits (MUXes 0,3,4,7,10,14)
-```
-
-## Debugging
-
-### Get MUX Information
-
-```python
-scheduler = OneQubitScheduler(chip_id="64Qv3")
-mux_info = scheduler.get_mux_info()
-
-for mux_id, info in mux_info.items():
-    print(f"MUX {mux_id}:")
-    print(f"  Box: {info['box_label']}")
-    print(f"  Qubits: {info['qids']}")
-    print(f"  Types: {info['box_types']}")
-```
-
-### Visualize Schedule
-
-```python
-schedule = scheduler.generate(qids=["0", "4", "8", "12"])
-
-for i, stage in enumerate(schedule.stages, 1):
-    print(f"\n=== Stage {i} ({stage.box_type}) ===")
-    print(f"Qubits: {stage.qids}")
-    print(f"MUXes: {stage.mux_ids}")
-```
-
-## References
-
-- Core Implementation: `src/qdash/workflow/engine/scheduler/one_qubit_scheduler.py`
-- Tests: `tests/qdash/workflow/engine/scheduler/test_one_qubit_scheduler.py`
-- CR Scheduler: [CR Gate Scheduler](./cr-scheduler.md)
-- Topology: [Square Lattice Topology](./square-lattice-topology.md)
+Run that test module after scheduler changes. Update the ordering tests as well when a change affects
+the order within a MUX or across synchronized steps.

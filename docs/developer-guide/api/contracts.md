@@ -1,185 +1,115 @@
 # API Contracts
 
-Conventions for what a QDash API endpoint accepts and returns: query parameters, response models, errors and the OpenAPI text that describes them. Path, method and naming conventions are on [API Design](./design.md).
+A QDash API contract consists of the route decorator, typed parameters, Pydantic request and
+response models, documented errors, and the generated OpenAPI operation.
 
-## Query Parameters
+## Model Request and Response Bodies
 
-### Naming
+Put reusable HTTP models in `src/qdash/api/schemas/` and name the file for the domain router. Use
+`<Action><Resource>Request` for request bodies and a descriptive `<Resource>Response` or
+`<Action><Resource>Response` for responses.
 
-Use **snake_case** for query parameters (FastAPI convention).
-
-```python
-# Good
-@router.get("/executions")
-def list_executions(
-    chip_id: str = Query(..., description="Chip ID to filter"),
-    skip: int = Query(0, ge=0, description="Number of items to skip"),
-    limit: int = Query(20, ge=1, le=100, description="Number of items to return"),
-):
-    pass
-
-# Bad - camelCase query params
-@router.get("/executions")
-def list_executions(
-    chipId: str = Query(...),  # Should be chip_id
-):
-    pass
-```
-
-### Pagination
-
-Use consistent pagination parameters across all list endpoints:
+Set `response_model` on JSON routes and return the declared type. This makes runtime serialization,
+OpenAPI, and generated clients agree. A collection can use either a domain wrapper or a raw list;
+preserve the established shape for that endpoint family. Prefer a wrapper when the contract needs
+metadata such as `total`, pagination, or warnings:
 
 ```python
-skip: int = Query(0, ge=0, description="Number of items to skip")
-limit: int = Query(20, ge=1, le=100, description="Number of items to return")
-```
-
-### Filtering
-
-Use descriptive parameter names that match the field being filtered:
-
-```python
-# Good
-chip_id: str = Query(..., description="Chip ID to filter")
-status: str = Query(None, description="Filter by status")
-start_at: str = Query(None, description="Start time in ISO format")
-
-# Bad
-id: str = Query(...)          # Too generic
-filter: str = Query(...)      # Too generic
-```
-
-## Response Model Design
-
-### Wrap Collections in Response Objects
-
-Always wrap collection responses in a response object with a descriptive field name.
-
-```python
-# Good - Wrapped response
 class ListChipsResponse(BaseModel):
     chips: list[ChipResponse]
-
-@router.get("/chips", response_model=ListChipsResponse)
-def list_chips() -> ListChipsResponse:
-    return ListChipsResponse(chips=[...])
-
-# Bad - Raw list (makes future extension impossible)
-@router.get("/chips", response_model=list[ChipResponse])
-def list_chips() -> list[ChipResponse]:
-    return [...]
+    total: int
 ```
 
-### Benefits of Wrapped Responses
+Do not change an existing raw list to a wrapper without treating it as a breaking response change.
 
-1. **Extensibility**: Easy to add metadata like pagination
-2. **Consistency**: Same structure across all list endpoints
-3. **Client friendliness**: Clear field names for deserialization
+## Type Path and Query Parameters
+
+Use snake_case Python names for query parameters. Describe and constrain a value with
+`Annotated` and FastAPI's `Query` when its bounds or meaning are not evident from the type:
 
 ```python
-# Future-proof: can add pagination without breaking clients
-class ListChipsResponse(BaseModel):
-    chips: list[ChipResponse]
-    total: int | None = None
-    page: int | None = None
-    per_page: int | None = None
+force: Annotated[
+    bool,
+    Query(
+        description="If true, also delete the chip's qubits and couplings.",
+    ),
+] = False
 ```
 
-### Naming Conventions for Response Models
+Use Python domain types such as `datetime`, `date`, enums, and constrained numbers instead of
+accepting a string and parsing it in the router. Keep pagination names and defaults consistent
+within the endpoint family. QDash currently has both `skip`/`limit` and `offset`/`limit` contracts;
+do not silently translate one family to the other.
 
-| Type                   | Pattern                      | Example                                  |
-| ---------------------- | ---------------------------- | ---------------------------------------- |
-| List response          | `List{Resource}sResponse`    | `ListChipsResponse`, `ListTasksResponse` |
-| Single resource        | `{Resource}Response`         | `ChipResponse`, `TaskResponse`           |
-| Detail response        | `{Resource}DetailResponse`   | `ExecutionDetailResponse`                |
-| Create/Update response | `{Action}{Resource}Response` | `CreateChipResponse`                     |
+FastAPI returns `422 Unprocessable Entity` when a typed path, query, or body fails schema
+validation. Domain validation performed after parsing uses the status that describes that domain
+failure.
 
-## Error Handling
+## Preserve Project Boundaries
 
-### Use Appropriate HTTP Status Codes
+Project-scoped routes resolve identity and permissions through dependencies in
+`src/qdash/api/lib/project.py`:
 
-| Status                    | Use Case                            |
-| ------------------------- | ----------------------------------- |
-| 400 Bad Request           | Invalid input, validation errors    |
-| 401 Unauthorized          | Authentication required             |
-| 403 Forbidden             | Authenticated but not authorized    |
-| 404 Not Found             | Resource doesn't exist              |
-| 409 Conflict              | Resource conflict (e.g., duplicate) |
-| 500 Internal Server Error | Server-side errors                  |
+| Dependency | Required access |
+| --- | --- |
+| `get_project_context` | Active project membership with read access |
+| `get_project_context_editor` | Editor or owner write access |
+| `get_project_context_owner` | Owner-level administration |
+| `get_project_context_from_path` and variants | Same checks for a `project_id` path parameter |
 
-### Error Response Format
+Project resolution uses the path parameter first, then `X-Project-Id`, then the user's default
+project. Services and repositories receive the resolved `project_id`; they must not trust a project
+identifier supplied inside an ordinary request body.
 
-Use consistent error response format:
+A lookup for a resource in another project generally returns `404` so the response does not reveal
+that the resource exists. Permission failures for a known project return `403`.
 
-```python
-from fastapi import HTTPException
+## Return Stable Errors
 
-# Good - Descriptive error
-raise HTTPException(
-    status_code=404,
-    detail=f"Chip '{chip_id}' not found for user '{username}'"
-)
+FastAPI exceptions and QDash error response classes use a JSON `detail` field. Choose status codes
+by failure meaning:
 
-# Bad - Generic error
-raise HTTPException(status_code=404, detail="Not found")
+| Status | Use |
+| --- | --- |
+| `400 Bad Request` | Parsed request violates a domain rule or field combination |
+| `401 Unauthorized` | Bearer credentials are missing or invalid |
+| `403 Forbidden` | Authenticated user lacks the required role or permission |
+| `404 Not Found` | Resource is absent in the resolved scope |
+| `409 Conflict` | Current resource or reservation state prevents the operation |
+| `422 Unprocessable Entity` | FastAPI request validation fails |
+| `502 Bad Gateway` | A required upstream service returned an invalid failure |
+| `503 Service Unavailable` | A required service is temporarily unavailable |
+
+Do not return exception text that exposes credentials, paths, or upstream internals. If an error is
+part of the public contract, add it to the route's `responses` metadata and test both its status and
+`detail` payload.
+
+## Keep OpenAPI and Clients Synchronized
+
+The route and schema source generate `docs/oas/openapi.json`, the UI schemas and API functions, and
+the TypeScript client. These generated files are one contract chain:
+
+```mermaid
+flowchart LR
+    route[FastAPI routes and schemas] --> generate[task generate]
+    generate --> openapi[docs/oas/openapi.json]
+    openapi --> ui[ui/src/schemas and ui/src/client]
+    openapi --> client[clients/typescript/src/generated]
 ```
 
-### Document Error Responses
+Do not edit generated outputs manually. After a route, parameter, schema, status, or
+`operation_id` changes, run:
 
-```python
-@router.get(
-    "/chips/{chip_id}",
-    responses={
-        404: {"model": ErrorResponse, "description": "Chip not found"},
-        403: {"model": ErrorResponse, "description": "Access denied"},
-    },
-)
-def get_chip(chip_id: str) -> ChipResponse:
-    pass
+```bash
+task generate
+task test-api
+task test-client-ts
 ```
 
-## Documentation
+Review the generated diff. A changed path, method, operation ID, required field, enum value,
+success status, or response shape can break callers. Adding an optional response field is usually
+compatible, but verify both generated TypeScript surfaces rather than assuming it.
 
-### Endpoint summary
-
-Use **imperative mood** (verb first) for endpoint summaries:
-
-```python
-# Good
-summary="List all chips"
-summary="Get a specific chip"
-summary="Create a new chip"
-summary="Delete a chip"
-
-# Bad
-summary="Chips listing"           # Noun phrase
-summary="Fetches all chips"       # Third person
-summary="list all chip"           # Lowercase, singular
-```
-
-### Description
-
-Provide detailed descriptions for complex endpoints:
-
-```python
-@router.get(
-    "/task-results/qubits/latest",
-    summary="Get latest qubit task results",
-    description="""
-    Fetch the most recent task results for all qubits in a chip.
-
-    Results are filtered by the specified task name and include
-    output parameters and execution metadata.
-    """,
-)
-```
-
-### Parameter Documentation
-
-Always document parameters with descriptions:
-
-```python
-chip_id: Annotated[str, Query(description="Unique identifier of the chip")]
-task: Annotated[str, Query(description="Name of the task to filter by")]
-```
+`src/qdash/api/app/factory.py` adds global bearer-auth metadata and normalizes binary response
+formats after FastAPI builds the schema. Tests for those transformations live in
+`tests/qdash/api/test_app_factory.py`.

@@ -13,13 +13,20 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-EvaluationStatus = Literal["pending", "running", "completed", "failed"]
-EvaluationRunStatus = Literal["running", "completed"]
+EvaluationStatus = Literal["pending", "running", "completed", "failed", "interrupted", "cancelled"]
+EvaluationRunStatus = Literal["running", "completed", "interrupted", "cancelled"]
 # Who asked: the chip page for every entity, a person for one task result, or
 # the chat planner judging a figure on its own.
 EvaluationTrigger = Literal["bulk", "single", "chat"]
 # How the evaluation was reached: the two tools run directly, or a planner turn that calls them.
 EvaluationMode = Literal["direct", "planner"]
+EvaluationVerdictIssue = Literal[
+    "parameter_extraction",
+    "diagnosis",
+    "recommendation",
+    "insufficient_evidence",
+    "other",
+]
 # The six QCalEval questions, keyed as pi-qcaleval keys the diagnosis (and as
 # the benchmark scripts key their responses). An answer is complete when every
 # question asked was answered; by default all six are.
@@ -72,6 +79,18 @@ class EvaluationInputModel(BaseModel):
     knowledge_sha256: str | None = Field(
         default=None, description="SHA-256 of the host-supplied reference text"
     )
+    reference_requested: bool = Field(
+        default=True, description="Whether the host attempted to load a task reference"
+    )
+    reference_used: bool = Field(
+        default=False, description="Whether a task reference was actually included in the prompt"
+    )
+    examples_requested: bool = Field(
+        default=False, description="Whether in-context examples were requested"
+    )
+    examples_used: int = Field(
+        default=0, description="Number of in-context examples actually included in the prompt"
+    )
     figures: list[EvaluationFigureModel] = Field(default_factory=list)
     examples: list[EvaluationExampleModel] = Field(
         default_factory=list,
@@ -89,6 +108,9 @@ class EvaluationCallModel(BaseModel):
     stop_reason: str = Field(..., description="Why the model stopped, as pi reports it")
     structured: bool = Field(
         default=False, description="Whether the call was constrained to the diagnosis schema"
+    )
+    input_tokens: int | None = Field(
+        default=None, description="Prompt tokens the model counted for the call, images included"
     )
     output_tokens: int | None = Field(default=None, description="Output tokens of the call")
     missing_keys: list[str] = Field(
@@ -143,6 +165,10 @@ class EvaluationOutputModel(BaseModel):
         default=0, description="Wall time of the evaluation call, every model call included"
     )
     usage: dict[str, Any] | None = Field(default=None, description="Token usage, as pi reports it")
+    context_window: int | None = Field(
+        default=None,
+        description="Context window of the judging model, from the evaluation config when recorded",
+    )
 
     @model_validator(mode="after")
     def _derive_completeness(self) -> "EvaluationOutputModel":
@@ -174,6 +200,9 @@ class EvaluationVerdictModel(BaseModel):
         description="True when the person agrees with the evaluation, False when not, None to clear",
     )
     note: str | None = Field(default=None, description="Why, in the person's words")
+    issues: list[EvaluationVerdictIssue] = Field(
+        default_factory=list, description="Parts of the evaluation the reviewer disputed"
+    )
     username: str = Field(..., description="Who judged")
     updated_at: datetime = Field(..., description="When the verdict was last changed")
 

@@ -1,202 +1,132 @@
 # Setup
 
-QDash operators configure the Qubex integration and run the full Docker Compose stack. Host-side
-API and UI processes are documented in [Development Environment Setup](../developer-guide/setup.md).
-Install Docker with Docker Compose and `uv` on the host. Go Task is optional for operators.
+Choose the backend before configuring QDash: Fake runs without quantum hardware, while Qubex
+connects QDash to a supported lab system.
 
-## Clone the Repository
+## Choose a Backend
 
-Clone the Git repository's release branch. The repository default is `develop`, so select `main`
-explicitly for an installation that will use Admin UI system updates:
+| Goal | Setup path |
+| --- | --- |
+| Evaluate QDash without quantum hardware | [Fake backend](./setup/fake-backend.md) |
+| Operate a Qubex-connected lab deployment | [Qubex backend](./setup/qubex-backend.md) |
+| Connect another hardware stack | Under construction — the current release accepts only `fake` and `qubex`; another backend requires QDash code changes, not deployment settings. |
+
+Both supported paths use the same Docker Compose stack. The backend choice changes the available
+calibration tasks and whether the workflow worker opens a hardware connection.
+
+Host-side API and UI processes are a development workflow. Use
+[Development Environment Setup](../developer-guide/setup.md) instead of this page when changing
+QDash code.
+
+## Prepare the Host
+
+Install Git, Docker, and Docker Compose. Go Task is optional; every required setup command has a
+Docker Compose equivalent.
+
+Clone the stable branch. The repository default is `develop`, so select `main` explicitly:
 
 ```bash
 git clone --branch main https://github.com/oqtopus-team/qdash.git
 cd qdash
 ```
 
-The `main` branch represents the latest stable release and its release commits carry
-`vMAJOR.MINOR.PATCH` tags. Do not use `develop`, a feature branch, or a prerelease tag for an
-updatable installation. The installation directory can be anywhere. See
-[System Updates](./system-updates.md#git-branch-and-tag-requirements) for the complete update rules.
+The `main` branch contains stable releases. Do not use `develop`, a feature branch, or a
+prerelease tag for an operational installation. Follow [System Updates](./system-updates.md) to
+move an existing installation to another release.
 
-## Qubex Setup
+Next, complete either the [Fake backend](./setup/fake-backend.md) or
+[Qubex backend](./setup/qubex-backend.md) configuration. Each path creates the `.env` file used by
+the remaining steps.
 
-Create `.env` from the Qubex example when you want QDash to run with the Qubex backend:
+## Configure Shared Deployment Settings
 
-```bash
-cp .env.example.qubex .env
-```
-
-Review or fill in these values before starting services:
+Set a unique initial administrator password in `.env` before exposing QDash to a network.
 
 | Variable | Purpose |
 | --- | --- |
-| `ENV` | Environment label; keep `dev-qubex` for local Qubex-backed setup unless you need another label |
-| `DEFAULT_BACKEND` | Backend selected by default; keep `qubex` for the Qubex-backed stack |
-| `QDASH_ADMIN_USERNAME` / `QDASH_ADMIN_PASSWORD` | Initial admin login |
-| `API_PORT` / `UI_PORT` / `PREFECT_PORT` | Host ports for API, UI, and Prefect |
-| `NEXT_PUBLIC_DEFAULT_THEME` | Initial UI color theme for browsers without a saved preference; defaults to `light` |
-| `MONGO_DATA_PATH` / `POSTGRES_DATA_PATH` | Persistent database storage |
-| `CALIB_DATA_PATH` | Calibration figures and run artifacts |
-| `CALIB_TASKS_PATH` | Calibration task definitions used by the workflow worker |
-| `CONFIG_PATH` | Qubex backend configuration repository/data |
-| `CONFIG_REPO_URL` / `GITHUB_TOKEN` / `GITHUB_USER` | Optional Qubex config repository sync settings |
-| `CLIENT_URL` | Public UI URL when the app is served through a domain or tunnel; Copilot also builds the links in its answers from it |
-| `TUNNEL_TOKEN` | Optional Cloudflare Tunnel token for remote access |
-| `AGENT_RUNTIME_TOKEN` | Shared secret for QDash API/workers to call the internal Pi Agent Runtime; required when `copilot_backend: pi`, and requests fail closed when it is empty |
-| `COMPOSE_PROFILES` | Set to `agent-runtime` when `copilot_backend: pi`; otherwise the Agent Runtime container is not created |
-| `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` | Experimental; set to `true` to expose the reviewed QDash write tools to Copilot (default: `false`) |
-| `OPENAI_COMPATIBLE_BASE_URL` / `OPENAI_COMPATIBLE_API_KEY` | Base URL and credential for the default vendor-neutral OpenAI Chat Completions endpoint |
-| `VLLM_BASE_URL` / `VLLM_API_KEY` | Base URL and bearer token of a vLLM endpoint; used by the `vllm` models in `config/copilot/*.yaml` such as `nvidia/Ising-Calibration-1.5-31B-NVFP4` |
-| `OPENAI_API_KEY` / `OLLAMA_BASE_URL` / `OLLAMA_API_KEY` | Optional settings for other Copilot AI providers |
-| `KNOWLEDGE_REPO_URL` | Optional external knowledge repository for Copilot context |
-| `SLACK_FORUM_NOTIFICATION` | Set to `true` to enable Slack notifications for forum thread creation, replies, and open/close status changes (optional) |
-| `SLACK_BOT_TOKEN` | Slack Bot Token (`xoxb-…`) with `chat:write` and `chat:write.public` scopes; required when `SLACK_FORUM_NOTIFICATION=true` |
-| `SLACK_FORUM_CHANNEL_ID` | Slack channel ID where forum notifications are posted; required when `SLACK_FORUM_NOTIFICATION=true` |
+| `QDASH_ADMIN_USERNAME` / `QDASH_ADMIN_PASSWORD` | Initial administrator login |
+| `API_PORT` / `UI_PORT` / `PREFECT_PORT` | Host ports for the API, UI, and Prefect |
+| `MONGO_DATA_PATH` / `POSTGRES_DATA_PATH` | Persistent database directories |
+| `CALIB_DATA_PATH` | Calibration figures, raw data, and run artifacts |
+| `CLIENT_URL` | Public UI URL used in links generated by QDash |
+| `NEXT_PUBLIC_DEFAULT_THEME` | Initial UI theme for browsers without a saved preference |
 
-QDash application settings are committed under `config/app`, `config/domain`, and
-`config/copilot`; `CONFIG_PATH` is only for the Qubex backend configuration tree.
+The example files also list optional AI provider, Slack, knowledge repository, and tunnel
+settings. Leave an optional credential empty when that integration is not in use.
 
-`AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true` should be used only in a trusted experimental
-deployment. The runtime uses the logged-in user's token and selected project for these calls;
-QDash API endpoints enforce that user's permissions. Copilot never runs a write
-operation itself: when it calls one, the chat shows an approval card with the exact arguments, and
-the runtime runs the operation only after the user clicks **Approve**, with the arguments shown. A
-decision is accepted only for the approval the latest answer asked for, so it cannot run the same
-operation twice.
+### Enable the Pi Agent Runtime
 
-A chat turn runs until it answers or the user presses Stop; there is no time limit by default,
-because a tool waiting on a calibration can legitimately be quiet for an hour. While a turn is
-quiet the runtime sends a keepalive every `AGENT_RUNTIME_PING_MS` (default 15 s), forwarded as an
-SSE comment, so proxies and tunnels do not drop the idle stream, and the API applies no read
-timeout to the runtime stream. Stop in the chat aborts the turn in the runtime through
-`POST /copilot/chat/stop`; closing the browser alone does not, and a retry with the same request
-recovers the committed answer. Two optional budgets remain for deployments that want them:
-`AGENT_RUNTIME_WRAP_UP_MS` tells the model to stop calling tools and answer with what it has after
-that long, and `AGENT_RUNTIME_TIMEOUT_MS` aborts the turn outright (both in ms, 0 disables).
-`AGENT_RUNTIME_MODEL_STREAM_TIMEOUT_MS` (default 180 s) still limits a single model request.
-
-The Pi Agent Runtime is an opt-in Compose service. When `copilot_backend: pi`, set the following in
-`.env` before starting the stack:
+The Pi Agent Runtime is an optional Compose service. Enable it only when the deployment uses the
+Pi Copilot backend:
 
 ```dotenv
 COMPOSE_PROFILES=agent-runtime
+AGENT_RUNTIME_TOKEN=<random-shared-secret>
 ```
 
-Leave `COMPOSE_PROFILES` unset when using `copilot_backend: litellm`; normal Compose startup then
-does not build or create the Agent Runtime container. Multiple profiles use a comma-separated value,
-for example `COMPOSE_PROFILES=agent-runtime,tunnel`.
+Leave `COMPOSE_PROFILES` unset for the in-process `litellm` backend. Set
+`AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true` only in a trusted experimental deployment. QDash still
+requires the signed-in user to approve each proposed write in the chat.
 
-### Default Color Theme
+Multiple profiles use a comma-separated value, such as `agent-runtime,tunnel`.
 
-Set `NEXT_PUBLIC_DEFAULT_THEME` in `.env` to choose the initial UI theme:
+### Set the Default Color Theme
 
-```dotenv
-NEXT_PUBLIC_DEFAULT_THEME=light
-```
+Set `NEXT_PUBLIC_DEFAULT_THEME` to `light`, `dark`, `cupcake`, `emerald`, `corporate`,
+`synthwave`, `nord`, `night`, `dracula`, `dim`, `abyss`, `business`, `coffee`, or `sunset`.
+An unsupported value falls back to `light`.
 
-Supported values are `light`, `dark`, `cupcake`, `emerald`, `corporate`, `synthwave`, `nord`,
-`night`, `dracula`, `dim`, `abyss`, `business`, `coffee`, and `sunset`. An unset or unsupported
-value falls back to `light`.
-
-A theme selected from **Settings** is saved in the browser and takes precedence over the deployment
-default. `NEXT_PUBLIC_DEFAULT_THEME` is embedded in the Next.js application at build time, so rebuild
-the UI image after changing it:
+A theme selected from **Settings** is saved in the browser and takes precedence. This variable is
+embedded in the UI image at build time; rebuild the UI after changing it:
 
 ```bash
 docker compose build ui
 docker compose up -d ui
 ```
 
-### Qubex Configuration Files
+## Start QDash
 
-The Qubex backend requires hardware and parameter configuration files before calibration tasks can
-run. Prepare a Qubex configuration tree following the
-[Qubex system configuration guide](https://amachino.github.io/qubex/user-guide/getting-started/system-configuration/)
-and place it under `CONFIG_PATH`.
-
-QDash resolves Qubex files by chip ID, so the expected local layout is:
-
-```text
-config/qubex-config/
-  <chip_id>/
-    config/
-      chip.yaml
-      box.yaml
-      system.yaml
-      wiring.yaml
-      skew.yaml
-    params/
-      measurement_defaults.yaml
-      ...
-    calibration/
-      calib_note.json
-```
-
-For the default `.env.example.qubex`, `CONFIG_PATH="./config/qubex-config"`. A task for
-`chip_id="64Qv3"` therefore reads shared Qubex files from
-`./config/qubex-config/64Qv3/config` and parameter files from
-`./config/qubex-config/64Qv3/params`. `skew.yaml` is only needed for Qubex setups that require
-inter-box timing adjustment.
-
-### Repository-Managed Qubex Config
-
-If the Qubex configuration tree is managed in a Git repository, set the repository settings in
-`.env`:
+Validate the resolved Compose configuration, then build and start the enabled services:
 
 ```bash
-CONFIG_REPO_URL=https://github.com/<owner>/<qubex-config-repo>.git
-GITHUB_USER=<github-username>
-GITHUB_TOKEN=<github-token>
-```
-
-With these values set, QDash can keep `CONFIG_PATH` synchronized with the repository. Calibration
-sessions pull the latest config before running when GitHub pull is enabled, which is the default
-for Qubex workflows. Config changes can also be pulled or pushed from the file management UI.
-
-When workflow GitHub push is enabled, QDash can commit updated calibration files such as
-`calibration/calib_note.json` and parameter YAML files back to the config repository after a
-calibration run.
-
-Complete the Qubex config placement or repository setup before starting services.
-
-## Full Stack
-
-Application file logs use Docker named volumes; use `docker compose logs` to read live service
-output. Pi conversation checkpoints use the `agent-runtime-state` named volume. Keep that volume
-when recreating containers so interrupted chat and analysis work can resume.
-
-Start all enabled services:
-
-```bash
-uv run --env-file .env --isolated --locked --no-dev qdash-updater start
+docker compose config --quiet
 docker compose up -d --build
 ```
 
-If Go Task is installed, `task deploy-local` performs the same startup and also pulls an optional
-external knowledge repository configured by `KNOWLEDGE_REPO_URL`.
+If Go Task is installed, `task deploy-local` performs the startup and also pulls the optional
+knowledge repository configured by `KNOWLEDGE_REPO_URL`.
 
-Open:
+Application logs use Docker named volumes. The Pi runtime stores resumable conversation state in
+the `agent-runtime-state` volume. Normal container recreation preserves both.
+
+## Verify the Installation
+
+Confirm that the containers are running:
+
+```bash
+docker compose ps
+```
+
+Open these services using the ports from `.env`:
 
 - QDash UI: <http://localhost:5714/login>
-- API docs: <http://localhost:5715/docs>
+- API documentation: <http://localhost:5715/docs>
 - Prefect: <http://localhost:4200>
 
-## Remote Access
+Sign in with `QDASH_ADMIN_USERNAME` and `QDASH_ADMIN_PASSWORD`. For a Fake deployment, continue
+with [Running Calibrations](./running-calibrations.md). For Qubex, confirm the intended chip and
+hardware configuration before starting a task.
 
-Set `TUNNEL_TOKEN` in `.env` and add `tunnel` to `COMPOSE_PROFILES`. Keep
-`agent-runtime` in the comma-separated value when the Pi backend is enabled:
+## Enable Remote Access
+
+Set `CLIENT_URL` to the public UI URL, set `TUNNEL_TOKEN`, and enable the `tunnel` Compose profile.
+Keep `agent-runtime` in the comma-separated value when Pi is enabled:
 
 ```dotenv
+CLIENT_URL=https://qdash.example.com
+TUNNEL_TOKEN=<cloudflare-tunnel-token>
 COMPOSE_PROFILES=agent-runtime,tunnel
 ```
 
-Then run:
-
-```bash
-uv run --env-file .env --isolated --locked --no-dev qdash-updater start
-docker compose up -d --build
-```
-
-This starts the Compose stack with the enabled profiles. `task deploy` is the equivalent Go Task
-command; it appends `tunnel` while preserving profiles already configured in `.env`.
+Start the stack again with `docker compose up -d --build`. `task deploy` is the equivalent Go
+Task command; it enables the tunnel while preserving profiles already configured in `.env`.

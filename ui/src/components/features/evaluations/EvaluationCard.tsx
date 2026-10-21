@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
+  CircleHelp,
   ExternalLink,
   Image as ImageIcon,
   LoaderCircle,
@@ -23,7 +24,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ModelInputView } from "./ModelInputView";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { formatDateTime } from "@/lib/utils/datetime";
-import type { EvaluationItem } from "@/schemas";
+import type { EvaluationItem, SetEvaluationVerdictRequestIssuesItem } from "@/schemas";
 
 import {
   DIAGNOSIS_SECTIONS,
@@ -41,6 +42,8 @@ import {
   outcomeBadgeClass,
   questionLabel,
   statusLabel,
+  tokenPeak,
+  tokenPeakLabel,
 } from "./evaluationDisplay";
 import { promptSummary } from "./evaluationPrompt";
 
@@ -54,13 +57,28 @@ interface EvaluationCardProps {
   showRunLink?: boolean;
 }
 
+const VERDICT_ISSUES: Array<{
+  value: SetEvaluationVerdictRequestIssuesItem;
+  label: string;
+}> = [
+  { value: "parameter_extraction", label: "Parameters" },
+  { value: "diagnosis", label: "Diagnosis" },
+  { value: "recommendation", label: "Recommendation" },
+  { value: "insufficient_evidence", label: "Insufficient evidence" },
+  { value: "other", label: "Other" },
+];
+
 function StatusIcon({ item }: { item: EvaluationItem }) {
-  if (item.status === "failed")
+  if (item.status === "failed" || item.status === "interrupted")
     return <XCircle className="h-4 w-4 text-error" aria-hidden="true" />;
+  if (item.status === "cancelled")
+    return <XCircle className="h-4 w-4 text-base-content/40" aria-hidden="true" />;
   if (item.status !== "completed") {
     return <LoaderCircle className="h-4 w-4 animate-spin text-info" aria-hidden="true" />;
   }
   const success = diagnosisSuccess(diagnosisOf(item));
+  if (success === null || item.output?.complete !== true)
+    return <CircleHelp className="h-4 w-4 text-warning" aria-label="incomplete evaluation" />;
   if (success === false)
     return <AlertTriangle className="h-4 w-4 text-warning" aria-hidden="true" />;
   return <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />;
@@ -71,11 +89,18 @@ function Verdict({ item }: { item: EvaluationItem }) {
   const setVerdict = useSetEvaluationVerdict();
   const current = item.verdict?.agree ?? null;
   const [note, setNote] = useState(item.verdict?.note ?? "");
+  const [issues, setIssues] = useState<SetEvaluationVerdictRequestIssuesItem[]>(
+    item.verdict?.issues ?? [],
+  );
   const [editingNote, setEditingNote] = useState(false);
 
-  const save = (agree: boolean | null, nextNote: string | null) => {
+  const save = (
+    agree: boolean | null,
+    nextNote: string | null,
+    nextIssues: SetEvaluationVerdictRequestIssuesItem[],
+  ) => {
     setVerdict.mutate(
-      { evaluationId: item.evaluation_id, data: { agree, note: nextNote } },
+      { evaluationId: item.evaluation_id, data: { agree, note: nextNote, issues: nextIssues } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetEvaluationRunQueryKey(item.run_id) });
@@ -91,9 +116,10 @@ function Verdict({ item }: { item: EvaluationItem }) {
     // Clicking the active verdict clears it; the note goes with it.
     if (current === agree) {
       setNote("");
-      save(null, null);
+      setIssues([]);
+      save(null, null, []);
     } else {
-      save(agree, note.trim() || null);
+      save(agree, note.trim() || null, issues);
     }
   };
 
@@ -126,7 +152,28 @@ function Verdict({ item }: { item: EvaluationItem }) {
         </button>
       )}
       {editingNote && (
-        <span className="flex w-full items-center gap-2">
+        <span className="flex w-full flex-wrap items-center gap-2">
+          {current === false && (
+            <span className="flex w-full flex-wrap gap-2">
+              {VERDICT_ISSUES.map((issue) => (
+                <label key={issue.value} className="label cursor-pointer gap-1 py-0 text-xs">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-xs"
+                    checked={issues.includes(issue.value)}
+                    onChange={(event) =>
+                      setIssues((currentIssues) =>
+                        event.target.checked
+                          ? [...currentIssues, issue.value]
+                          : currentIssues.filter((value) => value !== issue.value),
+                      )
+                    }
+                  />
+                  {issue.label}
+                </label>
+              ))}
+            </span>
+          )}
           <input
             type="text"
             className="input input-bordered input-xs flex-1"
@@ -138,7 +185,7 @@ function Verdict({ item }: { item: EvaluationItem }) {
           <button
             type="button"
             className="btn btn-xs btn-primary"
-            onClick={() => save(current, note.trim() || null)}
+            onClick={() => save(current, note.trim() || null, issues)}
             disabled={setVerdict.isPending}
           >
             Save
@@ -147,9 +194,36 @@ function Verdict({ item }: { item: EvaluationItem }) {
       )}
       {item.verdict && !editingNote && (
         <span className="w-full text-xs text-base-content/60">
-          {item.verdict.note ? `“${item.verdict.note}” — ` : ""}
-          {item.verdict.username}, {formatDateTime(item.verdict.updated_at)}
+          <span>
+            {item.verdict.note ? `“${item.verdict.note}” — ` : ""}
+            {item.verdict.username}, {formatDateTime(item.verdict.updated_at)}
+          </span>
+          {(item.verdict.issues?.length ?? 0) > 0 && (
+            <span className="mt-1 flex flex-wrap gap-1">
+              {item.verdict.issues?.map((issue) => (
+                <span key={issue} className="badge badge-warning badge-xs badge-outline">
+                  {VERDICT_ISSUES.find((candidate) => candidate.value === issue)?.label ?? issue}
+                </span>
+              ))}
+            </span>
+          )}
         </span>
+      )}
+      {(item.verdict_history?.length ?? 0) > 1 && (
+        <details className="w-full text-xs text-base-content/60">
+          <summary className="cursor-pointer">
+            Review history ({item.verdict_history?.length})
+          </summary>
+          <ul className="mt-1 space-y-1 pl-4">
+            {item.verdict_history?.map((verdict, index) => (
+              <li key={`${verdict.username}-${verdict.updated_at}-${index}`}>
+                {verdict.username}:{" "}
+                {verdict.agree === null ? "cleared" : verdict.agree ? "agree" : "disagree"}
+                {verdict.note ? ` — ${verdict.note}` : ""}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );
@@ -170,12 +244,14 @@ export function EvaluationCard({
   const output = item.output;
   const answers = Object.entries(output?.answers ?? {}).filter(([, text]) => text);
   const input = item.input;
+  const inputExamples = input?.examples ?? [];
   const figurePath = item.figure_path?.[0];
   const jsonFigurePath = item.json_figure_path?.[0];
   const evaluator = evaluatorLabel(item.evaluator);
   const duration = formatDuration(output?.duration_ms);
   const shortfall = answerShortfall(output);
   const calls = output?.calls ?? [];
+  const peak = tokenPeak([output]);
   // The full input loads its figures, so only once someone opens it.
   const [showInput, setShowInput] = useState(false);
 
@@ -263,26 +339,42 @@ export function EvaluationCard({
                 </span>
               )
             )}
+            {peak && (
+              <span
+                className={peak.nearLimit ? "font-medium text-warning" : undefined}
+                title="Tokens the model counted for its largest call, images included; with the answer, against the judging model's context window"
+                data-testid="token-peak"
+              >
+                {tokenPeakLabel(peak)}
+                {peak.nearLimit && " — close to the context limit"}
+              </span>
+            )}
             {evaluator && <span className="font-mono">{evaluator}</span>}
             {item.completed_at && <span>{formatDateTime(item.completed_at)}</span>}
             {input && (
               <span>
                 {input.knowledge_chars
                   ? `reference ${input.knowledge_chars} chars`
-                  : "no reference"}
+                  : input.reference_requested
+                    ? "reference requested · none used"
+                    : "no reference requested"}
               </span>
             )}
-            {input?.examples && input.examples.length > 0 && (
-              <span title={input.examples.map((e) => `${e.title} (${e.outcome})`).join("\n")}>
-                {input.examples.length} labeled example{input.examples.length === 1 ? "" : "s"}
+            {input?.examples_requested && (input.examples_used ?? 0) === 0 && (
+              <span className="text-warning">examples requested · none used</span>
+            )}
+            {(input?.examples_used ?? input?.examples?.length ?? 0) > 0 && (
+              <span title={inputExamples.map((e) => `${e.title} (${e.outcome})`).join("\n")}>
+                {input?.examples_used ?? inputExamples.length} labeled example
+                {(input?.examples_used ?? inputExamples.length) === 1 ? "" : "s"} used
               </span>
             )}
           </div>
 
-          {item.status === "failed" && (
+          {["failed", "interrupted", "cancelled"].includes(item.status) && (
             <div className="alert alert-error py-2 text-sm">
               <XCircle className="h-4 w-4" />
-              <span>{item.error || "The evaluation failed."}</span>
+              <span>{item.error || `The evaluation was ${item.status}.`}</span>
             </div>
           )}
 
@@ -348,6 +440,7 @@ export function EvaluationCard({
                   input={input}
                   taskName={item.task_name}
                   figurePaths={item.figure_path ?? []}
+                  evaluationId={item.evaluation_id}
                 />
               )}
             </details>

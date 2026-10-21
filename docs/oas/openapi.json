@@ -321,149 +321,6 @@
         ]
       }
     },
-    "/admin/system-updates/status": {
-      "get": {
-        "tags": [
-          "admin"
-        ],
-        "summary": "Get QDash system update status",
-        "description": "Return current/latest release information for system administrators.",
-        "operationId": "getSystemUpdateStatus",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SystemUpdateStatusResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          },
-          "503": {
-            "description": "Host updater unavailable"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/admin/system-updates": {
-      "post": {
-        "tags": [
-          "admin"
-        ],
-        "summary": "Start a QDash system update",
-        "description": "Start the latest safe stable update when no calibration is running.",
-        "operationId": "startSystemUpdate",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StartSystemUpdateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SystemUpdateOperationResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          },
-          "409": {
-            "description": "Calibration or system update in progress"
-          },
-          "503": {
-            "description": "Host updater unavailable"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/admin/system-updates/{operation_id}": {
-      "get": {
-        "tags": [
-          "admin"
-        ],
-        "summary": "Get QDash system update progress",
-        "description": "Return updater progress after the API becomes available again.",
-        "operationId": "getSystemUpdateOperation",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "operation_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Operation Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SystemUpdateOperationResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          },
-          "503": {
-            "description": "Host updater unavailable"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/admin/config/reload": {
       "post": {
         "tags": [
@@ -4003,6 +3860,88 @@
         }
       }
     },
+    "/calibrations/parameters/{chip_id}/{qid}/{parameter_name}": {
+      "delete": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Delete a current calibration parameter",
+        "description": "Delete one current qubit or coupling value without deleting its history.",
+        "operationId": "deleteCalibrationParameter",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "parameter_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Parameter Name"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationParameterDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/calibrations/manual-edits/{qid}": {
       "get": {
         "tags": [
@@ -6470,7 +6409,7 @@
           "task"
         ],
         "summary": "Get raw markdown for a task knowledge entry",
-        "description": "Get raw markdown content for a task knowledge entry.\n\nReturns the index.md content with image references replaced\nby inline base64 data URIs for self-contained rendering.",
+        "description": "Get raw markdown content for a task knowledge entry.\n\nReturns the task.md content with image references replaced\nby inline base64 data URIs for self-contained rendering.",
         "operationId": "getTaskKnowledgeMarkdown",
         "security": [
           {
@@ -6505,13 +6444,62 @@
         }
       }
     },
+    "/tasks/{task_name}/knowledge/archive": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Download a task's knowledge directory as a zip",
+        "description": "The task's ``task.md``, examples and figures, zipped under ``<task_name>/``.\n\nThe zip is the starting point of a knowledge draft: edit it locally and\nupload it from the evaluation dialog. Raises 404 when the task has no\nknowledge directory.",
+        "operationId": "downloadTaskKnowledgeArchive",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{task_name}/evaluation-prompts": {
       "get": {
         "tags": [
           "task"
         ],
         "summary": "Preview the prompts an AI evaluation of a task would send",
-        "description": "The prompts the evaluation model would receive for a task.\n\nThe Agent Runtime builds them the way a direct evaluation does, from the\ntask's reference in Knowledge (and its labeled examples when asked), as\nthe requesting user, without a figure or a model call.",
+        "description": "The prompts the evaluation model would receive for a task.\n\nThe Agent Runtime builds them the way a direct evaluation does, from the\ntask's reference in Knowledge, or from an uploaded draft, and its labeled\nexamples when asked, as the requesting user, without a figure or a model\ncall.",
         "operationId": "getTaskEvaluationPrompts",
         "security": [
           {
@@ -6541,7 +6529,7 @@
             "description": "Lay out the task's labeled examples, as an in-context evaluation"
           },
           {
-            "name": "question",
+            "name": "knowledge_draft_id",
             "in": "query",
             "required": false,
             "schema": {
@@ -6553,10 +6541,10 @@
                   "type": "null"
                 }
               ],
-              "description": "A specific question to add",
-              "title": "Question"
+              "description": "Build the prompts from this uploaded knowledge draft",
+              "title": "Knowledge Draft Id"
             },
-            "description": "A specific question to add"
+            "description": "Build the prompts from this uploaded knowledge draft"
           },
           {
             "name": "X-Project-Id",
@@ -6657,333 +6645,6 @@
             }
           }
         }
-      }
-    },
-    "/knowledge/files/tree": {
-      "get": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Get file tree of the knowledge directory",
-        "operationId": "getKnowledgeFileTree",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/FileTreeNode"
-                  },
-                  "type": "array",
-                  "title": "Response Getknowledgefiletree"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/knowledge/files/content": {
-      "get": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Get knowledge file content for editing",
-        "operationId": "getKnowledgeFileContent",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Getknowledgefilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Save knowledge file content",
-        "operationId": "saveKnowledgeFileContent",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaveFileRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Saveknowledgefilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/knowledge/files/image": {
-      "get": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Get an image from the knowledge directory",
-        "operationId": "getKnowledgeFileImage",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "image/*": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/knowledge/files/validate": {
-      "post": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Validate file content (YAML/JSON)",
-        "operationId": "validateKnowledgeFileContent",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ValidateFileRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Validateknowledgefilecontent"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/knowledge/files/git/status": {
-      "get": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Get Git status of the knowledge directory",
-        "operationId": "getKnowledgeGitStatus",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Getknowledgegitstatus"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/knowledge/files/git/pull": {
-      "post": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Pull the latest knowledge from its Git repository",
-        "operationId": "gitPullKnowledge",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Gitpullknowledge"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/knowledge/files/git/push": {
-      "post": {
-        "tags": [
-          "knowledge"
-        ],
-        "summary": "Open a pull request with the knowledge changes",
-        "operationId": "gitPushKnowledge",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GitPushRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Gitpushknowledge"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
       }
     },
     "/task-files/settings": {
@@ -8319,7 +7980,7 @@
           "evaluation"
         ],
         "summary": "Start a bulk calibration evaluation run",
-        "description": "Queue the latest evaluable result of a task for every entity on a chip.\n\nThe evaluations run in the background as the requesting user; poll the run\nfor progress. Entities without an evaluable result are reported as skipped.",
+        "description": "Queue the latest evaluable result of a task for every entity on a chip.\n\nThe evaluations run in the background as the requesting user; poll the run\nfor progress. Entities without an evaluable result are reported as skipped.\nWith `knowledge_draft_id` the run reads that uploaded draft instead of the\ntask's shared knowledge.",
         "operationId": "createEvaluationRun",
         "security": [
           {
@@ -8545,6 +8206,134 @@
         }
       }
     },
+    "/evaluations/runs/{run_id}/retry": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Retry unfinished calibration evaluations",
+        "description": "Reset failed, interrupted or cancelled items and execute them again.",
+        "operationId": "retryEvaluationRun",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetryEvaluationRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/runs/{run_id}/cancel": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Cancel a calibration evaluation run",
+        "description": "Cancel evaluations in this run that have not completed.",
+        "operationId": "cancelEvaluationRun",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationRunSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/evaluations": {
       "get": {
         "tags": [
@@ -8668,6 +8457,333 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EvaluationItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/{evaluation_id}/figures/{sha256}": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get a snapshotted evaluation figure",
+        "description": "The exact image bytes supplied to the model for this evaluation.",
+        "operationId": "getEvaluationFigure",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "evaluation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evaluation Id"
+            }
+          },
+          {
+            "name": "sha256",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sha256"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/knowledge-drafts": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Upload a task-knowledge draft to evaluate against",
+        "description": "Store one task's knowledge directory, zipped, as a draft of the project.\n\nThe draft is parsed by the knowledge repository's own generator and is\nread only by the evaluation runs and prompt previews that name it; the\nshared knowledge does not change. Uploading the same zip again returns\nthe stored draft.",
+        "operationId": "createKnowledgeDraft",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_createKnowledgeDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeDraftResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The zip is not one usable task directory"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/knowledge-drafts/{draft_id}": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get a task-knowledge draft",
+        "description": "The draft's task, uploader, generator warnings and derived reference.",
+        "operationId": "getKnowledgeDraft",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeDraftResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/knowledge-drafts/{draft_id}/knowledge": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get a task-knowledge draft as task knowledge",
+        "description": "The draft in the shape of `GET /tasks/{name}/knowledge`, for the Agent Runtime.",
+        "operationId": "getKnowledgeDraftKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/knowledge-drafts/{draft_id}/archive": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Download the zip a task-knowledge draft was uploaded as",
+        "description": "The uploaded zip, byte for byte, so the knowledge a run read can be reused.",
+        "operationId": "downloadKnowledgeDraftArchive",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -17400,6 +17516,21 @@
         ],
         "title": "Body_bulkImportUsers"
       },
+      "Body_createKnowledgeDraft": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "format": "binary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_createKnowledgeDraft"
+      },
       "Body_login": {
         "properties": {
           "username": {
@@ -17650,6 +17781,35 @@
         ],
         "title": "CalibrationNoteResponse",
         "description": "CalibrationNote is a subclass of BaseModel."
+      },
+      "CalibrationParameterDeleteResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "qid",
+          "parameter_name"
+        ],
+        "title": "CalibrationParameterDeleteResponse",
+        "description": "Response from deleting one current calibration parameter value."
       },
       "CancelExecutionResponse": {
         "properties": {
@@ -18863,18 +19023,17 @@
             "title": "Qids",
             "description": "Restrict the run to the latest results of these qubits or couplings"
           },
-          "question": {
+          "knowledge_draft_id": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 2000
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Question",
-            "description": "A specific question for the evaluation model, on top of the diagnosis"
+            "title": "Knowledge Draft Id",
+            "description": "Evaluate against this uploaded knowledge draft instead of the shared knowledge"
           },
           "trigger": {
             "type": "string",
@@ -18902,6 +19061,17 @@
             "title": "Mode",
             "description": "\"direct\" runs the evaluation tools; \"planner\" lets the chat planner call them",
             "default": "direct"
+          },
+          "evaluation_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationModelSelection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Configured evaluation model to use; defaults to evaluation_models[0]"
           }
         },
         "type": "object",
@@ -19472,6 +19642,18 @@
             "description": "Whether the call was constrained to the diagnosis schema",
             "default": false
           },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens",
+            "description": "Prompt tokens the model counted for the call, images included"
+          },
           "output_tokens": {
             "anyOf": [
               {
@@ -19644,6 +19826,30 @@
             "title": "Knowledge Sha256",
             "description": "SHA-256 of the host-supplied reference text"
           },
+          "reference_requested": {
+            "type": "boolean",
+            "title": "Reference Requested",
+            "description": "Whether the host attempted to load a task reference",
+            "default": true
+          },
+          "reference_used": {
+            "type": "boolean",
+            "title": "Reference Used",
+            "description": "Whether a task reference was actually included in the prompt",
+            "default": false
+          },
+          "examples_requested": {
+            "type": "boolean",
+            "title": "Examples Requested",
+            "description": "Whether in-context examples were requested",
+            "default": false
+          },
+          "examples_used": {
+            "type": "integer",
+            "title": "Examples Used",
+            "description": "Number of in-context examples actually included in the prompt",
+            "default": 0
+          },
           "figures": {
             "items": {
               "$ref": "#/components/schemas/EvaluationFigureModel"
@@ -19714,7 +19920,9 @@
               "pending",
               "running",
               "completed",
-              "failed"
+              "failed",
+              "interrupted",
+              "cancelled"
             ],
             "title": "Status"
           },
@@ -19807,6 +20015,22 @@
                 "type": "null"
               }
             ]
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationVerdictModel"
+            },
+            "type": "array",
+            "title": "Verdicts",
+            "description": "Current verdict from each reviewer"
+          },
+          "verdict_history": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationVerdictModel"
+            },
+            "type": "array",
+            "title": "Verdict History",
+            "description": "Immutable verdict changes"
           }
         },
         "type": "object",
@@ -19822,6 +20046,27 @@
         ],
         "title": "EvaluationItem",
         "description": "One evaluation of one task result."
+      },
+      "EvaluationModelSelection": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Provider"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "name"
+        ],
+        "title": "EvaluationModelSelection",
+        "description": "A configured model selected to judge calibration figures."
       },
       "EvaluationOutputModel": {
         "properties": {
@@ -19973,6 +20218,18 @@
             ],
             "title": "Usage",
             "description": "Token usage, as pi reports it"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window",
+            "description": "Context window of the judging model, from the evaluation config when recorded"
           }
         },
         "type": "object",
@@ -20173,6 +20430,30 @@
             ],
             "title": "Question"
           },
+          "knowledge_draft_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Draft Id",
+            "description": "The uploaded knowledge draft the run used, if any"
+          },
+          "knowledge_draft_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Draft Name",
+            "description": "File name of that draft's zip"
+          },
           "trigger": {
             "type": "string",
             "enum": [
@@ -20206,6 +20487,18 @@
             ],
             "title": "Planner Model"
           },
+          "evaluation_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Model",
+            "description": "Configured provider/modelId requested for every evaluation"
+          },
           "requested_by": {
             "type": "string",
             "title": "Requested By"
@@ -20231,7 +20524,9 @@
             "type": "string",
             "enum": [
               "running",
-              "completed"
+              "completed",
+              "interrupted",
+              "cancelled"
             ],
             "title": "Status"
           },
@@ -20246,6 +20541,18 @@
           "failed_count": {
             "type": "integer",
             "title": "Failed Count"
+          },
+          "interrupted_count": {
+            "type": "integer",
+            "title": "Interrupted Count",
+            "description": "Evaluations interrupted by worker loss",
+            "default": 0
+          },
+          "cancelled_count": {
+            "type": "integer",
+            "title": "Cancelled Count",
+            "description": "Evaluations cancelled by a user",
+            "default": 0
           },
           "pending_count": {
             "type": "integer",
@@ -20294,6 +20601,18 @@
             "title": "Disagree Count",
             "description": "Evaluations a person disagreed with"
           },
+          "reference_used_count": {
+            "type": "integer",
+            "title": "Reference Used Count",
+            "description": "Completed evaluations that actually used a task reference",
+            "default": 0
+          },
+          "examples_used_count": {
+            "type": "integer",
+            "title": "Examples Used Count",
+            "description": "Completed evaluations that actually used in-context examples",
+            "default": 0
+          },
           "model": {
             "anyOf": [
               {
@@ -20305,6 +20624,14 @@
             ],
             "title": "Model"
           },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models",
+            "description": "All evaluation models represented in the run"
+          },
           "evaluator": {
             "anyOf": [
               {
@@ -20314,6 +20641,14 @@
                 "type": "null"
               }
             ]
+          },
+          "evaluators": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluatorModel"
+            },
+            "type": "array",
+            "title": "Evaluators",
+            "description": "All evaluator builds represented in the run"
           }
         },
         "type": "object",
@@ -20366,6 +20701,21 @@
             ],
             "title": "Note",
             "description": "Why, in the person's words"
+          },
+          "issues": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "parameter_extraction",
+                "diagnosis",
+                "recommendation",
+                "insufficient_evidence",
+                "other"
+              ]
+            },
+            "type": "array",
+            "title": "Issues",
+            "description": "Parts of the evaluation the reviewer disputed"
           },
           "username": {
             "type": "string",
@@ -22502,6 +22852,68 @@
         "title": "InputParameterModel",
         "description": "Input parameter class."
       },
+      "KnowledgeDraftResponse": {
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "title": "Draft Id",
+            "description": "SHA-256 of the uploaded zip"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name",
+            "description": "The task the draft describes (its H1)"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "uploaded_by": {
+            "type": "string",
+            "title": "Uploaded By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "What the knowledge repository's generator warned about"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/TaskReferenceResponse",
+            "description": "The background and criteria the evaluation model would get"
+          },
+          "example_count": {
+            "type": "integer",
+            "title": "Example Count",
+            "description": "Labeled examples the draft holds"
+          },
+          "figure_count": {
+            "type": "integer",
+            "title": "Figure Count",
+            "description": "Figures of task.md and the examples"
+          }
+        },
+        "type": "object",
+        "required": [
+          "draft_id",
+          "task_name",
+          "filename",
+          "uploaded_by",
+          "created_at",
+          "reference",
+          "example_count",
+          "figure_count"
+        ],
+        "title": "KnowledgeDraftResponse",
+        "description": "An uploaded task-knowledge draft and what an evaluation would read from it."
+      },
       "KnowledgeExampleResponse": {
         "properties": {
           "id": {
@@ -23435,14 +23847,7 @@
             "description": "Parameters to update. Format: {\"param_name\": {\"value\": 4.85, \"unit\": \"GHz\"}}"
           },
           "source_task_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Source Task Id",
             "description": "Task result whose output values are being manually corrected"
           },
@@ -23462,10 +23867,11 @@
         "required": [
           "chip_id",
           "qid",
-          "parameters"
+          "parameters",
+          "source_task_id"
         ],
         "title": "ManualParameterUpdateRequest",
-        "description": "Request to manually update calibration parameters.\n\nParameters are written to the DB and provenance is recorded.\nThe qid format determines target type: \"0\" for qubit, \"0-1\" for coupling."
+        "description": "Request to manually correct calibration parameters from a task result.\n\nCorrections must reference a supported source task result, and only that\nresult's output parameters can be written. Parameters are written to the DB\nand provenance is recorded.\nThe qid format determines target type: \"0\" for qubit, \"0-1\" for coupling."
       },
       "ManualParameterUpdateResponse": {
         "properties": {
@@ -26821,6 +27227,24 @@
         "title": "ResolvedPipelineTargets",
         "description": "The starting targets after chip lookup."
       },
+      "RetryEvaluationRunResponse": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/EvaluationRunSummary"
+          },
+          "retried": {
+            "type": "integer",
+            "title": "Retried"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run",
+          "retried"
+        ],
+        "title": "RetryEvaluationRunResponse",
+        "description": "A run reset for another attempt."
+      },
       "SaveFileRequest": {
         "properties": {
           "path": {
@@ -27311,6 +27735,21 @@
             ],
             "title": "Note",
             "description": "Why"
+          },
+          "issues": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "parameter_extraction",
+                "diagnosis",
+                "recommendation",
+                "insufficient_evidence",
+                "other"
+              ]
+            },
+            "type": "array",
+            "title": "Issues",
+            "description": "Parts of the evaluation that are wrong"
           }
         },
         "type": "object",
@@ -27417,24 +27856,6 @@
         "title": "SettingsResponse",
         "description": "Settings for the QDash application."
       },
-      "StartSystemUpdateRequest": {
-        "properties": {
-          "expected_current_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expected Current Version"
-          }
-        },
-        "type": "object",
-        "title": "StartSystemUpdateRequest",
-        "description": "Start request guarded against stale status screens."
-      },
       "SubmitAgentActionRequest": {
         "properties": {
           "idempotency_key": {
@@ -27519,178 +27940,6 @@
         ],
         "title": "SystemRole",
         "description": "System-level role for a user.\n\nADMIN: Full system access, can manage all users and projects.\nUSER: Regular user."
-      },
-      "SystemUpdateOperationResponse": {
-        "properties": {
-          "operation_id": {
-            "type": "string",
-            "title": "Operation Id"
-          },
-          "state": {
-            "$ref": "#/components/schemas/SystemUpdateState"
-          },
-          "source_version": {
-            "type": "string",
-            "title": "Source Version"
-          },
-          "target_version": {
-            "type": "string",
-            "title": "Target Version"
-          },
-          "stage": {
-            "type": "string",
-            "title": "Stage"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "progress": {
-            "type": "integer",
-            "maximum": 100.0,
-            "minimum": 0.0,
-            "title": "Progress"
-          },
-          "started_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Started At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "completed_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Completed At"
-          },
-          "log_tail": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Log Tail"
-          }
-        },
-        "type": "object",
-        "required": [
-          "operation_id",
-          "state",
-          "source_version",
-          "target_version",
-          "stage",
-          "message",
-          "progress",
-          "started_at",
-          "updated_at"
-        ],
-        "title": "SystemUpdateOperationResponse",
-        "description": "Progress for one updater-owned operation."
-      },
-      "SystemUpdateState": {
-        "type": "string",
-        "enum": [
-          "idle",
-          "queued",
-          "running",
-          "rolling_back",
-          "succeeded",
-          "failed",
-          "rolled_back"
-        ],
-        "title": "SystemUpdateState",
-        "description": "Lifecycle state returned by the host updater."
-      },
-      "SystemUpdateStatusResponse": {
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "title": "Enabled"
-          },
-          "current_version": {
-            "type": "string",
-            "title": "Current Version"
-          },
-          "current_commit": {
-            "type": "string",
-            "title": "Current Commit"
-          },
-          "latest_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latest Version"
-          },
-          "update_available": {
-            "type": "boolean",
-            "title": "Update Available",
-            "default": false
-          },
-          "can_update": {
-            "type": "boolean",
-            "title": "Can Update",
-            "default": false
-          },
-          "dirty": {
-            "type": "boolean",
-            "title": "Dirty",
-            "default": false
-          },
-          "blocked_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Blocked Reason"
-          },
-          "operation_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Operation Id"
-          },
-          "operation_state": {
-            "$ref": "#/components/schemas/SystemUpdateState",
-            "default": "idle"
-          },
-          "checked_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Checked At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "enabled",
-          "current_version",
-          "current_commit",
-          "checked_at"
-        ],
-        "title": "SystemUpdateStatusResponse",
-        "description": "Current installation and latest stable release status."
       },
       "Tag": {
         "properties": {

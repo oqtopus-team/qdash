@@ -47,6 +47,14 @@ qubit_metrics:
     evaluation:
       mode: none
 
+  fh_frequency:
+    title: FH Frequency
+    unit: GHz
+    scale: 1
+    description: Measured f-to-h transition frequency
+    evaluation:
+      mode: none
+
   anharmonicity:
     title: Qubit Anharmonicity
     unit: MHz

@@ -18,6 +18,10 @@ def _entry(name: str, summary: str) -> dict[str, object]:
     return {"name": name, "category": "one_qubit_coarse", "background": summary}
 
 
+def _document(entries: dict[str, object], *, version: int = 1) -> dict[str, object]:
+    return {"schema_version": version, "tasks": entries}
+
+
 @pytest.fixture
 def knowledge_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     repo = tmp_path / "task-knowledge"
@@ -57,34 +61,26 @@ def test_registry_is_cached_while_the_json_is_unchanged(knowledge_repo: Path) ->
     assert tk.get_task_knowledge("CheckT1") is first
 
 
-def test_regenerate_runs_the_repository_generator(knowledge_repo: Path) -> None:
-    (knowledge_repo / "generate.py").write_text(
-        "import json, sys\n"
-        "out = sys.argv[sys.argv.index('--output') + 1]\n"
-        "json.dump({'CheckT1': "
-        + json.dumps(_entry("CheckT1", "generated"))
-        + "}, open(out, 'w'))\n",
-        encoding="utf-8",
+def test_versioned_registry_document_loads(knowledge_repo: Path) -> None:
+    (knowledge_repo / "task-knowledge.json").write_text(
+        json.dumps(_document({"CheckT2": _entry("CheckT2", "versioned")})), encoding="utf-8"
     )
+    tk._REGISTRY_CACHE = (None, {})
 
-    output = tk.regenerate_task_knowledge_json(knowledge_repo)
+    knowledge = tk.get_task_knowledge("CheckT2")
 
-    assert output == knowledge_repo / "task-knowledge.json"
-    assert json.loads(output.read_text())["CheckT1"]["background"] == "generated"
+    assert knowledge is not None
+    assert knowledge.summary == "versioned"
 
 
-def test_regenerate_reports_a_failing_generator(knowledge_repo: Path) -> None:
-    (knowledge_repo / "generate.py").write_text(
-        "import sys; print('boom', file=sys.stderr); sys.exit(3)\n", encoding="utf-8"
+def test_unknown_registry_schema_version_is_rejected(knowledge_repo: Path) -> None:
+    (knowledge_repo / "task-knowledge.json").write_text(
+        json.dumps(_document({}, version=2)), encoding="utf-8"
     )
+    tk._REGISTRY_CACHE = (None, {})
 
-    with pytest.raises(RuntimeError, match="boom"):
-        tk.regenerate_task_knowledge_json(knowledge_repo)
-
-
-def test_regenerate_requires_the_generator(knowledge_repo: Path) -> None:
-    with pytest.raises(RuntimeError, match=r"generate\.py not found"):
-        tk.regenerate_task_knowledge_json(knowledge_repo)
+    with pytest.raises(ValueError, match="unsupported task-knowledge schema_version: 2"):
+        tk.list_all_task_knowledge()
 
 
 def test_previous_format_entries_still_load(knowledge_repo: Path) -> None:

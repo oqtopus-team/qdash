@@ -16,9 +16,11 @@ import {
   RotateCcw,
   FileInput,
   LockKeyhole,
+  Trash2,
 } from "lucide-react";
 
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import {
   DropdownMenu,
@@ -26,7 +28,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
-import { useCompareSeedValues, useImportSeedParameters } from "@/client/calibration/calibration";
+import {
+  useCompareSeedValues,
+  useDeleteCalibrationParameter,
+  useImportSeedParameters,
+} from "@/client/calibration/calibration";
 import { useListChipQubits, useListChips } from "@/client/chip/chip";
 import type { SeedImportSource } from "@/schemas";
 
@@ -121,6 +127,13 @@ interface ImportEntry {
   edited: boolean;
 }
 
+interface DeleteTarget {
+  parameterName: string;
+  qid: string;
+  value: number | string;
+  unit: string;
+}
+
 function parseImportValue(raw: string): number | string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -138,6 +151,7 @@ export function SeedParametersPanel() {
   const [editedValues, setEditedValues] = useState<Record<string, Record<string, string>>>({});
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     mode: "all" | "selected";
@@ -241,6 +255,7 @@ export function SeedParametersPanel() {
 
   // Import mutation
   const importMutation = useImportSeedParameters();
+  const deleteMutation = useDeleteCalibrationParameter();
 
   // Get counts for display
   const counts = useMemo(() => {
@@ -507,6 +522,24 @@ export function SeedParametersPanel() {
     setConfirmDialog({ open: false, mode: "all", entries: [] });
   }, []);
 
+  const handleConfirmDelete = useCallback(() => {
+    if (!selectedChip || !deleteTarget) return;
+    deleteMutation.mutate(
+      {
+        chipId: selectedChip,
+        qid: deleteTarget.qid,
+        parameterName: deleteTarget.parameterName,
+      },
+      {
+        onSuccess: async () => {
+          setDeleteTarget(null);
+          setEditingCell(null);
+          await Promise.all([refetch(), refetchQubits()]);
+        },
+      },
+    );
+  }, [deleteMutation, deleteTarget, refetch, refetchQubits, selectedChip]);
+
   const viewParameterCount =
     viewMode === "import"
       ? Object.keys(importParameters).length
@@ -565,8 +598,8 @@ export function SeedParametersPanel() {
             className={`tab gap-2 ${viewMode === "import" ? "tab-active" : ""}`}
             onClick={() => handleViewChange("import")}
           >
-            <FileInput className="h-4 w-4" aria-hidden="true" />
-            Import from YAML
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+            Modify parameters
           </button>
         </div>
 
@@ -574,12 +607,12 @@ export function SeedParametersPanel() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
               <p className="text-sm font-medium">
-                {viewMode === "database" ? "Latest database values" : "Operational YAML import"}
+                {viewMode === "database" ? "Latest database values" : "Modify current parameters"}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-base-content/60">
                 {viewMode === "database"
                   ? "Read-only view of the latest calibration values stored in QDash."
-                  : "Compare YAML candidates with QDash, edit proposed values, and review changes before applying them."}
+                  : "Compare YAML candidates with QDash, edit proposed values, delete invalid current values, and review updates before applying them."}
               </p>
             </div>
             <div className="form-control w-full lg:max-w-sm">
@@ -661,6 +694,20 @@ export function SeedParametersPanel() {
           <div className="alert alert-error mb-4">
             <AlertCircle className="h-5 w-5" />
             <span>Update failed: {String(importMutation.error)}</span>
+          </div>
+        )}
+
+        {viewMode === "import" && deleteMutation.isSuccess && (
+          <div className="alert alert-success mb-4" role="status">
+            <Check className="h-5 w-5" />
+            <span>Calibration value deleted.</span>
+          </div>
+        )}
+
+        {viewMode === "import" && deleteMutation.isError && (
+          <div className="alert alert-error mb-4" role="alert">
+            <AlertCircle className="h-5 w-5" />
+            <span>Delete failed: {String(deleteMutation.error)}</span>
           </div>
         )}
 
@@ -979,6 +1026,26 @@ export function SeedParametersPanel() {
                                         >
                                           Save
                                         </button>
+                                        {qubitData.qdash_value !== null &&
+                                          qubitData.qdash_value !== undefined && (
+                                            <button
+                                              type="button"
+                                              className="btn btn-xs btn-error btn-outline gap-1"
+                                              aria-label={`Delete current ${paramName} for qubit ${qid}`}
+                                              onClick={() => {
+                                                deleteMutation.reset();
+                                                setDeleteTarget({
+                                                  parameterName: paramName,
+                                                  qid,
+                                                  value: qubitData.qdash_value as number | string,
+                                                  unit: paramData.unit,
+                                                });
+                                              }}
+                                            >
+                                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                              Delete
+                                            </button>
+                                          )}
                                         <button
                                           type="button"
                                           className="btn btn-xs btn-ghost"
@@ -1095,6 +1162,26 @@ export function SeedParametersPanel() {
             <p>Select a chip to view its latest calibration values.</p>
           </div>
         )}
+
+        <ConfirmDialog
+          open={deleteTarget !== null}
+          title="Delete calibration value?"
+          description={
+            deleteTarget ? (
+              <>
+                Delete <strong>{deleteTarget.parameterName}</strong> for qubit {deleteTarget.qid} (
+                {formatValue(deleteTarget.value)} {deleteTarget.unit}) from the current calibration
+                database. Historical results are retained, but tasks requiring this value may fail
+                until it is calibrated or imported again.
+              </>
+            ) : null
+          }
+          confirmLabel="Delete value"
+          destructive
+          pending={deleteMutation.isPending}
+          onConfirm={handleConfirmDelete}
+          onOpenChange={(open) => !open && setDeleteTarget(null)}
+        />
 
         {/* Overwrite Confirmation Dialog */}
         {confirmDialog.open && (

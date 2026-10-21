@@ -9,8 +9,11 @@ import {
   examplesLabel,
   fitAssessment,
   formatDuration,
+  knowledgeLabel,
   meanDurationMs,
   modeLabel,
+  tokenPeak,
+  tokenPeakLabel,
   triggerLabel,
 } from "./evaluationDisplay";
 import { promptProfile, referenceLabel, systemPromptLabel } from "./evaluationPrompt";
@@ -27,6 +30,7 @@ import { promptProfile, referenceLabel, systemPromptLabel } from "./evaluationPr
 
 /** How the two judgements of one entity relate. */
 export type RowOutcome = "same" | "differs" | "incomplete";
+export type DifferenceKind = "decision" | "content" | null;
 
 export interface CompareRow {
   qid: string;
@@ -35,6 +39,8 @@ export interface CompareRow {
   /** Both sides evaluated the same task result; null when a side is missing. */
   sameResult: boolean | null;
   outcome: RowOutcome;
+  /** Whether the verdict changed, or only its supporting content changed. */
+  difference: DifferenceKind;
 }
 
 export interface CompareSummary {
@@ -69,23 +75,48 @@ export function compareQids(left: string, right: string): number {
  * incomplete otherwise (a side missing, pending, failed, answered in prose, a
  * diagnosis without `success`, or a labelled answer on one side only).
  */
-export function rowOutcome(a: EvaluationItem | null, b: EvaluationItem | null): RowOutcome {
+function normalizeDiagnosis(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizeDiagnosis);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, normalizeDiagnosis(entry)]),
+    );
+  }
+  return typeof value === "string" ? value.trim().replace(/\s+/g, " ").toLowerCase() : value;
+}
+
+function sameValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(normalizeDiagnosis(left)) === JSON.stringify(normalizeDiagnosis(right));
+}
+
+/** Classify a full diagnosis delta, separating changed decisions from changed supporting content. */
+export function diagnosisDifference(
+  a: EvaluationItem | null,
+  b: EvaluationItem | null,
+): DifferenceKind | "incomplete" {
   if (!a || !b || a.status !== "completed" || b.status !== "completed") return "incomplete";
   const da = diagnosisOf(a);
   const db = diagnosisOf(b);
   if (!da || !db) return "incomplete";
+  if (a.output?.complete === false || b.output?.complete === false) return "incomplete";
   const successA = diagnosisSuccess(da);
   const successB = diagnosisSuccess(db);
   if (successA === null || successB === null) return "incomplete";
-  // The labelled answers: status (Q6), fit assessment (Q4), outcome (Q2). One
-  // answered on one side only cannot be compared.
-  const labels = [diagnosisStatus, fitAssessment, diagnosisOutcome].map((read) => [
+  const decisions = [diagnosisStatus, fitAssessment, diagnosisOutcome].map((read) => [
     read(da),
     read(db),
   ]);
-  if (labels.some(([left, right]) => (left === null) !== (right === null))) return "incomplete";
-  const same = successA === successB && labels.every(([left, right]) => left === right);
-  return same ? "same" : "differs";
+  if (decisions.some(([left, right]) => (left === null) !== (right === null))) return "incomplete";
+  if (successA !== successB || decisions.some(([left, right]) => left !== right)) return "decision";
+  return sameValue(da, db) ? null : "content";
+}
+
+export function rowOutcome(a: EvaluationItem | null, b: EvaluationItem | null): RowOutcome {
+  const difference = diagnosisDifference(a, b);
+  if (difference === "incomplete") return "incomplete";
+  return difference === null ? "same" : "differs";
 }
 
 /** Rows by entity, in natural order, from the evaluations of two runs. */
@@ -102,13 +133,17 @@ export function joinEvaluations(
   }
   return [...byQid.entries()]
     .sort(([left], [right]) => compareQids(left, right))
-    .map(([qid, sides]) => ({
-      qid,
-      a: sides.a,
-      b: sides.b,
-      sameResult: sides.a && sides.b ? sides.a.task_id === sides.b.task_id : null,
-      outcome: rowOutcome(sides.a, sides.b),
-    }));
+    .map(([qid, sides]) => {
+      const difference = diagnosisDifference(sides.a, sides.b);
+      return {
+        qid,
+        a: sides.a,
+        b: sides.b,
+        sameResult: sides.a && sides.b ? sides.a.task_id === sides.b.task_id : null,
+        outcome: difference === "incomplete" ? "incomplete" : difference ? "differs" : "same",
+        difference: difference === "incomplete" ? null : difference,
+      };
+    });
 }
 
 export function summarizeRows(rows: ReadonlyArray<CompareRow>): CompareSummary {
@@ -171,9 +206,22 @@ export function runSettings(a: RunSide, b: RunSide): SettingDiff[] {
       "Copilot model",
       ({ run }) => (run.mode === "planner" ? run.planner_model || "-" : "-"),
     ],
-    ["examples", "Examples", ({ run }) => examplesLabel(run.with_examples)],
+    [
+      "examples",
+      "Examples",
+      ({ run }) =>
+        run.with_examples
+          ? `In-context requested · ${run.examples_used_count ?? 0}/${run.completed_count} used`
+          : examplesLabel(false),
+    ],
+    [
+      "knowledge",
+      "Knowledge",
+      ({ run }) => knowledgeLabel(run),
+      ({ run }) => run.knowledge_draft_id ?? "",
+    ],
     ["question", "Question", ({ run }) => run.question || "-"],
-    ["model", "Evaluation model", ({ run }) => run.model || "-"],
+    ["model", "Evaluation model", ({ run }) => run.evaluation_model || run.model || "-"],
     ["evaluator", "Evaluator", ({ run }) => evaluatorLabel(run.evaluator) || "-"],
     ["elapsed", "Took", ({ run }) => formatDuration(run.elapsed_ms) ?? "-"],
     ["duration", "Per evaluation", ({ run }) => formatDuration(meanDurationMs(run)) ?? "-"],
@@ -182,6 +230,12 @@ export function runSettings(a: RunSide, b: RunSide): SettingDiff[] {
       "Reference",
       (side) => referenceLabel(promptProfile(side.evaluations ?? [])),
       (side) => JSON.stringify(promptProfile(side.evaluations ?? []).referenceKeys),
+    ],
+    [
+      "tokens",
+      "Tokens",
+      (side) =>
+        tokenPeakLabel(tokenPeak((side.evaluations ?? []).map((item) => item.output))) ?? "-",
     ],
     [
       "system_prompt",

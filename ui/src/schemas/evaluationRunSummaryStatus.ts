@@ -12,4 +12,6 @@ export type EvaluationRunSummaryStatus = typeof EvaluationRunSummaryStatus[keyof
 export const EvaluationRunSummaryStatus = {
   running: 'running',
   completed: 'completed',
+  interrupted: 'interrupted',
+  cancelled: 'cancelled',
 } as const;

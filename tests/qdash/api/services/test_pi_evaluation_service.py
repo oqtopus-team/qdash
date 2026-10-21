@@ -33,13 +33,22 @@ async def test_the_runtime_record_is_returned_as_is(monkeypatch) -> None:
         return httpx.Response(200, json={"task_id": "t1", "evaluation": {"model": "vllm/x"}})
 
     record = await evaluate_task_result(
-        "t1", auth=AUTH, question="Why?", transport=_transport(handler)
+        "t1",
+        auth=AUTH,
+        question="Why?",
+        knowledge_draft_id="ab" * 32,
+        transport=_transport(handler),
     )
 
     assert record == {"task_id": "t1", "evaluation": {"model": "vllm/x"}}
     assert isinstance(seen["url"], str)
     assert seen["url"].endswith("/evaluate")
-    assert seen["body"] == {"task_id": "t1", "mode": "direct", "question": "Why?"}
+    assert seen["body"] == {
+        "task_id": "t1",
+        "mode": "direct",
+        "question": "Why?",
+        "knowledge_draft_id": "ab" * 32,
+    }
     assert isinstance(seen["headers"], dict)
     assert seen["headers"]["authorization"] == "Bearer runtime-secret"
     assert seen["headers"]["x-qdash-token"] == "user-token"
@@ -76,7 +85,7 @@ async def test_a_non_json_failure_reports_the_status(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_planner_mode_sends_the_planner_model(monkeypatch) -> None:
+async def test_planner_mode_sends_the_planner_and_evaluation_models(monkeypatch) -> None:
     monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "runtime-secret")
     seen: dict[str, object] = {}
 
@@ -89,6 +98,10 @@ async def test_planner_mode_sends_the_planner_model(monkeypatch) -> None:
         auth=AUTH,
         mode="planner",
         model={"provider": "openai-compatible", "name": "qwen"},
+        evaluation_model={
+            "provider": "openai-compatible-evaluation",
+            "name": "nvidia/Ising-Calibration",
+        },
         thinking_level="low",
         transport=_transport(handler),
     )
@@ -97,6 +110,10 @@ async def test_planner_mode_sends_the_planner_model(monkeypatch) -> None:
         "task_id": "t1",
         "mode": "planner",
         "model": {"provider": "openai-compatible", "name": "qwen"},
+        "evaluation_model": {
+            "provider": "openai-compatible-evaluation",
+            "name": "nvidia/Ising-Calibration",
+        },
         "thinking_level": "low",
     }
 
@@ -113,13 +130,21 @@ async def test_a_prompt_preview_is_requested_as_the_user(monkeypatch) -> None:
         return httpx.Response(200, json={"task_name": "CheckRabi", "questions": []})
 
     preview = await preview_evaluation_prompts(
-        "CheckRabi", auth=AUTH, with_examples=True, question="Why?", transport=_transport(handler)
+        "CheckRabi",
+        auth=AUTH,
+        with_examples=True,
+        knowledge_draft_id="ab" * 32,
+        transport=_transport(handler),
     )
 
     assert preview == {"task_name": "CheckRabi", "questions": []}
     assert isinstance(seen["url"], str)
     assert seen["url"].endswith("/evaluation-prompts")
-    assert seen["body"] == {"task_name": "CheckRabi", "with_examples": True, "question": "Why?"}
+    assert seen["body"] == {
+        "task_name": "CheckRabi",
+        "with_examples": True,
+        "knowledge_draft_id": "ab" * 32,
+    }
     assert isinstance(seen["headers"], dict)
     assert seen["headers"]["authorization"] == "Bearer runtime-secret"
     assert seen["headers"]["x-qdash-token"] == "user-token"

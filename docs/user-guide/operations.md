@@ -1,40 +1,47 @@
 # Operations
 
-This page covers common operational commands for a local or lab QDash deployment.
+Use these commands to start, inspect, restart, and stop a local or lab QDash deployment.
 
-## Service Commands
+Run all commands from the QDash repository root. The examples use the default ports from the
+example `.env` files; use the values in your `.env` if you changed them.
+
+## Start QDash
+
+Start the enabled Docker Compose services:
 
 ```bash
-# Full Docker Compose stack
-uv run --env-file .env --isolated --locked --no-dev qdash-updater start
 docker compose up -d --build
-
-# Updater state or shutdown
-uv run --env-file .env --isolated --locked --no-dev qdash-updater status
-uv run --env-file .env --isolated --locked --no-dev qdash-updater stop
-
-# Host-side API/UI with Docker-backed services
-task dev-local
-
-# Stop host API/UI and local Docker Compose services
-task dev-local-down
-
-# Supporting services only
-task dev-services
-
-# Restart the API container in the full Docker stack
-task restart-api
 ```
 
-Go Task is optional for operators. When installed, `task deploy-local` wraps the first two startup
-commands and the remaining `task` commands provide development conveniences.
+If Go Task is installed, `task deploy-local` runs this command and also pulls the optional
+Copilot knowledge repository configured by `KNOWLEDGE_REPO_URL`.
 
 The `agent-runtime` service is opt-in. Set `COMPOSE_PROFILES=agent-runtime` in `.env` when
 `config/copilot/config.yaml` uses `copilot_backend: pi`. Leave it unset for the in-process
-`litellm` backend so the container is not created. `task deploy` preserves that selection while
-adding the `tunnel` profile required by remote deployments.
+`litellm` backend. For a remote deployment, follow
+[Enable Remote Access](./setup.md#enable-remote-access)
+instead of changing profiles at the command line.
 
-## Logs
+Host-side API and UI processes are a development workflow. Use
+[Development Environment Setup](../developer-guide/setup.md) instead of the commands on this page.
+
+## Check Service Health
+
+List containers and their current state:
+
+```bash
+docker compose ps
+```
+
+After the containers start, check the browser-facing services:
+
+- QDash UI: <http://localhost:5714/login>
+- API documentation: <http://localhost:5715/docs>
+- Prefect: <http://localhost:4200>
+
+## Inspect Logs
+
+Follow a service log with `docker compose logs -f <service>`. Common service names are:
 
 ```bash
 docker compose logs -f api
@@ -45,6 +52,9 @@ docker compose logs -f prefect-server
 docker compose logs -f agent-runtime
 ```
 
+Press Ctrl+C to stop following a log; the service continues to run. Omit `-f` to print the current
+log and return to the shell.
+
 The API also writes a rotating file to its Docker log volume. Host-side API runs write under
 `${XDG_STATE_HOME:-$HOME/.local/state}/qdash/logs`.
 
@@ -52,14 +62,36 @@ Pi stores per-user durable conversation state in the `agent-runtime-state` Docke
 container rebuilds preserve it. Deleting that volume removes Pi transcripts and unfinished work;
 the user-facing session list in MongoDB is unaffected.
 
-## Health Checks
+## Restart a Service
 
-- UI reachable: <http://localhost:5714/login>
-- API reachable: <http://localhost:5715/docs>
-- Prefect reachable: <http://localhost:4200>
-- Docker service status: `docker compose ps`
+Restart one service after a transient failure or a configuration change that does not require a
+new image:
 
-## Common Issues
+```bash
+docker compose restart api
+```
+
+Replace `api` with another service name from `docker compose ps`. If source, dependencies, or UI
+build settings changed, recreate the service from a new image instead:
+
+```bash
+docker compose up -d --build api
+```
+
+`task restart-api` is the Go Task shortcut for restarting the API container.
+
+## Stop QDash
+
+Stop and remove the Compose containers and network:
+
+```bash
+docker compose down
+```
+
+This command preserves named volumes and bind-mounted data. Do not add `--volumes` unless you
+intend to delete persistent service state.
+
+## Resolve Common Failures
 
 If the UI cannot reach the API, check `INTERNAL_API_URL` and whether the API is listening on
 `API_PORT`.

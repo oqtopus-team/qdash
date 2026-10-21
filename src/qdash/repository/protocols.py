@@ -888,6 +888,18 @@ class QubitCalibrationRepository(Protocol):
         """
         ...
 
+    def delete_calib_parameter(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+        parameter_name: str,
+        project_id: str | None,
+    ) -> QubitModel:
+        """Delete one current calibration parameter."""
+        ...
+
     def find_one(
         self,
         *,
@@ -959,6 +971,18 @@ class CouplingCalibrationRepository(Protocol):
             If the coupling or chip is not found
 
         """
+        ...
+
+    def delete_calib_parameter(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+        parameter_name: str,
+        project_id: str | None,
+    ) -> CouplingModel:
+        """Delete one current calibration parameter."""
         ...
 
     def find_one(

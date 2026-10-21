@@ -50,7 +50,10 @@ test("a chart in tool details is emitted before tool_end", () => {
 test("an evaluation tool's prompt and model travel with tool_end", () => {
   const details = {
     prompt: "Reference for this experiment:\n## Experiment: CheckRabi",
-    model: { provider: "vllm", modelId: "nvidia/Ising-Calibration-1.5-31B-NVFP4" },
+    model: {
+      provider: "openai-compatible-evaluation",
+      modelId: "nvidia/Ising-Calibration-1.5-31B-NVFP4",
+    },
     diagnosis: { success: true },
   };
   assert.deepEqual(
@@ -61,7 +64,7 @@ test("an evaluation tool's prompt and model travel with tool_end", () => {
         name: "qcal_evaluate",
         evaluation: {
           prompt: details.prompt,
-          model: "vllm/nvidia/Ising-Calibration-1.5-31B-NVFP4",
+          model: "openai-compatible-evaluation/nvidia/Ising-Calibration-1.5-31B-NVFP4",
         },
         isError: false,
       },
@@ -230,13 +233,13 @@ test("a stamped evaluation result also carries the record the API stores", () =>
     result: {
       details: {
         prompt: "p",
-        model: { provider: "vllm", modelId: "ising" },
+        model: { provider: "openai-compatible-evaluation", modelId: "ising" },
         diagnosis: { success: true },
         host: { context: "ctx", task_name: "CheckRabi", figures: [], knowledge: null, task_id: "task-7", duration_ms: 12 },
       },
     },
   });
-  assert.equal(end.evaluation.model, "vllm/ising");
+  assert.equal(end.evaluation.model, "openai-compatible-evaluation/ising");
   assert.equal(end.evaluation.record.task_id, "task-7");
   assert.equal(end.evaluation.record.mode, "planner");
   assert.deepEqual(end.evaluation.record.evaluation.diagnosis, { success: true });

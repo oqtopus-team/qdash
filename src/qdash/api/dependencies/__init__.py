@@ -32,6 +32,7 @@ from qdash.api.services.evaluation_service import EvaluationService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
 from qdash.api.services.forum_service import ForumService
+from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore
 from qdash.api.services.manual_update_service import ManualUpdateService
 from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.note_service import NoteService
@@ -41,11 +42,9 @@ from qdash.api.services.provenance_service import ProvenanceService
 from qdash.api.services.reanalysis_service import ReanalysisService
 from qdash.api.services.seed_import_service import SeedImportService
 from qdash.api.services.slack_notification_service import SlackNotificationService
-from qdash.api.services.system_update_service import SystemUpdateService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
-from qdash.config import get_settings
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.repository import (
     MongoChipRepository,
@@ -268,6 +267,12 @@ def get_evaluation_service() -> EvaluationService:
 
 
 @cached_dependency_provider
+def get_knowledge_draft_store() -> KnowledgeDraftStore:
+    """Get the store of uploaded task-knowledge drafts."""
+    return KnowledgeDraftStore()
+
+
+@cached_dependency_provider
 def get_tag_repository() -> MongoTagRepository:
     """Get the tag repository instance."""
     return MongoTagRepository()
@@ -373,12 +378,6 @@ def get_copilot_runtime() -> CopilotRuntime:
 def get_admin_service() -> AdminService:
     """Get the admin service instance."""
     return AdminService()
-
-
-@cached_dependency_provider
-def get_system_update_service() -> SystemUpdateService:
-    """Get the administrator-facing system update proxy."""
-    return SystemUpdateService(get_settings())
 
 
 @cached_dependency_provider
@@ -502,31 +501,6 @@ def get_task_file_service() -> TaskFileService:
 def get_file_service() -> FileService:
     """Get the file service instance."""
     return FileService()
-
-
-@cached_dependency_provider
-def get_knowledge_file_service() -> FileService:
-    """The task knowledge repository as an editable git workspace.
-
-    A save regenerates ``task-knowledge.json`` with the repository's own
-    generator so the edit reaches the copilot and evaluations at once; the
-    generated file is left out of pushes because the repository's CI rebuilds it.
-    """
-    from qdash.common.config.loader import ConfigLoader
-    from qdash.datamodel.task_knowledge import regenerate_task_knowledge_json
-
-    repo_dir = (ConfigLoader.get_config_dir() / "task-knowledge").resolve()
-
-    def after_save() -> None:
-        regenerate_task_knowledge_json(repo_dir)
-
-    return FileService(
-        repo_dir,
-        label="knowledge",
-        repo_url_env="KNOWLEDGE_REPO_URL",
-        after_save=after_save,
-        push_exclude=("task-knowledge.json",),
-    )
 
 
 @cached_dependency_provider

@@ -10,6 +10,7 @@ import {
   acceptsKnowledge,
   compactCriteria,
   examplesOf,
+  fetchKnowledgeDraft,
   fetchTaskExamples,
   fetchTaskKnowledge,
   hasExamples,
@@ -190,4 +191,26 @@ test("examples are fetched from the same knowledge endpoint, and none without it
   assert.deepEqual(examples.map((e) => e.id), ["e1"]);
   const notFound = async () => ({ ok: false, status: 404, json: async () => ({}) });
   assert.deepEqual(await fetchTaskExamples(connection, "Unknown", undefined, notFound), []);
+});
+
+test("a draft is fetched as the user by id, and one the API does not serve is an error", async () => {
+  const calls = [];
+  const ok = async (url, init) => {
+    calls.push({ url, headers: init.headers });
+    return { ok: true, status: 200, json: async () => ({ name: "CheckRabi", prompt_text: "ref" }) };
+  };
+  assert.deepEqual(await fetchKnowledgeDraft(connection, "ab12", undefined, ok), { name: "CheckRabi", prompt_text: "ref" });
+  assert.deepEqual(calls, [
+    {
+      url: "http://api:5715/evaluations/knowledge-drafts/ab12/knowledge",
+      headers: { Authorization: "Bearer tok", Accept: "application/json", "X-Project-Id": "p1" },
+    },
+  ]);
+
+  const notFound = async () => ({ ok: false, status: 404, json: async () => ({ detail: "knowledge draft ab12 not found" }) });
+  await assert.rejects(fetchKnowledgeDraft(connection, "ab12", undefined, notFound), {
+    message: "HTTP 404: knowledge draft ab12 not found",
+  });
+  const bare = async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError("not json"); } });
+  await assert.rejects(fetchKnowledgeDraft(connection, "ab12", undefined, bare), { message: "HTTP 502" });
 });

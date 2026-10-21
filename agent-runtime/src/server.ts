@@ -71,9 +71,13 @@ interface EvaluateBody {
   mode?: "direct" | "planner";
   /** The planner in planner mode; in direct mode only pi-qcaleval's fallback model. */
   model?: { provider?: string; name?: string };
+  /** The model that qcal_evaluate must use, independent of the planner. */
+  evaluation_model?: { provider?: string; name?: string };
   thinking_level?: SessionRequest["thinkingLevel"];
   /** Show the task's labeled example plots before the figure (in-context examples). */
   with_examples?: boolean;
+  /** Read this uploaded knowledge draft instead of the task's shared knowledge. */
+  knowledge_draft_id?: string;
 }
 
 interface PromptPreviewBody {
@@ -81,6 +85,12 @@ interface PromptPreviewBody {
   with_examples?: boolean;
   context?: string;
   question?: string;
+  knowledge_draft_id?: string;
+}
+
+/** The knowledge draft a request names, if any. */
+function draftIdOf(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 /** Planner-less evaluations in flight, for /health. */
@@ -111,6 +121,7 @@ async function handleEvaluationPrompts(req: IncomingMessage, res: ServerResponse
         withExamples: body.with_examples === true,
         context: typeof body.context === "string" ? body.context : undefined,
         question: typeof body.question === "string" ? body.question : undefined,
+        knowledgeDraftId: draftIdOf(body.knowledge_draft_id),
       },
       auth,
       controller.signal,
@@ -419,8 +430,11 @@ async function handleEvaluate(req: IncomingMessage, res: ServerResponse): Promis
       question: typeof body.question === "string" ? body.question : undefined,
       maxFigures: body.max_figures,
       withExamples: body.with_examples === true,
+      knowledgeDraftId: draftIdOf(body.knowledge_draft_id),
       provider: body.model?.provider,
       modelName: body.model?.name,
+      evaluationProvider: body.evaluation_model?.provider,
+      evaluationModelName: body.evaluation_model?.name,
       thinkingLevel: body.thinking_level,
     };
     const result =

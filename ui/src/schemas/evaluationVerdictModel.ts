@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { EvaluationVerdictModelAgree } from './evaluationVerdictModelAgree';
+import type { EvaluationVerdictModelIssuesItem } from './evaluationVerdictModelIssuesItem';
 import type { EvaluationVerdictModelNote } from './evaluationVerdictModelNote';
 
 /**
@@ -16,6 +17,8 @@ export interface EvaluationVerdictModel {
   agree?: EvaluationVerdictModelAgree;
   /** Why, in the person's words */
   note?: EvaluationVerdictModelNote;
+  /** Parts of the evaluation the reviewer disputed */
+  issues?: EvaluationVerdictModelIssuesItem[];
   /** Who judged */
   username: string;
   /** When the verdict was last changed */

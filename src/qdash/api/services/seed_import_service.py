@@ -41,6 +41,7 @@ DEFAULT_SEED_PARAMETERS = [
     "control_amplitude",
     "readout_amplitude",
     "control_frequency",
+    "control_frequency_ef",
     "readout_frequency",
 ]
 

@@ -62,8 +62,8 @@ Code from `${localWorkspaceFolder}` or by `compose.devcontainer.yaml` from `$PWD
 `/home/vscode/.codex` are persisted in Docker volumes, so they survive container rebuilds.
 Codex itself is installed under `/opt/codex`, which remains writable by the `vscode` user for
 CLI updates without being hidden by the persisted `.local` volume. Host-side deployment commands
-keep their Python environment and updater runtime state outside the checkout, so they do not reuse
-root-owned DevContainer artifacts.
+keep their Python environment outside the checkout, so they do not reuse root-owned DevContainer
+artifacts.
 
 Use the same `task` commands from the host or DevContainer. Both sessions edit the same source
 checkout and use the same Docker daemon. Run development commands as the `vscode` user in the
@@ -134,12 +134,16 @@ task dev-local-down
 
 ## Refresh Dependencies
 
-The DevContainer installs Python, frontend, and Lefthook dependencies automatically during
-creation. To refresh dependencies manually, run:
+The DevContainer includes Lychee and installs Python, frontend, and Lefthook dependencies during
+creation. To refresh dependencies and install the local documentation checker manually, run:
 
 ```shell
 task dev-local-setup
 ```
+
+The setup task installs Lychee in `$HOME/.local/bin` when the active environment does not already
+provide the pinned version. Keep that directory on `PATH` when running host-side tasks outside the
+DevContainer or Nix shell.
 
 ## Run the Development Stack
 

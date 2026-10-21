@@ -1,30 +1,40 @@
 "use client";
 
-import { ArrowLeft, XCircle } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, RotateCcw, Square, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
-import { useGetEvaluationRun } from "@/client/evaluation/evaluation";
+import {
+  getGetEvaluationRunQueryKey,
+  useCancelEvaluationRun,
+  useGetEvaluationRun,
+  useRetryEvaluationRun,
+} from "@/client/evaluation/evaluation";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { EvaluationItem, EvaluationRunSummary } from "@/schemas";
 
 import { EvaluationCard } from "./EvaluationCard";
+import { KnowledgeDraftDownloadButton } from "./KnowledgeDraftDownloadButton";
 import { compareHref } from "./evaluationCompare";
 import { promptProfile, rangeLabel, referenceLabel, systemPromptLabel } from "./evaluationPrompt";
 import { RunPicker } from "./RunPicker";
 import {
   agreementRate,
   evaluatorLabel,
+  knowledgeLabel,
   modeLabel,
   runDone,
   runIsActive,
   runTimingLabel,
+  tokenPeak,
+  tokenPeakLabel,
   triggerLabel,
 } from "./evaluationDisplay";
 
 /** A labeled value in the run summary. */
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <div className="text-xs uppercase text-base-content/50">{label}</div>
@@ -48,6 +58,7 @@ function RunPromptPanel({
   evaluations: EvaluationItem[];
 }) {
   const profile = promptProfile(evaluations);
+  const peak = tokenPeak(evaluations.map((item) => item.output));
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   if (profile.recorded === 0) return null;
   const consistent =
@@ -69,11 +80,23 @@ function RunPromptPanel({
             : `varies across the ${profile.recorded} evaluations${run.mode === "planner" ? " (Copilot wrote the context and may pass its own reference)" : ""}`}
         </span>
       </div>
-      <div className="grid gap-3 md:grid-cols-5">
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Stat label="System prompt" value={systemPromptLabel(profile)} />
         <Stat label="Reference" value={referenceLabel(profile)} />
         <Stat label="Labeled examples" value={rangeLabel(profile.examples)} />
         <Stat label="Figures" value={rangeLabel(profile.figures)} />
+        <Stat
+          label="Tokens"
+          value={
+            peak ? (
+              <span className={peak.nearLimit ? "font-medium text-warning" : undefined}>
+                {tokenPeakLabel(peak)}
+              </span>
+            ) : (
+              "not recorded"
+            )
+          }
+        />
         <Stat
           label="Question"
           value={
@@ -107,6 +130,9 @@ function RunPromptPanel({
 /** One evaluation run: its progress, what judged it, and every record with verdict controls. */
 export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const cancelRun = useCancelEvaluationRun();
+  const retryRun = useRetryEvaluationRun();
   const goBack = () => router.push("/evaluations");
   const {
     data: response,
@@ -151,6 +177,11 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
 
   const { run, evaluations } = data;
   const agreement = agreementRate(run);
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: getGetEvaluationRunQueryKey(runId) });
+  const retryable = evaluations.some((item) =>
+    ["failed", "interrupted", "cancelled"].includes(item.status),
+  );
 
   return (
     <PageContainer maxWidth>
@@ -182,12 +213,40 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
             onPick={(other) => router.push(compareHref(run.run_id, other))}
             className="max-w-xs"
           />
+          {runIsActive(run) && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm gap-1"
+              disabled={cancelRun.isPending}
+              onClick={() => cancelRun.mutate({ runId }, { onSuccess: refresh })}
+            >
+              <Square className="h-3.5 w-3.5" />
+              Cancel
+            </button>
+          )}
+          {!runIsActive(run) && retryable && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm gap-1"
+              disabled={retryRun.isPending}
+              onClick={() => retryRun.mutate({ runId }, { onSuccess: refresh })}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Retry unfinished
+            </button>
+          )}
           {runIsActive(run) && <span className="badge badge-info">running</span>}
           <span className="badge badge-neutral">
             {runDone(run)}/{run.total} done
           </span>
           {run.failed_count > 0 && (
             <span className="badge badge-error">{run.failed_count} failed</span>
+          )}
+          {(run.interrupted_count ?? 0) > 0 && (
+            <span className="badge badge-warning">{run.interrupted_count} interrupted</span>
+          )}
+          {(run.cancelled_count ?? 0) > 0 && (
+            <span className="badge badge-ghost">{run.cancelled_count} cancelled</span>
           )}
         </div>
       </div>
@@ -205,13 +264,44 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
                 : `${Math.round(agreement * 100)}% of ${run.agree_count + run.disagree_count}`
             }
           />
-          <Stat label="Evaluation model" value={run.model || "-"} />
-          <Stat label="Evaluator" value={evaluatorLabel(run.evaluator) || "-"} />
+          <Stat
+            label="Evaluation model"
+            value={
+              run.evaluation_model ||
+              ((run.models?.length ?? 0) > 1 ? `mixed (${run.models?.length})` : run.model || "-")
+            }
+          />
+          <Stat
+            label="Evaluator"
+            value={
+              (run.evaluators?.length ?? 0) > 1
+                ? `mixed (${run.evaluators?.length})`
+                : evaluatorLabel(run.evaluator) || "-"
+            }
+          />
           <Stat
             label={run.mode === "planner" ? "Copilot model" : "Mode"}
             value={run.mode === "planner" ? run.planner_model || "-" : modeLabel(run.mode)}
           />
         </div>
+        {run.knowledge_draft_id && (
+          <div className="mt-3 text-sm" data-testid="run-knowledge">
+            <span className="text-xs uppercase text-base-content/50">Knowledge</span>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-base-content/80">
+              {knowledgeLabel(run)}
+              <span className="font-mono text-xs text-base-content/50">
+                {run.knowledge_draft_id.slice(0, 12)}
+              </span>
+              <KnowledgeDraftDownloadButton
+                draftId={run.knowledge_draft_id}
+                filename={run.knowledge_draft_name || `${run.task_name}.zip`}
+              />
+              <span className="block w-full text-xs text-base-content/60">
+                Evaluated against an uploaded knowledge draft instead of the shared knowledge.
+              </span>
+            </p>
+          </div>
+        )}
         {run.question && (
           <div className="mt-3 text-sm">
             <span className="text-xs uppercase text-base-content/50">Question</span>

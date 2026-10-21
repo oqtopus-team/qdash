@@ -19,7 +19,7 @@ tasks:
   generate:
     dotenv: [.env]
     cmds:
-      - uv run scripts/generate_task_catalog.py
+      - uv run --all-packages scripts/generate_task_catalog.py
       - |
         OPENAPI_TMP="$(mktemp)"
         ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
@@ -33,7 +33,7 @@ tasks:
   generate-task-catalog:
     desc: Generate task metadata catalog from workflow classes
     cmds:
-      - uv run scripts/generate_task_catalog.py
+      - uv run --all-packages scripts/generate_task_catalog.py
 
   generate-python-schema:
     desc: Generate Python Pydantic schema models from OpenAPI
@@ -196,8 +196,9 @@ tasks:
       - docker compose down
 
   dev-local-setup:
-    desc: Install dependencies needed by host-side API/UI development
+    desc: Install dependencies and tools needed by local development
     cmds:
+      - .devcontainer/install-lychee.sh
       - uv sync --locked --all-groups --all-packages
       - mkdir -p "${CONFIG_PATH:-./config/qubex-config}"
       - bun install --cwd ui --frozen-lockfile
@@ -322,7 +323,7 @@ tasks:
       - bun run docs:build
 
   check-docs-links:
-    desc: Check documentation links (requires Lychee)
+    desc: Build docs and check external links, local links, and anchors
     deps: [build-docs]
     cmds:
       - |
@@ -336,7 +337,16 @@ tasks:
         for section in developer-guide user-guide reference; do
           ln -s "$(pwd)/docs/${section}" "${LYCHEE_ROOT_DIR}/source/${section}"
         done
-        git ls-files docs | awk '/\.md$/ { print }' > "${LYCHEE_ROOT_DIR}/inputs"
+        git ls-files --cached --others --exclude-standard docs |
+          while IFS= read -r file; do
+            case "${file}" in
+              *.md)
+                if [ -f "${file}" ]; then
+                  printf '%s\n' "${file}"
+                fi
+                ;;
+            esac
+          done > "${LYCHEE_ROOT_DIR}/inputs"
         lychee --config lychee.toml --root-dir "${LYCHEE_ROOT_DIR}/source" \
           --files-from "${LYCHEE_ROOT_DIR}/inputs"
         ln -s "$(pwd)/docs/.vitepress/dist" "${LYCHEE_ROOT_DIR}/site/qdash"
@@ -431,7 +441,7 @@ tasks:
   ci-lint:
     desc: Check Python linting (no auto-fix)
     cmds:
-      - uv run scripts/generate_task_catalog.py --check
+      - uv run --all-packages scripts/generate_task_catalog.py --check
       - uv run ruff check .
       - uv run ruff format --check .
 
@@ -523,7 +533,6 @@ tasks:
   deploy-local:
     cmds:
       - task: knowledge-pull
-      - task: updater-start
       - docker compose up -d --build
     desc: Deploy the application with Docker Compose in dev mode
 
@@ -533,7 +542,6 @@ tasks:
       ENV: dev-fake
     cmds:
       - task: knowledge-pull
-      - task: updater-start
       - docker compose up -d --build
     desc: Deploy the application locally with the fake QUBEX-compatible backend
 
@@ -552,34 +560,9 @@ tasks:
     dotenv: [.env]
     cmds:
       - task: knowledge-pull
-      - task: updater-start
       - |
         COMPOSE_PROFILES="${COMPOSE_PROFILES:+${COMPOSE_PROFILES},}tunnel" \
           docker compose up -d --build
       - sleep 3
       - docker compose restart api
     desc: Deploy the application with Docker Compose
-
-  updater:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater run
-    desc: Run the host-side QDash updater in the foreground
-
-  updater-start:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater start
-    desc: Start the host-side QDash updater in the background
-
-  updater-stop:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater stop
-    desc: Stop the background QDash updater
-
-  updater-status:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater status
-    desc: Show whether the host-side QDash updater is running

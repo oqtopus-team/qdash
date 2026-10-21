@@ -15,8 +15,8 @@
 
 import { createHash } from "node:crypto";
 
-import { compactCriteria, referenceIdentity, toolExample } from "./knowledge-context.ts";
-import type { LabeledExample, Reference } from "./knowledge-context.ts";
+import { compactCriteria, examplesOf, referenceIdentity, renderReference, toolExample } from "./knowledge-context.ts";
+import type { LabeledExample, Reference, TaskKnowledgeLike } from "./knowledge-context.ts";
 import type { ExtensionPackage } from "./local-extensions.ts";
 
 /** The pi-qdash tool that turns a task result into evidence text plus its figure. */
@@ -29,12 +29,16 @@ export const MAX_EVALUATION_FIGURES = 4;
 
 export interface EvaluateRequest {
   taskId: string;
+  /** Explicit `provider/modelId` selected to judge the figure. */
+  evaluationModel?: string;
   /** A specific question for the evaluation model, on top of the standard diagnosis. */
   question?: string;
   /** Figures of the task result to embed, newest first in pi-qdash's order (default 1). */
   maxFigures?: number;
   /** Show the task's expert-labeled example plots before the figure (in-context examples). */
   withExamples?: boolean;
+  /** Read this uploaded knowledge draft instead of the task's shared knowledge. */
+  knowledgeDraftId?: string;
 }
 
 /** One labeled example the model saw, by identity and figure hashes rather than bytes. */
@@ -87,7 +91,7 @@ export interface EvaluateDeps {
   evaluator?: ExtensionPackage;
 }
 
-export type EvaluationStage = "request" | "evidence" | "evaluation";
+export type EvaluationStage = "request" | "knowledge" | "evidence" | "evaluation";
 
 /** A failure of one stage, with the HTTP status the route answers with. */
 export class EvaluationError extends Error {
@@ -105,6 +109,8 @@ export interface FigureRecord {
   sha256: string;
   mime_type: string;
   bytes: number;
+  /** Exact bytes for durable, content-addressed storage by QDash. */
+  data?: string;
 }
 
 export interface EvaluateResult {
@@ -160,6 +166,8 @@ export interface EvaluationCall {
   duration_ms: number;
   stop_reason: string;
   structured: boolean;
+  /** Prompt tokens the model counted, images included, when the evaluator reports them. */
+  input_tokens?: number;
   output_tokens?: number;
   missing_keys?: string[];
 }
@@ -176,6 +184,7 @@ export function callRecords(value: unknown): EvaluationCall[] {
       duration_ms: c.duration_ms,
       stop_reason: c.stop_reason,
       structured: c.structured === true,
+      ...(typeof c.input_tokens === "number" ? { input_tokens: c.input_tokens } : {}),
       ...(typeof c.output_tokens === "number" ? { output_tokens: c.output_tokens } : {}),
       ...(Array.isArray(c.missing_keys)
         ? { missing_keys: c.missing_keys.filter((key): key is string => typeof key === "string") }
@@ -231,7 +240,12 @@ function sha256(bytes: Buffer | string): string {
 /** Hash and size of one base64-encoded figure. */
 export function figureRecord(image: { data: string; mimeType: string }): FigureRecord {
   const bytes = Buffer.from(image.data, "base64");
-  return { sha256: sha256(bytes), mime_type: image.mimeType, bytes: bytes.length };
+  return {
+    sha256: sha256(bytes),
+    mime_type: image.mimeType,
+    bytes: bytes.length,
+    data: image.data,
+  };
 }
 
 function stringField(value: unknown, key: string): string | undefined {
@@ -503,7 +517,12 @@ export function recordFromDetails(
 }
 
 /** The turn a planner is given to evaluate one task result the way the chat does. */
-export function plannerInstruction(taskId: string, question?: string, withExamples = false): string {
+export function plannerInstruction(
+  taskId: string,
+  question?: string,
+  withExamples = false,
+  evaluationModel?: string,
+): string {
   const lines = [
     `Evaluate QDash task result ${taskId} with pi-qcaleval.`,
     `First call ${EVIDENCE_TOOL} for it, then ${EVALUATION_TOOL} with task_name set to the task's name.`,
@@ -515,6 +534,9 @@ export function plannerInstruction(taskId: string, question?: string, withExampl
     );
   }
   if (question?.trim()) lines.push(`Pass this question to ${EVALUATION_TOOL}: ${question.trim()}`);
+  if (evaluationModel) {
+    lines.push(`Pass model: "${evaluationModel}" to ${EVALUATION_TOOL}.`);
+  }
   lines.push(
     "Report the status (calibration_diagnosis), the fit reliability and the outcome classification, and say in one or two sentences whether you agree with the diagnosis.",
   );
@@ -571,6 +593,28 @@ export function plannerOutcome(entries: ReadonlyArray<TranscriptEntryLike>): {
   return { details, usage, error, toolCalls };
 }
 
+/**
+ * The knowledge of an evaluation against an uploaded draft: one load of the
+ * draft serves both the reference and the examples, and a draft that cannot
+ * be read fails the evaluation instead of letting it run without knowledge.
+ */
+export function draftKnowledge(
+  load: () => Promise<TaskKnowledgeLike>,
+): Pick<EvaluateDeps, "fetchKnowledge" | "fetchExamples"> {
+  let pending: Promise<TaskKnowledgeLike> | undefined;
+  const draft = () =>
+    (pending ??= load().catch((error: unknown) => {
+      throw new EvaluationError(
+        "knowledge",
+        `knowledge draft: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }));
+  return {
+    fetchKnowledge: async () => renderReference(await draft()),
+    fetchExamples: async () => examplesOf(await draft()),
+  };
+}
+
 /** Clamp the requested figure count to what the tools accept. */
 export function figureCount(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 1;
@@ -584,6 +628,8 @@ export interface PromptPreviewRequest {
   /** The context line to show; a generic one names the task when absent. */
   context?: string;
   question?: string;
+  /** Build the prompts from this uploaded knowledge draft instead of the task's shared knowledge. */
+  knowledgeDraftId?: string;
 }
 
 /** The prompts an evaluation of a task would send, built without a figure or a model call. */
@@ -692,6 +738,7 @@ export async function evaluateTask(
   const question = request.question?.trim();
   const args = {
     context,
+    ...(request.evaluationModel ? { model: request.evaluationModel } : {}),
     ...(question ? { question } : {}),
     ...(taskName ? { task_name: taskName } : {}),
     ...(knowledge ? { knowledge: knowledge.knowledge } : {}),

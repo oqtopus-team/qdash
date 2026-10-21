@@ -5,6 +5,7 @@ import type { EvaluationItem, EvaluationRunSummary } from "@/schemas";
 import {
   compareHref,
   compareQids,
+  diagnosisDifference,
   joinEvaluations,
   rowOutcome,
   runSettings,
@@ -57,6 +58,7 @@ const run: EvaluationRunSummary = {
   success_count: 1,
   agree_count: 0,
   disagree_count: 0,
+  evaluation_model: "openai-compatible-evaluation/ising-requested",
   model: "vllm/ising",
   evaluator: { name: "@orangekame3/pi-qcaleval", version: "0.0.2-beta.9", source: "package" },
 };
@@ -67,7 +69,7 @@ describe("evaluationCompare", () => {
     expect(["0-10", "0-2"].sort(compareQids)).toEqual(["0-2", "0-10"]);
   });
 
-  it("compares status, fit, outcome and success only when both sides answered", () => {
+  it("compares the full diagnosis and classifies decision and content changes", () => {
     const answered = (
       status: string,
       fit: string,
@@ -108,6 +110,36 @@ describe("evaluationCompare", () => {
       "differs",
     );
     expect(rowOutcome(item("Q1", { success: true }), item("Q1", { success: true }))).toBe("same");
+    expect(
+      rowOutcome(
+        item("Q1", {
+          ...answered("SUCCESS", "reliable", "expected", true),
+          parameter_extraction: { t1: 10 },
+        }),
+        item("Q1", {
+          ...answered("SUCCESS", "reliable", "expected", true),
+          parameter_extraction: { t1: 11 },
+        }),
+      ),
+    ).toBe("differs");
+    expect(
+      diagnosisDifference(
+        item("Q1", {
+          ...answered("SUCCESS", "reliable", "expected", true),
+          parameter_extraction: { t1: 10 },
+        }),
+        item("Q1", {
+          ...answered("SUCCESS", "reliable", "expected", true),
+          parameter_extraction: { t1: 11 },
+        }),
+      ),
+    ).toBe("content");
+    expect(
+      diagnosisDifference(
+        good,
+        item("Q1", answered("LOW_CONTRAST", "reliable", "expected", false)),
+      ),
+    ).toBe("decision");
   });
 
   it("joins the two runs by entity and keeps whether they judged the same result", () => {
@@ -144,16 +176,26 @@ describe("evaluationCompare", () => {
           with_examples: true,
           mode: "planner",
           planner_model: "openai-compatible/qwen3.8-flash-next",
+          evaluation_model: "openai-compatible-chat/qwen3.8-flash-next",
         },
       },
     );
     const byKey = Object.fromEntries(settings.map((setting) => [setting.key, setting]));
     expect(byKey.chip).toMatchObject({ a: "64Qv1", b: "64Qv1", differs: false });
-    expect(byKey.examples).toMatchObject({ a: "Zero-shot", b: "In-context", differs: true });
+    expect(byKey.examples).toMatchObject({
+      a: "Zero-shot",
+      b: "In-context requested · 0/2 used",
+      differs: true,
+    });
     expect(byKey.mode).toMatchObject({ a: "Fixed prompt", b: "Via Copilot", differs: true });
     expect(byKey.planner).toMatchObject({
       a: "-",
       b: "openai-compatible/qwen3.8-flash-next",
+      differs: true,
+    });
+    expect(byKey.model).toMatchObject({
+      a: "openai-compatible-evaluation/ising-requested",
+      b: "openai-compatible-chat/qwen3.8-flash-next",
       differs: true,
     });
     expect(byKey.evaluator).toMatchObject({
@@ -167,6 +209,43 @@ describe("evaluationCompare", () => {
     // Without evaluations the prompt rows have nothing to say.
     expect(byKey.reference).toMatchObject({ a: "-", b: "-", differs: false });
     expect(byKey.system_prompt).toMatchObject({ a: "-", b: "-", differs: false });
+    expect(byKey.tokens).toMatchObject({ a: "-", b: "-", differs: false });
+  });
+
+  it("compares the largest prompt of two runs in tokens", () => {
+    const withTokens = (input_tokens: number) => [
+      item("Q1", null, {
+        output: {
+          parsed: true,
+          context_window: 16384,
+          calls: [{ duration_ms: 1, stop_reason: "stop", input_tokens, output_tokens: 100 }],
+        },
+      }),
+    ];
+    const settings = runSettings(
+      { run, evaluations: withTokens(2000) },
+      { run, evaluations: withTokens(9000) },
+    );
+    expect(settings.find((setting) => setting.key === "tokens")).toMatchObject({
+      a: "largest prompt 2,000 tokens (2,100 of 16,384 with the answer)",
+      b: "largest prompt 9,000 tokens (9,100 of 16,384 with the answer)",
+      differs: true,
+    });
+  });
+
+  it("flags a run against a knowledge draft, and two drafts that differ", () => {
+    const draft = (id: string, name: string) => ({
+      run: { ...run, knowledge_draft_id: id, knowledge_draft_name: name },
+    });
+    const shared = runSettings({ run }, draft("a".repeat(64), "rabi.zip"));
+    const knowledge = shared.find((setting) => setting.key === "knowledge");
+    expect(knowledge).toMatchObject({ a: "Shared", b: "Draft rabi.zip", differs: true });
+    // Same file name, different contents: still a different draft.
+    const renamed = runSettings(
+      draft("a".repeat(64), "rabi.zip"),
+      draft("b".repeat(64), "rabi.zip"),
+    );
+    expect(renamed.find((setting) => setting.key === "knowledge")?.differs).toBe(true);
   });
 
   it("flags different prompts and references even when their labels match", () => {

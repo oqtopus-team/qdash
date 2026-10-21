@@ -3,20 +3,25 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+import base64
+import hashlib
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
 
-from qdash.api.dependencies import get_evaluation_service
+from qdash.api.dependencies import get_evaluation_service, get_knowledge_draft_store
 from qdash.api.main import app
 from qdash.api.services.evaluation_service import EvaluationService
+from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore
 from qdash.api.services.pi_chat_service import QDashAuth
 from qdash.api.services.pi_evaluation_service import EvaluationRuntimeError
 from qdash.datamodel.note import NoteModel
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.evaluation import EvaluationDocument
+from qdash.dbmodel.evaluation_run import EvaluationRunDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -24,6 +29,7 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
 from qdash.repository.chip import MongoChipRepository
 from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
+from tests.qdash.api._knowledge_drafts import GENERATOR, RABI, make_zip
 
 HEADERS = {"Authorization": "Bearer eval_token", "X-Project-Id": "eval_project"}
 AUTH = QDashAuth(access_token="eval_token", project_id="eval_project")
@@ -91,6 +97,7 @@ RECORD: dict[str, Any] = {
                 "question": question,
                 "duration_ms": 5000,
                 "stop_reason": "stop",
+                "input_tokens": 190,
                 "output_tokens": 60,
             }
             for question in ANSWERS
@@ -190,13 +197,13 @@ def _task_result(
 def service(project):
     """The app's evaluation service, with the runtime replaced and launches recorded."""
     calls: list[tuple[str, str | None]] = []
-    modes: list[tuple[Any, Any]] = []
+    modes: list[tuple[Any, Any, Any]] = []
 
     async def evaluate(
         task_id: str, *, auth: QDashAuth, question: str | None = None, **kwargs: Any
     ):
         calls.append((task_id, question))
-        modes.append((kwargs.get("mode"), kwargs.get("model")))
+        modes.append((kwargs.get("mode"), kwargs.get("model"), kwargs.get("evaluation_model")))
         if task_id == "task-q1":
             raise EvaluationRuntimeError("evaluation", "qcal_evaluate: HTTP 400 Non-base64")
         return {**RECORD, "task_id": task_id}
@@ -222,7 +229,7 @@ def test_run_queues_the_latest_evaluable_result_per_qubit(test_client, service):
     response = test_client.post(
         "/evaluations/runs",
         headers=HEADERS,
-        json={"chip_id": "chip-1", "task": "CheckRabi", "question": "Is the fit trustworthy?"},
+        json={"chip_id": "chip-1", "task": "CheckRabi"},
     )
 
     assert response.status_code == 202, response.text
@@ -233,8 +240,12 @@ def test_run_queues_the_latest_evaluable_result_per_qubit(test_client, service):
     assert run["status"] == "running"
     assert run["total"] == 1
     assert run["pending_count"] == 1
-    assert run["question"] == "Is the fit trustworthy?"
+    assert run["question"] is None
+    assert (run["knowledge_draft_id"], run["knowledge_draft_name"]) == (None, None)
     assert (run["trigger"], run["mode"], run["planner_model"]) == ("bulk", "direct", None)
+    assert run["evaluation_model"] == (
+        "openai-compatible-evaluation/nvidia/Ising-Calibration-1.5-31B-NVFP4"
+    )
     assert run["requested_by"] == "eval_user"
     assert service.launched == [run["run_id"]]
 
@@ -248,18 +259,71 @@ def test_run_queues_the_latest_evaluable_result_per_qubit(test_client, service):
     assert detail["evaluations"][0]["figure_path"] == ["/figures/x.png"]
 
 
+def test_execution_records_the_judging_models_context_window(test_client, service, monkeypatch):
+    from qdash.copilot.config.settings import CopilotConfig, ModelConfig
+
+    config = CopilotConfig(
+        evaluation_models=[
+            ModelConfig(provider="vllm", name="nvidia/Ising-Calibration", num_ctx=16384)
+        ]
+    )
+    monkeypatch.setattr("qdash.api.services.evaluation_service.load_copilot_config", lambda: config)
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    run_id = test_client.post(
+        "/evaluations/runs", headers=HEADERS, json={"chip_id": "chip-1", "task": "CheckRabi"}
+    ).json()["run"]["run_id"]
+
+    asyncio.run(service.execute_run(run_id, AUTH))
+
+    detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
+    assert detail["evaluations"][0]["output"]["context_window"] == 16384
+
+
+def test_a_configured_evaluation_model_is_selected_and_an_unknown_one_is_rejected(
+    test_client, service
+):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    selected = {
+        "provider": "openai-compatible-chat",
+        "name": "qwen3.8-flash-next",
+    }
+    response = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={"chip_id": "chip-1", "task": "CheckRabi", "evaluation_model": selected},
+    )
+    assert response.status_code == 202, response.text
+    run = response.json()["run"]
+    assert run["evaluation_model"] == "openai-compatible-chat/qwen3.8-flash-next"
+
+    asyncio.run(service.execute_run(run["run_id"], AUTH))
+    assert service.modes[-1][2] == selected
+
+    rejected = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={
+            "chip_id": "chip-1",
+            "task": "CheckRabi",
+            "evaluation_model": {"provider": "unknown", "name": "model"},
+        },
+    )
+    assert rejected.status_code == 400
+    assert rejected.json()["detail"] == "evaluation model unknown/model is not configured"
+
+
 def test_execution_records_what_the_model_saw_and_answered(test_client, service):
     _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
     _task_result(task_id="task-q1", qid="1", end_at=datetime(2026, 1, 2, tzinfo=UTC))
     run_id = test_client.post(
         "/evaluations/runs",
         headers=HEADERS,
-        json={"chip_id": "chip-1", "task": "CheckRabi", "question": "Why?"},
+        json={"chip_id": "chip-1", "task": "CheckRabi"},
     ).json()["run"]["run_id"]
 
     asyncio.run(service.execute_run(run_id, AUTH))
 
-    assert sorted(service.calls) == [("task-q0-new", "Why?"), ("task-q1", "Why?")]
+    assert sorted(service.calls) == [("task-q0-new", None), ("task-q1", None)]
     detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
     run = detail["run"]
     assert run["status"] == "completed"
@@ -274,7 +338,7 @@ def test_execution_records_what_the_model_saw_and_answered(test_client, service)
     assert good["status"] == "completed"
     assert good["input"]["context"] == "Task: CheckRabi\nTarget: Q00"
     assert good["input"]["prompt"].startswith("Reference for this experiment")
-    assert good["input"]["question"] == "Why?"
+    assert good["input"]["question"] is None
     assert good["input"]["knowledge_chars"] == 1534
     assert good["input"]["figures"][0]["bytes"] == 33088
     assert good["input"]["figures"][0]["path"] is None
@@ -300,6 +364,7 @@ def test_execution_records_what_the_model_saw_and_answered(test_client, service)
         "duration_ms": 5000,
         "stop_reason": "stop",
         "structured": False,
+        "input_tokens": 190,
         "output_tokens": 60,
         "missing_keys": [],
     }
@@ -475,13 +540,20 @@ def test_verdicts_are_recorded_counted_and_cleared(test_client, service):
     judged = test_client.put(
         f"/evaluations/{evaluation_id}/verdict",
         headers=HEADERS,
-        json={"agree": False, "note": "The fit ignores the last period."},
+        json={
+            "agree": False,
+            "note": "The fit ignores the last period.",
+            "issues": ["diagnosis", "insufficient_evidence"],
+        },
     )
     assert judged.status_code == 200, judged.text
     verdict = judged.json()["verdict"]
     assert verdict["agree"] is False
     assert verdict["note"] == "The fit ignores the last period."
     assert verdict["username"] == "eval_user"
+    assert verdict["issues"] == ["diagnosis", "insufficient_evidence"]
+    assert judged.json()["verdicts"] == [verdict]
+    assert judged.json()["verdict_history"] == [verdict]
 
     run = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()["run"]
     assert (run["agree_count"], run["disagree_count"]) == (0, 1)
@@ -490,6 +562,8 @@ def test_verdicts_are_recorded_counted_and_cleared(test_client, service):
         f"/evaluations/{evaluation_id}/verdict", headers=HEADERS, json={"agree": None}
     )
     assert cleared.json()["verdict"] is None
+    assert cleared.json()["verdicts"] == []
+    assert len(cleared.json()["verdict_history"]) == 2
 
     missing = test_client.put(
         "/evaluations/ev_missing/verdict", headers=HEADERS, json={"agree": True}
@@ -559,6 +633,93 @@ def test_task_ids_restrict_the_run_and_running_results_are_skipped(test_client, 
     assert by_qid.json()["skipped"] == {"2": "status running"}
 
 
+def test_task_ids_select_the_exact_historical_result(test_client, service):
+    _task_result(task_id="task-q0-old", qid="0", end_at=datetime(2026, 1, 1, tzinfo=UTC))
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+
+    response = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={"chip_id": "chip-1", "task": "CheckRabi", "task_ids": ["task-q0-old"]},
+    )
+
+    assert response.status_code == 202, response.text
+    assert response.json()["task_ids"] == ["task-q0-old"]
+
+
+def test_cancelled_run_can_retry_failed_items(test_client, service):
+    _task_result(task_id="task-q0", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    created = test_client.post(
+        "/evaluations/runs", headers=HEADERS, json={"chip_id": "chip-1", "task": "CheckRabi"}
+    ).json()
+    run_id = created["run"]["run_id"]
+
+    cancelled = test_client.post(f"/evaluations/runs/{run_id}/cancel", headers=HEADERS)
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+
+    retried = test_client.post(f"/evaluations/runs/{run_id}/retry", headers=HEADERS)
+    assert retried.status_code == 202
+    assert retried.json()["retried"] == 1
+    assert retried.json()["run"]["status"] == "running"
+    assert service.launched[-1] == run_id
+
+
+def test_stale_run_is_marked_interrupted_and_can_retry(test_client, service):
+    _task_result(task_id="task-q0", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    created = test_client.post(
+        "/evaluations/runs", headers=HEADERS, json={"chip_id": "chip-1", "task": "CheckRabi"}
+    ).json()
+    run_id = created["run"]["run_id"]
+    doc = EvaluationDocument.find_one(EvaluationDocument.run_id == run_id).run()
+    assert doc is not None
+    doc.requested_at = datetime.now(UTC) - timedelta(days=30)
+    doc.save()
+    run = EvaluationRunDocument.find_one(EvaluationRunDocument.run_id == run_id).run()
+    assert run is not None
+    run.heartbeat_at = datetime.now(UTC) - timedelta(days=30)
+    run.save()
+
+    detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
+    assert detail["run"]["status"] == "interrupted"
+    assert detail["evaluations"][0]["status"] == "interrupted"
+    assert "retry the run" in detail["evaluations"][0]["error"]
+
+
+def test_evaluation_figure_is_served_from_the_snapshot(test_client, service):
+    _task_result(task_id="task-q0", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    raw = b"exact png bytes"
+    encoded = base64.b64encode(raw).decode()
+    sha256 = hashlib.sha256(raw).hexdigest()
+    service._evaluate = lambda *args, **kwargs: None
+    created = test_client.post(
+        "/evaluations/runs", headers=HEADERS, json={"chip_id": "chip-1", "task": "CheckRabi"}
+    ).json()
+    run_id = created["run"]["run_id"]
+    doc = EvaluationDocument.find_one(EvaluationDocument.run_id == run_id).run()
+    assert doc is not None
+    record = {
+        **RECORD,
+        "task_id": "task-q0",
+        "figures": [
+            {"sha256": sha256, "mime_type": "image/png", "bytes": len(raw), "data": encoded}
+        ],
+    }
+
+    async def evaluate(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        return record
+
+    service._evaluate = evaluate
+    asyncio.run(service.execute_run(run_id, AUTH))
+    detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
+    evaluation_id = detail["evaluations"][0]["evaluation_id"]
+
+    response = test_client.get(f"/evaluations/{evaluation_id}/figures/{sha256}", headers=HEADERS)
+    assert response.status_code == 200
+    assert response.content == raw
+    assert response.headers["content-type"] == "image/png"
+
+
 def test_a_single_planner_run_records_the_planner_turn(test_client, service):
     _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
     _task_result(task_id="task-q1", qid="1", end_at=datetime(2026, 1, 2, tzinfo=UTC))
@@ -574,7 +735,9 @@ def test_a_single_planner_run_records_the_planner_turn(test_client, service):
     }
 
     async def evaluate(task_id: str, **kwargs: Any):
-        service.modes.append((kwargs.get("mode"), kwargs.get("model")))
+        service.modes.append(
+            (kwargs.get("mode"), kwargs.get("model"), kwargs.get("evaluation_model"))
+        )
         return with_planner
 
     service._evaluate = evaluate
@@ -597,9 +760,13 @@ def test_a_single_planner_run_records_the_planner_turn(test_client, service):
 
     asyncio.run(service.execute_run(run["run_id"], AUTH))
 
-    mode, model = service.modes[-1]
+    mode, model, evaluation_model = service.modes[-1]
     assert mode == "planner"
     assert set(model) == {"provider", "name"}
+    assert evaluation_model == {
+        "provider": "openai-compatible-evaluation",
+        "name": "nvidia/Ising-Calibration-1.5-31B-NVFP4",
+    }
     detail = test_client.get(f"/evaluations/runs/{run['run_id']}", headers=HEADERS).json()
     planner = detail["evaluations"][0]["planner"]
     assert planner["model"] == "openai-compatible/qwen"
@@ -724,3 +891,129 @@ def test_example_setting_reaches_runtime_and_records_are_persisted(
     assert detail["run"]["with_examples"] is with_examples
     assert detail["evaluations"][0]["status"] == "completed"
     assert detail["evaluations"][0]["input"]["examples"] == examples
+
+
+@pytest.fixture
+def drafts(tmp_path, monkeypatch):
+    """A draft store under tmp_path, parsing with a stand-in knowledge generator."""
+    repo = tmp_path / "config" / "task-knowledge"
+    repo.mkdir(parents=True)
+    (repo / "generate.py").write_text(GENERATOR, encoding="utf-8")
+    monkeypatch.setattr(
+        "qdash.common.config.loader.ConfigLoader.get_config_dir",
+        classmethod(lambda cls: tmp_path / "config"),
+    )
+    store = KnowledgeDraftStore(tmp_path / "calib_data")
+    app.dependency_overrides[get_knowledge_draft_store] = lambda: store
+    yield store
+    app.dependency_overrides.pop(get_knowledge_draft_store, None)
+
+
+def _upload(test_client, files: dict[str, bytes | str], filename: str = "rabi.zip"):
+    return test_client.post(
+        "/evaluations/knowledge-drafts",
+        headers=HEADERS,
+        files={"file": (filename, make_zip(files), "application/zip")},
+    )
+
+
+def test_a_knowledge_draft_is_uploaded_and_served_as_task_knowledge(test_client, project, drafts):
+    response = _upload(test_client, RABI)
+
+    assert response.status_code == 200, response.text
+    draft = response.json()
+    assert draft["task_name"] == "CheckRabi"
+    assert (draft["filename"], draft["uploaded_by"]) == ("rabi.zip", "eval_user")
+    assert draft["warnings"] == []
+    assert draft["reference"]["statuses"]["SUCCESS"] == "a damped cosine"
+    assert (draft["example_count"], draft["figure_count"]) == (1, 1)
+
+    meta = test_client.get(f"/evaluations/knowledge-drafts/{draft['draft_id']}", headers=HEADERS)
+    assert meta.json() == draft
+
+    knowledge = test_client.get(
+        f"/evaluations/knowledge-drafts/{draft['draft_id']}/knowledge", headers=HEADERS
+    ).json()
+    assert knowledge["name"] == "CheckRabi"
+    assert knowledge["examples"][0]["figures"][0]["mime_type"] == "image/png"
+    assert knowledge["examples"][0]["figures"][0]["base64_data"]
+
+    missing = test_client.get(f"/evaluations/knowledge-drafts/{'0' * 64}", headers=HEADERS)
+    assert missing.status_code == 404
+
+
+def test_an_unusable_zip_is_rejected_on_upload(test_client, project, drafts):
+    response = _upload(test_client, {"CheckRabi/task.md": "# CheckRabi", "CheckRabi/x.py": "x"})
+
+    assert response.status_code == 400
+    assert "files are allowed" in response.json()["detail"]
+
+
+def test_a_run_against_a_draft_records_it_and_sends_it_to_the_runtime(test_client, service, drafts):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    draft_id = _upload(test_client, RABI).json()["draft_id"]
+    calls: list[dict[str, Any]] = []
+
+    async def evaluate(task_id: str, **kwargs: Any):
+        calls.append(kwargs)
+        return {**RECORD, "task_id": task_id}
+
+    service._evaluate = evaluate
+    response = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={"chip_id": "chip-1", "task": "CheckRabi", "knowledge_draft_id": draft_id},
+    )
+    assert response.status_code == 202, response.text
+    run = response.json()["run"]
+    assert (run["knowledge_draft_id"], run["knowledge_draft_name"]) == (draft_id, "rabi.zip")
+
+    asyncio.run(service.execute_run(run["run_id"], AUTH))
+
+    assert [call["knowledge_draft_id"] for call in calls] == [draft_id]
+    detail = test_client.get(f"/evaluations/runs/{run['run_id']}", headers=HEADERS).json()
+    assert detail["run"]["knowledge_draft_id"] == draft_id
+    assert detail["evaluations"][0]["status"] == "completed"
+
+
+@pytest.mark.parametrize(
+    ("body", "status_code", "detail"),
+    [
+        ({"task": "CheckT1"}, 400, "describes CheckRabi, not CheckT1"),
+        ({"task": "CheckRabi", "mode": "planner"}, 400, "direct mode"),
+        ({"task": "CheckRabi", "knowledge_draft_id": "f" * 64}, 404, "not found"),
+    ],
+)
+def test_a_draft_must_match_the_task_and_run_directly(
+    test_client, service, drafts, body, status_code, detail
+):
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    draft_id = _upload(test_client, RABI).json()["draft_id"]
+
+    response = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={"chip_id": "chip-1", "knowledge_draft_id": draft_id, **body},
+    )
+
+    assert response.status_code == status_code, response.text
+    assert detail in response.json()["detail"]
+    assert service.launched == []
+
+
+def test_a_drafts_zip_downloads_as_uploaded(test_client, project, drafts):
+    data = make_zip(RABI)
+    draft_id = test_client.post(
+        "/evaluations/knowledge-drafts",
+        headers=HEADERS,
+        files={"file": ("rabi v2.zip", data, "application/zip")},
+    ).json()["draft_id"]
+
+    response = test_client.get(f"/evaluations/knowledge-drafts/{draft_id}/archive", headers=HEADERS)
+
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"] == "application/zip"
+    assert response.headers["content-disposition"] == "attachment; filename*=utf-8''rabi%20v2.zip"
+    assert response.content == data
+    missing = test_client.get(f"/evaluations/knowledge-drafts/{'0' * 64}/archive", headers=HEADERS)
+    assert missing.status_code == 404

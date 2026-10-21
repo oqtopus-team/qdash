@@ -1,14 +1,16 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useId, useMemo } from "react";
 
-import dynamic from "next/dynamic";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { RotateCcw, Sparkles } from "lucide-react";
+import dynamic from "next/dynamic";
+import { useForm, type UseFormRegisterReturn } from "react-hook-form";
+import { z } from "zod";
 
 import type {
   ReanalyzeQubitSpectroscopyParams,
   ReanalyzeResonatorSpectroscopyParams,
-  ReanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType,
 } from "@/schemas";
 
 import {
@@ -34,6 +36,7 @@ interface ReanalysisPanelProps {
 const RESONATOR_TASK = "CheckResonatorSpectroscopy";
 const QUBIT_TASK = "CheckQubitSpectroscopy";
 
+/** Renders the reanalysis form matching the task, or nothing for unsupported tasks. */
 export function ReanalysisPanel({ chipId, qubitId, taskName, sourceTaskId }: ReanalysisPanelProps) {
   const kind: ReanalyzeKind | null =
     taskName === RESONATOR_TASK ? "resonator" : taskName === QUBIT_TASK ? "qubit" : null;
@@ -47,19 +50,71 @@ export function ReanalysisPanel({ chipId, qubitId, taskName, sourceTaskId }: Rea
   );
 }
 
-// ── Resonator-spectroscopy panel ──────────────────────────────────────────
+// ── Schema helpers ────────────────────────────────────────────────────────
 
-interface ResonatorParamForm {
-  num_resonators: string;
-  high_power_min: string;
-  high_power_max: string;
-  low_power: string;
-  /** Empty string means "use whatever the original task ran with". */
-  bare_shift_estimator_type: "" | "config" | "high_frequency_strength";
-  bare_shift_strength_limit: string;
+const NUMBER_ERROR = "Must be a number";
+const POSITIVE_INTEGER_ERROR = "Must be a positive integer";
+
+/** Converts a numeric text field to a number, or null when empty. */
+function toNumberOrNull(value: string): number | null {
+  const trimmed = value.trim();
+  return trimmed === "" ? null : Number(trimmed);
 }
 
-const DEFAULT_RESONATOR_FORM: ResonatorParamForm = {
+/** Adds a field issue when a non-empty numeric text field is not a finite number. */
+function checkNumber(ctx: z.RefinementCtx, field: string, value: string) {
+  const parsed = toNumberOrNull(value);
+  if (parsed !== null && !Number.isFinite(parsed)) {
+    ctx.addIssue({ code: "custom", path: [field], message: NUMBER_ERROR });
+  }
+}
+
+// ── Resonator-spectroscopy panel ──────────────────────────────────────────
+
+const resonatorFormSchema = z
+  .object({
+    num_resonators: z.string(),
+    high_power_min: z.string(),
+    high_power_max: z.string(),
+    low_power: z.string(),
+    bare_shift_estimator_type: z.enum(["", "config", "high_frequency_strength"]),
+    bare_shift_strength_limit: z.string(),
+  })
+  .superRefine((values, ctx) => {
+    const numResonators = toNumberOrNull(values.num_resonators);
+    if (numResonators !== null && !(Number.isInteger(numResonators) && numResonators >= 1)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["num_resonators"],
+        message: POSITIVE_INTEGER_ERROR,
+      });
+    }
+    if (values.bare_shift_estimator_type === "high_frequency_strength") {
+      checkNumber(ctx, "bare_shift_strength_limit", values.bare_shift_strength_limit);
+    } else {
+      checkNumber(ctx, "high_power_min", values.high_power_min);
+      checkNumber(ctx, "high_power_max", values.high_power_max);
+      checkNumber(ctx, "low_power", values.low_power);
+    }
+  })
+  .transform((values): ReanalyzeResonatorSpectroscopyParams => {
+    const usingAutoBoundary = values.bare_shift_estimator_type === "high_frequency_strength";
+    return {
+      num_resonators: toNumberOrNull(values.num_resonators),
+      high_power_min: usingAutoBoundary ? null : toNumberOrNull(values.high_power_min),
+      high_power_max: usingAutoBoundary ? null : toNumberOrNull(values.high_power_max),
+      low_power: usingAutoBoundary ? null : toNumberOrNull(values.low_power),
+      bare_shift_estimator_type: values.bare_shift_estimator_type || null,
+      bare_shift_strength_limit: usingAutoBoundary
+        ? toNumberOrNull(values.bare_shift_strength_limit)
+        : null,
+    };
+  });
+
+type ResonatorFormInput = z.input<typeof resonatorFormSchema>;
+type ResonatorFormOutput = z.output<typeof resonatorFormSchema>;
+
+const DEFAULT_RESONATOR_FORM: ResonatorFormInput = {
   num_resonators: "",
   high_power_min: "",
   high_power_max: "",
@@ -68,42 +123,43 @@ const DEFAULT_RESONATOR_FORM: ResonatorParamForm = {
   bare_shift_strength_limit: "",
 };
 
+/** Form that previews a resonator-spectroscopy reanalysis with parameter overrides. */
 function ResonatorReanalysis({
   chipId,
   qubitId,
   sourceTaskId,
 }: Omit<ReanalysisPanelProps, "taskName">) {
-  const [form, setForm] = useState<ResonatorParamForm>(DEFAULT_RESONATOR_FORM);
+  const id = useId();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    clearErrors,
+    formState: { errors },
+  } = useForm<ResonatorFormInput, unknown, ResonatorFormOutput>({
+    resolver: zodResolver(resonatorFormSchema),
+    defaultValues: DEFAULT_RESONATOR_FORM,
+  });
   const mutation = useReanalyzeResonatorSpectroscopy();
 
-  const usingAutoBoundary = form.bare_shift_estimator_type === "high_frequency_strength";
+  const usingAutoBoundary = watch("bare_shift_estimator_type") === "high_frequency_strength";
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const params: ReanalyzeResonatorSpectroscopyParams = {
-      num_resonators: parseInt(form.num_resonators) || null,
-      high_power_min: usingAutoBoundary ? null : parseFloatOrNull(form.high_power_min),
-      high_power_max: usingAutoBoundary ? null : parseFloatOrNull(form.high_power_max),
-      low_power: usingAutoBoundary ? null : parseFloatOrNull(form.low_power),
-      bare_shift_estimator_type:
-        (form.bare_shift_estimator_type as ReanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType) ||
-        null,
-      bare_shift_strength_limit: usingAutoBoundary
-        ? parseFloatOrNull(form.bare_shift_strength_limit)
-        : null,
-    };
+  /** Sends the validated parameters to the reanalysis mutation. */
+  const onValid = (parameters: ResonatorFormOutput) => {
     mutation.mutate({
       chipId,
       qid: qubitId,
       data: {
         source_task_id: sourceTaskId ?? null,
-        parameters: params,
+        parameters,
       },
     });
   };
 
+  /** Restores the default values and clears the mutation state. */
   const handleReset = () => {
-    setForm(DEFAULT_RESONATOR_FORM);
+    reset(DEFAULT_RESONATOR_FORM);
     mutation.reset();
   };
 
@@ -111,24 +167,28 @@ function ResonatorReanalysis({
     <PanelShell
       title="Re-analyze Resonator Spectroscopy"
       onReset={handleReset}
-      onSubmit={handleSubmit}
+      onSubmit={handleSubmit(onValid)}
       mutation={mutation}
     >
       <NumberField
+        id={`${id}-num_resonators`}
         label="num_resonators"
-        value={form.num_resonators}
         placeholder="4"
-        onChange={(v) => setForm({ ...form, num_resonators: v })}
+        error={errors.num_resonators?.message}
+        registration={register("num_resonators")}
       />
       <SelectField
+        id={`${id}-bare_shift_estimator_type`}
         label="bare_shift_estimator_type"
-        value={form.bare_shift_estimator_type}
-        onChange={(v) =>
-          setForm({
-            ...form,
-            bare_shift_estimator_type: v as ResonatorParamForm["bare_shift_estimator_type"],
-          })
-        }
+        error={errors.bare_shift_estimator_type?.message}
+        registration={register("bare_shift_estimator_type", {
+          onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
+            clearErrors(
+              e.target.value === "high_frequency_strength"
+                ? ["high_power_min", "high_power_max", "low_power"]
+                : "bare_shift_strength_limit",
+            ),
+        })}
         options={[
           { value: "", label: "(use original task setting)" },
           {
@@ -142,32 +202,36 @@ function ResonatorReanalysis({
         ]}
       />
       <NumberField
+        id={`${id}-high_power_min`}
         label="high_power_min (dB)"
-        value={form.high_power_min}
         placeholder="-20"
         disabled={usingAutoBoundary}
-        onChange={(v) => setForm({ ...form, high_power_min: v })}
+        error={errors.high_power_min?.message}
+        registration={register("high_power_min")}
       />
       <NumberField
+        id={`${id}-high_power_max`}
         label="high_power_max (dB)"
-        value={form.high_power_max}
         placeholder="0"
         disabled={usingAutoBoundary}
-        onChange={(v) => setForm({ ...form, high_power_max: v })}
+        error={errors.high_power_max?.message}
+        registration={register("high_power_max")}
       />
       <NumberField
+        id={`${id}-low_power`}
         label="low_power (dB)"
-        value={form.low_power}
         placeholder="-30"
         disabled={usingAutoBoundary}
-        onChange={(v) => setForm({ ...form, low_power: v })}
+        error={errors.low_power?.message}
+        registration={register("low_power")}
       />
       <NumberField
+        id={`${id}-bare_shift_strength_limit`}
         label="bare_shift_strength_limit"
-        value={form.bare_shift_strength_limit}
         placeholder="4.0"
         disabled={!usingAutoBoundary}
-        onChange={(v) => setForm({ ...form, bare_shift_strength_limit: v })}
+        error={errors.bare_shift_strength_limit?.message}
+        registration={register("bare_shift_strength_limit")}
       />
     </PanelShell>
   );
@@ -175,18 +239,41 @@ function ResonatorReanalysis({
 
 // ── Qubit-spectroscopy panel ──────────────────────────────────────────────
 
-interface QubitParamForm {
-  binarize_threshold_sigma_plus: string;
-  binarize_threshold_sigma_minus: string;
-  top_power: string;
-  f01_height_min: string;
-  f12_distance_min: string;
-  f12_distance_max: string;
-  f12_height_min: string;
-  retry_with_trim: boolean;
-}
+const qubitFormSchema = z
+  .object({
+    binarize_threshold_sigma_plus: z.string(),
+    binarize_threshold_sigma_minus: z.string(),
+    top_power: z.string(),
+    f01_height_min: z.string(),
+    f12_distance_min: z.string(),
+    f12_distance_max: z.string(),
+    f12_height_min: z.string(),
+    retry_with_trim: z.boolean(),
+  })
+  .superRefine((values, ctx) => {
+    checkNumber(ctx, "binarize_threshold_sigma_plus", values.binarize_threshold_sigma_plus);
+    checkNumber(ctx, "binarize_threshold_sigma_minus", values.binarize_threshold_sigma_minus);
+    checkNumber(ctx, "top_power", values.top_power);
+    checkNumber(ctx, "f01_height_min", values.f01_height_min);
+    checkNumber(ctx, "f12_distance_min", values.f12_distance_min);
+    checkNumber(ctx, "f12_distance_max", values.f12_distance_max);
+    checkNumber(ctx, "f12_height_min", values.f12_height_min);
+  })
+  .transform((values): ReanalyzeQubitSpectroscopyParams => ({
+    binarize_threshold_sigma_plus: toNumberOrNull(values.binarize_threshold_sigma_plus),
+    binarize_threshold_sigma_minus: toNumberOrNull(values.binarize_threshold_sigma_minus),
+    top_power: toNumberOrNull(values.top_power),
+    f01_height_min: toNumberOrNull(values.f01_height_min),
+    f12_distance_min: toNumberOrNull(values.f12_distance_min),
+    f12_distance_max: toNumberOrNull(values.f12_distance_max),
+    f12_height_min: toNumberOrNull(values.f12_height_min),
+    retry_with_trim: values.retry_with_trim || null,
+  }));
 
-const DEFAULT_QUBIT_FORM: QubitParamForm = {
+type QubitFormInput = z.input<typeof qubitFormSchema>;
+type QubitFormOutput = z.output<typeof qubitFormSchema>;
+
+const DEFAULT_QUBIT_FORM: QubitFormInput = {
   binarize_threshold_sigma_plus: "",
   binarize_threshold_sigma_minus: "",
   top_power: "",
@@ -197,38 +284,39 @@ const DEFAULT_QUBIT_FORM: QubitParamForm = {
   retry_with_trim: false,
 };
 
+/** Form that previews a qubit-spectroscopy reanalysis with parameter overrides. */
 function QubitReanalysis({
   chipId,
   qubitId,
   sourceTaskId,
 }: Omit<ReanalysisPanelProps, "taskName">) {
-  const [form, setForm] = useState<QubitParamForm>(DEFAULT_QUBIT_FORM);
+  const id = useId();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<QubitFormInput, unknown, QubitFormOutput>({
+    resolver: zodResolver(qubitFormSchema),
+    defaultValues: DEFAULT_QUBIT_FORM,
+  });
   const mutation = useReanalyzeQubitSpectroscopy();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const params: ReanalyzeQubitSpectroscopyParams = {
-      binarize_threshold_sigma_plus: parseFloatOrNull(form.binarize_threshold_sigma_plus),
-      binarize_threshold_sigma_minus: parseFloatOrNull(form.binarize_threshold_sigma_minus),
-      top_power: parseFloatOrNull(form.top_power),
-      f01_height_min: parseFloatOrNull(form.f01_height_min),
-      f12_distance_min: parseFloatOrNull(form.f12_distance_min),
-      f12_distance_max: parseFloatOrNull(form.f12_distance_max),
-      f12_height_min: parseFloatOrNull(form.f12_height_min),
-      retry_with_trim: form.retry_with_trim || null,
-    };
+  /** Sends the validated parameters to the reanalysis mutation. */
+  const onValid = (parameters: QubitFormOutput) => {
     mutation.mutate({
       chipId,
       qid: qubitId,
       data: {
         source_task_id: sourceTaskId ?? null,
-        parameters: params,
+        parameters,
       },
     });
   };
 
+  /** Restores the default values and clears the mutation state. */
   const handleReset = () => {
-    setForm(DEFAULT_QUBIT_FORM);
+    reset(DEFAULT_QUBIT_FORM);
     mutation.reset();
   };
 
@@ -236,55 +324,62 @@ function QubitReanalysis({
     <PanelShell
       title="Re-analyze Qubit Spectroscopy"
       onReset={handleReset}
-      onSubmit={handleSubmit}
+      onSubmit={handleSubmit(onValid)}
       mutation={mutation}
     >
       <NumberField
+        id={`${id}-binarize_threshold_sigma_plus`}
         label="binarize_threshold_sigma_plus"
-        value={form.binarize_threshold_sigma_plus}
         placeholder="3.0"
-        onChange={(v) => setForm({ ...form, binarize_threshold_sigma_plus: v })}
+        error={errors.binarize_threshold_sigma_plus?.message}
+        registration={register("binarize_threshold_sigma_plus")}
       />
       <NumberField
+        id={`${id}-binarize_threshold_sigma_minus`}
         label="binarize_threshold_sigma_minus"
-        value={form.binarize_threshold_sigma_minus}
         placeholder="-2.0"
-        onChange={(v) => setForm({ ...form, binarize_threshold_sigma_minus: v })}
+        error={errors.binarize_threshold_sigma_minus?.message}
+        registration={register("binarize_threshold_sigma_minus")}
       />
       <NumberField
+        id={`${id}-top_power`}
         label="top_power (dB)"
-        value={form.top_power}
         placeholder="0"
-        onChange={(v) => setForm({ ...form, top_power: v })}
+        error={errors.top_power?.message}
+        registration={register("top_power")}
       />
       <NumberField
+        id={`${id}-f01_height_min`}
         label="f01_height_min (dB)"
-        value={form.f01_height_min}
         placeholder="14.9"
-        onChange={(v) => setForm({ ...form, f01_height_min: v })}
+        error={errors.f01_height_min?.message}
+        registration={register("f01_height_min")}
       />
       <NumberField
+        id={`${id}-f12_distance_min`}
         label="f12_distance_min (GHz)"
-        value={form.f12_distance_min}
         placeholder="0.125"
-        onChange={(v) => setForm({ ...form, f12_distance_min: v })}
+        error={errors.f12_distance_min?.message}
+        registration={register("f12_distance_min")}
       />
       <NumberField
+        id={`${id}-f12_distance_max`}
         label="f12_distance_max (GHz)"
-        value={form.f12_distance_max}
         placeholder="0.5"
-        onChange={(v) => setForm({ ...form, f12_distance_max: v })}
+        error={errors.f12_distance_max?.message}
+        registration={register("f12_distance_max")}
       />
       <NumberField
+        id={`${id}-f12_height_min`}
         label="f12_height_min (dB)"
-        value={form.f12_height_min}
         placeholder="14.9"
-        onChange={(v) => setForm({ ...form, f12_height_min: v })}
+        error={errors.f12_height_min?.message}
+        registration={register("f12_height_min")}
       />
       <CheckboxField
+        id={`${id}-retry_with_trim`}
         label="retry_with_trim"
-        value={form.retry_with_trim}
-        onChange={(v) => setForm({ ...form, retry_with_trim: v })}
+        registration={register("retry_with_trim")}
       />
     </PanelShell>
   );
@@ -311,10 +406,11 @@ interface PanelShellProps {
   title: string;
   children: React.ReactNode;
   mutation: ReanalyzeMutationLike;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: React.FormEventHandler<HTMLFormElement>;
   onReset: () => void;
 }
 
+/** Card chrome shared by the reanalysis forms: header, form, mutation error and result. */
 function PanelShell({ title, children, mutation, onSubmit, onReset }: PanelShellProps) {
   return (
     <div className="card bg-base-100 shadow-md border border-base-300">
@@ -371,6 +467,7 @@ interface ReanalysisResultProps {
   result: NonNullable<NonNullable<ReanalyzeMutationLike["data"]>["data"]>;
 }
 
+/** Renders the figure and re-estimated outputs returned by a reanalysis. */
 function ReanalysisResult({ result }: ReanalysisResultProps) {
   const figure = result.figure as {
     data?: unknown;
@@ -443,46 +540,74 @@ function ReanalysisResult({ result }: ReanalysisResultProps) {
 
 // ── Form primitives ───────────────────────────────────────────────────────
 
-interface NumberFieldProps {
-  label: string;
-  value: string;
-  placeholder?: string;
-  disabled?: boolean;
-  onChange: (v: string) => void;
+interface FieldErrorProps {
+  id: string;
+  error?: string;
 }
 
-function NumberField({ label, value, placeholder, disabled, onChange }: NumberFieldProps) {
+/** Renders the inline validation message for a field. */
+function FieldError({ id, error }: FieldErrorProps) {
+  if (!error) return null;
   return (
-    <label className="form-control">
-      <span className="label-text text-xs font-mono">{label}</span>
+    <p id={`${id}-error`} className="mt-1 text-sm text-error">
+      {error}
+    </p>
+  );
+}
+
+interface NumberFieldProps {
+  id: string;
+  label: string;
+  placeholder?: string;
+  disabled?: boolean;
+  error?: string;
+  registration: UseFormRegisterReturn;
+}
+
+/** Labelled numeric input wired to React Hook Form with an inline error. */
+function NumberField({ id, label, placeholder, disabled, error, registration }: NumberFieldProps) {
+  return (
+    <div className="form-control">
+      <label htmlFor={id} className="label-text text-xs font-mono">
+        {label}
+      </label>
       <input
+        id={id}
         type="number"
         step="any"
-        className="input input-sm input-bordered w-full"
-        value={value}
+        className={`input input-sm input-bordered w-full ${error ? "input-error" : ""}`}
         placeholder={placeholder}
         disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${id}-error` : undefined}
+        {...registration}
       />
-    </label>
+      <FieldError id={id} error={error} />
+    </div>
   );
 }
 
 interface SelectFieldProps {
+  id: string;
   label: string;
-  value: string;
   options: { value: string; label: string }[];
-  onChange: (v: string) => void;
+  error?: string;
+  registration: UseFormRegisterReturn;
 }
 
-function SelectField({ label, value, options, onChange }: SelectFieldProps) {
+/** Labelled select wired to React Hook Form with an inline error. */
+function SelectField({ id, label, options, error, registration }: SelectFieldProps) {
   return (
-    <label className="form-control">
-      <span className="label-text text-xs font-mono">{label}</span>
+    <div className="form-control">
+      <label htmlFor={id} className="label-text text-xs font-mono">
+        {label}
+      </label>
       <select
-        className="select select-sm select-bordered w-full"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        id={id}
+        className={`select select-sm select-bordered w-full ${error ? "select-error" : ""}`}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${id}-error` : undefined}
+        {...registration}
       >
         <SelectedLabel />
         {options.map((o) => (
@@ -491,34 +616,23 @@ function SelectField({ label, value, options, onChange }: SelectFieldProps) {
           </option>
         ))}
       </select>
-    </label>
+      <FieldError id={id} error={error} />
+    </div>
   );
 }
 
 interface CheckboxFieldProps {
+  id: string;
   label: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
+  registration: UseFormRegisterReturn;
 }
 
-function CheckboxField({ label, value, onChange }: CheckboxFieldProps) {
+/** Labelled checkbox wired to React Hook Form. */
+function CheckboxField({ id, label, registration }: CheckboxFieldProps) {
   return (
-    <label className="label cursor-pointer justify-start gap-3">
-      <input
-        type="checkbox"
-        className="checkbox checkbox-sm"
-        checked={value}
-        onChange={(e) => onChange(e.target.checked)}
-      />
+    <label htmlFor={id} className="label cursor-pointer justify-start gap-3">
+      <input id={id} type="checkbox" className="checkbox checkbox-sm" {...registration} />
       <span className="label-text text-xs font-mono">{label}</span>
     </label>
   );
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-
-function parseFloatOrNull(s: string): number | null {
-  if (s === "") return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
 }

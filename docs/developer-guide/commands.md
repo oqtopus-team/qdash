@@ -35,6 +35,7 @@ task generate            # OpenAPI + generated UI client
 task generate-task-catalog # workflow task metadata catalog
 task build               # UI production build
 task build-docs          # documentation build
+task check-docs-links    # documentation build, links, and anchors
 ```
 
 ## Secrets

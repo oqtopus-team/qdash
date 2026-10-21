@@ -4,6 +4,7 @@ import DefaultTheme from "vitepress/theme";
 import * as OpenApiTheme from "vitepress-openapi/client";
 import "vitepress-openapi/dist/style.css";
 
+import Diagram from "./Diagram.vue";
 import "./custom.css";
 import { REDIRECTS } from "./redirects";
 
@@ -20,6 +21,8 @@ function redirectTarget(pathname: string, base: string): string | undefined {
 export default {
   extends: DefaultTheme,
   async enhanceApp({ app, router, siteData }) {
+    app.component("Diagram", Diagram);
+
     const openapi = OpenApiTheme.useOpenapi({
       spec,
     });

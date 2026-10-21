@@ -4,7 +4,7 @@
 Queries MongoDB for the latest successful task results with figures,
 then copies the figure files into each task's directory under
 ``docs/task-knowledge/<category>/<TaskName>/`` and inserts image
-references into the corresponding ``index.md`` files.
+references into the corresponding ``task.md`` files.
 
 Usage:
     # Copy from calib_data directory (run inside Docker or where data is mounted)
@@ -221,9 +221,12 @@ def _update_md_files(copied: dict[str, list[str]]) -> int:
     updated = 0
 
     for task_name, filenames in copied.items():
-        md_path = _find_task_dir(task_name) / "index.md"
+        task_dir = _find_task_dir(task_name)
+        md_path = task_dir / "task.md"
         if not md_path.exists():
-            print(f"  SKIP MD update: {task_name}/index.md not found")
+            md_path = task_dir / "index.md"
+        if not md_path.exists():
+            print(f"  SKIP MD update: {task_name}/task.md not found")
             continue
 
         content = md_path.read_text(encoding="utf-8")

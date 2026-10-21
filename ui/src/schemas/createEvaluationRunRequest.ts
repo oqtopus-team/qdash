@@ -6,9 +6,10 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { CreateEvaluationRunRequestDate } from './createEvaluationRunRequestDate';
+import type { CreateEvaluationRunRequestEvaluationModel } from './createEvaluationRunRequestEvaluationModel';
+import type { CreateEvaluationRunRequestKnowledgeDraftId } from './createEvaluationRunRequestKnowledgeDraftId';
 import type { CreateEvaluationRunRequestMode } from './createEvaluationRunRequestMode';
 import type { CreateEvaluationRunRequestQids } from './createEvaluationRunRequestQids';
-import type { CreateEvaluationRunRequestQuestion } from './createEvaluationRunRequestQuestion';
 import type { CreateEvaluationRunRequestTaskIds } from './createEvaluationRunRequestTaskIds';
 import type { CreateEvaluationRunRequestTrigger } from './createEvaluationRunRequestTrigger';
 
@@ -28,12 +29,14 @@ export interface CreateEvaluationRunRequest {
   task_ids?: CreateEvaluationRunRequestTaskIds;
   /** Restrict the run to the latest results of these qubits or couplings */
   qids?: CreateEvaluationRunRequestQids;
-  /** A specific question for the evaluation model, on top of the diagnosis */
-  question?: CreateEvaluationRunRequestQuestion;
+  /** Evaluate against this uploaded knowledge draft instead of the shared knowledge */
+  knowledge_draft_id?: CreateEvaluationRunRequestKnowledgeDraftId;
   /** "bulk" from the chip page, "single" for one task result */
   trigger?: CreateEvaluationRunRequestTrigger;
   /** Show the task's expert-labeled example plots before the figure (in-context examples) */
   with_examples?: boolean;
   /** "direct" runs the evaluation tools; "planner" lets the chat planner call them */
   mode?: CreateEvaluationRunRequestMode;
+  /** Configured evaluation model to use; defaults to evaluation_models[0] */
+  evaluation_model?: CreateEvaluationRunRequestEvaluationModel;
 }

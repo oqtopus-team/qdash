@@ -56,12 +56,11 @@ For detailed setup instructions, see [docs/developer-guide/setup.md](docs/develo
 | UI Architecture    | [docs/developer-guide/ui/architecture.md](docs/developer-guide/ui/architecture.md)   |
 | API Design         | [docs/developer-guide/api/design.md](docs/developer-guide/api/design.md)             |
 | Development Flow   | [docs/developer-guide/development-flow.md](docs/developer-guide/development-flow.md) |
-| Database Structure | [docs/reference/database-structure.md](docs/reference/database-structure.md) |
-| Database Indexes   | [docs/reference/database-indexes.md](docs/reference/database-indexes.md)     |
+| Database Collections | [docs/reference/database-structure.md](docs/reference/database-structure.md) |
 | Notes Architecture | [docs/developer-guide/architecture/notes.md](docs/developer-guide/architecture/notes.md)                     |
 | Copilot Knowledge  | [docs/developer-guide/copilot/knowledge-layout.md](docs/developer-guide/copilot/knowledge-layout.md) |
 | Dashboard Guide    | [docs/user-guide/dashboard.md](docs/user-guide/dashboard.md)                 |
-| Cryo Guide         | [docs/user-guide/cryo.md](docs/user-guide/cryo.md)                           |
+| Cryo Guide         | [docs/user-guide/cryostats-and-cool-downs.md](docs/user-guide/cryostats-and-cool-downs.md)                           |
 | Docs Guidelines    | [docs/developer-guide/docs-guidelines.md](docs/developer-guide/docs-guidelines.md)   |
 
 ## Claude Code Custom Commands
@@ -77,7 +76,7 @@ For detailed setup instructions, see [docs/developer-guide/setup.md](docs/develo
 - **Don't edit generated code**: `ui/src/client/` and `ui/src/schemas/` are auto-generated from OpenAPI
 - **Regenerate after API changes**: Run `task generate` when backend API changes
 - **Follow existing patterns**: Check `docs/developer-guide/ui/guidelines.md` for coding standards
-- **Follow docs guidelines**: Check `docs/developer-guide/docs-guidelines.md` when writing documentation, and use the `technical-docs` skill (`.agents/skills/technical-docs/SKILL.md`, shared with Codex; `.claude/skills/` links to it) to write, verify and review a page
+- **Follow docs guidelines**: Check `docs/developer-guide/docs-guidelines.md` when writing documentation. Use the shared `technical-docs` skill to write, verify and review a page, and the shared `document-changes` skill to audit code changes for documentation impact (`.agents/skills/` is the source; `.claude/skills/` links to it)
 - **Use conventional commits**: See `docs/developer-guide/development-flow.md`
 
 ## Useful Links

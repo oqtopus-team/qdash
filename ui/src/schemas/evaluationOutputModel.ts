@@ -8,6 +8,7 @@
 import type { EvaluationCallModel } from './evaluationCallModel';
 import type { EvaluationOutputModelAnswers } from './evaluationOutputModelAnswers';
 import type { EvaluationOutputModelAttempts } from './evaluationOutputModelAttempts';
+import type { EvaluationOutputModelContextWindow } from './evaluationOutputModelContextWindow';
 import type { EvaluationOutputModelDiagnosis } from './evaluationOutputModelDiagnosis';
 import type { EvaluationOutputModelModel } from './evaluationOutputModelModel';
 import type { EvaluationOutputModelRaw } from './evaluationOutputModelRaw';
@@ -49,4 +50,6 @@ export interface EvaluationOutputModel {
   duration_ms?: number;
   /** Token usage, as pi reports it */
   usage?: EvaluationOutputModelUsage;
+  /** Context window of the judging model, from the evaluation config when recorded */
+  context_window?: EvaluationOutputModelContextWindow;
 }

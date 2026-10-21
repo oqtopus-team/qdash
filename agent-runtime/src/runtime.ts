@@ -56,6 +56,7 @@ import {
   EVALUATION_TOOL,
   EVIDENCE_TOOL,
   EvaluationError,
+  draftKnowledge,
   evaluateTask,
   plannerInstruction,
   previewEvaluationPrompts,
@@ -68,7 +69,7 @@ import {
   type ToolRun,
 } from "./evaluate.ts";
 import { formatSettledDetail } from "./events.ts";
-import { fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
+import { fetchKnowledgeDraft, fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
 import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
 import { buildPythonTool } from "./python-tool.ts";
@@ -149,6 +150,15 @@ export interface OpenDurableSession {
 /** Return a stable non-identifying filename for one user's QDash session. */
 export function sessionStorageName(ownerId: string, sessionId: string): string {
   return `${createHash("sha256").update(ownerId).update("\0").update(sessionId).digest("hex")}.sqlite`;
+}
+
+/** Where an evaluation reads its knowledge: an uploaded draft when named, else the task's shared knowledge. */
+function knowledgeSource(connection: QDashConnection, draftId: string | undefined, signal?: AbortSignal) {
+  if (draftId) return draftKnowledge(() => fetchKnowledgeDraft(connection, draftId, signal));
+  return {
+    fetchKnowledge: (taskName: string) => fetchTaskKnowledge(connection, taskName, signal),
+    fetchExamples: (taskName: string) => fetchTaskExamples(connection, taskName, signal),
+  };
 }
 
 /** An enabled extension tool and the file that defines it. */
@@ -348,6 +358,12 @@ export class SharedRuntime {
     return model;
   }
 
+  /** Resolve an optional request pair into qcal_evaluate's `provider/modelId` form. */
+  private resolveModelSpec(provider: string | undefined, modelName: string | undefined): string | undefined {
+    const model = this.resolveModel(provider, modelName);
+    return model ? `${model.provider}/${model.id}` : undefined;
+  }
+
   /**
    * Evaluate one task result's figure without a conversation: evidence from
    * pi-qdash, judgement from pi-qcaleval, QDash's reference in between. The
@@ -355,7 +371,12 @@ export class SharedRuntime {
    * is configured.
    */
   async evaluateTask(
-    request: EvaluateRequest & { provider?: string; modelName?: string },
+    request: EvaluateRequest & {
+      provider?: string;
+      modelName?: string;
+      evaluationProvider?: string;
+      evaluationModelName?: string;
+    },
     auth: QDashAuth,
     signal?: AbortSignal,
   ): Promise<EvaluateResult> {
@@ -366,9 +387,13 @@ export class SharedRuntime {
       throw new EvaluationError("request", `evaluation tools not loaded: ${missing.join(", ")}`, 503);
     }
     const model = this.resolveModel(request.provider, request.modelName);
+    const evaluationModel = this.resolveModelSpec(
+      request.evaluationProvider,
+      request.evaluationModelName,
+    );
     const connection = await createQDashConnection(auth);
     try {
-      return await evaluateTask(request, {
+      return await evaluateTask({ ...request, evaluationModel }, {
         runTool: async (name, args) => {
           const tool = this.enabledTools.get(name);
           if (!tool) throw new EvaluationError("request", `tool ${name} is not enabled`, 503);
@@ -383,8 +408,7 @@ export class SharedRuntime {
             model,
           )) as ToolRun;
         },
-        fetchKnowledge: (taskName) => fetchTaskKnowledge(connection, taskName, signal),
-        fetchExamples: (taskName) => fetchTaskExamples(connection, taskName, signal),
+        ...knowledgeSource(connection, request.knowledgeDraftId, signal),
         evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
       });
     } finally {
@@ -423,8 +447,7 @@ export class SharedRuntime {
             undefined,
           )) as ToolRun;
         },
-        fetchKnowledge: (taskName) => fetchTaskKnowledge(connection, taskName, signal),
-        fetchExamples: (taskName) => fetchTaskExamples(connection, taskName, signal),
+        ...knowledgeSource(connection, request.knowledgeDraftId, signal),
       });
     } finally {
       await connection.close();
@@ -443,6 +466,8 @@ export class SharedRuntime {
     request: EvaluateRequest & {
       provider?: string;
       modelName?: string;
+      evaluationProvider?: string;
+      evaluationModelName?: string;
       thinkingLevel?: ThinkingLevel;
     },
     auth: QDashAuth,
@@ -451,7 +476,15 @@ export class SharedRuntime {
     if (!request.provider || !request.modelName) {
       throw new EvaluationError("request", "planner mode needs a model provider and name", 400);
     }
+    if (request.knowledgeDraftId) {
+      // The planner's qcal_evaluate call is filled with the shared knowledge.
+      throw new EvaluationError("request", "a knowledge draft can only be evaluated in direct mode", 400);
+    }
     this.resolveModel(request.provider, request.modelName);
+    const evaluationModel = this.resolveModelSpec(
+      request.evaluationProvider,
+      request.evaluationModelName,
+    );
     const evaluation = this.enabledTools.get(EVALUATION_TOOL);
     if (!evaluation) {
       throw new EvaluationError("request", `evaluation tools not loaded: ${EVALUATION_TOOL}`, 503);
@@ -479,7 +512,12 @@ export class SharedRuntime {
         const submission = await conversation.submit(
           {
             type: "input",
-            content: plannerInstruction(request.taskId, request.question, request.withExamples),
+            content: plannerInstruction(
+              request.taskId,
+              request.question,
+              request.withExamples,
+              evaluationModel,
+            ),
           },
           BACKGROUND_CONTEXT,
         );
@@ -500,6 +538,19 @@ export class SharedRuntime {
             ? `the planner did not call ${EVALUATION_TOOL}${answer ? `: ${answer.slice(0, 300)}` : ""}`
             : `planner turn ${settled.reason}${formatSettledDetail(settled.detail)}`;
         throw new EvaluationError("evaluation", why);
+      }
+      const usedModel = (outcome.details as Record<string, unknown>).model as
+        | { provider?: unknown; modelId?: unknown }
+        | undefined;
+      const usedModelSpec =
+        typeof usedModel?.provider === "string" && typeof usedModel.modelId === "string"
+          ? `${usedModel.provider}/${usedModel.modelId}`
+          : undefined;
+      if (evaluationModel && usedModelSpec !== evaluationModel) {
+        throw new EvaluationError(
+          "evaluation",
+          `${EVALUATION_TOOL} used ${usedModelSpec ?? "no model"}; requested ${evaluationModel}`,
+        );
       }
       const providerId = PROVIDER_ALIASES[request.provider] ?? request.provider;
       return recordFromDetails(request.taskId, outcome.details, {

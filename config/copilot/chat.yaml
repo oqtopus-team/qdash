@@ -5,12 +5,12 @@
 # The Pi Agent Runtime generates its models.json from this list at startup;
 # `temperature`/`top_p`/`top_k` do not reach Bedrock there.
 chat_models:
-  # Default vendor-neutral OpenAI Chat Completions endpoint.
-  - provider: openai-compatible
+  # Default vendor-neutral OpenAI Chat Completions API. The base URL must include /v1.
+  - provider: openai-compatible-chat
     name: qwen3.8-flash-next
     api_style: completion
-    base_url: env:OPENAI_COMPATIBLE_BASE_URL
-    api_key_env: OPENAI_COMPATIBLE_API_KEY
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
     temperature: 0.7
     top_p: 0.80
     top_k: 20
@@ -52,14 +52,14 @@ chat_models:
     # Chat answers and their thinking fit well within 8k; 16k reserved a quarter
     # of the 64k window for output and left prompts no room.
     max_output_tokens: 8192
-  # - provider: ollama
+  # - provider: openai-compatible-ollama
   #   name: nvidia/Gemma-4-31B-IT-NVFP4
   #   api_style: completion
-  #   # Ollama endpoint. Set OLLAMA_BASE_URL to your Ollama server URL,
-  #   # e.g. http://localhost:11434.
-  #   base_url: env:OLLAMA_BASE_URL
+  #   # Ollama endpoint. Set this to its OpenAI-compatible API base URL,
+  #   # e.g. http://localhost:11434/v1. The OLLAMA suffix is operator-chosen.
+  #   base_url: env:OPENAI_COMPATIBLE_BASE_URL_OLLAMA
   #   # Optional API key, forwarded when set.
-  #   api_key_env: OLLAMA_API_KEY
+  #   api_key_env: OPENAI_COMPATIBLE_API_KEY_OLLAMA
   #   keep_alive: 30m
   #   num_ctx: 16384
   #   temperature: 1.0
@@ -68,11 +68,11 @@ chat_models:
   #   reasoning_effort: none
   #   disable_thinking_instruction: true
   #   max_output_tokens: 4096
-  # - provider: ollama
+  # - provider: openai-compatible-ollama
   #   name: gemma4:31b
   #   api_style: completion
-  #   base_url: env:OLLAMA_BASE_URL
-  #   api_key_env: OLLAMA_API_KEY
+  #   base_url: env:OPENAI_COMPATIBLE_BASE_URL_OLLAMA
+  #   api_key_env: OPENAI_COMPATIBLE_API_KEY_OLLAMA
   #   keep_alive: 30m
   #   num_ctx: 16384
   #   temperature: 1.0
@@ -87,15 +87,16 @@ chat_models:
   #   temperature: 0.7
   #   max_output_tokens: 4096
   # DeepSeek v4 flash via an OpenAI-compatible gateway (e.g. local ds4-server).
+  # OPENAI_COMPATIBLE_BASE_URL_DS4 must include /v1.
   # DeepSeek only exposes /v1/chat/completions, so use api_style: completion.
   # Thinking mode is enabled by `reasoning_effort`; reasoning_content is
-  # carried across tool rounds automatically. Uncomment when DS4_BASE_URL /
-  # DS4_API_KEY are configured.
-  # - provider: openai
+  # carried across tool rounds automatically. Uncomment when the suffixed
+  # OpenAI-compatible variables below are configured.
+  # - provider: openai-compatible-ds4
   #   name: deepseek-v4-flash
   #   api_style: completion
-  #   base_url: env:DS4_BASE_URL
-  #   api_key_env: DS4_API_KEY
+  #   base_url: env:OPENAI_COMPATIBLE_BASE_URL_DS4
+  #   api_key_env: OPENAI_COMPATIBLE_API_KEY_DS4
   #   temperature: 0.7
   #   reasoning_effort: high
   #   max_output_tokens: 4096

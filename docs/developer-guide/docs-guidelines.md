@@ -25,26 +25,26 @@ docs/
   index.md                 Two entry points: User Guide, Developer Guide
   user-guide/
     index.md               Reading order: set up, operate, work with calibrations
-    setup.md               Clone, configure, start, sign in
+    setup.md               Choose a backend, then clone, configure, start, sign in
+    setup/                  Fake and Qubex backend-specific configuration
     operations.md          Start, stop, logs, recovery
-    system-updates.md      Release updates through the updater
-    migrations/            Steps for upgrades that change stored data
+    system-updates.md      Select a stable release and rebuild from the host
     application-tour.md    One page per job after that: running calibrations,
-    ...                    reviewing results, copilot, projects, cryo, ...
+    ...                    reviewing results, AI chat, projects, cryostats, ...
   developer-guide/
     index.md               Reading order: setup, codebase, commands, testing
     setup.md  codebase.md  commands.md  testing.md  development-flow.md
     docs-guidelines.md     This page
     conventions/           Rules that apply across the code: datetime, logging,
-                           qid validation, credential scanning
+                           credential scanning
     api/  ui/  workflow/  copilot/
-                           One directory per component: design, architecture,
-                           testing, and the component's own deep dives
+      ...                  Design, architecture, testing, and deep dives
     architecture/          Cross-component design: schedulers, topology,
                            provenance, notes, agent platform
   reference/
-    database-structure.md  Overview, collections, data flow
-    data-models.md  database-documents-*.md  database-indexes.md  openapi.md
+    index.md               Entry point for generated and tabular reference
+    database-structure.md  Collection-to-document source map
+    openapi.md             Generated HTTP operations and schemas
     clients/               Python and TypeScript client packages
 ```
 
@@ -131,6 +131,10 @@ belongs in CI configuration.
 
 **No "Future Enhancements"** — Track planned work in GitHub Issues.
 
+**Under construction** — Use this marker only for an implemented feature whose guidance depends
+on a product-owner decision. Put it in the nearest navigation or coverage table instead of
+creating an empty placeholder page. Do not infer the missing behavior.
+
 **No "Best Practices" / "Quick Reference" appendices** — Integrate guidance where it is
 relevant.
 
@@ -144,6 +148,37 @@ repeat the same pattern in different sections.
 
 **Tables** — For structured data (settings, endpoints, file mappings). Not for prose.
 
+**Diagrams** — Use Mermaid for compact flows and sequences that remain readable in Markdown.
+Use `<Diagram name="..." caption="..." />` with a theme-aware SVG in `docs/diagrams/` when an
+architecture or lifecycle needs more deliberate layout. SVG diagrams must use VitePress color
+variables, include `role="img"` and a descriptive `aria-label`, and keep marker IDs unique. The
+nearby prose must still communicate the consequence for readers who cannot see the diagram.
+
+**Screenshots and short demos** — Use a static image when the reader must recognize a dense page
+or spatial relationship. Use a short animated GIF, like the sign-in demo, when the order of two or
+more UI actions matters. Do not add media that only repeats a short list of visible labels. Crop
+to the task, use representative non-sensitive data, keep the viewport stable, and store the final
+file under `docs/public/images/guides/`.
+
+An animated demo covers one task, starts from a recognizable state, pauses long enough to show the
+result, and loops without requiring narration. Avoid unrelated cursor movement and optimize the
+file before committing it.
+
+Until the image exists, use a Markdown comment so the published page remains complete without an
+empty visual frame:
+
+```markdown
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/example.gif
+Start: Page and initial state.
+Sequence: Actions and final state the demo must show.
+Alt: Meaningful replacement text for the final image.
+-->
+```
+
+Keep the prose sufficient without the media. Replace the whole comment with Markdown image syntax
+and reuse its `Alt` text when the image or GIF is ready.
+
 **Emoji** — None. Plain text for status in tables (Yes/No).
 
 **Length** — A page is read in one sitting. Past roughly 400 lines, split it by topic: a testing
@@ -152,8 +187,9 @@ page by test kind, a reference by collection group.
 ## Checks
 
 Documentation changes must build and keep their external links reachable. Run `task build-docs`
-to validate VitePress routes and local links. Run `task check-docs-links` when Lychee is
-installed to validate links and anchors against the local VitePress layout and external sites.
+to validate VitePress routes and local links. Run `task check-docs-links` to validate external
+links and anchors against the local VitePress layout. `task dev-local-setup` installs Lychee when
+the active development environment does not provide it.
 
 CI builds the documentation, checks external links in changed Markdown files, and checks every
 internal link and anchor in the generated site on each pull request. A weekly scan checks every

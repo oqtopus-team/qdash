@@ -101,6 +101,12 @@ function RunCard({
               {run.failed_count > 0 && (
                 <span className="badge badge-error">{run.failed_count} failed</span>
               )}
+              {(run.interrupted_count ?? 0) > 0 && (
+                <span className="badge badge-warning">{run.interrupted_count} interrupted</span>
+              )}
+              {(run.cancelled_count ?? 0) > 0 && (
+                <span className="badge badge-ghost">{run.cancelled_count} cancelled</span>
+              )}
               {runIsActive(run) && <span className="badge badge-info">running</span>}
             </div>
             <div className="truncate text-sm font-semibold text-base-content">{run.task_name}</div>

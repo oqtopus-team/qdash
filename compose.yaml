@@ -194,7 +194,6 @@ services:
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - api-logs:/app/logs
-      - ${QDASH_UPDATER_RUNTIME_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/qdash/updater}:/run/qdash-updater
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
     develop:
@@ -217,7 +216,6 @@ services:
       - PREFECT_API_URL=http://prefect-server:4200/api
       - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
-      - UPDATER_SOCKET=/run/qdash-updater/updater.sock
       - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
       - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
     networks:
@@ -265,8 +263,8 @@ services:
       - QDASH_WEB_URL=${CLIENT_URL:-http://localhost:${UI_PORT:-5714}}
       # Pi hides models whose provider has no credential, even when the server
       # ignores it. Keep a placeholder for keyless local endpoints.
-      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-ollama}
-      - VLLM_API_KEY=${VLLM_API_KEY:-vllm}
+      - OPENAI_COMPATIBLE_API_KEY_CHAT=${OPENAI_COMPATIBLE_API_KEY_CHAT:-openai-compatible}
+      - OPENAI_COMPATIBLE_API_KEY_EVALUATION=${OPENAI_COMPATIBLE_API_KEY_EVALUATION:-openai-compatible}
       # Bun's fetch reads HTTP(S)_PROXY on its own. NO_PROXY comes from .env via
       # env_file; redeclaring it here would let an ambient shell value win.
     depends_on:

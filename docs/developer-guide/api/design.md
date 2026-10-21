@@ -1,315 +1,122 @@
-# API Design Guidelines
+# API Design
 
-Conventions for the shape of a QDash API endpoint: its path, HTTP method, operation ID, handler name and router tag. What an endpoint accepts and returns is on [API Contracts](./contracts.md); how the code is laid out is on [API Code Structure](./structure.md).
+A QDash route exposes a stable resource-oriented HTTP contract; its path, method, and
+`operation_id` must remain predictable for people and generated clients.
 
-## URL Path Design
+## Design Resource Paths
 
-### Resource Names
+Use lowercase plural nouns for collections and kebab-case for multiword segments:
 
-Resource names are clear, domain-specific nouns that represent the entities in the system.
-
-1. **Use domain terminology**: Use terms familiar to quantum computing (qubits, couplings, fidelity)
-2. **Be specific**: `task-results` not `results`, `flow-schedules` not `schedules`
-3. **Avoid abbreviations**: `executions` not `execs`, `configurations` not `configs`
-
-### Use Plural Nouns for Collections
-
-Always use **plural nouns** for resource collections. This maintains consistency and clearly indicates that the endpoint can return multiple resources.
-
-```python
-# Good
-GET  /chips              # List all chips
-GET  /chips/{chip_id}    # Get a specific chip
-POST /chips              # Create a new chip
-
-# Bad
-GET  /chip               # Inconsistent - singular for collection
-GET  /chip/{chip_id}     # Inconsistent
+```text
+GET  /chips
+GET  /chips/{chip_id}
+GET  /task-results
+GET  /device-topology
 ```
 
-### Use Lowercase with Hyphens
+Nest a resource when the parent identifies its scope. Keep the hierarchy shallow enough that the
+resource is still recognizable:
 
-- Use **lowercase letters** exclusively
-- Use **hyphens (`-`)** to separate words (kebab-case): `task-results`, `device-topology`, `lock-status`
-- Never use underscores, camelCase, or PascalCase in URLs
-
-```python
-# Good
-/task-results
-/execution-history
-/flow-schedules
-
-# Bad
-/taskResults        # camelCase
-/task_results       # underscores
-/TaskResults        # PascalCase
+```text
+GET /chips/{chip_id}/qubits
+GET /chips/{chip_id}/qubits/{qid}
+GET /flows/{name}/schedules
 ```
 
-### Resource Hierarchy and Nesting
+Use a verb after the resource for an operation that is not CRUD:
 
-Use nesting to show parent-child relationships, but limit to 2-3 levels maximum.
-
-```python
-# Good - Clear hierarchy
-GET /chips/{chip_id}/muxes                    # Muxes belonging to a chip
-GET /chips/{chip_id}/muxes/{mux_id}           # Specific mux
-GET /task-results/qubits/{qid}/history        # Qubit task history
-
-# Bad - Too deeply nested
-GET /users/{user_id}/chips/{chip_id}/qubits/{qid}/tasks/{task_id}/results
+```text
+POST /flows/{name}/execute
+POST /executions/{flow_run_id}/cancel
+POST /calibration-pipelines/validate
 ```
 
-### Singleton Resources
+Static routes must be declared before a dynamic route that could consume the same segment.
+`src/qdash/api/routers/flow.py` declares `/flows/templates` and `/flows/schedules` before
+`/flows/{name}` for this reason.
 
-Use singular form only for singleton resources (resources that exist as a single instance).
+Existing paths are public contracts even when they predate these conventions. Do not rename one
+only for consistency; use the compatibility process in [API Contracts](./contracts.md).
 
-```python
-# Good - Singleton
-GET  /settings                                # Application settings (only one)
-GET  /executions/lock-status                  # Lock status (singleton)
+## Match the Method to the Effect
 
-# Good - Collection
-GET  /chips                                   # Multiple chips
-GET  /executions                              # Multiple executions
-```
+| Method | Use |
+| --- | --- |
+| `GET` | Read without changing server state |
+| `POST` | Create a resource or start an action |
+| `PUT` | Replace or upsert the complete representation at a known path |
+| `PATCH` | Change part of an existing resource |
+| `DELETE` | Remove a resource or relationship |
 
-### Action Endpoints
+Choose the success status as part of the contract. FastAPI defaults to `200`; specify `201` for a
+created resource, `202` when work continues asynchronously, and `204` only when the response has no
+body. Match an existing endpoint family when extending it, because changing an established success
+status can break callers.
 
-For actions that don't fit standard CRUD operations, use verbs as sub-resources.
+## Treat Operation IDs as Client API Names
 
-```python
-# Good
-POST /flows/{name}/execute                    # Execute a flow
-POST /flows/{name}/schedule                   # Schedule a flow
-POST /executions/{flow_run_id}/cancel         # Cancel a running execution
+Every new route must set a unique camelCase `operation_id`. The TypeScript generator uses it as the
+exported method name, so changing `listChips` also renames
+`client.api.listChips()`.
 
-# Bad
-POST /execute-flow/{name}                     # Verb in wrong position
-POST /flowExecute/{name}                      # camelCase, poor structure
-```
+Use an action and domain noun:
 
-## HTTP Methods
+| Purpose | Pattern | Example |
+| --- | --- | --- |
+| Collection read | `list<Resource>` | `listChips` |
+| Single read | `get<Resource>` | `getChip` |
+| Creation | `create<Resource>` | `createCryostat` |
+| Mutation | `update<Resource>`, `set<Resource>` | `updateFlowSchedule` |
+| Removal | `delete<Resource>` | `deleteChip` |
+| Domain action | Specific verb | `executeFlow`, `cancelExecution` |
 
-Use HTTP methods according to their semantic meaning:
+Name the Python handler with the snake_case form when that remains clear:
+`operation_id="getChipDeletionImpact"` pairs with `get_chip_deletion_impact()`. The ID is the
+public contract; the handler name is an internal navigation aid.
 
-| Method   | Purpose                 | Idempotent | Response                 |
-| -------- | ----------------------- | ---------- | ------------------------ |
-| `GET`    | Retrieve resource(s)    | Yes        | 200 OK                   |
-| `POST`   | Create new resource     | No         | 201 Created              |
-| `PUT`    | Replace entire resource | Yes        | 200 OK                   |
-| `PATCH`  | Partial update          | No         | 200 OK                   |
-| `DELETE` | Remove resource         | Yes        | 204 No Content or 200 OK |
+`src/qdash/api/app/factory.py` provides `custom_generate_unique_id()` as a fallback, but new routes
+must not rely on the tag-and-function-name fallback. Explicit IDs remain stable if registration or
+internal function names change.
 
-```python
-# Good
-@router.get("/chips")                         # List chips
-@router.get("/chips/{chip_id}")               # Get single chip
-@router.post("/chips")                        # Create chip
-@router.put("/chips/{chip_id}")               # Replace chip entirely
-@router.patch("/chips/{chip_id}")             # Update chip partially
-@router.delete("/chips/{chip_id}")            # Delete chip
+## Register Tags and Authentication Centrally
 
-# Bad
-@router.post("/chips/{chip_id}/delete")       # Don't use POST for delete
-@router.get("/chips/create")                  # Don't use GET for create
-```
+`src/qdash/api/app/router_registry.py` is the inventory of mounted routers. Each
+`RouterRegistration` owns the router's OpenAPI tag, optional path prefix, and default authentication
+policy.
 
-## Operation ID Naming
+Use a stable kebab-case domain tag such as `agent-session` or `device-topology`. Add the tag in the
+registry rather than both the `APIRouter` and `include_router()`; duplicate registration produces
+duplicate OpenAPI tags. Preserve an existing tag spelling because OpenAPI navigation and fallback
+operation IDs expose it.
 
-### Use camelCase Format
+Protected routers receive `get_current_active_user` at registration. Routes still add
+`get_project_context`, `get_project_context_editor`, or an owner dependency when they need a
+project and role. A router marked public skips only the registry-level check; each public route
+remains responsible for any authentication it requires.
 
-All `operation_id` values must use **camelCase** format for consistency and SDK generation compatibility.
+## Keep Route Metadata Useful
 
-```python
-# Good - camelCase
-operation_id="listChips"
-operation_id="getChip"
-operation_id="createChip"
-operation_id="updateChip"
-operation_id="deleteChip"
+Write a short imperative summary such as “List all chips” or “Execute a flow.” Use a longer
+description only when a caller needs behavior that the schemas cannot express, such as ordering,
+fallbacks, or side effects.
 
-# Bad - snake_case
-operation_id="list_chips"
-operation_id="get_chip"
-```
-
-### Verb + Noun Pattern
-
-Follow the **verb + noun** pattern consistently:
-
-| Action              | Verb             | Example                        |
-| ------------------- | ---------------- | ------------------------------ |
-| List collection     | `list`           | `listChips`, `listExecutions`  |
-| Get single resource | `get`            | `getChip`, `getExecution`      |
-| Create resource     | `create`         | `createChip`, `createFlow`     |
-| Update resource     | `update`         | `updateChip`, `updateSchedule` |
-| Delete resource     | `delete`         | `deleteChip`, `deleteFlow`     |
-| Custom action       | descriptive verb | `executeFlow`, `scheduleFlow`  |
-
-### Consistency Rules
-
-1. **Use `list` for collections**: Not `fetch`, `getAll`, or `fetchAll`
-2. **Use `get` for single resources**: Not `fetch`, `retrieve`, or `read`
-3. **Include resource name**: Always include the noun
+A typical route makes all client-facing decisions visible in its decorator and signature:
 
 ```python
-# Good - Consistent verbs
-operation_id="listChips"
-operation_id="listExecutions"
-operation_id="listTasks"
-operation_id="listFlows"
-
-operation_id="getChip"
-operation_id="getExecution"
-operation_id="getTask"
-operation_id="getFlow"
-
-# Bad - Inconsistent verbs
-operation_id="fetchChips"      # Use 'list' instead
-operation_id="getAll"          # Missing resource name
-operation_id="retrieveChip"    # Use 'get' instead
+@router.get(
+    "/chips",
+    response_model=ListChipsResponse,
+    summary="List all chips",
+    operation_id="listChips",
+)
+def list_chips(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+) -> ListChipsResponse:
+    chips = chip_service.list_chips_summary(ctx.project_id)
+    return ListChipsResponse(chips=chips, total=len(chips))
 ```
 
-### Nested Resources
-
-For nested resources, include the parent context if it improves clarity:
-
-```python
-# Good
-operation_id="listChipMuxes"                  # Muxes under a chip
-operation_id="getChipMux"                     # Single mux under a chip
-operation_id="listFlowSchedules"              # Schedules for a flow
-
-# For deeply nested or context-heavy endpoints
-operation_id="getQubitTaskHistory"            # Task history for qubit
-operation_id="getCouplingTaskHistory"         # Task history for coupling
-```
-
-## Function Naming
-
-### Alignment with Operation ID
-
-**Function names must align with their `operation_id`**. The function name should be the **snake_case version** of the `operation_id`. This ensures:
-
-1. **Predictability**: Developers can easily find functions by operation_id and vice versa
-2. **Code generation compatibility**: Generated SDKs use operation_id as method names
-3. **Consistency**: Reduces cognitive load when switching between API docs and code
-
-```python
-# Good - Function name matches operation_id (snake_case <-> camelCase)
-@router.get("/chips", operation_id="listChips")
-def list_chips():                               # listChips -> list_chips
-    pass
-
-@router.get("/chips/{chip_id}", operation_id="getChip")
-def get_chip(chip_id: str):                     # getChip -> get_chip
-    pass
-
-@router.post("/flows/{name}/execute", operation_id="executeFlow")
-async def execute_flow(name: str):              # executeFlow -> execute_flow
-    pass
-
-# Bad - Function name doesn't match operation_id
-@router.get("/me", operation_id="getCurrentUser")
-def read_users_me():                            # Should be get_current_user
-
-@router.get("/settings", operation_id="getSettings")
-def get_settings_endpoint():                    # Should be get_settings (no suffix)
-
-@router.get("/task-results", operation_id="getLatestQubitTaskResults")
-def fetch_latest_qubit_task_results():          # Should be get_latest_qubit_task_results
-```
-
-### Conversion Rules
-
-| operation_id (camelCase) | Function name (snake_case) |
-| ------------------------ | -------------------------- |
-| `listChips`              | `list_chips`               |
-| `getChip`                | `get_chip`                 |
-| `createChip`             | `create_chip`              |
-| `updateChip`             | `update_chip`              |
-| `deleteChip`             | `delete_chip`              |
-| `executeFlow`            | `execute_flow`             |
-| `getQubitTaskHistory`    | `get_qubit_task_history`   |
-
-### Verb Consistency
-
-Use the same verb in both operation_id and function name:
-
-| operation_id verb | Function name verb | Notes                    |
-| ----------------- | ------------------ | ------------------------ |
-| `list`            | `list_`            | For collections          |
-| `get`             | `get_`             | For single resources     |
-| `create`          | `create_`          | For creating resources   |
-| `update`          | `update_`          | For modifying resources  |
-| `delete`          | `delete_`          | For removing resources   |
-| `execute`         | `execute_`         | For action endpoints     |
-| `schedule`        | `schedule_`        | For scheduling endpoints |
-
-**Avoid these inconsistencies:**
-
-```python
-# Bad - Verb mismatch
-operation_id="getTaskResults"
-def fetch_task_results():          # 'fetch' vs 'get' - use get_task_results
-
-operation_id="listExecutions"
-def read_executions():             # 'read' vs 'list' - use list_executions
-
-# Bad - Unnecessary suffixes
-operation_id="getSettings"
-def get_settings_endpoint():       # '_endpoint' suffix - use get_settings
-
-operation_id="listFlows"
-def list_flows_handler():          # '_handler' suffix - use list_flows
-```
-
-### Private/Helper Functions
-
-Helper functions that are not endpoints should use a leading underscore:
-
-```python
-# Good - Clear distinction between endpoints and helpers
-@router.get("/muxes/{mux_id}", operation_id="getChipMux")
-def get_chip_mux(mux_id: int) -> MuxDetailResponse:
-    return _build_mux_detail(mux_id, tasks, task_results)
-
-def _build_mux_detail(mux_id: int, tasks: list, task_results: dict) -> MuxDetailResponse:
-    """Helper function - not an endpoint."""
-    pass
-```
-
-## Router Tags
-
-### Tag Naming Convention
-
-Router tags are used for OpenAPI documentation grouping and should use **lowercase singular** or **kebab-case** format.
-
-```python
-# Good - Consistent tag naming
-app.include_router(resource.router, tags=["resource"])
-app.include_router(sub_resource.router, tags=["sub-resource"])
-
-# Bad - Inconsistent
-app.include_router(resource.router, tags=["resources"])          # Plural
-app.include_router(resource.router, tags=["Resource"])           # PascalCase
-app.include_router(sub_resource.router, tags=["sub_resource"])   # Underscore
-```
-
-### Tag Organization in OpenAPI
-
-Tags appear in the order they are registered. Group related tags together:
-
-```python
-# Core resources
-app.include_router(resource.router, tags=["resource"])
-app.include_router(item.router, tags=["item"])
-
-# Operations
-app.include_router(execution.router, tags=["execution"])
-app.include_router(workflow.router, tags=["workflow"])
-
-# Configuration
-app.include_router(settings.router, tags=["settings"])
-app.include_router(config.router, tags=["config"])
-```
+The request and response rules are in [API Contracts](./contracts.md). Router placement,
+dependency providers, and the request path through the application are in
+[API Code Structure](./structure.md).

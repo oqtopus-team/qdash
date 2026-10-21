@@ -25,7 +25,6 @@ Read `docs/developer-guide/architecture.md` and the more specific docs under `do
 - Development flow and commits: `docs/developer-guide/development-flow.md`
 - API design: `docs/developer-guide/api/design.md`
 - API testing: `docs/developer-guide/api/testing.md`
-- API endpoint testing: `docs/developer-guide/api/testing-endpoints.md`
 - UI guidelines: `docs/developer-guide/ui/guidelines.md`
 - UI architecture: `docs/developer-guide/ui/architecture.md`
 - UI testing: `docs/developer-guide/ui/testing.md`
@@ -34,8 +33,7 @@ Read `docs/developer-guide/architecture.md` and the more specific docs under `do
 - Workflow architecture: `docs/developer-guide/workflow/engine-architecture.md`
 - Workflow testing: `docs/developer-guide/workflow/testing.md`
 - Documentation guidelines: `docs/developer-guide/docs-guidelines.md`
-- Database structure: `docs/reference/database-structure.md`
-- Database indexes: `docs/reference/database-indexes.md`
+- Database collections: `docs/reference/database-structure.md`
 
 ## Generated Code
 
@@ -101,6 +99,7 @@ Prefer focused tests for narrow changes, then broader checks when touching share
 ## Documentation Conventions
 
 - Follow `docs/developer-guide/docs-guidelines.md` and use the `technical-docs` skill (`.agents/skills/technical-docs/SKILL.md`) to write, verify and review a page.
+- Use the `document-changes` skill (`.agents/skills/document-changes/SKILL.md`) to audit a branch, pull request, commit, or working-tree diff for documentation impact before making documentation fixes.
 - Start docs with a direct context sentence.
 - Do not add manual tables of contents, summary sections, empty checklists, future-enhancement sections, or emoji.
 - Link relevant docs inline instead of adding broad related-document lists.

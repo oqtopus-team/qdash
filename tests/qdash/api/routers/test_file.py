@@ -3,7 +3,6 @@
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.exceptions import HTTPException
 
@@ -87,72 +86,3 @@ def test_figure_archive_refuses_files_outside_calibration_data(
 
     assert exc_info.value.status_code == 400
     assert str(secret) in str(exc_info.value.detail)
-
-
-@pytest.fixture
-def knowledge(tmp_path: Path, test_client: TestClient):
-    """A knowledge workspace with one task folder holding its plot."""
-    from qdash.api.dependencies import get_knowledge_file_service
-    from qdash.api.services.file_service import FileService
-
-    task = tmp_path / "knowledge" / "one_qubit_coarse" / "CheckRabi"
-    task.mkdir(parents=True)
-    (task / "index.md").write_text("![Rabi](./check_rabi_expected_1.png)\n")
-    (task / "check_rabi_expected_1.png").write_bytes(b"\x89PNG-rabi")
-    (task / "notes.svg").write_text("<svg><script>alert(1)</script></svg>")
-    app = test_client.app
-    assert isinstance(app, FastAPI)
-    app.dependency_overrides[get_knowledge_file_service] = lambda: FileService(
-        tmp_path / "knowledge", label="knowledge"
-    )
-    yield tmp_path / "knowledge"
-    app.dependency_overrides.pop(get_knowledge_file_service, None)
-
-
-def test_a_knowledge_image_is_served_for_the_markdown_preview(
-    test_client: TestClient, headers: dict[str, str], knowledge: Path
-) -> None:
-    response = test_client.get(
-        "/knowledge/files/image",
-        params={"path": "one_qubit_coarse/CheckRabi/check_rabi_expected_1.png"},
-        headers=headers,
-    )
-
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "image/png"
-    assert response.content == b"\x89PNG-rabi"
-
-
-@pytest.mark.parametrize(
-    ("path", "status"),
-    [
-        ("one_qubit_coarse/CheckRabi/index.md", 400),
-        ("one_qubit_coarse/CheckRabi/notes.svg", 400),
-        ("one_qubit_coarse/CheckRabi/missing.png", 404),
-        ("../outside.png", 400),
-    ],
-)
-def test_only_raster_images_inside_the_workspace_are_served(
-    test_client: TestClient,
-    headers: dict[str, str],
-    knowledge: Path,
-    path: str,
-    status: int,
-) -> None:
-    (knowledge.parent / "outside.png").write_bytes(b"TOP-SECRET-CONTENT")
-
-    response = test_client.get("/knowledge/files/image", params={"path": path}, headers=headers)
-
-    assert response.status_code == status
-    assert b"TOP-SECRET-CONTENT" not in response.content
-
-
-def test_knowledge_images_require_a_signed_in_user(
-    test_client: TestClient, knowledge: Path
-) -> None:
-    response = test_client.get(
-        "/knowledge/files/image",
-        params={"path": "one_qubit_coarse/CheckRabi/check_rabi_expected_1.png"},
-    )
-
-    assert response.status_code in {401, 403}
