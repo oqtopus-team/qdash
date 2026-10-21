@@ -62,9 +62,14 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t2_echo_average impo
 )
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_hpi_pulse import CreateHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_pi_pulse import CreatePIPulse
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_adaptive_ef_chevron import (
+    CheckAdaptiveEFChevron,
+)
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_adaptive_fh_chevron import (
+    CheckAdaptiveFHChevron,
+)
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_hpi_pulse import CheckDRAGHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_pi_pulse import CheckDRAGPIPulse
-from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_chevron import CheckEFChevron
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_rabi import CheckEFRabi
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_hpi_pulse import CreateDRAGHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_pi_pulse import CreateDRAGPIPulse
@@ -83,6 +88,8 @@ __all__ = [
     "Check1QGateCoherenceLimit",
     "Check2QGateCoherenceLimit",
     "CheckAdaptiveChevron",
+    "CheckAdaptiveEFChevron",
+    "CheckAdaptiveFHChevron",
     "CheckBellState",
     "CheckBellStateTomography",
     "CheckCKP",
@@ -92,7 +99,6 @@ __all__ = [
     "CheckCrossResonance",
     "CheckDRAGHPIPulse",
     "CheckDRAGPIPulse",
-    "CheckEFChevron",
     "CheckEFRabi",
     "CheckHPIPulse",
     "CheckJAZZ",

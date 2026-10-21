@@ -45,7 +45,7 @@ def test_ef_calibration_runs_expected_tasks_in_one_synchronized_step() -> None:
         "ConfigureEF",
         "CheckRabi",
         "CreateHPIPulse",
-        "CheckEFChevron",
+        "CheckAdaptiveEFChevron",
         "CheckEFRabi",
         "CreateEFHPIPulse",
         "CreateEFPIPulse",
@@ -75,7 +75,7 @@ def test_ef_calibration_forwards_configuration_mode_and_shared_defaults() -> Non
             "CreateHPIPulse": {
                 "hpi_duration": {"value": 32, "value_type": "int"},
             },
-            "CheckEFChevron": {
+            "CheckAdaptiveEFChevron": {
                 "shots": {"value": 256, "value_type": "int"},
             },
             "CreateEFHPIPulse": {

@@ -159,7 +159,7 @@ def test_list_task_info_uses_configured_category_and_task_order() -> None:
 def test_ef_chevron_is_enabled_with_calibration_and_sweep_metadata() -> None:
     clear_backend_config_cache()
     tasks = TaskFileService().list_task_info("qubex", enabled_only=True).tasks
-    task = next(task for task in tasks if task.name == "CheckEFChevron")
+    task = next(task for task in tasks if task.name == "CheckAdaptiveEFChevron")
 
     assert task.enabled
     assert task.category == "One Qubit"
@@ -172,7 +172,37 @@ def test_ef_chevron_is_enabled_with_calibration_and_sweep_metadata() -> None:
     assert task.input_parameters["hpi_amplitude"]["resolution"] == "database_required"
     assert task.input_parameters["hpi_duration"]["resolution"] == "database_required"
     assert "anharmonicity" not in task.input_parameters
-    assert task.input_parameters["ef_control_amplitude"]["default_value"] == 0.0625
+    assert task.input_parameters["control_amplitude"]["resolution"] == "database_required"
+    assert task.input_parameters["control_amplitude"]["description"] == (
+        "Calibrated GE amplitude used to derive the initial EF drive amplitude"
+    )
+    assert "ef_control_amplitude" not in task.input_parameters
+    assert task.run_parameters["detuning_range"]["value"] == [-0.05, 0.05, 41]
+    assert task.run_parameters["shots"]["value"] == 256
+
+
+def test_fh_chevron_is_enabled_with_transition_and_pulse_dependencies() -> None:
+    clear_backend_config_cache()
+    all_task_names = {task.name for task in TaskFileService().list_task_info("qubex").tasks}
+    tasks = (
+        TaskFileService().list_task_info("qubex", sort_order="category", enabled_only=True).tasks
+    )
+    task = next(task for task in tasks if task.name == "CheckAdaptiveFHChevron")
+    task_names = [task.name for task in tasks]
+
+    assert task.enabled
+    assert task.category == "One Qubit"
+    assert "CheckEFChevron" not in all_task_names
+    assert "CheckFHChevron" not in all_task_names
+    assert task_names.index("CheckAdaptiveFHChevron") > task_names.index("CreateEFPIPulse")
+    assert task.input_parameters["control_frequency_ef"]["fallback_parameter_names"] == [
+        "ef_frequency"
+    ]
+    assert task.input_parameters["control_amplitude"]["description"] == (
+        "Calibrated GE amplitude used to derive the initial FH drive amplitude"
+    )
+    assert task.input_parameters["ef_pi_amplitude"]["resolution"] == "database_required"
+    assert task.input_parameters["ef_pi_duration"]["resolution"] == "database_required"
     assert task.run_parameters["detuning_range"]["value"] == [-0.05, 0.05, 41]
     assert task.run_parameters["shots"]["value"] == 256
 

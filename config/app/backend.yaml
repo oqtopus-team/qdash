@@ -46,10 +46,11 @@ backends:
         - CheckDRAGHPIPulse
         - CreateDRAGPIPulse
         - CheckDRAGPIPulse
-        - CheckEFChevron
+        - CheckAdaptiveEFChevron
         - CheckEFRabi
         - CreateEFHPIPulse
         - CreateEFPIPulse
+        - CheckAdaptiveFHChevron
         - EFReadoutClassification
         - CheckThermalExcitation
         - ReadoutClassification

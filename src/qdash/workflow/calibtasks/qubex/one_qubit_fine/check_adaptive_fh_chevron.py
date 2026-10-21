@@ -1,46 +1,46 @@
-"""Measure EF frequency and anharmonicity with Qubex chevron analysis."""
+"""Measure the FH transition frequency with Qubex adaptive chevron analysis."""
 
 import math
 from typing import ClassVar
 
-from qubex.contrib.experiment import estimate_ef_frequency_from_chevron_adaptive
+from qubex.contrib.experiment import estimate_fh_frequency_from_chevron_adaptive
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
-from qdash.datamodel.task import (
-    InputParameterSpec,
-    OutputParameterSpec,
-    RunParameterSpec,
-)
-from qdash.workflow.calibtasks.base import (
-    PostProcessResult,
-    RunResult,
-)
-from qdash.workflow.calibtasks.qubex.base import (
-    QubexTask,
-    readout_duration_run_parameter,
-)
+from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
+from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
 from qdash.workflow.calibtasks.qubex.validation import (
     finite_value_error,
     first_validation_error,
-    require_ef_configuration,
+    require_fh_configuration,
 )
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
-class CheckEFChevron(QubexTask):
-    """Measure f_ef and alpha = f_ef - f_ge using the Qubex session's GE pulses."""
+class CheckAdaptiveFHChevron(QubexTask):
+    """Adaptively measure the FH transition using stored Qubex GE and EF pulses.
 
-    name: str = "CheckEFChevron"
+    The recorded HPI and EF pi inputs enforce the calibration prerequisites. Qubex resolves the
+    actual preparation waveforms from the synchronized session when it constructs each sequence.
+    """
+
+    name: str = "CheckAdaptiveFHChevron"
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         "control_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("qubit_frequency",), unit="GHz"
         ),
+        "control_frequency_ef": InputParameterSpec.required_database(
+            fallback_parameter_names=("ef_frequency",), unit="GHz"
+        ),
+        "control_amplitude": InputParameterSpec.required_database(
+            unit="a.u.",
+            description="Calibrated GE amplitude used to derive the initial FH drive amplitude",
+        ),
         "hpi_amplitude": InputParameterSpec.required_database(unit="a.u."),
         "hpi_duration": InputParameterSpec.required_database(unit="ns"),
-        "ef_control_amplitude": InputParameterSpec.database_or_default(
-            default=0.0625, unit="a.u.", description="EF drive pulse amplitude"
-        ),
+        "ef_pi_amplitude": InputParameterSpec.required_database(unit="a.u."),
+        "ef_pi_duration": InputParameterSpec.required_database(unit="ns"),
         "readout_amplitude": InputParameterSpec.required_database(unit="a.u."),
         "readout_frequency": InputParameterSpec.required_database(
             fallback_parameter_names=("resonator_frequency",), unit="GHz"
@@ -52,19 +52,19 @@ class CheckEFChevron(QubexTask):
             unit="GHz",
             value_type="np.linspace",
             default=(-0.05, 0.05, 41),
-            description="Final EF detuning sweep around the adaptively estimated frequency",
+            description="Final FH detuning sweep around the adaptively estimated frequency",
         ),
         "time_range": RunParameterSpec(
             unit="ns",
             value_type="range",
             default=(0, 257, 8),
-            description="Final EF drive duration sweep",
+            description="Final FH drive duration sweep",
         ),
         "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
             default=DEFAULT_SHOTS // 4,
-            description="Number of shots per EF chevron point",
+            description="Number of shots per FH chevron point",
         ),
         "interval": RunParameterSpec(
             unit="ns",
@@ -80,16 +80,10 @@ class CheckEFChevron(QubexTask):
         ),
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
-        "ef_frequency": OutputParameterSpec(
+        "fh_frequency": OutputParameterSpec(
             unit="GHz",
-            description="Measured e-to-f transition frequency",
-            publish_targets=(
-                "ef_frequency",
-                "control_frequency_ef",
-            ),
-        ),
-        "anharmonicity": OutputParameterSpec(
-            unit="GHz", description="Anharmonicity alpha = ef_frequency - control_frequency"
+            description="Measured f-to-h transition frequency",
+            publish_targets=("fh_frequency", "control_frequency_fh"),
         ),
     }
 
@@ -97,18 +91,15 @@ class CheckEFChevron(QubexTask):
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         exp = self.get_experiment(backend)
-        label = exp.ctx.resolve_ef_label(self.get_qubit_label(backend, qid))
+        label = exp.ctx.resolve_fh_label(self.get_qubit_label(backend, qid))
         result = run_result.raw_result
         frequency = result.data["resonant_frequencies"].get(label)
-        ge_frequency = self._get_calibration_value("control_frequency")
-        anharmonicity = None if frequency is None else frequency - ge_frequency
+        ef_frequency = self._get_calibration_value("control_frequency_ef")
         threshold = self.run_parameters["minimum_peak_background_rms_ratio"].get_value()
         threshold_error = finite_value_error(
             threshold, "minimum_peak_background_rms_ratio", minimum=0
         )
-        self.output_parameters["ef_frequency"].value = frequency
-        self.output_parameters["anharmonicity"].value = anharmonicity
-        # Keep the final chevron and its transform together at the front.
+        self.output_parameters["fh_frequency"].value = frequency
         final_keys = (f"{label}_measurement", f"{label}_transform")
         figures = [result.figures[key] for key in final_keys if key in result.figures]
         figures.extend(figure for key, figure in result.figures.items() if key not in final_keys)
@@ -116,12 +107,11 @@ class CheckEFChevron(QubexTask):
             output_parameters=self.attach_execution_id(execution_id),
             figures=figures,
             validation_error=first_validation_error(
-                finite_value_error(frequency, "ef_frequency", minimum=0),
-                finite_value_error(anharmonicity, "anharmonicity", maximum=0),
+                finite_value_error(frequency, "fh_frequency", minimum=0, maximum=ef_frequency),
                 threshold_error,
                 finite_value_error(
                     result.data["peak_background_rms_ratios"].get(label),
-                    "EF chevron peak/background RMS ratio",
+                    "FH chevron peak/background RMS ratio",
                     minimum=threshold if threshold_error is None else None,
                 ),
             ),
@@ -130,29 +120,29 @@ class CheckEFChevron(QubexTask):
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
-        require_ef_configuration(exp, label)
-        readout_amp_param = self.input_parameters["readout_amplitude"]
-        if readout_amp_param is not None:
-            exp.params.readout_amplitude[label] = readout_amp_param.value
+        require_fh_configuration(exp, label)
+        control_amplitude = self._get_calibration_value("control_amplitude")
+        exp.params.control_amplitude[label] = control_amplitude
+        exp.params.readout_amplitude[label] = self._get_calibration_value("readout_amplitude")
         ge_frequency = self._get_calibration_value("control_frequency")
-        configured_ef_frequency = exp.quantum_system.get_qubit(label).control_frequency_ef_value
-        if configured_ef_frequency is not None and math.isfinite(configured_ef_frequency):
-            ef_frequency = float(configured_ef_frequency)
+        ef_frequency = self._get_calibration_value("control_frequency_ef")
+        configured_fh_frequency = exp.quantum_system.get_qubit(label).control_frequency_fh_value
+        if configured_fh_frequency is not None and math.isfinite(configured_fh_frequency):
+            fh_frequency = float(configured_fh_frequency)
         else:
-            # Match Qubex's missing-anharmonicity default (E_J / E_C = 50)
-            # without allowing a persisted spectroscopy estimate to affect the seed.
-            ef_frequency = ge_frequency * 18 / 19
+            fh_frequency = 2 * ef_frequency - ge_frequency
         with exp.modified_frequencies(
             {
                 exp.ctx.resolve_ge_label(label): ge_frequency,
+                exp.ctx.resolve_ef_label(label): ef_frequency,
                 exp.ctx.resolve_read_label(label): self._get_calibration_value("readout_frequency"),
             }
         ):
-            result = estimate_ef_frequency_from_chevron_adaptive(
+            result = estimate_fh_frequency_from_chevron_adaptive(
                 exp=exp,
                 targets=[label],
-                frequencies={label: ef_frequency},
-                amplitudes={label: self._get_calibration_value("ef_control_amplitude")},
+                frequencies={label: fh_frequency},
+                amplitudes={label: control_amplitude / math.sqrt(3)},
                 final_detuning_range=self.run_parameters["detuning_range"].get_value(),
                 final_time_range=self.run_parameters["time_range"].get_value(),
                 n_shots=self.run_parameters["shots"].get_value(),

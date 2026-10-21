@@ -45,38 +45,49 @@ next bringup task consumes the value measured in the current workflow instead of
 value. Adaptive Chevron, fixed-grid Chevron, and Ramsey produce a physical qubit-frequency result
 and also make it the next operating control frequency.
 
-### EF frequency and configuration
+### EF and FH frequency and configuration
 
-EF calibration separates the measured transition from its operational drive frequency in the same
-way as GE calibration.
+EF and FH calibration separate measured transitions from operational drive frequencies in the
+same way as GE calibration.
 
 | Task or task family | Frequency input | Frequency result | Published database parameters |
 | --- | --- | --- | --- |
-| `CheckEFChevron` | Configured `control_frequency_ef`; otherwise the Qubex missing-anharmonicity default derived from `control_frequency` | Measured EF transition and anharmonicity | `ef_frequency`, `control_frequency_ef`, `anharmonicity` |
+| `CheckAdaptiveEFChevron` | Configured `control_frequency_ef`; otherwise the Qubex missing-anharmonicity default derived from `control_frequency` | Measured EF transition and anharmonicity | `ef_frequency`, `control_frequency_ef`, `anharmonicity` |
 | `CheckEFRabi`, EF pulse creation, and EF readout classification | `control_frequency_ef`; fallback: `ef_frequency` | No transition-frequency result | None |
+| `CheckAdaptiveFHChevron` | Configured `control_frequency_fh`; otherwise `2 * control_frequency_ef - control_frequency` | Measured FH transition | `fh_frequency`, `control_frequency_fh` |
 
-`ConfigureEF` must run in the same worker session before an EF measurement. It loads and pushes
-either the `ge-ef-cr` layout, which is the default, or `ge-ef-fh`. EF tasks reject a session whose
-GE and EF targets are not available. Ordinary `Configure` defaults to `ge-cr-cr`, even after an EF
-configuration task, so a flow returning to CR calibration must run `Configure` to restore the CR
-layout.
+`ConfigureEF` must run in the same worker session before an EF- or FH-dependent measurement. It
+loads and pushes either the `ge-ef-cr` layout, which is the default, or `ge-ef-fh`. EF tasks reject
+a session whose GE and EF targets are not available, and `CheckAdaptiveFHChevron` additionally requires an
+FH target. Ordinary `Configure` defaults to `ge-cr-cr`, even after an EF configuration task, so a
+flow returning to CR calibration must run `Configure` to restore the CR layout.
 
-`CheckEFChevron` deliberately ignores persisted anharmonicity when selecting its initial search
+`CheckAdaptiveEFChevron` deliberately ignores persisted anharmonicity when selecting its initial search
 frequency. If Qubex has an explicit `control_frequency_ef`, the task uses it. Otherwise it uses
 `18 / 19 * control_frequency`, matching Qubex's `E_J / E_C = 50` fallback when anharmonicity is
-unset. Qubit spectroscopy may still display an f12 estimate for diagnosis, but it does not publish
-that estimate as calibrated anharmonicity.
+unset. Its initial EF drive amplitude is `control_amplitude / sqrt(2)`, matching Qubex's default
+scaling from the calibrated GE control amplitude. Qubit spectroscopy may still display an f12
+estimate for diagnosis, but it does not publish that estimate as calibrated anharmonicity.
+
+`CheckAdaptiveFHChevron` requires the `ge-ef-fh` layout, a calibrated GE HPI pulse, and a calibrated EF pi
+pulse. It uses the configured `control_frequency_fh` as its initial search frequency when present.
+Otherwise it derives the initial frequency from the measured GE and EF transition frequencies
+without reading persisted anharmonicity. Its initial FH drive amplitude is
+`control_amplitude / sqrt(3)`, matching Qubex's default scaling. The task is available for explicit
+task lists but is not part of the `ef_calibration` template.
 
 The `ef_calibration` template keeps all EF tasks in one synchronized `CustomOneQubit` step. It
 starts from existing GE control and readout frequencies and readout amplitude, then runs
 `ConfigureEF`, calibrates GE Rabi and HPI, measures the EF transition, and calibrates EF pulses and
-three-state readout. `CheckEFChevron` therefore receives the HPI parameters created earlier in the
+three-state readout. `CheckAdaptiveEFChevron` therefore receives the HPI parameters created earlier in the
 same task list; a pre-existing HPI calibration is not required by the template.
 
 `CheckEFRabi` records the GE HPI inputs used by the task, but Qubex currently prepares the
-`|e>` state through `x180()`. That call can prefer a stored DRAG PI, PI, or DRAG HPI pulse over the
-restored HPI. Existing calibration-note entries can therefore change state preparation even when
-the recorded task inputs match. Starting a new QDash execution does not remove those entries.
+`|e>` state through `x180()`. `CheckAdaptiveFHChevron` likewise uses `x180()` for its GE and EF preparation
+pulses. For GE, that call can prefer a stored DRAG PI, PI, or DRAG HPI pulse over the restored HPI.
+For EF, a stored DRAG PI can take precedence over the restored EF PI. Existing calibration-note
+entries can therefore change state preparation even when the recorded task inputs match. Starting
+a new QDash execution does not remove those entries.
 
 ### Resonator and readout frequency
 
