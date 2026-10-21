@@ -11,8 +11,10 @@ import { parse } from "yaml";
  * sidebar. See adr/0004 of the chat session.
  */
 
-/** QDash's chat config names providers the way LiteLLM does; pi uses its own ids. */
+/** Translate catalog provider aliases into pi's provider ids. */
 export const PROVIDER_ALIASES: Record<string, string> = { bedrock: "amazon-bedrock" };
+
+const OPENAI_COMPATIBLE_PROVIDER_PREFIX = "openai-compatible";
 
 /** Used for locally hosted models, whose context window chat.yaml does not state. */
 const DEFAULT_CONTEXT_WINDOW = 131072;
@@ -75,10 +77,10 @@ function readModels(yaml: string | undefined, key: string): ChatModel[] {
  * Translate chat.yaml's `chat_models` and evaluation.yaml's `evaluation_models` into a
  * models.json object.
  *
- * Models with a `base_url` describe an endpoint pi has no catalog for
- * (ollama, vllm, gateways), so they become full provider definitions. Models
- * without one are served by pi's bundled catalog (openai, bedrock); only their
- * sampling parameters are layered on via `modelOverrides`.
+ * Models with a `base_url` describe an endpoint pi has no catalog for, so they
+ * become full provider definitions. Each endpoint uses a distinct provider id.
+ * Models without one are served by pi's bundled catalog (openai, bedrock); only
+ * their sampling parameters are layered on via `modelOverrides`.
  *
  * Chat and analysis routinely name the same provider and sometimes the same
  * model, so entries are merged rather than appended blindly.
@@ -137,11 +139,13 @@ export function buildModelsConfig(
       compat: {
         supportsDeveloperRole: false,
         supportsReasoningEffort: false,
-        ...(rawProvider === "openai-compatible"
+        ...(isOpenAiCompatibleProvider(rawProvider)
           ? {
               supportsStore: false,
               maxTokensField: "max_tokens",
-              ...(reasoning ? { thinkingFormat: "qwen-chat-template" } : {}),
+              ...(reasoning && isQwenModel(name)
+                ? { thinkingFormat: "qwen-chat-template" }
+                : {}),
             }
           : {}),
       },
@@ -167,6 +171,18 @@ export function buildModelsConfig(
   }
 
   return { providers };
+}
+
+/** A suffix gives each OpenAI-compatible endpoint its own provider namespace. */
+function isOpenAiCompatibleProvider(provider: string): boolean {
+  return (
+    provider === OPENAI_COMPATIBLE_PROVIDER_PREFIX ||
+    provider.startsWith(`${OPENAI_COMPATIBLE_PROVIDER_PREFIX}-`)
+  );
+}
+
+function isQwenModel(name: string): boolean {
+  return name.toLowerCase().includes("qwen");
 }
 
 /** Generate models.json next to the agent dir and return its path. */
@@ -196,17 +212,14 @@ function readFileIfPresent(path: string): string | undefined {
 /**
  * `env:NAME` reads the environment; anything else is a literal URL.
  *
- * The `/v1` suffix is added when missing, mirroring
- * `normalize_openai_compatible_base_url` on the Python side. LiteLLM appends it
- * for OpenAI-compatible endpoints, so QDash's OLLAMA_BASE_URL is conventionally
- * written without it; pi hands the value straight to the OpenAI SDK, which
- * appends only `/chat/completions` and would otherwise 404.
+ * OpenAI-compatible API base URLs conventionally end in `/v1`. QDash passes the
+ * configured path through after removing trailing slashes. Pi's OpenAI SDK then
+ * appends the operation path such as `/chat/completions` or `/responses`.
  */
 function resolveBaseUrl(setting: string, env: NodeJS.ProcessEnv): string | undefined {
   const raw = setting.startsWith("env:") ? env[setting.slice(4)] : setting;
   if (!raw) return undefined;
-  const trimmed = raw.replace(/\/+$/, "");
-  return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
+  return raw.replace(/\/+$/, "");
 }
 
 /** Only the /v1/responses style has its own pi api; everything else is completions. */

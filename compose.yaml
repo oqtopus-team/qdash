@@ -263,8 +263,8 @@ services:
       - QDASH_WEB_URL=${CLIENT_URL:-http://localhost:${UI_PORT:-5714}}
       # Pi hides models whose provider has no credential, even when the server
       # ignores it. Keep a placeholder for keyless local endpoints.
-      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-ollama}
-      - VLLM_API_KEY=${VLLM_API_KEY:-vllm}
+      - OPENAI_COMPATIBLE_API_KEY_CHAT=${OPENAI_COMPATIBLE_API_KEY_CHAT:-openai-compatible}
+      - OPENAI_COMPATIBLE_API_KEY_EVALUATION=${OPENAI_COMPATIBLE_API_KEY_EVALUATION:-openai-compatible}
       # Bun's fetch reads HTTP(S)_PROXY on its own. NO_PROXY comes from .env via
       # env_file; redeclaring it here would let an ambient shell value win.
     depends_on:

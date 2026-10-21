@@ -62,19 +62,43 @@ task_chat:                 # How a chat about a task result opens
 
 # chat.yaml: the planner models every chat can use; the first is the default
 chat_models:
-  - provider: openai-compatible
+  - provider: openai-compatible-chat
     name: qwen3.8-flash-next
     api_style: completion
-    base_url: env:OPENAI_COMPATIBLE_BASE_URL
-    api_key_env: OPENAI_COMPATIBLE_API_KEY
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
 
-# evaluation.yaml: the model pi-qcaleval judges calibration plots with
+# evaluation.yaml: models pi-qcaleval can use to judge calibration plots
 evaluation_models:
-  - provider: vllm
+  - provider: openai-compatible-evaluation
     name: nvidia/Ising-Calibration-1.5-31B-NVFP4
-    base_url: env:VLLM_BASE_URL
-    api_key_env: VLLM_API_KEY
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_EVALUATION
+  - provider: openai-compatible-chat
+    name: qwen3.8-flash-next
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
 ```
+
+Custom OpenAI-compatible API base URLs must include `/v1`, for example
+`https://models.example.com/v1`. Do not include an operation path such as
+`/chat/completions` or `/responses`. The runtime passes the configured path to the model client
+without adding `/v1`.
+
+Name OpenAI-compatible endpoint variables with a descriptive suffix:
+`OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` and `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>`.
+The suffix is not predefined; choose one that identifies the endpoint or its purpose, then use
+the exact variable names in `base_url: env:...` and `api_key_env`. The supplied templates use
+`CHAT` and `EVALUATION`.
+
+Give each endpoint a matching provider ID with the form `openai-compatible-<suffix>`. Provider
+IDs are namespaces in the generated Pi configuration, so endpoints with different base URLs
+must not share an ID. The supplied templates use `openai-compatible-chat` and
+`openai-compatible-evaluation`.
+
+The default chat model also appears in `evaluation_models`, which makes its evaluation role
+explicit. When the same provider ID and model name appear in both lists, the runtime keeps the
+full definition from `chat_models`.
 
 YAML string values support shell-style environment variable references such
 as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be supplied
@@ -86,10 +110,8 @@ builds its `models.json` from `chat_models` and `evaluation_models` at startup.
 | Variable | Purpose |
 |----------|---------|
 | `OPENAI_API_KEY` | OpenAI API authentication |
-| `OLLAMA_BASE_URL` | Ollama / OpenAI-compatible server URL (default: `http://localhost:11434`) |
-| `OLLAMA_API_KEY` | Optional API key for the Ollama / OpenAI-compatible server |
-| `DS4_BASE_URL` | DeepSeek v4 OpenAI-compatible gateway base URL |
-| `DS4_API_KEY` | DeepSeek v4 API key |
+| `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` | OpenAI-compatible API base URL through `/v1`; the suffix is operator-defined |
+| `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` | API key for the endpoint with the matching suffix; it can be a placeholder for a keyless endpoint |
 | `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
 
 ### Developing a pi extension against the runtime

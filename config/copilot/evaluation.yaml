@@ -11,15 +11,15 @@
 # model when that accepts images.
 evaluation_models:
   # NVIDIA Ising-Calibration: Gemma 4 31B fine-tuned on qubit calibration plots
-  # (fit quality, parameter extraction, success classification). Served by vLLM;
-  # set VLLM_BASE_URL / VLLM_API_KEY. Move it to the top to make it the default.
-  - provider: vllm
+  # (fit quality, parameter extraction, success classification). Served by an
+  # OpenAI-compatible endpoint such as vLLM; the base URL below must include /v1.
+  - provider: openai-compatible-evaluation
     name: nvidia/Ising-Calibration-1.5-31B-NVFP4
     # /v1/responses rejects input_image on vLLM; only chat/completions accepts
     # figures, which task analysis depends on.
     api_style: completion
-    base_url: env:VLLM_BASE_URL
-    api_key_env: VLLM_API_KEY
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_EVALUATION
     # Must not exceed the server's max_model_len (16384 on llm.qiqb.dev).
     num_ctx: 16384
     # Greedy decoding, as the QCalEval benchmark queries every model: the same
@@ -31,3 +31,14 @@ evaluation_models:
     # The prompt (system prompt + tool schemas) already takes roughly half of
     # the context, so leave the model card's 8192 for larger deployments.
     max_output_tokens: 2048
+
+  # Also declare the default chat model as evaluation-capable. Because chat.yaml
+  # is loaded first, its full sampling and thinking configuration remains authoritative.
+  - provider: openai-compatible-chat
+    name: qwen3.8-flash-next
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
+    num_ctx: 65536
+    max_output_tokens: 8192
+    reasoning_effort: medium
