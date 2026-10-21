@@ -50,6 +50,9 @@ class EvaluationRunDocument(Document):
     planner_model: str | None = Field(
         default=None, description="provider/modelId of the planner, in planner mode"
     )
+    evaluation_model: str | None = Field(
+        default=None, description="Configured provider/modelId requested for every evaluation"
+    )
     requested_by: str = Field(..., description="Username that requested the run")
     requested_at: datetime = Field(default_factory=now)
     completed_at: datetime | None = Field(default=None)

@@ -88,6 +88,45 @@ def planner_model_config() -> tuple[dict[str, str], str | None]:
     )
 
 
+def evaluation_model_config(requested: dict[str, str] | None) -> dict[str, str] | None:
+    """Resolve a requested evaluator against the configured evaluation model list."""
+    candidates = load_copilot_config().evaluation_models
+    if not candidates:
+        if requested is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="no evaluation models are configured",
+            )
+        return None
+    if requested is None:
+        default = candidates[0]
+        return {"provider": default.provider, "name": default.name}
+    selected = next(
+        (
+            candidate
+            for candidate in candidates
+            if candidate.provider == requested.get("provider")
+            and candidate.name == requested.get("name")
+        ),
+        None,
+    )
+    if selected is None:
+        identity = f"{requested.get('provider', '')}/{requested.get('name', '')}"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"evaluation model {identity} is not configured",
+        )
+    return {"provider": selected.provider, "name": selected.name}
+
+
+def _model_from_identity(identity: str | None) -> dict[str, str] | None:
+    """Parse a stored `provider/modelId`, preserving slashes in the model id."""
+    if not identity or "/" not in identity:
+        return None
+    provider, name = identity.split("/", 1)
+    return {"provider": provider, "name": name}
+
+
 @dataclass
 class RunSelection:
     """A created run, its queued evaluations, and why entities were left out."""
@@ -163,6 +202,7 @@ def _summary(
         mode=run.mode,
         with_examples=run.with_examples,
         planner_model=run.planner_model,
+        evaluation_model=run.evaluation_model,
         requested_by=run.requested_by,
         requested_at=run.requested_at,
         completed_at=run.completed_at,
@@ -381,6 +421,7 @@ class EvaluationService:
         knowledge_draft: KnowledgeDraft | None = None,
         trigger: str = "bulk",
         mode: str = "direct",
+        evaluation_model: dict[str, str] | None = None,
         with_examples: bool = False,
         requested_by: str,
     ) -> RunSelection:
@@ -415,6 +456,7 @@ class EvaluationService:
         if mode == "planner":
             model, _ = planner_model_config()
             planner_model = f"{model['provider']}/{model['name']}"
+        selected_evaluation_model = evaluation_model_config(evaluation_model)
         # Taken before `qids` is rebound to the chip's entity ids below.
         chosen = set(qids or [])
         is_latest = date is None or date == "latest"
@@ -471,6 +513,11 @@ class EvaluationService:
             mode=mode,
             with_examples=with_examples,
             planner_model=planner_model,
+            evaluation_model=(
+                f"{selected_evaluation_model['provider']}/{selected_evaluation_model['name']}"
+                if selected_evaluation_model
+                else None
+            ),
             requested_by=requested_by,
         )
         evaluations: list[EvaluationDocument] = []
@@ -599,11 +646,19 @@ class EvaluationService:
         thinking: str | None = None
         if run.mode == "planner":
             model, thinking = planner_model_config()
+        evaluation_model = _model_from_identity(run.evaluation_model)
         heartbeat = asyncio.create_task(self._heartbeat(run_id))
 
         async def one(doc: EvaluationDocument) -> None:
             async with semaphore:
-                await self._evaluate_one(doc, run, auth, model=model, thinking=thinking)
+                await self._evaluate_one(
+                    doc,
+                    run,
+                    auth,
+                    model=model,
+                    evaluation_model=evaluation_model,
+                    thinking=thinking,
+                )
                 self._refresh_run(run_id)
 
         try:
@@ -632,6 +687,7 @@ class EvaluationService:
         auth: QDashAuth,
         *,
         model: dict[str, str] | None = None,
+        evaluation_model: dict[str, str] | None = None,
         thinking: str | None = None,
     ) -> None:
         doc.status = "running"
@@ -646,6 +702,7 @@ class EvaluationService:
                 mode=run.mode,
                 with_examples=run.with_examples,
                 model=model,
+                evaluation_model=evaluation_model,
                 thinking_level=thinking,
             )
         except EvaluationRuntimeError as exc:

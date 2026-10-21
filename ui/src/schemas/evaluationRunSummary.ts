@@ -8,6 +8,7 @@
 import type { EvaluationRunSummaryCompletedAt } from './evaluationRunSummaryCompletedAt';
 import type { EvaluationRunSummaryDate } from './evaluationRunSummaryDate';
 import type { EvaluationRunSummaryElapsedMs } from './evaluationRunSummaryElapsedMs';
+import type { EvaluationRunSummaryEvaluationModel } from './evaluationRunSummaryEvaluationModel';
 import type { EvaluationRunSummaryEvaluator } from './evaluationRunSummaryEvaluator';
 import type { EvaluationRunSummaryKnowledgeDraftId } from './evaluationRunSummaryKnowledgeDraftId';
 import type { EvaluationRunSummaryKnowledgeDraftName } from './evaluationRunSummaryKnowledgeDraftName';
@@ -37,6 +38,8 @@ export interface EvaluationRunSummary {
   mode: EvaluationRunSummaryMode;
   with_examples?: boolean;
   planner_model?: EvaluationRunSummaryPlannerModel;
+  /** Configured provider/modelId requested for every evaluation */
+  evaluation_model?: EvaluationRunSummaryEvaluationModel;
   requested_by: string;
   requested_at: string;
   completed_at?: EvaluationRunSummaryCompletedAt;

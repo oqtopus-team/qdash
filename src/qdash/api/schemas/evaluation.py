@@ -19,6 +19,13 @@ from qdash.datamodel.evaluation import (
 )
 
 
+class EvaluationModelSelection(BaseModel):
+    """A configured model selected to judge calibration figures."""
+
+    provider: str = Field(..., min_length=1)
+    name: str = Field(..., min_length=1)
+
+
 class CreateEvaluationRunRequest(BaseModel):
     """Evaluate the latest result of one task for every entity on a chip."""
 
@@ -51,6 +58,10 @@ class CreateEvaluationRunRequest(BaseModel):
         default="direct",
         description='"direct" runs the evaluation tools; "planner" lets the chat planner call them',
     )
+    evaluation_model: EvaluationModelSelection | None = Field(
+        default=None,
+        description="Configured evaluation model to use; defaults to evaluation_models[0]",
+    )
 
 
 class EvaluationRunSummary(BaseModel):
@@ -72,6 +83,9 @@ class EvaluationRunSummary(BaseModel):
     mode: EvaluationMode
     with_examples: bool = False
     planner_model: str | None = None
+    evaluation_model: str | None = Field(
+        default=None, description="Configured provider/modelId requested for every evaluation"
+    )
     requested_by: str
     requested_at: datetime
     completed_at: datetime | None = None

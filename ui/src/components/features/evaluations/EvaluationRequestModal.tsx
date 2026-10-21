@@ -10,8 +10,10 @@ import {
   getListEvaluationsQueryKey,
   useCreateEvaluationRun,
 } from "@/client/evaluation/evaluation";
+import { useGetCopilotConfig } from "@/client/copilot/copilot";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
+import { buildEvaluationModelOptions, type ModelOverride } from "@/lib/copilotModels";
 import type { CreateEvaluationRunRequest, KnowledgeDraftResponse, Task } from "@/schemas";
 
 import { examplesLabel, modeLabel } from "./evaluationDisplay";
@@ -200,6 +202,7 @@ export function buildEvaluationRunRequest(
   withExamples = false,
   qids?: string[],
   knowledgeDraftId?: string,
+  evaluationModel?: Pick<ModelOverride, "provider" | "name">,
 ): CreateEvaluationRunRequest {
   return {
     chip_id: scope.chipId,
@@ -212,6 +215,14 @@ export function buildEvaluationRunRequest(
     ...(scope.taskIds?.length ? { task_ids: scope.taskIds } : {}),
     ...(qids?.length ? { qids } : {}),
     ...(knowledgeDraftId ? { knowledge_draft_id: knowledgeDraftId } : {}),
+    ...(evaluationModel
+      ? {
+          evaluation_model: {
+            provider: evaluationModel.provider,
+            name: evaluationModel.name,
+          },
+        }
+      : {}),
   };
 }
 
@@ -324,9 +335,19 @@ export function EvaluationRequestModal({
   const [mode, setMode] = useState<EvaluationMode>("direct");
   const [withExamples, setWithExamples] = useState(false);
   const [draft, setDraft] = useState<KnowledgeDraftResponse | null>(null);
+  const [evaluationModelKey, setEvaluationModelKey] = useState("");
   // Targets the person unticked; empty means the whole chip view, as before.
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const create = useCreateEvaluationRun();
+  const { data: copilotConfigResponse, isLoading: modelsLoading } = useGetCopilotConfig();
+  const evaluationModelOptions = useMemo(
+    () => buildEvaluationModelOptions(copilotConfigResponse?.data ?? null),
+    [copilotConfigResponse?.data],
+  );
+  const evaluationModel =
+    evaluationModelOptions.find((option) => option.key === evaluationModelKey) ??
+    evaluationModelOptions[0] ??
+    null;
   const isSubmitting = create.isPending;
   const targets = scope.targets;
   const evaluable = useMemo(
@@ -360,6 +381,7 @@ export function EvaluationRequestModal({
           withExamples,
           narrowed ? chosen : undefined,
           draft?.draft_id,
+          evaluationModel?.model ?? undefined,
         ),
       });
       const created = response.data;
@@ -469,6 +491,26 @@ export function EvaluationRequestModal({
                 disabled={isSubmitting}
               />
 
+              {evaluationModelOptions.length > 0 && (
+                <fieldset className="fieldset min-w-0">
+                  <legend className="fieldset-legend">Evaluation model</legend>
+                  <select
+                    className="select w-full min-w-0 max-w-full"
+                    value={evaluationModel?.key ?? ""}
+                    onChange={(event) => setEvaluationModelKey(event.target.value)}
+                    disabled={isSubmitting || modelsLoading}
+                    aria-label="Evaluation model"
+                  >
+                    {evaluationModelOptions.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="label">This model judges every selected figure in the run.</p>
+                </fieldset>
+              )}
+
               <RadioCards
                 name="evaluation-mode"
                 legend="Who prepares the prompt"
@@ -506,6 +548,12 @@ export function EvaluationRequestModal({
               <>
                 Will evaluate <strong>{targetLabel}</strong> with{" "}
                 <strong>{settingsLabel(mode, withExamples)}</strong>
+                {evaluationModel ? (
+                  <>
+                    {" "}
+                    using <strong>{evaluationModel.model?.name}</strong>
+                  </>
+                ) : null}
                 {draft ? (
                   <>
                     , against the knowledge draft <strong>{draft.filename || "uploaded"}</strong>
