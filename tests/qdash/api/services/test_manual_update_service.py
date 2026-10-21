@@ -15,6 +15,7 @@ from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
+from qdash.dbmodel.provenance import ParameterVersionDocument
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -378,6 +379,47 @@ def test_manual_update_persists_yaml_and_database(manual_backend):
     history = TaskResultHistoryDocument.find_one({"task_id": result.task_id}).run()
     assert history is not None
     assert history.status == "completed"
+
+
+def test_delete_parameter_removes_only_current_value_and_records_history(manual_backend):
+    service, _ = manual_backend
+
+    with patch.object(ParameterVersionDocument, "invalidate_current") as invalidate_current:
+        result = service.delete_parameter(
+            chip_id="16Q",
+            qid="4",
+            parameter_name="readout_frequency",
+            project_id="project",
+            username="tester",
+        )
+
+    assert result.deleted is True
+    assert result.parameter_name == "readout_frequency"
+    invalidate_current.assert_called_once_with(
+        project_id="project", parameter_name="readout_frequency", qid="4"
+    )
+    assert _qubit_data() == {"untouched": {"value": 7}}
+    history = QubitHistoryDocument.find_one(
+        {"project_id": "project", "chip_id": "16Q", "qid": "4"}
+    ).run()
+    assert history is not None
+    assert history.data == {"untouched": {"value": 7}}
+
+
+def test_delete_parameter_returns_not_found_without_changing_data(manual_backend):
+    service, _ = manual_backend
+
+    with pytest.raises(HTTPException, match="Parameter missing not found") as exc_info:
+        service.delete_parameter(
+            chip_id="16Q",
+            qid="4",
+            parameter_name="missing",
+            project_id="project",
+            username="tester",
+        )
+
+    assert exc_info.value.status_code == 404
+    assert "readout_frequency" in _qubit_data()
 
 
 def test_spectroscopy_correction_also_updates_yaml(manual_backend):

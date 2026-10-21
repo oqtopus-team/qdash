@@ -75,6 +75,7 @@ export * from './calibrationGitHubSyncStatus';
 export * from './calibrationNoteResponse';
 export * from './calibrationNoteResponseNote';
 export * from './calibrationNoteResponseTimestamp';
+export * from './calibrationParameterDeleteResponse';
 export * from './cancelExecutionResponse';
 export * from './candidateGateResponse';
 export * from './candidateGateResponseMaximum';

@@ -14,6 +14,7 @@ from qdash.api.lib.project import ProjectContext, get_project_context, get_proje
 from qdash.api.schemas.calibration import (
     CalibrationGitHubSync,
     CalibrationNoteResponse,
+    CalibrationParameterDeleteResponse,
     ManualEditsResponse,
     ManualParameterUpdateRequest,
     ManualParameterUpdateResponse,
@@ -263,6 +264,29 @@ def update_calibration_parameters(
     )
     return service.update_parameters(
         request=request,
+        project_id=ctx.project_id,
+        username=ctx.user.username,
+    )
+
+
+@router.delete(
+    "/calibrations/parameters/{chip_id}/{qid}/{parameter_name}",
+    response_model=CalibrationParameterDeleteResponse,
+    summary="Delete a current calibration parameter",
+    operation_id="deleteCalibrationParameter",
+)
+def delete_calibration_parameter(
+    chip_id: str,
+    qid: str,
+    parameter_name: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[ManualUpdateService, Depends(get_manual_update_service)],
+) -> CalibrationParameterDeleteResponse:
+    """Delete one current qubit or coupling value without deleting its history."""
+    return service.delete_parameter(
+        chip_id=chip_id,
+        qid=qid,
+        parameter_name=parameter_name,
         project_id=ctx.project_id,
         username=ctx.user.username,
     )

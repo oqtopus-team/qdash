@@ -138,6 +138,15 @@ class ManualParameterUpdateResponse(BaseModel):
     github_sync: CalibrationGitHubSync = Field(default_factory=CalibrationGitHubSync)
 
 
+class CalibrationParameterDeleteResponse(BaseModel):
+    """Response from deleting one current calibration parameter value."""
+
+    chip_id: str
+    qid: str
+    parameter_name: str
+    deleted: bool = True
+
+
 class ManualEditItem(BaseModel):
     """A single manual edit record."""
 
