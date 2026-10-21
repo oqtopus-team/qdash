@@ -2,7 +2,7 @@
 
 import { ArrowLeft, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { useGetEvaluationRun } from "@/client/evaluation/evaluation";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -22,11 +22,13 @@ import {
   runDone,
   runIsActive,
   runTimingLabel,
+  tokenPeak,
+  tokenPeakLabel,
   triggerLabel,
 } from "./evaluationDisplay";
 
 /** A labeled value in the run summary. */
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <div className="text-xs uppercase text-base-content/50">{label}</div>
@@ -50,6 +52,7 @@ function RunPromptPanel({
   evaluations: EvaluationItem[];
 }) {
   const profile = promptProfile(evaluations);
+  const peak = tokenPeak(evaluations.map((item) => item.output));
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   if (profile.recorded === 0) return null;
   const consistent =
@@ -71,11 +74,23 @@ function RunPromptPanel({
             : `varies across the ${profile.recorded} evaluations${run.mode === "planner" ? " (Copilot wrote the context and may pass its own reference)" : ""}`}
         </span>
       </div>
-      <div className="grid gap-3 md:grid-cols-5">
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Stat label="System prompt" value={systemPromptLabel(profile)} />
         <Stat label="Reference" value={referenceLabel(profile)} />
         <Stat label="Labeled examples" value={rangeLabel(profile.examples)} />
         <Stat label="Figures" value={rangeLabel(profile.figures)} />
+        <Stat
+          label="Tokens"
+          value={
+            peak ? (
+              <span className={peak.nearLimit ? "font-medium text-warning" : undefined}>
+                {tokenPeakLabel(peak)}
+              </span>
+            ) : (
+              "not recorded"
+            )
+          }
+        />
         <Stat
           label="Question"
           value={

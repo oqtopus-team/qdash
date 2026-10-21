@@ -12,6 +12,8 @@ import {
   knowledgeLabel,
   meanDurationMs,
   modeLabel,
+  tokenPeak,
+  tokenPeakLabel,
   triggerLabel,
 } from "./evaluationDisplay";
 import { promptProfile, referenceLabel, systemPromptLabel } from "./evaluationPrompt";
@@ -189,6 +191,12 @@ export function runSettings(a: RunSide, b: RunSide): SettingDiff[] {
       "Reference",
       (side) => referenceLabel(promptProfile(side.evaluations ?? [])),
       (side) => JSON.stringify(promptProfile(side.evaluations ?? []).referenceKeys),
+    ],
+    [
+      "tokens",
+      "Tokens",
+      (side) =>
+        tokenPeakLabel(tokenPeak((side.evaluations ?? []).map((item) => item.output))) ?? "-",
     ],
     [
       "system_prompt",

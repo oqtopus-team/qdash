@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { EvaluationCallModelInputTokens } from './evaluationCallModelInputTokens';
 import type { EvaluationCallModelOutputTokens } from './evaluationCallModelOutputTokens';
 import type { EvaluationCallModelQuestion } from './evaluationCallModelQuestion';
 
@@ -20,6 +21,8 @@ export interface EvaluationCallModel {
   stop_reason: string;
   /** Whether the call was constrained to the diagnosis schema */
   structured?: boolean;
+  /** Prompt tokens the model counted for the call, images included */
+  input_tokens?: EvaluationCallModelInputTokens;
   /** Output tokens of the call */
   output_tokens?: EvaluationCallModelOutputTokens;
   /** Diagnosis keys the call's answer lacked */

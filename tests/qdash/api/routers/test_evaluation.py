@@ -93,6 +93,7 @@ RECORD: dict[str, Any] = {
                 "question": question,
                 "duration_ms": 5000,
                 "stop_reason": "stop",
+                "input_tokens": 190,
                 "output_tokens": 60,
             }
             for question in ANSWERS
@@ -251,6 +252,26 @@ def test_run_queues_the_latest_evaluable_result_per_qubit(test_client, service):
     assert detail["evaluations"][0]["figure_path"] == ["/figures/x.png"]
 
 
+def test_execution_records_the_judging_models_context_window(test_client, service, monkeypatch):
+    from qdash.copilot.config.settings import CopilotConfig, ModelConfig
+
+    config = CopilotConfig(
+        evaluation_models=[
+            ModelConfig(provider="vllm", name="nvidia/Ising-Calibration", num_ctx=16384)
+        ]
+    )
+    monkeypatch.setattr("qdash.api.services.evaluation_service.load_copilot_config", lambda: config)
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    run_id = test_client.post(
+        "/evaluations/runs", headers=HEADERS, json={"chip_id": "chip-1", "task": "CheckRabi"}
+    ).json()["run"]["run_id"]
+
+    asyncio.run(service.execute_run(run_id, AUTH))
+
+    detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
+    assert detail["evaluations"][0]["output"]["context_window"] == 16384
+
+
 def test_execution_records_what_the_model_saw_and_answered(test_client, service):
     _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
     _task_result(task_id="task-q1", qid="1", end_at=datetime(2026, 1, 2, tzinfo=UTC))
@@ -303,6 +324,7 @@ def test_execution_records_what_the_model_saw_and_answered(test_client, service)
         "duration_ms": 5000,
         "stop_reason": "stop",
         "structured": False,
+        "input_tokens": 190,
         "output_tokens": 60,
         "missing_keys": [],
     }

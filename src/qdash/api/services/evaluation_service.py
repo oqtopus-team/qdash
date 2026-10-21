@@ -200,6 +200,21 @@ def _figures_from(value: Any) -> list[EvaluationFigureModel]:
     ]
 
 
+def _context_window(model: Any) -> int | None:
+    """The configured context window (`num_ctx`) of the `provider/name` that judged."""
+    if not isinstance(model, str) or not model:
+        return None
+    try:
+        config = load_copilot_config()
+    except Exception:
+        logger.warning("copilot config unavailable; context window of %s unknown", model)
+        return None
+    for candidate in [*config.evaluation_models, *config.chat_models, config.model]:
+        if f"{candidate.provider}/{candidate.name}" == model:
+            return candidate.num_ctx
+    return None
+
+
 def _output_from_record(record: dict[str, Any]) -> EvaluationOutputModel:
     evaluation = record.get("evaluation") or {}
     diagnosis = evaluation.get("diagnosis")
@@ -224,6 +239,8 @@ def _output_from_record(record: dict[str, Any]) -> EvaluationOutputModel:
         calls=_calls_from(evaluation.get("calls")),
         duration_ms=int(evaluation.get("duration_ms") or 0),
         usage=evaluation.get("usage") if isinstance(evaluation.get("usage"), dict) else None,
+        # Kept with the record: a later change to the config does not rewrite it.
+        context_window=_context_window(evaluation.get("model")),
     )
 
 
@@ -247,6 +264,9 @@ def _calls_from(value: Any) -> list[EvaluationCallModel]:
                 duration_ms=int(call.get("duration_ms") or 0),
                 stop_reason=call["stop_reason"],
                 structured=call.get("structured") is True,
+                input_tokens=(
+                    call.get("input_tokens") if isinstance(call.get("input_tokens"), int) else None
+                ),
                 output_tokens=(
                     call.get("output_tokens")
                     if isinstance(call.get("output_tokens"), int)

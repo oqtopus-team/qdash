@@ -90,6 +90,9 @@ class EvaluationCallModel(BaseModel):
     structured: bool = Field(
         default=False, description="Whether the call was constrained to the diagnosis schema"
     )
+    input_tokens: int | None = Field(
+        default=None, description="Prompt tokens the model counted for the call, images included"
+    )
     output_tokens: int | None = Field(default=None, description="Output tokens of the call")
     missing_keys: list[str] = Field(
         default_factory=list, description="Diagnosis keys the call's answer lacked"
@@ -143,6 +146,10 @@ class EvaluationOutputModel(BaseModel):
         default=0, description="Wall time of the evaluation call, every model call included"
     )
     usage: dict[str, Any] | None = Field(default=None, description="Token usage, as pi reports it")
+    context_window: int | None = Field(
+        default=None,
+        description="Context window of the judging model, from the evaluation config when recorded",
+    )
 
     @model_validator(mode="after")
     def _derive_completeness(self) -> "EvaluationOutputModel":

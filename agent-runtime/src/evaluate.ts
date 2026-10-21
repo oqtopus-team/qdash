@@ -162,6 +162,8 @@ export interface EvaluationCall {
   duration_ms: number;
   stop_reason: string;
   structured: boolean;
+  /** Prompt tokens the model counted, images included, when the evaluator reports them. */
+  input_tokens?: number;
   output_tokens?: number;
   missing_keys?: string[];
 }
@@ -178,6 +180,7 @@ export function callRecords(value: unknown): EvaluationCall[] {
       duration_ms: c.duration_ms,
       stop_reason: c.stop_reason,
       structured: c.structured === true,
+      ...(typeof c.input_tokens === "number" ? { input_tokens: c.input_tokens } : {}),
       ...(typeof c.output_tokens === "number" ? { output_tokens: c.output_tokens } : {}),
       ...(Array.isArray(c.missing_keys)
         ? { missing_keys: c.missing_keys.filter((key): key is string => typeof key === "string") }

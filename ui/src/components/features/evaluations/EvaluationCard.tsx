@@ -41,6 +41,8 @@ import {
   outcomeBadgeClass,
   questionLabel,
   statusLabel,
+  tokenPeak,
+  tokenPeakLabel,
 } from "./evaluationDisplay";
 import { promptSummary } from "./evaluationPrompt";
 
@@ -176,6 +178,7 @@ export function EvaluationCard({
   const duration = formatDuration(output?.duration_ms);
   const shortfall = answerShortfall(output);
   const calls = output?.calls ?? [];
+  const peak = tokenPeak([output]);
   // The full input loads its figures, so only once someone opens it.
   const [showInput, setShowInput] = useState(false);
 
@@ -262,6 +265,16 @@ export function EvaluationCard({
                   {output.attempts} attempts
                 </span>
               )
+            )}
+            {peak && (
+              <span
+                className={peak.nearLimit ? "font-medium text-warning" : undefined}
+                title="Tokens the model counted for its largest call, images included; with the answer, against the judging model's context window"
+                data-testid="token-peak"
+              >
+                {tokenPeakLabel(peak)}
+                {peak.nearLimit && " — close to the context limit"}
+              </span>
             )}
             {evaluator && <span className="font-mono">{evaluator}</span>}
             {item.completed_at && <span>{formatDateTime(item.completed_at)}</span>}

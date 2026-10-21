@@ -167,6 +167,28 @@ describe("evaluationCompare", () => {
     // Without evaluations the prompt rows have nothing to say.
     expect(byKey.reference).toMatchObject({ a: "-", b: "-", differs: false });
     expect(byKey.system_prompt).toMatchObject({ a: "-", b: "-", differs: false });
+    expect(byKey.tokens).toMatchObject({ a: "-", b: "-", differs: false });
+  });
+
+  it("compares the largest prompt of two runs in tokens", () => {
+    const withTokens = (input_tokens: number) => [
+      item("Q1", null, {
+        output: {
+          parsed: true,
+          context_window: 16384,
+          calls: [{ duration_ms: 1, stop_reason: "stop", input_tokens, output_tokens: 100 }],
+        },
+      }),
+    ];
+    const settings = runSettings(
+      { run, evaluations: withTokens(2000) },
+      { run, evaluations: withTokens(9000) },
+    );
+    expect(settings.find((setting) => setting.key === "tokens")).toMatchObject({
+      a: "largest prompt 2,000 tokens (2,100 of 16,384 with the answer)",
+      b: "largest prompt 9,000 tokens (9,100 of 16,384 with the answer)",
+      differs: true,
+    });
   });
 
   it("flags a run against a knowledge draft, and two drafts that differ", () => {

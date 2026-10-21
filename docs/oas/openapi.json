@@ -19326,6 +19326,18 @@
             "description": "Whether the call was constrained to the diagnosis schema",
             "default": false
           },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens",
+            "description": "Prompt tokens the model counted for the call, images included"
+          },
           "output_tokens": {
             "anyOf": [
               {
@@ -19827,6 +19839,18 @@
             ],
             "title": "Usage",
             "description": "Token usage, as pi reports it"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window",
+            "description": "Context window of the judging model, from the evaluation config when recorded"
           }
         },
         "type": "object",
