@@ -19,6 +19,13 @@ Review the status and message first, then compare the input, run, and output par
 figure and download raw data when the task produced it. Check the execution and target before
 comparing this result with another run.
 
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/task-result-detail.gif
+Start: Task Results filtered to one completed result with a figure.
+Sequence: Open the result, inspect its figure and parameters, then scroll to AI evaluation, New thread, and Note.
+Alt: Task Result detail showing its status, evidence, evaluation, discussion, and note sections.
+-->
+
 Use [Calibration Data and Provenance](./data-and-provenance.md) when you need parameter history or
 the lineage of a saved value.
 

@@ -3,6 +3,13 @@
 QDash groups project-scoped calibration work into Overview, Operate, Collaborate, and Manage
 sections in the application sidebar.
 
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/application-sidebar.gif
+Start: Home with a project selected and every sidebar section visible.
+Sequence: Highlight each sidebar section, open the project selector, then return to Home.
+Alt: QDash sidebar grouped into Overview, Operate, Collaborate, and Manage sections.
+-->
+
 ## Project Context
 
 Most data in QDash belongs to the active project. Select the intended project before inspecting
@@ -56,14 +63,14 @@ See [Reviewing and Sharing Results](./reviewing-results.md) for how these record
 
 ## Manage
 
-**Under construction** marks an implemented page whose operating guidance still needs a product
-decision or review. The marker does not mean that the feature is unavailable.
+The Config guide is under construction because its repository workflow still needs product-owner
+review. The page is available to project editors.
 
 | Page | Purpose | Guide |
 | --- | --- | --- |
 | **Config** | Edit Qubex configuration files and synchronize their repository. | **Under construction** |
-| **Settings** | Change appearance, account settings, active project, and project membership. | **Under construction** |
-| **Admin** | Manage system users and administrative settings. | **Under construction** |
+| **Settings** | Change appearance, account settings, active project, and project membership. | [Authentication and Users](./authentication-and-users.md) and [Projects and Data Sharing](./projects-and-data-sharing.md) |
+| **Admin** | Manage system users, projects, and administrative settings. | [Authentication and Users](./authentication-and-users.md#create-users) and [Projects and Data Sharing](./projects-and-data-sharing.md#create-a-project) |
 
 The Config and Admin pages are permission-gated. File saves, Git operations, imports, workflow
 runs, and administrative actions change shared state; confirm the active project before using

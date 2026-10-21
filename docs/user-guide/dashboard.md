@@ -12,6 +12,13 @@ needs investigation or context.
 The selected time range and value mode apply to the summary and every metric section. Include
 them when sharing an observation because another scope can show a different record.
 
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/dashboard-scope-and-metrics.gif
+Start: Dashboard for a populated chip with the default scope visible.
+Sequence: Select a cool-down, change Value selection, and expand one populated metric.
+Alt: Dashboard scope controls above the chip summary and expanded metric topology.
+-->
+
 ## Scan Chip Health
 
 Start with the collapsed all-metrics summary. It shows coverage, median, minimum, and maximum for

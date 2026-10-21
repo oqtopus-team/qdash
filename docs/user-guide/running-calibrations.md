@@ -29,6 +29,13 @@ QDash so the workflow and its Prefect deployment remain aligned.
 
 ## Run One Task
 
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/task-workbench.gif
+Start: Tasks with no task or target selected.
+Sequence: Select a task, chip, and target; select Reload; then show resolved inputs and run options without starting hardware.
+Alt: Task workbench ready to run one calibration task with resolved inputs and run options.
+-->
+
 1. Open **Tasks** and select a task.
 2. Under **Setup**, select **Chip** and enter a **Qubit or coupling** such as `0` or `0-1`.
 3. Select **Reload** to check hardware availability and load the current input values.

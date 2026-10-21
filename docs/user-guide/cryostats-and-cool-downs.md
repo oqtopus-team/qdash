@@ -43,6 +43,13 @@ image, heading, list, toggle, code block, or another supported block. Paste or d
 a diagram communicates the setup more clearly. Changes save automatically; check the save status
 before leaving the page.
 
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/cooldown-wiring.gif
+Start: An expanded active cool-down with existing Wiring info.
+Sequence: Edit one wiring block, wait for saved status, create a checkpoint, and expand it in Wiring history.
+Alt: Cool-down wiring editor and checkpoint history for an active hardware setup.
+-->
+
 Autosave keeps the current wiring but does not create a permanent history entry. When the wiring
 changes during a cool-down:
 
