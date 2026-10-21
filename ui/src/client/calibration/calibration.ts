@@ -27,6 +27,7 @@ import type {
 import type {
   CalibrationGitHubSync,
   CalibrationNoteResponse,
+  CalibrationParameterDeleteResponse,
   CompareSeedValues200,
   CompareSeedValuesParams,
   HTTPValidationError,
@@ -652,6 +653,71 @@ export const useUpdateCalibrationParameters = <TError = HTTPValidationError,
         TContext
       > => {
       return useMutation(getUpdateCalibrationParametersMutationOptions(options), queryClient);
+    }
+    /**
+ * Delete one current qubit or coupling value without deleting its history.
+ * @summary Delete a current calibration parameter
+ */
+export const deleteCalibrationParameter = (
+    chipId: string,
+    qid: string,
+    parameterName: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CalibrationParameterDeleteResponse>(
+      {url: `/calibrations/parameters/${chipId}/${qid}/${parameterName}`, method: 'DELETE', signal
+    },
+      options);
+    }
+
+
+
+
+export const getDeleteCalibrationParameterMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCalibrationParameter>>, TError,{chipId: string;qid: string;parameterName: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCalibrationParameter>>, TError,{chipId: string;qid: string;parameterName: string}, TContext> => {
+
+const mutationKey = ['deleteCalibrationParameter'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCalibrationParameter>>, {chipId: string;qid: string;parameterName: string}> = (props) => {
+          const {chipId,qid,parameterName} = props ?? {};
+
+          return  deleteCalibrationParameter(chipId,qid,parameterName,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCalibrationParameterMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCalibrationParameter>>>
+
+    export type DeleteCalibrationParameterMutationError = HTTPValidationError
+
+    /**
+ * @summary Delete a current calibration parameter
+ */
+export const useDeleteCalibrationParameter = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCalibrationParameter>>, TError,{chipId: string;qid: string;parameterName: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCalibrationParameter>>,
+        TError,
+        {chipId: string;qid: string;parameterName: string},
+        TContext
+      > => {
+      return useMutation(getDeleteCalibrationParameterMutationOptions(options), queryClient);
     }
     /**
  * Get the most recent manual edit for each parameter of a qid.

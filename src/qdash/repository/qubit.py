@@ -88,6 +88,25 @@ class MongoQubitCalibrationRepository:
 
         return self._to_model(doc, project_id)
 
+    def delete_calib_parameter(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+        parameter_name: str,
+        project_id: str | None,
+    ) -> QubitModel:
+        """Delete one current calibration parameter."""
+        doc = QubitDocument.delete_calib_parameter(
+            username=username,
+            qid=qid,
+            chip_id=chip_id,
+            parameter_name=parameter_name,
+            project_id=project_id,
+        )
+        return self._to_model(doc, project_id)
+
     def find_one(
         self,
         *,

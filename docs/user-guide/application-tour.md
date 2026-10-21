@@ -46,7 +46,7 @@ until the form is submitted.
 | **AI Evaluations** | Request, inspect, and compare recorded evaluations of task results. | [AI Evaluations](./ai-evaluations.md) |
 | **Tasks** | Run an individual calibration task with resolved parameters. | [Running Calibrations](./running-calibrations.md) |
 | **Cryo** | Manage cryostats, cool-downs, and wiring context. | [Cryostats and Cool-downs](./cryostats-and-cool-downs.md) |
-| **Calibration DB** | Compare and import initial calibration parameters from Qubex YAML. | [Calibration Data and Provenance](./data-and-provenance.md#import-initial-parameters) |
+| **Calibration DB** | Review current values, modify YAML candidates, or delete an invalid current value. | [Calibration Data and Provenance](./data-and-provenance.md#modify-current-parameters) |
 
 Workflow, Tasks, and some external operational links are shown only to members with edit
 permission. See [Running Calibrations](./running-calibrations.md) for the end-to-end flow.

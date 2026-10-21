@@ -21,6 +21,7 @@ from fastapi import HTTPException
 
 from qdash.api.schemas.calibration import (
     CalibrationGitHubSync,
+    CalibrationParameterDeleteResponse,
     ManualEditItem,
     ManualEditsResponse,
     ManualParameterUpdateRequest,
@@ -250,6 +251,48 @@ class ManualUpdateService:
             execution_id=execution_id,
             provenance_activity_id=activity.activity_id,
             github_sync=CalibrationGitHubService().sync(task_result),
+        )
+
+    def delete_parameter(
+        self,
+        *,
+        chip_id: str,
+        qid: str,
+        parameter_name: str,
+        project_id: str,
+        username: str,
+    ) -> CalibrationParameterDeleteResponse:
+        """Delete one current calibration value while retaining historical snapshots."""
+        repository = self._coupling_repo if "-" in qid else self._qubit_repo
+        try:
+            repository.delete_calib_parameter(
+                username=username,
+                qid=qid,
+                chip_id=chip_id,
+                parameter_name=parameter_name,
+                project_id=project_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        ParameterVersionDocument.invalidate_current(
+            project_id=project_id,
+            parameter_name=parameter_name,
+            qid=qid,
+        )
+
+        logger.info(
+            "Deleted calibration parameter: project=%s, chip=%s, qid=%s, parameter=%s, user=%s",
+            project_id,
+            chip_id,
+            qid,
+            parameter_name,
+            username,
+        )
+        return CalibrationParameterDeleteResponse(
+            chip_id=chip_id,
+            qid=qid,
+            parameter_name=parameter_name,
         )
 
     def retry_github_sync(self, task_id: str, project_id: str) -> CalibrationGitHubSync:

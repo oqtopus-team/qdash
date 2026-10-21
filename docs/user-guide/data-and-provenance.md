@@ -42,16 +42,19 @@ range and confirm the chip, target, and parameter selections.
 Open **Data Provenance** to trace a current value back to the task result and inputs that produced
 it. Use the affected lineage to identify downstream values that may need recalibration.
 
-## Import Initial Parameters
+## Modify Current Parameters
 
-Use **Calibration DB** to review current values or import permitted values from Qubex YAML:
+Use **Calibration DB** to review current values, modify YAML candidates, or remove an invalid
+current value:
 
-1. Open **Calibration DB** and select **Import from YAML**.
-2. Select a permitted YAML source and compare its values with the current database.
-3. Select the parameters to import and edit them if needed.
+1. Open **Calibration DB** and select **Modify parameters**.
+2. Compare the YAML candidate values with the current database.
+3. To change a value, select the parameters to import and edit them if needed.
 4. Review the proposed changes, then confirm the import.
+5. To remove a current value, select **Edit import value**, then select **Delete** and confirm the
+   deletion.
 
-The import view shows only parameters the deployment permits. Frequency values produced by
+The modification view shows only parameters the deployment permits. Frequency values produced by
 calibration experiments can be excluded from seed import even when a YAML file contains them.
 Treat the comparison as a review, not as an unconditional overwrite.
 

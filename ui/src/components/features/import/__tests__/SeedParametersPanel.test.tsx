@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SeedParametersPanel } from "../SeedParametersPanel";
 
 const mutate = vi.fn();
+const deleteMutate = vi.fn();
 const refetchComparison = vi.fn().mockResolvedValue(undefined);
 const refetchQubits = vi.fn().mockResolvedValue(undefined);
 
@@ -76,6 +77,13 @@ vi.mock("@/client/calibration/calibration", () => ({
     isSuccess: false,
     isError: false,
   }),
+  useDeleteCalibrationParameter: () => ({
+    mutate: deleteMutate,
+    reset: vi.fn(),
+    isPending: false,
+    isSuccess: false,
+    isError: false,
+  }),
 }));
 
 vi.mock("@/client/chip/chip", () => ({
@@ -128,12 +136,13 @@ vi.mock("@/client/chip/chip", () => ({
 afterEach(() => {
   cleanup();
   mutate.mockReset();
+  deleteMutate.mockReset();
   refetchComparison.mockClear();
   refetchQubits.mockClear();
 });
 
 function openImportView() {
-  fireEvent.click(screen.getByRole("tab", { name: "Import from YAML" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Modify parameters" }));
 }
 
 describe("SeedParametersPanel", () => {
@@ -163,6 +172,31 @@ describe("SeedParametersPanel", () => {
     expect(screen.getByText("42.0000")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit coherence_time for qubit 0" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Import from YAML/ })).toBeNull();
+  });
+
+  it("confirms before deleting a current calibration value", async () => {
+    render(<SeedParametersPanel />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose chip" }));
+    openImportView();
+    fireEvent.click(screen.getByText("readout_frequency"));
+    fireEvent.click(screen.getByRole("button", { name: "Edit readout_frequency for qubit 0" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete current readout_frequency for qubit 0" }),
+    );
+
+    expect(screen.getByText("Delete calibration value?")).toBeTruthy();
+    expect(screen.getByText(/Historical results are retained/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Delete value" }));
+
+    expect(deleteMutate).toHaveBeenCalledWith(
+      { chipId: "chip-1", qid: "0", parameterName: "readout_frequency" },
+      expect.any(Object),
+    );
+    const mutationOptions = deleteMutate.mock.calls[0]?.[1] as { onSuccess: () => Promise<void> };
+    await mutationOptions.onSuccess();
+    expect(refetchComparison).toHaveBeenCalledOnce();
+    expect(refetchQubits).toHaveBeenCalledOnce();
   });
 
   it("separates read-only database values from importable YAML parameters", () => {

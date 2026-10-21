@@ -3860,6 +3860,88 @@
         }
       }
     },
+    "/calibrations/parameters/{chip_id}/{qid}/{parameter_name}": {
+      "delete": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Delete a current calibration parameter",
+        "description": "Delete one current qubit or coupling value without deleting its history.",
+        "operationId": "deleteCalibrationParameter",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "parameter_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Parameter Name"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationParameterDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/calibrations/manual-edits/{qid}": {
       "get": {
         "tags": [
@@ -17699,6 +17781,35 @@
         ],
         "title": "CalibrationNoteResponse",
         "description": "CalibrationNote is a subclass of BaseModel."
+      },
+      "CalibrationParameterDeleteResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "qid",
+          "parameter_name"
+        ],
+        "title": "CalibrationParameterDeleteResponse",
+        "description": "Response from deleting one current calibration parameter value."
       },
       "CancelExecutionResponse": {
         "properties": {
