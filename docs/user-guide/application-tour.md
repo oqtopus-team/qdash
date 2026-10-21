@@ -3,10 +3,10 @@
 QDash groups project-scoped calibration work into Overview, Operate, Collaborate, and Manage
 sections in the application sidebar.
 
-<!-- SCREENSHOT PLACEHOLDER
-File: /images/guides/application-sidebar.png
-Capture: QDash with a project selected and every sidebar section visible.
-Focus: Overview, Operate, Collaborate, Manage, the project selector, and profile menu.
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/application-sidebar.gif
+Start: Home with a project selected and every sidebar section visible.
+Sequence: Highlight each sidebar section, open the project selector, then return to Home.
 Alt: QDash sidebar grouped into Overview, Operate, Collaborate, and Manage sections.
 -->
 

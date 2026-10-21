@@ -154,25 +154,30 @@ architecture or lifecycle needs more deliberate layout. SVG diagrams must use Vi
 variables, include `role="img"` and a descriptive `aria-label`, and keep marker IDs unique. The
 nearby prose must still communicate the consequence for readers who cannot see the diagram.
 
-**Screenshots** — Add one when the reader must recognize a dense page, an unfamiliar control, or
-the spatial relationship between actions. Do not capture a screen that only repeats a short list
-of visible labels. Crop to the task, use representative non-sensitive data, and store the final
-image under `docs/public/images/guides/`.
+**Screenshots and short demos** — Use a static image when the reader must recognize a dense page
+or spatial relationship. Use a short animated GIF, like the sign-in demo, when the order of two or
+more UI actions matters. Do not add media that only repeats a short list of visible labels. Crop
+to the task, use representative non-sensitive data, keep the viewport stable, and store the final
+file under `docs/public/images/guides/`.
+
+An animated demo covers one task, starts from a recognizable state, pauses long enough to show the
+result, and loops without requiring narration. Avoid unrelated cursor movement and optimize the
+file before committing it.
 
 Until the image exists, use a Markdown comment so the published page remains complete without an
 empty visual frame:
 
 ```markdown
-<!-- SCREENSHOT PLACEHOLDER
-File: /images/guides/example.png
-Capture: Page and state to reproduce.
-Focus: Controls or relationship the image must show.
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/example.gif
+Start: Page and initial state.
+Sequence: Actions and final state the demo must show.
 Alt: Meaningful replacement text for the final image.
 -->
 ```
 
-Keep the prose sufficient without the image. Replace the whole comment with Markdown image syntax
-and reuse its `Alt` text when the screenshot is ready.
+Keep the prose sufficient without the media. Replace the whole comment with Markdown image syntax
+and reuse its `Alt` text when the image or GIF is ready.
 
 **Emoji** — None. Plain text for status in tables (Yes/No).
 

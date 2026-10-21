@@ -39,10 +39,10 @@ not obvious.
 Project owners manage an existing project from **Settings**. They can update its name and
 description, invite existing QDash users, change member roles, and remove members.
 
-<!-- SCREENSHOT PLACEHOLDER
-File: /images/guides/project-members.png
-Capture: Settings with the current project and member list visible to its Owner.
-Focus: Project identity, Add member, role selector, and member removal controls.
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/project-members.gif
+Start: Settings with the current project and member list visible to its Owner.
+Sequence: Add a demo Viewer, change that member to Editor, and leave the updated row visible.
 Alt: Project membership controls in Settings for adding a member and changing their role.
 -->
 

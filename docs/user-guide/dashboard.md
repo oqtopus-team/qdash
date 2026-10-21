@@ -12,10 +12,10 @@ needs investigation or context.
 The selected time range and value mode apply to the summary and every metric section. Include
 them when sharing an observation because another scope can show a different record.
 
-<!-- SCREENSHOT PLACEHOLDER
-File: /images/guides/dashboard-scope-and-metrics.png
-Capture: Dashboard for a populated chip with a cool-down selected and metric groups expanded.
-Focus: Chip, time or cool-down scope, value selection, all-metrics summary, and one topology view.
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/dashboard-scope-and-metrics.gif
+Start: Dashboard for a populated chip with the default scope visible.
+Sequence: Select a cool-down, change Value selection, and expand one populated metric.
 Alt: Dashboard scope controls above the chip summary and expanded metric topology.
 -->
 
