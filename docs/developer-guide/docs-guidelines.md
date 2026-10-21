@@ -154,6 +154,26 @@ architecture or lifecycle needs more deliberate layout. SVG diagrams must use Vi
 variables, include `role="img"` and a descriptive `aria-label`, and keep marker IDs unique. The
 nearby prose must still communicate the consequence for readers who cannot see the diagram.
 
+**Screenshots** — Add one when the reader must recognize a dense page, an unfamiliar control, or
+the spatial relationship between actions. Do not capture a screen that only repeats a short list
+of visible labels. Crop to the task, use representative non-sensitive data, and store the final
+image under `docs/public/images/guides/`.
+
+Until the image exists, use a Markdown comment so the published page remains complete without an
+empty visual frame:
+
+```markdown
+<!-- SCREENSHOT PLACEHOLDER
+File: /images/guides/example.png
+Capture: Page and state to reproduce.
+Focus: Controls or relationship the image must show.
+Alt: Meaningful replacement text for the final image.
+-->
+```
+
+Keep the prose sufficient without the image. Replace the whole comment with Markdown image syntax
+and reuse its `Alt` text when the screenshot is ready.
+
 **Emoji** — None. Plain text for status in tables (Yes/No).
 
 **Length** — A page is read in one sitting. Past roughly 400 lines, split it by topic: a testing

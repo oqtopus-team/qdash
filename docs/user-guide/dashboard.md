@@ -12,6 +12,13 @@ needs investigation or context.
 The selected time range and value mode apply to the summary and every metric section. Include
 them when sharing an observation because another scope can show a different record.
 
+<!-- SCREENSHOT PLACEHOLDER
+File: /images/guides/dashboard-scope-and-metrics.png
+Capture: Dashboard for a populated chip with a cool-down selected and metric groups expanded.
+Focus: Chip, time or cool-down scope, value selection, all-metrics summary, and one topology view.
+Alt: Dashboard scope controls above the chip summary and expanded metric topology.
+-->
+
 ## Scan Chip Health
 
 Start with the collapsed all-metrics summary. It shows coverage, median, minimum, and maximum for
