@@ -45,6 +45,12 @@ class EvaluationDocument(Document):
         default=None, description="The planner turn, when the run used planner mode"
     )
     verdict: EvaluationVerdictModel | None = Field(default=None)
+    verdicts: list[EvaluationVerdictModel] = Field(
+        default_factory=list, description="Current verdict of each reviewer"
+    )
+    verdict_history: list[EvaluationVerdictModel] = Field(
+        default_factory=list, description="Immutable verdict changes, oldest first"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 

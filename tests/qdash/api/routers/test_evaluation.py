@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+import base64
+import hashlib
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -18,6 +20,8 @@ from qdash.datamodel.note import NoteModel
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.evaluation import EvaluationDocument
+from qdash.dbmodel.evaluation_run import EvaluationRunDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -500,13 +504,20 @@ def test_verdicts_are_recorded_counted_and_cleared(test_client, service):
     judged = test_client.put(
         f"/evaluations/{evaluation_id}/verdict",
         headers=HEADERS,
-        json={"agree": False, "note": "The fit ignores the last period."},
+        json={
+            "agree": False,
+            "note": "The fit ignores the last period.",
+            "issues": ["diagnosis", "insufficient_evidence"],
+        },
     )
     assert judged.status_code == 200, judged.text
     verdict = judged.json()["verdict"]
     assert verdict["agree"] is False
     assert verdict["note"] == "The fit ignores the last period."
     assert verdict["username"] == "eval_user"
+    assert verdict["issues"] == ["diagnosis", "insufficient_evidence"]
+    assert judged.json()["verdicts"] == [verdict]
+    assert judged.json()["verdict_history"] == [verdict]
 
     run = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()["run"]
     assert (run["agree_count"], run["disagree_count"]) == (0, 1)
@@ -515,6 +526,8 @@ def test_verdicts_are_recorded_counted_and_cleared(test_client, service):
         f"/evaluations/{evaluation_id}/verdict", headers=HEADERS, json={"agree": None}
     )
     assert cleared.json()["verdict"] is None
+    assert cleared.json()["verdicts"] == []
+    assert len(cleared.json()["verdict_history"]) == 2
 
     missing = test_client.put(
         "/evaluations/ev_missing/verdict", headers=HEADERS, json={"agree": True}
@@ -582,6 +595,93 @@ def test_task_ids_restrict_the_run_and_running_results_are_skipped(test_client, 
     assert by_qid.status_code == 202, by_qid.text
     assert by_qid.json()["task_ids"] == ["task-q0"]
     assert by_qid.json()["skipped"] == {"2": "status running"}
+
+
+def test_task_ids_select_the_exact_historical_result(test_client, service):
+    _task_result(task_id="task-q0-old", qid="0", end_at=datetime(2026, 1, 1, tzinfo=UTC))
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+
+    response = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={"chip_id": "chip-1", "task": "CheckRabi", "task_ids": ["task-q0-old"]},
+    )
+
+    assert response.status_code == 202, response.text
+    assert response.json()["task_ids"] == ["task-q0-old"]
+
+
+def test_cancelled_run_can_retry_failed_items(test_client, service):
+    _task_result(task_id="task-q0", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    created = test_client.post(
+        "/evaluations/runs", headers=HEADERS, json={"chip_id": "chip-1", "task": "CheckRabi"}
+    ).json()
+    run_id = created["run"]["run_id"]
+
+    cancelled = test_client.post(f"/evaluations/runs/{run_id}/cancel", headers=HEADERS)
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+
+    retried = test_client.post(f"/evaluations/runs/{run_id}/retry", headers=HEADERS)
+    assert retried.status_code == 202
+    assert retried.json()["retried"] == 1
+    assert retried.json()["run"]["status"] == "running"
+    assert service.launched[-1] == run_id
+
+
+def test_stale_run_is_marked_interrupted_and_can_retry(test_client, service):
+    _task_result(task_id="task-q0", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    created = test_client.post(
+        "/evaluations/runs", headers=HEADERS, json={"chip_id": "chip-1", "task": "CheckRabi"}
+    ).json()
+    run_id = created["run"]["run_id"]
+    doc = EvaluationDocument.find_one(EvaluationDocument.run_id == run_id).run()
+    assert doc is not None
+    doc.requested_at = datetime.now(UTC) - timedelta(days=30)
+    doc.save()
+    run = EvaluationRunDocument.find_one(EvaluationRunDocument.run_id == run_id).run()
+    assert run is not None
+    run.heartbeat_at = datetime.now(UTC) - timedelta(days=30)
+    run.save()
+
+    detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
+    assert detail["run"]["status"] == "interrupted"
+    assert detail["evaluations"][0]["status"] == "interrupted"
+    assert "retry the run" in detail["evaluations"][0]["error"]
+
+
+def test_evaluation_figure_is_served_from_the_snapshot(test_client, service):
+    _task_result(task_id="task-q0", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    raw = b"exact png bytes"
+    encoded = base64.b64encode(raw).decode()
+    sha256 = hashlib.sha256(raw).hexdigest()
+    service._evaluate = lambda *args, **kwargs: None
+    created = test_client.post(
+        "/evaluations/runs", headers=HEADERS, json={"chip_id": "chip-1", "task": "CheckRabi"}
+    ).json()
+    run_id = created["run"]["run_id"]
+    doc = EvaluationDocument.find_one(EvaluationDocument.run_id == run_id).run()
+    assert doc is not None
+    record = {
+        **RECORD,
+        "task_id": "task-q0",
+        "figures": [
+            {"sha256": sha256, "mime_type": "image/png", "bytes": len(raw), "data": encoded}
+        ],
+    }
+
+    async def evaluate(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        return record
+
+    service._evaluate = evaluate
+    asyncio.run(service.execute_run(run_id, AUTH))
+    detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
+    evaluation_id = detail["evaluations"][0]["evaluation_id"]
+
+    response = test_client.get(f"/evaluations/{evaluation_id}/figures/{sha256}", headers=HEADERS)
+    assert response.status_code == 200
+    assert response.content == raw
+    assert response.headers["content-type"] == "image/png"
 
 
 def test_a_single_planner_run_records_the_planner_turn(test_client, service):

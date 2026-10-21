@@ -309,11 +309,19 @@ export function formatDuration(ms: number | null | undefined): string | null {
   return `${(ms / 60_000).toFixed(1)} min`;
 }
 
-/** Finished evaluations of a run, done or failed. */
+/** Evaluations that reached any terminal state. */
 export function runDone(
-  run: Pick<EvaluationRunSummary, "completed_count" | "failed_count">,
+  run: Pick<
+    EvaluationRunSummary,
+    "completed_count" | "failed_count" | "interrupted_count" | "cancelled_count"
+  >,
 ): number {
-  return run.completed_count + run.failed_count;
+  return (
+    run.completed_count +
+    run.failed_count +
+    (run.interrupted_count ?? 0) +
+    (run.cancelled_count ?? 0)
+  );
 }
 
 /** Whether a run still has work in flight, so the page keeps polling. */

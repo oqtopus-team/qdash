@@ -24,6 +24,6 @@ export interface KnowledgeDraftResponse {
   reference: TaskReferenceResponse;
   /** Labeled examples the draft holds */
   example_count: number;
-  /** Figures of index.md and the examples */
+  /** Figures of task.md and the examples */
   figure_count: number;
 }

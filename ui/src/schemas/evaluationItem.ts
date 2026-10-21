@@ -14,6 +14,7 @@ import type { EvaluationItemPlanner } from './evaluationItemPlanner';
 import type { EvaluationItemStartedAt } from './evaluationItemStartedAt';
 import type { EvaluationItemStatus } from './evaluationItemStatus';
 import type { EvaluationItemVerdict } from './evaluationItemVerdict';
+import type { EvaluationVerdictModel } from './evaluationVerdictModel';
 
 /**
  * One evaluation of one task result.
@@ -38,4 +39,8 @@ export interface EvaluationItem {
   evaluator?: EvaluationItemEvaluator;
   planner?: EvaluationItemPlanner;
   verdict?: EvaluationItemVerdict;
+  /** Current verdict from each reviewer */
+  verdicts?: EvaluationVerdictModel[];
+  /** Immutable verdict changes */
+  verdict_history?: EvaluationVerdictModel[];
 }

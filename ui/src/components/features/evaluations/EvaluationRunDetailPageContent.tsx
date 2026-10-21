@@ -1,10 +1,16 @@
 "use client";
 
-import { ArrowLeft, XCircle } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, RotateCcw, Square, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useState } from "react";
 
-import { useGetEvaluationRun } from "@/client/evaluation/evaluation";
+import {
+  getGetEvaluationRunQueryKey,
+  useCancelEvaluationRun,
+  useGetEvaluationRun,
+  useRetryEvaluationRun,
+} from "@/client/evaluation/evaluation";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { EvaluationItem, EvaluationRunSummary } from "@/schemas";
@@ -124,6 +130,9 @@ function RunPromptPanel({
 /** One evaluation run: its progress, what judged it, and every record with verdict controls. */
 export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const cancelRun = useCancelEvaluationRun();
+  const retryRun = useRetryEvaluationRun();
   const goBack = () => router.push("/evaluations");
   const {
     data: response,
@@ -168,6 +177,11 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
 
   const { run, evaluations } = data;
   const agreement = agreementRate(run);
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: getGetEvaluationRunQueryKey(runId) });
+  const retryable = evaluations.some((item) =>
+    ["failed", "interrupted", "cancelled"].includes(item.status),
+  );
 
   return (
     <PageContainer maxWidth>
@@ -199,12 +213,40 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
             onPick={(other) => router.push(compareHref(run.run_id, other))}
             className="max-w-xs"
           />
+          {runIsActive(run) && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm gap-1"
+              disabled={cancelRun.isPending}
+              onClick={() => cancelRun.mutate({ runId }, { onSuccess: refresh })}
+            >
+              <Square className="h-3.5 w-3.5" />
+              Cancel
+            </button>
+          )}
+          {!runIsActive(run) && retryable && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm gap-1"
+              disabled={retryRun.isPending}
+              onClick={() => retryRun.mutate({ runId }, { onSuccess: refresh })}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Retry unfinished
+            </button>
+          )}
           {runIsActive(run) && <span className="badge badge-info">running</span>}
           <span className="badge badge-neutral">
             {runDone(run)}/{run.total} done
           </span>
           {run.failed_count > 0 && (
             <span className="badge badge-error">{run.failed_count} failed</span>
+          )}
+          {(run.interrupted_count ?? 0) > 0 && (
+            <span className="badge badge-warning">{run.interrupted_count} interrupted</span>
+          )}
+          {(run.cancelled_count ?? 0) > 0 && (
+            <span className="badge badge-ghost">{run.cancelled_count} cancelled</span>
           )}
         </div>
       </div>
@@ -222,8 +264,20 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
                 : `${Math.round(agreement * 100)}% of ${run.agree_count + run.disagree_count}`
             }
           />
-          <Stat label="Evaluation model" value={run.model || "-"} />
-          <Stat label="Evaluator" value={evaluatorLabel(run.evaluator) || "-"} />
+          <Stat
+            label="Evaluation model"
+            value={
+              (run.models?.length ?? 0) > 1 ? `mixed (${run.models?.length})` : run.model || "-"
+            }
+          />
+          <Stat
+            label="Evaluator"
+            value={
+              (run.evaluators?.length ?? 0) > 1
+                ? `mixed (${run.evaluators?.length})`
+                : evaluatorLabel(run.evaluator) || "-"
+            }
+          />
           <Stat
             label={run.mode === "planner" ? "Copilot model" : "Mode"}
             value={run.mode === "planner" ? run.planner_model || "-" : modeLabel(run.mode)}

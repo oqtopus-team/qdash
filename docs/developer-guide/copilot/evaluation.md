@@ -135,11 +135,19 @@ Every judgement the evaluation model makes becomes an `evaluation` document unde
 | `chat` | The planner, during a chat | Recorded from the `qcal_evaluate` tool result; see below |
 
 A bulk request selects the latest evaluable result of the task per qubit or coupling of the
-chip, or the results of the day. The run stores one pending record per task result and executes
-them in the background of the API worker as the requesting user, a few at a time
+chip, or the results of the day. A request with `task_ids` selects those exact historical records
+instead of resolving each entity to its latest result. The run stores one pending record per task
+result and executes them in the background of the API worker as the requesting user, a few at a time
 (`EVALUATION_CONCURRENCY`, default 2). Entities without an evaluable result (no result, no
-figure, still running) are reported as skipped. A run interrupted by an API restart keeps its
-unfinished records as pending; request it again rather than resuming it.
+figure, still running) are reported as skipped.
+
+Background tasks are owned by one API process. The owner updates the run's durable heartbeat every
+`EVALUATION_HEARTBEAT_SECONDS` (default 30 seconds). When that heartbeat is older than
+`EVALUATION_STALE_AFTER_SECONDS` (default 1800 seconds), a read marks unfinished items and the run
+as `interrupted`. `POST /evaluations/runs/{id}/retry` resets failed, interrupted, or cancelled
+items and relaunches only those items with the current user's credentials.
+`POST /evaluations/runs/{id}/cancel` marks unfinished items as cancelled and cancels the local
+background task when this process owns it.
 
 Each record is produced by the runtime's `POST /evaluate` in one of two modes:
 
@@ -203,11 +211,17 @@ their project and are not deleted.
 
 | Part | Holds |
 | --- | --- |
-| `input` | The context, the exact prompt (`[figure]` marks an image) and system prompt, the run's question (only runs made before knowledge drafts have one), the reference's size and hash, the figures by hash, the examples by id and figure hash |
+| `input` | The context, the exact prompt (`[figure]` marks an image) and system prompt, the run's question, whether a reference and examples were requested and actually used, the reference's size and hash, the figures by hash, and the examples by id and figure hash |
 | `output` | The model (`provider/modelId`, `fallback` when no calibration VLM was configured), the parsed diagnosis, the raw answer, every answer as returned, the questions asked, `attempts`, `stop_reason`, each call's duration and input and output tokens, the total duration and token usage, and the judging model's `context_window` |
 | `evaluator` | The extension that judged: package name, version, `checkout` or `package`, the checkout commit |
 | `planner` | In planner mode: the planner's model, answer, tool calls and duration |
-| `verdict` | A person's **Agree** or **Disagree** with a note, who and when |
+| `verdict`, `verdicts`, `verdict_history` | The latest verdict for compatibility, each reviewer's current verdict, and every immutable review change; a disagreement can classify the affected diagnosis area |
+
+`EvaluationAssetDocument` stores the exact bytes of each new evaluation figure up to
+`MAX_SNAPSHOT_BYTES` (10 MiB), deduplicated by project and SHA-256.
+`GET /evaluations/{evaluation_id}/figures/{sha256}` serves an asset only when that evaluation
+references its hash. Records created before image snapshots, and figures above the limit, load the
+current task result or knowledge figure and compare its hash with the record.
 
 `complete` and `missing_keys` are derived from the diagnosis over the questions asked on every
 load, so records stored before those fields existed are judged the same way. A run's summary
@@ -232,8 +246,12 @@ model, the mode, the examples setting or the task's reference yields a second ru
 shape. `/evaluations/compare?a=&b=` joins two runs in the browser
 (`evaluationCompare.ts`): settings side by side with the differing ones flagged, totals, and one
 row per entity (joined by qid, noting whether both judged the same task result) with each side's
-fit quality, success and verdict. The **Tokens** row compares the largest call of each run, so
-the cost of in-context examples shows next to their effect. There is no compare API.
+fit quality, success and verdict. `diagnosisDifference` compares the normalized complete diagnosis:
+a change to success, status, fit assessment, or outcome is a decision difference; any other field,
+including extracted parameters and suggested ranges, is a content difference. The expanded row
+renders the diagnosis JSON and prompts with `PierreDiffViewer`. The **Tokens** row compares the
+largest call of each run, so the cost of in-context examples shows next to their effect. There is
+no compare API.
 
 ## Changing it
 
@@ -283,7 +301,7 @@ context, examples, preview), `tests/qdash/datamodel/test_task_knowledge_registry
 | `agent-runtime/src/server.ts` | `POST /evaluate`, `POST /evaluation-prompts` |
 | `src/qdash/datamodel/task_knowledge.py` | `derive_reference`, `KnowledgeExample`, `parse_task_dir` |
 | `src/qdash/datamodel/evaluation.py` | The evaluation record |
-| `src/qdash/api/services/evaluation_service.py` | Runs: selection, background execution, chat recording, verdicts |
+| `src/qdash/api/services/evaluation_service.py` | Runs: exact or latest-result selection, background execution and recovery, image snapshots, chat recording, reviewer verdicts |
 | `src/qdash/api/services/pi_evaluation_service.py` | The runtime calls |
 | `src/qdash/api/services/knowledge_draft_service.py` | `KnowledgeDraftStore`: storing, validating and reading knowledge drafts; `task_archive` |
 | `src/qdash/api/routers/evaluation.py`, `routers/task.py` | `/evaluations/*` (runs, knowledge drafts), `/tasks/{task_name}/knowledge`, `/tasks/{task_name}/knowledge/archive`, `/tasks/{task_name}/evaluation-prompts` |

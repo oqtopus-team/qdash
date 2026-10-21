@@ -30,12 +30,14 @@ import type {
   CreateEvaluationRunResponse,
   EvaluationItem,
   EvaluationRunDetailResponse,
+  EvaluationRunSummary,
   HTTPValidationError,
   KnowledgeDraftResponse,
   ListEvaluationRunsParams,
   ListEvaluationRunsResponse,
   ListEvaluationsParams,
   ListEvaluationsResponse,
+  RetryEvaluationRunResponse,
   SetEvaluationVerdictRequest,
   TaskKnowledgeResponse
 } from '../../schemas';
@@ -320,6 +322,132 @@ export function useGetEvaluationRun<TData = Awaited<ReturnType<typeof getEvaluat
 
 
 /**
+ * Reset failed, interrupted or cancelled items and execute them again.
+ * @summary Retry unfinished calibration evaluations
+ */
+export const retryEvaluationRun = (
+    runId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<RetryEvaluationRunResponse>(
+      {url: `/evaluations/runs/${runId}/retry`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getRetryEvaluationRunMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryEvaluationRun>>, TError,{runId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryEvaluationRun>>, TError,{runId: string}, TContext> => {
+
+const mutationKey = ['retryEvaluationRun'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryEvaluationRun>>, {runId: string}> = (props) => {
+          const {runId} = props ?? {};
+
+          return  retryEvaluationRun(runId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryEvaluationRunMutationResult = NonNullable<Awaited<ReturnType<typeof retryEvaluationRun>>>
+
+    export type RetryEvaluationRunMutationError = HTTPValidationError
+
+    /**
+ * @summary Retry unfinished calibration evaluations
+ */
+export const useRetryEvaluationRun = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryEvaluationRun>>, TError,{runId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof retryEvaluationRun>>,
+        TError,
+        {runId: string},
+        TContext
+      > => {
+      return useMutation(getRetryEvaluationRunMutationOptions(options), queryClient);
+    }
+    /**
+ * Cancel evaluations in this run that have not completed.
+ * @summary Cancel a calibration evaluation run
+ */
+export const cancelEvaluationRun = (
+    runId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<EvaluationRunSummary>(
+      {url: `/evaluations/runs/${runId}/cancel`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getCancelEvaluationRunMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelEvaluationRun>>, TError,{runId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelEvaluationRun>>, TError,{runId: string}, TContext> => {
+
+const mutationKey = ['cancelEvaluationRun'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelEvaluationRun>>, {runId: string}> = (props) => {
+          const {runId} = props ?? {};
+
+          return  cancelEvaluationRun(runId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelEvaluationRunMutationResult = NonNullable<Awaited<ReturnType<typeof cancelEvaluationRun>>>
+
+    export type CancelEvaluationRunMutationError = HTTPValidationError
+
+    /**
+ * @summary Cancel a calibration evaluation run
+ */
+export const useCancelEvaluationRun = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelEvaluationRun>>, TError,{runId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof cancelEvaluationRun>>,
+        TError,
+        {runId: string},
+        TContext
+      > => {
+      return useMutation(getCancelEvaluationRunMutationOptions(options), queryClient);
+    }
+    /**
  * Every evaluation of one task result across runs, newest first.
  * @summary List evaluations of a task result
  */
@@ -480,6 +608,106 @@ export const useSetEvaluationVerdict = <TError = HTTPValidationError,
       return useMutation(getSetEvaluationVerdictMutationOptions(options), queryClient);
     }
     /**
+ * The exact image bytes supplied to the model for this evaluation.
+ * @summary Get a snapshotted evaluation figure
+ */
+export const getEvaluationFigure = (
+    evaluationId: string,
+    sha256: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/evaluations/${evaluationId}/figures/${sha256}`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetEvaluationFigureQueryKey = (evaluationId: string,
+    sha256: string,) => {
+    return [
+    `/evaluations/${evaluationId}/figures/${sha256}`
+    ] as const;
+    }
+
+
+export const getGetEvaluationFigureQueryOptions = <TData = Awaited<ReturnType<typeof getEvaluationFigure>>, TError = HTTPValidationError>(evaluationId: string,
+    sha256: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEvaluationFigure>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEvaluationFigureQueryKey(evaluationId,sha256);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEvaluationFigure>>> = ({ signal }) => getEvaluationFigure(evaluationId,sha256, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: evaluationId !== null && evaluationId !== undefined && sha256 !== null && sha256 !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEvaluationFigure>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetEvaluationFigureQueryResult = NonNullable<Awaited<ReturnType<typeof getEvaluationFigure>>>
+export type GetEvaluationFigureQueryError = HTTPValidationError
+
+
+export function useGetEvaluationFigure<TData = Awaited<ReturnType<typeof getEvaluationFigure>>, TError = HTTPValidationError>(
+ evaluationId: string,
+    sha256: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEvaluationFigure>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getEvaluationFigure>>,
+          TError,
+          Awaited<ReturnType<typeof getEvaluationFigure>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetEvaluationFigure<TData = Awaited<ReturnType<typeof getEvaluationFigure>>, TError = HTTPValidationError>(
+ evaluationId: string,
+    sha256: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEvaluationFigure>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getEvaluationFigure>>,
+          TError,
+          Awaited<ReturnType<typeof getEvaluationFigure>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetEvaluationFigure<TData = Awaited<ReturnType<typeof getEvaluationFigure>>, TError = HTTPValidationError>(
+ evaluationId: string,
+    sha256: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEvaluationFigure>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a snapshotted evaluation figure
+ */
+
+export function useGetEvaluationFigure<TData = Awaited<ReturnType<typeof getEvaluationFigure>>, TError = HTTPValidationError>(
+ evaluationId: string,
+    sha256: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEvaluationFigure>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetEvaluationFigureQueryOptions(evaluationId,sha256,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * Store one task's knowledge directory, zipped, as a draft of the project.
  *
  * The draft is parsed by the knowledge repository's own generator and is

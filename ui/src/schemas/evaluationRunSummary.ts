@@ -17,6 +17,7 @@ import type { EvaluationRunSummaryPlannerModel } from './evaluationRunSummaryPla
 import type { EvaluationRunSummaryQuestion } from './evaluationRunSummaryQuestion';
 import type { EvaluationRunSummaryStatus } from './evaluationRunSummaryStatus';
 import type { EvaluationRunSummaryTrigger } from './evaluationRunSummaryTrigger';
+import type { EvaluatorModel } from './evaluatorModel';
 
 /**
  * One run with its progress and agreement counts.
@@ -43,6 +44,10 @@ export interface EvaluationRunSummary {
   total: number;
   completed_count: number;
   failed_count: number;
+  /** Evaluations interrupted by worker loss */
+  interrupted_count?: number;
+  /** Evaluations cancelled by a user */
+  cancelled_count?: number;
   /** Evaluations not finished yet */
   pending_count: number;
   /** Completed evaluations whose answer was JSON */
@@ -59,6 +64,14 @@ export interface EvaluationRunSummary {
   agree_count: number;
   /** Evaluations a person disagreed with */
   disagree_count: number;
+  /** Completed evaluations that actually used a task reference */
+  reference_used_count?: number;
+  /** Completed evaluations that actually used in-context examples */
+  examples_used_count?: number;
   model?: EvaluationRunSummaryModel;
+  /** All evaluation models represented in the run */
+  models?: string[];
   evaluator?: EvaluationRunSummaryEvaluator;
+  /** All evaluator builds represented in the run */
+  evaluators?: EvaluatorModel[];
 }

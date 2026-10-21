@@ -12,7 +12,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.security import (
     HTTPAuthorizationCredentials,  # noqa: TC002 - FastAPI resolves annotations
 )
@@ -29,9 +29,11 @@ from qdash.api.schemas.evaluation import (
     CreateEvaluationRunResponse,
     EvaluationItem,
     EvaluationRunDetailResponse,
+    EvaluationRunSummary,
     KnowledgeDraftResponse,
     ListEvaluationRunsResponse,
     ListEvaluationsResponse,
+    RetryEvaluationRunResponse,
     SetEvaluationVerdictRequest,
 )
 from qdash.api.schemas.task import TaskKnowledgeResponse, TaskReferenceResponse
@@ -139,6 +141,42 @@ def get_evaluation_run(
     return service.get_run(project_id=ctx.project_id, run_id=run_id)
 
 
+@router.post(
+    "/evaluations/runs/{run_id}/retry",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Retry unfinished calibration evaluations",
+    operation_id="retryEvaluationRun",
+    response_model=RetryEvaluationRunResponse,
+)
+async def retry_evaluation_run(
+    run_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
+    service: Annotated[EvaluationService, Depends(get_evaluation_service)],
+) -> RetryEvaluationRunResponse:
+    """Reset failed, interrupted or cancelled items and execute them again."""
+    run, retried = service.retry_run(project_id=ctx.project_id, run_id=run_id)
+    service.launch(
+        run_id, QDashAuth(access_token=credentials.credentials, project_id=ctx.project_id)
+    )
+    return RetryEvaluationRunResponse(run=run, retried=retried)
+
+
+@router.post(
+    "/evaluations/runs/{run_id}/cancel",
+    summary="Cancel a calibration evaluation run",
+    operation_id="cancelEvaluationRun",
+    response_model=EvaluationRunSummary,
+)
+async def cancel_evaluation_run(
+    run_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[EvaluationService, Depends(get_evaluation_service)],
+) -> EvaluationRunSummary:
+    """Cancel evaluations in this run that have not completed."""
+    return service.cancel_run(project_id=ctx.project_id, run_id=run_id)
+
+
 @router.get(
     "/evaluations",
     summary="List evaluations of a task result",
@@ -174,7 +212,31 @@ def set_evaluation_verdict(
         evaluation_id=evaluation_id,
         agree=body.agree,
         note=body.note,
+        issues=body.issues,
         username=ctx.user.username,
+    )
+
+
+@router.get(
+    "/evaluations/{evaluation_id}/figures/{sha256}",
+    summary="Get a snapshotted evaluation figure",
+    operation_id="getEvaluationFigure",
+    response_class=Response,
+)
+def get_evaluation_figure(
+    evaluation_id: str,
+    sha256: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[EvaluationService, Depends(get_evaluation_service)],
+) -> Response:
+    """The exact image bytes supplied to the model for this evaluation."""
+    data, media_type = service.evaluation_asset(
+        project_id=ctx.project_id, evaluation_id=evaluation_id, sha256=sha256
+    )
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={"Cache-Control": "private, max-age=31536000, immutable"},
     )
 
 

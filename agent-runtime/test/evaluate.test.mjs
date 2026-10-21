@@ -323,6 +323,7 @@ test("the host record captures what the host put into the call", () => {
   assert.equal(record.task_name, "CheckRabi");
   assert.equal(record.figures.length, 1);
   assert.equal(record.figures[0].bytes, 88);
+  assert.equal(record.figures[0].data, PNG);
   assert.equal(record.knowledge.chars, "Expect a damped cosine.\n{}".length);
   assert.equal(record.duration_ms, 1234);
 

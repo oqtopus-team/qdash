@@ -60,6 +60,7 @@ how accepted parameters, task results, and history differ.
 | `flows` | `FlowDocument` | `flow.py` |
 | `evaluation_run` | `EvaluationRunDocument` | `evaluation_run.py` |
 | `evaluation` | `EvaluationDocument` | `evaluation.py` |
+| `evaluation_asset` | `EvaluationAssetDocument` | `evaluation_asset.py` |
 
 [Workflow Engine Architecture](../developer-guide/workflow/engine-architecture.md) explains the
 runtime lifecycle, reservations, and terminal state handling.
