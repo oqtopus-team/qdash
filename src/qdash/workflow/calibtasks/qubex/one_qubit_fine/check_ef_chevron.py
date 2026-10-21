@@ -1,5 +1,6 @@
 """Measure EF frequency and anharmonicity with Qubex chevron analysis."""
 
+import math
 from typing import ClassVar
 
 from qubex.contrib.experiment import estimate_ef_frequency_from_chevron_adaptive
@@ -37,9 +38,6 @@ class CheckEFChevron(QubexTask):
         ),
         "hpi_amplitude": InputParameterSpec.required_database(unit="a.u."),
         "hpi_duration": InputParameterSpec.required_database(unit="ns"),
-        "anharmonicity": InputParameterSpec.database_or_default(
-            default=-0.3, unit="GHz", description="Initial EF frequency offset from f_ge"
-        ),
         "ef_control_amplitude": InputParameterSpec.database_or_default(
             default=0.0625, unit="a.u.", description="EF drive pulse amplitude"
         ),
@@ -136,12 +134,17 @@ class CheckEFChevron(QubexTask):
         readout_amp_param = self.input_parameters["readout_amplitude"]
         if readout_amp_param is not None:
             exp.params.readout_amplitude[label] = readout_amp_param.value
-        ef_frequency = self._get_calibration_value(
-            "control_frequency"
-        ) + self._get_calibration_value("anharmonicity")
+        ge_frequency = self._get_calibration_value("control_frequency")
+        configured_ef_frequency = exp.quantum_system.get_qubit(label).control_frequency_ef_value
+        if configured_ef_frequency is not None and math.isfinite(configured_ef_frequency):
+            ef_frequency = float(configured_ef_frequency)
+        else:
+            # Match Qubex's missing-anharmonicity default (E_J / E_C = 50)
+            # without allowing a persisted spectroscopy estimate to affect the seed.
+            ef_frequency = ge_frequency * 18 / 19
         with exp.modified_frequencies(
             {
-                exp.ctx.resolve_ge_label(label): self._get_calibration_value("control_frequency"),
+                exp.ctx.resolve_ge_label(label): ge_frequency,
                 exp.ctx.resolve_read_label(label): self._get_calibration_value("readout_frequency"),
             }
         ):

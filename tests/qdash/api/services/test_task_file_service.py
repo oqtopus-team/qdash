@@ -171,7 +171,7 @@ def test_ef_chevron_is_enabled_with_calibration_and_sweep_metadata() -> None:
     assert not any(name.startswith("drag_pi_") for name in task.input_parameters)
     assert task.input_parameters["hpi_amplitude"]["resolution"] == "database_required"
     assert task.input_parameters["hpi_duration"]["resolution"] == "database_required"
-    assert task.input_parameters["anharmonicity"]["default_value"] == -0.3
+    assert "anharmonicity" not in task.input_parameters
     assert task.input_parameters["ef_control_amplitude"]["default_value"] == 0.0625
     assert task.run_parameters["detuning_range"]["value"] == [-0.05, 0.05, 41]
     assert task.run_parameters["shots"]["value"] == 256

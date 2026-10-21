@@ -52,7 +52,7 @@ way as GE calibration.
 
 | Task or task family | Frequency input | Frequency result | Published database parameters |
 | --- | --- | --- | --- |
-| `CheckEFChevron` | `control_frequency` plus the current `anharmonicity` estimate | Measured EF transition and anharmonicity | `ef_frequency`, `control_frequency_ef`, `anharmonicity` |
+| `CheckEFChevron` | Configured `control_frequency_ef`; otherwise the Qubex missing-anharmonicity default derived from `control_frequency` | Measured EF transition and anharmonicity | `ef_frequency`, `control_frequency_ef`, `anharmonicity` |
 | `CheckEFRabi`, EF pulse creation, and EF readout classification | `control_frequency_ef`; fallback: `ef_frequency` | No transition-frequency result | None |
 
 `ConfigureEF` must run in the same worker session before an EF measurement. It loads and pushes
@@ -60,6 +60,12 @@ either the `ge-ef-cr` layout, which is the default, or `ge-ef-fh`. EF tasks reje
 GE and EF targets are not available. Ordinary `Configure` defaults to `ge-cr-cr`, even after an EF
 configuration task, so a flow returning to CR calibration must run `Configure` to restore the CR
 layout.
+
+`CheckEFChevron` deliberately ignores persisted anharmonicity when selecting its initial search
+frequency. If Qubex has an explicit `control_frequency_ef`, the task uses it. Otherwise it uses
+`18 / 19 * control_frequency`, matching Qubex's `E_J / E_C = 50` fallback when anharmonicity is
+unset. Qubit spectroscopy may still display an f12 estimate for diagnosis, but it does not publish
+that estimate as calibrated anharmonicity.
 
 The `ef_calibration` template keeps all EF tasks in one synchronized `CustomOneQubit` step. It
 starts from existing GE control and readout frequencies and readout amplitude, then runs

@@ -35,7 +35,8 @@ class CheckQubitSpectroscopy(QubexTask):
 
     This task performs qubit spectroscopy with the dedicated 1024 ns Qubex
     readout pulse and estimates the qubit frequency (f01) and optionally the f12
-    transition frequency from the spectroscopy data.
+    transition frequency from the spectroscopy data. The f12 estimate remains
+    diagnostic and is not published as calibrated anharmonicity.
     """
 
     name: str = "CheckQubitSpectroscopy"
@@ -105,10 +106,6 @@ class CheckQubitSpectroscopy(QubexTask):
                 "coarse_qubit_frequency",
                 "control_frequency",
             ),
-        ),
-        "anharmonicity": OutputParameterSpec(
-            unit="GHz",
-            description="Anharmonicity alpha = f12 - f01 (typically negative for transmon)",
         ),
         "f01_repr_db": OutputParameterSpec(
             unit="dB",
@@ -222,8 +219,6 @@ class CheckQubitSpectroscopy(QubexTask):
         # Create a deep copy of output_parameters to avoid sharing state
         output_params_copy = copy.deepcopy(self.output_parameters)
         output_params_copy["coarse_qubit_frequency"].value = estimated_frequency
-        if estimated_anharmonicity is not None:
-            output_params_copy["anharmonicity"].value = estimated_anharmonicity
         if estimated_repr_db is not None:
             output_params_copy["f01_repr_db"].value = estimated_repr_db
             coarse_control_amplitude, coarse_control_marker_db = (

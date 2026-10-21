@@ -78,7 +78,6 @@ def test_bringup_normalizes_serialized_metrics() -> None:
         "readout_frequency": 7.1,
         "readout_amplitude": 0.25,
         "coarse_qubit_frequency": 5.2,
-        "anharmonicity": -0.3,
         "qubit_frequency": 5.15,
     }
 
