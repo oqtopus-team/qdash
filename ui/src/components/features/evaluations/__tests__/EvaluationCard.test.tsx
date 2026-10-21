@@ -193,6 +193,30 @@ describe("EvaluationCard", () => {
     expect(screen.getByText("2 attempts")).toBeTruthy();
   });
 
+  it("shows the largest prompt in tokens and flags one near the context window", () => {
+    const output = (input_tokens: number) => ({
+      model: "vllm/x",
+      fallback: false,
+      diagnosis: { technical_description: "Two exponential decays." },
+      parsed: true,
+      complete: true,
+      context_window: 16384,
+      calls: [
+        { duration_ms: 1000, stop_reason: "stop", input_tokens: 1200, output_tokens: 80 },
+        { duration_ms: 1000, stop_reason: "stop", input_tokens, output_tokens: 200 },
+      ],
+      duration_ms: 2000,
+    });
+    const { unmount } = renderCard({ output: output(9000), planner: undefined });
+    const peak = screen.getByTestId("token-peak");
+    expect(peak.textContent).toBe("largest prompt 9,000 tokens (9,200 of 16,384 with the answer)");
+    expect(peak.className).not.toContain("text-warning");
+    unmount();
+
+    renderCard({ output: output(15000), planner: undefined });
+    expect(screen.getByTestId("token-peak").textContent).toContain("close to the context limit");
+  });
+
   it("records a verdict and clears it when clicked again", () => {
     renderCard();
     fireEvent.click(screen.getByRole("button", { name: /Disagree/ }));

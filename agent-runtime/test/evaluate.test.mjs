@@ -411,7 +411,7 @@ test("an incomplete answer keeps its text, the keys it lacks, and how it was ask
     structured: true,
     stop_reason: "stop",
     calls: [
-      { question: "technical_description", duration_ms: 195000, stop_reason: "length", structured: true, output_tokens: 2000, missing_keys: ["success"] },
+      { question: "technical_description", duration_ms: 195000, stop_reason: "length", structured: true, input_tokens: 1800, output_tokens: 2000, missing_keys: ["success"] },
       { duration_ms: 30000, stop_reason: "stop", structured: true, output_tokens: 300, missing_keys: [] },
       { bogus: true },
     ],
@@ -429,9 +429,12 @@ test("an incomplete answer keeps its text, the keys it lacks, and how it was ask
     duration_ms: 195000,
     stop_reason: "length",
     structured: true,
+    input_tokens: 1800,
     output_tokens: 2000,
     missing_keys: ["success"],
   });
+  // A call without token counts (an older evaluator) is kept without them.
+  assert.equal("input_tokens" in record.evaluation.calls[1], false);
   assert.deepEqual(record.evaluation.diagnosis, { technical_description: "only" });
   assert.equal(record.evaluation.raw, '{"technical_description": "only"}');
   assert.equal(record.evaluation.missing_keys.length, 5);

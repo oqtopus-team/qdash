@@ -81,6 +81,12 @@ Expand **Prompt sent to the model** to inspect the exact text and figures used f
 run-level **Prompt** panel summarizes the reference version, example count, and prompt consistency
 across the run.
 
+Each evaluation shows its largest prompt in tokens, images included, and how much of the
+model's context window it filled with the answer; **Tokens** in the **Prompt** panel shows the
+largest across the run. A value marked as close to the context limit means the answer may be cut
+short: evaluate **Zero-shot**, use a draft with fewer examples, or ask the operator for a model
+with a larger window.
+
 ## Record Agreement
 
 Select **Agree** or **Disagree** on each evaluation after checking the underlying result. Add a

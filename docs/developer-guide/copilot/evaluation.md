@@ -202,7 +202,7 @@ their project and are not deleted.
 | Part | Holds |
 | --- | --- |
 | `input` | The context, the exact prompt (`[figure]` marks an image) and system prompt, the run's question (only runs made before knowledge drafts have one), the reference's size and hash, the figures by hash, the examples by id and figure hash |
-| `output` | The model (`provider/modelId`, `fallback` when no calibration VLM was configured), the parsed diagnosis, the raw answer, every answer as returned, the questions asked, `attempts`, `stop_reason`, each call's duration and output tokens, the total duration and token usage |
+| `output` | The model (`provider/modelId`, `fallback` when no calibration VLM was configured), the parsed diagnosis, the raw answer, every answer as returned, the questions asked, `attempts`, `stop_reason`, each call's duration and input and output tokens, the total duration and token usage, and the judging model's `context_window` |
 | `evaluator` | The extension that judged: package name, version, `checkout` or `package`, the checkout commit |
 | `planner` | In planner mode: the planner's model, answer, tool calls and duration |
 | `verdict` | A person's **Agree** or **Disagree** with a note, who and when |
@@ -212,6 +212,17 @@ load, so records stored before those fields existed are judged the same way. A r
 adds its wall time and the completed records' model time added up, so runs are weighed on cost
 as well as outcome.
 
+Sizes are reported in two units on purpose. The reference is measured in characters
+(`knowledge_chars`) because that is independent of the judging model and known before any call,
+so a preview can show it; next to its hash it tells two references apart. The context budget
+is measured in tokens, because that is what the model's window limits and images dominate it:
+pi-qcaleval records each call's `input_tokens` (images included) and `output_tokens` as the
+model counted them, and `_context_window` in the evaluation service stores the judging model's
+`num_ctx` from `config/copilot/evaluation.yaml` with the record, so a later config change does
+not rewrite it. The UI reports the largest call (`tokenPeak` in `evaluationDisplay.ts`) and
+flags it once prompt plus answer reach 90% of the window (`CONTEXT_WARNING_RATIO`). Records
+from an evaluator that does not report `input_tokens` show no token figure.
+
 ### Comparing runs
 
 A run is a snapshot. The same selection evaluated again after a change to the extension, the
@@ -219,7 +230,8 @@ model, the mode, the examples setting or the task's reference yields a second ru
 shape. `/evaluations/compare?a=&b=` joins two runs in the browser
 (`evaluationCompare.ts`): settings side by side with the differing ones flagged, totals, and one
 row per entity (joined by qid, noting whether both judged the same task result) with each side's
-fit quality, success and verdict. There is no compare API.
+fit quality, success and verdict. The **Tokens** row compares the largest call of each run, so
+the cost of in-context examples shows next to their effect. There is no compare API.
 
 ## Changing it
 
