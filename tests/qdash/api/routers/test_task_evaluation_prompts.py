@@ -43,6 +43,17 @@ def _credentials() -> SimpleNamespace:
     return SimpleNamespace(credentials="user-token")
 
 
+def _drafts(task_name: str = "CheckRabi") -> SimpleNamespace:
+    """A draft store holding one draft of `task_name`, recording what was asked for."""
+    asked: list[tuple[str, str]] = []
+
+    def get(project_id: str, draft_id: str) -> SimpleNamespace:
+        asked.append((project_id, draft_id))
+        return SimpleNamespace(task_name=task_name)
+
+    return SimpleNamespace(get=get, asked=asked)
+
+
 @pytest.mark.asyncio
 async def test_the_preview_is_requested_as_the_user_and_mapped(
     monkeypatch: pytest.MonkeyPatch,
@@ -54,8 +65,9 @@ async def test_the_preview_is_requested_as_the_user_and_mapped(
         task_name="CheckRabi",
         ctx=_ctx(),  # type: ignore[arg-type]
         credentials=_credentials(),  # type: ignore[arg-type]
+        drafts=_drafts(),  # type: ignore[arg-type]
         with_examples=True,
-        question="  Is it centred? ",
+        knowledge_draft_id=None,
     )
 
     preview.assert_awaited_once()
@@ -64,7 +76,7 @@ async def test_the_preview_is_requested_as_the_user_and_mapped(
     assert kwargs["auth"].access_token == _credentials().credentials
     assert kwargs["auth"].project_id == "project-1"
     assert kwargs["with_examples"] is True
-    assert kwargs["question"] == "Is it centred?"
+    assert kwargs["knowledge_draft_id"] is None
     assert response.task_name == "CheckRabi"
     assert response.with_examples is True
     assert response.model == "vllm/nvidia/Ising-Calibration"
@@ -79,7 +91,7 @@ async def test_the_preview_is_requested_as_the_user_and_mapped(
 
 
 @pytest.mark.asyncio
-async def test_a_blank_question_is_not_sent_and_missing_fields_default(
+async def test_missing_fields_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     preview = AsyncMock(return_value={"task_name": "CheckRabi", "questions": []})
@@ -89,13 +101,11 @@ async def test_a_blank_question_is_not_sent_and_missing_fields_default(
         task_name="CheckRabi",
         ctx=_ctx(),  # type: ignore[arg-type]
         credentials=_credentials(),  # type: ignore[arg-type]
+        drafts=_drafts(),  # type: ignore[arg-type]
         with_examples=False,
-        question="   ",
+        knowledge_draft_id=None,
     )
 
-    await_args = preview.await_args
-    assert await_args is not None
-    assert await_args.kwargs["question"] is None
     assert response.with_examples is False
     assert response.model is None
     assert response.questions == []
@@ -116,8 +126,9 @@ async def test_runtime_errors_map_to_502_and_unreachable_to_503(
             task_name="CheckRabi",
             ctx=_ctx(),  # type: ignore[arg-type]
             credentials=_credentials(),  # type: ignore[arg-type]
+            drafts=_drafts(),  # type: ignore[arg-type]
             with_examples=False,
-            question=None,
+            knowledge_draft_id=None,
         )
     assert exc_info.value.status_code == 502
     assert exc_info.value.detail == "evaluation: no reference"
@@ -129,7 +140,44 @@ async def test_runtime_errors_map_to_502_and_unreachable_to_503(
             task_name="CheckRabi",
             ctx=_ctx(),  # type: ignore[arg-type]
             credentials=_credentials(),  # type: ignore[arg-type]
+            drafts=_drafts(),  # type: ignore[arg-type]
             with_examples=False,
-            question=None,
+            knowledge_draft_id=None,
         )
     assert exc_info.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_a_draft_of_the_task_is_passed_on_and_another_tasks_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    preview = AsyncMock(return_value=PREVIEW)
+    monkeypatch.setattr("qdash.api.routers.task.preview_evaluation_prompts", preview)
+    drafts = _drafts()
+
+    await get_task_evaluation_prompts(
+        task_name="CheckRabi",
+        ctx=_ctx(),  # type: ignore[arg-type]
+        credentials=_credentials(),  # type: ignore[arg-type]
+        drafts=drafts,  # type: ignore[arg-type]
+        with_examples=True,
+        knowledge_draft_id="ab" * 32,
+    )
+
+    assert drafts.asked == [("project-1", "ab" * 32)]
+    await_args = preview.await_args
+    assert await_args is not None
+    assert await_args.kwargs["knowledge_draft_id"] == "ab" * 32
+
+    preview.reset_mock()
+    with pytest.raises(HTTPException) as exc_info:
+        await get_task_evaluation_prompts(
+            task_name="CheckRabi",
+            ctx=_ctx(),  # type: ignore[arg-type]
+            credentials=_credentials(),  # type: ignore[arg-type]
+            drafts=_drafts("CheckT1"),  # type: ignore[arg-type]
+            with_examples=False,
+            knowledge_draft_id="ab" * 32,
+        )
+    assert exc_info.value.status_code == 400
+    preview.assert_not_awaited()

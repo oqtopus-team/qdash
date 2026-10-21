@@ -7,6 +7,6 @@
  */
 
 /**
- * A specific question for the evaluation model, on top of the diagnosis
+ * The uploaded knowledge draft the run used, if any
  */
-export type CreateEvaluationRunRequestQuestion = string | null;
+export type EvaluationRunSummaryKnowledgeDraftId = string | null;

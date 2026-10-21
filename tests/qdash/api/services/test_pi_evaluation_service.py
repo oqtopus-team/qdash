@@ -33,13 +33,22 @@ async def test_the_runtime_record_is_returned_as_is(monkeypatch) -> None:
         return httpx.Response(200, json={"task_id": "t1", "evaluation": {"model": "vllm/x"}})
 
     record = await evaluate_task_result(
-        "t1", auth=AUTH, question="Why?", transport=_transport(handler)
+        "t1",
+        auth=AUTH,
+        question="Why?",
+        knowledge_draft_id="ab" * 32,
+        transport=_transport(handler),
     )
 
     assert record == {"task_id": "t1", "evaluation": {"model": "vllm/x"}}
     assert isinstance(seen["url"], str)
     assert seen["url"].endswith("/evaluate")
-    assert seen["body"] == {"task_id": "t1", "mode": "direct", "question": "Why?"}
+    assert seen["body"] == {
+        "task_id": "t1",
+        "mode": "direct",
+        "question": "Why?",
+        "knowledge_draft_id": "ab" * 32,
+    }
     assert isinstance(seen["headers"], dict)
     assert seen["headers"]["authorization"] == "Bearer runtime-secret"
     assert seen["headers"]["x-qdash-token"] == "user-token"
@@ -113,13 +122,21 @@ async def test_a_prompt_preview_is_requested_as_the_user(monkeypatch) -> None:
         return httpx.Response(200, json={"task_name": "CheckRabi", "questions": []})
 
     preview = await preview_evaluation_prompts(
-        "CheckRabi", auth=AUTH, with_examples=True, question="Why?", transport=_transport(handler)
+        "CheckRabi",
+        auth=AUTH,
+        with_examples=True,
+        knowledge_draft_id="ab" * 32,
+        transport=_transport(handler),
     )
 
     assert preview == {"task_name": "CheckRabi", "questions": []}
     assert isinstance(seen["url"], str)
     assert seen["url"].endswith("/evaluation-prompts")
-    assert seen["body"] == {"task_name": "CheckRabi", "with_examples": True, "question": "Why?"}
+    assert seen["body"] == {
+        "task_name": "CheckRabi",
+        "with_examples": True,
+        "knowledge_draft_id": "ab" * 32,
+    }
     assert isinstance(seen["headers"], dict)
     assert seen["headers"]["authorization"] == "Bearer runtime-secret"
     assert seen["headers"]["x-qdash-token"] == "user-token"

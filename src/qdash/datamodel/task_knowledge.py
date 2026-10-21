@@ -20,7 +20,7 @@ import os
 import re
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -262,6 +262,9 @@ class TaskKnowledge(BaseModel):
     )
     examples: list[KnowledgeExample] = Field(default_factory=list)
 
+    # A draft's figures live in its own directory, not the shared repository.
+    _task_dir: Any = PrivateAttr(default=None)
+
     @model_validator(mode="before")
     @classmethod
     def _accept_previous_format(cls, data: Any) -> Any:
@@ -309,7 +312,9 @@ class TaskKnowledge(BaseModel):
     # --- figures on disk ---
 
     def task_dir(self) -> Path | None:
-        """The task's directory in the cloned knowledge repository, if present."""
+        """The task's directory: a draft's own, else the cloned knowledge repository's."""
+        if self._task_dir is not None:
+            return self._task_dir if self._task_dir.is_dir() else None
         repo_dir = _resolve_repo_dir()
         if repo_dir is None or not self.category:
             return None
@@ -452,6 +457,35 @@ def regenerate_task_knowledge_json(repo_dir: Path | None = None) -> Path:
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "generate.py failed")
     return output
+
+
+def parse_task_dir(task_dir: Path, *, category: str = "") -> tuple[TaskKnowledge | None, list[str]]:
+    """Parse one task directory with the knowledge repository's own generator.
+
+    The same parser builds ``task-knowledge.json``, so a draft reads exactly as
+    the published entry would. Returns the entry, ``None`` when the generator
+    rejects it, and the generator's warnings. Figures resolve inside
+    ``task_dir``.
+    """
+    import importlib.util
+
+    repo_dir = _resolve_repo_dir()
+    generator = repo_dir / "generate.py" if repo_dir is not None else None
+    if generator is None or not generator.is_file():
+        raise RuntimeError("generate.py not found in the task-knowledge repository")
+    spec = importlib.util.spec_from_file_location("_task_knowledge_generate", generator)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {generator}")
+    # A fresh module per call: the generator collects warnings in a module-level list.
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    entry = module._parse_task(task_dir, category)
+    warnings = [str(warning) for warning in getattr(module, "warnings", [])]
+    if not entry:
+        return None, warnings
+    knowledge = TaskKnowledge(**entry)
+    knowledge._task_dir = task_dir
+    return knowledge, warnings
 
 
 def get_task_knowledge(task_name: str) -> TaskKnowledge | None:

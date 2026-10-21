@@ -32,6 +32,7 @@ from qdash.api.services.evaluation_service import EvaluationService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
 from qdash.api.services.forum_service import ForumService
+from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore
 from qdash.api.services.manual_update_service import ManualUpdateService
 from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.note_service import NoteService
@@ -263,6 +264,12 @@ def get_evaluation_service() -> EvaluationService:
         chip_repository=get_chip_repository(),
         task_result_repository=get_task_result_repository(),
     )
+
+
+@cached_dependency_provider
+def get_knowledge_draft_store() -> KnowledgeDraftStore:
+    """Get the store of uploaded task-knowledge drafts."""
+    return KnowledgeDraftStore()
 
 
 @cached_dependency_provider

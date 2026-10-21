@@ -15,8 +15,8 @@
 
 import { createHash } from "node:crypto";
 
-import { compactCriteria, referenceIdentity, toolExample } from "./knowledge-context.ts";
-import type { LabeledExample, Reference } from "./knowledge-context.ts";
+import { compactCriteria, examplesOf, referenceIdentity, renderReference, toolExample } from "./knowledge-context.ts";
+import type { LabeledExample, Reference, TaskKnowledgeLike } from "./knowledge-context.ts";
 import type { ExtensionPackage } from "./local-extensions.ts";
 
 /** The pi-qdash tool that turns a task result into evidence text plus its figure. */
@@ -35,6 +35,8 @@ export interface EvaluateRequest {
   maxFigures?: number;
   /** Show the task's expert-labeled example plots before the figure (in-context examples). */
   withExamples?: boolean;
+  /** Read this uploaded knowledge draft instead of the task's shared knowledge. */
+  knowledgeDraftId?: string;
 }
 
 /** One labeled example the model saw, by identity and figure hashes rather than bytes. */
@@ -87,7 +89,7 @@ export interface EvaluateDeps {
   evaluator?: ExtensionPackage;
 }
 
-export type EvaluationStage = "request" | "evidence" | "evaluation";
+export type EvaluationStage = "request" | "knowledge" | "evidence" | "evaluation";
 
 /** A failure of one stage, with the HTTP status the route answers with. */
 export class EvaluationError extends Error {
@@ -571,6 +573,28 @@ export function plannerOutcome(entries: ReadonlyArray<TranscriptEntryLike>): {
   return { details, usage, error, toolCalls };
 }
 
+/**
+ * The knowledge of an evaluation against an uploaded draft: one load of the
+ * draft serves both the reference and the examples, and a draft that cannot
+ * be read fails the evaluation instead of letting it run without knowledge.
+ */
+export function draftKnowledge(
+  load: () => Promise<TaskKnowledgeLike>,
+): Pick<EvaluateDeps, "fetchKnowledge" | "fetchExamples"> {
+  let pending: Promise<TaskKnowledgeLike> | undefined;
+  const draft = () =>
+    (pending ??= load().catch((error: unknown) => {
+      throw new EvaluationError(
+        "knowledge",
+        `knowledge draft: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }));
+  return {
+    fetchKnowledge: async () => renderReference(await draft()),
+    fetchExamples: async () => examplesOf(await draft()),
+  };
+}
+
 /** Clamp the requested figure count to what the tools accept. */
 export function figureCount(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 1;
@@ -584,6 +608,8 @@ export interface PromptPreviewRequest {
   /** The context line to show; a generic one names the task when absent. */
   context?: string;
   question?: string;
+  /** Build the prompts from this uploaded knowledge draft instead of the task's shared knowledge. */
+  knowledgeDraftId?: string;
 }
 
 /** The prompts an evaluation of a task would send, built without a figure or a model call. */

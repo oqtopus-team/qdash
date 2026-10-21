@@ -35,6 +35,13 @@ class EvaluationRunDocument(Document):
     question: str | None = Field(
         default=None, description="Specific question asked on top of the standard diagnosis"
     )
+    knowledge_draft_id: str | None = Field(
+        default=None,
+        description="Uploaded knowledge draft evaluated against, instead of the shared one",
+    )
+    knowledge_draft_name: str | None = Field(
+        default=None, description="File name of that draft's zip"
+    )
     trigger: EvaluationTrigger = Field(default="bulk")
     mode: EvaluationMode = Field(default="direct")
     with_examples: bool = Field(

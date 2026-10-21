@@ -532,3 +532,47 @@ test("a prompt preview runs the evaluator dry with the task's reference and exam
   await assert.rejects(previewEvaluationPrompts({ taskName: "CheckRabi" }, failing), (error) => error instanceof EvaluationError && error.stage === "evaluation" && /boom/.test(error.message));
   await assert.rejects(previewEvaluationPrompts({ taskName: "  " }, d), (error) => error instanceof EvaluationError && error.status === 400);
 });
+
+import { draftKnowledge } from "../src/evaluate.ts";
+
+const DRAFT = {
+  name: "CheckRabi",
+  prompt_text: "## Experiment: CheckRabi",
+  reference: { background: "This is a CheckRabi experiment: the draft's wording.", statuses: { SUCCESS: "clear oscillation" } },
+  examples: [
+    { id: "d1", title: "Draft example", outcome: "suboptimal", status: "SHORT_T1", diagnosis: "Short.", figures: [{ base64_data: PNG, mime_type: "image/png", path: "examples/d1.png" }] },
+  ],
+};
+
+test("an evaluation against a draft reads its reference and examples from one load of it", async () => {
+  let loads = 0;
+  const knowledge = draftKnowledge(async () => {
+    loads += 1;
+    return DRAFT;
+  });
+  const d = { ...deps({ [EVIDENCE_TOOL]: evidenceResult(), [EVALUATION_TOOL]: evaluationResult() }), ...knowledge };
+
+  const result = await evaluateTask({ taskId: "task-1", withExamples: true }, d);
+
+  assert.equal(loads, 1);
+  const evaluation = d.calls.find((call) => call.name === EVALUATION_TOOL).args;
+  assert.equal(evaluation.knowledge, "This is a CheckRabi experiment: the draft's wording.");
+  assert.deepEqual(evaluation.criteria.statuses, { SUCCESS: "clear oscillation" });
+  assert.deepEqual(evaluation.examples.map((e) => e.scenario), ["Draft example"]);
+  assert.deepEqual(result.examples.map((e) => [e.id, e.figures[0].path]), [["d1", "examples/d1.png"]]);
+});
+
+test("a draft that cannot be read fails the evaluation at the knowledge stage", async () => {
+  const knowledge = draftKnowledge(async () => {
+    throw new Error("HTTP 404: knowledge draft abc not found");
+  });
+  const d = { ...deps({ [EVIDENCE_TOOL]: evidenceResult(), [EVALUATION_TOOL]: evaluationResult() }), ...knowledge };
+
+  await assert.rejects(evaluateTask({ taskId: "task-1" }, d), (error) => {
+    assert.ok(error instanceof EvaluationError);
+    assert.equal(error.stage, "knowledge");
+    assert.equal(error.message, "knowledge draft: HTTP 404: knowledge draft abc not found");
+    return true;
+  });
+  assert.equal(d.calls.some((call) => call.name === EVALUATION_TOOL), false);
+});

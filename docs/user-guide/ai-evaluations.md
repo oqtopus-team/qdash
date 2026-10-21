@@ -35,8 +35,28 @@ Choose the evaluation settings before confirming:
 | **Examples** | **Zero-shot** | The task reference is enough. |
 | | **In-context** | Expert-labeled examples should be shown before the result. |
 
-Add **Question for the evaluation model** when the model must address a specific concern. Review
-the request summary, then confirm. QDash records the selected targets as one evaluation run.
+Review the request summary, then confirm. QDash records the selected targets as one evaluation
+run.
+
+## Try a Knowledge Change Before Proposing It
+
+Evaluate against a knowledge draft to see how an edited reference changes the judgments. The
+draft is read only by the run you start with it; **Knowledge** stays the same for everyone.
+
+1. Zip the task's directory: `index.md` and, for **In-context** evaluation, `examples/` with
+   its figures. The zip holds one task, either at the top or in one folder named after the
+   task. It may contain only `.md`, `.png`, `.jpg`, `.jpeg` and `.webp` files, up to 200 files,
+   20 MB zipped and 50 MB unpacked.
+2. Start an evaluation of that task as described above.
+3. Drop the zip on **Knowledge**, or select that area to choose the file. The dialog shows the
+   draft's statuses, parameters and example count, and lists any format warnings. A zip for a
+   different task is refused.
+4. Confirm. **Who prepares the prompt** is fixed to **Fixed prompt**, because Copilot reads the
+   shared knowledge.
+5. Compare the run with one that used the shared knowledge. The **Knowledge** row shows which
+   run used the draft.
+
+When the draft improves the judgments, propose the change to the task-knowledge repository.
 
 ## Read a Run
 

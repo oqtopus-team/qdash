@@ -6368,7 +6368,7 @@
           "task"
         ],
         "summary": "Preview the prompts an AI evaluation of a task would send",
-        "description": "The prompts the evaluation model would receive for a task.\n\nThe Agent Runtime builds them the way a direct evaluation does, from the\ntask's reference in Knowledge (and its labeled examples when asked), as\nthe requesting user, without a figure or a model call.",
+        "description": "The prompts the evaluation model would receive for a task.\n\nThe Agent Runtime builds them the way a direct evaluation does, from the\ntask's reference in Knowledge, or from an uploaded draft, and its labeled\nexamples when asked, as the requesting user, without a figure or a model\ncall.",
         "operationId": "getTaskEvaluationPrompts",
         "security": [
           {
@@ -6398,7 +6398,7 @@
             "description": "Lay out the task's labeled examples, as an in-context evaluation"
           },
           {
-            "name": "question",
+            "name": "knowledge_draft_id",
             "in": "query",
             "required": false,
             "schema": {
@@ -6410,10 +6410,10 @@
                   "type": "null"
                 }
               ],
-              "description": "A specific question to add",
-              "title": "Question"
+              "description": "Build the prompts from this uploaded knowledge draft",
+              "title": "Knowledge Draft Id"
             },
-            "description": "A specific question to add"
+            "description": "Build the prompts from this uploaded knowledge draft"
           },
           {
             "name": "X-Project-Id",
@@ -8176,7 +8176,7 @@
           "evaluation"
         ],
         "summary": "Start a bulk calibration evaluation run",
-        "description": "Queue the latest evaluable result of a task for every entity on a chip.\n\nThe evaluations run in the background as the requesting user; poll the run\nfor progress. Entities without an evaluable result are reported as skipped.",
+        "description": "Queue the latest evaluable result of a task for every entity on a chip.\n\nThe evaluations run in the background as the requesting user; poll the run\nfor progress. Entities without an evaluable result are reported as skipped.\nWith `knowledge_draft_id` the run reads that uploaded draft instead of the\ntask's shared knowledge.",
         "operationId": "createEvaluationRun",
         "security": [
           {
@@ -8525,6 +8525,202 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EvaluationItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/knowledge-drafts": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Upload a task-knowledge draft to evaluate against",
+        "description": "Store one task's knowledge directory, zipped, as a draft of the project.\n\nThe draft is parsed by the knowledge repository's own generator and is\nread only by the evaluation runs and prompt previews that name it; the\nshared knowledge does not change. Uploading the same zip again returns\nthe stored draft.",
+        "operationId": "createKnowledgeDraft",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_createKnowledgeDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeDraftResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The zip is not one usable task directory"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/knowledge-drafts/{draft_id}": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get a task-knowledge draft",
+        "description": "The draft's task, uploader, generator warnings and derived reference.",
+        "operationId": "getKnowledgeDraft",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeDraftResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluations/knowledge-drafts/{draft_id}/knowledge": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get a task-knowledge draft as task knowledge",
+        "description": "The draft in the shape of `GET /tasks/{name}/knowledge`, for the Agent Runtime.",
+        "operationId": "getKnowledgeDraftKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskKnowledgeResponse"
                 }
               }
             }
@@ -17257,6 +17453,21 @@
         ],
         "title": "Body_bulkImportUsers"
       },
+      "Body_createKnowledgeDraft": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "format": "binary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_createKnowledgeDraft"
+      },
       "Body_login": {
         "properties": {
           "username": {
@@ -18720,18 +18931,17 @@
             "title": "Qids",
             "description": "Restrict the run to the latest results of these qubits or couplings"
           },
-          "question": {
+          "knowledge_draft_id": {
             "anyOf": [
               {
-                "type": "string",
-                "maxLength": 2000
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Question",
-            "description": "A specific question for the evaluation model, on top of the diagnosis"
+            "title": "Knowledge Draft Id",
+            "description": "Evaluate against this uploaded knowledge draft instead of the shared knowledge"
           },
           "trigger": {
             "type": "string",
@@ -20029,6 +20239,30 @@
               }
             ],
             "title": "Question"
+          },
+          "knowledge_draft_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Draft Id",
+            "description": "The uploaded knowledge draft the run used, if any"
+          },
+          "knowledge_draft_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Draft Name",
+            "description": "File name of that draft's zip"
           },
           "trigger": {
             "type": "string",
@@ -22358,6 +22592,68 @@
         "type": "object",
         "title": "InputParameterModel",
         "description": "Input parameter class."
+      },
+      "KnowledgeDraftResponse": {
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "title": "Draft Id",
+            "description": "SHA-256 of the uploaded zip"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name",
+            "description": "The task the draft describes (its H1)"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "uploaded_by": {
+            "type": "string",
+            "title": "Uploaded By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "What the knowledge repository's generator warned about"
+          },
+          "reference": {
+            "$ref": "#/components/schemas/TaskReferenceResponse",
+            "description": "The background and criteria the evaluation model would get"
+          },
+          "example_count": {
+            "type": "integer",
+            "title": "Example Count",
+            "description": "Labeled examples the draft holds"
+          },
+          "figure_count": {
+            "type": "integer",
+            "title": "Figure Count",
+            "description": "Figures of index.md and the examples"
+          }
+        },
+        "type": "object",
+        "required": [
+          "draft_id",
+          "task_name",
+          "filename",
+          "uploaded_by",
+          "created_at",
+          "reference",
+          "example_count",
+          "figure_count"
+        ],
+        "title": "KnowledgeDraftResponse",
+        "description": "An uploaded task-knowledge draft and what an evaluation would read from it."
       },
       "KnowledgeExampleResponse": {
         "properties": {

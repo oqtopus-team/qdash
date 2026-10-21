@@ -12,9 +12,10 @@ import {
 } from "@/client/evaluation/evaluation";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
-import type { CreateEvaluationRunRequest, Task } from "@/schemas";
+import type { CreateEvaluationRunRequest, KnowledgeDraftResponse, Task } from "@/schemas";
 
 import { examplesLabel, modeLabel } from "./evaluationDisplay";
+import { KnowledgeDraftPicker } from "./KnowledgeDraftPicker";
 
 export type EvaluationMode = "direct" | "planner";
 
@@ -188,18 +189,18 @@ const EXAMPLE_OPTIONS: ReadonlyArray<Option<boolean>> = [
 ];
 
 /**
- * The request body for one scope, mode, example setting and optional question.
- * `qids` narrows a chip-wide run to chosen entities; left out, the run covers
- * every entity of the chip view.
+ * The request body for one scope, mode and example setting. `qids` narrows a
+ * chip-wide run to chosen entities; left out, the run covers every entity of
+ * the chip view. `knowledgeDraftId` evaluates against an uploaded draft
+ * instead of the task's shared knowledge.
  */
 export function buildEvaluationRunRequest(
   scope: EvaluationRequestScope,
   mode: EvaluationMode,
-  question: string,
   withExamples = false,
   qids?: string[],
+  knowledgeDraftId?: string,
 ): CreateEvaluationRunRequest {
-  const trimmed = question.trim();
   return {
     chip_id: scope.chipId,
     task: scope.taskName,
@@ -210,7 +211,7 @@ export function buildEvaluationRunRequest(
     ...(scope.date ? { date: scope.date } : {}),
     ...(scope.taskIds?.length ? { task_ids: scope.taskIds } : {}),
     ...(qids?.length ? { qids } : {}),
-    ...(trimmed ? { question: trimmed } : {}),
+    ...(knowledgeDraftId ? { knowledge_draft_id: knowledgeDraftId } : {}),
   };
 }
 
@@ -322,7 +323,7 @@ export function EvaluationRequestModal({
   const chatting = !!onChat && action === "chat";
   const [mode, setMode] = useState<EvaluationMode>("direct");
   const [withExamples, setWithExamples] = useState(false);
-  const [question, setQuestion] = useState("");
+  const [draft, setDraft] = useState<KnowledgeDraftResponse | null>(null);
   // Targets the person unticked; empty means the whole chip view, as before.
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const create = useCreateEvaluationRun();
@@ -356,9 +357,9 @@ export function EvaluationRequestModal({
         data: buildEvaluationRunRequest(
           scope,
           mode,
-          question,
           withExamples,
           narrowed ? chosen : undefined,
+          draft?.draft_id,
         ),
       });
       const created = response.data;
@@ -378,7 +379,7 @@ export function EvaluationRequestModal({
           action: { label: "Open run", onClick: () => router.push(`/evaluations/${runId}`) },
         },
       );
-      setQuestion("");
+      setDraft(null);
       setExcluded(new Set());
       onClose();
     } catch (error) {
@@ -457,14 +458,30 @@ export function EvaluationRequestModal({
                 />
               )}
 
+              <KnowledgeDraftPicker
+                taskName={scope.taskName}
+                draft={draft}
+                onChange={(next) => {
+                  setDraft(next);
+                  // Copilot's evaluation call reads the shared knowledge.
+                  if (next) setMode("direct");
+                }}
+                disabled={isSubmitting}
+              />
+
               <RadioCards
                 name="evaluation-mode"
                 legend="Who prepares the prompt"
                 options={MODE_OPTIONS}
                 value={mode}
                 onChange={setMode}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !!draft}
               />
+              {draft && (
+                <p className="-mt-2 text-xs text-base-content/60">
+                  A knowledge draft is evaluated with the fixed prompt.
+                </p>
+              )}
 
               <RadioCards
                 name="evaluation-examples"
@@ -474,21 +491,6 @@ export function EvaluationRequestModal({
                 onChange={setWithExamples}
                 disabled={isSubmitting}
               />
-
-              <label className="form-control w-full">
-                <span className="label-text mb-1">
-                  Question for the evaluation model (optional)
-                </span>
-                <textarea
-                  className="textarea textarea-bordered textarea-sm w-full"
-                  rows={2}
-                  value={question}
-                  onChange={(event) => setQuestion(event.target.value)}
-                  placeholder="e.g. Is the decay fit trustworthy beyond 50 Cliffords?"
-                  maxLength={2000}
-                  disabled={isSubmitting}
-                />
-              </label>
             </>
           )}
 
@@ -504,7 +506,14 @@ export function EvaluationRequestModal({
               <>
                 Will evaluate <strong>{targetLabel}</strong> with{" "}
                 <strong>{settingsLabel(mode, withExamples)}</strong>
-                {question.trim() ? ", with your question" : ""}. Recorded as one run.
+                {draft ? (
+                  <>
+                    , against the knowledge draft <strong>{draft.filename || "uploaded"}</strong>
+                  </>
+                ) : (
+                  ""
+                )}
+                . Recorded as one run.
               </>
             )}
           </div>

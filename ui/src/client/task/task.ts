@@ -534,8 +534,9 @@ export function useGetTaskKnowledgeMarkdown<TData = Awaited<ReturnType<typeof ge
  * The prompts the evaluation model would receive for a task.
  *
  * The Agent Runtime builds them the way a direct evaluation does, from the
- * task's reference in Knowledge (and its labeled examples when asked), as
- * the requesting user, without a figure or a model call.
+ * task's reference in Knowledge, or from an uploaded draft, and its labeled
+ * examples when asked, as the requesting user, without a figure or a model
+ * call.
  * @summary Preview the prompts an AI evaluation of a task would send
  */
 export const getTaskEvaluationPrompts = (

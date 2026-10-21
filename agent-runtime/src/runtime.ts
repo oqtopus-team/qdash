@@ -56,6 +56,7 @@ import {
   EVALUATION_TOOL,
   EVIDENCE_TOOL,
   EvaluationError,
+  draftKnowledge,
   evaluateTask,
   plannerInstruction,
   previewEvaluationPrompts,
@@ -68,7 +69,7 @@ import {
   type ToolRun,
 } from "./evaluate.ts";
 import { formatSettledDetail } from "./events.ts";
-import { fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
+import { fetchKnowledgeDraft, fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
 import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
 import { buildPythonTool } from "./python-tool.ts";
@@ -149,6 +150,15 @@ export interface OpenDurableSession {
 /** Return a stable non-identifying filename for one user's QDash session. */
 export function sessionStorageName(ownerId: string, sessionId: string): string {
   return `${createHash("sha256").update(ownerId).update("\0").update(sessionId).digest("hex")}.sqlite`;
+}
+
+/** Where an evaluation reads its knowledge: an uploaded draft when named, else the task's shared knowledge. */
+function knowledgeSource(connection: QDashConnection, draftId: string | undefined, signal?: AbortSignal) {
+  if (draftId) return draftKnowledge(() => fetchKnowledgeDraft(connection, draftId, signal));
+  return {
+    fetchKnowledge: (taskName: string) => fetchTaskKnowledge(connection, taskName, signal),
+    fetchExamples: (taskName: string) => fetchTaskExamples(connection, taskName, signal),
+  };
 }
 
 /** An enabled extension tool and the file that defines it. */
@@ -383,8 +393,7 @@ export class SharedRuntime {
             model,
           )) as ToolRun;
         },
-        fetchKnowledge: (taskName) => fetchTaskKnowledge(connection, taskName, signal),
-        fetchExamples: (taskName) => fetchTaskExamples(connection, taskName, signal),
+        ...knowledgeSource(connection, request.knowledgeDraftId, signal),
         evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
       });
     } finally {
@@ -423,8 +432,7 @@ export class SharedRuntime {
             undefined,
           )) as ToolRun;
         },
-        fetchKnowledge: (taskName) => fetchTaskKnowledge(connection, taskName, signal),
-        fetchExamples: (taskName) => fetchTaskExamples(connection, taskName, signal),
+        ...knowledgeSource(connection, request.knowledgeDraftId, signal),
       });
     } finally {
       await connection.close();
@@ -450,6 +458,10 @@ export class SharedRuntime {
   ): Promise<EvaluateResult> {
     if (!request.provider || !request.modelName) {
       throw new EvaluationError("request", "planner mode needs a model provider and name", 400);
+    }
+    if (request.knowledgeDraftId) {
+      // The planner's qcal_evaluate call is filled with the shared knowledge.
+      throw new EvaluationError("request", "a knowledge draft can only be evaluated in direct mode", 400);
     }
     this.resolveModel(request.provider, request.modelName);
     const evaluation = this.enabledTools.get(EVALUATION_TOOL);

@@ -36,12 +36,39 @@ from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 if TYPE_CHECKING:
+    from qdash.datamodel.task_knowledge import TaskKnowledge
     from qdash.repository.task_definition import MongoTaskDefinitionRepository
 
 logger = logging.getLogger(__name__)
 
 
 _MARKDOWN_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+
+
+def knowledge_response(knowledge: TaskKnowledge) -> TaskKnowledgeResponse:
+    """A task's knowledge as served to the UI and the runtime: figures inlined, prompt rendered."""
+
+    def _figure(fig: KnowledgeFigure) -> KnowledgeFigureResponse:
+        loaded = knowledge.load_figure_base64(fig.path)
+        data, mime = loaded if loaded else ("", "")
+        return KnowledgeFigureResponse(alt=fig.alt, path=fig.path, base64_data=data, mime_type=mime)
+
+    return TaskKnowledgeResponse(
+        name=knowledge.name,
+        category=knowledge.category,
+        background=knowledge.background,
+        figures=[_figure(f) for f in knowledge.figures],
+        examples=[
+            KnowledgeExampleResponse(
+                **example.model_dump(exclude={"figures"}),
+                figures=[_figure(f) for f in example.figures],
+                label=example.label(),
+            )
+            for example in knowledge.examples
+        ],
+        prompt_text=knowledge.to_prompt(),
+        reference=TaskReferenceResponse(**knowledge.reference().model_dump()),
+    )
 
 
 class TaskService:
@@ -233,26 +260,4 @@ class TaskService:
                 detail=f"Task '{task_name}' does not have knowledge defined",
             )
 
-        def _figure(fig: KnowledgeFigure) -> KnowledgeFigureResponse:
-            loaded = knowledge.load_figure_base64(fig.path)
-            data, mime = loaded if loaded else ("", "")
-            return KnowledgeFigureResponse(
-                alt=fig.alt, path=fig.path, base64_data=data, mime_type=mime
-            )
-
-        return TaskKnowledgeResponse(
-            name=knowledge.name,
-            category=knowledge.category,
-            background=knowledge.background,
-            figures=[_figure(f) for f in knowledge.figures],
-            examples=[
-                KnowledgeExampleResponse(
-                    **example.model_dump(exclude={"figures"}),
-                    figures=[_figure(f) for f in example.figures],
-                    label=example.label(),
-                )
-                for example in knowledge.examples
-            ],
-            prompt_text=knowledge.to_prompt(),
-            reference=TaskReferenceResponse(**knowledge.reference().model_dump()),
-        )
+        return knowledge_response(knowledge)

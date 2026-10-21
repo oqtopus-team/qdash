@@ -4,6 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from qdash.api.schemas.task import TaskReferenceResponse
 from qdash.datamodel.evaluation import (
     EvaluationInputModel,
     EvaluationMode,
@@ -34,10 +35,9 @@ class CreateEvaluationRunRequest(BaseModel):
         default=None,
         description="Restrict the run to the latest results of these qubits or couplings",
     )
-    question: str | None = Field(
+    knowledge_draft_id: str | None = Field(
         default=None,
-        max_length=2000,
-        description="A specific question for the evaluation model, on top of the diagnosis",
+        description="Evaluate against this uploaded knowledge draft instead of the shared knowledge",
     )
     trigger: EvaluationTrigger = Field(
         default="bulk", description='"bulk" from the chip page, "single" for one task result'
@@ -61,6 +61,12 @@ class EvaluationRunSummary(BaseModel):
     entity_type: str
     date: str | None = None
     question: str | None = None
+    knowledge_draft_id: str | None = Field(
+        default=None, description="The uploaded knowledge draft the run used, if any"
+    )
+    knowledge_draft_name: str | None = Field(
+        default=None, description="File name of that draft's zip"
+    )
     trigger: EvaluationTrigger
     mode: EvaluationMode
     with_examples: bool = False
@@ -153,3 +159,21 @@ class SetEvaluationVerdictRequest(BaseModel):
         ..., description="True to agree, False to disagree, null to clear the verdict"
     )
     note: str | None = Field(default=None, max_length=2000, description="Why")
+
+
+class KnowledgeDraftResponse(BaseModel):
+    """An uploaded task-knowledge draft and what an evaluation would read from it."""
+
+    draft_id: str = Field(..., description="SHA-256 of the uploaded zip")
+    task_name: str = Field(..., description="The task the draft describes (its H1)")
+    filename: str
+    uploaded_by: str
+    created_at: datetime
+    warnings: list[str] = Field(
+        default_factory=list, description="What the knowledge repository's generator warned about"
+    )
+    reference: TaskReferenceResponse = Field(
+        ..., description="The background and criteria the evaluation model would get"
+    )
+    example_count: int = Field(..., description="Labeled examples the draft holds")
+    figure_count: int = Field(..., description="Figures of index.md and the examples")

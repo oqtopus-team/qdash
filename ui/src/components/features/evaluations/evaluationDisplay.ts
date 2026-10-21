@@ -180,6 +180,14 @@ export function modeLabel(mode: string): string {
   return mode === "planner" ? "Via Copilot" : "Fixed prompt";
 }
 
+/** Which knowledge a run read: the task's shared knowledge, or an uploaded draft by file name. */
+export function knowledgeLabel(
+  run: Pick<EvaluationRunSummary, "knowledge_draft_id" | "knowledge_draft_name">,
+): string {
+  if (!run.knowledge_draft_id) return "Shared";
+  return `Draft ${run.knowledge_draft_name || run.knowledge_draft_id.slice(0, 12)}`;
+}
+
 /** Whether labeled examples were shown before the figure, in QCalEval's terms. */
 export function examplesLabel(withExamples: boolean | undefined): string {
   return withExamples ? "In-context" : "Zero-shot";
