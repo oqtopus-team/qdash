@@ -112,10 +112,6 @@ export default withMermaid(
                   text: "Projects and Data Sharing",
                   link: "/user-guide/projects-and-data-sharing",
                 },
-                {
-                  text: "Roles and Permissions",
-                  link: "/user-guide/roles-and-permissions",
-                },
                 { text: "Dashboard", link: "/user-guide/dashboard" },
                 { text: "Running Calibrations", link: "/user-guide/running-calibrations" },
                 { text: "Task Parameters", link: "/user-guide/task-parameters" },

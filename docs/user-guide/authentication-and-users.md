@@ -16,13 +16,14 @@ personal settings and password changes.
 
 | Role | Platform access |
 | --- | --- |
-| User | Sign in, update the own account, and access assigned projects. |
+| User | Sign in, update their own account, and access assigned projects. |
 | Admin | Create users, reset passwords, and open the Admin page. |
 
 The deployment creates its initial administrator during setup. See
 [Setup](./setup.md#configure-shared-deployment-settings) for the required credentials. System
 administrators do not automatically own every project; project membership still controls access
-to project data.
+to project data. An administrator can add themselves to a project from **Admin** when they need
+that access.
 
 ## Create Users
 
@@ -45,15 +46,8 @@ Automation should use a saved [QDash Client](../reference/clients/python.md) pro
 handles authentication and project selection without placing tokens directly in shell history.
 
 For a custom API integration, use the interactive OpenAPI page linked from QDash or the
-[OpenAPI reference](../reference/openapi.md) for the current authentication operation, project
-header, and request and response schemas.
+[OpenAPI reference](../reference/openapi.md) for the current authentication and project-selection
+contract.
 
-## Authorization Layers
-
-System and project roles answer different questions:
-
-- The system role controls account administration.
-- The project role controls access to a project's calibration data and operations.
-
-See [Projects and Data Sharing](./projects-and-data-sharing.md) for owner, editor, and viewer
-permissions.
+System roles control account administration. Project roles separately control calibration data
+and operations; see [Projects and Data Sharing](./projects-and-data-sharing.md#choose-a-project-role).
