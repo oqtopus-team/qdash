@@ -18,6 +18,10 @@ def _entry(name: str, summary: str) -> dict[str, object]:
     return {"name": name, "category": "one_qubit_coarse", "background": summary}
 
 
+def _document(entries: dict[str, object], *, version: int = 1) -> dict[str, object]:
+    return {"schema_version": version, "tasks": entries}
+
+
 @pytest.fixture
 def knowledge_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     repo = tmp_path / "task-knowledge"
@@ -55,6 +59,28 @@ def test_registry_reloads_when_the_json_changes(knowledge_repo: Path) -> None:
 def test_registry_is_cached_while_the_json_is_unchanged(knowledge_repo: Path) -> None:
     first = tk.list_all_task_knowledge()[0]
     assert tk.get_task_knowledge("CheckT1") is first
+
+
+def test_versioned_registry_document_loads(knowledge_repo: Path) -> None:
+    (knowledge_repo / "task-knowledge.json").write_text(
+        json.dumps(_document({"CheckT2": _entry("CheckT2", "versioned")})), encoding="utf-8"
+    )
+    tk._REGISTRY_CACHE = (None, {})
+
+    knowledge = tk.get_task_knowledge("CheckT2")
+
+    assert knowledge is not None
+    assert knowledge.summary == "versioned"
+
+
+def test_unknown_registry_schema_version_is_rejected(knowledge_repo: Path) -> None:
+    (knowledge_repo / "task-knowledge.json").write_text(
+        json.dumps(_document({}, version=2)), encoding="utf-8"
+    )
+    tk._REGISTRY_CACHE = (None, {})
+
+    with pytest.raises(ValueError, match="unsupported task-knowledge schema_version: 2"):
+        tk.list_all_task_knowledge()
 
 
 def test_previous_format_entries_still_load(knowledge_repo: Path) -> None:

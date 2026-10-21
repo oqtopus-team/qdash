@@ -175,11 +175,12 @@ exceeds `MAX_ZIP_BYTES` (20 MB), `MAX_EXTRACTED_BYTES` (50 MB, counted while ext
 `MAX_ENTRIES` (200).
 
 The directory is parsed by the knowledge repository's own `generate.py`: `parse_task_dir`
-loads it from the `config/task-knowledge` checkout and calls its public `parse_task_dir`
-(`_parse_task` on checkouts that predate it), so a draft reads
-exactly as the published entry would, warnings included. The resulting `TaskKnowledge` resolves
-its figures inside the draft directory. Without the checkout's `generate.py` the upload answers
-503.
+loads it from the `config/task-knowledge` checkout and calls its public `parse_task_dir`. The
+public parser returns a versioned `ParseResult` dictionary; QDash also accepts the earlier tuple
+result. QDash calls `_parse_task` on checkouts that predate the public entry point. A draft
+therefore reads exactly as the published entry would, warnings included. The resulting
+`TaskKnowledge` resolves its figures inside the draft directory. Without the checkout's
+`generate.py` the upload answers 503.
 
 `GET /evaluations/knowledge-drafts/{id}/archive` returns `draft.zip` byte for byte under its
 uploaded file name, so the knowledge a run read can be downloaded from the run's page and

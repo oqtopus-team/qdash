@@ -204,7 +204,7 @@ def test_a_drafts_archive_is_the_upload_under_its_file_name(
     assert exc_info.value.status_code == 404
 
 
-def test_the_generators_public_parser_is_preferred(
+def test_the_generators_versioned_public_parser_is_preferred(
     store: kds.KnowledgeDraftStore, config_dir: Path
 ) -> None:
     # A checkout with parse_task_dir: QDash uses it and its warnings, not the private function.
@@ -214,7 +214,7 @@ def test_the_generators_public_parser_is_preferred(
 
 def parse_task_dir(task_dir, category=""):
     entry = _parse_task(task_dir, category)
-    return entry, ["from the public parser"]
+    return {"schema_version": 1, "entry": entry, "warnings": ["from the public parser"]}
 """,
         encoding="utf-8",
     )
@@ -222,3 +222,21 @@ def parse_task_dir(task_dir, category=""):
     draft = store.create("proj-1", make_zip(RABI), filename="rabi.zip", uploaded_by="alice")
 
     assert draft.warnings == ["from the public parser"]
+
+
+def test_a_public_parser_tuple_from_an_older_checkout_still_loads(
+    store: kds.KnowledgeDraftStore, config_dir: Path
+) -> None:
+    (config_dir / "generate.py").write_text(
+        GENERATOR
+        + """
+
+def parse_task_dir(task_dir, category=""):
+    return _parse_task(task_dir, category), ["from the tuple parser"]
+""",
+        encoding="utf-8",
+    )
+
+    draft = store.create("proj-1", make_zip(RABI), filename="rabi.zip", uploaded_by="alice")
+
+    assert draft.warnings == ["from the tuple parser"]

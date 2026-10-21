@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
+TASK_KNOWLEDGE_SCHEMA_VERSION = 1
 
 # ---------------------------------------------------------------------------
 # Models
@@ -395,8 +396,19 @@ def _resolve_repo_dir() -> Path | None:
 def _build_registry(json_path: Path) -> dict[str, TaskKnowledge]:
     """Build the task knowledge registry from the generated JSON file."""
     raw = json.loads(json_path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("task-knowledge.json must contain an object")
+    if "schema_version" in raw or "tasks" in raw:
+        version = raw.get("schema_version")
+        if version != TASK_KNOWLEDGE_SCHEMA_VERSION:
+            raise ValueError(f"unsupported task-knowledge schema_version: {version!r}")
+        raw = raw.get("tasks")
+        if not isinstance(raw, dict):
+            raise ValueError("task-knowledge.json tasks must contain an object")
     registry: dict[str, TaskKnowledge] = {}
     for name, data in raw.items():
+        if not isinstance(data, dict):
+            raise ValueError(f"task-knowledge entry {name!r} must contain an object")
         registry[name] = TaskKnowledge(**data)
     logger.info("Loaded %d task knowledge entries from %s", len(registry), json_path)
     return registry
@@ -449,7 +461,16 @@ def parse_task_dir(task_dir: Path, *, category: str = "") -> tuple[TaskKnowledge
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     if hasattr(module, "parse_task_dir"):
-        entry, raised = module.parse_task_dir(task_dir, category)
+        result = module.parse_task_dir(task_dir, category)
+        if isinstance(result, dict):
+            version = result.get("schema_version")
+            if version != TASK_KNOWLEDGE_SCHEMA_VERSION:
+                raise RuntimeError(f"unsupported task-knowledge schema_version: {version!r}")
+            entry = result.get("entry")
+            raised = result.get("warnings", [])
+        else:
+            # Public parsers deployed before the versioned result returned a tuple.
+            entry, raised = result
     else:
         # Checkouts from before the public entry point.
         entry = module._parse_task(task_dir, category)
