@@ -99,23 +99,23 @@ def evaluation_model_config(requested: dict[str, str] | None) -> dict[str, str] 
             )
         return None
     if requested is None:
-        selected = candidates[0]
-    else:
-        selected = next(
-            (
-                candidate
-                for candidate in candidates
-                if candidate.provider == requested.get("provider")
-                and candidate.name == requested.get("name")
-            ),
-            None,
+        default = candidates[0]
+        return {"provider": default.provider, "name": default.name}
+    selected = next(
+        (
+            candidate
+            for candidate in candidates
+            if candidate.provider == requested.get("provider")
+            and candidate.name == requested.get("name")
+        ),
+        None,
+    )
+    if selected is None:
+        identity = f"{requested.get('provider', '')}/{requested.get('name', '')}"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"evaluation model {identity} is not configured",
         )
-        if selected is None:
-            identity = f"{requested.get('provider', '')}/{requested.get('name', '')}"
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"evaluation model {identity} is not configured",
-            )
     return {"provider": selected.provider, "name": selected.name}
 
 
