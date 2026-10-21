@@ -63,11 +63,21 @@ figure, raw data, task knowledge, and current calibration context. See
 Mentions, replies, and system events appear in **Inbox**. Open the linked record to recover its
 project and result context, then mark the notification read after reviewing the event.
 
-## Share a Result
+## Share and Hand Off a Result
 
 Before sending a QDash link, confirm that the recipient belongs to the active project. Project
 membership controls access; removing a member revokes access without deleting the records they
 produced.
 
-See [Calibration Data Sharing](./calibration-data-sharing.md) when another member will continue the
-calibration from this result.
+When another member will continue the calibration:
+
+1. Confirm the active project and chip.
+2. Open **Task Results** and share the result link or start a forum thread from the result.
+3. Record the execution, target, evidence, and next decision in the result note or thread.
+4. Ask the recipient to confirm the same project and chip before starting the next task or
+   workflow.
+
+Saved calibrated outputs become the current state for later tasks in the same project. An
+exploratory run with **Save calibrated outputs to DB** turned off remains available for review,
+but later tasks do not use its outputs as current values. See
+[Task Parameters](./task-parameters.md#decide-whether-to-save-outputs) for that choice.

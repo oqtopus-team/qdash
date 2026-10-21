@@ -128,10 +128,6 @@ export default withMermaid(
                   text: "Cryostats and Cool-downs",
                   link: "/user-guide/cryostats-and-cool-downs",
                 },
-                {
-                  text: "Calibration Data Sharing",
-                  link: "/user-guide/calibration-data-sharing",
-                },
               ],
             },
           ],
