@@ -70,5 +70,6 @@ Open **Config** to edit the active project's Qubex configuration files. Save loc
 pulling or creating a pull request; pulling can replace the working copy.
 
 Figures and raw data stay associated with the project, chip, execution, and task result that
-produced them. See [Calibration Data Sharing](./calibration-data-sharing.md) before handing a run
-over to another project member.
+produced them. See
+[Share and Hand Off a Result](./reviewing-results.md#share-and-hand-off-a-result) before handing a
+run over to another project member.

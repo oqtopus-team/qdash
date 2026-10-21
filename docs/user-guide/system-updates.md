@@ -6,17 +6,6 @@ the Docker Compose stack.
 Run these commands from the QDash repository root. Schedule a maintenance window because QDash is
 unavailable while its containers are stopped and rebuilt.
 
-## Stop the Legacy Updater
-
-Releases that show an update control under Admin **System** run a separate updater process on the
-host. Stop that process from the old checkout before moving to a release that removes the control:
-
-```bash
-uv run --env-file .env --isolated --locked --no-dev qdash-updater stop
-```
-
-This is a one-time transition step. Current releases do not install or run the host updater.
-
 ## Prepare the Update
 
 Read the target release notes before changing the checkout. A release that changes stored data

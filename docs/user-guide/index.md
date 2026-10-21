@@ -2,43 +2,38 @@
 
 Use this guide to operate a QDash deployment and complete calibration work in the application.
 
-## Choose a Starting Point
+## Set Up and Operate QDash
 
-| Goal | Start here |
+Choose a backend in [Setup](./setup.md) to take a new installation from clone to sign-in. The
+[Fake backend](./setup/fake-backend.md) evaluates QDash without hardware; the
+[Qubex backend](./setup/qubex-backend.md) connects a supported control system.
+
+After setup, use [Operations](./operations.md) to control and troubleshoot services and
+[System Updates](./system-updates.md) to deploy another stable release.
+
+## Learn the Application
+
+Read [What is QDash?](./what-is-qdash.md) for the calibration model and watch the short demo.
+Use the [Application Tour](./application-tour.md) to find each page and its task-specific guide.
+
+## Complete Calibration Work
+
+| Goal | Guide |
 | --- | --- |
-| Understand what QDash manages | [What is QDash?](./what-is-qdash.md) |
-| Choose an installation path | [Setup](./setup.md) |
-| Evaluate QDash without hardware | [Fake Backend Setup](./setup/fake-backend.md) |
-| Connect QDash to supported hardware | [Qubex Backend Setup](./setup/qubex-backend.md) |
-| Start, stop, or troubleshoot QDash | [Operations](./operations.md) |
-| Learn the application pages | [Application Tour](./application-tour.md) |
-| Run a workflow or one calibration task | [Running Calibrations](./running-calibrations.md) |
-| Investigate calibration state or history | [Calibration Data and Provenance](./data-and-provenance.md) |
-| Review and discuss a result | [Reviewing and Sharing Results](./reviewing-results.md) |
-| Evaluate task-result figures with AI | [AI Evaluations](./ai-evaluations.md) |
-| Use QDash from a script | [Python client](../reference/clients/python.md) or [TypeScript client](../reference/clients/typescript.md) |
+| Run a workflow or one task | [Running Calibrations](./running-calibrations.md) |
+| Control inputs and saved outputs | [Task Parameters](./task-parameters.md) |
+| Scan chip health | [Dashboard](./dashboard.md) |
+| Investigate state, history, or provenance | [Calibration Data and Provenance](./data-and-provenance.md) |
+| Review, discuss, or hand off a result | [Reviewing and Sharing Results](./reviewing-results.md) |
+| Track cryostats, cool-downs, and wiring | [Cryostats and Cool-downs](./cryostats-and-cool-downs.md) |
+| Evaluate results with AI | [AI Evaluations](./ai-evaluations.md) |
+| Use assisted calibration | [AI Chat](./ai-chat.md) or [Agent Calibration](./agent-calibration.md) |
 
-## Operate a Deployment
+## Manage Access
 
-[Setup](./setup.md) takes a new installation from clone to sign-in. After setup, use
-[Operations](./operations.md) for routine service control and recovery, and
-[System Updates](./system-updates.md) to move the installation to another stable release.
+Use [Authentication and Users](./authentication-and-users.md) for accounts and passwords,
+[Projects and Data Sharing](./projects-and-data-sharing.md) for membership and project boundaries,
+and [Roles and Permissions](./roles-and-permissions.md) to look up allowed actions.
 
-## Work in QDash
-
-Start with the [Application Tour](./application-tour.md), then open the guide for the job at
-hand:
-
-- **Access and scope:** [Authentication](./authentication-and-users.md),
-  [Projects and Data Sharing](./projects-and-data-sharing.md), and
-  [Roles and Permissions](./roles-and-permissions.md).
-- **Run calibration:** [Running Calibrations](./running-calibrations.md) and
-  [Task Parameters](./task-parameters.md).
-- **Inspect data:** [Dashboard](./dashboard.md) and
-  [Calibration Data and Provenance](./data-and-provenance.md).
-- **Collaborate:** [Reviewing and Sharing Results](./reviewing-results.md),
-  [AI Evaluations](./ai-evaluations.md), and
-  [Calibration Data Sharing](./calibration-data-sharing.md).
-- **Track hardware context:** [Cryostats and Cool-downs](./cryostats-and-cool-downs.md).
-- **Use assisted workflows:** [AI Chat](./ai-chat.md) and
-  [Agent Calibration](./agent-calibration.md).
+For automation, use the [Python client](../reference/clients/python.md) or
+[TypeScript client](../reference/clients/typescript.md).

@@ -44,8 +44,8 @@ chip.
 Before sharing a QDash link, confirm that the recipient belongs to the project. Removing a member
 revokes access but does not delete records that member produced.
 
-See [Calibration Data Sharing](./calibration-data-sharing.md) when another member will continue
-work from an existing result.
+See [Reviewing and Sharing Results](./reviewing-results.md#share-and-hand-off-a-result) when
+another member will continue work from an existing result.
 
 ## Programmatic Access
 

@@ -337,7 +337,16 @@ tasks:
         for section in developer-guide user-guide reference; do
           ln -s "$(pwd)/docs/${section}" "${LYCHEE_ROOT_DIR}/source/${section}"
         done
-        git ls-files docs | awk '/\.md$/ { print }' > "${LYCHEE_ROOT_DIR}/inputs"
+        git ls-files --cached --others --exclude-standard docs |
+          while IFS= read -r file; do
+            case "${file}" in
+              *.md)
+                if [ -f "${file}" ]; then
+                  printf '%s\n' "${file}"
+                fi
+                ;;
+            esac
+          done > "${LYCHEE_ROOT_DIR}/inputs"
         lychee --config lychee.toml --root-dir "${LYCHEE_ROOT_DIR}/source" \
           --files-from "${LYCHEE_ROOT_DIR}/inputs"
         ln -s "$(pwd)/docs/.vitepress/dist" "${LYCHEE_ROOT_DIR}/site/qdash"

@@ -66,5 +66,5 @@ Calibration follows this flow.
 <Diagram name="calibration-flow" caption="How a calibration run is dispatched, executed task by task, and closed or cancelled." />
 
 The [Workflow Engine Architecture](./workflow/engine-architecture.md) describes the
-runtime components in detail. [Calibration Data Sharing](../user-guide/calibration-data-sharing.md)
-explains project-scoped state and artifacts.
+runtime components in detail. [Projects and Data Sharing](../user-guide/projects-and-data-sharing.md)
+explains the user-visible boundary for project-scoped state and artifacts.

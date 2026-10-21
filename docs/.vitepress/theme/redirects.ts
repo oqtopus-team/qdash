@@ -63,6 +63,7 @@ export const REDIRECTS: Record<string, string> = {
   "/developer-guide/workflow/testing-components": "/developer-guide/workflow/testing",
   "/developer-guide/workflow/testing-fixtures": "/developer-guide/workflow/testing",
   "/user-guide/authentication": "/user-guide/authentication-and-users",
+  "/user-guide/calibration-data-sharing": "/user-guide/reviewing-results#share-and-hand-off-a-result",
   "/user-guide/copilot": "/user-guide/ai-chat",
   "/user-guide/cryo": "/user-guide/cryostats-and-cool-downs",
   "/user-guide/permissions": "/user-guide/roles-and-permissions",
