@@ -57,6 +57,10 @@ def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monk
     task = _task()
     exp = MagicMock()
     exp.get_qubit_label.return_value = "Q00"
+    exp.quantum_system.get_qubit.return_value = SimpleNamespace(
+        control_frequency_ef_value=4.72,
+        anharmonicity_value=-0.9,
+    )
     exp.ctx.resolve_ge_label.return_value = "Q00_ge"
     exp.ctx.resolve_ef_label.return_value = "Q00-ef"
     # Validation must not access backend-specific channel attributes.
@@ -75,7 +79,7 @@ def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monk
         result = task.run(cast("Any", object()), "0")
     kwargs = estimate.call_args.kwargs
     assert kwargs["targets"] == ["Q00"]
-    assert kwargs["frequencies"]["Q00"] == pytest.approx(4.701)
+    assert kwargs["frequencies"]["Q00"] == pytest.approx(4.72)
     assert kwargs["amplitudes"] == {"Q00": 0.0625}
     np.testing.assert_allclose(kwargs["final_detuning_range"], np.linspace(-0.05, 0.05, 41))
     assert list(kwargs["final_time_range"]) == list(range(0, 257, 8))
@@ -85,6 +89,42 @@ def test_run_passes_ef_seed_final_sweep_and_amplitude_to_adaptive_estimator(monk
     assert result.raw_result is estimate.return_value
     exp.params.readout_amplitude.__setitem__.assert_called_once_with("Q00", 0.031)
     exp.modified_frequencies.assert_called_once_with({"Q00_ge": 5.001, "Q00_read": 6.1})
+
+
+def test_run_uses_qubex_missing_anharmonicity_default_when_ef_frequency_is_unset(
+    monkeypatch,
+) -> None:
+    """Ignore a configured anharmonicity when no explicit EF frequency exists."""
+    task = _task()
+    exp = MagicMock()
+    exp.get_qubit_label.return_value = "Q00"
+    exp.quantum_system.get_qubit.return_value = SimpleNamespace(
+        control_frequency_ef_value=None,
+        anharmonicity_value=-0.9,
+    )
+    exp.ctx.resolve_ge_label.return_value = "Q00_ge"
+    exp.ctx.resolve_ef_label.return_value = "Q00-ef"
+    exp.targets = {"Q00_ge": object(), "Q00-ef": object()}
+    exp.ctx.resolve_read_label.return_value = "Q00_read"
+    exp.modified_frequencies.return_value = nullcontext()
+    monkeypatch.setattr(task, "get_experiment", lambda backend: exp)
+    estimate = create_autospec(
+        estimate_ef_frequency_from_chevron_adaptive, return_value=_result().raw_result
+    )
+
+    with patch(
+        "qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_chevron."
+        "estimate_ef_frequency_from_chevron_adaptive",
+        estimate,
+    ):
+        task.run(cast("Any", object()), "0")
+
+    assert estimate.call_args.kwargs["frequencies"]["Q00"] == pytest.approx(5.001 * 18 / 19)
+
+
+def test_ef_chevron_does_not_declare_anharmonicity_as_an_input() -> None:
+    """Keep persisted anharmonicity out of EF chevron seed selection."""
+    assert "anharmonicity" not in CheckEFChevron.input_spec
 
 
 def test_run_rejects_missing_ef_target_before_measurement() -> None:

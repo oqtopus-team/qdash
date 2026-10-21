@@ -28,7 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 BRINGUP_TASKS: list[str] = [
     "CheckResonatorSpectroscopy",  # MUX-level: estimates readout_frequency
-    "CheckQubitSpectroscopy",  # coarse_qubit_frequency, anharmonicity, coarse_control_amplitude
+    "CheckQubitSpectroscopy",  # coarse_qubit_frequency, coarse_control_amplitude
     "CheckControlAmplitude",  # Refine coarse_control_amplitude from spectroscopy-derived seed
     "CheckAdaptiveChevron",
 ]
