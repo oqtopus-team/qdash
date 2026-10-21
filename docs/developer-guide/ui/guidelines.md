@@ -7,12 +7,12 @@ small and features remain testable.
 
 | Tool | Role |
 | --- | --- |
-| Next.js 16 and React 19 | App Router and component runtime |
-| TypeScript 6 | Strict application types |
-| Bun 1.4 | Package manager and script runtime |
+| Next.js and React | App Router and component runtime |
+| TypeScript | Strict application types |
+| Bun | Package manager and script runtime |
 | TanStack Query | Generated server-state hooks and caching |
 | `nuqs` | URL query state |
-| Tailwind CSS 4 and DaisyUI 5 | Layout, components, semantic colors, and themes |
+| Tailwind CSS and DaisyUI | Layout, components, semantic colors, and themes |
 | Radix UI | Accessible behavior for dialogs, menus, and tooltips |
 | Vitest and Testing Library | Unit and component tests |
 | Oxlint, Oxfmt, and Knip | Lint, format, and unused-code checks |
@@ -57,16 +57,45 @@ Use established aliases:
 
 ## Keep Boundaries Explicit
 
-- Use generated TanStack Query hooks for API state.
-- Use Context only for state shared across unrelated routes or surfaces.
-- Use `nuqs` for shareable filters, selections, and date ranges.
-- Use React Hook Form and Zod for validated multi-field forms.
-- Reuse `Dialog`, `DropdownMenu`, `Tooltip`, `PageHeader`, `PageFiltersBar`, and other existing
-  primitives before adding another abstraction.
-- Put general visual rules in `globals.css`; keep one-off layout in component classes.
+Choose the narrowest owner that preserves the required behavior:
 
-See [Components and State](./components.md) for choosing boundaries and
-[UI Architecture](./architecture.md) for the complete data flow.
+| State | Owner |
+| --- | --- |
+| API records and mutation status | Generated TanStack Query hook |
+| Shareable filters, selections, and date ranges | Existing `use*UrlState` hook |
+| Authentication, active project, theme, or global layout | Existing context |
+| One component subtree | Local state or a focused hook |
+| Validated multi-field form | React Hook Form with Zod |
+
+Do not copy query results into Context or synchronize duplicate response state by hand. Invalidate
+the affected generated query keys after a mutation.
+
+Keep feature-specific composition in `components/features/`. Move a component to
+`components/ui/` only when its API no longer depends on a feature model and at least two callers
+can reuse it. Search the existing primitives before adding one; QDash already provides dialogs,
+menus, tooltips, page framing, tables, loading and empty states, errors, confirmation, and toast
+feedback.
+
+Use DaisyUI for buttons, cards, inputs, badges, tables, alerts, and other visual components. Reuse
+the shared Radix-based `Dialog`, `DropdownMenu`, and `Tooltip` wrappers when focus management,
+keyboard navigation, portals, dismissal, or collision handling requires them. Feature code does
+not import another headless primitive to replace an established wrapper.
+
+How these boundaries connect: [UI Architecture](./architecture.md).
+
+## Write TypeScript
+
+`ui/tsconfig.json` enables strict checking, unused-symbol checks, fallthrough checks, and
+`noEmit`. Model finite UI states with string or discriminated unions instead of independent
+booleans that allow impossible combinations.
+
+Import API request and response types from `@/schemas`; do not copy generated interfaces into a
+feature. Use `unknown` and narrow it at an untyped boundary instead of spreading `any` through
+props or state. Keep unavoidable assertions at the deserialization, DOM, or third-party library
+boundary, and render reachable missing states instead of hiding them with a non-null assertion.
+
+Generated hooks already type their data, errors, variables, and callbacks. Add explicit types
+when data crosses a generic boundary, not to repeat inference that is already precise.
 
 ## Run the Development Loop
 
