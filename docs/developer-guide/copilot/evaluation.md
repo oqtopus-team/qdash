@@ -175,7 +175,8 @@ exceeds `MAX_ZIP_BYTES` (20 MB), `MAX_EXTRACTED_BYTES` (50 MB, counted while ext
 `MAX_ENTRIES` (200).
 
 The directory is parsed by the knowledge repository's own `generate.py`: `parse_task_dir`
-loads it from the `config/task-knowledge` checkout and calls its `_parse_task`, so a draft reads
+loads it from the `config/task-knowledge` checkout and calls its public `parse_task_dir`
+(`_parse_task` on checkouts that predate it), so a draft reads
 exactly as the published entry would, warnings included. The resulting `TaskKnowledge` resolves
 its figures inside the draft directory. Without the checkout's `generate.py` the upload answers
 503.

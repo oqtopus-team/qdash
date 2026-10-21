@@ -202,3 +202,23 @@ def test_a_drafts_archive_is_the_upload_under_its_file_name(
     with pytest.raises(HTTPException) as exc_info:
         store.archive("proj-2", draft.draft_id)
     assert exc_info.value.status_code == 404
+
+
+def test_the_generators_public_parser_is_preferred(
+    store: kds.KnowledgeDraftStore, config_dir: Path
+) -> None:
+    # A checkout with parse_task_dir: QDash uses it and its warnings, not the private function.
+    (config_dir / "generate.py").write_text(
+        GENERATOR
+        + """
+
+def parse_task_dir(task_dir, category=""):
+    entry = _parse_task(task_dir, category)
+    return entry, ["from the public parser"]
+""",
+        encoding="utf-8",
+    )
+
+    draft = store.create("proj-1", make_zip(RABI), filename="rabi.zip", uploaded_by="alice")
+
+    assert draft.warnings == ["from the public parser"]

@@ -448,8 +448,13 @@ def parse_task_dir(task_dir: Path, *, category: str = "") -> tuple[TaskKnowledge
     # A fresh module per call: the generator collects warnings in a module-level list.
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    entry = module._parse_task(task_dir, category)
-    warnings = [str(warning) for warning in getattr(module, "warnings", [])]
+    if hasattr(module, "parse_task_dir"):
+        entry, raised = module.parse_task_dir(task_dir, category)
+    else:
+        # Checkouts from before the public entry point.
+        entry = module._parse_task(task_dir, category)
+        raised = getattr(module, "warnings", [])
+    warnings = [str(warning) for warning in raised]
     if not entry:
         return None, warnings
     knowledge = TaskKnowledge(**entry)
