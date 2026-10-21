@@ -246,12 +246,12 @@ export function callLabel(call: EvaluationCallModel): string {
 }
 
 /** A token count with thousands separators. */
-export function formatTokens(count: number): string {
+function formatTokens(count: number): string {
   return count.toLocaleString("en-US");
 }
 
 /** Share of the context window past which a call is flagged as close to the limit. */
-export const CONTEXT_WARNING_RATIO = 0.9;
+const CONTEXT_WARNING_RATIO = 0.9;
 
 /**
  * The largest model call of one or more evaluations, in tokens: the prompt it
