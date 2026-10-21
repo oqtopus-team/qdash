@@ -169,9 +169,6 @@ export default withMermaid(
               items: [
                 { text: "Architecture", link: "/developer-guide/ui/architecture" },
                 { text: "Guidelines", link: "/developer-guide/ui/guidelines" },
-                { text: "Components and State", link: "/developer-guide/ui/components" },
-                { text: "Styling", link: "/developer-guide/ui/styling" },
-                { text: "TypeScript", link: "/developer-guide/ui/typescript" },
                 { text: "API Integration", link: "/developer-guide/ui/api-integration" },
                 { text: "Design Policy", link: "/developer-guide/ui/design-policy" },
                 { text: "Testing", link: "/developer-guide/ui/testing" },

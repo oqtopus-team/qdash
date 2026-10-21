@@ -36,6 +36,25 @@ only status signal; pair it with text, an icon, or both.
 Use fixed colors only where the same data category must remain stable across themes, such as a
 plot series. Verify contrast against every surface on which that color appears.
 
+## Implement Styles
+
+Start with a DaisyUI component class, add its intent or size modifier, then use Tailwind utilities
+for local layout and responsive behavior. Do not reproduce a component's base style with a long
+utility list or use inline styles for ordinary layout and theme colors.
+
+Use `base-*` colors for surfaces and content. Pair filled semantic backgrounds with their matching
+`*-content` foreground. Do not add `dark:` variants for DaisyUI semantic colors; the active
+`data-theme` supplies their values.
+
+`ui/src/app/globals.css` owns application-wide theme overrides, shared motion, and behavior that
+must apply to every matching component. Keep one-off layout in component classes. Before adding a
+global selector, confirm that every matching component should change.
+
+Theme names live in `ui/src/constants/themes.ts`, while their imports and QDash overrides live in
+`globals.css`. When adding a theme, update `AVAILABLE_THEMES`, update `DARK_THEMES` when it needs
+dark surfaces, import its DaisyUI theme, and check representative pages, dialogs, charts, status
+colors, and focus indicators.
+
 ## Represent Every UI State
 
 Feature components distinguish these states:
@@ -88,7 +107,5 @@ color itself carries stable domain meaning. A global error route can use a minim
 surface because normal providers may be unavailable.
 
 An exception must still provide readable text, accessible names, and sufficient contrast. It is
-not a reason to bypass semantic colors for ordinary controls.
-
-See [Styling](./styling.md) for implementation rules and [Components and State](./components.md)
-for component foundations.
+not a reason to bypass semantic colors for ordinary controls. Component placement and interaction
+foundations are defined in [UI Development Guidelines](./guidelines.md#keep-boundaries-explicit).
