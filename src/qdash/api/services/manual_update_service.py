@@ -163,19 +163,18 @@ class ManualUpdateService:
                     execution_id=execution_id,
                 )
 
-            if source_doc is not None:
-                for source_version in self._param_version_repo.get_by_task(
-                    project_id=project_id, task_id=source_doc.task_id
-                ):
-                    self._relation_repo.create_relation(
-                        relation_type=ProvenanceRelationType.USED,
-                        source_type="activity",
-                        source_id=activity.activity_id,
-                        target_type="entity",
-                        target_id=source_version.entity_id,
-                        project_id=project_id,
-                        execution_id=execution_id,
-                    )
+            for source_version in self._param_version_repo.get_by_task(
+                project_id=project_id, task_id=source_doc.task_id
+            ):
+                self._relation_repo.create_relation(
+                    relation_type=ProvenanceRelationType.USED,
+                    source_type="activity",
+                    source_id=activity.activity_id,
+                    target_type="entity",
+                    target_id=source_version.entity_id,
+                    project_id=project_id,
+                    execution_id=execution_id,
+                )
 
             # Record in TaskResultHistory so metrics page picks up the new values.
             task_type = "coupling" if is_coupling else "qubit"
@@ -208,7 +207,7 @@ class ManualUpdateService:
                 execution_id=execution_id,
                 tags=["manual-edit"],
                 chip_id=request.chip_id,
-                source_task_id=source_doc.task_id if source_doc is not None else None,
+                source_task_id=source_doc.task_id,
             )
             task_result.insert()
 
@@ -340,11 +339,8 @@ class ManualUpdateService:
         self,
         request: ManualParameterUpdateRequest,
         project_id: str,
-    ) -> TaskResultHistoryDocument | None:
+    ) -> TaskResultHistoryDocument:
         """Validate a correction against the source spectroscopy result."""
-        if request.source_task_id is None:
-            return None
-
         source_doc = TaskResultHistoryDocument.find_one(
             {"project_id": project_id, "task_id": request.source_task_id}
         ).run()
@@ -374,11 +370,11 @@ class ManualUpdateService:
 
     @staticmethod
     def _save_correction_figure(
-        source_doc: TaskResultHistoryDocument | None,
+        source_doc: TaskResultHistoryDocument,
         request: ManualParameterUpdateRequest,
     ) -> tuple[list[str], list[str]]:
         """Persist a marker-overlay figure for later review of a manual correction."""
-        if source_doc is None or request.correction_point is None:
+        if request.correction_point is None:
             return [], []
         if not source_doc.json_figure_path:
             raise HTTPException(

@@ -470,7 +470,6 @@ export * from './manualEditsResponse';
 export * from './manualParameterUpdateRequest';
 export * from './manualParameterUpdateRequestCorrectionPoint';
 export * from './manualParameterUpdateRequestParameters';
-export * from './manualParameterUpdateRequestSourceTaskId';
 export * from './manualParameterUpdateResponse';
 export * from './manualParameterUpdateResponseProvenanceActivityId';
 export * from './markAllNotificationsRead200';

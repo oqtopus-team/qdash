@@ -23292,14 +23292,7 @@
             "description": "Parameters to update. Format: {\"param_name\": {\"value\": 4.85, \"unit\": \"GHz\"}}"
           },
           "source_task_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Source Task Id",
             "description": "Task result whose output values are being manually corrected"
           },
@@ -23319,10 +23312,11 @@
         "required": [
           "chip_id",
           "qid",
-          "parameters"
+          "parameters",
+          "source_task_id"
         ],
         "title": "ManualParameterUpdateRequest",
-        "description": "Request to manually update calibration parameters.\n\nParameters are written to the DB and provenance is recorded.\nThe qid format determines target type: \"0\" for qubit, \"0-1\" for coupling."
+        "description": "Request to manually correct calibration parameters from a task result.\n\nCorrections must reference a supported source task result, and only that\nresult's output parameters can be written. Parameters are written to the DB\nand provenance is recorded.\nThe qid format determines target type: \"0\" for qubit, \"0-1\" for coupling."
       },
       "ManualParameterUpdateResponse": {
         "properties": {
