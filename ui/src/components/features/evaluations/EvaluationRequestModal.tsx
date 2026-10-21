@@ -492,10 +492,10 @@ export function EvaluationRequestModal({
               />
 
               {evaluationModelOptions.length > 0 && (
-                <fieldset className="fieldset">
+                <fieldset className="fieldset min-w-0">
                   <legend className="fieldset-legend">Evaluation model</legend>
                   <select
-                    className="select w-full"
+                    className="select w-full min-w-0 max-w-full"
                     value={evaluationModel?.key ?? ""}
                     onChange={(event) => setEvaluationModelKey(event.target.value)}
                     disabled={isSubmitting || modelsLoading}

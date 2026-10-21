@@ -16,13 +16,13 @@ describe("buildEvaluationModelOptions", () => {
     ).toEqual([
       {
         key: "evaluation-openai-compatible-evaluation:ising",
-        label: "ising (openai-compatible-evaluation)",
+        label: "ising",
         model: { provider: "openai-compatible-evaluation", name: "ising" },
         reasoningEffort: null,
       },
       {
         key: "evaluation-openai-compatible-chat:qwen",
-        label: "qwen (openai-compatible-chat)",
+        label: "qwen",
         model: {
           provider: "openai-compatible-chat",
           name: "qwen",

@@ -111,7 +111,7 @@ export function buildEvaluationModelOptions(config: Record<string, unknown> | nu
     seen.add(identity);
     options.push({
       key: `evaluation-${identity}`,
-      label: `${model.name} (${model.provider})`,
+      label: model.name,
       model,
       reasoningEffort: model.reasoning_effort ?? null,
     });

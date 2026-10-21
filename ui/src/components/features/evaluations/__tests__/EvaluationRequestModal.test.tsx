@@ -144,11 +144,15 @@ describe("EvaluationRequestModal", () => {
       </QueryClientProvider>,
     );
 
+    const modelSelect = screen.getByLabelText("Evaluation model");
+    expect(modelSelect.className).toContain("min-w-0");
+    expect(screen.getByRole("option", { name: "qwen" })).toBeTruthy();
+    expect(screen.queryByText(/qwen \(openai-compatible-chat\)/)).toBeNull();
     fireEvent.click(screen.getByLabelText(/Via Copilot/));
     fireEvent.click(screen.getByLabelText(/In-context/));
     expect(screen.getByTestId("request-summary").textContent).toContain("Via Copilot · In-context");
     fireEvent.click(screen.getByLabelText(/Zero-shot/));
-    fireEvent.change(screen.getByLabelText("Evaluation model"), {
+    fireEvent.change(modelSelect, {
       target: { value: "evaluation-openai-compatible-chat:qwen" },
     });
     expect(screen.getByTestId("request-summary").textContent).toContain(
