@@ -41,6 +41,7 @@ async def evaluate_task_result(
     mode: str = "direct",
     with_examples: bool = False,
     model: dict[str, str] | None = None,
+    evaluation_model: dict[str, str] | None = None,
     thinking_level: str | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> dict[str, Any]:
@@ -66,6 +67,11 @@ async def evaluate_task_result(
     if model:
         # The planner in planner mode; in direct mode only pi-qcaleval's fallback.
         payload["model"] = {"provider": model["provider"], "name": model["name"]}
+    if evaluation_model:
+        payload["evaluation_model"] = {
+            "provider": evaluation_model["provider"],
+            "name": evaluation_model["name"],
+        }
     if thinking_level:
         payload["thinking_level"] = thinking_level
     # trust_env=False: the runtime is an internal service, so an ambient

@@ -98,7 +98,8 @@ must not share an ID. The supplied templates use `openai-compatible-chat` and
 
 The default chat model also appears in `evaluation_models`, which makes its evaluation role
 explicit. When the same provider ID and model name appear in both lists, the runtime keeps the
-full definition from `chat_models`.
+full definition from `chat_models`. Qwen reasoning models receive the Qwen chat-template thinking
+format on that model only; other models sharing the provider keep their own response format.
 
 YAML string values support shell-style environment variable references such
 as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be supplied
@@ -113,6 +114,21 @@ builds its `models.json` from `chat_models` and `evaluation_models` at startup.
 | `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` | OpenAI-compatible API base URL through `/v1`; the suffix is operator-defined |
 | `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` | API key for the endpoint with the matching suffix; it can be a placeholder for a keyless endpoint |
 | `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
+
+Existing deployments must rename the earlier fixed variables and add `/v1` to each base URL:
+
+| Earlier variable | Replacement in the supplied configuration |
+| --- | --- |
+| `OPENAI_COMPATIBLE_BASE_URL` | `OPENAI_COMPATIBLE_BASE_URL_CHAT` |
+| `OPENAI_COMPATIBLE_API_KEY` | `OPENAI_COMPATIBLE_API_KEY_CHAT` |
+| `VLLM_BASE_URL` | `OPENAI_COMPATIBLE_BASE_URL_EVALUATION` |
+| `VLLM_API_KEY` | `OPENAI_COMPATIBLE_API_KEY_EVALUATION` |
+
+`OLLAMA_BASE_URL` and `OLLAMA_API_KEY` no longer have special meaning. If that endpoint remains
+in use, choose a suffix such as `OLLAMA`, name its variables
+`OPENAI_COMPATIBLE_BASE_URL_OLLAMA` and `OPENAI_COMPATIBLE_API_KEY_OLLAMA`, and reference them from
+the corresponding YAML model. Variable renaming does not transform the URL: for example, migrate
+`http://ollama:11434` to `http://ollama:11434/v1`.
 
 ### Developing a pi extension against the runtime
 

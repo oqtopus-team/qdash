@@ -55,8 +55,7 @@ class CopilotConfig(BaseModel):
     # as context. The first entry is the default.
     chat_models: list[ModelConfig] = Field(default_factory=list)
     # Models that judge calibration plots (evaluation.yaml). They are not
-    # planners: the pi runtime declares them so pi-qcaleval can find the
-    # calibration VLM; nothing in the API calls them directly.
+    # planners: the selected entry is passed to pi-qcaleval for each run.
     evaluation_models: list[ModelConfig] = Field(default_factory=list)
     task_chat: TaskChatConfig = Field(default_factory=TaskChatConfig)
     # The default planner: `chat_models[0]`. Kept as a field so a per-request

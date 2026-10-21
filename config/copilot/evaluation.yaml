@@ -6,9 +6,8 @@
 # single-result runs, the chat planner). Chat and planner models live in
 # chat.yaml; the pi runtime builds its models.json from both files.
 
-# Models that judge calibration plots. pi-qcaleval picks the first model whose
-# id matches Ising-Calibration; without one it falls back to the conversation's
-# model when that accepts images.
+# Models that judge calibration plots. The first is the default in the evaluation
+# request dialog; a run passes its selected model explicitly to pi-qcaleval.
 evaluation_models:
   # NVIDIA Ising-Calibration: Gemma 4 31B fine-tuned on qubit calibration plots
   # (fit quality, parameter extraction, success classification). Served by an

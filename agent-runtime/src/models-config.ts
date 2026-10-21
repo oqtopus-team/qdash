@@ -42,6 +42,7 @@ interface ModelEntry {
   contextWindow: number;
   maxTokens: number;
   input: ("text" | "image")[];
+  compat?: Record<string, unknown>;
   samplingParams?: Record<string, unknown>;
   reasoning?: boolean;
   samplingParamsByThinkingLevel?: Record<string, Record<string, unknown>>;
@@ -143,9 +144,6 @@ export function buildModelsConfig(
           ? {
               supportsStore: false,
               maxTokensField: "max_tokens",
-              ...(reasoning && isQwenModel(name)
-                ? { thinkingFormat: "qwen-chat-template" }
-                : {}),
             }
           : {}),
       },
@@ -158,6 +156,9 @@ export function buildModelsConfig(
       contextWindow: asNumber(model.num_ctx) ?? DEFAULT_CONTEXT_WINDOW,
       maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
       ...(reasoning ? { reasoning: true } : {}),
+      ...(reasoning && isOpenAiCompatibleProvider(rawProvider) && isQwenModel(name)
+        ? { compat: { thinkingFormat: "qwen-chat-template" } }
+        : {}),
       // Pi treats an unstated `input` as text-only and then silently drops
       // image content while building the request. Figure analysis exists to
       // read figures, so the answer would come back as "no figures attached"

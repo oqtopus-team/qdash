@@ -118,7 +118,6 @@ test("OpenAI-compatible Qwen models preserve Pi 1.0 sampling and thinking settin
       supportsDeveloperRole: false,
       supportsReasoningEffort: false,
       maxTokensField: "max_tokens",
-      thinkingFormat: "qwen-chat-template",
     },
     models: [
       {
@@ -126,6 +125,7 @@ test("OpenAI-compatible Qwen models preserve Pi 1.0 sampling and thinking settin
         contextWindow: 65536,
         maxTokens: 16384,
         reasoning: true,
+        compat: { thinkingFormat: "qwen-chat-template" },
         input: ["text", "image"],
         samplingParams: {
           min_p: 0,
@@ -149,6 +149,25 @@ test("OpenAI-compatible Qwen models preserve Pi 1.0 sampling and thinking settin
       },
     ],
   });
+});
+
+test("Qwen thinking format stays on the Qwen model in a mixed provider", () => {
+  const yaml = `${OPENAI_COMPATIBLE_YAML}
+  - provider: openai-compatible-chat
+    name: gemma4:31b
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
+    reasoning_effort: high
+`;
+  const { providers } = buildModelsConfig(yaml, undefined, {
+    OPENAI_COMPATIBLE_BASE_URL_CHAT: "https://gateway.example/v1",
+  });
+
+  const [qwen, gemma] = providers["openai-compatible-chat"].models;
+  assert.deepEqual(qwen.compat, { thinkingFormat: "qwen-chat-template" });
+  assert.equal(gemma.compat, undefined);
+  assert.equal(providers["openai-compatible-chat"].compat.thinkingFormat, undefined);
 });
 
 test("suffixed OpenAI-compatible providers keep endpoints separate", () => {

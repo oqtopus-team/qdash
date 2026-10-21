@@ -19061,6 +19061,17 @@
             "title": "Mode",
             "description": "\"direct\" runs the evaluation tools; \"planner\" lets the chat planner call them",
             "default": "direct"
+          },
+          "evaluation_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationModelSelection"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Configured evaluation model to use; defaults to evaluation_models[0]"
           }
         },
         "type": "object",
@@ -20036,6 +20047,27 @@
         "title": "EvaluationItem",
         "description": "One evaluation of one task result."
       },
+      "EvaluationModelSelection": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Provider"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "name"
+        ],
+        "title": "EvaluationModelSelection",
+        "description": "A configured model selected to judge calibration figures."
+      },
       "EvaluationOutputModel": {
         "properties": {
           "model": {
@@ -20454,6 +20486,18 @@
               }
             ],
             "title": "Planner Model"
+          },
+          "evaluation_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Model",
+            "description": "Configured provider/modelId requested for every evaluation"
           },
           "requested_by": {
             "type": "string",

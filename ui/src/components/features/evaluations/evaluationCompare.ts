@@ -221,7 +221,7 @@ export function runSettings(a: RunSide, b: RunSide): SettingDiff[] {
       ({ run }) => run.knowledge_draft_id ?? "",
     ],
     ["question", "Question", ({ run }) => run.question || "-"],
-    ["model", "Evaluation model", ({ run }) => run.model || "-"],
+    ["model", "Evaluation model", ({ run }) => run.evaluation_model || run.model || "-"],
     ["evaluator", "Evaluator", ({ run }) => evaluatorLabel(run.evaluator) || "-"],
     ["elapsed", "Took", ({ run }) => formatDuration(run.elapsed_ms) ?? "-"],
     ["duration", "Per evaluation", ({ run }) => formatDuration(meanDurationMs(run)) ?? "-"],

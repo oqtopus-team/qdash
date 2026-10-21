@@ -33,13 +33,14 @@ Choose the evaluation settings before confirming:
 
 | Setting | Choice | Use when |
 | --- | --- | --- |
+| **Evaluation model** | Any configured model | Choose which model judges every selected figure. The first configured model is selected initially. |
 | **Who prepares the prompt** | **Fixed prompt** | You need a fast, reproducible prompt built directly by QDash. |
 | | **Via Copilot** | You want Copilot to summarize the result and call the evaluation model. |
 | **Examples** | **Zero-shot** | The task reference is enough. |
 | | **In-context** | Expert-labeled examples should be shown before the result. |
 
-Review the request summary, then confirm. QDash records the selected targets as one evaluation
-run.
+Review the request summary, including the model name, then confirm. QDash records the selected
+model and targets as one evaluation run. Retrying unfinished evaluations keeps the run's model.
 
 Select **Cancel** on an active run to stop its unfinished evaluations. If a worker stops during
 a run, QDash marks evaluations that remain unfinished for 30 minutes as interrupted. Select

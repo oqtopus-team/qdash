@@ -137,9 +137,11 @@ Every judgement the evaluation model makes becomes an `evaluation` document unde
 A bulk request selects the latest evaluable result of the task per qubit or coupling of the
 chip, or the results of the day. A request with `task_ids` selects those exact historical records
 instead of resolving each entity to its latest result. The run stores one pending record per task
-result and executes them in the background of the API worker as the requesting user, a few at a time
-(`EVALUATION_CONCURRENCY`, default 2). Entities without an evaluable result (no result, no
-figure, still running) are reported as skipped.
+result, the requested evaluation model, and executes them in the background of the API worker as
+the requesting user, a few at a time (`EVALUATION_CONCURRENCY`, default 2). The API accepts only a
+model declared in `evaluation_models`; an omitted selection uses the first entry. Retries reuse the
+stored selection. Entities without an evaluable result (no result, no figure, still running) are
+reported as skipped.
 
 Background tasks are owned by one API process. The owner updates the run's durable heartbeat every
 `EVALUATION_HEARTBEAT_SECONDS` (default 30 seconds). When that heartbeat is older than
@@ -152,11 +154,12 @@ background task when this process owns it.
 Each record is produced by the runtime's `POST /evaluate` in one of two modes:
 
 - `direct` (the default) runs `qdash_build_qcal_evidence` and then `qcal_evaluate` as such,
-  with the reference and examples filled in as above. Fast and reproducible.
+  with the reference, examples, and selected model filled in as above. Fast and reproducible.
 - `planner` opens a throwaway conversation on the chat's planner model, tells it to summarise
-  the result and judge its figure (`plannerInstruction`), and reads the record off the
-  `qcal_evaluate` result it produced. The planner writes its own context and may pass its own
-  reference; what it did and answered is stored next to the record.
+  the result and judge its figure with the selected model (`plannerInstruction`), and reads the
+  record off the `qcal_evaluate` result it produced. The runtime rejects a result produced by a
+  different model. The planner writes its own context and may pass its own reference; what it did
+  and answered is stored next to the record.
 
 The two modes differ in what reaches the evaluation model, which is exactly what the stored
 records make comparable.

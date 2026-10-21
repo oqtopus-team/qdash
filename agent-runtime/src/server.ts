@@ -71,6 +71,8 @@ interface EvaluateBody {
   mode?: "direct" | "planner";
   /** The planner in planner mode; in direct mode only pi-qcaleval's fallback model. */
   model?: { provider?: string; name?: string };
+  /** The model that qcal_evaluate must use, independent of the planner. */
+  evaluation_model?: { provider?: string; name?: string };
   thinking_level?: SessionRequest["thinkingLevel"];
   /** Show the task's labeled example plots before the figure (in-context examples). */
   with_examples?: boolean;
@@ -431,6 +433,8 @@ async function handleEvaluate(req: IncomingMessage, res: ServerResponse): Promis
       knowledgeDraftId: draftIdOf(body.knowledge_draft_id),
       provider: body.model?.provider,
       modelName: body.model?.name,
+      evaluationProvider: body.evaluation_model?.provider,
+      evaluationModelName: body.evaluation_model?.name,
       thinkingLevel: body.thinking_level,
     };
     const result =

@@ -89,10 +89,17 @@ function deps(results, knowledge = REFERENCE) {
   };
 }
 
-test("evidence feeds the evaluation: task and target as context, figure bytes, task name and reference", async () => {
+test("evidence feeds the selected evaluation model: task, target, figure and reference", async () => {
   const d = deps({ [EVIDENCE_TOOL]: evidenceResult(), [EVALUATION_TOOL]: evaluationResult() });
 
-  const result = await evaluateTask({ taskId: "task-1", question: "Is the fit trustworthy?" }, d);
+  const result = await evaluateTask(
+    {
+      taskId: "task-1",
+      question: "Is the fit trustworthy?",
+      evaluationModel: "openai-compatible-evaluation/nvidia/Ising-Calibration",
+    },
+    d,
+  );
 
   assert.deepEqual(
     d.calls.map((call) => call.name),
@@ -113,6 +120,10 @@ test("evidence feeds the evaluation: task and target as context, figure bytes, t
     ].join("\n"),
   );
   assert.equal(evaluation.question, "Is the fit trustworthy?");
+  assert.equal(
+    evaluation.model,
+    "openai-compatible-evaluation/nvidia/Ising-Calibration",
+  );
   assert.equal(evaluation.task_name, "CheckRabi");
   assert.equal(evaluation.knowledge, REFERENCE.knowledge);
   assert.deepEqual(evaluation.criteria, PASSED_CRITERIA);
@@ -383,11 +394,20 @@ test("the planner instruction asks for examples only when the request does", () 
 });
 
 test("the planner instruction names both tools and passes the question on", () => {
-  const text = plannerInstruction("task-1", "Is the fit trustworthy?");
+  const text = plannerInstruction(
+    "task-1",
+    "Is the fit trustworthy?",
+    false,
+    "openai-compatible-evaluation/nvidia/Ising-Calibration",
+  );
   assert.match(text, /task result task-1/);
   assert.match(text, new RegExp(`First call ${EVIDENCE_TOOL}`));
   assert.match(text, new RegExp(`then ${EVALUATION_TOOL}`));
   assert.match(text, /Is the fit trustworthy\?/);
+  assert.match(
+    text,
+    /Pass model: "openai-compatible-evaluation\/nvidia\/Ising-Calibration"/,
+  );
   assert.doesNotMatch(plannerInstruction("task-1"), /Pass this question/);
   assert.match(text, /not the fitted metrics/);
   assert.match(text, /calibration_diagnosis/);

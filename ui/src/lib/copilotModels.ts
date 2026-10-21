@@ -98,6 +98,27 @@ export function buildChatModelOptions(config: Record<string, unknown> | null): M
   return options;
 }
 
+/** Configured models that can judge calibration figures, in configuration order. */
+export function buildEvaluationModelOptions(config: Record<string, unknown> | null): ModelOption[] {
+  const values = config && Array.isArray(config.evaluation_models) ? config.evaluation_models : [];
+  const seen = new Set<string>();
+  const options: ModelOption[] = [];
+  for (const value of values) {
+    const model = readModel(value);
+    if (!model) continue;
+    const identity = modelIdentity(model);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    options.push({
+      key: `evaluation-${identity}`,
+      label: `${model.name} (${model.provider})`,
+      model,
+      reasoningEffort: model.reasoning_effort ?? null,
+    });
+  }
+  return options;
+}
+
 export function getStoredChatModelKey(): string {
   if (typeof window === "undefined") return "default";
   return localStorage.getItem(CHAT_MODEL_STORAGE_KEY) || "default";

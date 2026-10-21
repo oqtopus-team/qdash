@@ -58,6 +58,7 @@ const run: EvaluationRunSummary = {
   success_count: 1,
   agree_count: 0,
   disagree_count: 0,
+  evaluation_model: "openai-compatible-evaluation/ising-requested",
   model: "vllm/ising",
   evaluator: { name: "@orangekame3/pi-qcaleval", version: "0.0.2-beta.9", source: "package" },
 };
@@ -175,6 +176,7 @@ describe("evaluationCompare", () => {
           with_examples: true,
           mode: "planner",
           planner_model: "openai-compatible/qwen3.8-flash-next",
+          evaluation_model: "openai-compatible-chat/qwen3.8-flash-next",
         },
       },
     );
@@ -189,6 +191,11 @@ describe("evaluationCompare", () => {
     expect(byKey.planner).toMatchObject({
       a: "-",
       b: "openai-compatible/qwen3.8-flash-next",
+      differs: true,
+    });
+    expect(byKey.model).toMatchObject({
+      a: "openai-compatible-evaluation/ising-requested",
+      b: "openai-compatible-chat/qwen3.8-flash-next",
       differs: true,
     });
     expect(byKey.evaluator).toMatchObject({
