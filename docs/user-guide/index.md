@@ -32,8 +32,8 @@ Use the [Application Tour](./application-tour.md) to find each page and its task
 ## Manage Access
 
 Use [Authentication and Users](./authentication-and-users.md) for accounts and passwords,
-[Projects and Data Sharing](./projects-and-data-sharing.md) for membership and project boundaries,
-and [Roles and Permissions](./roles-and-permissions.md) to look up allowed actions.
+[Projects and Data Sharing](./projects-and-data-sharing.md) for membership, roles, and project
+boundaries.
 
 For automation, use the [Python client](../reference/clients/python.md) or
 [TypeScript client](../reference/clients/typescript.md).

@@ -6,14 +6,9 @@ sections in the application sidebar.
 ## Project Context
 
 Most data in QDash belongs to the active project. Select the intended project before inspecting
-or changing calibration data. Project roles control what is visible:
-
-- Viewers can inspect project data and participate where their permissions allow.
-- Editors can create and run workflows, edit project files, and change calibration data.
-- Project owners manage membership and project settings.
-- System administrators manage users and system-wide settings from **Admin**.
-
-See [Projects and Data Sharing](./projects-and-data-sharing.md) for membership and role details.
+or changing calibration data. Project roles separate read access, operational changes, and project
+management. See [Projects and Data Sharing](./projects-and-data-sharing.md#choose-a-project-role)
+for the role to assign.
 
 ## Explore Calibration State
 
