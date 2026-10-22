@@ -95,6 +95,14 @@ def bringup(
         "CheckControlAmplitude": {
             "shots": {"value": 8192, "value_type": "int"},
         },
+        # Keep this explicit so users can see and tune the adaptive Chevron
+        # acquisition condition directly from the workflow template.
+        "CheckAdaptiveChevron": {
+            "shots": {"value": 256, "value_type": "int"},
+            # Set to False to keep the result as measurement history without
+            # updating the current calibration parameters.
+            # "update_calibration_parameters": False,
+        },
         # resonator_assignment_order lists the four qid offsets within each MUX
         # in increasing resonator-frequency order. The default is [3, 0, 2, 1].
         # For 16Q, override it with [0, 3, 1, 2] because the order is

@@ -5,6 +5,8 @@ from typing import Any
 
 import pytest
 
+from qdash.workflow.calibtasks.qubex import CheckAdaptiveChevron
+
 bringup_module = importlib.import_module("qdash.workflow.templates.bringup")
 
 
@@ -83,7 +85,12 @@ def test_bringup_template_preserves_task_specific_acquisition_settings(monkeypat
         "CheckControlAmplitude": {
             "shots": {"value": 8192, "value_type": "int"},
         },
+        "CheckAdaptiveChevron": {
+            "shots": {"value": 256, "value_type": "int"},
+        },
     }
+    adaptive_settings = FakeCalibService.last_kwargs["task_run_parameters"]["CheckAdaptiveChevron"]
+    assert adaptive_settings["shots"]["value"] == CheckAdaptiveChevron.run_spec["shots"].default
 
 
 def test_bringup_template_requires_explicit_mux_ids(monkeypatch) -> None:
