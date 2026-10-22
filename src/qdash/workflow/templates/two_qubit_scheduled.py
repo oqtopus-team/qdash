@@ -158,12 +158,14 @@ def two_qubit_scheduled(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
+        task_parameters={
             # Per-task overrides — uncomment to tune the CR parameter search.
             # "CheckCrossResonance": {
-            #     "adiabatic_safe_factor": {"value": 0.65, "value_type": "float"},
-            #     "max_amplitude": {"value": 0.85, "value_type": "float"},
-            #     "max_time_range": {"value": 8192, "value_type": "int"},
+            #     "run": {
+            #         "adiabatic_safe_factor": {"value": 0.65, "value_type": "float"},
+            #         "max_amplitude": {"value": 0.85, "value_type": "float"},
+            #         "max_time_range": {"value": 8192, "value_type": "int"},
+            #     },
             # },
         },
         default_run_parameters={

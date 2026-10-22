@@ -765,7 +765,16 @@ class TestCalibServiceParameterManagement:
                         qid="0",
                         task_type=TaskTypes.QUBIT,
                         task_id="task-1",
-                        output_parameters={"control_amplitude": {"value": 0.25}},
+                        output_parameters={
+                            "control_amplitude": {
+                                "value": 0.25,
+                                "database_updated": True,
+                            },
+                            "measurement_only": {
+                                "value": 0.75,
+                                "database_updated": False,
+                            },
+                        },
                     )
                 ]
 
@@ -789,6 +798,7 @@ class TestCalibServiceParameterManagement:
         merged = execution_service.calib_data.qubit["0"]["control_amplitude"]
         assert isinstance(merged, ParameterModel)
         assert merged.value == 0.25
+        assert "measurement_only" not in execution_service.calib_data.qubit["0"]
 
 
 class TestGlobalSessionHelpers:
@@ -1090,9 +1100,7 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
         lock_repo=env.lock,
         counter_repo=FakeExecutionCounterRepository(2),
         default_run_parameters={"interval": {"value": 1024, "value_type": "int"}},
-        task_run_parameters={
-            "CheckCrossResonance": {"shots": {"value": 2048, "value_type": "int"}}
-        },
+        task_parameters={"CheckRabi": {"run": {"shots": {"value": 2048, "value_type": "int"}}}},
     )
     session.run(
         QubitTargets(["0", "1"]),
@@ -1110,7 +1118,7 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
     assert all(
         config["default_run_parameters"] == session.default_run_parameters for config in configs
     )
-    assert all(config["task_run_parameters"] == session.task_run_parameters for config in configs)
+    assert all(config["task_parameters"] == session.task_parameters for config in configs)
     assert [record.status for record in env.records] == ["completed", "completed"]
     assert env.lock.locked is False
 
@@ -1277,9 +1285,7 @@ def test_task_and_isolated_worker_reject_unreserved_hardware(pipeline_wiring, mo
     with pytest.raises(RuntimeError, match="outside the workflow"):
         session.execute_task_batch("CheckRabi", ["0", "4"])
     with pytest.raises(RuntimeError, match="outside the workflow"):
-        session.execute_task(
-            "ConfigureAll", "", {"ConfigureAll": {"run_parameters": {"mux_ids": {"value": [1]}}}}
-        )
+        session.execute_task("ConfigureAll", "", parameters={"run": {"mux_ids": {"value": [1]}}})
     orchestrator.run_task.assert_not_called()
     orchestrator.run_task_batch.assert_not_called()
     with pytest.raises(RuntimeError, match="outside the workflow"):
@@ -1300,6 +1306,28 @@ def test_task_and_isolated_worker_reject_unreserved_hardware(pipeline_wiring, mo
             },
             ["4"],
         )
+
+
+def test_configure_all_scope_uses_service_task_parameters(pipeline_wiring):
+    """Service-level MUX settings should be used for operation scope validation."""
+    from qdash.common.execution_resources import resolve_execution_resource_scope
+
+    scope = resolve_execution_resource_scope("chip-1", {"mux_ids": [0]})
+    session = CalibService(
+        "alice",
+        "chip-1",
+        project_id="project-1",
+        use_lock=False,
+        resource_scope=scope,
+        enable_github=False,
+        task_parameters={"ConfigureAll": {"run": {"mux_ids": [0]}}},
+    )
+    orchestrator = MagicMock()
+    session._orchestrator = orchestrator
+
+    session.execute_task("ConfigureAll", "")
+
+    orchestrator.run_task.assert_called_once()
 
 
 def test_pipeline_keeps_supplied_reservation_owner(pipeline_execution_env, monkeypatch):

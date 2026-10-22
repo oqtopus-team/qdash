@@ -159,30 +159,42 @@ def one_qubit(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
+        task_parameters={
             "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "hpi_duration": {"value": 32, "value_type": "int"},
+                },
             },
             "CreatePIPulse": {
-                "pi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "pi_duration": {"value": 32, "value_type": "int"},
+                },
             },
             "CreateDRAGHPIPulse": {
-                "drag_hpi_duration": {"value": 16, "value_type": "int"},
+                "run": {
+                    "drag_hpi_duration": {"value": 16, "value_type": "int"},
+                },
             },
             "CreateDRAGPIPulse": {
-                "drag_pi_duration": {"value": 24, "value_type": "int"},
+                "run": {
+                    "drag_pi_duration": {"value": 24, "value_type": "int"},
+                },
             },
             # Per-task overrides — uncomment to extend coherence sweep ranges.
             # "CheckT1": {
-            #     "time_range": {
-            #         "value": (np.log10(100), np.log10(1000 * 1000), 51),  # 100 ns 〜 1 ms
-            #         "value_type": "np.logspace",
+            #     "run": {
+            #         "time_range": {
+            #             "value": (np.log10(100), np.log10(1000 * 1000), 51),  # 100 ns 〜 1 ms
+            #             "value_type": "np.logspace",
+            #         },
             #     },
             # },
             # "CheckT2Echo": {
-            #     "time_range": {
-            #         "value": (np.log10(300), np.log10(500 * 1000), 51),  # 300 ns 〜 500 μs
-            #         "value_type": "np.logspace",
+            #     "run": {
+            #         "time_range": {
+            #             "value": (np.log10(300), np.log10(500 * 1000), 51),  # 300 ns 〜 500 μs
+            #             "value_type": "np.logspace",
+            #         },
             #     },
             # },
         },

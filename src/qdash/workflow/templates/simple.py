@@ -120,9 +120,11 @@ def simple_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
+        task_parameters={
             "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "hpi_duration": {"value": 32, "value_type": "int"},
+                },
             },
         },
         default_run_parameters={

@@ -91,18 +91,26 @@ def test_coarse_one_forwards_execution_context_and_preserves_task_scan_defaults(
         "project_id": "project-1",
         "flow_name": "coarse-check",
         "tags": ["coarse"],
-        "task_run_parameters": {
+        "task_parameters": {
             "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "hpi_duration": {"value": 32, "value_type": "int"},
+                },
             },
             "CreatePIPulse": {
-                "pi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "pi_duration": {"value": 32, "value_type": "int"},
+                },
             },
             "CreateDRAGHPIPulse": {
-                "drag_hpi_duration": {"value": 16, "value_type": "int"},
+                "run": {
+                    "drag_hpi_duration": {"value": 16, "value_type": "int"},
+                },
             },
             "CreateDRAGPIPulse": {
-                "drag_pi_duration": {"value": 24, "value_type": "int"},
+                "run": {
+                    "drag_pi_duration": {"value": 24, "value_type": "int"},
+                },
             },
         },
         "default_run_parameters": {

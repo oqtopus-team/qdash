@@ -970,24 +970,20 @@ class QubexTask(BaseTask):
         Example:
         -------
             ```python
-            # Single parameter override
-            task_details = {
-                "CheckFineChevron": {
-                    "input_parameters": {
-                        "readout_amplitude": {"value": 0.15}
+            # Overrides are declared per task in the workflow and applied to
+            # input_parameters by TaskExecutor after preprocess.
+            cal = CalibService(
+                username,
+                chip_id,
+                task_parameters={
+                    "CheckFineChevron": {
+                        "input": {
+                            "control_frequency": 5.2,
+                            "readout_amplitude": 0.15,
+                        }
                     }
-                }
-            }
-
-            # Multiple parameter overrides
-            task_details = {
-                "CheckFineChevron": {
-                    "input_parameters": {
-                        "control_frequency": {"value": 5.2},
-                        "readout_amplitude": {"value": 0.15}
-                    }
-                }
-            }
+                },
+            )
 
             # Usage in task run method:
             with self._apply_parameter_overrides(session, qid):
@@ -1053,7 +1049,7 @@ class QubexTask(BaseTask):
         DEPRECATED: Use _apply_parameter_overrides() instead for better flexibility.
 
         This method checks if the control_frequency was explicitly overridden
-        via task_details. If so, it uses exp.modified_frequencies() to
+        through a calibration input override. If so, it uses exp.modified_frequencies() to
         temporarily modify the qubit frequency during task execution.
 
         Args:

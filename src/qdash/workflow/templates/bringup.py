@@ -81,24 +81,37 @@ def bringup(
         "readout_duration": {"value": 1024, "value_type": "int"},
         "interval": {"value": 150 * 1024, "value_type": "int"},
     }
-    task_run_parameters: dict[str, dict[str, Any]] = {
+    task_parameters: dict[str, dict[str, Any]] = {
         # Preserve task-specific acquisition settings instead of allowing shared
         # defaults to replace the values selected for bring-up measurements.
         "CheckResonatorSpectroscopy": {
-            "shots": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 0, "value_type": "int"},
+            "run": {
+                "shots": {"value": 1024, "value_type": "int"},
+                "interval": {"value": 0, "value_type": "int"},
+            },
         },
         "CheckQubitSpectroscopy": {
-            "shots": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 1024, "value_type": "int"},
+            "run": {
+                "shots": {"value": 1024, "value_type": "int"},
+                "interval": {"value": 1024, "value_type": "int"},
+            },
         },
         "CheckControlAmplitude": {
-            "shots": {"value": 8192, "value_type": "int"},
+            "run": {
+                "shots": {"value": 8192, "value_type": "int"},
+            },
         },
         # Keep this explicit so users can see and tune the adaptive Chevron
         # acquisition condition directly from the workflow template.
         "CheckAdaptiveChevron": {
-            "shots": {"value": 256, "value_type": "int"},
+            "run": {
+                "shots": {"value": 256, "value_type": "int"},
+            },
+            # Calibration inputs normally come from the current calibration
+            # parameters. Set a value here to override it for every qubit:
+            # "input": {
+            #     "coarse_control_amplitude": 0.05,
+            # },
             # Set to False to keep the result as measurement history without
             # updating the current calibration parameters.
             # "update_calibration_parameters": False,
@@ -111,8 +124,8 @@ def bringup(
         # CheckResonatorSpectroscopy uses the connected readout box's qubex default:
         # low band [5.75, 6.75, 0.002] GHz or high band [9.75, 10.75, 0.002] GHz.
         # Its qubex default power range is [-60, 5, 5] dB (stop is exclusive).
-        # Leave each range unset to use its default, or add these keys to the existing
-        # CheckResonatorSpectroscopy entry above to override it.
+        # Leave each range unset to use its default, or add these keys to the "run"
+        # entry of CheckResonatorSpectroscopy above to override it.
         #     "resonator_assignment_order": {
         #         "value": [0, 3, 1, 2],
         #         "value_type": "list",
@@ -124,8 +137,8 @@ def bringup(
         # CheckQubitSpectroscopy uses the connected control box's qubex default:
         # low band [3.0, 5.75, 0.005] GHz or high band [6.5, 9.75, 0.005] GHz.
         # Its qubex default power range is [-60, 0, 5] dB (stop is exclusive).
-        # Leave frequency_range unset to use that default, or add these keys to the existing
-        # CheckQubitSpectroscopy entry above to override it.
+        # Leave frequency_range unset to use that default, or add these keys to the
+        # "run" entry of CheckQubitSpectroscopy above to override it.
         #     "frequency_range": {
         #         "value": [3.0, 5.75, 0.005],
         #         "value_type": "np.arange",
@@ -147,6 +160,6 @@ def bringup(
         tags=tags,
         project_id=project_id,
         default_run_parameters=default_run_parameters,
-        task_run_parameters=task_run_parameters,
+        task_parameters=task_parameters,
     )
     return cal.run(targets, steps=steps)

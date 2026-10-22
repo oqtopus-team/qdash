@@ -49,13 +49,11 @@ class ConfigureAll(CalibrationStep):
             raw_result = service.execute_task(
                 "ConfigureAll",
                 qid="",
-                task_details={
-                    "ConfigureAll": {
-                        "run_parameters": {
-                            "mux_ids": {
-                                "value": mux_ids,
-                                "value_type": "list",
-                            },
+                parameters={
+                    "run": {
+                        "mux_ids": {
+                            "value": mux_ids,
+                            "value_type": "list",
                         },
                     },
                 },

@@ -114,6 +114,7 @@ export default withMermaid(
                 },
                 { text: "Dashboard", link: "/user-guide/dashboard" },
                 { text: "Running Calibrations", link: "/user-guide/running-calibrations" },
+                { text: "Creating Workflows", link: "/user-guide/creating-workflows" },
                 { text: "Task Parameters", link: "/user-guide/task-parameters" },
                 { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
                 { text: "Reviewing Results", link: "/user-guide/reviewing-results" },

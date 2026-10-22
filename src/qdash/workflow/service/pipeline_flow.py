@@ -31,6 +31,7 @@ from qdash.datamodel.calibration_pipeline import (
     PipelineStep,
     TwoQubitCalibrationStep,
 )
+from qdash.workflow.engine.task_parameters import task_parameters_from_run_parameters
 from qdash.workflow.service.calib_service import (
     CalibService,
     on_flow_cancellation,
@@ -177,7 +178,7 @@ def calibration_pipeline(
         tags=all_tags,
         project_id=project_id,
         backend_name=backend_name,
-        task_run_parameters=parsed.task_run_parameters or None,
+        task_parameters=task_parameters_from_run_parameters(parsed.task_run_parameters),
         default_run_parameters=parsed.default_run_parameters or None,
         note=pipeline_note(parsed, steps),
     )

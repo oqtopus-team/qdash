@@ -31,6 +31,7 @@ import contextlib
 import json
 import logging
 import time
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -60,6 +61,15 @@ from qdash.common.execution_resources import (
 from qdash.common.utils.datetime import now
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
 from qdash.workflow.engine.params_updater import get_params_updater
+from qdash.workflow.engine.task_parameters import (
+    INPUT,
+    RUN,
+    merge_task_parameters,
+    normalize_task_settings,
+    resolve_task_parameters,
+    task_settings_from_task_details,
+    validate_task_names,
+)
 from qdash.workflow.service.execution_id import generate_execution_id
 from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
@@ -345,12 +355,12 @@ class CalibService:
         default_run_parameters: dict[str, Any] | None = None,
         task_run_parameters: dict[str, dict[str, Any]] | None = None,
         source_execution_id: str | None = None,
-        parameter_overrides: dict[str, dict[str, Any]] | None = None,
         source_task_id: str | None = None,
         snapshot_exempt_tasks: set[str] | None = None,
         force_update_params: bool = False,
         persist_output_parameters: bool = True,
         *,
+        task_parameters: dict[str, dict[str, Any]] | None = None,
         user_repo: UserRepository | None = None,
         lock_repo: ExecutionLockRepository | None = None,
         counter_repo: ExecutionCounterRepository | None = None,
@@ -395,10 +405,16 @@ class CalibService:
                 Execution. Pipelines automatically create one Execution per calibration
                 step, including when older templates pass this option. Default: False.
             default_run_parameters: Shared fallback run parameters applied to all tasks.
-            task_run_parameters: Explicit task settings keyed by task name. Alongside
-                run parameters, ``update_calibration_parameters`` can be set to ``False``
-                to keep a task's output as measurement history without applying it to
-                the current calibration parameters.
+            task_run_parameters: Deprecated flat form of ``task_parameters`` that holds
+                only run parameters and ``update_calibration_parameters``.
+            task_parameters: Settings keyed by task name. Each entry may contain
+                ``run`` (run parameters declared in the task's ``run_spec``), ``input``
+                (overrides for calibration inputs declared in its ``input_spec``), and
+                ``update_calibration_parameters`` (``False`` keeps the output as
+                measurement history without updating current calibration parameters).
+                For example: ``{"CheckAdaptiveChevron": {"run": {"shots": {"value":
+                256, "value_type": "int"}}, "input": {"coarse_control_amplitude":
+                0.05}}}``. An input override applies to every qid the task runs on.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
@@ -415,7 +431,8 @@ class CalibService:
         self.use_lock = use_lock
         self.skip_execution = skip_execution
         self.default_run_parameters = default_run_parameters or {}
-        self.task_run_parameters = task_run_parameters or {}
+        self.task_parameters = resolve_task_parameters(task_parameters, task_run_parameters)
+        validate_task_names(self.task_parameters, self.backend_name)
         self._lock_acquired = False
         self._lock_execution_id: str | None = None
         self._reserved_scope = resource_scope
@@ -424,7 +441,6 @@ class CalibService:
         if source_execution_id is None:
             source_execution_id = self._read_source_execution_id_from_context()
         self.source_execution_id = source_execution_id
-        self._parameter_overrides = parameter_overrides
         self._source_task_id = source_task_id
         self._snapshot_exempt_tasks = snapshot_exempt_tasks or set()
         self._force_update_params = force_update_params
@@ -469,10 +485,10 @@ class CalibService:
         if not self.default_run_parameters and self.flow_name:
             self._load_default_run_parameters()
         logger.debug(
-            "CalibService.__init__ flow_name=%s default_run_parameters=%s task_run_parameters=%s",
+            "CalibService.__init__ flow_name=%s default_run_parameters=%s task_parameters=%s",
             self.flow_name,
             self.default_run_parameters,
-            self.task_run_parameters,
+            self.task_parameters,
         )
 
         # Session state
@@ -691,9 +707,9 @@ class CalibService:
 
             # Create CalibConfig
             logger.debug(
-                "CalibConfig default_run_parameters=%s task_run_parameters=%s",
+                "CalibConfig default_run_parameters=%s task_parameters=%s",
                 self.default_run_parameters,
-                self.task_run_parameters,
+                self.task_parameters,
             )
             config = CalibConfig(
                 username=self.username,
@@ -710,16 +726,15 @@ class CalibService:
                 skip_execution=self.skip_execution,
                 connect_backend=connect_backend,
                 default_run_parameters=self.default_run_parameters,
-                task_run_parameters=self.task_run_parameters,
+                task_parameters=self.task_parameters,
                 force_update_params=self._force_update_params,
                 persist_output_parameters=self._persist_output_parameters,
             )
 
-            # Create a parameter loader for snapshot re-execution or standalone
-            # user overrides. Quick runs have no source snapshot, but still need
-            # input overrides to be re-applied after task preprocessing.
+            # Create a parameter loader for snapshot re-execution. Explicit
+            # overrides travel with each task through task_parameters.
             snapshot_loader = None
-            if self._source_task_id or self.source_execution_id or self._parameter_overrides:
+            if self._source_task_id or self.source_execution_id:
                 from qdash.workflow.engine.task.snapshot_loader import (
                     SnapshotParameterLoader,
                 )
@@ -728,7 +743,6 @@ class CalibService:
                     source_execution_id=self.source_execution_id,
                     project_id=self.project_id,
                     source_task_id=self._source_task_id,
-                    parameter_overrides=self._parameter_overrides,
                     snapshot_exempt_tasks=self._snapshot_exempt_tasks,
                 )
                 logger.info(
@@ -805,16 +819,20 @@ class CalibService:
         qid: str,
         task_details: dict[str, Any] | None = None,
         upstream_id: str | None = None,
+        *,
+        parameters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute a calibration task with integrated save processing.
 
         Args:
             task_name: Name of the task to execute (e.g., 'CheckFreq')
             qid: Qubit ID to calibrate
-            task_details: Optional task-specific configuration parameters. Set
-                ``task_details[task_name]["update_calibration_parameters"]`` to ``False``
-                to retain a successful measurement without updating current calibration values.
+            task_details: Deprecated form of ``parameters`` keyed by task name.
             upstream_id: Optional explicit upstream task_id for dependency tracking
+            parameters: Settings for this call only, in the form of one
+                ``task_parameters`` entry: ``run``, ``input``, and
+                ``update_calibration_parameters``. They take precedence over the
+                service's ``task_parameters``.
 
         Returns:
             Dictionary containing the task's output parameters and task_id
@@ -827,24 +845,26 @@ class CalibService:
             # With explicit upstream_id for group execution
             result1 = session.execute_task("CheckRabi", "33")
             result2 = session.execute_task("CheckRabi", "32", upstream_id=result1["task_id"])
+
+            # Override one input for this call only
+            session.execute_task("CheckRabi", "0", parameters={"input": {"control_amplitude": 0.05}})
             ```
         """
         if self.use_lock and not self._lock_acquired:
             raise RuntimeError("No hardware reservation is held for this execution")
-        parameters: dict[str, Any] = {"qid": qid}
+        settings = self._call_settings(task_name, task_details, parameters)
+        effective_settings = merge_task_parameters(
+            {task_name: self.task_parameters.get(task_name, {RUN: {}, INPUT: {}})},
+            {task_name: settings},
+        )[task_name]
+        resource_parameters: dict[str, Any] = {"qid": qid}
         if task_name == "ConfigureAll":
-            parameters = {
-                "mux_ids": (task_details or {})
-                .get(task_name, {})
-                .get("run_parameters", {})
-                .get("mux_ids", {})
-                .get("value")
+            resource_parameters = {
+                "mux_ids": effective_settings[RUN].get("mux_ids", {}).get("value")
             }
-        self._validate_resource_scope(parameters)
+        self._validate_resource_scope(resource_parameters)
         assert self._orchestrator is not None, "Session not initialized"
-        result: dict[str, Any] = self._orchestrator.run_task(
-            task_name, qid, task_details, upstream_id
-        )
+        result: dict[str, Any] = self._orchestrator.run_task(task_name, qid, settings, upstream_id)
         return result
 
     def execute_task_batch(
@@ -853,13 +873,39 @@ class CalibService:
         qids: list[str],
         task_details: dict[str, Any] | None = None,
         upstream_id: str | None = None,
+        *,
+        parameters: dict[str, Any] | None = None,
     ) -> dict[str, dict[str, Any]]:
-        """Execute one calibration task with a single batch_run over qids."""
+        """Execute one calibration task with a single batch_run over qids.
+
+        ``parameters`` and the deprecated ``task_details`` behave as in ``execute_task``.
+        """
         if self.use_lock and not self._lock_acquired:
             raise RuntimeError("No hardware reservation is held for this execution")
+        settings = self._call_settings(task_name, task_details, parameters)
         self._validate_resource_scope({"qids": qids})
         assert self._orchestrator is not None, "Session not initialized"
-        return self._orchestrator.run_task_batch(task_name, qids, task_details, upstream_id)
+        return self._orchestrator.run_task_batch(task_name, qids, settings, upstream_id)
+
+    @staticmethod
+    def _call_settings(
+        task_name: str,
+        task_details: dict[str, Any] | None,
+        parameters: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Combine call-level ``parameters`` with the deprecated ``task_details``."""
+        if task_details is None:
+            return normalize_task_settings(task_name, parameters)
+        warnings.warn(
+            "task_details is deprecated; pass parameters="
+            '{"run": {...}, "input": {...}} for the task instead',
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return merge_task_parameters(
+            {task_name: task_settings_from_task_details(task_name, task_details)},
+            {task_name: normalize_task_settings(task_name, parameters)},
+        )[task_name]
 
     def get_parameter(self, qid: str, param_name: str) -> Any:
         """Get a calibration parameter value for a qubit.
@@ -1143,7 +1189,12 @@ class CalibService:
         try:
             from bunnet import SortDirection
 
-            from qdash.datamodel.task import CalibDataModel, ParameterModel, TaskTypes
+            from qdash.datamodel.task import (
+                CalibDataModel,
+                ParameterModel,
+                TaskResultOutputParameterModel,
+                TaskTypes,
+            )
             from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
             docs = (
@@ -1165,10 +1216,15 @@ class CalibService:
 
                 for name, value in doc.output_parameters.items():
                     try:
-                        parameter = (
+                        output_parameter = (
                             value
-                            if isinstance(value, ParameterModel)
-                            else ParameterModel.model_validate(value)
+                            if isinstance(value, TaskResultOutputParameterModel)
+                            else TaskResultOutputParameterModel.model_validate(value)
+                        )
+                        if not output_parameter.database_updated:
+                            continue
+                        parameter = ParameterModel.model_validate(
+                            output_parameter.model_dump(exclude_none=True)
                         )
                     except Exception:
                         logger.debug(

@@ -9,14 +9,21 @@ import pytest
 # Import fake tasks to trigger registration in BaseTask.registry
 import qdash.workflow.calibtasks.fake  # noqa: F401
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
+from qdash.workflow.calibtasks.base import BaseTask
 from qdash.workflow.engine.config import CalibConfig
 from qdash.workflow.engine.orchestrator import CalibOrchestrator
+from qdash.workflow.engine.task_parameters import (
+    normalize_task_parameters,
+    task_parameters_from_run_parameters,
+)
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.task.context import TaskContext
 
 # FakeCheckRabi registers as "CheckRabi" with backend "fake"
 TASK_NAME = "CheckRabi"
+# CheckRabi also declares calibration inputs.
+INPUT_TASK_NAME = "CheckRabi"
 BACKEND = "fake"
 
 
@@ -223,14 +230,24 @@ class TestDefaultRunParameterInjection:
         assert "drag_hpi_duration" not in task.run_parameters
 
 
+def _config(**kwargs: Any) -> CalibConfig:
+    return CalibConfig(
+        username="alice",
+        chip_id="chip-1",
+        qids=["0"],
+        execution_id="exec-1",
+        project_id="project-1",
+        backend_name=BACKEND,
+        **kwargs,
+    )
+
+
 class TestTaskRunParameterInjection:
     """Test task-specific parameters separately from shared defaults."""
 
-    def test_task_run_parameters_have_explicit_precedence(self) -> None:
-        config = cast(
-            "CalibConfig",
-            SimpleNamespace(
-                backend_name=BACKEND,
+    def test_task_parameters_have_explicit_precedence(self) -> None:
+        orchestrator = CalibOrchestrator(
+            _config(
                 default_run_parameters={
                     "shots": {"value": 4096, "value_type": "int"},
                     "readout_duration": {"value": 7, "value_type": "float"},
@@ -240,19 +257,22 @@ class TestTaskRunParameterInjection:
                         "interval": {"value": 8, "value_type": "int"},
                     },
                 },
-                task_run_parameters={
-                    TASK_NAME: {
-                        "shots": {"value": 1024, "value_type": "int"},
-                        "time_range": {"value": (0, 501, 10), "value_type": "range"},
+                task_parameters=normalize_task_parameters(
+                    {
+                        TASK_NAME: {
+                            "run": {
+                                "shots": {"value": 1024, "value_type": "int"},
+                                "time_range": {"value": (0, 501, 10), "value_type": "range"},
+                            }
+                        }
                     }
-                },
-            ),
+                ),
+            )
         )
-        orchestrator = CalibOrchestrator(config)
 
         task = orchestrator._create_task_instance(
             TASK_NAME,
-            {TASK_NAME: {"run_parameters": {"shots": {"value": 512, "value_type": "int"}}}},
+            {"run": {"shots": {"value": 512, "value_type": "int"}}},
         )
 
         assert task.run_parameters["shots"].value == 512
@@ -262,25 +282,143 @@ class TestTaskRunParameterInjection:
         assert task.run_parameters["readout_duration"].value == 7
 
     def test_update_policy_is_not_injected_as_a_run_parameter(self) -> None:
-        config = cast(
-            "CalibConfig",
-            SimpleNamespace(
-                backend_name=BACKEND,
-                default_run_parameters={},
-                task_run_parameters={
-                    TASK_NAME: {
-                        "shots": {"value": 1024, "value_type": "int"},
-                        "update_calibration_parameters": False,
+        orchestrator = CalibOrchestrator(
+            _config(
+                task_parameters=task_parameters_from_run_parameters(
+                    {
+                        TASK_NAME: {
+                            "shots": {"value": 1024, "value_type": "int"},
+                            "update_calibration_parameters": False,
+                        }
                     }
-                },
-            ),
+                ),
+            )
         )
-        orchestrator = CalibOrchestrator(config)
 
         task = orchestrator._create_task_instance(TASK_NAME, None)
 
         assert task.run_parameters["shots"].value == 1024
         assert "update_calibration_parameters" not in task.run_parameters
+
+    def test_call_parameters_are_not_mutated(self) -> None:
+        orchestrator = CalibOrchestrator(
+            _config(default_run_parameters={"shots": {"value": 4096, "value_type": "int"}})
+        )
+        parameters: dict[str, Any] = {"run": {}}
+
+        orchestrator._create_task_instance(TASK_NAME, parameters)
+
+        assert parameters == {"run": {}}
+
+    def test_explicit_run_values_are_recorded_as_run_overrides(self) -> None:
+        orchestrator = CalibOrchestrator(
+            _config(
+                default_run_parameters={"interval": {"value": 8, "value_type": "int"}},
+                task_parameters=normalize_task_parameters({TASK_NAME: {"run": {"shots": 1024}}}),
+            )
+        )
+
+        task = orchestrator._create_task_instance(TASK_NAME, {"run": {"time_range": [0, 101, 4]}})
+
+        # Shared defaults are not explicit, so a re-execution snapshot keeps its own values.
+        assert task.run_overrides == {"shots": 1024, "time_range": (0, 101, 4)}
+
+    def test_undeclared_task_run_parameter_is_rejected(self) -> None:
+        orchestrator = CalibOrchestrator(
+            _config(task_parameters=normalize_task_parameters({TASK_NAME: {"run": {"shotz": 1}}}))
+        )
+
+        with pytest.raises(ValueError, match="does not declare run parameter 'shotz'"):
+            orchestrator._create_task_instance(TASK_NAME, None)
+
+    def test_calibration_input_under_run_is_rejected_with_guidance(self) -> None:
+        orchestrator = CalibOrchestrator(
+            _config(
+                task_parameters=normalize_task_parameters(
+                    {INPUT_TASK_NAME: {"run": {"control_frequency": {"value": 5.0}}}}
+                )
+            )
+        )
+
+        with pytest.raises(
+            ValueError, match="calibration input of CheckRabi; set it under 'input'"
+        ):
+            orchestrator._create_task_instance(INPUT_TASK_NAME, None)
+
+    def test_unknown_parameters_key_is_rejected(self) -> None:
+        orchestrator = CalibOrchestrator(_config())
+
+        with pytest.raises(ValueError, match="unknown keys"):
+            orchestrator._create_task_instance(TASK_NAME, {"shots": 1})
+
+    def test_array_run_value_rejects_string(self) -> None:
+        orchestrator = CalibOrchestrator(_config())
+
+        with pytest.raises(ValueError, match="requires a tuple/list of 3 values"):
+            orchestrator._create_task_instance(TASK_NAME, {"run": {"time_range": "[0, 101, 4]"}})
+
+
+class TestTaskInputOverrides:
+    """Test task-scoped calibration input overrides."""
+
+    def test_task_parameters_input_reaches_task_input_overrides(self) -> None:
+        orchestrator = CalibOrchestrator(
+            _config(
+                task_parameters=normalize_task_parameters(
+                    {INPUT_TASK_NAME: {"input": {"control_frequency": 5.1}}}
+                )
+            )
+        )
+
+        task = orchestrator._create_task_instance(INPUT_TASK_NAME, None)
+
+        assert task.input_overrides == {"control_frequency": 5.1}
+
+    def test_call_parameters_input_takes_precedence(self) -> None:
+        orchestrator = CalibOrchestrator(
+            _config(
+                task_parameters=normalize_task_parameters(
+                    {
+                        INPUT_TASK_NAME: {
+                            "input": {"control_frequency": 5.1, "control_amplitude": 0.2}
+                        }
+                    }
+                )
+            )
+        )
+
+        task = orchestrator._create_task_instance(
+            INPUT_TASK_NAME,
+            {"input": {"control_frequency": {"value": "5.3"}}},
+        )
+
+        assert task.input_overrides == {"control_frequency": 5.3, "control_amplitude": 0.2}
+
+    def test_run_parameter_under_input_is_rejected_with_guidance(self) -> None:
+        orchestrator = CalibOrchestrator(
+            _config(task_parameters=normalize_task_parameters({TASK_NAME: {"input": {"shots": 1}}}))
+        )
+
+        with pytest.raises(ValueError, match="run parameter of CheckRabi; set it under 'run'"):
+            orchestrator._create_task_instance(TASK_NAME, None)
+
+    def test_forbidden_input_override_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        task_class = BaseTask.registry[BACKEND][INPUT_TASK_NAME]
+        spec = dict(task_class.input_spec)
+        spec["control_frequency"] = spec["control_frequency"].model_copy(
+            update={"user_override": "forbidden"}
+        )
+        monkeypatch.setattr(task_class, "input_spec", spec)
+        orchestrator = CalibOrchestrator(
+            _config(
+                task_parameters=normalize_task_parameters(
+                    {INPUT_TASK_NAME: {"input": {"control_frequency": 5.1}}}
+                )
+            )
+        )
+
+        with pytest.raises(ValueError, match="does not allow user overrides"):
+            orchestrator._create_task_instance(INPUT_TASK_NAME, None)
 
 
 class TestTaskCalibrationParameterUpdates:
@@ -299,7 +437,7 @@ class TestTaskCalibrationParameterUpdates:
 
         assert orchestrator._should_update_calibration_parameters(TASK_NAME, None) is True
 
-    def test_task_details_can_disable_calibration_parameter_updates(self) -> None:
+    def test_call_parameters_can_disable_calibration_parameter_updates(self) -> None:
         config = CalibConfig(
             username="alice",
             chip_id="chip-1",
@@ -312,12 +450,12 @@ class TestTaskCalibrationParameterUpdates:
 
         update_parameters = orchestrator._should_update_calibration_parameters(
             TASK_NAME,
-            {TASK_NAME: {"update_calibration_parameters": False}},
+            {"update_calibration_parameters": False},
         )
 
         assert update_parameters is False
 
-    def test_task_run_parameters_can_disable_calibration_parameter_updates(self) -> None:
+    def test_task_parameters_can_disable_calibration_parameter_updates(self) -> None:
         config = CalibConfig(
             username="alice",
             chip_id="chip-1",
@@ -325,15 +463,15 @@ class TestTaskCalibrationParameterUpdates:
             execution_id="exec-1",
             project_id="project-1",
             backend_name=BACKEND,
-            task_run_parameters={
-                TASK_NAME: {"update_calibration_parameters": False},
-            },
+            task_parameters=normalize_task_parameters(
+                {TASK_NAME: {"update_calibration_parameters": False}}
+            ),
         )
         orchestrator = CalibOrchestrator(config)
 
         assert orchestrator._should_update_calibration_parameters(TASK_NAME, None) is False
 
-    def test_task_details_override_task_run_parameter_policy(self) -> None:
+    def test_call_parameters_override_task_parameter_policy(self) -> None:
         config = CalibConfig(
             username="alice",
             chip_id="chip-1",
@@ -341,20 +479,20 @@ class TestTaskCalibrationParameterUpdates:
             execution_id="exec-1",
             project_id="project-1",
             backend_name=BACKEND,
-            task_run_parameters={
-                TASK_NAME: {"update_calibration_parameters": False},
-            },
+            task_parameters=normalize_task_parameters(
+                {TASK_NAME: {"update_calibration_parameters": False}}
+            ),
         )
         orchestrator = CalibOrchestrator(config)
 
         update_parameters = orchestrator._should_update_calibration_parameters(
             TASK_NAME,
-            {TASK_NAME: {"update_calibration_parameters": True}},
+            {"update_calibration_parameters": True},
         )
 
         assert update_parameters is True
 
-    def test_task_details_override_measurement_only_session_default(self) -> None:
+    def test_call_parameters_override_measurement_only_session_default(self) -> None:
         config = CalibConfig(
             username="alice",
             chip_id="chip-1",
@@ -368,7 +506,7 @@ class TestTaskCalibrationParameterUpdates:
 
         update_parameters = orchestrator._should_update_calibration_parameters(
             TASK_NAME,
-            {TASK_NAME: {"update_calibration_parameters": True}},
+            {"update_calibration_parameters": True},
         )
 
         assert update_parameters is True
@@ -387,7 +525,7 @@ class TestTaskCalibrationParameterUpdates:
         with pytest.raises(ValueError, match="must be a boolean"):
             orchestrator._should_update_calibration_parameters(
                 TASK_NAME,
-                {TASK_NAME: {"update_calibration_parameters": "false"}},
+                {"update_calibration_parameters": "false"},
             )
 
     def test_run_task_passes_task_output_persistence_to_context(
@@ -400,9 +538,9 @@ class TestTaskCalibrationParameterUpdates:
             execution_id="exec-1",
             project_id="project-1",
             backend_name=BACKEND,
-            task_run_parameters={
-                TASK_NAME: {"update_calibration_parameters": False},
-            },
+            task_parameters=normalize_task_parameters(
+                {TASK_NAME: {"update_calibration_parameters": False}}
+            ),
         )
         orchestrator = CalibOrchestrator(config)
         task = SimpleNamespace(get_task_type=lambda: "qubit")
@@ -463,7 +601,7 @@ class TestTaskCalibrationParameterUpdates:
         orchestrator.run_task_batch(
             TASK_NAME,
             ["0", "1"],
-            {TASK_NAME: {"update_calibration_parameters": False}},
+            {"update_calibration_parameters": False},
         )
 
         prepare_context.assert_called_once_with(
