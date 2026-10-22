@@ -96,8 +96,8 @@ def test_ef_calibration_forwards_configuration_mode_and_shared_defaults() -> Non
             },
         },
         "default_run_parameters": {
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     }
 

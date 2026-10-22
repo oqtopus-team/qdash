@@ -14,6 +14,7 @@ from qdash.workflow.engine.orchestrator import CalibOrchestrator
 from qdash.workflow.engine.task.executor import TaskExecutor
 from qdash.workflow.engine.task_parameters import (
     merge_task_parameters,
+    normalize_default_run_parameters,
     normalize_task_parameters,
     resolve_task_parameters,
     task_parameters_from_run_parameters,
@@ -92,6 +93,37 @@ class TestNormalizeTaskParameters:
         assert normalized["CheckRabi"]["run"]["time_range"] == {
             "value": expected_value,
             "value_type": expected_type,
+        }
+
+
+class TestNormalizeDefaultRunParameters:
+    def test_normalizes_plain_values_and_sweeps(self) -> None:
+        normalized = normalize_default_run_parameters(
+            {"shots": 1024, "time_range": sweep.range(0, 101, 4)}
+        )
+
+        assert normalized == {
+            "shots": {"value": 1024},
+            "time_range": {"value": (0, 101, 4), "value_type": "range"},
+        }
+
+    def test_preserves_and_normalizes_legacy_task_nested_defaults(self) -> None:
+        normalized = normalize_default_run_parameters(
+            {
+                "CheckRabi": {
+                    "shots": 1024,
+                    "time_range": {"value": (0, 101, 4), "value_type": "range"},
+                    "update_calibration_parameters": False,
+                }
+            }
+        )
+
+        assert normalized == {
+            "CheckRabi": {
+                "shots": {"value": 1024},
+                "time_range": {"value": (0, 101, 4), "value_type": "range"},
+                "update_calibration_parameters": False,
+            }
         }
 
 

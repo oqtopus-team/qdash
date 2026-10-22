@@ -57,6 +57,35 @@ def normalize_task_parameters(
     }
 
 
+def normalize_default_run_parameters(
+    default_run_parameters: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Return shared run defaults in the same canonical value form as task settings.
+
+    Flat values and sweep declarations become ``{"value": ...}`` mappings. Legacy
+    task-nested defaults remain supported and their parameter values are normalized
+    recursively.
+    """
+    if default_run_parameters is None:
+        return {}
+    if not isinstance(default_run_parameters, Mapping):
+        raise ValueError("default_run_parameters must be a mapping of parameter names to values")
+
+    normalized: dict[str, Any] = {}
+    for name, data in copy.deepcopy(dict(default_run_parameters)).items():
+        if isinstance(data, Mapping) and "value" not in data and "value_type" not in data:
+            nested: dict[str, Any] = {}
+            for parameter_name, parameter_data in data.items():
+                if parameter_name == UPDATE_CALIBRATION_PARAMETERS:
+                    nested[parameter_name] = parameter_data
+                else:
+                    nested[parameter_name] = _normalize_run_value(parameter_data)
+            normalized[name] = nested
+        else:
+            normalized[name] = _normalize_run_value(data)
+    return normalized
+
+
 def normalize_task_settings(task_name: str, settings: Any) -> dict[str, Any]:
     """Return one task's settings in canonical form (see ``normalize_task_parameters``)."""
     if settings is None:
@@ -234,16 +263,15 @@ def validate_task_settings(
 def _normalize_run_entries(task_name: str, entries: Any) -> dict[str, dict[str, Any]]:
     if not isinstance(entries, Mapping):
         raise ValueError(f"task_parameters[{task_name!r}][{RUN!r}] must be a mapping")
-    return {
-        name: (
-            data.as_run_parameter()
-            if isinstance(data, Sweep)
-            else dict(data)
-            if isinstance(data, Mapping)
-            else {"value": data}
-        )
-        for name, data in entries.items()
-    }
+    return {name: _normalize_run_value(data) for name, data in entries.items()}
+
+
+def _normalize_run_value(data: Any) -> dict[str, Any]:
+    if isinstance(data, Sweep):
+        return data.as_run_parameter()
+    if isinstance(data, Mapping):
+        return dict(data)
+    return {"value": data}
 
 
 def _normalize_input_entries(task_name: str, entries: Any) -> dict[str, Any]:

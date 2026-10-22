@@ -79,8 +79,8 @@ def bringup(
     targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
 
     default_run_parameters: dict[str, Any] = {
-        "readout_duration": {"value": 1024, "value_type": "int"},
-        "interval": {"value": 150 * 1024, "value_type": "int"},
+        "readout_duration": 1024,
+        "interval": 150 * 1024,
     }
     task_parameters: dict[str, dict[str, Any]] = {
         # Preserve task-specific acquisition settings instead of allowing shared

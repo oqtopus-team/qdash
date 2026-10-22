@@ -107,7 +107,9 @@ Use `default_run_parameters` only for values intentionally shared by every decla
 A shared value overrides task-specific defaults, including Qubex optimized defaults: qubit
 spectroscopy normally uses a 1024 ns interval and resonator spectroscopy uses 0 ns. Use
 `task_parameters` when a template should preserve or configure one named task. Nested entries
-in `default_run_parameters` remain readable only for existing flow documents.
+in `default_run_parameters` remain readable only for existing flow documents. Shared defaults use
+the same plain-value and `sweep` declaration forms as `task_parameters[task_name]["run"]`; wrapped
+`{"value": ...}` mappings remain compatible.
 
 `readout_duration` is session-scoped in Qubex. QDash passes the shared value when constructing the
 Experiment, records the effective value on each task that uses the session readout pulse, and rejects

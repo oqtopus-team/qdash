@@ -131,7 +131,7 @@ service = CalibService(
     chip_id,
     project_id=project_id,
     default_run_parameters={
-        "interval": {"value": 150 * 1024, "value_type": "int"},
+        "interval": 150 * 1024,
     },
     task_parameters={
         "CheckRamsey": {
@@ -146,11 +146,12 @@ service = CalibService(
 )
 ```
 
+`default_run_parameters` and `task_parameters[task_name]["run"]` use the same value syntax.
 `run` sets run parameters the task declares in its `run_spec`, and overrides shared defaults.
 `input` replaces calibration inputs the task declares in its `input_spec`; the value applies to
 every qid the task runs on. Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or
-`sweep.range` for generated ranges, and plain values for other parameters. The helper records the
-constructor without creating an array in the workflow process. Setting
+`sweep.range` for generated run ranges, and plain values for other run values and `input` entries.
+The helper records the constructor without creating an array in the workflow process. Setting
 `update_calibration_parameters=False` retains task history without promoting validated outputs to
 the current calibration state. A name in the wrong section, or one the task does not declare,
 fails when the task is created. The complete precedence rules are in [Parameter
