@@ -9,7 +9,9 @@ from typing import Any
 
 import pytest
 
+from qdash.workflow import sweep
 from qdash.workflow.calibtasks.qubex import CheckChevron
+from qdash.workflow.engine.task_parameters import normalize_task_parameters
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
 
@@ -62,17 +64,20 @@ def test_coherence_check_uses_explicit_chevron_settings_without_updating_calibra
     assert result["kwargs"]["task_parameters"] == {
         "CheckChevron": {
             "run": {
-                "detuning_range": (-0.05, 0.05, 41),
-                "time_range": (0, 250, 26),
+                "detuning_range": sweep.linspace(-0.05, 0.05, 41),
+                "time_range": sweep.linspace(0, 250, 26),
                 "shots": 256,
             },
             "update_calibration_parameters": False,
         },
     }
-    chevron_settings = result["kwargs"]["task_parameters"]["CheckChevron"]
+    chevron_settings = normalize_task_parameters(result["kwargs"]["task_parameters"])[
+        "CheckChevron"
+    ]
     for parameter_name in ("detuning_range", "time_range", "shots"):
         assert (
-            chevron_settings["run"][parameter_name] == CheckChevron.run_spec[parameter_name].default
+            chevron_settings["run"][parameter_name]["value"]
+            == CheckChevron.run_spec[parameter_name].default
         )
 
 

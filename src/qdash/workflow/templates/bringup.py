@@ -15,6 +15,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import sweep  # noqa: F401  # used by commented range overrides below
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -127,14 +128,14 @@ def bringup(
         # Leave each range unset to use its default, or add these keys to the "run"
         # entry of CheckResonatorSpectroscopy above to override it.
         #     "resonator_assignment_order": [0, 3, 1, 2],
-        #     "frequency_range": [5.75, 6.75, 0.002],
+        #     "frequency_range": sweep.arange(5.75, 6.75, 0.002),
         # CheckQubitSpectroscopy uses the connected control box's qubex default:
         # low band [3.0, 5.75, 0.005] GHz or high band [6.5, 9.75, 0.005] GHz.
         # Its qubex default power range is [-60, 0, 5] dB (stop is exclusive).
         # Leave frequency_range unset to use that default, or add these keys to the
         # "run" entry of CheckQubitSpectroscopy above to override it.
-        #     "frequency_range": [3.0, 5.75, 0.005],
-        #     "power_range": [-60, 0, 10],
+        #     "frequency_range": sweep.arange(3.0, 5.75, 0.005),
+        #     "power_range": sweep.arange(-60, 0, 10),
     }
     steps = [
         ConfigureAll(),

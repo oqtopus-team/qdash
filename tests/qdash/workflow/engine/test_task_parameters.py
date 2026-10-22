@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from qdash.workflow import sweep
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_adaptive_chevron import (
     CheckAdaptiveChevron,
 )
@@ -57,6 +58,12 @@ class TestNormalizeTaskParameters:
         with pytest.raises(ValueError, match="needs a value"):
             normalize_task_parameters({"CheckRabi": {"input": {"control_amplitude": None}}})
 
+    def test_rejects_sweep_as_calibration_input(self) -> None:
+        with pytest.raises(ValueError, match="put generated experiment ranges under 'run'"):
+            normalize_task_parameters(
+                {"CheckRabi": {"input": {"control_amplitude": sweep.linspace(0, 1, 5)}}}
+            )
+
     def test_returns_independent_copy(self) -> None:
         source: dict[str, Any] = {"CheckRabi": {"run": {"shots": {"value": 256}}}}
 
@@ -64,6 +71,28 @@ class TestNormalizeTaskParameters:
         normalized["CheckRabi"]["run"]["shots"]["value"] = 1
 
         assert source["CheckRabi"]["run"]["shots"]["value"] == 256
+
+    @pytest.mark.parametrize(
+        ("declaration", "expected_type", "expected_value"),
+        [
+            (sweep.linspace(0, 1, 5), "np.linspace", (0, 1, 5)),
+            (sweep.logspace(2, 6, 51), "np.logspace", (2, 6, 51)),
+            (sweep.arange(0, 10, 2), "np.arange", (0, 10, 2)),
+            (sweep.range(0, 10, 2), "range", (0, 10, 2)),
+        ],
+    )
+    def test_normalizes_declarative_sweep(
+        self,
+        declaration: Any,
+        expected_type: str,
+        expected_value: tuple[int | float, int | float, int | float],
+    ) -> None:
+        normalized = normalize_task_parameters({"CheckRabi": {"run": {"time_range": declaration}}})
+
+        assert normalized["CheckRabi"]["run"]["time_range"] == {
+            "value": expected_value,
+            "value_type": expected_type,
+        }
 
 
 class TestLegacyTaskRunParameters:

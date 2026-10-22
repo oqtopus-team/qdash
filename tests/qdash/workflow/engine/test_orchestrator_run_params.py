@@ -8,6 +8,7 @@ import pytest
 
 # Import fake tasks to trigger registration in BaseTask.registry
 import qdash.workflow.calibtasks.fake  # noqa: F401
+from qdash.workflow import sweep
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
 from qdash.workflow.calibtasks.base import BaseTask
 from qdash.workflow.engine.config import CalibConfig
@@ -318,7 +319,12 @@ class TestTaskRunParameterInjection:
             )
         )
 
-        task = orchestrator._create_task_instance(TASK_NAME, {"run": {"time_range": [0, 101, 4]}})
+        task = orchestrator._create_task_instance(
+            TASK_NAME,
+            normalize_task_parameters({TASK_NAME: {"run": {"time_range": sweep.range(0, 101, 4)}}})[
+                TASK_NAME
+            ],
+        )
 
         # Shared defaults are not explicit, so a re-execution snapshot keeps its own values.
         assert task.run_overrides == {"shots": 1024, "time_range": (0, 101, 4)}
@@ -356,6 +362,18 @@ class TestTaskRunParameterInjection:
 
         with pytest.raises(ValueError, match="requires a tuple/list of 3 values"):
             orchestrator._create_task_instance(TASK_NAME, {"run": {"time_range": "[0, 101, 4]"}})
+
+    def test_sweep_constructor_must_match_declared_run_type(self) -> None:
+        orchestrator = CalibOrchestrator(
+            _config(
+                task_parameters=normalize_task_parameters(
+                    {TASK_NAME: {"run": {"time_range": sweep.linspace(0, 100, 11)}}}
+                )
+            )
+        )
+
+        with pytest.raises(ValueError, match=r"declares 'range'.*uses 'np\.linspace'"):
+            orchestrator._create_task_instance(TASK_NAME, None)
 
 
 class TestTaskInputOverrides:

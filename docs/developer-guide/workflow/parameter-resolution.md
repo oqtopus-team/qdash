@@ -51,9 +51,14 @@ A workflow sets parameters for one task through `CalibService(task_parameters=..
 entry has up to three keys:
 
 ```python
+from qdash.workflow import sweep
+
 task_parameters={
     "CheckAdaptiveChevron": {
-        "run": {"shots": 256},
+        "run": {
+            "shots": 256,
+            "final_detuning_range": sweep.linspace(-0.05, 0.05, 41),
+        },
         "input": {"coarse_control_amplitude": 0.05},
         "update_calibration_parameters": False,
     },
@@ -62,13 +67,16 @@ task_parameters={
 
 | Key | Holds | Declared by |
 | --- | --- | --- |
-| `run` | Run parameter overrides as plain values | `run_spec` |
+| `run` | Run parameter overrides as plain values or `sweep` declarations | `run_spec` |
 | `input` | Calibration input overrides as plain values | `input_spec` |
 | `update_calibration_parameters` | Output persistence policy for the task (see [Output persistence](#output-persistence)) | — |
 
-Use plain values for both `run` and `input` in new workflows. The task specs provide type and
-parameter metadata. QDash continues to accept `{"value": ...}` mappings in both sections for
-existing workflows.
+Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or `sweep.range` when a run parameter
+declares a generated range. The helper keeps the constructor and its three arguments explicit and
+normalizes them to the task parameter's serializable `value` and `value_type` fields without
+materializing an array. Use plain values for other `run` values and for `input` values. QDash
+continues to accept three-element lists or tuples and `{"value": ...}` mappings in existing
+workflows.
 
 `qdash.workflow.engine.task_parameters` normalizes this mapping when `CalibService` starts. The
 orchestrator validates it against the task class when it creates the task: a name under `run`

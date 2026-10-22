@@ -124,6 +124,8 @@ Pass shared run-parameter fallbacks through `default_run_parameters` and setting
 through `task_parameters`:
 
 ```python
+from qdash.workflow import sweep
+
 service = CalibService(
     username,
     chip_id,
@@ -133,7 +135,10 @@ service = CalibService(
     },
     task_parameters={
         "CheckRamsey": {
-            "run": {"shots": 1024},
+            "run": {
+                "shots": 1024,
+                "time_range": sweep.arange(0, 10_000, 100),
+            },
             "input": {"control_frequency": 7.012},
             "update_calibration_parameters": False,
         },
@@ -143,11 +148,13 @@ service = CalibService(
 
 `run` sets run parameters the task declares in its `run_spec`, and overrides shared defaults.
 `input` replaces calibration inputs the task declares in its `input_spec`; the value applies to
-every qid the task runs on. Use plain values in both sections because the task specs declare their
-types. Setting `update_calibration_parameters=False` retains task history without promoting
-validated outputs to the current calibration state. A name in the wrong section, or one the task
-does not declare, fails when the task is created. The complete precedence rules are in
-[Parameter Resolution](./parameter-resolution.md).
+every qid the task runs on. Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or
+`sweep.range` for generated ranges, and plain values for other parameters. The helper records the
+constructor without creating an array in the workflow process. Setting
+`update_calibration_parameters=False` retains task history without promoting validated outputs to
+the current calibration state. A name in the wrong section, or one the task does not declare,
+fails when the task is created. The complete precedence rules are in [Parameter
+Resolution](./parameter-resolution.md).
 
 ## Preserve Terminal Handling
 

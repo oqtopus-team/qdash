@@ -28,6 +28,8 @@ import warnings
 from collections.abc import Mapping
 from typing import Any
 
+from qdash.workflow.sweep import SWEEP_VALUE_TYPES, Sweep
+
 RUN = "run"
 INPUT = "input"
 UPDATE_CALIBRATION_PARAMETERS = "update_calibration_parameters"
@@ -41,8 +43,9 @@ def normalize_task_parameters(
     """Return a validated deep copy of ``task_parameters`` in canonical form.
 
     Every task entry gets ``run`` and ``input`` mappings. Run values written as
-    scalars become ``{"value": ...}``; input values written as ``{"value": ...}``
-    become the bare value.
+    scalars become ``{"value": ...}``, and declarative sweeps become serializable
+    value/type mappings. Input values written as ``{"value": ...}`` become the
+    bare value.
     """
     if task_parameters is None:
         return {}
@@ -201,8 +204,15 @@ def validate_task_settings(
     """Reject task-scoped names the task does not declare in the matching spec."""
     run_spec = getattr(task_class, "run_spec", {})
     input_spec = getattr(task_class, "input_spec", {})
-    for name in settings.get(RUN, {}):
+    for name, data in settings.get(RUN, {}).items():
         if name in run_spec:
+            value_type = data.get("value_type") if isinstance(data, Mapping) else None
+            declared_type = run_spec[name].value_type
+            if value_type in SWEEP_VALUE_TYPES and value_type != declared_type:
+                raise ValueError(
+                    f"{source}: {task_name}.{name} declares {declared_type!r}, "
+                    f"but the workflow uses {value_type!r}"
+                )
             continue
         if name in input_spec:
             raise ValueError(
@@ -225,7 +235,13 @@ def _normalize_run_entries(task_name: str, entries: Any) -> dict[str, dict[str, 
     if not isinstance(entries, Mapping):
         raise ValueError(f"task_parameters[{task_name!r}][{RUN!r}] must be a mapping")
     return {
-        name: dict(data) if isinstance(data, Mapping) else {"value": data}
+        name: (
+            data.as_run_parameter()
+            if isinstance(data, Sweep)
+            else dict(data)
+            if isinstance(data, Mapping)
+            else {"value": data}
+        )
         for name, data in entries.items()
     }
 
@@ -236,6 +252,11 @@ def _normalize_input_entries(task_name: str, entries: Any) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     # Calibration inputs are scalars, so a mapping is the {"value": ...} form.
     for name, data in entries.items():
+        if isinstance(data, Sweep):
+            raise ValueError(
+                f"task_parameters[{task_name!r}][{INPUT!r}][{name!r}] uses a sweep; "
+                f"put generated experiment ranges under {RUN!r}"
+            )
         value = data.get("value") if isinstance(data, Mapping) else data
         if value is None:
             raise ValueError(f"task_parameters[{task_name!r}][{INPUT!r}][{name!r}] needs a value")

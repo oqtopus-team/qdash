@@ -19,11 +19,12 @@ Example:
     )
 """
 
+import math  # noqa: F401  # used by commented range overrides below
 from typing import Any
 
-import numpy as np  # noqa: F401  # used by commented per-task overrides below
 from prefect import flow
 
+from qdash.workflow import sweep  # noqa: F401  # used by commented range overrides below
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -200,15 +201,13 @@ def full_calibration(
             # Per-task overrides — uncomment to extend coherence sweep ranges.
             # "CheckT1": {
             #     "run": {
-            #         "time_range": (
-            #             np.log10(100), np.log10(1000 * 1000), 51
-            #         ),  # 100 ns 〜 1 ms
+            #         "time_range": sweep.logspace(2, 6, 51),  # 100 ns 〜 1 ms
             #     },
             # },
             # "CheckT2Echo": {
             #     "run": {
-            #         "time_range": (
-            #             np.log10(300), np.log10(500 * 1000), 51
+            #         "time_range": sweep.logspace(
+            #             math.log10(300), math.log10(500_000), 51
             #         ),  # 300 ns 〜 500 μs
             #     },
             # },
