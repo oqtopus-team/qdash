@@ -42,7 +42,7 @@ def test_bringup_step_accepts_resonator_assignment_order() -> None:
         (),
         {
             "default_run_parameters": {"interval": {"value": 1, "value_type": "int"}},
-            "task_run_parameters": {},
+            "task_parameters": {},
         },
     )()
     step = BringUp(mode="scheduled", resonator_assignment_order=[0, 3, 1, 2])
@@ -52,9 +52,10 @@ def test_bringup_step_accepts_resonator_assignment_order() -> None:
     assert service.default_run_parameters == {
         "interval": {"value": 1, "value_type": "int"},
     }
-    assert service.task_run_parameters == {
+    assert service.task_parameters == {
         "CheckResonatorSpectroscopy": {
-            "resonator_assignment_order": {"value": [0, 3, 1, 2], "value_type": "list"}
+            "run": {"resonator_assignment_order": {"value": [0, 3, 1, 2], "value_type": "list"}},
+            "input": {},
         },
     }
 
@@ -73,24 +74,34 @@ def test_bringup_template_preserves_task_specific_acquisition_settings(monkeypat
     bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
 
     assert FakeCalibService.last_kwargs is not None
-    assert FakeCalibService.last_kwargs["task_run_parameters"] == {
+    assert FakeCalibService.last_kwargs["task_parameters"] == {
         "CheckResonatorSpectroscopy": {
-            "shots": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 0, "value_type": "int"},
+            "run": {
+                "shots": {"value": 1024, "value_type": "int"},
+                "interval": {"value": 0, "value_type": "int"},
+            },
         },
         "CheckQubitSpectroscopy": {
-            "shots": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 1024, "value_type": "int"},
+            "run": {
+                "shots": {"value": 1024, "value_type": "int"},
+                "interval": {"value": 1024, "value_type": "int"},
+            },
         },
         "CheckControlAmplitude": {
-            "shots": {"value": 8192, "value_type": "int"},
+            "run": {
+                "shots": {"value": 8192, "value_type": "int"},
+            },
         },
         "CheckAdaptiveChevron": {
-            "shots": {"value": 256, "value_type": "int"},
+            "run": {
+                "shots": {"value": 256, "value_type": "int"},
+            },
         },
     }
-    adaptive_settings = FakeCalibService.last_kwargs["task_run_parameters"]["CheckAdaptiveChevron"]
-    assert adaptive_settings["shots"]["value"] == CheckAdaptiveChevron.run_spec["shots"].default
+    adaptive_settings = FakeCalibService.last_kwargs["task_parameters"]["CheckAdaptiveChevron"]
+    assert (
+        adaptive_settings["run"]["shots"]["value"] == CheckAdaptiveChevron.run_spec["shots"].default
+    )
 
 
 def test_bringup_template_requires_explicit_mux_ids(monkeypatch) -> None:

@@ -1,6 +1,7 @@
 """Tests for task API routes."""
 
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -307,6 +308,7 @@ async def test_re_execute_passes_snapshot_or_override_duration_to_session(
         flow_service=SimpleNamespace(  # type: ignore[arg-type]
             execute_single_task_from_snapshot=execute
         ),
+        task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
         parameter_overrides=parameter_overrides,
     )
 
@@ -359,6 +361,7 @@ async def test_re_execute_restores_legacy_snapshot_duration(
         flow_service=SimpleNamespace(  # type: ignore[arg-type]
             execute_single_task_from_snapshot=execute
         ),
+        task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
     )
 
     assert execute.await_args_list[0].kwargs["default_run_parameters"] == {
@@ -398,7 +401,88 @@ async def test_re_execute_rejects_conflicting_legacy_two_qubit_durations(
             flow_service=SimpleNamespace(  # type: ignore[arg-type]
                 execute_single_task_from_snapshot=execute
             ),
+            task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
         )
 
     assert exc_info.value.status_code == 400
     execute.assert_not_awaited()
+
+
+def _reexecution_doc(monkeypatch: pytest.MonkeyPatch, name: str = "CheckRabi") -> None:
+    doc = SimpleNamespace(
+        username="alice",
+        name=name,
+        qid="0",
+        chip_id="chip-1",
+        execution_id="exec-1",
+        tags=["calibration"],
+        input_parameters={},
+        run_parameters={"readout_duration": {"value": 2048}},
+    )
+    monkeypatch.setattr(
+        TaskResultHistoryDocument,
+        "find_one",
+        lambda *_args: SimpleNamespace(run=lambda: doc),
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "parameter_overrides",
+    [
+        {"run": {"shotz": 100}},
+        {"input": {"unknown_input": 1.0}},
+        {"inputs": {"qubit_frequency": 5.0}},
+    ],
+)
+async def test_re_execute_rejects_overrides_the_task_cannot_apply(
+    monkeypatch: pytest.MonkeyPatch, parameter_overrides: dict[str, dict[str, Any]]
+) -> None:
+    _reexecution_doc(monkeypatch)
+    execute = AsyncMock()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await re_execute_task_result(
+            task_id="task-1",
+            ctx=_project_context(),  # type: ignore[arg-type]
+            service=SimpleNamespace(),  # type: ignore[arg-type]
+            flow_service=SimpleNamespace(  # type: ignore[arg-type]
+                execute_single_task_from_snapshot=execute
+            ),
+            task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
+            parameter_overrides=parameter_overrides,
+        )
+
+    assert exc_info.value.status_code == 400
+    execute.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_re_execute_keeps_session_duration_out_of_undeclared_run_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _reexecution_doc(monkeypatch, name="CheckQubitSpectroscopy")
+    task = _task_info().model_copy(
+        update={
+            "name": "CheckQubitSpectroscopy",
+            "run_parameters": {"shots": {"value_type": "int"}},
+        }
+    )
+    execute = AsyncMock()
+
+    await re_execute_task_result(
+        task_id="task-1",
+        ctx=_project_context(),  # type: ignore[arg-type]
+        service=SimpleNamespace(),  # type: ignore[arg-type]
+        flow_service=SimpleNamespace(  # type: ignore[arg-type]
+            execute_single_task_from_snapshot=execute
+        ),
+        task_file_service=_task_file_service(task),  # type: ignore[arg-type]
+        parameter_overrides={"run": {"readout_duration": 1024, "shots": 256}},
+    )
+
+    sent = execute.await_args_list[0].kwargs
+    assert sent["parameter_overrides"] == {"input": {}, "run": {"shots": 256}}
+    assert sent["default_run_parameters"] == {
+        "readout_duration": {"value": 1024, "value_type": "float"}
+    }

@@ -1090,9 +1090,7 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
         lock_repo=env.lock,
         counter_repo=FakeExecutionCounterRepository(2),
         default_run_parameters={"interval": {"value": 1024, "value_type": "int"}},
-        task_run_parameters={
-            "CheckCrossResonance": {"shots": {"value": 2048, "value_type": "int"}}
-        },
+        task_parameters={"CheckRabi": {"run": {"shots": {"value": 2048, "value_type": "int"}}}},
     )
     session.run(
         QubitTargets(["0", "1"]),
@@ -1110,7 +1108,7 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
     assert all(
         config["default_run_parameters"] == session.default_run_parameters for config in configs
     )
-    assert all(config["task_run_parameters"] == session.task_run_parameters for config in configs)
+    assert all(config["task_parameters"] == session.task_parameters for config in configs)
     assert [record.status for record in env.records] == ["completed", "completed"]
     assert env.lock.locked is False
 
@@ -1277,9 +1275,7 @@ def test_task_and_isolated_worker_reject_unreserved_hardware(pipeline_wiring, mo
     with pytest.raises(RuntimeError, match="outside the workflow"):
         session.execute_task_batch("CheckRabi", ["0", "4"])
     with pytest.raises(RuntimeError, match="outside the workflow"):
-        session.execute_task(
-            "ConfigureAll", "", {"ConfigureAll": {"run_parameters": {"mux_ids": {"value": [1]}}}}
-        )
+        session.execute_task("ConfigureAll", "", parameters={"run": {"mux_ids": {"value": [1]}}})
     orchestrator.run_task.assert_not_called()
     orchestrator.run_task_batch.assert_not_called()
     with pytest.raises(RuntimeError, match="outside the workflow"):

@@ -20,13 +20,11 @@ class TestSnapshotParameterLoaderInit:
             source_task_id="source-result",
             project_id="proj-1",
             snapshot_exempt_tasks={"CheckRabi"},
-            parameter_overrides={"input": {"freq": 5.0}},
         )
         with patch.object(loader, "_load") as load:
             assert loader.get_snapshot("CheckRabi", "0") is None
             load.assert_not_called()
         assert loader.requires_snapshot("CheckRabi") is False
-        assert loader._parameter_overrides == {"input": {"freq": 5.0}}
 
     def test_init_defaults(self) -> None:
         loader = SnapshotParameterLoader(
@@ -36,31 +34,14 @@ class TestSnapshotParameterLoaderInit:
         assert loader._source_execution_id == "exec-001"
         assert loader._source_task_id is None
         assert loader._project_id == "proj-1"
-        assert loader._parameter_overrides is None
         assert loader._limit == DEFAULT_SNAPSHOT_LIMIT
         assert loader._cache is None
         assert loader.has_snapshot_source is True
 
-    def test_override_only_loader_has_no_snapshot_source(self) -> None:
-        loader = SnapshotParameterLoader(
-            source_execution_id=None,
-            project_id="proj-1",
-            parameter_overrides={"input": {}},
-        )
+    def test_loader_without_source_has_no_snapshot_source(self) -> None:
+        loader = SnapshotParameterLoader(source_execution_id=None, project_id="proj-1")
 
         assert loader.has_snapshot_source is False
-
-    def test_init_with_overrides(self) -> None:
-        overrides: dict[str, dict[str, Any]] = {
-            "run": {"shots": 2048},
-            "input": {"freq": 5.0},
-        }
-        loader = SnapshotParameterLoader(
-            source_execution_id="exec-001",
-            project_id="proj-1",
-            parameter_overrides=overrides,
-        )
-        assert loader._parameter_overrides == overrides
 
     def test_init_with_custom_limit(self) -> None:
         loader = SnapshotParameterLoader(
@@ -111,12 +92,8 @@ class TestSnapshotParameterLoaderLoad:
 
     @patch("qdash.workflow.engine.task.snapshot_loader.TaskResultHistoryDocument")
     def test_no_source_snapshot_skips_database_load(self, mock_doc_cls: MagicMock) -> None:
-        """Standalone quick-run overrides do not require a source execution."""
-        loader = SnapshotParameterLoader(
-            source_execution_id=None,
-            project_id="proj-1",
-            parameter_overrides={"input": {"frequency": 5.0}},
-        )
+        """A loader without a source execution or task does not query history."""
+        loader = SnapshotParameterLoader(source_execution_id=None, project_id="proj-1")
 
         assert loader.get_snapshot("CheckRabi", "0") is None
         assert loader._cache == {}
@@ -213,12 +190,8 @@ class TestSnapshotParameterLoaderLoad:
 class TestSnapshotParameterLoaderGetSnapshot:
     """Test SnapshotParameterLoader.get_snapshot method."""
 
-    def _make_loader_with_cache(
-        self,
-        cache: _CacheType,
-        overrides: dict[str, dict[str, Any]] | None = None,
-    ) -> SnapshotParameterLoader:
-        loader = SnapshotParameterLoader("exec-001", "proj-1", parameter_overrides=overrides)
+    def _make_loader_with_cache(self, cache: _CacheType) -> SnapshotParameterLoader:
+        loader = SnapshotParameterLoader("exec-001", "proj-1")
         loader._cache = cache
         return loader
 
@@ -257,119 +230,3 @@ class TestSnapshotParameterLoaderGetSnapshot:
 
         mock_load.assert_called_once()
         assert result is None
-
-    def test_get_snapshot_without_overrides_returns_raw(self) -> None:
-        """Test that without overrides, raw snapshot data is returned."""
-        snap_input: dict[str, Any] = {"freq": {"value": 5.0, "unit": "GHz"}}
-        snap_run: dict[str, Any] = {"shots": {"value": 1024}}
-        cache: _CacheType = {("TaskA", "0"): (snap_input, snap_run)}
-        loader = self._make_loader_with_cache(cache, overrides=None)
-
-        result = loader.get_snapshot("TaskA", "0")
-
-        assert result == (snap_input, snap_run)
-
-    def test_get_snapshot_with_input_overrides(self) -> None:
-        """Test that input overrides are merged on top of snapshot."""
-        snap_input: dict[str, Any] = {"freq": {"value": 5.0, "unit": "GHz"}, "amp": {"value": 0.1}}
-        snap_run: dict[str, Any] = {"shots": {"value": 1024}}
-        cache: _CacheType = {("TaskA", "0"): (snap_input, snap_run)}
-        overrides: dict[str, dict[str, Any]] = {"input": {"freq": 6.0}}
-        loader = self._make_loader_with_cache(cache, overrides=overrides)
-
-        result = loader.get_snapshot("TaskA", "0")
-
-        assert result is not None
-        merged_input, merged_run = result
-        # freq should have its value replaced but unit preserved
-        assert merged_input["freq"] == {"value": 6.0, "unit": "GHz"}
-        # amp should be untouched
-        assert merged_input["amp"] == {"value": 0.1}
-        # run_params should be unchanged
-        assert merged_run == snap_run
-
-    def test_get_snapshot_with_run_overrides(self) -> None:
-        """Test that run overrides are merged on top of snapshot."""
-        snap_input: dict[str, Any] = {"freq": {"value": 5.0}}
-        snap_run: dict[str, Any] = {
-            "shots": {"value": 1024, "unit": "count"},
-            "interval": {"value": 150},
-        }
-        cache: _CacheType = {("TaskA", "0"): (snap_input, snap_run)}
-        overrides: dict[str, dict[str, Any]] = {"run": {"shots": 2048}}
-        loader = self._make_loader_with_cache(cache, overrides=overrides)
-
-        result = loader.get_snapshot("TaskA", "0")
-
-        assert result is not None
-        merged_input, merged_run = result
-        assert merged_input == snap_input
-        assert merged_run["shots"] == {"value": 2048, "unit": "count"}
-        assert merged_run["interval"] == {"value": 150}
-
-    def test_get_snapshot_with_both_overrides(self) -> None:
-        """Test that both input and run overrides are applied."""
-        snap_input: dict[str, Any] = {"freq": {"value": 5.0}}
-        snap_run: dict[str, Any] = {"shots": {"value": 1024}}
-        cache: _CacheType = {("TaskA", "0"): (snap_input, snap_run)}
-        overrides: dict[str, dict[str, Any]] = {"input": {"freq": 6.0}, "run": {"shots": 2048}}
-        loader = self._make_loader_with_cache(cache, overrides=overrides)
-
-        result = loader.get_snapshot("TaskA", "0")
-
-        assert result is not None
-        merged_input, merged_run = result
-        # Both have "value" key, so only the value field is replaced
-        assert merged_input["freq"] == {"value": 6.0}
-        assert merged_run["shots"] == {"value": 2048}
-
-    def test_get_snapshot_with_empty_overrides(self) -> None:
-        """Test that empty overrides dict doesn't modify data."""
-        snap_input: dict[str, Any] = {"freq": {"value": 5.0}}
-        snap_run: dict[str, Any] = {"shots": {"value": 1024}}
-        cache: _CacheType = {("TaskA", "0"): (snap_input, snap_run)}
-        overrides: dict[str, dict[str, Any]] = {}
-        loader = self._make_loader_with_cache(cache, overrides=overrides)
-
-        result = loader.get_snapshot("TaskA", "0")
-
-        assert result == (snap_input, snap_run)
-
-
-class TestMergeOverrides:
-    """Test SnapshotParameterLoader._merge_overrides static method."""
-
-    def test_empty_overrides_returns_snapshot(self) -> None:
-        snapshot: dict[str, Any] = {"a": 1, "b": 2}
-        result = SnapshotParameterLoader._merge_overrides(snapshot, {})
-        assert result == snapshot
-
-    def test_override_replaces_simple_value(self) -> None:
-        snapshot: dict[str, Any] = {"a": 1, "b": 2}
-        result = SnapshotParameterLoader._merge_overrides(snapshot, {"a": 10})
-        assert result == {"a": 10, "b": 2}
-
-    def test_override_replaces_value_key_in_dict(self) -> None:
-        """When snapshot has {"value": ...}, override replaces only the value."""
-        snapshot: dict[str, Any] = {
-            "freq": {"value": 5.0, "unit": "GHz", "description": "Frequency"},
-        }
-        result = SnapshotParameterLoader._merge_overrides(snapshot, {"freq": 6.0})
-        assert result["freq"] == {"value": 6.0, "unit": "GHz", "description": "Frequency"}
-
-    def test_override_replaces_entire_entry_without_value_key(self) -> None:
-        """When snapshot dict lacks 'value' key, override replaces entirely."""
-        snapshot: dict[str, Any] = {"config": {"mode": "fast", "retries": 3}}
-        result = SnapshotParameterLoader._merge_overrides(snapshot, {"config": "simple"})
-        assert result["config"] == "simple"
-
-    def test_override_adds_new_key(self) -> None:
-        snapshot: dict[str, Any] = {"a": 1}
-        result = SnapshotParameterLoader._merge_overrides(snapshot, {"b": 2})
-        assert result == {"a": 1, "b": 2}
-
-    def test_does_not_mutate_original(self) -> None:
-        snapshot: dict[str, Any] = {"a": {"value": 1, "unit": "V"}}
-        original_snapshot: dict[str, Any] = {"a": {"value": 1, "unit": "V"}}
-        SnapshotParameterLoader._merge_overrides(snapshot, {"a": 2})
-        assert snapshot == original_snapshot

@@ -135,24 +135,34 @@ def fast_full_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
+        task_parameters={
             "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "hpi_duration": {"value": 32, "value_type": "int"},
+                },
             },
             "CreatePIPulse": {
-                "pi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "pi_duration": {"value": 32, "value_type": "int"},
+                },
             },
             "CreateDRAGHPIPulse": {
-                "drag_hpi_duration": {"value": 16, "value_type": "int"},
+                "run": {
+                    "drag_hpi_duration": {"value": 16, "value_type": "int"},
+                },
             },
             "CreateDRAGPIPulse": {
-                "drag_pi_duration": {"value": 24, "value_type": "int"},
+                "run": {
+                    "drag_pi_duration": {"value": 24, "value_type": "int"},
+                },
             },
             # Per-task overrides — uncomment to tune the CR parameter search.
             # "CheckCrossResonance": {
-            #     "adiabatic_safe_factor": {"value": 0.65, "value_type": "float"},
-            #     "max_amplitude": {"value": 0.85, "value_type": "float"},
-            #     "max_time_range": {"value": 8192, "value_type": "int"},
+            #     "run": {
+            #         "adiabatic_safe_factor": {"value": 0.65, "value_type": "float"},
+            #         "max_amplitude": {"value": 0.85, "value_type": "float"},
+            #         "max_time_range": {"value": 8192, "value_type": "int"},
+            #     },
             # },
         },
         default_run_parameters={

@@ -314,7 +314,7 @@ class CheckQubitSpectroscopy(QubexTask):
     def batch_run(self, backend: QubexBackend, qids: list[str]) -> RunResult:
         """Run the task for a batch of qubits.
 
-        Note: batch_run does not support parameter overrides via task_details.
+        Note: batch_run does not support calibration input overrides.
         Use individual run() calls if you need per-qubit parameter customization.
         """
         exp = self.get_experiment(backend)

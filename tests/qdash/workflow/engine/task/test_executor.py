@@ -39,6 +39,8 @@ class MockTask:
         self.backend = backend
         self.input_parameters: dict[str, Any] = {}
         self.input_parameters_from_snapshot = False
+        self.input_overrides: dict[str, Any] = {}
+        self.run_overrides: dict[str, Any] = {}
         self.run_parameters: dict[str, Any] = {}
         self.resolve_run_parameters_callback: Any = None
 
@@ -240,6 +242,47 @@ class TestTaskExecutorExecuteTask:
         assert call_args[0][0] == "CheckRabi"
         assert "param1" in call_args[0][1]
         assert call_args[0][1]["param1"].value == 1.0
+
+    def test_task_input_override_replaces_preprocess_value_without_snapshot_loader(
+        self, executor: TaskExecutor
+    ) -> None:
+        """A workflow input override wins over the database value loaded in preprocess."""
+
+        class DeclaredTask(MockTask):
+            input_spec = {
+                "coarse_control_amplitude": InputParameterSpec.required_database(
+                    greater_than=0.0,
+                )
+            }
+
+            def preprocess(self, session: Any, qid: str) -> PreProcessResult:
+                self.input_parameters["coarse_control_amplitude"] = InputParameterModel(value=0.2)
+                return PreProcessResult(input_parameters=self.input_parameters)
+
+            def run(self, session: Any, qid: str) -> RunResult:
+                session.used_value = self.input_parameters["coarse_control_amplitude"].value
+                return super().run(session, qid)
+
+        task = DeclaredTask()
+        task.input_overrides = {"coarse_control_amplitude": 0.05}
+        session: Any = MockSession()
+
+        result = executor.execute_task(task, session, "0")
+
+        assert result["success"] is True
+        assert session.used_value == 0.05
+
+    def test_execute_batch_rejects_task_input_overrides(self, executor: TaskExecutor) -> None:
+        """Batch execution has no preprocess step, so an input override cannot apply."""
+        task = MockTask()
+        task.input_overrides = {"control_amplitude": 0.05}
+        task.batch_run = MagicMock()  # type: ignore[method-assign]
+        session: Any = MockSession()
+
+        with pytest.raises(ValueError, match="does not support calibration input overrides"):
+            executor.execute_batch(task, session, ["0", "4"])
+
+        task.batch_run.assert_not_called()
 
     def test_execute_task_handles_no_run_result(
         self, executor: TaskExecutor, mock_state_manager: MagicMock
@@ -1023,13 +1066,9 @@ class TestSnapshotOverrides:
 
         task = DeclaredTask()
         task.input_parameters["control_amplitude"] = ParameterModel(value=0.1)
-        mock_snapshot_loader._parameter_overrides = {
-            "input": {"control_amplitude": "0.002479649788714785"}
-        }
+        task.input_overrides = {"control_amplitude": "0.002479649788714785"}
 
-        executor_with_snapshot._apply_user_overrides_only(
-            task, "CheckControlAmplitude", "qubit", "0"
-        )
+        executor_with_snapshot._apply_input_overrides(task, "CheckControlAmplitude", "qubit", "0")
         executor_with_snapshot._validate_effective_inputs(task)
         session = MagicMock()
         executor_with_snapshot._prepare_run(task, session, "0")
@@ -1039,38 +1078,28 @@ class TestSnapshotOverrides:
         assert isinstance(value, float)
         assert session.applied_value == pytest.approx(value)
 
-    def test_user_run_override_preserves_list_value(
+    def test_explicit_overrides_replace_snapshot_values(
         self,
         executor_with_snapshot: TaskExecutor,
         mock_snapshot_loader: MagicMock,
+        mock_state_manager: MagicMock,
     ) -> None:
-        task = MockTask()
-        task.run_parameters["resonator_assignment_order"] = RunParameterModel(
-            value=[3, 0, 2, 1], value_type="list"
+        """Re-execution applies the request's overrides on top of the recorded values."""
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {"control_amplitude": {"value": 0.1, "unit": "a.u."}},
+            {"resonator_assignment_order": {"value": [3, 0, 2, 1], "value_type": "list"}},
         )
-        mock_snapshot_loader._parameter_overrides = {
-            "run": {"resonator_assignment_order": [0, 3, 1, 2]}
-        }
+        task = MockTask()
+        task.input_overrides = {"control_amplitude": 0.05}
+        task.run_overrides = {"resonator_assignment_order": [0, 3, 1, 2]}
 
-        executor_with_snapshot._apply_user_overrides_only(task, "Task", "qubit", "0")
+        executor_with_snapshot._apply_snapshot_overrides(task, "Task", "qubit", "0")
 
+        assert task.input_parameters["control_amplitude"].value == 0.05
+        assert task.input_parameters["control_amplitude"].unit == "a.u."
         assert task.run_parameters["resonator_assignment_order"].value == [0, 3, 1, 2]
-
-    def test_user_run_override_rejects_string_for_array_type(
-        self,
-        executor_with_snapshot: TaskExecutor,
-        mock_snapshot_loader: MagicMock,
-    ) -> None:
-        task = MockTask()
-        task.run_parameters["frequency_range"] = RunParameterModel(
-            value=(5.75, 6.75, 0.002), value_type="np.arange"
-        )
-        mock_snapshot_loader._parameter_overrides = {
-            "run": {"frequency_range": "[5.75, 6.75, 0.002]"}
-        }
-
-        with pytest.raises(ValueError, match="must be a 3-value JSON array"):
-            executor_with_snapshot._apply_user_overrides_only(task, "Task", "qubit", "0")
+        recorded_run = mock_state_manager.put_run_parameters.call_args[0][1]
+        assert recorded_run["resonator_assignment_order"]["value"] == [0, 3, 1, 2]
 
     def test_apply_snapshot_overrides_empty_params(
         self,
@@ -1191,3 +1220,42 @@ class TestSnapshotOverrides:
 
         assert results["0"].r2 == {"0": 0.91}
         assert results["4"].r2 == {"4": 0.87}
+
+
+class TestMergeOverrides:
+    """Test TaskExecutor._merge_overrides static method."""
+
+    def test_empty_overrides_returns_snapshot(self) -> None:
+        snapshot: dict[str, Any] = {"a": 1, "b": 2}
+        result = TaskExecutor._merge_overrides(snapshot, {})
+        assert result == snapshot
+
+    def test_override_replaces_simple_value(self) -> None:
+        snapshot: dict[str, Any] = {"a": 1, "b": 2}
+        result = TaskExecutor._merge_overrides(snapshot, {"a": 10})
+        assert result == {"a": 10, "b": 2}
+
+    def test_override_replaces_value_key_in_dict(self) -> None:
+        """When snapshot has {"value": ...}, override replaces only the value."""
+        snapshot: dict[str, Any] = {
+            "freq": {"value": 5.0, "unit": "GHz", "description": "Frequency"},
+        }
+        result = TaskExecutor._merge_overrides(snapshot, {"freq": 6.0})
+        assert result["freq"] == {"value": 6.0, "unit": "GHz", "description": "Frequency"}
+
+    def test_override_replaces_entire_entry_without_value_key(self) -> None:
+        """When snapshot dict lacks 'value' key, override replaces entirely."""
+        snapshot: dict[str, Any] = {"config": {"mode": "fast", "retries": 3}}
+        result = TaskExecutor._merge_overrides(snapshot, {"config": "simple"})
+        assert result["config"] == "simple"
+
+    def test_override_adds_new_key(self) -> None:
+        snapshot: dict[str, Any] = {"a": 1}
+        result = TaskExecutor._merge_overrides(snapshot, {"b": 2})
+        assert result == {"a": 1, "b": 2}
+
+    def test_does_not_mutate_original(self) -> None:
+        snapshot: dict[str, Any] = {"a": {"value": 1, "unit": "V"}}
+        original_snapshot: dict[str, Any] = {"a": {"value": 1, "unit": "V"}}
+        TaskExecutor._merge_overrides(snapshot, {"a": 2})
+        assert snapshot == original_snapshot

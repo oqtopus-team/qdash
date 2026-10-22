@@ -223,6 +223,21 @@ class InputParameterSpec(ParameterSpec):
                     raise ValueError("Numeric bounds must define a non-empty interval")
         return self
 
+    def coerce_override(self, name: str, value: Any) -> Any:
+        """Return a user override converted to ``value_type`` after the policy check."""
+        if self.user_override == "forbidden":
+            raise ValueError(f"Input parameter '{name}' does not allow user overrides")
+        try:
+            if self.value_type == "float":
+                return float(value)
+            if self.value_type == "int":
+                return int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Input parameter {name!r} must be a valid {self.value_type}, got {value!r}"
+            ) from exc
+        return value
+
     def validate_effective_value(self, name: str, value: Any) -> None:
         """Validate a resolved value without changing it or applying a fallback."""
         if value is None:

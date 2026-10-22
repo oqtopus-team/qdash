@@ -92,21 +92,31 @@ def ef_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
+        task_parameters={
             "ConfigureEF": {
-                "configuration_mode": {"value": configuration_mode, "value_type": "str"},
+                "run": {
+                    "configuration_mode": {"value": configuration_mode, "value_type": "str"},
+                },
             },
             "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "hpi_duration": {"value": 32, "value_type": "int"},
+                },
             },
             "CheckAdaptiveEFChevron": {
-                "shots": {"value": 256, "value_type": "int"},
+                "run": {
+                    "shots": {"value": 256, "value_type": "int"},
+                },
             },
             "CreateEFHPIPulse": {
-                "ef_hpi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "ef_hpi_duration": {"value": 32, "value_type": "int"},
+                },
             },
             "CreateEFPIPulse": {
-                "ef_pi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "ef_pi_duration": {"value": 32, "value_type": "int"},
+                },
             },
         },
         default_run_parameters={

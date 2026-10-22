@@ -115,10 +115,10 @@ step's default list. The visible order is part of the flow contract: repeated me
 configuration checkpoints must remain reviewable in the saved source. If two templates must stay
 aligned, compare their lists in template tests.
 
-## Set Run Parameters
+## Set Task Parameters
 
-Pass shared fallbacks through `default_run_parameters` and task-specific values through
-`task_run_parameters`:
+Pass shared run-parameter fallbacks through `default_run_parameters` and settings for one task
+through `task_parameters`:
 
 ```python
 service = CalibService(
@@ -128,19 +128,22 @@ service = CalibService(
     default_run_parameters={
         "interval": {"value": 150 * 1024, "value_type": "int"},
     },
-    task_run_parameters={
+    task_parameters={
         "CheckRamsey": {
-            "shots": {"value": 1024, "value_type": "int"},
+            "run": {"shots": {"value": 1024, "value_type": "int"}},
+            "input": {"control_frequency": 7.012},
             "update_calibration_parameters": False,
         },
     },
 )
 ```
 
-Explicit task settings override shared defaults. Setting
-`update_calibration_parameters=False` retains task history without promoting validated outputs to
-the current calibration state. The complete precedence rules are in
-[Parameter Resolution](./parameter-resolution.md).
+`run` sets run parameters the task declares in its `run_spec`, and overrides shared defaults.
+`input` replaces calibration inputs the task declares in its `input_spec`; the value applies to
+every qid the task runs on. Setting `update_calibration_parameters=False` retains task history
+without promoting validated outputs to the current calibration state. A name in the wrong section,
+or one the task does not declare, fails when the task is created. The complete precedence rules are
+in [Parameter Resolution](./parameter-resolution.md).
 
 ## Preserve Terminal Handling
 

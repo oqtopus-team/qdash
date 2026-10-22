@@ -198,7 +198,7 @@ def _create_isolated_session(
         enable_github_pull=False,  # Parent session handles GitHub pull
         enable_github=False,  # No GitHub operations for isolated sessions
         default_run_parameters=session_config.get("default_run_parameters"),
-        task_run_parameters=session_config.get("task_run_parameters"),
+        task_parameters=session_config.get("task_parameters"),
         tags=session_config.get("tags"),
         flow_name=session_config.get("flow_name"),
         note=session_config.get("note"),
@@ -282,22 +282,6 @@ def _coupling_task_run_name() -> str:
     params = task_run.parameters
     coupling_qid = params.get("coupling_qid", "?-?")
     return f"coupling-{coupling_qid}"
-
-
-def _group_retry_task_run_name() -> str:
-    """Generate dynamic task name for group with retry calibration tasks."""
-    from prefect.runtime import task_run
-
-    params = task_run.parameters
-    qids = params.get("qids", [])
-    if qids:
-        return f"retry-group-Q{qids[0]}-{qids[-1]}"
-    return "retry-group"
-
-
-# =============================================================================
-# MUX-level Tasks (for scheduled/strategy execution)
-# =============================================================================
 
 
 def _execute_mux_qubits_with_session(
@@ -798,156 +782,6 @@ def run_qubit_calibrations_parallel(
         return dict(pair_results)
 
     result: dict[str, Any] = _run_qubit_parallel_flow(qids, tasks, session_config)
-    return result
-
-
-@task(task_run_name=_group_retry_task_run_name, log_prints=True)
-def calibrate_group_with_retry(
-    qids: list[str],
-    tasks: list[str],
-    offsets: list[float],
-    session_config: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Calibrate a group of qubits sequentially with retry logic.
-
-    Each qubit in the group runs sequentially, with retry on failure
-    using frequency offsets.
-
-    Args:
-        qids: Qubit IDs in this group (run sequentially)
-        tasks: Task names (run sequentially per qubit)
-        offsets: Frequency offsets to try on failure (e.g., [0, 0.001, -0.001])
-        session_config: Optional configuration for creating isolated session.
-            If provided, creates independent CalibService. If None, uses
-            global session context.
-
-    Returns:
-        Results dict keyed by qubit ID
-    """
-    # Ensure Prefect logging is configured in Dask worker processes
-    _ensure_prefect_logging()
-
-    logger = get_run_logger()
-
-    # Create isolated session or use global session
-    use_isolated = session_config is not None
-
-    if use_isolated:
-        assert session_config is not None
-        session = _create_isolated_session(session_config, qids)
-    else:
-        session = _get_session()
-
-    results: dict[str, Any] = {}
-
-    try:
-        for qid in qids:
-            # Retry loop for each qubit
-            for attempt, offset in enumerate(offsets):
-                try:
-                    if offset != 0:
-                        logger.info(
-                            f"Q{qid}: Attempt {attempt + 1} with {offset * 1000:+.0f} MHz offset"
-                        )
-
-                    # Tasks run sequentially within qubit
-                    result: dict[str, Any] = {}
-                    for task_name in tasks:
-                        task_details = None
-                        if offset != 0:
-                            task_details = {
-                                task_name: {
-                                    "input_parameters": {
-                                        "qubit_frequency_offset": {"value": offset}
-                                    }
-                                }
-                            }
-                        result[task_name] = session.execute_task(
-                            task_name, qid, task_details=task_details
-                        )
-
-                    result["status"] = "success"
-                    result["attempt"] = attempt + 1
-                    results[qid] = result
-                    break  # Success, move to next qubit
-
-                except Exception as e:
-                    error_details = _format_exception_details(e)
-                    logger.warning(f"Q{qid}: Attempt {attempt + 1} failed:\n{error_details}")
-                    if attempt == len(offsets) - 1:
-                        results[qid] = {
-                            "status": "failed",
-                            "error": str(e),
-                            "error_details": error_details,
-                            "attempt": attempt + 1,
-                        }
-    finally:
-        if use_isolated:
-            session.finish_calibration(update_chip_history=False, push_to_github=False)
-
-    # Flush logs before returning (critical for Dask worker processes)
-    _flush_prefect_logs()
-    return results
-
-
-def run_groups_with_retry_parallel(
-    groups: list[list[str]],
-    tasks: list[str],
-    offsets: list[float],
-    session_config: dict[str, Any],
-) -> dict[str, Any]:
-    """Run multiple qubit groups with retry logic in parallel using separate processes.
-
-    Each group runs in its own process with isolated memory space.
-    Within each group, qubits are processed sequentially with retry logic.
-
-    Args:
-        groups: List of qubit groups, where each group is a list of qubit IDs
-        tasks: List of task names to execute
-        offsets: Frequency offsets to try on failure (e.g., [0, 0.001, -0.001])
-        session_config: Configuration for creating isolated sessions
-
-    Returns:
-        Dictionary mapping qid to results (combined from all groups)
-    """
-
-    # Define flow dynamically to avoid import errors when prefect-dask not installed
-    @flow(task_runner=_get_dask_task_runner())
-    def _run_groups_retry_parallel_flow(
-        groups: list[list[str]],
-        tasks: list[str],
-        offsets: list[float],
-        session_config: dict[str, Any],
-    ) -> dict[str, Any]:
-        logger = get_run_logger()
-        logger.info(f"Running {len(groups)} groups with retry in parallel processes")
-
-        # Submit all groups to run in parallel processes
-        futures = [
-            calibrate_group_with_retry.submit(
-                qids=group,
-                tasks=tasks,
-                offsets=offsets,
-                session_config=session_config,
-            )
-            for group in groups
-        ]
-
-        # Collect results and log any errors from subprocesses
-        all_results: dict[str, Any] = {}
-        for future in futures:
-            group_result = future.result()
-            # Log error details from subprocess (since subprocess logs don't propagate)
-            for qid, qid_result in group_result.items():
-                if qid_result.get("status") == "failed" and "error_details" in qid_result:
-                    logger.error(
-                        f"[From subprocess] Failed to calibrate qubit {qid}:\n{qid_result['error_details']}"
-                    )
-            all_results.update(group_result)
-
-        return all_results
-
-    result: dict[str, Any] = _run_groups_retry_parallel_flow(groups, tasks, offsets, session_config)
     return result
 
 

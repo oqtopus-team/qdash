@@ -27,7 +27,9 @@ class CalibConfig:
         enable_github_pull: Whether to pull config from GitHub
         enable_provenance_tracking: Whether to track data provenance for lineage
         connect_backend: Whether to connect hardware during session initialization
-        task_run_parameters: Explicit run parameters keyed by task name
+        task_parameters: Task-scoped run parameters, input overrides, and
+            ``update_calibration_parameters`` in the canonical form of
+            :mod:`qdash.workflow.engine.task_parameters`
     """
 
     username: str
@@ -52,7 +54,7 @@ class CalibConfig:
     default_run_parameters: dict[str, Any] = field(
         default_factory=dict
     )  # Shared fallback run parameters for all tasks.
-    task_run_parameters: dict[str, dict[str, Any]] = field(default_factory=dict)
+    task_parameters: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     # Derived paths (computed after initialization)
     calib_data_path: str = field(default="", init=False)
