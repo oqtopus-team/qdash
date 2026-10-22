@@ -526,15 +526,12 @@
         "description": "Estimate qubit frequency and control amplitude with an adaptive Chevron.",
         "file_path": "one_qubit_coarse/check_adaptive_chevron.py",
         "input_parameters": {
-          "control_amplitude": {
-            "default_value": 0.0625,
-            "description": "Initial control pulse amplitude; falls back to coarse_control_amplitude",
-            "fallback_parameter_names": [
-              "coarse_control_amplitude"
-            ],
+          "coarse_control_amplitude": {
+            "default_value": null,
+            "description": "Coarse control pulse amplitude",
             "greater_than_or_equal": 0.0001,
             "less_than_or_equal": 1.0,
-            "resolution": "database_or_default",
+            "resolution": "database_required",
             "unit": "a.u.",
             "user_override": "allowed"
           },
@@ -1515,7 +1512,7 @@
       },
       {
         "class_name": "CheckChevron",
-        "description": "Measure one fixed-grid Chevron pattern and estimate the qubit frequency.",
+        "description": "Estimate qubit frequency and control amplitude from a fixed-grid Chevron.",
         "file_path": "one_qubit_coarse/check_chevron.py",
         "input_parameters": {
           "control_amplitude": {

@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
-from qdash.workflow.service._internal.worker_session import build_isolated_session_config
 from qdash.workflow.service.results import OneQubitResult, normalize_metric_value
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_1Q_TASKS_AFTER_CHECK
@@ -39,7 +38,18 @@ def _execute_direct_one_qubit(
     if not qids:
         return {"direct": {}}
 
-    session_config = build_isolated_session_config(service)
+    session_config = {
+        "username": service.username,
+        "chip_id": service.chip_id,
+        "backend_name": service.backend_name,
+        "execution_id": service.execution_id,
+        "project_id": service.project_id,
+        "default_run_parameters": service.default_run_parameters,
+        "task_run_parameters": service.task_run_parameters,
+        "tags": service.tags,
+        "flow_name": service.flow_name,
+        "note": service.note,
+    }
 
     results = run_qubit_calibrations_parallel(
         qids=qids,

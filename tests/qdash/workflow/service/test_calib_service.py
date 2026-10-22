@@ -1053,9 +1053,6 @@ def test_single_step_without_api_reservation_creates_one_execution(
         project_id="project-1",
         enable_github=False,
         skip_execution=skip_execution,
-        parameter_overrides={"input": {"control_amplitude": 0.0625}},
-        force_update_params=True,
-        persist_output_parameters=False,
         lock_repo=env.lock,
         counter_repo=FakeExecutionCounterRepository(2),
     )
@@ -1068,11 +1065,6 @@ def test_single_step_without_api_reservation_creates_one_execution(
         worker.call_args.kwargs["session_config"]["execution_id"]
         == env.records[0].config.execution_id
     )
-    assert worker.call_args.kwargs["session_config"]["parameter_overrides"] == {
-        "input": {"control_amplitude": 0.0625}
-    }
-    assert worker.call_args.kwargs["session_config"]["force_update_params"] is True
-    assert worker.call_args.kwargs["session_config"]["persist_output_parameters"] is False
     assert env.lock.locked is False
 
 

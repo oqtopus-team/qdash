@@ -23,7 +23,7 @@ CONTROL_AMPLITUDE_MAX = 1.0
 
 
 class CheckChevron(QubexTask):
-    """Measure one fixed-grid Chevron pattern and estimate the qubit frequency."""
+    """Estimate qubit frequency and control amplitude from a fixed-grid Chevron."""
 
     name: str = "CheckChevron"
     task_type: str = "qubit"

@@ -20,7 +20,6 @@ from qdash.workflow.service._internal.scheduling_tasks import (
     run_mux_calibrations_parallel,
     run_qubit_calibrations_parallel,
 )
-from qdash.workflow.service._internal.worker_session import build_isolated_session_config
 
 if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
@@ -161,10 +160,19 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
         all_qids = list(dict.fromkeys(all_qids))
 
         # Workers borrow the Execution owned by the pipeline step.
-        session_config = build_isolated_session_config(
-            cal_service,
-            project_id=config.project_id,
-        )
+        session_config = {
+            "username": cal_service.username,
+            "chip_id": cal_service.chip_id,
+            "backend_name": cal_service.backend_name,
+            "project_id": config.project_id,
+            "muxes": None,
+            "execution_id": cal_service.execution_id,
+            "default_run_parameters": cal_service.default_run_parameters,
+            "task_run_parameters": cal_service.task_run_parameters,
+            "tags": cal_service.tags,
+            "flow_name": cal_service.flow_name,
+            "note": cal_service.note,
+        }
 
         # Execute stages grouped by box type (sequentially between box types)
         for box_type, sequential_groups in box_sequential_groups.items():
@@ -232,10 +240,19 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             return {}
 
         # Workers borrow the Execution owned by the pipeline step.
-        session_config = build_isolated_session_config(
-            cal_service,
-            project_id=config.project_id,
-        )
+        session_config = {
+            "username": cal_service.username,
+            "chip_id": cal_service.chip_id,
+            "backend_name": cal_service.backend_name,
+            "project_id": config.project_id,
+            "muxes": None,
+            "execution_id": cal_service.execution_id,
+            "default_run_parameters": cal_service.default_run_parameters,
+            "task_run_parameters": cal_service.task_run_parameters,
+            "tags": cal_service.tags,
+            "flow_name": cal_service.flow_name,
+            "note": cal_service.note,
+        }
 
         all_results: dict[str, Any] = {}
 

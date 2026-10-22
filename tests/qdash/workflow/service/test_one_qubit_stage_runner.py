@@ -15,11 +15,7 @@ def _service() -> CalibService:
             project_id="project-1",
             default_run_parameters={"interval": {"value": 1024}},
             task_run_parameters={"CreateHPIPulse": {"hpi_duration": {"value": 52}}},
-            parameter_overrides=None,
-            force_update_params=False,
-            persist_output_parameters=True,
             tags=["tag-1"],
-            flow_name="parent-flow",
             note={"kind": "test"},
         ),
     )
@@ -35,18 +31,6 @@ def test_collect_qids_preserves_order_and_filters_duplicates() -> None:
     )
 
     assert runner.collect_scheduled_qids(schedule, allowed_qids=["4", "8"]) == ["4", "8"]
-
-
-def test_build_session_config_preserves_explicit_empty_flow_name() -> None:
-    service = _service()
-    service.flow_name = "parent-flow"
-
-    config = OneQubitStageRunner(service).build_session_config(
-        execution_id="exec-1",
-        flow_name=None,
-    )
-
-    assert config["flow_name"] is None
 
 
 def test_execute_scheduled_mux_schedule_uses_parent_session_config(

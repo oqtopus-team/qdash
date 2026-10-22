@@ -22,7 +22,6 @@ from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 DEFAULT_MINIMUM_PEAK_BACKGROUND_RMS_RATIO = 5.0
-DEFAULT_CONTROL_AMPLITUDE = 0.0625
 CONTROL_AMPLITUDE_MIN = 1e-4
 CONTROL_AMPLITUDE_MAX = 1.0
 
@@ -40,13 +39,11 @@ class CheckAdaptiveChevron(QubexTask):
             fallback_parameter_names=("resonator_frequency",)
         ),
         "readout_amplitude": InputParameterSpec.required_database(),
-        "control_amplitude": InputParameterSpec.database_or_default(
-            default=DEFAULT_CONTROL_AMPLITUDE,
-            fallback_parameter_names=("coarse_control_amplitude",),
+        "coarse_control_amplitude": InputParameterSpec.required_database(
             greater_than_or_equal=CONTROL_AMPLITUDE_MIN,
             less_than_or_equal=CONTROL_AMPLITUDE_MAX,
             unit="a.u.",
-            description=("Initial control pulse amplitude; falls back to coarse_control_amplitude"),
+            description="Coarse control pulse amplitude",
         ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
@@ -179,14 +176,14 @@ class CheckAdaptiveChevron(QubexTask):
         readout_freq = float(readout_frequency.value)
         readout_amp = float(readout_amplitude.value)
 
-        control_amplitude = self.input_parameters["control_amplitude"].value
+        control_amplitude = self.input_parameters["coarse_control_amplitude"].value
         if control_amplitude is None:
-            raise ValueError("control_amplitude input parameter was not resolved")
+            raise ValueError("coarse_control_amplitude input parameter is required")
         ctrl_amp_value = float(control_amplitude)
 
         print(
             f"[run] CheckAdaptiveChevron params for {label}: "
-            f"control_amplitude={ctrl_amp_value}, "
+            f"coarse_control_amplitude={ctrl_amp_value}, "
             f"control_frequency={control_freq}, "
             f"readout_amplitude={readout_amp}, "
             f"readout_frequency={readout_freq}"

@@ -30,7 +30,6 @@ from typing import Any
 from prefect import flow, get_run_logger
 
 from qdash.workflow.service import CalibService
-from qdash.workflow.service._internal.worker_session import build_isolated_session_config
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
     on_flow_crashed,
@@ -109,7 +108,16 @@ def parallel_retry_calibration(
 
     try:
         # Build session config for multiprocess execution
-        session_config = build_isolated_session_config(cal)
+        session_config = {
+            "username": cal.username,
+            "chip_id": cal.chip_id,
+            "backend_name": cal.backend_name,
+            "execution_id": cal.execution_id,
+            "project_id": cal.project_id,
+            "tags": cal.tags,
+            "flow_name": cal.flow_name,
+            "note": cal.note,
+        }
 
         # === PARALLEL PROCESSES: Run groups using DaskTaskRunner ===
         from qdash.workflow.service._internal.scheduling_tasks import (

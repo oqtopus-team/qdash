@@ -8,7 +8,6 @@ import pytest
 from qdash.datamodel.task import InputParameterModel as ParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_adaptive_chevron import (
-    DEFAULT_CONTROL_AMPLITUDE,
     DEFAULT_MINIMUM_PEAK_BACKGROUND_RMS_RATIO,
     CheckAdaptiveChevron,
 )
@@ -25,56 +24,17 @@ def test_adaptive_chevron_uses_operational_frequency_with_legacy_fallback() -> N
     assert frequency_spec.fallback_parameter_names == ("coarse_qubit_frequency",)
 
 
-def test_chevron_control_amplitude_uses_coarse_fallback_and_default() -> None:
-    spec = CheckAdaptiveChevron.input_spec["control_amplitude"]
+def test_chevron_control_amplitude_requires_database_value() -> None:
+    spec = CheckAdaptiveChevron.input_spec["coarse_control_amplitude"]
 
-    assert spec.resolution == "database_or_default"
-    assert spec.fallback_parameter_names == ("coarse_control_amplitude",)
-    assert spec.default == DEFAULT_CONTROL_AMPLITUDE
-
-
-@pytest.mark.parametrize(
-    ("database_values", "expected_value", "expected_parameter_name"),
-    [
-        (
-            {
-                "control_amplitude": {"value": 0.08, "unit": "a.u."},
-                "coarse_control_amplitude": {"value": 0.07, "unit": "a.u."},
-            },
-            0.08,
-            "control_amplitude",
-        ),
-        (
-            {"coarse_control_amplitude": {"value": 0.07, "unit": "a.u."}},
-            0.07,
-            "coarse_control_amplitude",
-        ),
-        ({}, DEFAULT_CONTROL_AMPLITUDE, ""),
-    ],
-)
-def test_chevron_control_amplitude_resolution_priority(
-    database_values: dict[str, dict[str, object]],
-    expected_value: float,
-    expected_parameter_name: str,
-) -> None:
-    task = CheckAdaptiveChevron()
-    required_database_values = {
-        "control_frequency": {"value": 4.25, "unit": "GHz"},
-        "readout_frequency": {"value": 6.1, "unit": "GHz"},
-        "readout_amplitude": {"value": 0.031, "unit": "a.u."},
-    }
-
-    task._populate_parameters({"self": [{**required_database_values, **database_values}]})
-
-    parameter = task.input_parameters["control_amplitude"]
-    assert parameter.value == expected_value
-    assert parameter.parameter_name == expected_parameter_name
+    assert spec.resolution == "database_required"
+    assert spec.default is None
 
 
 @pytest.mark.parametrize("value", [1e-4, 0.07, 1.0])
 def test_chevron_control_amplitude_accepts_inclusive_bounds(value: float) -> None:
-    CheckAdaptiveChevron.input_spec["control_amplitude"].validate_effective_value(
-        "control_amplitude", value
+    CheckAdaptiveChevron.input_spec["coarse_control_amplitude"].validate_effective_value(
+        "coarse_control_amplitude", value
     )
 
 
@@ -82,9 +42,9 @@ def test_chevron_control_amplitude_accepts_inclusive_bounds(value: float) -> Non
     "value", [0.000099, 1.000001, float("nan"), float("inf"), None, True, "0.5"]
 )
 def test_chevron_control_amplitude_rejects_invalid_values(value: Any) -> None:
-    with pytest.raises(ValueError, match="control_amplitude"):
-        CheckAdaptiveChevron.input_spec["control_amplitude"].validate_effective_value(
-            "control_amplitude", value
+    with pytest.raises(ValueError, match="coarse_control_amplitude"):
+        CheckAdaptiveChevron.input_spec["coarse_control_amplitude"].validate_effective_value(
+            "coarse_control_amplitude", value
         )
 
 
@@ -107,7 +67,7 @@ def test_check_chevron_run_uses_adaptive_helper(monkeypatch) -> None:
     task.input_parameters["control_frequency"] = ParameterModel(value=4.25, unit="GHz")
     task.input_parameters["readout_frequency"] = ParameterModel(value=6.1, unit="GHz")
     task.input_parameters["readout_amplitude"] = ParameterModel(value=0.031, unit="a.u.")
-    task.input_parameters["control_amplitude"] = ParameterModel(value=0.07, unit="a.u.")
+    task.input_parameters["coarse_control_amplitude"] = ParameterModel(value=0.07, unit="a.u.")
 
     exp = _DummyExperiment()
     captured: dict[str, object] = {}
