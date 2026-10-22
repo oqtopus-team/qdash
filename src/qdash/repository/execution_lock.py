@@ -64,6 +64,16 @@ class MongoExecutionLockRepository:
         result: bool | None = ExecutionLockDocument.get_lock_status(project_id=project_id)
         return result
 
+    def list_owner_execution_ids(self, project_id: str) -> list[str]:
+        """List distinct owners of outstanding claims, including legacy reservations."""
+        doc = ExecutionLockDocument.find_one({"project_id": project_id}).run()
+        if doc is None or not doc.locked:
+            return []
+        owners = [claim.execution_id for claim in doc.claims]
+        if not doc.claims:
+            owners.append(doc.execution_id)
+        return sorted({owner for owner in owners if owner is not None})
+
     def has_conflict(self, project_id: str, scope: ExecutionResourceScope) -> bool:
         """Inspect current claims without acquiring a lock or creating a record."""
         doc = ExecutionLockDocument.find_one({"project_id": project_id}).run()

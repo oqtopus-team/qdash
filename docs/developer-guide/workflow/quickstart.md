@@ -146,7 +146,9 @@ the current calibration state. The complete precedence rules are in
 
 Every top-level flow that owns hardware reservations must register `on_flow_cancellation`,
 `on_flow_failure`, and `on_flow_crashed`. Do not reproduce their exception-classification logic in
-the template. Nested single-task flows use the `*_keep_lock` hooks supplied by the service layer.
+the template. The system `single-task-executor` also owns its reservation and uses these hooks.
+Use the `*_keep_lock` variants only for nested flows configured with `use_lock=False` that borrow
+the parent flow's reservation.
 
 The hooks finalize execution and task records that the worker cannot close itself and release only
 reservations owned by that flow. [Workflow Engine Architecture](./engine-architecture.md#cancellation)

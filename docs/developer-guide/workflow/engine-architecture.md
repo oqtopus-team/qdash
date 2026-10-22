@@ -108,8 +108,11 @@ exception or a process termination signal.
   `on_flow_cancellation` or `on_flow_crashed` hook finds executions by `flow_run_id`, assigns the
   correct terminal status, finalizes unfinished tasks, and releases the reservation.
 
-Top-level flows that own a reservation use the ordinary terminal hooks. Nested single-task flows
-use the `*_keep_lock` variants so they cannot release a reservation owned by the parent pipeline.
+Top-level flows that own a reservation, including `single-task-executor`, use the ordinary terminal
+hooks. The `*_keep_lock` variants are for nested flows configured with `use_lock=False` that borrow
+the parent pipeline's reservation. If `project_id` was resolved inside `CalibService`, terminal hooks
+recover it from the execution history recorded for the same `flow_run_id`. Initialization also
+releases its reservation on signals or cancellation before the caller receives the session.
 The shared flow helpers in `service/calib_service.py` implement the exception classification and
 terminal behavior; flow templates should not reproduce that policy independently.
 

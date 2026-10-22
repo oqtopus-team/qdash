@@ -6,11 +6,10 @@ and allows re-executing a single calibration task from the task detail page.
 Unlike user flows, this flow does not require a FlowDocument to exist.
 It is always available as a system deployment.
 
-This flow always runs with ``use_lock=False`` (see ``single_task_executor``
-below), so it never owns the project execution lock. It therefore registers
-the ``*_keep_lock`` terminal hooks, which close its own executions on
-cancellation/failure/crash without releasing a lock that belongs to an
-unrelated, concurrently running calibration.
+This top-level flow owns its hardware reservation (``use_lock=True``). Its
+terminal hooks must release that reservation even when cancellation interrupts
+CalibService construction, before the in-process cleanup handler is installed.
+The shared finalizer preserves reservations belonging to other executions.
 """
 
 from __future__ import annotations
@@ -24,18 +23,18 @@ from qdash.common.config.backend import get_default_backend
 from qdash.common.config.loader import ConfigLoader
 from qdash.workflow.service.calib_service import (
     CalibService,
-    on_flow_cancellation_keep_lock,
-    on_flow_crashed_keep_lock,
-    on_flow_failure_keep_lock,
+    on_flow_cancellation,
+    on_flow_crashed,
+    on_flow_failure,
 )
 from qdash.workflow.service.github import GitHubPushConfig
 
 
 @flow(
     name="single-task-executor",
-    on_cancellation=[on_flow_cancellation_keep_lock],
-    on_failure=[on_flow_failure_keep_lock],
-    on_crashed=[on_flow_crashed_keep_lock],
+    on_cancellation=[on_flow_cancellation],
+    on_failure=[on_flow_failure],
+    on_crashed=[on_flow_crashed],
 )
 def single_task_executor(
     username: str,

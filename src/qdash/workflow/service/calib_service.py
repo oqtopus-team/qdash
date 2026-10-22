@@ -152,13 +152,23 @@ def _run_terminal_hook(
         project_id = params.get("project_id")
         flow_run_id = str(flow_run.id)
 
-        if not project_id:
-            _logger.warning("%s: no project_id in parameters, skipping", hook_name)
-            return
-
         from qdash.dbmodel.initialize import initialize
 
         initialize()
+
+        if not project_id:
+            # Direct callers may let CalibService resolve the project. Use the
+            # recorded execution, not a user's default that may have changed.
+            from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+
+            executions = ExecutionHistoryDocument.find({"note.flow_run_id": flow_run_id}).run()
+            projects = {execution.project_id for execution in executions if execution.project_id}
+            if len(projects) != 1:
+                _logger.warning(
+                    "%s: cannot identify one project for flow run %s", hook_name, flow_run_id
+                )
+                return
+            project_id = projects.pop()
 
         from qdash.repository.execution_finalizer import finalize_executions_by_flow_run_id
 
@@ -737,8 +747,9 @@ class CalibService:
             self._orchestrator.initialize()
 
             self._initialized = True
-        except Exception:
-            # Release lock if initialization fails
+        except BaseException:
+            # Construction can be interrupted before the caller has a session
+            # to clean up. Signals and cancellations also release this claim.
             if self._lock_acquired and self._lock_repo is not None:
                 self._lock_repo.unlock(
                     project_id=self.project_id,
