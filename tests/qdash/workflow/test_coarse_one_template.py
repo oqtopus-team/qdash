@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import importlib
-import math
 from typing import Any
 
 import pytest
 
-from qdash.workflow import sweep
 from qdash.workflow.service.steps import OneQubitCheck
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
 
@@ -94,16 +92,6 @@ def test_coarse_one_forwards_execution_context_and_preserves_task_scan_defaults(
         "flow_name": "coarse-check",
         "tags": ["coarse"],
         "task_parameters": {
-            "CheckT1": {
-                "run": {
-                    "time_range": sweep.logspace(math.log10(100), math.log10(500_000), 51),
-                },
-            },
-            "CheckT2Echo": {
-                "run": {
-                    "time_range": sweep.logspace(math.log10(300), math.log10(100_000), 51),
-                },
-            },
             "CreateHPIPulse": {
                 "run": {
                     "hpi_duration": 32,

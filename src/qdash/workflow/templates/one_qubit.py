@@ -11,12 +11,12 @@ Example:
     )
 """
 
-import math
+import math  # noqa: F401  # used by commented range overrides below
 from typing import Any
 
 from prefect import flow
 
-from qdash.workflow import sweep
+from qdash.workflow import sweep  # noqa: F401  # used by commented range overrides below
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -181,20 +181,21 @@ def one_qubit(
                     "drag_pi_duration": 24,
                 },
             },
-            "CheckT1": {
-                "run": {
-                    "time_range": sweep.logspace(
-                        math.log10(100), math.log10(500_000), 51
-                    ),  # 100 ns 〜 500 μs
-                },
-            },
-            "CheckT2Echo": {
-                "run": {
-                    "time_range": sweep.logspace(
-                        math.log10(300), math.log10(100_000), 51
-                    ),  # 300 ns 〜 100 μs
-                },
-            },
+            # Per-task overrides — uncomment to make coherence sweep ranges explicit.
+            # "CheckT1": {
+            #     "run": {
+            #         "time_range": sweep.logspace(
+            #             math.log10(100), math.log10(500_000), 51
+            #         ),  # 100 ns 〜 500 μs
+            #     },
+            # },
+            # "CheckT2Echo": {
+            #     "run": {
+            #         "time_range": sweep.logspace(
+            #             math.log10(300), math.log10(100_000), 51
+            #         ),  # 300 ns 〜 100 μs
+            #     },
+            # },
         },
         default_run_parameters={
             "readout_duration": {"value": 1024, "value_type": "int"},

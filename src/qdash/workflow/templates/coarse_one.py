@@ -10,12 +10,10 @@ Example:
     coarse_one(username="alice", chip_id="64Qv3", mux_ids=[0, 1])
 """
 
-import math
 from typing import Any
 
 from prefect import flow
 
-from qdash.workflow import sweep
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -92,20 +90,6 @@ def coarse_one(
         tags=tags,
         project_id=project_id,
         task_parameters={
-            "CheckT1": {
-                "run": {
-                    "time_range": sweep.logspace(
-                        math.log10(100), math.log10(500_000), 51
-                    ),  # 100 ns 〜 500 μs
-                },
-            },
-            "CheckT2Echo": {
-                "run": {
-                    "time_range": sweep.logspace(
-                        math.log10(300), math.log10(100_000), 51
-                    ),  # 300 ns 〜 100 μs
-                },
-            },
             "CreateHPIPulse": {
                 "run": {
                     "hpi_duration": 32,

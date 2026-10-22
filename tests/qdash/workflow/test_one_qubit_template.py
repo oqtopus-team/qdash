@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import importlib
-import math
 from typing import Any
 
 import pytest
 
-from qdash.workflow import sweep
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
 
 one_qubit_module = importlib.import_module("qdash.workflow.templates.one_qubit")
@@ -69,27 +67,6 @@ def test_one_qubit_template_passes_template_task_lists(monkeypatch) -> None:
     assert steps[0].tasks == COARSE_ONE_TASKS
     assert isinstance(steps[1], FilterByStatus)
     assert steps[2].tasks == FINE_ONE_TASKS
-
-
-def test_one_qubit_template_makes_coherence_sweeps_explicit(monkeypatch) -> None:
-    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
-
-    result = one_qubit_module.one_qubit(username="alice", chip_id="64Q", mux_ids=[0])
-
-    expected = {
-        "CheckT1": {
-            "run": {
-                "time_range": sweep.logspace(math.log10(100), math.log10(500_000), 51),
-            },
-        },
-        "CheckT2Echo": {
-            "run": {
-                "time_range": sweep.logspace(math.log10(300), math.log10(100_000), 51),
-            },
-        },
-    }
-    for task_name, settings in expected.items():
-        assert result["kwargs"]["task_parameters"][task_name] == settings
 
 
 @pytest.mark.parametrize("check_only", [False, True])
@@ -200,8 +177,7 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     ]
     full = one_qubit_module.one_qubit(username="alice", chip_id="64Q", qids=["8"])
     assert result["kwargs"]["default_run_parameters"] == full["kwargs"]["default_run_parameters"]
-    for task_name, settings in result["kwargs"]["task_parameters"].items():
-        assert full["kwargs"]["task_parameters"][task_name] == settings
+    assert result["kwargs"]["task_parameters"] == full["kwargs"]["task_parameters"]
     assert result["kwargs"]["flow_name"] == "fine-check"
     assert result["kwargs"]["project_id"] == "project-1"
     assert result["kwargs"]["tags"] == ["fine"]
