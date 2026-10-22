@@ -142,6 +142,37 @@ class TestLegacyTaskDetails:
             "input": {"control_amplitude": 0.05},
         }
 
+    def test_legacy_input_parameters_rejects_calibration_input_with_guidance(self) -> None:
+        """The legacy key remains a Run alias and reports misplaced Inputs explicitly."""
+        with pytest.warns(DeprecationWarning, match="task_details is deprecated"):
+            settings = CalibService._call_settings(
+                "CheckAdaptiveChevron",
+                {
+                    "CheckAdaptiveChevron": {
+                        "input_parameters": {"coarse_control_amplitude": {"value": 0.05}}
+                    }
+                },
+                None,
+            )
+        orchestrator = CalibOrchestrator(
+            CalibConfig(
+                username="alice",
+                chip_id="chip-1",
+                qids=["0"],
+                execution_id="exec-1",
+                project_id="project-1",
+                backend_name="qubex",
+            )
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=(
+                "calibration input of CheckAdaptiveChevron; set it under 'input' instead of 'run'"
+            ),
+        ):
+            orchestrator._create_task_instance("CheckAdaptiveChevron", settings)
+
 
 class TestValidateTaskNames:
     def test_accepts_registered_tasks(self) -> None:
