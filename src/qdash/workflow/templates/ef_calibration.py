@@ -95,27 +95,27 @@ def ef_calibration(
         task_parameters={
             "ConfigureEF": {
                 "run": {
-                    "configuration_mode": {"value": configuration_mode, "value_type": "str"},
+                    "configuration_mode": configuration_mode,
                 },
             },
             "CreateHPIPulse": {
                 "run": {
-                    "hpi_duration": {"value": 32, "value_type": "int"},
+                    "hpi_duration": 32,
                 },
             },
             "CheckAdaptiveEFChevron": {
                 "run": {
-                    "shots": {"value": 256, "value_type": "int"},
+                    "shots": 256,
                 },
             },
             "CreateEFHPIPulse": {
                 "run": {
-                    "ef_hpi_duration": {"value": 32, "value_type": "int"},
+                    "ef_hpi_duration": 32,
                 },
             },
             "CreateEFPIPulse": {
                 "run": {
-                    "ef_pi_duration": {"value": 32, "value_type": "int"},
+                    "ef_pi_duration": 32,
                 },
             },
         },

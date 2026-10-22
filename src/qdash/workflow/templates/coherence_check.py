@@ -88,15 +88,9 @@ def coherence_check(
                 "run": {
                     # Keep the measurement grid explicit so users can inspect and
                     # tune the coherence-check acquisition condition here.
-                    "detuning_range": {
-                        "value": (-0.05, 0.05, 41),
-                        "value_type": "np.linspace",
-                    },
-                    "time_range": {
-                        "value": (0, 250, 26),
-                        "value_type": "np.linspace",
-                    },
-                    "shots": {"value": 256, "value_type": "int"},
+                    "detuning_range": (-0.05, 0.05, 41),
+                    "time_range": (0, 250, 26),
+                    "shots": 256,
                 },
                 "update_calibration_parameters": False,
             },

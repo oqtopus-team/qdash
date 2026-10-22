@@ -136,10 +136,7 @@ class BringUp(CalibrationStep):
         task_settings = task_parameters.setdefault(
             "CheckResonatorSpectroscopy", {"run": {}, "input": {}}
         )
-        task_settings["run"]["resonator_assignment_order"] = {
-            "value": self.resonator_assignment_order,
-            "value_type": "list",
-        }
+        task_settings["run"]["resonator_assignment_order"] = self.resonator_assignment_order
         service.task_parameters.clear()
         service.task_parameters.update(task_parameters)
 

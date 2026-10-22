@@ -86,26 +86,26 @@ def bringup(
         # defaults to replace the values selected for bring-up measurements.
         "CheckResonatorSpectroscopy": {
             "run": {
-                "shots": {"value": 1024, "value_type": "int"},
-                "interval": {"value": 0, "value_type": "int"},
+                "shots": 1024,
+                "interval": 0,
             },
         },
         "CheckQubitSpectroscopy": {
             "run": {
-                "shots": {"value": 1024, "value_type": "int"},
-                "interval": {"value": 1024, "value_type": "int"},
+                "shots": 1024,
+                "interval": 1024,
             },
         },
         "CheckControlAmplitude": {
             "run": {
-                "shots": {"value": 8192, "value_type": "int"},
+                "shots": 8192,
             },
         },
         # Keep this explicit so users can see and tune the adaptive Chevron
         # acquisition condition directly from the workflow template.
         "CheckAdaptiveChevron": {
             "run": {
-                "shots": {"value": 256, "value_type": "int"},
+                "shots": 256,
             },
             # Calibration inputs normally come from the current calibration
             # parameters. Set a value here to override it for every qubit:
@@ -126,27 +126,15 @@ def bringup(
         # Its qubex default power range is [-60, 5, 5] dB (stop is exclusive).
         # Leave each range unset to use its default, or add these keys to the "run"
         # entry of CheckResonatorSpectroscopy above to override it.
-        #     "resonator_assignment_order": {
-        #         "value": [0, 3, 1, 2],
-        #         "value_type": "list",
-        #     },
-        #     "frequency_range": {
-        #         "value": [5.75, 6.75, 0.002],
-        #         "value_type": "np.arange",
-        #     },
+        #     "resonator_assignment_order": [0, 3, 1, 2],
+        #     "frequency_range": [5.75, 6.75, 0.002],
         # CheckQubitSpectroscopy uses the connected control box's qubex default:
         # low band [3.0, 5.75, 0.005] GHz or high band [6.5, 9.75, 0.005] GHz.
         # Its qubex default power range is [-60, 0, 5] dB (stop is exclusive).
         # Leave frequency_range unset to use that default, or add these keys to the
         # "run" entry of CheckQubitSpectroscopy above to override it.
-        #     "frequency_range": {
-        #         "value": [3.0, 5.75, 0.005],
-        #         "value_type": "np.arange",
-        #     },
-        #     "power_range": {
-        #         "value": [-60, 0, 10],
-        #         "value_type": "np.arange",
-        #     },
+        #     "frequency_range": [3.0, 5.75, 0.005],
+        #     "power_range": [-60, 0, 10],
     }
     steps = [
         ConfigureAll(),

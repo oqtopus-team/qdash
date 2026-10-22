@@ -171,47 +171,45 @@ def full_calibration(
         task_parameters={
             "CreateHPIPulse": {
                 "run": {
-                    "hpi_duration": {"value": 32, "value_type": "int"},
+                    "hpi_duration": 32,
                 },
             },
             "CreatePIPulse": {
                 "run": {
-                    "pi_duration": {"value": 32, "value_type": "int"},
+                    "pi_duration": 32,
                 },
             },
             "CreateDRAGHPIPulse": {
                 "run": {
-                    "drag_hpi_duration": {"value": 16, "value_type": "int"},
+                    "drag_hpi_duration": 16,
                 },
             },
             "CreateDRAGPIPulse": {
                 "run": {
-                    "drag_pi_duration": {"value": 24, "value_type": "int"},
+                    "drag_pi_duration": 24,
                 },
             },
             # Per-task overrides — uncomment to tune the CR parameter search.
             # "CheckCrossResonance": {
             #     "run": {
-            #         "adiabatic_safe_factor": {"value": 0.65, "value_type": "float"},
-            #         "max_amplitude": {"value": 0.85, "value_type": "float"},
-            #         "max_time_range": {"value": 8192, "value_type": "int"},
+            #         "adiabatic_safe_factor": 0.65,
+            #         "max_amplitude": 0.85,
+            #         "max_time_range": 8192,
             #     },
             # },
             # Per-task overrides — uncomment to extend coherence sweep ranges.
             # "CheckT1": {
             #     "run": {
-            #         "time_range": {
-            #             "value": (np.log10(100), np.log10(1000 * 1000), 51),  # 100 ns 〜 1 ms
-            #             "value_type": "np.logspace",
-            #         },
+            #         "time_range": (
+            #             np.log10(100), np.log10(1000 * 1000), 51
+            #         ),  # 100 ns 〜 1 ms
             #     },
             # },
             # "CheckT2Echo": {
             #     "run": {
-            #         "time_range": {
-            #             "value": (np.log10(300), np.log10(500 * 1000), 51),  # 300 ns 〜 500 μs
-            #             "value_type": "np.logspace",
-            #         },
+            #         "time_range": (
+            #             np.log10(300), np.log10(500 * 1000), 51
+            #         ),  # 300 ns 〜 500 μs
             #     },
             # },
         },

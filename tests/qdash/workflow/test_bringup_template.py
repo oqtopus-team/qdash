@@ -54,7 +54,7 @@ def test_bringup_step_accepts_resonator_assignment_order() -> None:
     }
     assert service.task_parameters == {
         "CheckResonatorSpectroscopy": {
-            "run": {"resonator_assignment_order": {"value": [0, 3, 1, 2], "value_type": "list"}},
+            "run": {"resonator_assignment_order": [0, 3, 1, 2]},
             "input": {},
         },
     }
@@ -77,31 +77,29 @@ def test_bringup_template_preserves_task_specific_acquisition_settings(monkeypat
     assert FakeCalibService.last_kwargs["task_parameters"] == {
         "CheckResonatorSpectroscopy": {
             "run": {
-                "shots": {"value": 1024, "value_type": "int"},
-                "interval": {"value": 0, "value_type": "int"},
+                "shots": 1024,
+                "interval": 0,
             },
         },
         "CheckQubitSpectroscopy": {
             "run": {
-                "shots": {"value": 1024, "value_type": "int"},
-                "interval": {"value": 1024, "value_type": "int"},
+                "shots": 1024,
+                "interval": 1024,
             },
         },
         "CheckControlAmplitude": {
             "run": {
-                "shots": {"value": 8192, "value_type": "int"},
+                "shots": 8192,
             },
         },
         "CheckAdaptiveChevron": {
             "run": {
-                "shots": {"value": 256, "value_type": "int"},
+                "shots": 256,
             },
         },
     }
     adaptive_settings = FakeCalibService.last_kwargs["task_parameters"]["CheckAdaptiveChevron"]
-    assert (
-        adaptive_settings["run"]["shots"]["value"] == CheckAdaptiveChevron.run_spec["shots"].default
-    )
+    assert adaptive_settings["run"]["shots"] == CheckAdaptiveChevron.run_spec["shots"].default
 
 
 def test_bringup_template_requires_explicit_mux_ids(monkeypatch) -> None:

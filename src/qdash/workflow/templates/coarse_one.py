@@ -92,22 +92,22 @@ def coarse_one(
         task_parameters={
             "CreateHPIPulse": {
                 "run": {
-                    "hpi_duration": {"value": 32, "value_type": "int"},
+                    "hpi_duration": 32,
                 },
             },
             "CreatePIPulse": {
                 "run": {
-                    "pi_duration": {"value": 32, "value_type": "int"},
+                    "pi_duration": 32,
                 },
             },
             "CreateDRAGHPIPulse": {
                 "run": {
-                    "drag_hpi_duration": {"value": 16, "value_type": "int"},
+                    "drag_hpi_duration": 16,
                 },
             },
             "CreateDRAGPIPulse": {
                 "run": {
-                    "drag_pi_duration": {"value": 24, "value_type": "int"},
+                    "drag_pi_duration": 24,
                 },
             },
         },

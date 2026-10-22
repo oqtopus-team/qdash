@@ -51,10 +51,7 @@ class ConfigureAll(CalibrationStep):
                 qid="",
                 parameters={
                     "run": {
-                        "mux_ids": {
-                            "value": mux_ids,
-                            "value_type": "list",
-                        },
+                        "mux_ids": mux_ids,
                     },
                 },
             )
