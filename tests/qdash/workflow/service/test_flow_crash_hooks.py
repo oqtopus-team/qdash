@@ -258,15 +258,15 @@ def test_on_flow_failure_preserves_prefect_failure_message(init_db) -> None:
     assert execution.message == state.message
 
 
-def test_hook_without_project_id_is_noop(init_db) -> None:
-    """A flow_run whose parameters lack project_id leaves executions untouched."""
+def test_hook_without_project_id_uses_persisted_execution(init_db) -> None:
+    """A flow with an auto-resolved project is finalized using its persisted history."""
     _make_execution(status="running")
 
     on_flow_crashed(None, _fake_flow_run(project_id=None), None)
 
     execution = _reload_execution()
     assert execution is not None
-    assert execution.status == "running"
+    assert execution.status == "failed"
 
 
 def test_hook_leaves_terminal_execution_untouched(init_db) -> None:
@@ -304,8 +304,9 @@ def test_hook_swallows_finalizer_errors(init_db) -> None:
     ],
 )
 @pytest.mark.parametrize("concurrent_claim", [False, True])
+@pytest.mark.parametrize("omitted_project", [False, True])
 def test_single_task_terminal_hooks_release_preparing_reservation(
-    init_db, hook_name, terminal_status, concurrent_claim
+    init_db, hook_name, terminal_status, concurrent_claim, omitted_project
 ) -> None:
     """A task interrupted before initialization releases only its own API claim."""
     from qdash.workflow.service import single_task_flow
@@ -313,6 +314,7 @@ def test_single_task_terminal_hooks_release_preparing_reservation(
     registered = {}
 
     def capture_flow(**kwargs):
+        """Capture the hooks registered by the real flow module."""
         registered.update(kwargs)
         return lambda fn: fn
 
@@ -334,7 +336,7 @@ def test_single_task_terminal_hooks_release_preparing_reservation(
         )
 
     for hook in registered[hook_name]:
-        hook(None, _fake_flow_run(), None)
+        hook(None, _fake_flow_run(project_id=None if omitted_project else PROJECT_ID), None)
 
     execution = _reload_execution()
     assert execution is not None
@@ -346,3 +348,19 @@ def test_single_task_terminal_hooks_release_preparing_reservation(
     assert [claim.execution_id for claim in lock.claims] == (
         ["unrelated-execution"] if concurrent_claim else []
     )
+
+
+@pytest.mark.parametrize("projects", [[], [PROJECT_ID, "another-project"]])
+def test_hook_without_project_id_skips_missing_or_ambiguous_history(init_db, projects) -> None:
+    """A missing project parameter cannot make the hook guess an unrecorded or ambiguous owner."""
+    for project_id in projects:
+        _make_execution(status="running", project_id=project_id)
+        ExecutionLockDocument(project_id=project_id, locked=True, execution_id="exec-1").save()
+
+    on_flow_cancellation(None, _fake_flow_run(project_id=None), None)
+
+    for project_id in projects:
+        execution = _reload_execution(project_id=project_id)
+        assert execution is not None
+        assert execution.status == "running"
+        assert ExecutionLockDocument.get_lock_status(project_id)

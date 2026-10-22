@@ -416,10 +416,10 @@ class ExecutionService:
     def get_lock_status(self, project_id: str) -> ExecutionLockStatusResponse:
         """Get the execution lock status.
 
-        A ``scheduled`` or ``cancelling`` execution is reconciled against Prefect
-        first: a run whose terminal hooks were interrupted would otherwise hold
-        the lock with nothing left to release it. Non-terminal Prefect states
-        retain the reservation until termination is confirmed.
+        ``scheduled`` and ``cancelling`` reservation owners are reconciled against
+        Prefect, even when a newer execution has started. The latest execution
+        is also checked for legacy reservations with no owner ID. Non-terminal
+        Prefect states retain reservations until termination is confirmed.
 
         Parameters
         ----------
@@ -433,11 +433,23 @@ class ExecutionService:
 
         """
         latest = self._history_repo.find_latest_by_project(project_id)
-        if latest is not None and latest.status in (
-            ExecutionStatusModel.SCHEDULED,
-            ExecutionStatusModel.CANCELLING,
-        ):
-            self._reconcile_with_prefect([latest])
+        candidates = {latest.execution_id: latest} if latest is not None else {}
+        for owner_id in self._lock_repo.list_owner_execution_ids(project_id):
+            if owner_id in candidates:
+                continue
+            if owner_id.startswith("flow:"):
+                owners = self._history_repo.list_by_flow_run_id(project_id, owner_id[5:])
+            else:
+                owner = self._history_repo.find_by_id(project_id, owner_id)
+                owners = [owner] if owner is not None else []
+            candidates.update({owner.execution_id: owner for owner in owners})
+        targets = [
+            doc
+            for doc in candidates.values()
+            if doc.status in (ExecutionStatusModel.SCHEDULED, ExecutionStatusModel.CANCELLING)
+        ]
+        if targets:
+            self._reconcile_with_prefect(targets)
 
         status = self._lock_repo.get_lock_status(project_id)
         if latest is None:

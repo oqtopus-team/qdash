@@ -3,6 +3,7 @@
 These tests verify the CalibService API and helper functions for custom calibration flows.
 """
 
+import asyncio
 import re
 import sys
 from dataclasses import dataclass, field
@@ -1481,3 +1482,32 @@ class TestRunPipelineAbortHandling:
         execution_service.complete.assert_not_called()
         execution_service.fail.assert_not_called()
         execution_service.cancel.assert_not_called()
+
+
+@pytest.mark.parametrize("signal", [TerminationSignal("SIGTERM"), asyncio.CancelledError()])
+def test_initialization_interrupt_releases_auto_resolved_project_lock(
+    mock_flow_session_deps, monkeypatch, signal
+):
+    """A constructor abort frees its claim even when the caller has no CalibService instance."""
+    lock = MockExecutionLockRepository()
+    user = MockUserRepository()
+    monkeypatch.setattr(user, "get_default_project_id", lambda username: "test_project")
+
+    def interrupt(self):
+        """Interrupt initialization after its reservation has been acquired."""
+        assert lock.locked
+        raise signal
+
+    monkeypatch.setattr(MockCalibOrchestrator, "initialize", interrupt)
+    with pytest.raises(type(signal)) as raised:
+        CalibService(
+            username="test_user",
+            chip_id="chip_1",
+            qids=["0"],
+            execution_id="20261022-008",
+            lock_repo=lock,
+            user_repo=user,
+        )
+    assert raised.value is signal
+    assert not lock.locked
+    assert lock.unlock_calls == ["20261022-008"]

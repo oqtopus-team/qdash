@@ -739,3 +739,42 @@ def test_get_lock_status_reconciles_cancelling_execution(
     task = TaskResultHistoryDocument.find_one({"task_id": "task-1"}).run()
     assert task is not None
     assert task.status == ("cancelled" if terminated else "running")
+
+
+@pytest.mark.parametrize("newer_status", ["running", "completed"])
+def test_lock_poll_recovers_older_cancelling_claim(
+    monkeypatch: Any, init_db: Any, newer_status: str
+) -> None:
+    """A newer execution cannot hide a stopped owner's outstanding hardware claim."""
+    from datetime import datetime, timezone
+
+    from qdash.dbmodel.execution_lock import ExecutionLockDocument
+
+    old_run, new_run = str(uuid4()), str(uuid4())
+    old = _make_execution(execution_id="older", status="cancelling", note={"flow_run_id": old_run})
+    new = _make_execution(execution_id="newer", status=newer_status, note={"flow_run_id": new_run})
+    old.start_at = datetime(2026, 10, 22, 1, tzinfo=timezone.utc)
+    old.save()
+    new.start_at = datetime(2026, 10, 22, 2, tzinfo=timezone.utc)
+    new.save()
+    repo = MongoExecutionLockRepository()
+    assert repo.try_lock(PROJECT_ID, "older", CHIP_ID, ("module:ctrl:S137R",), False)
+    assert repo.try_lock(PROJECT_ID, "newer", CHIP_ID, ("module:ctrl:S121R",), False)
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        execution_service,
+        "get_client",
+        _make_get_client(_FakeSyncClient([_make_run(old_run, "CANCELLED")]), calls),
+    )
+
+    result = _make_service().get_lock_status(PROJECT_ID)
+
+    assert result.execution_id == "newer"
+    assert result.status == newer_status
+    lock = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert lock is not None
+    assert lock.locked
+    assert [claim.execution_id for claim in lock.claims] == ["newer"]
+    recovered = _make_service().get_execution(PROJECT_ID, "older")
+    assert recovered is not None
+    assert recovered.status == "cancelled"
