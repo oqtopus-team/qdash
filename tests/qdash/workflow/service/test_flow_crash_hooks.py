@@ -337,9 +337,11 @@ def test_single_task_terminal_hooks_release_preparing_reservation(
         hook(None, _fake_flow_run(), None)
 
     execution = _reload_execution()
+    assert execution is not None
     assert execution.status == terminal_status
     assert execution.end_at is not None
     lock = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert lock is not None
     assert lock.locked is concurrent_claim
     assert [claim.execution_id for claim in lock.claims] == (
         ["unrelated-execution"] if concurrent_claim else []

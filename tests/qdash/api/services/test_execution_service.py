@@ -734,6 +734,8 @@ def test_get_lock_status_reconciles_cancelling_execution(
     execution = ExecutionHistoryDocument.find_one(
         {"project_id": PROJECT_ID, "execution_id": "exec-1"}
     ).run()
+    assert execution is not None
     assert execution.status == result.status
     task = TaskResultHistoryDocument.find_one({"task_id": "task-1"}).run()
+    assert task is not None
     assert task.status == ("cancelled" if terminated else "running")
