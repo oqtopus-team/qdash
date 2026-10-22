@@ -95,6 +95,8 @@ def bringup(
         "CheckControlAmplitude": {
             "shots": {"value": 8192, "value_type": "int"},
         },
+        # Keep this explicit so users can see and tune the adaptive Chevron
+        # acquisition condition directly from the workflow template.
         "CheckAdaptiveChevron": {
             "shots": {"value": 256, "value_type": "int"},
             # Set to False to keep the result as measurement history without

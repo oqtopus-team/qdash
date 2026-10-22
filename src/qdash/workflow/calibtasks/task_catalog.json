@@ -523,7 +523,7 @@
       },
       {
         "class_name": "CheckAdaptiveChevron",
-        "description": "Adaptive chevron task for coarse qubit-frequency estimation.",
+        "description": "Estimate qubit frequency and control amplitude with an adaptive Chevron.",
         "file_path": "one_qubit_coarse/check_adaptive_chevron.py",
         "input_parameters": {
           "coarse_control_amplitude": {
@@ -1512,7 +1512,7 @@
       },
       {
         "class_name": "CheckChevron",
-        "description": "Measure one fixed-grid Chevron pattern and estimate the qubit frequency.",
+        "description": "Estimate qubit frequency and control amplitude from a fixed-grid Chevron.",
         "file_path": "one_qubit_coarse/check_chevron.py",
         "input_parameters": {
           "control_amplitude": {
@@ -1554,7 +1554,7 @@
             "value": [
               -0.05,
               0.05,
-              51
+              41
             ],
             "value_type": "np.linspace"
           },
@@ -1562,6 +1562,12 @@
             "description": "Time interval between shots",
             "unit": "ns",
             "value": 153600.0,
+            "value_type": "float"
+          },
+          "minimum_peak_background_rms_ratio": {
+            "description": "Minimum matched-transform peak/background RMS ratio",
+            "unit": "a.u.",
+            "value": 5.0,
             "value_type": "float"
           },
           "readout_duration": {
@@ -1573,18 +1579,24 @@
           "shots": {
             "description": "Number of shots per Chevron sweep point",
             "unit": "a.u.",
-            "value": 1024,
+            "value": 256,
             "value_type": "int"
+          },
+          "target_omega_rabi": {
+            "description": "Target Rabi frequency used to estimate control amplitude",
+            "unit": "GHz",
+            "value": 0.0125,
+            "value_type": "float"
           },
           "time_range": {
             "description": "Control-pulse duration sweep",
             "unit": "ns",
             "value": [
               0,
-              401,
-              8
+              250,
+              26
             ],
-            "value_type": "range"
+            "value_type": "np.linspace"
           }
         },
         "task_type": "qubit"

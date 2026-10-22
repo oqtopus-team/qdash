@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from qdash.workflow.calibtasks.qubex import CheckChevron
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
 
@@ -51,7 +52,7 @@ def test_coherence_check_runs_expected_tasks_in_order() -> None:
     ]
 
 
-def test_coherence_check_uses_coarse_measurement_only_chevron() -> None:
+def test_coherence_check_uses_explicit_chevron_settings_without_updating_calibration() -> None:
     result = coherence_check_module.coherence_check(
         username="alice",
         chip_id="64Q",
@@ -61,16 +62,23 @@ def test_coherence_check_uses_coarse_measurement_only_chevron() -> None:
     assert result["kwargs"]["task_run_parameters"] == {
         "CheckChevron": {
             "detuning_range": {
-                "value": (-0.05, 0.05, 31),
+                "value": (-0.05, 0.05, 41),
                 "value_type": "np.linspace",
             },
             "time_range": {
-                "value": (0, 401, 16),
-                "value_type": "range",
+                "value": (0, 250, 26),
+                "value_type": "np.linspace",
             },
+            "shots": {"value": 256, "value_type": "int"},
             "update_calibration_parameters": False,
         },
     }
+    chevron_settings = result["kwargs"]["task_run_parameters"]["CheckChevron"]
+    for parameter_name in ("detuning_range", "time_range", "shots"):
+        assert (
+            chevron_settings[parameter_name]["value"]
+            == CheckChevron.run_spec[parameter_name].default
+        )
 
 
 def test_coherence_check_uses_explicit_qubits() -> None:
