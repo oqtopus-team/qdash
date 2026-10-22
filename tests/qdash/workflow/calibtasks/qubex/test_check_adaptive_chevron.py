@@ -8,6 +8,7 @@ import pytest
 from qdash.datamodel.task import InputParameterModel as ParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_adaptive_chevron import (
+    DEFAULT_CONTROL_AMPLITUDE,
     DEFAULT_MINIMUM_PEAK_BACKGROUND_RMS_RATIO,
     CheckAdaptiveChevron,
 )
@@ -24,17 +25,56 @@ def test_adaptive_chevron_uses_operational_frequency_with_legacy_fallback() -> N
     assert frequency_spec.fallback_parameter_names == ("coarse_qubit_frequency",)
 
 
-def test_chevron_control_amplitude_requires_database_value() -> None:
-    spec = CheckAdaptiveChevron.input_spec["coarse_control_amplitude"]
+def test_chevron_control_amplitude_uses_coarse_fallback_and_default() -> None:
+    spec = CheckAdaptiveChevron.input_spec["control_amplitude"]
 
-    assert spec.resolution == "database_required"
-    assert spec.default is None
+    assert spec.resolution == "database_or_default"
+    assert spec.fallback_parameter_names == ("coarse_control_amplitude",)
+    assert spec.default == DEFAULT_CONTROL_AMPLITUDE
+
+
+@pytest.mark.parametrize(
+    ("database_values", "expected_value", "expected_parameter_name"),
+    [
+        (
+            {
+                "control_amplitude": {"value": 0.08, "unit": "a.u."},
+                "coarse_control_amplitude": {"value": 0.07, "unit": "a.u."},
+            },
+            0.08,
+            "control_amplitude",
+        ),
+        (
+            {"coarse_control_amplitude": {"value": 0.07, "unit": "a.u."}},
+            0.07,
+            "coarse_control_amplitude",
+        ),
+        ({}, DEFAULT_CONTROL_AMPLITUDE, ""),
+    ],
+)
+def test_chevron_control_amplitude_resolution_priority(
+    database_values: dict[str, dict[str, object]],
+    expected_value: float,
+    expected_parameter_name: str,
+) -> None:
+    task = CheckAdaptiveChevron()
+    required_database_values = {
+        "control_frequency": {"value": 4.25, "unit": "GHz"},
+        "readout_frequency": {"value": 6.1, "unit": "GHz"},
+        "readout_amplitude": {"value": 0.031, "unit": "a.u."},
+    }
+
+    task._populate_parameters({"self": [{**required_database_values, **database_values}]})
+
+    parameter = task.input_parameters["control_amplitude"]
+    assert parameter.value == expected_value
+    assert parameter.parameter_name == expected_parameter_name
 
 
 @pytest.mark.parametrize("value", [1e-4, 0.07, 1.0])
 def test_chevron_control_amplitude_accepts_inclusive_bounds(value: float) -> None:
-    CheckAdaptiveChevron.input_spec["coarse_control_amplitude"].validate_effective_value(
-        "coarse_control_amplitude", value
+    CheckAdaptiveChevron.input_spec["control_amplitude"].validate_effective_value(
+        "control_amplitude", value
     )
 
 
@@ -42,9 +82,9 @@ def test_chevron_control_amplitude_accepts_inclusive_bounds(value: float) -> Non
     "value", [0.000099, 1.000001, float("nan"), float("inf"), None, True, "0.5"]
 )
 def test_chevron_control_amplitude_rejects_invalid_values(value: Any) -> None:
-    with pytest.raises(ValueError, match="coarse_control_amplitude"):
-        CheckAdaptiveChevron.input_spec["coarse_control_amplitude"].validate_effective_value(
-            "coarse_control_amplitude", value
+    with pytest.raises(ValueError, match="control_amplitude"):
+        CheckAdaptiveChevron.input_spec["control_amplitude"].validate_effective_value(
+            "control_amplitude", value
         )
 
 
@@ -67,7 +107,7 @@ def test_check_chevron_run_uses_adaptive_helper(monkeypatch) -> None:
     task.input_parameters["control_frequency"] = ParameterModel(value=4.25, unit="GHz")
     task.input_parameters["readout_frequency"] = ParameterModel(value=6.1, unit="GHz")
     task.input_parameters["readout_amplitude"] = ParameterModel(value=0.031, unit="a.u.")
-    task.input_parameters["coarse_control_amplitude"] = ParameterModel(value=0.07, unit="a.u.")
+    task.input_parameters["control_amplitude"] = ParameterModel(value=0.07, unit="a.u.")
 
     exp = _DummyExperiment()
     captured: dict[str, object] = {}
@@ -142,7 +182,6 @@ def test_check_chevron_postprocess_handles_adaptive_search_figures(monkeypatch) 
     task = CheckAdaptiveChevron()
     task.input_parameters["readout_amplitude"] = ParameterModel(value=0.031, unit="a.u.")
 
-    monkeypatch.setattr(task, "get_experiment", lambda _backend: object())
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
 
     run_result = RunResult(
@@ -189,7 +228,6 @@ def test_check_chevron_postprocess_rejects_invalid_peak_background_rms_ratio(
     expected_error: str,
 ) -> None:
     task = CheckAdaptiveChevron()
-    monkeypatch.setattr(task, "get_experiment", lambda _backend: object())
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
 
     result = task.postprocess(
@@ -213,7 +251,6 @@ def test_check_chevron_postprocess_accepts_peak_background_rms_ratio_at_threshol
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     task = CheckAdaptiveChevron()
-    monkeypatch.setattr(task, "get_experiment", lambda _backend: object())
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
 
     result = task.postprocess(
@@ -237,7 +274,6 @@ def test_check_chevron_postprocess_uses_configured_peak_background_rms_ratio_thr
 ) -> None:
     task = CheckAdaptiveChevron()
     task.run_parameters["minimum_peak_background_rms_ratio"].value = 8.0
-    monkeypatch.setattr(task, "get_experiment", lambda _backend: object())
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
 
     result = task.postprocess(
@@ -264,7 +300,6 @@ def test_check_chevron_postprocess_rejects_invalid_peak_background_rms_ratio_thr
 ) -> None:
     task = CheckAdaptiveChevron()
     task.run_parameters["minimum_peak_background_rms_ratio"].value = cast("Any", threshold)
-    monkeypatch.setattr(task, "get_experiment", lambda _backend: object())
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
 
     result = task.postprocess(
@@ -284,13 +319,21 @@ def test_check_chevron_postprocess_rejects_invalid_peak_background_rms_ratio_thr
     assert "minimum_peak_background_rms_ratio" in result.validation_error
 
 
-@pytest.mark.parametrize("target_amplitudes", [{}, {"Q00": float("nan")}, {"Q00": "invalid"}])
+@pytest.mark.parametrize(
+    "target_amplitudes",
+    [
+        {},
+        {"Q00": float("nan")},
+        {"Q00": "invalid"},
+        {"Q00": 0.0},
+        {"Q00": -0.1},
+    ],
+)
 def test_check_chevron_postprocess_rejects_invalid_target_control_amplitude(
     monkeypatch: pytest.MonkeyPatch,
     target_amplitudes: dict[str, object],
 ) -> None:
     task = CheckAdaptiveChevron()
-    monkeypatch.setattr(task, "get_experiment", lambda _backend: object())
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
 
     result = task.postprocess(
@@ -309,6 +352,88 @@ def test_check_chevron_postprocess_rejects_invalid_target_control_amplitude(
     assert result.output_parameters["control_amplitude"].value is None
     assert result.validation_error is not None
     assert "target control amplitude for Q00" in result.validation_error
+
+
+@pytest.mark.parametrize(
+    ("target_amplitude", "expected_amplitude"),
+    [(1e-8, 1e-4), (2.0, 1.0)],
+)
+def test_check_chevron_postprocess_clips_target_control_amplitude(
+    monkeypatch: pytest.MonkeyPatch,
+    target_amplitude: float,
+    expected_amplitude: float,
+) -> None:
+    task = CheckAdaptiveChevron()
+    monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
+
+    result = task.postprocess(
+        backend=cast("QubexBackend", object()),
+        execution_id="exec-1",
+        run_result=RunResult(
+            raw_result={
+                "resonant_frequencies": {"Q00": 4.321},
+                "peak_background_rms_ratios": {"Q00": 8.5},
+                "target_amplitudes": {"Q00": target_amplitude},
+            }
+        ),
+        qid="0",
+    )
+
+    assert result.output_parameters["control_amplitude"].value == expected_amplitude
+    assert result.validation_error is None
+
+
+@pytest.mark.parametrize(
+    ("resonant_frequencies", "expected_error", "expected_output"),
+    [
+        ({}, "qubit frequency for Q00 is missing", None),
+        ({"Q00": float("nan")}, "qubit frequency for Q00 is non-finite", None),
+        ({"Q00": "invalid"}, "qubit frequency for Q00 is not numeric", None),
+        ({"Q00": 2.49}, "qubit frequency for Q00 is below minimum 2.5", 2.49),
+    ],
+)
+def test_check_chevron_postprocess_rejects_invalid_qubit_frequency(
+    monkeypatch: pytest.MonkeyPatch,
+    resonant_frequencies: dict[str, object],
+    expected_error: str,
+    expected_output: float | None,
+) -> None:
+    task = CheckAdaptiveChevron()
+    monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
+
+    result = task.postprocess(
+        backend=cast("QubexBackend", object()),
+        execution_id="exec-1",
+        run_result=RunResult(
+            raw_result={
+                "resonant_frequencies": resonant_frequencies,
+                "peak_background_rms_ratios": {"Q00": 8.5},
+                "target_amplitudes": {"Q00": 0.086},
+                "figures": {"Q00_measurement": go.Figure()},
+            }
+        ),
+        qid="0",
+    )
+
+    assert result.output_parameters["qubit_frequency"].value == expected_output
+    assert result.validation_error is not None
+    assert expected_error in result.validation_error
+
+
+def test_check_chevron_postprocess_rejects_unsupported_result_type(monkeypatch) -> None:
+    task = CheckAdaptiveChevron()
+    monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
+
+    with pytest.raises(
+        TypeError,
+        match="estimate_qubit_frequency_from_chevron_adaptive returned unsupported data type",
+    ):
+        task.postprocess(
+            backend=cast("QubexBackend", object()),
+            execution_id="exec-1",
+            run_result=RunResult(raw_result=object()),
+            qid="0",
+        )
 
 
 def test_check_chevron_run_requires_db_readout_amplitude(monkeypatch) -> None:

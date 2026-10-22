@@ -83,9 +83,6 @@ def test_bringup_template_preserves_task_specific_acquisition_settings(monkeypat
         "CheckControlAmplitude": {
             "shots": {"value": 8192, "value_type": "int"},
         },
-        "CheckAdaptiveChevron": {
-            "shots": {"value": 256, "value_type": "int"},
-        },
     }
 
 

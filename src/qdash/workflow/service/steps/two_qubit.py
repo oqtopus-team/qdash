@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from prefect import get_run_logger
 
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.workflow.service._internal.worker_session import build_isolated_session_config
 from qdash.workflow.service.results import TwoQubitResult, normalize_metric_value
 from qdash.workflow.service.steps.base import CalibrationStep, TransformStep
 from qdash.workflow.service.tasks import FULL_2Q_TASKS
@@ -118,18 +119,7 @@ class CustomTwoQubit(CalibrationStep):
             run_coupling_calibrations_parallel,
         )
 
-        session_config = {
-            "username": service.username,
-            "chip_id": service.chip_id,
-            "backend_name": service.backend_name,
-            "execution_id": service.execution_id,
-            "project_id": service.project_id,
-            "default_run_parameters": service.default_run_parameters,
-            "task_run_parameters": service.task_run_parameters,
-            "tags": service.tags,
-            "flow_name": service.flow_name,
-            "note": service.note,
-        }
+        session_config = build_isolated_session_config(service)
 
         # Execute groups sequentially (groups are scheduled to avoid resource conflicts)
         # but within each group, coupling pairs run in parallel using separate processes
@@ -411,18 +401,7 @@ class TwoQubitCalibration(CalibrationStep):
             run_coupling_calibrations_parallel,
         )
 
-        session_config = {
-            "username": service.username,
-            "chip_id": service.chip_id,
-            "backend_name": service.backend_name,
-            "execution_id": service.execution_id,
-            "project_id": service.project_id,
-            "default_run_parameters": service.default_run_parameters,
-            "task_run_parameters": service.task_run_parameters,
-            "tags": service.tags,
-            "flow_name": service.flow_name,
-            "note": service.note,
-        }
+        session_config = build_isolated_session_config(service)
 
         # Execute groups sequentially (groups are scheduled to avoid resource conflicts)
         # but within each group, coupling pairs run in parallel using separate processes

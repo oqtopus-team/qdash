@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
+from qdash.workflow.service._internal.worker_session import build_isolated_session_config
 from qdash.workflow.service.results import OneQubitResult, normalize_metric_value
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import BRINGUP_TASKS
@@ -153,18 +154,7 @@ class BringUp(CalibrationStep):
         )
 
         # Build session config for multiprocess execution
-        session_config = {
-            "username": service.username,
-            "chip_id": service.chip_id,
-            "backend_name": service.backend_name,
-            "execution_id": service.execution_id,
-            "project_id": service.project_id,
-            "default_run_parameters": service.default_run_parameters,
-            "task_run_parameters": service.task_run_parameters,
-            "tags": service.tags,
-            "flow_name": service.flow_name,
-            "note": service.note,
-        }
+        session_config = build_isolated_session_config(service)
 
         results = run_qubit_calibrations_parallel(
             qids=qids,

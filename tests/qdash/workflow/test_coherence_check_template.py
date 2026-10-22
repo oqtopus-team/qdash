@@ -60,14 +60,6 @@ def test_coherence_check_uses_coarse_measurement_only_chevron() -> None:
 
     assert result["kwargs"]["task_run_parameters"] == {
         "CheckChevron": {
-            "detuning_range": {
-                "value": (-0.05, 0.05, 31),
-                "value_type": "np.linspace",
-            },
-            "time_range": {
-                "value": (0, 401, 16),
-                "value_type": "range",
-            },
             "update_calibration_parameters": False,
         },
     }

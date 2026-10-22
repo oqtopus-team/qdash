@@ -85,16 +85,6 @@ def coherence_check(
         project_id=project_id,
         task_run_parameters={
             "CheckChevron": {
-                # Keep the full search window while using a coarser grid for
-                # routine coherence monitoring (806 points instead of 2601).
-                "detuning_range": {
-                    "value": (-0.05, 0.05, 31),
-                    "value_type": "np.linspace",
-                },
-                "time_range": {
-                    "value": (0, 401, 16),
-                    "value_type": "range",
-                },
                 "update_calibration_parameters": False,
             },
         },

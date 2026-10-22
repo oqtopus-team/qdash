@@ -10,6 +10,7 @@ from qdash.workflow.service._internal.scheduling_tasks import (
     run_mux_calibrations_parallel,
     run_qubit_batch_calibration_isolated,
 )
+from qdash.workflow.service._internal.worker_session import build_isolated_session_config
 from qdash.workflow.service.calib_service import get_session
 
 if TYPE_CHECKING:
@@ -25,19 +26,15 @@ class OneQubitStageRunner:
 
     def build_session_config(self, *, execution_id: str, flow_name: str | None) -> dict[str, Any]:
         """Build isolated-worker session config for the current parent execution."""
-        return {
-            "username": self.cal_service.username,
-            "chip_id": self.cal_service.chip_id,
-            "backend_name": self.cal_service.backend_name,
-            "project_id": self.project_id,
-            "muxes": None,
-            "execution_id": execution_id,
-            "default_run_parameters": self.cal_service.default_run_parameters,
-            "task_run_parameters": self.cal_service.task_run_parameters,
-            "tags": self.cal_service.tags,
-            "flow_name": flow_name,
-            "note": self.cal_service.note,
-        }
+        config = build_isolated_session_config(
+            self.cal_service,
+            execution_id=execution_id,
+            project_id=self.project_id,
+        )
+        # Unlike an omitted builder override, an explicit None here means the
+        # worker should not inherit the parent's display name.
+        config["flow_name"] = flow_name
+        return config
 
     def collect_scheduled_qids(
         self, schedule: Any, allowed_qids: list[str] | None = None

@@ -479,6 +479,31 @@ class CalibService:
         if qids is not None:
             self._initialize(qids, tags, note)
 
+    @property
+    def parameter_overrides(self) -> dict[str, dict[str, Any]] | None:
+        """User-supplied parameter overrides that worker sessions must preserve."""
+        return self._parameter_overrides
+
+    @property
+    def source_task_id(self) -> str | None:
+        """Source task whose parameter snapshot is used for re-execution."""
+        return self._source_task_id
+
+    @property
+    def snapshot_exempt_tasks(self) -> set[str]:
+        """Tasks that resolve live parameters instead of source snapshots."""
+        return self._snapshot_exempt_tasks
+
+    @property
+    def force_update_params(self) -> bool:
+        """Whether backend parameters may be updated after failed validation."""
+        return self._force_update_params
+
+    @property
+    def persist_output_parameters(self) -> bool:
+        """Whether successful outputs are written to authoritative stores."""
+        return self._persist_output_parameters
+
     @staticmethod
     def _read_source_execution_id_from_context() -> str | None:
         """Try to read source_execution_id from Prefect flow run parameters."""

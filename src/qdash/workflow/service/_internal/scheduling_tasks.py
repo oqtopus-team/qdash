@@ -169,6 +169,12 @@ def _create_isolated_session(
             - project_id: Project ID (optional)
             - muxes: List of MUX IDs (optional)
             - execution_id: Parent's execution_id (to share Execution document)
+            - source_execution_id: Execution providing parameter snapshots (optional)
+            - source_task_id: Task providing a parameter snapshot (optional)
+            - snapshot_exempt_tasks: Tasks that bypass source snapshots
+            - parameter_overrides: Explicit Input/Run overrides from the parent
+            - force_update_params: Whether failed validation may update backend parameters
+            - persist_output_parameters: Whether outputs update authoritative stores
         qids: List of qubit IDs for this session
 
     Returns:
@@ -199,6 +205,12 @@ def _create_isolated_session(
         enable_github=False,  # No GitHub operations for isolated sessions
         default_run_parameters=session_config.get("default_run_parameters"),
         task_run_parameters=session_config.get("task_run_parameters"),
+        source_execution_id=session_config.get("source_execution_id"),
+        source_task_id=session_config.get("source_task_id"),
+        snapshot_exempt_tasks=set(session_config.get("snapshot_exempt_tasks", ())),
+        parameter_overrides=session_config.get("parameter_overrides"),
+        force_update_params=session_config.get("force_update_params", False),
+        persist_output_parameters=session_config.get("persist_output_parameters", True),
         tags=session_config.get("tags"),
         flow_name=session_config.get("flow_name"),
         note=session_config.get("note"),
