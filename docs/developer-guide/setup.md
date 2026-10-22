@@ -18,9 +18,9 @@ the project toolchain.
 
 | Tool                                        | Version   | Description                          |
 | ------------------------------------------- | --------- | ------------------------------------ |
-| [Python](https://www.python.org/downloads/) | 3.10-3.12 | Backend development                  |
+| [Python](https://www.python.org/downloads/) | 3.11-3.12 | Backend development                  |
 | [Bun](https://bun.sh/)                      | 1.4.0+    | Frontend package manager and runtime |
-| [Node.js](https://nodejs.org/)              | 24+       | Alternative frontend runtime         |
+| [Node.js](https://nodejs.org/)              | 24.22.1+ (24.x) or 26.12.1+ | Next.js production runtime         |
 
 ## Clone the Repository
 

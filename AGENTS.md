@@ -76,7 +76,7 @@ Prefer focused tests for narrow changes, then broader checks when touching share
 
 ## Python Conventions
 
-- Python supports `>=3.10,<3.13`.
+- Python supports `>=3.11,<3.13`.
 - Use `uv run ...` for Python tooling when invoking commands directly.
 - Ruff line length is 100. The project uses Ruff for linting and formatting.
 - Mypy is strict for application code. Keep types explicit when adding public helpers or cross-module interfaces.
