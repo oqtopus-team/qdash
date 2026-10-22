@@ -3,6 +3,9 @@
 Use a QDash flow template to define targets, an explicit sequence of calibration steps, and the
 parameters those steps need.
 
+To create, save, and run a workflow in the application, see
+[Creating Workflows](../../user-guide/creating-workflows.md).
+
 ## Start from an Existing Template
 
 Copy the closest file under `src/qdash/workflow/templates/` before writing a flow from scratch.

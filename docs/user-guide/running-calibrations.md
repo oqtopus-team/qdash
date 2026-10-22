@@ -18,10 +18,11 @@ Running a workflow or task requires project edit permission.
 
 ## Run a Workflow
 
-1. Open **Workflow** and select a workflow. Select **New Flow** if you need to create one.
-2. Select **Edit** before changing the source, then save the workflow.
+1. Open **Workflow** and select a workflow. Follow [Creating Workflows](./creating-workflows.md)
+   first if you need to create or change one.
+2. Select **Edit** before changing the source, then select **Save**.
 3. Select **Execute**.
-4. Review the chip, targets, and execution options in the confirmation dialog.
+4. Review the flow name, username, chip, and tags in the confirmation dialog.
 5. Confirm the run, then open **Execution** to follow its progress.
 
 Use the workflow schedule panel when the same flow must run automatically. Manage schedules in
