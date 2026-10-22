@@ -133,7 +133,7 @@ service = CalibService(
     },
     task_parameters={
         "CheckRamsey": {
-            "run": {"shots": {"value": 1024, "value_type": "int"}},
+            "run": {"shots": 1024},
             "input": {"control_frequency": 7.012},
             "update_calibration_parameters": False,
         },
@@ -143,10 +143,11 @@ service = CalibService(
 
 `run` sets run parameters the task declares in its `run_spec`, and overrides shared defaults.
 `input` replaces calibration inputs the task declares in its `input_spec`; the value applies to
-every qid the task runs on. Setting `update_calibration_parameters=False` retains task history
-without promoting validated outputs to the current calibration state. A name in the wrong section,
-or one the task does not declare, fails when the task is created. The complete precedence rules are
-in [Parameter Resolution](./parameter-resolution.md).
+every qid the task runs on. Use plain values in both sections because the task specs declare their
+types. Setting `update_calibration_parameters=False` retains task history without promoting
+validated outputs to the current calibration state. A name in the wrong section, or one the task
+does not declare, fails when the task is created. The complete precedence rules are in
+[Parameter Resolution](./parameter-resolution.md).
 
 ## Preserve Terminal Handling
 

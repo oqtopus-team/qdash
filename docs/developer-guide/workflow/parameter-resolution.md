@@ -53,7 +53,7 @@ entry has up to three keys:
 ```python
 task_parameters={
     "CheckAdaptiveChevron": {
-        "run": {"shots": {"value": 256, "value_type": "int"}},
+        "run": {"shots": 256},
         "input": {"coarse_control_amplitude": 0.05},
         "update_calibration_parameters": False,
     },
@@ -62,9 +62,13 @@ task_parameters={
 
 | Key | Holds | Declared by |
 | --- | --- | --- |
-| `run` | Run parameters, as `{"value": ..., "value_type": ...}` or a bare value | `run_spec` |
-| `input` | Calibration input overrides, as a bare value or `{"value": ...}` | `input_spec` |
+| `run` | Run parameter overrides as plain values | `run_spec` |
+| `input` | Calibration input overrides as plain values | `input_spec` |
 | `update_calibration_parameters` | Output persistence policy for the task (see [Output persistence](#output-persistence)) | — |
+
+Use plain values for both `run` and `input` in new workflows. The task specs provide type and
+parameter metadata. QDash continues to accept `{"value": ...}` mappings in both sections for
+existing workflows.
 
 `qdash.workflow.engine.task_parameters` normalizes this mapping when `CalibService` starts. The
 orchestrator validates it against the task class when it creates the task: a name under `run`

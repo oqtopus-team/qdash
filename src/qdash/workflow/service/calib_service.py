@@ -412,9 +412,9 @@ class CalibService:
                 (overrides for calibration inputs declared in its ``input_spec``), and
                 ``update_calibration_parameters`` (``False`` keeps the output as
                 measurement history without updating current calibration parameters).
-                For example: ``{"CheckAdaptiveChevron": {"run": {"shots": {"value":
-                256, "value_type": "int"}}, "input": {"coarse_control_amplitude":
-                0.05}}}``. An input override applies to every qid the task runs on.
+                For example: ``{"CheckAdaptiveChevron": {"run": {"shots": 256},
+                "input": {"coarse_control_amplitude": 0.05}}}``. An input override
+                applies to every qid the task runs on.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.

@@ -94,8 +94,8 @@ run settings, calibration inputs, or output-saving behavior:
 task_parameters={
     "CheckRamsey": {
         "run": {
-            "shots": {"value": 1024, "value_type": "int"},
-            "detuning": {"value": 0.001, "value_type": "float"},
+            "shots": 1024,
+            "detuning": 0.001,
         },
         "input": {
             "control_frequency": 7.012,
@@ -106,9 +106,9 @@ task_parameters={
 ```
 
 Values under `run` control the experiment. Values under `input` replace the current calibration
-input for every selected target in that task. Set `update_calibration_parameters` to `False` for
-an exploratory measurement whose outputs must remain in history without becoming the current
-calibration values.
+input for every selected target in that task. Write both kinds as plain values; the task definition
+provides their types. Set `update_calibration_parameters` to `False` for an exploratory measurement
+whose outputs must remain in history without becoming the current calibration values.
 
 QDash rejects a parameter placed in the wrong section, a parameter the task does not declare, or
 an input the task does not allow users to override. See [Task Parameters](./task-parameters.md)

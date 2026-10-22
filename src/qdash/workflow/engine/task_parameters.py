@@ -4,7 +4,7 @@
 
     {
         "CheckAdaptiveChevron": {
-            "run": {"shots": {"value": 256, "value_type": "int"}},
+            "run": {"shots": 256},
             "input": {"coarse_control_amplitude": 0.05},
             "update_calibration_parameters": False,
         }
