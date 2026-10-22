@@ -55,12 +55,12 @@ from qdash.workflow import sweep
 
 task_parameters={
     "CheckAdaptiveChevron": {
-        "run": {
-            "shots": 256,
-            "final_detuning_range": sweep.linspace(-0.05, 0.05, 41),
-        },
+        "run": {"shots": 256},
         "input": {"coarse_control_amplitude": 0.05},
         "update_calibration_parameters": False,
+    },
+    "CheckChevron": {
+        "run": {"detuning_range": sweep.linspace(-0.08, 0.08, 81)},
     },
 }
 ```
@@ -109,7 +109,11 @@ spectroscopy normally uses a 1024 ns interval and resonator spectroscopy uses 0 
 `task_parameters` when a template should preserve or configure one named task. Nested entries
 in `default_run_parameters` remain readable only for existing flow documents. Shared defaults use
 the same plain-value and `sweep` declaration forms as `task_parameters[task_name]["run"]`; wrapped
-`{"value": ...}` mappings remain compatible.
+`{"value": ...}` mappings remain compatible. A sweep in either place must use the constructor the
+task declares, because the task rebuilds the range with its declared `value_type`: a shared
+`sweep.linspace` for a `time_range` that a task declares as `range` fails when that task is
+created, unless `task_parameters` sets that task's own value. The `sweep` helpers also reject a
+zero step or a non-positive count when the workflow is defined.
 
 `readout_duration` is session-scoped in Qubex. QDash passes the shared value when constructing the
 Experiment, records the effective value on each task that uses the session readout pulse, and rejects

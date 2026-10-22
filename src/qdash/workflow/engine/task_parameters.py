@@ -235,13 +235,7 @@ def validate_task_settings(
     input_spec = getattr(task_class, "input_spec", {})
     for name, data in settings.get(RUN, {}).items():
         if name in run_spec:
-            value_type = data.get("value_type") if isinstance(data, Mapping) else None
-            declared_type = run_spec[name].value_type
-            if value_type in SWEEP_VALUE_TYPES and value_type != declared_type:
-                raise ValueError(
-                    f"{source}: {task_name}.{name} declares {declared_type!r}, "
-                    f"but the workflow uses {value_type!r}"
-                )
+            validate_sweep_type(task_class, task_name, name, data, source=source)
             continue
         if name in input_spec:
             raise ValueError(
@@ -258,6 +252,28 @@ def validate_task_settings(
                 f"set it under {RUN!r} instead of {INPUT!r}"
             )
         raise ValueError(f"{source}: {task_name} does not declare calibration input {name!r}")
+
+
+def validate_sweep_type(
+    task_class: type[Any],
+    task_name: str,
+    name: str,
+    data: Any,
+    *,
+    source: str,
+) -> None:
+    """Reject a sweep whose constructor differs from the one ``run_spec`` declares.
+
+    The task records the declared ``value_type`` and rebuilds the sweep with it, so a
+    ``linspace`` triple given for a ``range`` parameter would otherwise run as a range.
+    """
+    value_type = data.get("value_type") if isinstance(data, Mapping) else None
+    declared_type = task_class.run_spec[name].value_type
+    if value_type in SWEEP_VALUE_TYPES and value_type != declared_type:
+        raise ValueError(
+            f"{source}: {task_name}.{name} declares {declared_type!r}, "
+            f"but the workflow uses {value_type!r}"
+        )
 
 
 def _normalize_run_entries(task_name: str, entries: Any) -> dict[str, dict[str, Any]]:

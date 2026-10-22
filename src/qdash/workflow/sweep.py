@@ -27,21 +27,51 @@ class Sweep:
         return {"value": self.arguments, "value_type": self.value_type}
 
 
+def _require_number(constructor: str, name: str, value: object) -> None:
+    # bool is an int subclass, but True as a bound or step is a mistake.
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise TypeError(f"sweep.{constructor} {name} must be a number, got {value!r}")
+
+
+def _require_count(constructor: str, num: object) -> None:
+    if isinstance(num, bool) or not isinstance(num, int) or num < 1:
+        raise ValueError(f"sweep.{constructor} num must be a positive integer, got {num!r}")
+
+
+def _require_step(constructor: str, step: SweepArgument) -> None:
+    if step == 0:
+        raise ValueError(f"sweep.{constructor} step must not be zero")
+
+
 def linspace(start: SweepArgument, stop: SweepArgument, num: int) -> Sweep:
     """Declare ``numpy.linspace(start, stop, num)`` for a run parameter."""
+    _require_number("linspace", "start", start)
+    _require_number("linspace", "stop", stop)
+    _require_count("linspace", num)
     return Sweep("np.linspace", (start, stop, num))
 
 
 def logspace(start: SweepArgument, stop: SweepArgument, num: int) -> Sweep:
     """Declare ``numpy.logspace(start, stop, num)`` for a run parameter."""
+    _require_number("logspace", "start", start)
+    _require_number("logspace", "stop", stop)
+    _require_count("logspace", num)
     return Sweep("np.logspace", (start, stop, num))
 
 
 def arange(start: SweepArgument, stop: SweepArgument, step: SweepArgument) -> Sweep:
     """Declare ``numpy.arange(start, stop, step)`` for a run parameter."""
+    for name, value in (("start", start), ("stop", stop), ("step", step)):
+        _require_number("arange", name, value)
+    _require_step("arange", step)
     return Sweep("np.arange", (start, stop, step))
 
 
+# Named after the builtin it declares; this module does not use the builtin.
 def range(start: int, stop: int, step: int) -> Sweep:
     """Declare ``range(start, stop, step)`` for a run parameter."""
+    for name, value in (("start", start), ("stop", stop), ("step", step)):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"sweep.range {name} must be an integer, got {value!r}")
+    _require_step("range", step)
     return Sweep("range", (start, stop, step))

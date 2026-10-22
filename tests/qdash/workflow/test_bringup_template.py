@@ -54,7 +54,7 @@ def test_bringup_step_accepts_resonator_assignment_order() -> None:
     }
     assert service.task_parameters == {
         "CheckResonatorSpectroscopy": {
-            "run": {"resonator_assignment_order": [0, 3, 1, 2]},
+            "run": {"resonator_assignment_order": {"value": [0, 3, 1, 2]}},
             "input": {},
         },
     }

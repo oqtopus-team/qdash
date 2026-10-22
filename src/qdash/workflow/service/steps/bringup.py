@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
+from qdash.workflow.engine.task_parameters import normalize_task_parameters
 from qdash.workflow.service.results import OneQubitResult, normalize_metric_value
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import BRINGUP_TASKS
@@ -138,7 +139,7 @@ class BringUp(CalibrationStep):
         )
         task_settings["run"]["resonator_assignment_order"] = self.resonator_assignment_order
         service.task_parameters.clear()
-        service.task_parameters.update(task_parameters)
+        service.task_parameters.update(normalize_task_parameters(task_parameters))
 
     def _execute_direct(
         self,
