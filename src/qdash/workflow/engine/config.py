@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
+from qdash.workflow.engine.task_parameters import normalize_default_run_parameters
 from qdash.workflow.paths import get_path_resolver
 
 
@@ -30,6 +31,8 @@ class CalibConfig:
         task_parameters: Task-scoped run parameters, input overrides, and
             ``update_calibration_parameters`` in the canonical form of
             :mod:`qdash.workflow.engine.task_parameters`
+        default_run_parameters: Shared run fallbacks in the canonical form of
+            :mod:`qdash.workflow.engine.task_parameters`.
     """
 
     username: str
@@ -62,6 +65,7 @@ class CalibConfig:
 
     def __post_init__(self) -> None:
         """Compute derived paths from execution_id."""
+        self.default_run_parameters = normalize_default_run_parameters(self.default_run_parameters)
         if not self.project_id:
             raise ValueError("project_id is required for calibration paths")
         resolver = get_path_resolver()

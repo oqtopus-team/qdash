@@ -65,6 +65,7 @@ from qdash.workflow.engine.task_parameters import (
     INPUT,
     RUN,
     merge_task_parameters,
+    normalize_default_run_parameters,
     normalize_task_settings,
     resolve_task_parameters,
     task_settings_from_task_details,
@@ -405,6 +406,8 @@ class CalibService:
                 Execution. Pipelines automatically create one Execution per calibration
                 step, including when older templates pass this option. Default: False.
             default_run_parameters: Shared fallback run parameters applied to all tasks.
+                Values use the same plain, sweep, or wrapped form as task-specific
+                ``run`` values.
             task_run_parameters: Deprecated flat form of ``task_parameters`` that holds
                 only run parameters and ``update_calibration_parameters``.
             task_parameters: Settings keyed by task name. Each entry may contain
@@ -412,9 +415,9 @@ class CalibService:
                 (overrides for calibration inputs declared in its ``input_spec``), and
                 ``update_calibration_parameters`` (``False`` keeps the output as
                 measurement history without updating current calibration parameters).
-                For example: ``{"CheckAdaptiveChevron": {"run": {"shots": {"value":
-                256, "value_type": "int"}}, "input": {"coarse_control_amplitude":
-                0.05}}}``. An input override applies to every qid the task runs on.
+                For example: ``{"CheckAdaptiveChevron": {"run": {"shots": 256},
+                "input": {"coarse_control_amplitude": 0.05}}}``. An input override
+                applies to every qid the task runs on.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
@@ -430,7 +433,7 @@ class CalibService:
         self.backend_name = backend_name or get_default_backend()
         self.use_lock = use_lock
         self.skip_execution = skip_execution
-        self.default_run_parameters = default_run_parameters or {}
+        self.default_run_parameters = normalize_default_run_parameters(default_run_parameters)
         self.task_parameters = resolve_task_parameters(task_parameters, task_run_parameters)
         validate_task_names(self.task_parameters, self.backend_name)
         self._lock_acquired = False
@@ -543,7 +546,9 @@ class CalibService:
             flow_name = self.flow_name or ""
             flow = flow_repo.find_by_project_and_name(self.project_id, flow_name)
             if flow and flow.default_run_parameters:
-                self.default_run_parameters = flow.default_run_parameters
+                self.default_run_parameters = normalize_default_run_parameters(
+                    flow.default_run_parameters
+                )
                 logger.debug(
                     "Loaded default_run_parameters from flow '%s': %s",
                     self.flow_name,

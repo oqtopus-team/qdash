@@ -106,7 +106,7 @@ def coherence_limit(
         task_parameters={
             "Check1QGateCoherenceLimit": {
                 "run": {
-                    "drag_hpi_duration": {"value": 16, "value_type": "int"},
+                    "drag_hpi_duration": 16,
                 },
             },
         },

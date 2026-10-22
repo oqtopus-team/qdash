@@ -51,20 +51,32 @@ A workflow sets parameters for one task through `CalibService(task_parameters=..
 entry has up to three keys:
 
 ```python
+from qdash.workflow import sweep
+
 task_parameters={
     "CheckAdaptiveChevron": {
-        "run": {"shots": {"value": 256, "value_type": "int"}},
+        "run": {"shots": 256},
         "input": {"coarse_control_amplitude": 0.05},
         "update_calibration_parameters": False,
+    },
+    "CheckChevron": {
+        "run": {"detuning_range": sweep.linspace(-0.08, 0.08, 81)},
     },
 }
 ```
 
 | Key | Holds | Declared by |
 | --- | --- | --- |
-| `run` | Run parameters, as `{"value": ..., "value_type": ...}` or a bare value | `run_spec` |
-| `input` | Calibration input overrides, as a bare value or `{"value": ...}` | `input_spec` |
+| `run` | Run parameter overrides as plain values or `sweep` declarations | `run_spec` |
+| `input` | Calibration input overrides as plain values | `input_spec` |
 | `update_calibration_parameters` | Output persistence policy for the task (see [Output persistence](#output-persistence)) | — |
+
+Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or `sweep.range` when a run parameter
+declares a generated range. The helper keeps the constructor and its three arguments explicit and
+normalizes them to the task parameter's serializable `value` and `value_type` fields without
+materializing an array. Use plain values for other `run` values and for `input` values. QDash
+continues to accept three-element lists or tuples and `{"value": ...}` mappings in existing
+workflows.
 
 `qdash.workflow.engine.task_parameters` normalizes this mapping when `CalibService` starts. The
 orchestrator validates it against the task class when it creates the task: a name under `run`
@@ -95,7 +107,13 @@ Use `default_run_parameters` only for values intentionally shared by every decla
 A shared value overrides task-specific defaults, including Qubex optimized defaults: qubit
 spectroscopy normally uses a 1024 ns interval and resonator spectroscopy uses 0 ns. Use
 `task_parameters` when a template should preserve or configure one named task. Nested entries
-in `default_run_parameters` remain readable only for existing flow documents.
+in `default_run_parameters` remain readable only for existing flow documents. Shared defaults use
+the same plain-value and `sweep` declaration forms as `task_parameters[task_name]["run"]`; wrapped
+`{"value": ...}` mappings remain compatible. A sweep in either place must use the constructor the
+task declares, because the task rebuilds the range with its declared `value_type`: a shared
+`sweep.linspace` for a `time_range` that a task declares as `range` fails when that task is
+created, unless `task_parameters` sets that task's own value. The `sweep` helpers also reject a
+zero step or a non-positive count when the workflow is defined.
 
 `readout_duration` is session-scoped in Qubex. QDash passes the shared value when constructing the
 Experiment, records the effective value on each task that uses the session readout pulse, and rejects

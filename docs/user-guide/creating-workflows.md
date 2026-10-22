@@ -91,11 +91,13 @@ Add `task_parameters` to the workflow's calibration service when one named task 
 run settings, calibration inputs, or output-saving behavior:
 
 ```python
+from qdash.workflow import sweep
+
 task_parameters={
     "CheckRamsey": {
         "run": {
-            "shots": {"value": 1024, "value_type": "int"},
-            "detuning": {"value": 0.001, "value_type": "float"},
+            "shots": 1024,
+            "time_range": sweep.arange(0, 10_000, 100),
         },
         "input": {
             "control_frequency": 7.012,
@@ -105,10 +107,12 @@ task_parameters={
 },
 ```
 
-Values under `run` control the experiment. Values under `input` replace the current calibration
-input for every selected target in that task. Set `update_calibration_parameters` to `False` for
-an exploratory measurement whose outputs must remain in history without becoming the current
-calibration values.
+Values under `run` control the experiment. Use `sweep.linspace`, `sweep.logspace`,
+`sweep.arange`, or `sweep.range` for generated ranges so their construction remains visible in the
+workflow. Other run parameters use plain values. Values under `input` replace the current
+calibration input for every selected target in that task. Set `update_calibration_parameters` to
+`False` for an exploratory measurement whose outputs must remain in history without becoming the
+current calibration values.
 
 QDash rejects a parameter placed in the wrong section, a parameter the task does not declare, or
 an input the task does not allow users to override. See [Task Parameters](./task-parameters.md)

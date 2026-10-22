@@ -12,6 +12,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import sweep
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -88,22 +89,16 @@ def coherence_check(
                 "run": {
                     # Keep the measurement grid explicit so users can inspect and
                     # tune the coherence-check acquisition condition here.
-                    "detuning_range": {
-                        "value": (-0.05, 0.05, 41),
-                        "value_type": "np.linspace",
-                    },
-                    "time_range": {
-                        "value": (0, 250, 26),
-                        "value_type": "np.linspace",
-                    },
-                    "shots": {"value": 256, "value_type": "int"},
+                    "detuning_range": sweep.linspace(-0.05, 0.05, 41),
+                    "time_range": sweep.linspace(0, 250, 26),
+                    "shots": 256,
                 },
                 "update_calibration_parameters": False,
             },
         },
         default_run_parameters={
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

@@ -8,6 +8,7 @@ import pytest
 
 # Import fake tasks to trigger registration in BaseTask.registry
 import qdash.workflow.calibtasks.fake  # noqa: F401
+from qdash.workflow import sweep
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
 from qdash.workflow.calibtasks.base import BaseTask
 from qdash.workflow.engine.config import CalibConfig
@@ -35,7 +36,7 @@ def test_shared_readout_duration_configures_backend_session(monkeypatch: Any) ->
         execution_id="exec-1",
         project_id="project-1",
         backend_name="fake",
-        default_run_parameters={"readout_duration": {"value": 2048, "value_type": "int"}},
+        default_run_parameters={"readout_duration": 2048},
     )
     orchestrator = CalibOrchestrator(config)
     orchestrator._task_context = cast("TaskContext", SimpleNamespace(id="manager-1"))
@@ -177,34 +178,6 @@ class TestDefaultRunParameterInjection:
         task = instances[TASK_NAME]
         assert task.run_parameters["shots"].value == 2048
 
-    def test_malformed_default_run_parameter_skipped(self):
-        """Test that non-dict default_run_parameters are skipped gracefully."""
-        default_run_parameters: dict[str, Any] = {
-            "shots": {"value": 2048, "value_type": "int"},
-            "bad_param": "not_a_dict",  # malformed
-            "another_bad": 42,  # malformed
-        }
-        task_details: dict[str, Any] = {TASK_NAME: {"run_parameters": {}}}
-
-        # Simulate orchestrator injection logic with validation
-        task_params = task_details[TASK_NAME]
-        for param_name, param_data in default_run_parameters.items():
-            if not isinstance(param_data, dict):
-                continue
-            if param_name not in task_params["run_parameters"]:
-                task_params["run_parameters"][param_name] = param_data
-
-        instances = generate_task_instances(
-            task_names=[TASK_NAME],
-            task_details=task_details,
-            backend=BACKEND,
-        )
-        task = instances[TASK_NAME]
-        # Only valid param should be injected
-        assert task.run_parameters["shots"].value == 2048
-        assert "bad_param" not in task.run_parameters
-        assert "another_bad" not in task.run_parameters
-
     def test_shared_defaults_reach_only_tasks_that_declare_them(self):
         """A flow's shared default for another task's parameter is not recorded on this task."""
         config = CalibConfig(
@@ -281,6 +254,13 @@ class TestTaskRunParameterInjection:
         assert task.run_parameters["interval"].value == 8
         assert task.run_parameters["readout_duration"].value == 7
 
+    def test_plain_shared_default_overrides_task_default(self) -> None:
+        orchestrator = CalibOrchestrator(_config(default_run_parameters={"shots": 4096}))
+
+        task = orchestrator._create_task_instance(TASK_NAME, None)
+
+        assert task.run_parameters["shots"].value == 4096
+
     def test_update_policy_is_not_injected_as_a_run_parameter(self) -> None:
         orchestrator = CalibOrchestrator(
             _config(
@@ -318,7 +298,12 @@ class TestTaskRunParameterInjection:
             )
         )
 
-        task = orchestrator._create_task_instance(TASK_NAME, {"run": {"time_range": [0, 101, 4]}})
+        task = orchestrator._create_task_instance(
+            TASK_NAME,
+            normalize_task_parameters({TASK_NAME: {"run": {"time_range": sweep.range(0, 101, 4)}}})[
+                TASK_NAME
+            ],
+        )
 
         # Shared defaults are not explicit, so a re-execution snapshot keeps its own values.
         assert task.run_overrides == {"shots": 1024, "time_range": (0, 101, 4)}
@@ -356,6 +341,18 @@ class TestTaskRunParameterInjection:
 
         with pytest.raises(ValueError, match="requires a tuple/list of 3 values"):
             orchestrator._create_task_instance(TASK_NAME, {"run": {"time_range": "[0, 101, 4]"}})
+
+    def test_sweep_constructor_must_match_declared_run_type(self) -> None:
+        orchestrator = CalibOrchestrator(
+            _config(
+                task_parameters=normalize_task_parameters(
+                    {TASK_NAME: {"run": {"time_range": sweep.linspace(0, 100, 11)}}}
+                )
+            )
+        )
+
+        with pytest.raises(ValueError, match=r"declares 'range'.*uses 'np\.linspace'"):
+            orchestrator._create_task_instance(TASK_NAME, None)
 
 
 class TestTaskInputOverrides:

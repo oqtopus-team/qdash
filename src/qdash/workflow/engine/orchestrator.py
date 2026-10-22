@@ -27,6 +27,7 @@ from qdash.workflow.engine.task_parameters import (
     RUN,
     UPDATE_CALIBRATION_PARAMETERS,
     normalize_task_settings,
+    validate_sweep_type,
     validate_task_settings,
 )
 
@@ -533,6 +534,19 @@ class CalibOrchestrator:
                     default_run_parameters[param_name] = param_data
         for param_name, param_data in flat_defaults.items():
             default_run_parameters.setdefault(param_name, param_data)
+        if task_class is not None:
+            # A shared sweep must match the constructor of every task it reaches;
+            # a task-scoped value for the same name replaces it for this task.
+            for param_name, param_data in default_run_parameters.items():
+                overridden = param_name in configured[RUN] or param_name in explicit[RUN]
+                if param_name in task_class.run_spec and not overridden:
+                    validate_sweep_type(
+                        task_class,
+                        task_name,
+                        param_name,
+                        param_data,
+                        source="default_run_parameters",
+                    )
 
         params = {
             "run_parameters": default_run_parameters,

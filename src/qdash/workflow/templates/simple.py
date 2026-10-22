@@ -123,13 +123,13 @@ def simple_calibration(
         task_parameters={
             "CreateHPIPulse": {
                 "run": {
-                    "hpi_duration": {"value": 32, "value_type": "int"},
+                    "hpi_duration": 32,
                 },
             },
         },
         default_run_parameters={
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

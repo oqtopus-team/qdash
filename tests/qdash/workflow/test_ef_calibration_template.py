@@ -71,33 +71,33 @@ def test_ef_calibration_forwards_configuration_mode_and_shared_defaults() -> Non
         "task_parameters": {
             "ConfigureEF": {
                 "run": {
-                    "configuration_mode": {"value": "ge-ef-fh", "value_type": "str"},
+                    "configuration_mode": "ge-ef-fh",
                 },
             },
             "CreateHPIPulse": {
                 "run": {
-                    "hpi_duration": {"value": 32, "value_type": "int"},
+                    "hpi_duration": 32,
                 },
             },
             "CheckAdaptiveEFChevron": {
                 "run": {
-                    "shots": {"value": 256, "value_type": "int"},
+                    "shots": 256,
                 },
             },
             "CreateEFHPIPulse": {
                 "run": {
-                    "ef_hpi_duration": {"value": 32, "value_type": "int"},
+                    "ef_hpi_duration": 32,
                 },
             },
             "CreateEFPIPulse": {
                 "run": {
-                    "ef_pi_duration": {"value": 32, "value_type": "int"},
+                    "ef_pi_duration": 32,
                 },
             },
         },
         "default_run_parameters": {
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     }
 

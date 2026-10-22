@@ -94,27 +94,27 @@ def test_coarse_one_forwards_execution_context_and_preserves_task_scan_defaults(
         "task_parameters": {
             "CreateHPIPulse": {
                 "run": {
-                    "hpi_duration": {"value": 32, "value_type": "int"},
+                    "hpi_duration": 32,
                 },
             },
             "CreatePIPulse": {
                 "run": {
-                    "pi_duration": {"value": 32, "value_type": "int"},
+                    "pi_duration": 32,
                 },
             },
             "CreateDRAGHPIPulse": {
                 "run": {
-                    "drag_hpi_duration": {"value": 16, "value_type": "int"},
+                    "drag_hpi_duration": 16,
                 },
             },
             "CreateDRAGPIPulse": {
                 "run": {
-                    "drag_pi_duration": {"value": 24, "value_type": "int"},
+                    "drag_pi_duration": 24,
                 },
             },
         },
         "default_run_parameters": {
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     }

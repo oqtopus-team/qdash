@@ -4,7 +4,7 @@
 
     {
         "CheckAdaptiveChevron": {
-            "run": {"shots": {"value": 256, "value_type": "int"}},
+            "run": {"shots": 256},
             "input": {"coarse_control_amplitude": 0.05},
             "update_calibration_parameters": False,
         }
@@ -28,6 +28,8 @@ import warnings
 from collections.abc import Mapping
 from typing import Any
 
+from qdash.workflow.sweep import SWEEP_VALUE_TYPES, Sweep
+
 RUN = "run"
 INPUT = "input"
 UPDATE_CALIBRATION_PARAMETERS = "update_calibration_parameters"
@@ -41,8 +43,9 @@ def normalize_task_parameters(
     """Return a validated deep copy of ``task_parameters`` in canonical form.
 
     Every task entry gets ``run`` and ``input`` mappings. Run values written as
-    scalars become ``{"value": ...}``; input values written as ``{"value": ...}``
-    become the bare value.
+    scalars become ``{"value": ...}``, and declarative sweeps become serializable
+    value/type mappings. Input values written as ``{"value": ...}`` become the
+    bare value.
     """
     if task_parameters is None:
         return {}
@@ -52,6 +55,35 @@ def normalize_task_parameters(
         task_name: normalize_task_settings(task_name, settings)
         for task_name, settings in task_parameters.items()
     }
+
+
+def normalize_default_run_parameters(
+    default_run_parameters: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Return shared run defaults in the same canonical value form as task settings.
+
+    Flat values and sweep declarations become ``{"value": ...}`` mappings. Legacy
+    task-nested defaults remain supported and their parameter values are normalized
+    recursively.
+    """
+    if default_run_parameters is None:
+        return {}
+    if not isinstance(default_run_parameters, Mapping):
+        raise ValueError("default_run_parameters must be a mapping of parameter names to values")
+
+    normalized: dict[str, Any] = {}
+    for name, data in copy.deepcopy(dict(default_run_parameters)).items():
+        if isinstance(data, Mapping) and "value" not in data and "value_type" not in data:
+            nested: dict[str, Any] = {}
+            for parameter_name, parameter_data in data.items():
+                if parameter_name == UPDATE_CALIBRATION_PARAMETERS:
+                    nested[parameter_name] = parameter_data
+                else:
+                    nested[parameter_name] = _normalize_run_value(parameter_data)
+            normalized[name] = nested
+        else:
+            normalized[name] = _normalize_run_value(data)
+    return normalized
 
 
 def normalize_task_settings(task_name: str, settings: Any) -> dict[str, Any]:
@@ -201,8 +233,9 @@ def validate_task_settings(
     """Reject task-scoped names the task does not declare in the matching spec."""
     run_spec = getattr(task_class, "run_spec", {})
     input_spec = getattr(task_class, "input_spec", {})
-    for name in settings.get(RUN, {}):
+    for name, data in settings.get(RUN, {}).items():
         if name in run_spec:
+            validate_sweep_type(task_class, task_name, name, data, source=source)
             continue
         if name in input_spec:
             raise ValueError(
@@ -221,13 +254,40 @@ def validate_task_settings(
         raise ValueError(f"{source}: {task_name} does not declare calibration input {name!r}")
 
 
+def validate_sweep_type(
+    task_class: type[Any],
+    task_name: str,
+    name: str,
+    data: Any,
+    *,
+    source: str,
+) -> None:
+    """Reject a sweep whose constructor differs from the one ``run_spec`` declares.
+
+    The task records the declared ``value_type`` and rebuilds the sweep with it, so a
+    ``linspace`` triple given for a ``range`` parameter would otherwise run as a range.
+    """
+    value_type = data.get("value_type") if isinstance(data, Mapping) else None
+    declared_type = task_class.run_spec[name].value_type
+    if value_type in SWEEP_VALUE_TYPES and value_type != declared_type:
+        raise ValueError(
+            f"{source}: {task_name}.{name} declares {declared_type!r}, "
+            f"but the workflow uses {value_type!r}"
+        )
+
+
 def _normalize_run_entries(task_name: str, entries: Any) -> dict[str, dict[str, Any]]:
     if not isinstance(entries, Mapping):
         raise ValueError(f"task_parameters[{task_name!r}][{RUN!r}] must be a mapping")
-    return {
-        name: dict(data) if isinstance(data, Mapping) else {"value": data}
-        for name, data in entries.items()
-    }
+    return {name: _normalize_run_value(data) for name, data in entries.items()}
+
+
+def _normalize_run_value(data: Any) -> dict[str, Any]:
+    if isinstance(data, Sweep):
+        return data.as_run_parameter()
+    if isinstance(data, Mapping):
+        return dict(data)
+    return {"value": data}
 
 
 def _normalize_input_entries(task_name: str, entries: Any) -> dict[str, Any]:
@@ -236,6 +296,11 @@ def _normalize_input_entries(task_name: str, entries: Any) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     # Calibration inputs are scalars, so a mapping is the {"value": ...} form.
     for name, data in entries.items():
+        if isinstance(data, Sweep):
+            raise ValueError(
+                f"task_parameters[{task_name!r}][{INPUT!r}][{name!r}] uses a sweep; "
+                f"put generated experiment ranges under {RUN!r}"
+            )
         value = data.get("value") if isinstance(data, Mapping) else data
         if value is None:
             raise ValueError(f"task_parameters[{task_name!r}][{INPUT!r}][{name!r}] needs a value")
