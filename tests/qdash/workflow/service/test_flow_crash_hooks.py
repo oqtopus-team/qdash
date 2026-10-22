@@ -13,8 +13,11 @@ MongoDB (mongomock via the ``init_db`` fixture).
 
 from __future__ import annotations
 
+import runpy
 from types import SimpleNamespace
 from unittest.mock import patch
+
+import pytest
 
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
@@ -290,3 +293,54 @@ def test_hook_swallows_finalizer_errors(init_db) -> None:
     execution = _reload_execution()
     assert execution is not None
     assert execution.status == "running"
+
+
+@pytest.mark.parametrize(
+    ("hook_name", "terminal_status"),
+    [
+        ("on_cancellation", "cancelled"),
+        ("on_failure", "failed"),
+        ("on_crashed", "failed"),
+    ],
+)
+@pytest.mark.parametrize("concurrent_claim", [False, True])
+def test_single_task_terminal_hooks_release_preparing_reservation(
+    init_db, hook_name, terminal_status, concurrent_claim
+) -> None:
+    """A task interrupted before initialization releases only its own API claim."""
+    from qdash.workflow.service import single_task_flow
+
+    registered = {}
+
+    def capture_flow(**kwargs):
+        registered.update(kwargs)
+        return lambda fn: fn
+
+    with patch("prefect.flow", capture_flow):
+        runpy.run_path(single_task_flow.__file__)
+
+    # The API reserved hardware, but CalibService construction never completed.
+    _make_execution(status="scheduled")
+    assert ExecutionLockDocument.try_lock(
+        PROJECT_ID, execution_id="exec-1", chip_id="chip-1", resources=("S137R",), exclusive=False
+    )
+    if concurrent_claim:
+        assert ExecutionLockDocument.try_lock(
+            PROJECT_ID,
+            execution_id="unrelated-execution",
+            chip_id="chip-1",
+            resources=("S121R",),
+            exclusive=False,
+        )
+
+    for hook in registered[hook_name]:
+        hook(None, _fake_flow_run(), None)
+
+    execution = _reload_execution()
+    assert execution.status == terminal_status
+    assert execution.end_at is not None
+    lock = ExecutionLockDocument.find_one({"project_id": PROJECT_ID}).run()
+    assert lock.locked is concurrent_claim
+    assert [claim.execution_id for claim in lock.claims] == (
+        ["unrelated-execution"] if concurrent_claim else []
+    )

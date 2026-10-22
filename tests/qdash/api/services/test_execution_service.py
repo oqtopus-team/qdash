@@ -7,6 +7,8 @@ from typing import Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
+import pytest
+
 import qdash.api.services.execution_service as execution_service
 from qdash.api.services.execution_service import ExecutionService
 from qdash.datamodel.system_info import SystemInfoModel
@@ -707,3 +709,31 @@ def test_plain_executions_have_no_pipeline(init_db: Any) -> None:
     detail = _make_service().get_execution(project_id=PROJECT_ID, execution_id="exec-1")
     assert detail is not None
     assert detail.pipeline is None
+
+
+@pytest.mark.parametrize("prefect_state", ["CANCELLED", "CANCELLING", "RUNNING"])
+def test_get_lock_status_reconciles_cancelling_execution(
+    monkeypatch: Any, init_db: Any, prefect_state: str
+) -> None:
+    """Polling recovers a cancelled run, but retains claims until Prefect confirms termination."""
+    flow_run_id = str(uuid4())
+    _make_execution(execution_id="exec-1", status="cancelling", note={"flow_run_id": flow_run_id})
+    _make_task(task_id="task-1", execution_id="exec-1", status="running")
+    repo = MongoExecutionLockRepository()
+    repo.try_lock(project_id=PROJECT_ID, execution_id="exec-1")
+    calls: list[dict[str, Any]] = []
+    client = _FakeSyncClient([_make_run(flow_run_id, prefect_state)])
+    monkeypatch.setattr(execution_service, "get_client", _make_get_client(client, calls))
+
+    result = _make_service().get_lock_status(PROJECT_ID)
+
+    terminated = prefect_state == "CANCELLED"
+    assert len(calls) == 1
+    assert result.lock is (not terminated)
+    assert result.status == ("cancelled" if terminated else "cancelling")
+    execution = ExecutionHistoryDocument.find_one(
+        {"project_id": PROJECT_ID, "execution_id": "exec-1"}
+    ).run()
+    assert execution.status == result.status
+    task = TaskResultHistoryDocument.find_one({"task_id": "task-1"}).run()
+    assert task.status == ("cancelled" if terminated else "running")

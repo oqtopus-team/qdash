@@ -416,9 +416,10 @@ class ExecutionService:
     def get_lock_status(self, project_id: str) -> ExecutionLockStatusResponse:
         """Get the execution lock status.
 
-        A still ``scheduled`` execution is reconciled against Prefect first: a
-        run that died before its flow process started would otherwise hold the
-        lock with nothing left to release it.
+        A ``scheduled`` or ``cancelling`` execution is reconciled against Prefect
+        first: a run whose terminal hooks were interrupted would otherwise hold
+        the lock with nothing left to release it. Non-terminal Prefect states
+        retain the reservation until termination is confirmed.
 
         Parameters
         ----------
@@ -432,7 +433,10 @@ class ExecutionService:
 
         """
         latest = self._history_repo.find_latest_by_project(project_id)
-        if latest is not None and latest.status == ExecutionStatusModel.SCHEDULED:
+        if latest is not None and latest.status in (
+            ExecutionStatusModel.SCHEDULED,
+            ExecutionStatusModel.CANCELLING,
+        ):
             self._reconcile_with_prefect([latest])
 
         status = self._lock_repo.get_lock_status(project_id)
