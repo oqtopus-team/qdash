@@ -1101,6 +1101,31 @@ class TestSnapshotOverrides:
         recorded_run = mock_state_manager.put_run_parameters.call_args[0][1]
         assert recorded_run["resonator_assignment_order"]["value"] == [0, 3, 1, 2]
 
+    def test_run_override_keeps_declared_type_and_parameters_missing_from_snapshot(
+        self,
+        executor_with_snapshot: TaskExecutor,
+        mock_snapshot_loader: MagicMock,
+    ) -> None:
+        """A partial legacy snapshot must not erase current run declarations."""
+        mock_snapshot_loader.get_snapshot.return_value = (
+            {},
+            {"shots": {"value": 512, "value_type": "int"}},
+        )
+        task = MockTask()
+        task.run_parameters = {
+            "shots": RunParameterModel(value=1024, value_type="int"),
+            "time_range": RunParameterModel(value=(0, 101, 4), value_type="range"),
+            "interval": RunParameterModel(value=8, value_type="int"),
+        }
+        task.run_overrides = {"time_range": (0, 201, 8)}
+
+        executor_with_snapshot._apply_snapshot_overrides(task, "Task", "qubit", "0")
+
+        assert task.run_parameters["shots"].value == 512
+        assert task.run_parameters["time_range"].value_type == "range"
+        assert task.run_parameters["time_range"].value == (0, 201, 8)
+        assert task.run_parameters["interval"].value == 8
+
     def test_apply_snapshot_overrides_empty_params(
         self,
         executor_with_snapshot: TaskExecutor,

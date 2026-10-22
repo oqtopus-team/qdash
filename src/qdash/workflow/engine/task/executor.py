@@ -860,6 +860,14 @@ class TaskExecutor:
         # Explicit overrides are part of the requested execution conditions, so
         # they replace the recorded values before the snapshot is applied.
         snap_input = self._merge_overrides(snap_input, task.input_overrides)
+        if task.run_overrides:
+            # Seed parameters missing from older snapshots with the current
+            # declaration so explicit overrides retain their value_type and
+            # unrelated declared defaults remain available.
+            snap_run = {
+                **{name: model.model_dump() for name, model in task.run_parameters.items()},
+                **snap_run,
+            }
         snap_run = self._merge_overrides(snap_run, task.run_overrides)
         declarations = getattr(task.__class__, "input_spec", {})
         normalized_input = dict(snap_input)

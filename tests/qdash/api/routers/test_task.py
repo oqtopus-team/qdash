@@ -426,34 +426,111 @@ def _reexecution_doc(monkeypatch: pytest.MonkeyPatch, name: str = "CheckRabi") -
     )
 
 
-@pytest.mark.asyncio
+def _empty_namespace() -> SimpleNamespace:
+    return SimpleNamespace()
+
+
 @pytest.mark.parametrize(
-    "parameter_overrides",
+    ("parameter_overrides", "expected_detail"),
     [
-        {"run": {"shotz": 100}},
-        {"input": {"unknown_input": 1.0}},
-        {"inputs": {"qubit_frequency": 5.0}},
+        (
+            {"run": {"shotz": 100}},
+            "Invalid parameter overrides: unknown run parameters: shotz",
+        ),
+        (
+            {"input": {"unknown_input": 1.0}},
+            "Invalid parameter overrides: unknown input parameters: unknown_input",
+        ),
+        (
+            {"inputs": {"qubit_frequency": 5.0}},
+            "Invalid parameter overrides: unknown keys ['inputs']",
+        ),
     ],
 )
-async def test_re_execute_rejects_overrides_the_task_cannot_apply(
-    monkeypatch: pytest.MonkeyPatch, parameter_overrides: dict[str, dict[str, Any]]
+def test_re_execute_rejects_overrides_the_task_cannot_apply_via_http(
+    test_client: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    parameter_overrides: dict[str, dict[str, Any]],
+    expected_detail: str,
 ) -> None:
+    from qdash.api.dependencies import (
+        get_flow_service,
+        get_task_file_service,
+        get_task_result_service,
+    )
+    from qdash.api.lib.auth import get_current_active_user
+    from qdash.api.lib.project import get_project_context_editor
+    from qdash.api.main import app
+
     _reexecution_doc(monkeypatch)
     execute = AsyncMock()
-
-    with pytest.raises(HTTPException) as exc_info:
-        await re_execute_task_result(
-            task_id="task-1",
-            ctx=_project_context(),  # type: ignore[arg-type]
-            service=SimpleNamespace(),  # type: ignore[arg-type]
-            flow_service=SimpleNamespace(  # type: ignore[arg-type]
-                execute_single_task_from_snapshot=execute
-            ),
-            task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
-            parameter_overrides=parameter_overrides,
+    previous_overrides = app.dependency_overrides.copy()
+    app.dependency_overrides[get_current_active_user] = lambda: _project_context().user
+    app.dependency_overrides[get_project_context_editor] = _project_context
+    app.dependency_overrides[get_task_result_service] = _empty_namespace
+    app.dependency_overrides[get_flow_service] = lambda: SimpleNamespace(
+        execute_single_task_from_snapshot=execute
+    )
+    app.dependency_overrides[get_task_file_service] = lambda: _task_file_service(_task_info())
+    try:
+        response = test_client.post(
+            "/task-results/task-1/re-execute",
+            json={"parameter_overrides": parameter_overrides},
         )
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
 
-    assert exc_info.value.status_code == 400
+    assert response.status_code == 400
+    assert response.json() == {"detail": expected_detail}
+    execute.assert_not_awaited()
+
+
+@pytest.mark.parametrize("invalid_duration", ["invalid", True])
+def test_re_execute_rejects_invalid_session_duration_via_http(
+    test_client: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_duration: Any,
+) -> None:
+    from qdash.api.dependencies import (
+        get_flow_service,
+        get_task_file_service,
+        get_task_result_service,
+    )
+    from qdash.api.lib.auth import get_current_active_user
+    from qdash.api.lib.project import get_project_context_editor
+    from qdash.api.main import app
+
+    _reexecution_doc(monkeypatch, name="CheckQubitSpectroscopy")
+    task = _task_info().model_copy(
+        update={
+            "name": "CheckQubitSpectroscopy",
+            "run_parameters": {"shots": {"value_type": "int"}},
+        }
+    )
+    execute = AsyncMock()
+    previous_overrides = app.dependency_overrides.copy()
+    app.dependency_overrides[get_current_active_user] = lambda: _project_context().user
+    app.dependency_overrides[get_project_context_editor] = _project_context
+    app.dependency_overrides[get_task_result_service] = _empty_namespace
+    app.dependency_overrides[get_flow_service] = lambda: SimpleNamespace(
+        execute_single_task_from_snapshot=execute
+    )
+    app.dependency_overrides[get_task_file_service] = lambda: _task_file_service(task)
+    try:
+        response = test_client.post(
+            "/task-results/task-1/re-execute",
+            json={"parameter_overrides": {"run": {"readout_duration": invalid_duration}}},
+        )
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Invalid parameter overrides: invalid parameter types: "
+        "run.readout_duration must be float"
+    }
     execute.assert_not_awaited()
 
 

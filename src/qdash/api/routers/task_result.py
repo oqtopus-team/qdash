@@ -72,9 +72,22 @@ def _validated_reexecution_overrides(
     task, _ = resolve_catalog_task(task_file_service, task_name, None)
     input_overrides = dict(parameter_overrides.get("input") or {})
     run_overrides = dict(parameter_overrides.get("run") or {})
-    if "readout_duration" not in task.run_parameters:
-        run_overrides.pop("readout_duration", None)
+    declares_readout_duration = "readout_duration" in task.run_parameters
+    if not declares_readout_duration and "readout_duration" in run_overrides:
+        # The duration still configures the Qubex session for tasks that do not
+        # expose it as a task-level run parameter. Add temporary metadata so the
+        # shared override validator rejects non-numeric or non-finite values.
+        task = task.model_copy(
+            update={
+                "run_parameters": {
+                    **task.run_parameters,
+                    "readout_duration": {"value_type": "float"},
+                }
+            }
+        )
     validate_overrides(task, input_overrides, run_overrides)
+    if not declares_readout_duration:
+        run_overrides.pop("readout_duration", None)
     return {"input": input_overrides, "run": run_overrides}
 
 

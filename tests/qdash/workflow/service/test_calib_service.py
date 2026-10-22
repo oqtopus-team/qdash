@@ -765,7 +765,16 @@ class TestCalibServiceParameterManagement:
                         qid="0",
                         task_type=TaskTypes.QUBIT,
                         task_id="task-1",
-                        output_parameters={"control_amplitude": {"value": 0.25}},
+                        output_parameters={
+                            "control_amplitude": {
+                                "value": 0.25,
+                                "database_updated": True,
+                            },
+                            "measurement_only": {
+                                "value": 0.75,
+                                "database_updated": False,
+                            },
+                        },
                     )
                 ]
 
@@ -789,6 +798,7 @@ class TestCalibServiceParameterManagement:
         merged = execution_service.calib_data.qubit["0"]["control_amplitude"]
         assert isinstance(merged, ParameterModel)
         assert merged.value == 0.25
+        assert "measurement_only" not in execution_service.calib_data.qubit["0"]
 
 
 class TestGlobalSessionHelpers:
@@ -1296,6 +1306,28 @@ def test_task_and_isolated_worker_reject_unreserved_hardware(pipeline_wiring, mo
             },
             ["4"],
         )
+
+
+def test_configure_all_scope_uses_service_task_parameters(pipeline_wiring):
+    """Service-level MUX settings should be used for operation scope validation."""
+    from qdash.common.execution_resources import resolve_execution_resource_scope
+
+    scope = resolve_execution_resource_scope("chip-1", {"mux_ids": [0]})
+    session = CalibService(
+        "alice",
+        "chip-1",
+        project_id="project-1",
+        use_lock=False,
+        resource_scope=scope,
+        enable_github=False,
+        task_parameters={"ConfigureAll": {"run": {"mux_ids": [0]}}},
+    )
+    orchestrator = MagicMock()
+    session._orchestrator = orchestrator
+
+    session.execute_task("ConfigureAll", "")
+
+    orchestrator.run_task.assert_called_once()
 
 
 def test_pipeline_keeps_supplied_reservation_owner(pipeline_execution_env, monkeypatch):

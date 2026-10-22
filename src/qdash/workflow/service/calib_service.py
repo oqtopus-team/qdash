@@ -62,6 +62,7 @@ from qdash.common.utils.datetime import now
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
 from qdash.workflow.engine.params_updater import get_params_updater
 from qdash.workflow.engine.task_parameters import (
+    INPUT,
     RUN,
     merge_task_parameters,
     normalize_task_settings,
@@ -852,9 +853,15 @@ class CalibService:
         if self.use_lock and not self._lock_acquired:
             raise RuntimeError("No hardware reservation is held for this execution")
         settings = self._call_settings(task_name, task_details, parameters)
+        effective_settings = merge_task_parameters(
+            {task_name: self.task_parameters.get(task_name, {RUN: {}, INPUT: {}})},
+            {task_name: settings},
+        )[task_name]
         resource_parameters: dict[str, Any] = {"qid": qid}
         if task_name == "ConfigureAll":
-            resource_parameters = {"mux_ids": settings[RUN].get("mux_ids", {}).get("value")}
+            resource_parameters = {
+                "mux_ids": effective_settings[RUN].get("mux_ids", {}).get("value")
+            }
         self._validate_resource_scope(resource_parameters)
         assert self._orchestrator is not None, "Session not initialized"
         result: dict[str, Any] = self._orchestrator.run_task(task_name, qid, settings, upstream_id)
@@ -1182,7 +1189,12 @@ class CalibService:
         try:
             from bunnet import SortDirection
 
-            from qdash.datamodel.task import CalibDataModel, ParameterModel, TaskTypes
+            from qdash.datamodel.task import (
+                CalibDataModel,
+                ParameterModel,
+                TaskResultOutputParameterModel,
+                TaskTypes,
+            )
             from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
             docs = (
@@ -1204,10 +1216,15 @@ class CalibService:
 
                 for name, value in doc.output_parameters.items():
                     try:
-                        parameter = (
+                        output_parameter = (
                             value
-                            if isinstance(value, ParameterModel)
-                            else ParameterModel.model_validate(value)
+                            if isinstance(value, TaskResultOutputParameterModel)
+                            else TaskResultOutputParameterModel.model_validate(value)
+                        )
+                        if not output_parameter.database_updated:
+                            continue
+                        parameter = ParameterModel.model_validate(
+                            output_parameter.model_dump(exclude_none=True)
                         )
                     except Exception:
                         logger.debug(
