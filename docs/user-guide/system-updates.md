@@ -49,11 +49,21 @@ The command must exit successfully. If it does not, do not deploy that tag.
 
 ## Deploy the Release
 
-Stop QDash, advance `main` to the target without creating a merge commit, validate Compose, and
-rebuild the stack:
+Stop QDash before advancing `main`:
 
 ```bash
 docker compose down
+```
+
+When upgrading a Copilot deployment from Pi 1.3 to Pi 1.4, back up the stopped
+`agent-runtime-state` Docker volume before continuing. Pi 1.4 migrates saved conversations when
+the new runtime first opens them. A previous release cannot read the migrated volume; restore the
+pre-update volume backup before starting that release during a rollback. How this works:
+[Copilot architecture](../developer-guide/copilot/architecture.md#durable-conversations).
+
+Advance `main` to the target without creating a merge commit, validate Compose, and rebuild:
+
+```bash
 git merge --ff-only <target-tag>
 docker compose config --quiet
 docker compose up -d --build

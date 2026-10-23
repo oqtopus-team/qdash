@@ -45,6 +45,25 @@ Each open conversation gets its own tool registry and a private temporary pi-qda
 
 The pinned pi-qdash version accepts a configuration file rather than an injected client. The runtime creates the profile in a private directory with a mode-0600 file and removes it when the conversation closes, including failures. Docker Compose mounts `/tmp` as tmpfs so these credentials do not enter the container's persistent filesystem. Deployments outside Compose should provide an equivalent memory-backed temporary directory.
 
+## Durable conversations
+
+`agent-runtime/src/runtime.ts` opens one Pi SQLite store per user and session in the
+`agent-runtime-state` volume. Pi 1.4 upgrades existing stores to schema version 2 on first open;
+Pi 1.3 cannot reopen an upgraded store. Back up the stopped volume before upgrading, and restore
+that backup before a rollback to Pi 1.3. See [System Updates](../../user-guide/system-updates.md#deploy-the-release).
+
+Each chat model in `config/copilot/chat.yaml` gets compaction thresholds based on its own context
+window and output limit. `agent-runtime/src/models-config.ts` resolves those models at startup,
+and `agent-runtime/src/budget.ts` calculates their thresholds. The runtime gives Pi 1.4 a
+`modelOverrides` entry for each resolved model, so a resumed task uses the budget of the model it
+started with even if the next request selects another model. The selected request model also gets
+an entry when it is absent from the startup list.
+
+Pi reports session failures, faulted or parked tasks, migrations, and extension errors through
+`onReport`. `agent-runtime/src/durable-report.ts` logs the report type, task and extension names,
+and error type under the hashed session filename. It omits error messages, prompts, tool
+arguments, and user identifiers from these logs.
+
 ## Page context and editor edits
 
 A chat from the sidebar or the floating window tells the assistant what the user has open.

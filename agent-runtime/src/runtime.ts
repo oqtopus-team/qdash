@@ -33,7 +33,7 @@ import {
   TRUSTED_EXTENSION_PACKAGES,
   isExperimentalWriteTool,
 } from "./allowed-tools.ts";
-import { compactionBudget } from "./budget.ts";
+import { compactionBudget, type CompactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { ExecWorkspace, execConfigFromEnv, removeWorkspace, WORKSPACE_TOOL_NAMES } from "./exec-env.ts";
@@ -71,8 +71,9 @@ import {
   type ToolRun,
 } from "./evaluate.ts";
 import { formatSettledDetail } from "./events.ts";
+import { logDurableReport } from "./durable-report.ts";
 import { fetchKnowledgeDraft, fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
-import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
+import { chatCompactionOverrides, PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
 import {
   buildPageContextSection,
   buildProposeCodeEditTool,
@@ -201,6 +202,7 @@ export class SharedRuntime {
     private readonly enabledTools: ReadonlyMap<string, EnabledTool>,
     /** QDash's system prompt for chats, as built at startup. */
     private readonly systemPrompt: string,
+    private readonly modelCompactionOverrides: Readonly<Record<string, CompactionBudget>> = {},
   ) {}
 
   /**
@@ -377,7 +379,18 @@ export class SharedRuntime {
       }
     }
 
-    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames, enabledTools, systemPrompt);
+    const modelCompactionOverrides = chatCompactionOverrides(
+      readFileSync(CHAT_CONFIG_PATH, "utf8"),
+      (provider, modelId) => modelRuntime.getModel(provider, modelId),
+    );
+    return new SharedRuntime(
+      modelRuntime,
+      buildChatRegistry,
+      toolNames,
+      enabledTools,
+      systemPrompt,
+      modelCompactionOverrides,
+    );
   }
 
   /** A configured model named by the request, or none when the request names none. */
@@ -663,7 +676,8 @@ export class SharedRuntime {
       contextWindow,
       maxTokens,
     } = this.resolveModelWithLimits(request.provider, request.modelName);
-    const path = join(STATE_DIR, sessionStorageName(request.ownerId, request.sessionId));
+    const storageName = sessionStorageName(request.ownerId, request.sessionId);
+    const path = join(STATE_DIR, storageName);
     const connection = await createQDashConnection(auth);
     const workspace = EXEC_CONFIG
       ? new ExecWorkspace(EXEC_CONFIG, request.ownerId, request.sessionId)
@@ -695,17 +709,23 @@ export class SharedRuntime {
         request.userInstructions,
         request.pageContext,
       );
+      const selectedBudget = compactionBudget(contextWindow, maxTokens);
       harness = await Harness.open(
         await openNodeSqliteStorage(path),
         {
           models: this.modelRuntime,
           registry,
           ...(workspace ? { env: workspaceEnv } : {}),
+          onReport: (error, info) => logDurableReport(storageName, error, info),
           settings: {
             stream: { timeoutMs: MODEL_STREAM_TIMEOUT_MS },
             compaction: {
               enabled: true,
-              ...compactionBudget(contextWindow, maxTokens),
+              ...selectedBudget,
+              modelOverrides: {
+                ...this.modelCompactionOverrides,
+                [`${model.provider}/${model.modelId}`]: selectedBudget,
+              },
             },
           },
         },
