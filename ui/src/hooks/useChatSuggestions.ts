@@ -2,12 +2,14 @@
 
 import { useMemo } from "react";
 import {
+  FileCode,
   FlaskConical,
   GitCompare,
   History,
   LineChart,
   ListChecks,
   Sparkles,
+  Terminal,
   Workflow,
   type LucideIcon,
 } from "lucide-react";
@@ -47,7 +49,10 @@ function label(qid: string): string {
  *
  * Chips and qubit ids differ per deployment, so the examples name the first
  * qubits of the active chip instead of a fixed "Q00". The pipeline suggestion
- * asks for a plan, which is read-only; running it is a separate approval.
+ * asks for a plan, which is read-only; running it is a separate approval. The
+ * workspace suggestion has the model write and run a script (code streams into
+ * the trace as it is typed), and the flow suggestion ends in a save that waits
+ * for approval; neither touches hardware.
  */
 export function buildGeneralSuggestions(chipId: string | null, qids: string[]): ChatSuggestion[] {
   const [a, b] = qids;
@@ -60,8 +65,12 @@ export function buildGeneralSuggestions(chipId: string | null, qids: string[]): 
     a !== undefined
       ? `Plan a calibration${on}: coarse one-qubit check on ${b !== undefined ? `qubits ${a} and ${b}` : `qubit ${a}`}, then T1 and T2 on the ones that pass`
       : `Plan a calibration${on}: coarse one-qubit check on MUX 0, then T1 and T2 on the ones that pass`;
+  const workspace = `Fetch ${qa}'s recent T1 values, write a Python script in the workspace that fits their drift, and run it`;
+  const flow = `Write a flow from the "simple" template that runs CheckT1 on ${a !== undefined ? `qubit ${a}` : "qubit 0"} and save it as t1_check_${a ?? "0"}`;
   return [
     { text: pipeline, Icon: Workflow },
+    { text: workspace, Icon: Terminal },
+    { text: flow, Icon: FileCode },
     { text: `Show T1 trend for ${qa}`, Icon: LineChart },
     { text: `What are ${qa}'s current parameters?`, Icon: ListChecks },
     { text: `Compare T1 and T2 for ${qb}`, Icon: GitCompare },

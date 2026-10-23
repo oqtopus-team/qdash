@@ -3,11 +3,18 @@
 import Link from "next/link";
 
 import { useEffect, useState } from "react";
-import { Brain, Check, Loader2, Wrench, X, Code2, LineChart, Database } from "lucide-react";
+import { Brain, Check, Loader2, PenLine, X } from "lucide-react";
 import type { ChatTrace as ChatTraceData, ToolEvaluation, TraceStep } from "@/types/copilotChat";
-import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
 import { FigureStrip } from "@/components/features/chat/ChatFigures";
+import {
+  ToolDetails,
+  hasDetails,
+  isWorkspaceTool,
+  stepPreview,
+  stepTitle,
+  toolIcon,
+} from "@/components/features/chat/ToolStepDetails";
 import {
   ExecutionProgress,
   executionIdFromArgs,
@@ -36,52 +43,6 @@ function useNow(active: boolean): number {
     return () => clearInterval(id);
   }, [active]);
   return now;
-}
-
-function toolIcon(tool: string) {
-  if (tool.includes("python")) return Code2;
-  if (tool.includes("chart") || tool.includes("timeseries") || tool.includes("plot")) {
-    return LineChart;
-  }
-  if (tool.startsWith("qdash_")) return Database;
-  return Wrench;
-}
-
-/** A short one-line hint of what the tool was asked, e.g. `qid: 0, parameter: t1`. */
-function argsPreview(args: unknown): string | null {
-  if (!args || typeof args !== "object") return null;
-  const entries = Object.entries(args as Record<string, unknown>).filter(
-    ([, v]) => v !== null && v !== undefined && v !== "",
-  );
-  if (entries.length === 0) return null;
-  const text = entries
-    .map(([k, v]) => {
-      const value = typeof v === "string" ? v.split("\n")[0] : JSON.stringify(v);
-      return `${k}: ${value}`;
-    })
-    .join(", ");
-  return text.length > 90 ? `${text.slice(0, 90)}…` : text;
-}
-
-function ToolArgs({ args }: { args: unknown }) {
-  if (args === undefined || args === null) return null;
-  if (typeof args === "string") {
-    return <CodeBlock language="json">{args}</CodeBlock>;
-  }
-  const record = args as Record<string, unknown>;
-  // run_python and similar tools carry source code; show it as code.
-  if (typeof record.code === "string") {
-    const { code, ...rest } = record;
-    return (
-      <>
-        <CodeBlock language="python">{code}</CodeBlock>
-        {Object.keys(rest).length > 0 && (
-          <CodeBlock language="json">{JSON.stringify(rest, null, 2)}</CodeBlock>
-        )}
-      </>
-    );
-  }
-  return <CodeBlock language="json">{JSON.stringify(args, null, 2)}</CodeBlock>;
 }
 
 /** Which model judged a plot and, on request, exactly what it was sent. */
@@ -120,25 +81,37 @@ function EvaluationPanel({ evaluation }: { evaluation: ToolEvaluation }) {
 function ToolStepRow({
   step,
   now,
+  live,
   isLast,
 }: {
   step: Extract<TraceStep, { kind: "tool" }>;
   now: number;
+  /** The turn is still streaming; code and output stay in view instead of folding. */
+  live: boolean;
   isLast?: boolean;
 }) {
   const Icon = toolIcon(step.tool);
-  const preview = argsPreview(step.args);
+  const preview = stepPreview(step);
+  // Code written live stays open while it runs and when its output lands;
+  // folding it the moment the call starts would hide what the user just watched.
+  const stayOpen = live && (isWorkspaceTool(step.tool) || step.tool === "qdash_save_flow");
   const elapsed = (step.endedAt ?? now) - step.startedAt;
-  const hasArgs = step.args !== undefined && step.args !== null;
+  const details = hasDetails(step);
+  const drafting = step.status === "drafting";
   // While the assistant waits on an execution, show its tasks and figures as they land.
   const waitingOn = executionIdFromArgs(step.args);
 
   return (
     <ChainOfThoughtStep
       isLast={isLast}
-      status={step.status}
+      status={step.status === "drafting" ? "running" : step.status}
+      // A call being written opens its row; a workspace step stays open for the whole live turn.
+      isStreaming={drafting && !stayOpen}
+      defaultOpen={stayOpen}
       marker={
-        step.status === "running" ? (
+        drafting ? (
+          <PenLine className="w-3 h-3" />
+        ) : step.status === "running" ? (
           <Loader2 className="w-3 h-3 animate-spin" />
         ) : step.status === "error" ? (
           <X className="w-3 h-3" />
@@ -148,17 +121,17 @@ function ToolStepRow({
       }
     >
       <ChainOfThoughtTrigger
-        hideChevron={!hasArgs}
-        disabled={!hasArgs}
-        className={hasArgs ? "" : "cursor-default"}
+        hideChevron={!details || drafting}
+        disabled={!details}
+        className={details ? "" : "cursor-default"}
       >
         <Icon className="w-3.5 h-3.5 shrink-0 text-base-content/50" />
         <span
           className={`font-medium shrink-0 ${
-            step.status === "running" ? "loader-text-shimmer" : "text-base-content/80"
+            step.status === "running" || drafting ? "loader-text-shimmer" : "text-base-content/80"
           }`}
         >
-          {step.label}
+          {stepTitle(step)}
         </span>
         {preview && (
           <span className="truncate font-mono text-[11px] text-base-content/40">{preview}</span>
@@ -175,9 +148,9 @@ function ToolStepRow({
         <FigureStrip paths={step.figures} compact className="mt-1.5" />
       )}
       {step.evaluation && <EvaluationPanel evaluation={step.evaluation} />}
-      {hasArgs && (
+      {details && (
         <ChainOfThoughtContent>
-          <ToolArgs args={step.args} />
+          <ToolDetails step={step} />
         </ChainOfThoughtContent>
       )}
     </ChainOfThoughtStep>
@@ -230,7 +203,9 @@ function TraceSteps({ steps, live }: { steps: TraceStep[]; live: boolean }) {
   return (
     <ChainOfThought>
       {steps.map((step, i) => {
-        if (step.kind === "tool") return <ToolStepRow key={step.id} step={step} now={now} />;
+        if (step.kind === "tool") {
+          return <ToolStepRow key={step.id} step={step} now={now} live={live} />;
+        }
         if (step.kind === "thinking") {
           return <ThinkingStepRow key={`thinking-${i}`} step={step} now={now} live={live} />;
         }

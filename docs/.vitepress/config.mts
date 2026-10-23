@@ -192,7 +192,7 @@ export default withMermaid(
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },
                 { text: "Knowledge Layout", link: "/developer-guide/copilot/knowledge-layout" },
                 { text: "Calibration Evaluation", link: "/developer-guide/copilot/evaluation" },
-                { text: "Python Sandbox", link: "/developer-guide/copilot/python-sandbox" },
+                { text: "Workspace", link: "/developer-guide/copilot/workspace" },
                 { text: "Chat Streaming", link: "/developer-guide/copilot/chat-streaming" },
               ],
             },

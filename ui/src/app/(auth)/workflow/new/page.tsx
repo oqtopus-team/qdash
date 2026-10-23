@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 
@@ -13,6 +13,7 @@ import type { SaveFlowRequest, FlowTemplate, SaveFlowResponse } from "@/schemas"
 import type { AxiosResponse } from "axios";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { useListChips } from "@/client/chip/chip";
 import { getFlowTemplate, listFlowTemplates, saveFlow } from "@/client/flow/flow";
 
@@ -38,6 +39,26 @@ export default function NewFlowPage() {
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+
+  // The chat sidebar sees the flow being written here and can propose its code.
+  const { registerPage } = useChatDock();
+  const pageState = useRef({ name, chipId, code });
+  pageState.current = { name, chipId, code };
+  useEffect(
+    () =>
+      registerPage({
+        current: () => {
+          const { name, chipId, code } = pageState.current;
+          return {
+            path: "/workflow/new",
+            title: "New workflow",
+            flow: { name: name || "new_flow", chipId: chipId || undefined, code, dirty: true },
+          };
+        },
+        applyCode: setCode,
+      }),
+    [registerPage],
+  );
 
   // Fetch current user
   const { data: userData } = useGetCurrentUser();

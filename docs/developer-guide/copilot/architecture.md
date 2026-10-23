@@ -9,7 +9,7 @@ QDash Copilot is an AI-powered assistant that helps experimentalists interpret q
 
 Both are the same chat with the same planner; the first just opens with a task result as its context. The evaluation model's recorded judgements are a separate thing (see [Calibration Evaluation](./evaluation.md)). Forum AI replies are one planner turn each on the same runtime.
 
-Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a sandboxed Python tool served by the API, and SSE streaming for progress.
+Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a shell and files per conversation in a separate container (the [workspace](./workspace.md)), and SSE streaming for progress.
 
 ## Component Diagram
 
@@ -19,11 +19,11 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 
 | File | Responsibility |
 |------|---------------|
-| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/chat/stream` (general and task chats), `/sandbox/python`, chat sessions |
+| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/chat/stream` (general and task chats), chat sessions |
 | `src/qdash/copilot/runtime.py` | Data loading: `build_task_context()`, `build_images_sent_metadata()`, qubit/task/history queries |
 | `src/qdash/api/services/pi_chat_service.py` | Runtime bridge: request payloads, the task chat's opening message and figures, NDJSON to SSE translation, `thread_reply` / `complete_once` for forum reply turns |
 | `src/qdash/copilot/` | Shared Copilot runtime used outside the API process |
-| `src/qdash/copilot/tooling/sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
+| `agent-runtime/src/exec-env.ts` | The workspace: one `agent-exec` connection per conversation behind `bash`, `read`, `write`, `edit` |
 | `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`); request schemas |
 | `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter |
 | `src/qdash/copilot/config/settings.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `TaskChatConfig`; YAML loading with local override |
@@ -41,9 +41,29 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 
 The API forwards the authenticated user's access token and selected `X-Project-Id` to the Pi runtime on each chat or analysis turn, including approval responses. When no project header is supplied, it uses the user's default project. The internal `AGENT_RUNTIME_TOKEN` still authenticates API-to-runtime requests; user credentials travel in separate internal headers and are never added to model input or durable conversation state.
 
-Each open conversation gets its own tool registry and a private temporary pi-qdash profile. Read tools, approved writes, and the Python sandbox use that user's credentials. The runtime overrides connection arguments supplied by a model or an older stored tool call and never falls back to `QDASH_API_TOKEN` or an administrator login. QDash API endpoints enforce the user's permissions.
+Each open conversation gets its own tool registry and a private temporary pi-qdash profile. Read tools and approved writes use that user's credentials; the workspace container never sees them. The runtime overrides connection arguments supplied by a model or an older stored tool call and never falls back to `QDASH_API_TOKEN` or an administrator login. QDash API endpoints enforce the user's permissions.
 
 The pinned pi-qdash version accepts a configuration file rather than an injected client. The runtime creates the profile in a private directory with a mode-0600 file and removes it when the conversation closes, including failures. Docker Compose mounts `/tmp` as tmpfs so these credentials do not enter the container's persistent filesystem. Deployments outside Compose should provide an equivalent memory-backed temporary directory.
+
+## Page context and editor edits
+
+A chat from the sidebar or the floating window tells the assistant what the user has open.
+Every turn carries `ChatRequest.page` (`PageContext`: route, title, and on the Workflow editor
+the flow's name, chip, and the editor's current text, unsaved changes included); the runtime
+rebuilds a system prompt section from it each turn (`agent-runtime/src/page-context.ts`,
+`buildPageContextSection`). The chat page itself sends none.
+
+Pages register what they show with the chat dock (`ChatDockContext.registerPage`): the
+registration reads the page's state when a turn is sent, so an editor's buffer is current, and
+may accept code back (`applyCode`). Without a registration the dock sends the route and the
+document title.
+
+On the Workflow editor the runtime also offers `propose_code_edit`: the model passes the
+complete new file and a one-line summary, the call ends the turn, and the chat renders an
+`edit` block (`EditProposalCard`) with a diff against what the editor holds now. **Apply to
+editor** replaces the buffer and unlocks the editor; saving stays with the user and goes through
+the editor's Save, so `POST /flows` validation and deployment registration are unchanged. The
+runtime never writes the flow; `qdash_save_flow` stays for flows written from the chat alone.
 
 ## Configuration
 

@@ -30,6 +30,12 @@ describe("buildGeneralSuggestions", () => {
     expect(texts[0]).toBe(
       "Plan a calibration on 64Qv3: coarse one-qubit check on qubits 0 and 1, then T1 and T2 on the ones that pass",
     );
+    expect(texts[1]).toBe(
+      "Fetch Q00's recent T1 values, write a Python script in the workspace that fits their drift, and run it",
+    );
+    expect(texts[2]).toBe(
+      'Write a flow from the "simple" template that runs CheckT1 on qubit 0 and save it as t1_check_0',
+    );
     expect(texts).toContain("Show T1 trend for Q00");
     expect(texts).toContain("Compare T1 and T2 for Q01");
   });
@@ -48,6 +54,7 @@ describe("buildGeneralSuggestions", () => {
       "Plan a calibration: coarse one-qubit check on MUX 0, then T1 and T2 on the ones that pass",
     );
     expect(texts).toContain("Show T1 trend for Q00");
+    expect(texts[2]).toMatch(/runs CheckT1 on qubit 0 and save it as t1_check_0$/);
   });
 });
 

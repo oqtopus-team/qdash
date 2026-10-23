@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { Type } from "typebox";
 
-import { buildQDashExtension, decisionMessage } from "../src/durable-tools.ts";
+import { boundToolText, buildQDashExtension, decisionMessage, MAX_TOOL_TEXT_CHARS, ToolCancelled, untilAborted } from "../src/durable-tools.ts";
 
 const connection = {
   toolArgs: {
@@ -344,4 +344,47 @@ test("a trusted installed package gets the checkout treatment", () => {
     ["qcal_evaluate"],
   );
   assert.equal(extension.tools[0].replay, "safe");
+});
+
+test("a tool's text reaches the model without inline images and within the budget", async () => {
+  const image = `data:image/png;base64,${"A".repeat(5000)}`;
+  const long = "x".repeat(MAX_TOOL_TEXT_CHARS + 500);
+  const tool = registered("qdash_get_task_knowledge");
+  tool.definition.execute = async () => ({
+    content: [
+      { type: "text", text: `# CheckRabi\n![plot](${image})\nAxes: time` },
+      { type: "text", text: long },
+      { type: "image", data: "ignored", mimeType: "image/png" },
+    ],
+    details: {},
+  });
+  const { extension } = buildQDashExtension(
+    [{ tools: new Map([["qdash_get_task_knowledge", tool]]) }],
+    {},
+    "/tmp/work",
+    connection,
+  );
+  const result = await extension.tools[0].execute({}, { callId: "c1" }, { abortSignal: undefined });
+  assert.equal(result.output[0].text, "# CheckRabi\n![plot](data:… (inline image omitted; QDash shows it))\nAxes: time");
+  assert.ok(result.output[1].text.length < MAX_TOOL_TEXT_CHARS + 200);
+  assert.match(result.output[1].text, /output truncated to 24000 characters/);
+  assert.deepEqual(result.output[2], { type: "image", data: "ignored", mimeType: "image/png" });
+  assert.equal(boundToolText("short", "t"), "short");
+});
+
+test("a cancelled turn does not wait for a tool that ignores the signal", async () => {
+  const tool = registered("qdash_wait_execution");
+  tool.definition.execute = () => new Promise(() => {}); // polls forever, never looks at the signal
+  const { extension } = buildQDashExtension(
+    [{ tools: new Map([["qdash_wait_execution", tool]]) }],
+    {},
+    "/tmp/work",
+    connection,
+  );
+  const controller = new AbortController();
+  const call = extension.tools[0].execute({}, { callId: "c1" }, { abortSignal: controller.signal });
+  setTimeout(() => controller.abort(), 10);
+  await assert.rejects(call, (error) => error instanceof ToolCancelled && /keeps running in QDash/.test(error.message));
+  await assert.rejects(untilAborted(new Promise(() => {}), controller.signal, "x"), ToolCancelled);
+  assert.equal(await untilAborted(Promise.resolve(3), new AbortController().signal, "x"), 3);
 });

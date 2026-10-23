@@ -1,7 +1,18 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApprovalCard, AskCard, type InteractionState } from "../ChatInteractionCards";
+import {
+  ApprovalCard,
+  AskCard,
+  EditProposalCard,
+  type InteractionState,
+} from "../ChatInteractionCards";
+
+vi.mock("@/components/ui/PierreDiffViewer", () => ({
+  PierreDiffViewer: ({ oldContent, newContent }: { oldContent: string; newContent: string }) => (
+    <div data-testid="diff">{`${oldContent}=>${newContent}`}</div>
+  ),
+}));
 
 afterEach(cleanup);
 
@@ -76,5 +87,97 @@ describe("ApprovalCard", () => {
     );
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getByText("Approved")).toBeTruthy();
+  });
+
+  it("shows a flow about to be saved as code, not as a JSON string", () => {
+    const code = "from prefect import flow\n\n@flow\ndef t1_sweep():\n    pass\n";
+    render(
+      <ApprovalCard
+        approval={{
+          id: "call-2",
+          tool: "qdash_save_flow",
+          label: "QDash Save Flow",
+          args: {
+            name: "t1_sweep",
+            chipId: "64Qv3",
+            code,
+            description: "T1 across the chip",
+            tags: ["check"],
+          },
+        }}
+        state={state()}
+      />,
+    );
+    const preview = screen.getByTestId("flow-save-preview");
+    expect(preview.textContent).toContain("t1_sweep");
+    expect(preview.textContent).toContain("64Qv3");
+    expect(preview.textContent).toContain("T1 across the chip");
+    expect(preview.textContent).toContain("def t1_sweep():");
+    expect(screen.queryByText(/"code"/)).toBeNull();
+    expect(screen.queryByText("code", { selector: "dt" })).toBeNull();
+  });
+});
+
+describe("EditProposalCard", () => {
+  const edit = {
+    summary: "Add a T2 step",
+    code: "new code\n",
+    flowName: "t1_check",
+    chipId: "chip1",
+    pagePath: "/workflow/t1_check",
+  };
+
+  it("shows the diff against the open editor and applies the code there", () => {
+    const applyCode = vi.fn(() => true);
+    render(
+      <EditProposalCard
+        edit={edit}
+        state={state({ applyCode, currentCode: () => "old code\n" })}
+      />,
+    );
+    expect(screen.getByText("Add a T2 step")).toBeTruthy();
+    expect(screen.getByTestId("diff").textContent).toBe("old code\n=>new code\n");
+    fireEvent.click(screen.getByRole("button", { name: "Apply to editor" }));
+    expect(applyCode).toHaveBeenCalledWith(edit);
+    expect(screen.getByText(/Applied to the editor/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Apply to editor" })).toBeNull();
+  });
+
+  it("shows the code alone and says where to apply it when no editor is open", () => {
+    render(<EditProposalCard edit={edit} state={state()} />);
+    expect(screen.queryByTestId("diff")).toBeNull();
+    expect(screen.getByText(/Open this flow in the Workflow editor/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Apply to editor" })).toBeNull();
+  });
+
+  it("can be discarded", () => {
+    render(
+      <EditProposalCard
+        edit={edit}
+        state={state({ applyCode: () => true, currentCode: () => "x" })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(screen.getByText("Discarded")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Discard" })).toBeNull();
+  });
+
+  it("does not offer Apply when the open editor is a different target", () => {
+    const applyCode = vi.fn();
+    render(<EditProposalCard edit={edit} state={state({ applyCode, currentCode: () => null })} />);
+    expect(screen.queryByRole("button", { name: "Apply to editor" })).toBeNull();
+    expect(screen.queryByTestId("diff")).toBeNull();
+    expect(applyCode).not.toHaveBeenCalled();
+  });
+
+  it("does not report success if the target changed before the click", () => {
+    render(
+      <EditProposalCard
+        edit={edit}
+        state={state({ applyCode: () => false, currentCode: () => "old" })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply to editor" }));
+    expect(screen.queryByText(/Applied to the editor/)).toBeNull();
   });
 });

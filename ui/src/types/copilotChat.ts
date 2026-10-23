@@ -43,8 +43,34 @@ export interface ApprovalRequest {
   args: Record<string, unknown>;
 }
 
+/** A change the assistant proposes to the code open in the Workflow editor; the user applies it there. */
+export interface EditProposal {
+  summary: string;
+  /** The complete new file. */
+  code: string;
+  flowName: string;
+  chipId: string | null;
+  pagePath: string;
+}
+
+/** The flow open in the Workflow editor, read when a turn is sent. */
+interface FlowEditorContext {
+  name: string;
+  chipId?: string;
+  /** The editor's current text, unsaved changes included. */
+  code: string;
+  dirty: boolean;
+}
+
+/** What the user has open while chatting from the sidebar or floating window; sent with every turn. */
+export interface PageContext {
+  path: string;
+  title: string;
+  flow?: FlowEditorContext;
+}
+
 interface ContentBlock {
-  type: "text" | "chart" | "ask" | "approval";
+  type: "text" | "chart" | "ask" | "approval" | "edit";
   content: string | null;
   chart: {
     data: Record<string, unknown>[];
@@ -52,6 +78,7 @@ interface ContentBlock {
   } | null;
   ask?: AskRequest;
   approval?: ApprovalRequest;
+  edit?: EditProposal;
 }
 
 export interface BlocksResult {
@@ -86,9 +113,18 @@ export type TraceStep =
       tool: string;
       label: string;
       args?: unknown;
-      status: "running" | "done" | "error";
+      /** `drafting`: the model is still writing the call; `draft` holds what it has typed. */
+      status: "drafting" | "running" | "done" | "error";
       startedAt: number;
       endedAt?: number;
+      /** Arguments written so far, by JSON path such as `content` or `path` (while drafting). */
+      draft?: Record<string, string>;
+      /** The call's index in the model's message, which argument deltas name (while drafting). */
+      draftIndex?: number;
+      /** What a workspace tool (bash, read, write, edit) answered; the tail when long. */
+      output?: string;
+      /** A command's exit status (bash). */
+      exitCode?: number;
       /** QDash figure paths the tool fetched, shown inline in the chat. */
       figures?: string[];
       /** What an evaluation tool sent its model (qcal_evaluate). */

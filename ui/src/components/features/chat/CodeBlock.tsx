@@ -27,6 +27,12 @@ hljs.registerAliases(["yml"], { languageName: "yaml" });
 interface CodeBlockProps {
   language?: string;
   children: string;
+  /** Tighter margins and padding, for code inside a trace step or a card. */
+  compact?: boolean;
+  /** Shown in the header instead of the language, such as a file name. */
+  title?: string;
+  /** A blinking caret after the code, while it is still being written. */
+  caret?: boolean;
 }
 
 /** Highlighted HTML for a known language, or null to render the code as plain text. */
@@ -39,7 +45,13 @@ function highlight(code: string, language?: string): string | null {
   }
 }
 
-export function CodeBlock({ language, children }: CodeBlockProps) {
+export function CodeBlock({
+  language,
+  children,
+  compact = false,
+  title,
+  caret = false,
+}: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
@@ -57,11 +69,22 @@ export function CodeBlock({ language, children }: CodeBlockProps) {
   const html = useMemo(() => highlight(children, language), [children, language]);
 
   return (
-    <div className="relative group my-3 rounded-xl overflow-hidden border border-base-300/70 bg-base-200/80 not-prose">
+    <div
+      className={`relative group overflow-hidden border border-base-300/70 bg-base-200/80 not-prose ${
+        compact ? "my-1.5 rounded-lg" : "my-3 rounded-xl"
+      }`}
+    >
       {/* Header bar */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-base-300/30 text-xs border-b border-base-300/50">
-        <span className="font-mono text-base-content/50 text-[11px] lowercase tracking-wide">
-          {language || "code"}
+        <span className="font-mono text-base-content/50 text-[11px] tracking-wide">
+          {title ? (
+            <>
+              <span className="text-base-content/70">{title}</span>
+              {language && <span className="lowercase"> · {language}</span>}
+            </>
+          ) : (
+            <span className="lowercase">{language || "code"}</span>
+          )}
         </span>
         <button
           type="button"
@@ -85,12 +108,21 @@ export function CodeBlock({ language, children }: CodeBlockProps) {
         </button>
       </div>
       {/* Code content */}
-      <pre className="overflow-x-auto px-4 py-3 text-xs leading-relaxed font-mono">
+      <pre
+        className={`overflow-x-auto font-mono leading-relaxed ${
+          compact ? "px-3 py-2 text-[11px]" : "px-4 py-3 text-xs"
+        }`}
+      >
         {html !== null ? (
           // hljs escapes the source, so its output is safe to inject.
           <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
         ) : (
           <code>{children}</code>
+        )}
+        {caret && (
+          <span className="animate-pulse text-primary" aria-hidden="true">
+            ▍
+          </span>
         )}
       </pre>
     </div>
