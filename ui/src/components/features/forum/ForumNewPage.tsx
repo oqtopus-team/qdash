@@ -1,6 +1,9 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -30,6 +33,7 @@ import { useProject } from "@/contexts/ProjectContext";
 import { useForumAiReply } from "@/hooks/useForumAiReply";
 import { useForumLabels } from "@/hooks/useForumLabels";
 import { useImageUpload } from "@/hooks/useImageUpload";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import {
@@ -73,6 +77,36 @@ export function parseLabels(values: string[]): string[] {
   return result;
 }
 
+/** Zod schema for the new thread form; limits mirror the backend ForumPostCreate. */
+const newThreadSchema = z.object({
+  category: z
+    .string()
+    .trim()
+    .min(1, "Category is required")
+    .regex(
+      /^[a-z0-9][a-z0-9_-]{0,63}$/,
+      "Category must be lowercase letters, numbers, hyphens or underscores (64 characters max)",
+    ),
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title is required")
+    .max(200, "Title must be 200 characters or fewer"),
+  content: z
+    .string()
+    .trim()
+    .min(1, "Content is required")
+    .max(8000, "Content must be 8000 characters or fewer"),
+  labels: z.array(z.string()),
+  assigneeUsername: z.string().trim().max(64, "Assignee must be 64 characters or fewer"),
+  chipId: z.string().trim().max(128, "Chip ID must be 128 characters or fewer"),
+  targetType: z.enum(["qubit", "coupling"]),
+  targetId: z.string().trim().max(128, "Target ID must be 128 characters or fewer"),
+  cooldownId: z.string().trim().max(128, "Cooldown ID must be 128 characters or fewer"),
+});
+
+export type NewThreadFormValues = z.infer<typeof newThreadSchema>;
+
 /** Page for composing a new forum thread. */
 export function ForumNewPage() {
   const router = useRouter();
@@ -87,22 +121,41 @@ export function ForumNewPage() {
   const forumReturnHref = fromQuery ? `/forum?${fromQuery.replace(/^\?/, "")}` : "/forum";
 
   const initialTargetType = normalizeTargetType(searchParams.get("target_type"));
-  const [category, setCategory] = useState(searchParams.get("category") ?? "qubit");
-  const [title, setTitle] = useState(searchParams.get("title") ?? "");
-  const [content, setContent] = useState(searchParams.get("content") ?? "");
-  const [contentBlocks, setContentBlocks] = useState<Record<string, unknown>[]>([]);
-  const [selectedLabels, setSelectedLabels] = useState<string[]>(() =>
-    parseLabels(searchParams.getAll("labels")),
-  );
-  const [targetDraftChipId, setTargetDraftChipId] = useState(searchParams.get("chip_id") ?? "");
-  const [targetDraftType, setTargetDraftType] = useState<"qubit" | "coupling">(
-    initialTargetType ?? (searchParams.get("category") === "coupling" ? "coupling" : "qubit"),
-  );
-  const [targetDraftId, setTargetDraftId] = useState(searchParams.get("target_id") ?? "");
-  const [cooldownDraftId, setCooldownDraftId] = useState(searchParams.get("cooldown_id") ?? "");
+  const contentBlocksRef = useRef<Record<string, unknown>[]>([]);
+  const [serverError, setServerError] = useState<string | null>(null);
   // The task result this thread is about, when opened from a result page.
   const linkedTaskId = searchParams.get("task_id")?.trim() || null;
-  const [assigneeUsername, setAssigneeUsername] = useState("");
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    getValues,
+    formState: { errors, isSubmitted, isSubmitting },
+  } = useForm<NewThreadFormValues>({
+    resolver: zodResolver(newThreadSchema),
+    defaultValues: {
+      category: searchParams.get("category") ?? "qubit",
+      title: searchParams.get("title") ?? "",
+      content: searchParams.get("content") ?? "",
+      labels: parseLabels(searchParams.getAll("labels")),
+      assigneeUsername: "",
+      chipId: searchParams.get("chip_id") ?? "",
+      targetType:
+        initialTargetType ?? (searchParams.get("category") === "coupling" ? "coupling" : "qubit"),
+      targetId: searchParams.get("target_id") ?? "",
+      cooldownId: searchParams.get("cooldown_id") ?? "",
+    },
+  });
+  const category = watch("category");
+  const content = watch("content");
+  const selectedLabels = watch("labels");
+  const assigneeUsername = watch("assigneeUsername");
+  const targetDraftChipId = watch("chipId");
+  const targetDraftType = watch("targetType");
+  const targetDraftId = watch("targetId");
+  const cooldownDraftId = watch("cooldownId");
 
   const { data: categoriesResponse } = useListForumCategories(undefined, {
     query: { staleTime: 60_000 },
@@ -169,61 +222,94 @@ export function ForumNewPage() {
 
   /** Toggles a label in the new-thread selection. */
   const toggleLabel = (label: string) => {
-    setSelectedLabels((current) => {
-      if (current.includes(label)) return current.filter((item) => item !== label);
-      return [...current, label];
-    });
+    const current = getValues("labels");
+    const next = current.includes(label)
+      ? current.filter((item) => item !== label)
+      : [...current, label];
+    setValue("labels", next);
   };
 
+  /** Resets the target chip, type, id and cooldown to their defaults. */
   const clearTargetMetadata = () => {
-    setTargetDraftChipId("");
-    setTargetDraftType("qubit");
-    setTargetDraftId("");
-    setCooldownDraftId("");
+    setValue("chipId", "", { shouldValidate: isSubmitted });
+    setValue("targetType", "qubit", { shouldValidate: isSubmitted });
+    setValue("targetId", "", { shouldValidate: isSubmitted });
+    setValue("cooldownId", "", { shouldValidate: isSubmitted });
   };
 
-  const handleCreate = async () => {
-    const snapshot = await editorSnapshotRef.current?.();
-    const trimmedTitle = title.trim();
-    const trimmedContent = (snapshot?.markdown ?? content).trim();
-    const nextBlocks = snapshot?.blocks ?? contentBlocks;
-    if (!trimmedTitle || !trimmedContent) return;
-
-    const chipId = targetDraftChipId.trim();
-    const targetId = targetDraftId.trim();
-    const hasTarget = !!chipId && !!targetId;
-    const response = await createMutation.mutateAsync({
-      data: {
-        category,
-        title: trimmedTitle,
-        content: trimmedContent,
-        content_blocks: nextBlocks,
-        parent_id: null,
-        labels: selectedLabels,
-        assignee_username: assigneeUsername || null,
-        chip_id: hasTarget ? chipId : null,
-        target_type: hasTarget ? targetDraftType : null,
-        target_id: hasTarget ? targetId : null,
-        cooldown_id: cooldownDraftId || null,
-        task_id: linkedTaskId,
-      },
-    });
-    queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
-    if (/@qdash\b/i.test(trimmedContent)) {
-      triggerAiReply(response.data.id, trimmedContent, () => {
-        queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
+  /** Creates the thread and surfaces API failures as a server error. */
+  const submit = async (values: NewThreadFormValues) => {
+    setServerError(null);
+    const hasTarget = !!values.chipId && !!values.targetId;
+    try {
+      const response = await createMutation.mutateAsync({
+        data: {
+          category: values.category,
+          title: values.title,
+          content: values.content,
+          content_blocks: contentBlocksRef.current,
+          parent_id: null,
+          labels: values.labels,
+          assignee_username: values.assigneeUsername || null,
+          chip_id: hasTarget ? values.chipId : null,
+          target_type: hasTarget ? values.targetType : null,
+          target_id: hasTarget ? values.targetId : null,
+          cooldown_id: values.cooldownId || null,
+          task_id: linkedTaskId,
+        },
       });
+      queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
+      if (/@qdash\b/i.test(values.content)) {
+        triggerAiReply(response.data.id, values.content, () => {
+          queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
+        });
+      }
+      const detailHref = fromQuery
+        ? `/forum/${response.data.id}?from=${encodeURIComponent(fromQuery)}`
+        : `/forum/${response.data.id}`;
+      router.push(detailHref);
+    } catch (err) {
+      setServerError(getApiErrorMessage(err, "Failed to create thread"));
     }
-    const detailHref = fromQuery
-      ? `/forum/${response.data.id}?from=${encodeURIComponent(fromQuery)}`
-      : `/forum/${response.data.id}`;
-    router.push(detailHref);
   };
+
+  /** Prevents Enter in a single-line input from implicitly submitting the form. */
+  const handleFormKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    if (
+      event.key === "Enter" &&
+      event.target instanceof HTMLInputElement &&
+      !event.nativeEvent.isComposing
+    ) {
+      event.preventDefault();
+    }
+  };
+
+  /** Takes the editor snapshot, syncs it into the form, then validates and submits. */
+  const handleCreate = async (event?: React.BaseSyntheticEvent) => {
+    event?.preventDefault();
+    const snapshot = await editorSnapshotRef.current?.();
+    if (snapshot) {
+      contentBlocksRef.current = snapshot.blocks;
+      setValue("content", snapshot.markdown);
+    }
+    await handleSubmit(submit)(event);
+  };
+
+  const chipField = register("chipId");
+  const titleField = register("title");
+  /** Returns the error element id for aria-describedby when the field is invalid. */
+  const descriptionIds = (id: string, invalid: boolean) => (invalid ? `${id}-error` : undefined);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <form
+      className="mx-auto max-w-6xl"
+      onSubmit={handleCreate}
+      onKeyDown={handleFormKeyDown}
+      noValidate
+    >
       <div className="mb-6 flex min-w-0 items-start gap-3">
         <button
+          type="button"
           className="btn btn-square btn-ghost btn-sm shrink-0"
           onClick={() => router.push(forumReturnHref)}
           title="Back to Forum"
@@ -234,12 +320,20 @@ export function ForumNewPage() {
           <div className="flex min-w-0 items-start gap-2">
             <span className="badge badge-outline mt-1 shrink-0">Draft</span>
             <input
-              className="input input-bordered input-sm min-w-0 flex-1 text-xl font-bold"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              id="forum-new-title"
+              className={`input input-bordered input-sm min-w-0 flex-1 text-xl font-bold${errors.title ? " input-error" : ""}`}
+              {...titleField}
+              aria-label="Thread title"
+              aria-invalid={Boolean(errors.title)}
+              aria-describedby={descriptionIds("forum-new-title", Boolean(errors.title))}
               placeholder="Thread title"
             />
           </div>
+          {errors.title && (
+            <p id="forum-new-title-error" className="mt-1 text-xs text-error">
+              {errors.title.message}
+            </p>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
             <span>Opened by {user?.username ?? "you"}</span>
             <span>New forum thread</span>
@@ -259,27 +353,42 @@ export function ForumNewPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0 pb-8">
-          <div className="rounded-lg border border-base-300 bg-base-100 p-4">
+          <div
+            role="group"
+            aria-label="Content"
+            aria-invalid={Boolean(errors.content)}
+            aria-describedby={errors.content ? "forum-new-content-error" : undefined}
+            className="rounded-lg border border-base-300 bg-base-100 p-4"
+          >
             <ForumBlockEditor
               legacyMarkdown={content}
               onChange={(blocks, markdown) => {
-                setContentBlocks(blocks);
-                setContent(markdown);
+                contentBlocksRef.current = blocks;
+                setValue("content", markdown, { shouldValidate: isSubmitted });
               }}
               onImageUpload={uploadImage}
               snapshotRef={editorSnapshotRef}
               mentionCandidates={mentionCandidates}
             />
+            {errors.content && (
+              <p id="forum-new-content-error" role="alert" className="mt-2 text-xs text-error">
+                {errors.content.message}
+              </p>
+            )}
+            {serverError && (
+              <div role="alert" className="alert alert-error mt-2 py-2 text-sm">
+                {serverError}
+              </div>
+            )}
             <div className="mt-2 flex items-center justify-between gap-2">
               <span className="text-xs text-base-content/50">
                 Type <kbd className="kbd kbd-xs">/</kbd> for blocks. Use{" "}
                 <span className="font-mono">@username</span> to mention members.
               </span>
               <button
-                type="button"
+                type="submit"
                 className="btn btn-sm btn-primary gap-2"
-                onClick={handleCreate}
-                disabled={!title.trim() || !content.trim() || createMutation.isPending}
+                disabled={isSubmitting || createMutation.isPending}
               >
                 {createMutation.isPending ? (
                   <span className="loading loading-spinner loading-xs" />
@@ -294,14 +403,22 @@ export function ForumNewPage() {
 
         <aside className="space-y-5 border-t border-base-300 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <label
+              htmlFor="forum-new-category"
+              className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50"
+            >
               <CategoryIcon className="h-3.5 w-3.5" />
               Category
-            </div>
+            </label>
             <select
-              className="select select-bordered select-sm w-full"
+              id="forum-new-category"
+              className={`select select-bordered select-sm w-full${errors.category ? " select-error" : ""}`}
               value={category}
-              onChange={(event) => setCategory(event.target.value)}
+              onChange={(event) =>
+                setValue("category", event.target.value, { shouldValidate: isSubmitted })
+              }
+              aria-invalid={Boolean(errors.category)}
+              aria-describedby={descriptionIds("forum-new-category", Boolean(errors.category))}
             >
               <SelectedLabel />
               {categories.map((item) => (
@@ -310,21 +427,33 @@ export function ForumNewPage() {
                 </option>
               ))}
             </select>
+            {errors.category && (
+              <p id="forum-new-category-error" className="text-xs text-error">
+                {errors.category.message}
+              </p>
+            )}
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <label
+              htmlFor="forum-new-chip"
+              className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50"
+            >
               <Crosshair className="h-3.5 w-3.5" />
               Target
-            </div>
+            </label>
             <div className="space-y-2">
               <select
-                className="select select-bordered select-xs w-full"
+                id="forum-new-chip"
+                className={`select select-bordered select-xs w-full${errors.chipId ? " select-error" : ""}`}
+                name={chipField.name}
                 value={targetDraftChipId}
                 onChange={(event) => {
-                  setTargetDraftChipId(event.target.value);
-                  setCooldownDraftId("");
+                  setValue("chipId", event.target.value, { shouldValidate: isSubmitted });
+                  setValue("cooldownId", "", { shouldValidate: isSubmitted });
                 }}
+                aria-invalid={Boolean(errors.chipId)}
+                aria-describedby={descriptionIds("forum-new-chip", Boolean(errors.chipId))}
               >
                 <SelectedLabel />
                 <option value="">Select chip</option>
@@ -336,25 +465,43 @@ export function ForumNewPage() {
               </select>
               <div className="grid grid-cols-[96px_1fr] gap-2">
                 <select
+                  aria-label="Target type"
                   className="select select-bordered select-xs w-full"
                   value={targetDraftType}
                   onChange={(event) => {
                     const nextType = event.target.value === "coupling" ? "coupling" : "qubit";
-                    setTargetDraftType(nextType);
-                    if (nextType === "coupling" && category === "qubit") setCategory("coupling");
-                    if (nextType === "qubit" && category === "coupling") setCategory("qubit");
+                    setValue("targetType", nextType, { shouldValidate: isSubmitted });
+                    if (nextType === "coupling" && category === "qubit") {
+                      setValue("category", "coupling", { shouldValidate: isSubmitted });
+                    }
+                    if (nextType === "qubit" && category === "coupling") {
+                      setValue("category", "qubit", { shouldValidate: isSubmitted });
+                    }
                   }}
                 >
                   <option value="qubit">Qubit</option>
                   <option value="coupling">Coupling</option>
                 </select>
                 <input
-                  className="input input-bordered input-xs w-full"
-                  value={targetDraftId}
-                  onChange={(event) => setTargetDraftId(event.target.value)}
+                  id="forum-new-target-id"
+                  aria-label="Target ID"
+                  className={`input input-bordered input-xs w-full${errors.targetId ? " input-error" : ""}`}
+                  {...register("targetId")}
+                  aria-invalid={Boolean(errors.targetId)}
+                  aria-describedby={descriptionIds("forum-new-target-id", Boolean(errors.targetId))}
                   placeholder={targetDraftType === "coupling" ? "0-1" : "0"}
                 />
               </div>
+              {errors.chipId && (
+                <p id="forum-new-chip-error" className="text-xs text-error">
+                  {errors.chipId.message}
+                </p>
+              )}
+              {errors.targetId && (
+                <p id="forum-new-target-id-error" className="text-xs text-error">
+                  {errors.targetId.message}
+                </p>
+              )}
               <div className="flex justify-end">
                 <button
                   type="button"
@@ -369,14 +516,22 @@ export function ForumNewPage() {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <label
+              htmlFor="forum-new-cooldown"
+              className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50"
+            >
               <CalendarDays className="h-3.5 w-3.5" />
               Cooldown
-            </div>
+            </label>
             <select
-              className="select select-bordered select-xs w-full"
+              id="forum-new-cooldown"
+              className={`select select-bordered select-xs w-full${errors.cooldownId ? " select-error" : ""}`}
               value={cooldownDraftId}
-              onChange={(event) => setCooldownDraftId(event.target.value)}
+              onChange={(event) =>
+                setValue("cooldownId", event.target.value, { shouldValidate: isSubmitted })
+              }
+              aria-invalid={Boolean(errors.cooldownId)}
+              aria-describedby={descriptionIds("forum-new-cooldown", Boolean(errors.cooldownId))}
               disabled={!targetDraftChipId}
             >
               <SelectedLabel />
@@ -388,6 +543,11 @@ export function ForumNewPage() {
                 </option>
               ))}
             </select>
+            {errors.cooldownId && (
+              <p id="forum-new-cooldown-error" className="text-xs text-error">
+                {errors.cooldownId.message}
+              </p>
+            )}
             {selectedCooldown && (
               <div className="text-xs text-base-content/55">
                 {formatCooldownPeriod(selectedCooldown)}
@@ -396,14 +556,25 @@ export function ForumNewPage() {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <label
+              htmlFor="forum-new-assignee"
+              className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50"
+            >
               <UserRound className="h-3.5 w-3.5" />
               Assignee
-            </div>
+            </label>
             <select
-              className="select select-bordered select-xs w-full"
+              id="forum-new-assignee"
+              className={`select select-bordered select-xs w-full${errors.assigneeUsername ? " select-error" : ""}`}
               value={assigneeUsername}
-              onChange={(event) => setAssigneeUsername(event.target.value)}
+              onChange={(event) =>
+                setValue("assigneeUsername", event.target.value, { shouldValidate: isSubmitted })
+              }
+              aria-invalid={Boolean(errors.assigneeUsername)}
+              aria-describedby={descriptionIds(
+                "forum-new-assignee",
+                Boolean(errors.assigneeUsername),
+              )}
             >
               <SelectedLabel />
               <option value="">Unassigned</option>
@@ -415,6 +586,11 @@ export function ForumNewPage() {
                 </option>
               ))}
             </select>
+            {errors.assigneeUsername && (
+              <p id="forum-new-assignee-error" className="text-xs text-error">
+                {errors.assigneeUsername.message}
+              </p>
+            )}
           </section>
 
           <section className="space-y-2">
@@ -426,6 +602,7 @@ export function ForumNewPage() {
               labels={labels}
               selectedLabels={selectedLabels}
               onToggle={toggleLabel}
+              disabled={isSubmitting || createMutation.isPending}
             />
           </section>
 
@@ -445,6 +622,6 @@ export function ForumNewPage() {
           </section>
         </aside>
       </div>
-    </div>
+    </form>
   );
 }
