@@ -28,7 +28,7 @@ import warnings
 from collections.abc import Mapping
 from typing import Any
 
-from qdash.workflow.sweep import SWEEP_VALUE_TYPES, Sweep
+from qdash.workflow.sweep import Sweep, compatible_value_type
 
 RUN = "run"
 INPUT = "input"
@@ -262,17 +262,18 @@ def validate_sweep_type(
     *,
     source: str,
 ) -> None:
-    """Reject a sweep whose constructor differs from the one ``run_spec`` declares.
+    """Reject a value whose ``value_type`` the declared ``run_spec`` type cannot take.
 
-    The task records the declared ``value_type`` and rebuilds the sweep with it, so a
-    ``linspace`` triple given for a ``range`` parameter would otherwise run as a range.
+    A parameter declared with a sweep constructor takes any sweep constructor or
+    explicit ``list`` values. A sweep for a scalar parameter, or a scalar for a sweep
+    parameter, fails here with the workflow source instead of inside the task.
     """
     value_type = data.get("value_type") if isinstance(data, Mapping) else None
     declared_type = task_class.run_spec[name].value_type
-    if value_type in SWEEP_VALUE_TYPES and value_type != declared_type:
+    if not compatible_value_type(declared_type, value_type):
         raise ValueError(
-            f"{source}: {task_name}.{name} declares {declared_type!r}, "
-            f"but the workflow uses {value_type!r}"
+            f"{source}: {task_name}.{name} declares {declared_type!r} "
+            f"and cannot take a {value_type!r} value"
         )
 
 

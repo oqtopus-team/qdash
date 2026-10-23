@@ -26776,7 +26776,8 @@
           "run_parameter_overrides": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Run Parameter Overrides"
+            "title": "Run Parameter Overrides",
+            "description": "Run parameter values keyed by name. A bare value takes the task's declared type. A parameter that declares a generated range also takes {\"value\": [...], \"value_type\": ...} with np.linspace, np.logspace, np.arange, range, or list to run the sweep in another form."
           },
           "reconfigure": {
             "type": "boolean",

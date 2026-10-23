@@ -43,6 +43,32 @@ class TaskTypes:
     MUX: Final[TaskType] = "mux"
 
 
+SWEEP_VALUE_TYPES = frozenset({"np.linspace", "np.logspace", "np.arange", "range"})
+# A run parameter declared with a sweep constructor accepts any constructor, or
+# explicit values, because the experiment only consumes the generated points.
+SWEEP_OVERRIDE_VALUE_TYPES = SWEEP_VALUE_TYPES | {"list"}
+
+
+def is_sweep_value_type(value_type: object) -> bool:
+    """Return whether ``value_type`` declares a generated range."""
+    return value_type in SWEEP_VALUE_TYPES
+
+
+def compatible_value_type(declared: object, requested: object) -> bool:
+    """Return whether a value of ``requested`` type may set a parameter declared as ``declared``.
+
+    A sweep parameter takes any sweep constructor or explicit ``list`` values. A
+    scalar parameter never takes a sweep, and a sweep parameter never takes a
+    scalar. Two scalar types are compatible: the task converts the value with the
+    declared type.
+    """
+    if requested is None or requested == declared:
+        return True
+    if declared in SWEEP_VALUE_TYPES:
+        return requested in SWEEP_OVERRIDE_VALUE_TYPES
+    return requested not in SWEEP_OVERRIDE_VALUE_TYPES
+
+
 class ParameterSpec(BaseModel):
     """Common metadata declared for a task parameter."""
 

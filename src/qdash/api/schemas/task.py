@@ -47,7 +47,15 @@ class QuickRunTaskRequest(BaseModel):
         description="Source result for provenance only; execution uses current task definitions",
     )
     input_parameter_overrides: dict[str, Any] = Field(default_factory=dict)
-    run_parameter_overrides: dict[str, Any] = Field(default_factory=dict)
+    run_parameter_overrides: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Run parameter values keyed by name. A bare value takes the task's declared "
+            "type. A parameter that declares a generated range also takes "
+            '{"value": [...], "value_type": ...} with np.linspace, np.logspace, '
+            "np.arange, range, or list to run the sweep in another form."
+        ),
+    )
     reconfigure: bool = False
     persist_output_parameters: bool = False
     update_params: bool = False

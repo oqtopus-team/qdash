@@ -207,26 +207,114 @@ class TestSweepDeclarations:
         ).all()
 
 
-class TestSharedSweepValidation:
-    def test_shared_sweep_with_other_constructor_is_rejected(self) -> None:
+class TestSweepValueTypes:
+    """A sweep parameter takes any sweep form; its type never crosses to a scalar."""
+
+    @pytest.mark.parametrize(
+        ("declared", "requested", "expected"),
+        [
+            ("range", None, True),
+            ("range", "range", True),
+            ("range", "np.linspace", True),
+            ("np.logspace", "list", True),
+            ("range", "float", False),
+            ("int", "np.linspace", False),
+            ("int", "list", False),
+            ("list", "np.arange", False),
+            ("list", "list", True),
+            ("float", "int", True),
+        ],
+    )
+    def test_compatible_value_type(
+        self, declared: str, requested: str | None, expected: bool
+    ) -> None:
+        assert sweep.compatible_value_type(declared, requested) is expected
+
+    def test_explicit_values_declare_a_list(self) -> None:
+        assert sweep.values(0, 4, 16, 64).as_run_parameter() == {
+            "value": (0, 4, 16, 64),
+            "value_type": "list",
+        }
+
+    def test_rejects_empty_values(self) -> None:
+        with pytest.raises(ValueError, match="at least one point"):
+            sweep.values()
+
+    def test_rejects_non_numeric_values(self) -> None:
+        with pytest.raises(TypeError, match=r"points\[1\] must be a number"):
+            sweep.values(0, "4")  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize(
+        ("declared", "expected_type", "expected_points"),
+        [
+            (sweep.linspace(0, 100, 11), "np.linspace", list(range(0, 101, 10))),
+            (sweep.arange(0, 50, 10), "np.arange", [0, 10, 20, 30, 40]),
+            (sweep.values(0, 4, 16, 64), "list", [0, 4, 16, 64]),
+        ],
+    )
+    def test_task_scoped_sweep_switches_the_constructor(
+        self, declared: sweep.Sweep, expected_type: str, expected_points: list[int]
+    ) -> None:
+        """CheckRabi declares ``range``; the task runs and records the form it was given."""
+        orchestrator = _orchestrator(
+            task_parameters=normalize_task_parameters(
+                {"CheckRabi": {"run": {"time_range": declared}}}
+            )
+        )
+
+        task = orchestrator._create_task_instance("CheckRabi", None)
+
+        parameter = task.run_parameters["time_range"]
+        assert parameter.value_type == expected_type
+        assert list(parameter.get_value()) == expected_points
+        assert parameter.model_dump()["value_type"] == expected_type
+
+    def test_shared_sweep_with_other_constructor_is_applied(self) -> None:
         orchestrator = _orchestrator(
             default_run_parameters={"time_range": sweep.linspace(0, 100, 11)}
         )
 
+        task = orchestrator._create_task_instance("CheckRabi", None)
+
+        assert task.run_parameters["time_range"].value_type == "np.linspace"
+        assert list(task.run_parameters["time_range"].get_value()) == list(range(0, 101, 10))
+
+    def test_sweep_for_scalar_parameter_is_rejected(self) -> None:
+        orchestrator = _orchestrator(
+            task_parameters=normalize_task_parameters(
+                {"CheckRabi": {"run": {"shots": sweep.linspace(0, 100, 11)}}}
+            )
+        )
+
         with pytest.raises(
             ValueError,
-            match=r"default_run_parameters: CheckRabi.time_range declares 'range', "
-            r"but the workflow uses 'np.linspace'",
+            match=r"CheckRabi.shots declares 'int' and cannot take a 'np.linspace' value",
         ):
             orchestrator._create_task_instance("CheckRabi", None)
 
-    def test_legacy_nested_sweep_with_other_constructor_is_rejected(self) -> None:
+    def test_shared_scalar_for_sweep_parameter_is_rejected(self) -> None:
         orchestrator = _orchestrator(
-            default_run_parameters={"CheckRabi": {"time_range": sweep.linspace(0, 100, 11)}}
+            default_run_parameters={"time_range": {"value": 100, "value_type": "float"}}
         )
 
-        with pytest.raises(ValueError, match="declares 'range'"):
+        with pytest.raises(
+            ValueError,
+            match=r"default_run_parameters: CheckRabi.time_range declares 'range' "
+            r"and cannot take a 'float' value",
+        ):
             orchestrator._create_task_instance("CheckRabi", None)
+
+    def test_scalar_type_hint_does_not_change_the_declared_type(self) -> None:
+        orchestrator = _orchestrator(
+            task_parameters=normalize_task_parameters(
+                {"CheckRabi": {"run": {"shots": {"value": 512.0, "value_type": "float"}}}}
+            )
+        )
+
+        task = orchestrator._create_task_instance("CheckRabi", None)
+
+        assert task.run_parameters["shots"].value_type == "int"
+        assert task.run_parameters["shots"].get_value() == 512
 
     def test_matching_shared_sweep_is_applied(self) -> None:
         orchestrator = _orchestrator(default_run_parameters={"time_range": sweep.range(0, 101, 4)})
@@ -235,7 +323,7 @@ class TestSharedSweepValidation:
 
         assert task.run_parameters["time_range"].get_value() == range(0, 101, 4)
 
-    def test_task_scoped_value_replaces_mismatched_shared_sweep(self) -> None:
+    def test_task_scoped_value_replaces_shared_sweep(self) -> None:
         orchestrator = _orchestrator(
             default_run_parameters={"time_range": sweep.logspace(2, 5, 11)},
             task_parameters=normalize_task_parameters(

@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any, ClassVar
 
 from qdash.datamodel.task import (
+    SWEEP_VALUE_TYPES,
     InputParameterModel,
     InputParameterSpec,
     OutputParameterModel,
@@ -11,6 +12,7 @@ from qdash.datamodel.task import (
     RunParameterModel,
     RunParameterSpec,
     TaskTypes,
+    compatible_value_type,
 )
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.backend.base import BaseBackend
@@ -204,9 +206,10 @@ class BaseTask(ABC):
                 continue
             value = param_data.get("value")
             if value is not None:
-                value_type = param_data.get("value_type", self.run_parameters[name].value_type)
+                value_type = self._resolve_run_value_type(name, param_data.get("value_type"))
                 converted_value = self._convert_value_to_type(value, value_type)
                 self.run_parameters[name].value = converted_value
+                self.run_parameters[name].value_type = value_type
 
     def _set_run_overrides(self, overrides: Mapping[str, Any]) -> None:
         """Set and record explicit run parameter values.
@@ -226,10 +229,28 @@ class BaseTask(ABC):
             value = param_data.get("value")
             if value is None:
                 raise ValueError(f"Run parameter {name!r} for {self.name} needs a value")
-            value_type = param_data.get("value_type", self.run_parameters[name].value_type)
+            value_type = self._resolve_run_value_type(name, param_data.get("value_type"))
             converted_value = self._convert_value_to_type(value, value_type)
             self.run_parameters[name].value = converted_value
+            self.run_parameters[name].value_type = value_type
             self.run_overrides[name] = converted_value
+
+    def _resolve_run_value_type(self, name: str, requested: Any) -> str:
+        """Return the ``value_type`` a run value sets on the parameter ``name``.
+
+        A parameter declared with a sweep constructor takes any sweep constructor or
+        explicit ``list`` values, and the parameter then records the type it ran
+        with. A scalar parameter keeps its declared type: a scalar type hint is
+        informational, and a sweep for a scalar (or a scalar for a sweep) fails.
+        """
+        declared = self.run_parameters[name].value_type
+        if not compatible_value_type(declared, requested):
+            raise ValueError(
+                f"{self.name}.{name} declares {declared!r} and cannot take a {requested!r} value"
+            )
+        if declared in SWEEP_VALUE_TYPES and requested is not None:
+            return str(requested)
+        return declared
 
     def _set_input_overrides(self, overrides: Mapping[str, Any]) -> None:
         """Record explicit calibration input overrides.
