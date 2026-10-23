@@ -36,4 +36,6 @@ export interface GetFlowResponse {
   updated_at: string;
   /** Tags */
   tags: string[];
+  /** Folder path inside the creator's space, e.g. "daily/t1" (empty = root) */
+  folder?: string;
 }

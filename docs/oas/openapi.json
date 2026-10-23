@@ -11075,6 +11075,80 @@
         }
       }
     },
+    "/flows/{name}/folder": {
+      "patch": {
+        "tags": [
+          "flow"
+        ],
+        "summary": "Move a flow to another folder",
+        "description": "Change the folder a Flow is filed under; its code and deployment are untouched.",
+        "operationId": "moveFlow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveFlowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/{name}/schedule": {
       "post": {
         "tags": [
@@ -21576,6 +21650,12 @@
             "title": "Tags",
             "description": "Tags"
           },
+          "folder": {
+            "type": "string",
+            "title": "Folder",
+            "description": "Folder path inside the creator's space, e.g. \"daily/t1\" (empty = root)",
+            "default": ""
+          },
           "file_exists": {
             "type": "boolean",
             "title": "File Exists",
@@ -22725,6 +22805,12 @@
             "type": "array",
             "title": "Tags",
             "description": "Tags"
+          },
+          "folder": {
+            "type": "string",
+            "title": "Folder",
+            "description": "Folder path inside the creator's space, e.g. \"daily/t1\" (empty = root)",
+            "default": ""
           }
         },
         "type": "object",
@@ -24643,6 +24729,48 @@
         ],
         "title": "MetricsSummaryResponse",
         "description": "Response model for aggregated metrics summary.\n\nReturns statistical summary computed by the database.\nMinimal data transfer (~0.1KB).\nMetrics are loaded dynamically from metrics.yaml config."
+      },
+      "MoveFlowRequest": {
+        "properties": {
+          "folder": {
+            "type": "string",
+            "title": "Folder",
+            "description": "Target folder path, e.g. \"daily/t1\"; \"\" moves the flow to the root"
+          }
+        },
+        "type": "object",
+        "required": [
+          "folder"
+        ],
+        "title": "MoveFlowRequest",
+        "description": "Request to move a Flow to another folder of its creator's space."
+      },
+      "MoveFlowResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Flow name"
+          },
+          "folder": {
+            "type": "string",
+            "title": "Folder",
+            "description": "The folder the flow now sits in"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Success message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "folder",
+          "message"
+        ],
+        "title": "MoveFlowResponse",
+        "description": "Response after moving a flow."
       },
       "MuxDetailResponse": {
         "properties": {
@@ -27318,6 +27446,18 @@
             "type": "array",
             "title": "Tags",
             "description": "Tags for categorization"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder",
+            "description": "Folder path inside the creator's space, e.g. \"daily/t1\"; \"\" is the root. Omitted keeps an existing flow's folder (a new flow goes to the root)."
           }
         },
         "type": "object",
@@ -27340,6 +27480,7 @@
             },
             "description": "Adaptive calibration with convergence check",
             "flow_function_name": "my_adaptive_calibration",
+            "folder": "adaptive",
             "name": "my_adaptive_calibration",
             "tags": [
               "adaptive",
