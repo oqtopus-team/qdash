@@ -2,6 +2,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { parse } from "yaml";
 
+import { compactionBudget, type CompactionBudget } from "./budget.ts";
+
 /**
  * Build pi's models.json from QDash's chat.yaml and evaluation.yaml.
  *
@@ -72,6 +74,31 @@ function readModels(yaml: string | undefined, key: string): ChatModel[] {
   const raw = parse(yaml) as Record<string, unknown> | null;
   const list = raw?.[key];
   return Array.isArray(list) ? (list as ChatModel[]) : [];
+}
+
+/** Give each configured chat model its own Pi durable compaction thresholds. */
+export function chatCompactionOverrides(
+  chatYaml: string,
+  resolveModel: (
+    provider: string,
+    modelId: string,
+  ) => { contextWindow: number; maxTokens: number } | undefined,
+): Record<string, CompactionBudget> {
+  const overrides: Record<string, CompactionBudget> = {};
+  for (const model of readModels(chatYaml, "chat_models")) {
+    const name = asString(model.name);
+    const provider = asString(model.provider);
+    if (!name || !provider) continue;
+    const providerId = PROVIDER_ALIASES[provider] ?? provider;
+    const resolved = resolveModel(providerId, name);
+    if (resolved) {
+      overrides[`${providerId}/${name}`] = compactionBudget(
+        resolved.contextWindow,
+        resolved.maxTokens,
+      );
+    }
+  }
+  return overrides;
 }
 
 /**

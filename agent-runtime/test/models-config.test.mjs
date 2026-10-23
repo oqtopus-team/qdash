@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildModelsConfig } from "../src/models-config.ts";
+import { buildModelsConfig, chatCompactionOverrides } from "../src/models-config.ts";
+import { compactionBudget } from "../src/budget.ts";
 
 const YAML = `
 chat_models:
@@ -52,6 +53,27 @@ evaluation_models:
 `;
 
 const env = { OPENAI_COMPATIBLE_BASE_URL_LOCAL: "http://ollama:11434/v1" };
+
+test("configured chat models keep separate compaction budgets across model switches", () => {
+  const limits = {
+    "openai-compatible-local/gemma4:31b": { contextWindow: 65_536, maxTokens: 16_384 },
+    "amazon-bedrock/jp.anthropic.claude-sonnet-4-6": {
+      contextWindow: 200_000,
+      maxTokens: 8_192,
+    },
+  };
+  const overrides = chatCompactionOverrides(YAML, (provider, modelId) =>
+    limits[`${provider}/${modelId}`],
+  );
+  assert.deepEqual(overrides, {
+    "openai-compatible-local/gemma4:31b": compactionBudget(65_536, 16_384),
+    "amazon-bedrock/jp.anthropic.claude-sonnet-4-6": compactionBudget(200_000, 8_192),
+  });
+  assert.notDeepEqual(
+    overrides["openai-compatible-local/gemma4:31b"],
+    overrides["amazon-bedrock/jp.anthropic.claude-sonnet-4-6"],
+  );
+});
 
 const OPENAI_COMPATIBLE_YAML = `
 chat_models:
