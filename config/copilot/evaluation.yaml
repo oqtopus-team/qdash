@@ -31,13 +31,12 @@ evaluation_models:
     # the context, so leave the model card's 8192 for larger deployments.
     max_output_tokens: 2048
 
-  # Also declare the default chat model as evaluation-capable. Because chat.yaml
-  # is loaded first, its full sampling and thinking configuration remains authoritative.
-  - provider: openai-compatible-chat
+  # Qwen served by the dedicated vLLM evaluation endpoint.
+  - provider: openai-compatible-evaluation-vllm
     name: qwen3.8-flash-next
     api_style: completion
-    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
-    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION_VLLM
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_EVALUATION_VLLM
     num_ctx: 65536
     max_output_tokens: 8192
     reasoning_effort: medium
