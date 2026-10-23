@@ -58,6 +58,14 @@ Cloudflare tunnel domain. If an older `.env` sets `NEXT_PUBLIC_PREFECT_URL` to a
 replace it with `NEXT_PUBLIC_PREFECT_URL=${QDASH_PREFECT_UI_URL}` and rebuild the UI image so the
 sidebar link works from other machines.
 
+After every change to `QDASH_PREFECT_UI_URL` or `PREFECT_PORT`, rebuild and restart the UI from
+the repository root. Next.js embeds the `NEXT_PUBLIC_` values in the UI image at build time:
+
+```bash
+docker compose build ui
+docker compose up -d ui
+```
+
 The example files also list optional AI provider, Slack, knowledge repository, and tunnel
 settings. Leave an optional credential empty when that integration is not in use.
 
