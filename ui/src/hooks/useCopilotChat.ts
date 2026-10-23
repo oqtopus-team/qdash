@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { recoverMessageImages } from "@/lib/chatAttachments";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
 import type { AnswerFeedback, ChatImageAttachment, ChatMessage } from "@/types/copilotChat";
@@ -80,6 +81,9 @@ export function useCopilotChat(sessionId?: string | null) {
   const thinkingLevel = thinkingLevelForRequest(thinking.choice);
   const { sendMessage, stop: stopSession } = ctx;
   const id = session?.id;
+  // The page the user has open, read when a turn goes out; null on the chat page.
+  const dock = useOptionalChatDock();
+  const currentPage = dock?.currentPage;
   const messages = useMemo(() => session?.messages ?? [], [session?.messages]);
 
   const send = useCallback(
@@ -88,9 +92,10 @@ export function useCopilotChat(sessionId?: string | null) {
         sessionId: id,
         modelOverride,
         thinkingLevel,
+        page: currentPage?.() ?? null,
         ...(images?.length ? { images } : {}),
       }),
-    [id, modelOverride, thinkingLevel, sendMessage],
+    [id, modelOverride, thinkingLevel, sendMessage, currentPage],
   );
 
   /** Answer the approval card on the last answer; the label is what the thread shows. */
@@ -100,9 +105,10 @@ export function useCopilotChat(sessionId?: string | null) {
         sessionId: id,
         modelOverride,
         thinkingLevel,
+        page: currentPage?.() ?? null,
         approval: { id: approvalId, approve },
       }),
-    [id, modelOverride, thinkingLevel, sendMessage],
+    [id, modelOverride, thinkingLevel, sendMessage, currentPage],
   );
 
   const stop = useCallback(() => {
@@ -123,8 +129,9 @@ export function useCopilotChat(sessionId?: string | null) {
       history: messages.slice(0, lastUser),
       modelOverride,
       thinkingLevel,
+      page: currentPage?.() ?? null,
     });
-  }, [id, messages, modelOverride, thinkingLevel, run, sendMessage]);
+  }, [id, messages, modelOverride, thinkingLevel, run, sendMessage, currentPage]);
 
   /** Replace the user message at `index` and everything after it with a new turn. */
   const editMessage = useCallback(
@@ -140,9 +147,10 @@ export function useCopilotChat(sessionId?: string | null) {
         modelOverride,
         thinkingLevel,
         images,
+        page: currentPage?.() ?? null,
       });
     },
-    [id, messages, modelOverride, thinkingLevel, run, sendMessage],
+    [id, messages, modelOverride, thinkingLevel, run, sendMessage, currentPage],
   );
 
   /** Rate the assistant message at `index`; rating it the same way again clears it. */

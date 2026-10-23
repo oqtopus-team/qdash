@@ -23,6 +23,29 @@ The assistant can use the project tools exposed by QDash to inspect records such
 metrics, task results, forum threads, workflows, and provenance. Keep the active project and selected chip
 in mind when interpreting an answer. Open referenced records to confirm important conclusions.
 
+### Ask AI beside any page
+
+**Ask AI** on the right edge opens the same chat as a sidebar next to the page you are on. The
+assistant is told which page is open with every message, so "what am I looking at?" or "compare
+this with last week" refer to the current page. Drag the sidebar's left edge to make it wider or
+narrower; double-click the edge to restore the default width. The width is remembered in your
+browser.
+
+On the **Workflow** editor the assistant also sees the flow's code as it is in the editor,
+unsaved changes included. Ask for a change in plain terms, for example "add a T2 echo check after
+T1". The answer shows a diff against the editor; **Apply to editor** puts the new code into the
+editor and unlocks it, **Discard** leaves it as it was. Nothing is saved until you select
+**Save**, which checks the flow the same way as a hand-written one.
+Apply is available only while the proposal's flow is open on the same chip.
+
+### A workspace for calculations and scripts
+
+When the deployment enables it, the assistant has a private workspace for each chat: a shell with
+Python, NumPy, SciPy, pandas, Plotly and Matplotlib, no network, and no access to QDash. It uses
+it for arithmetic, fitting and data wrangling, writing data from tool results into files. The
+answer's trace shows each command, the file it wrote with the code typed out as it is written,
+and the output of each run. Files stay for the rest of the chat and are deleted with it.
+
 ### Thinking and your own instructions
 
 The **Thinking** menu next to the model picker sets how much the model reasons before it answers:

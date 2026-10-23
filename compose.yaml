@@ -171,7 +171,6 @@ services:
       context: .
       dockerfile: ./src/qdash/api/Dockerfile
     restart: always
-    privileged: true
     env_file:
       - .env
     ports:
@@ -234,11 +233,13 @@ services:
       - .env
     volumes:
       - ./agent-runtime/src:/app/src
+      - ./agent-runtime/exec:/app/exec # Hello protocol shared with agent-exec
       - ./config:/app/config # Read for copilot language and model settings only
       # Local pi extension checkouts for development (gitignored, empty in
       # production); the runtime trusts whatever package directories it finds.
       - ./agent-runtime/extensions:/app/extensions:ro
       - agent-runtime-state:/app/state
+      - agent-exec-socket:/run/agent-exec:ro
     # Per-turn pi-qdash credential profiles are transient, including on crashes.
     tmpfs:
       - /tmp
@@ -265,13 +266,58 @@ services:
       # ignores it. Keep a placeholder for keyless local endpoints.
       - OPENAI_COMPATIBLE_API_KEY_CHAT=${OPENAI_COMPATIBLE_API_KEY_CHAT:-openai-compatible}
       - OPENAI_COMPATIBLE_API_KEY_EVALUATION=${OPENAI_COMPATIBLE_API_KEY_EVALUATION:-openai-compatible}
+      # The Copilot workspace (agent-exec below): where the chat's bash, read,
+      # write and edit tools run. Unset AGENT_EXEC_SOCKET to offer no workspace.
+      - AGENT_EXEC_SOCKET=/run/agent-exec/exec.sock
       # Bun's fetch reads HTTP(S)_PROXY on its own. NO_PROXY comes from .env via
       # env_file; redeclaring it here would let an ambient shell value win.
     depends_on:
       api:
         condition: service_started
+      agent-exec:
+        condition: service_started
     networks:
       - custom_net
+  agent-exec:
+    # The Copilot workspace: a shell and files for each chat, behind the
+    # runtime's bash/read/write/edit tools. It holds no QDash credentials (no
+    # env_file) and has no network. A Unix socket restricted to the runtime's
+    # group (bun, gid 1000) prevents workspace users from impersonating others.
+    # The server starts one pi-env daemon per conversation as that user's own
+    # uid; see docs/developer-guide/copilot/workspace.md.
+    profiles:
+      - agent-runtime
+    build:
+      context: ./agent-runtime
+      dockerfile: ./exec/Dockerfile
+    restart: always
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - agent-exec-workspace:/workspace
+      - agent-exec-socket:/run/agent-exec
+    environment:
+      - AGENT_EXEC_SOCKET=/run/agent-exec/exec.sock
+      - AGENT_EXEC_SOCKET_GID=1000
+    # Root only to chown each owner's directory and drop to that uid (setpriv).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - KILL
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          pids: 512
+          memory: ${AGENT_EXEC_MEMORY_LIMIT:-2g}
+    network_mode: none
   ui:
     build:
       context: .
@@ -315,3 +361,5 @@ volumes:
   worker-logs:
   api-logs:
   agent-runtime-state:
+  agent-exec-workspace:
+  agent-exec-socket:

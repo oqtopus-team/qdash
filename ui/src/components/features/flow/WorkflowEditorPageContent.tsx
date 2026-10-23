@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ExecutionResponseDetail, SaveFlowRequest, ExecuteFlowResponse } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
 import { useToast } from "@/components/ui/Toast";
 import { PierreFileTree } from "@/components/ui/PierreFileTree";
@@ -315,6 +316,33 @@ export function WorkflowEditorPageContent() {
   }, [chipsData, chipId, data]);
 
   const isDirty = code !== originalCode;
+
+  // Tell the chat sidebar what is open here: the flow and the editor's current
+  // text, read when a turn is sent; a proposed edit lands in the editor unlocked.
+  const { registerPage } = useChatDock();
+  const pageState = useRef({ name, chipId, code, isDirty });
+  // Written after each commit, never during render; the provider below reads it when a turn is sent.
+  useEffect(() => {
+    pageState.current = { name, chipId, code, isDirty };
+  });
+  useEffect(
+    () =>
+      registerPage({
+        current: () => {
+          const { name, chipId, code, isDirty } = pageState.current;
+          return {
+            path: `/workflow/${name}`,
+            title: `Workflow editor: ${name}`,
+            flow: { name, chipId: chipId || undefined, code, dirty: isDirty },
+          };
+        },
+        applyCode: (next) => {
+          setCode(next);
+          setIsEditorLocked(false);
+        },
+      }),
+    [registerPage],
+  );
 
   const handleSave = useCallback(() => {
     if (isEditorLocked) return;

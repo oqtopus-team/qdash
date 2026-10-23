@@ -153,10 +153,39 @@ class TaskChatTarget(BaseModel):
     task_id: str
 
 
+class FlowEditorContext(BaseModel):
+    """The flow open in the Workflow editor, with the editor's current text."""
+
+    name: str = Field(max_length=200)
+    chip_id: str | None = Field(default=None, max_length=100)
+    code: str = Field(
+        max_length=200_000, description="The editor's buffer, unsaved changes included"
+    )
+    dirty: bool = Field(default=False, description="The buffer differs from the saved flow")
+
+
+class PageContext(BaseModel):
+    """What the user has open in QDash while chatting from the sidebar or floating window."""
+
+    path: str = Field(max_length=512, description="The route, such as /workflow/t1_check")
+    title: str | None = Field(default=None, max_length=200)
+    flow: FlowEditorContext | None = Field(
+        default=None, description="Set on the Workflow editor: the flow and its current code"
+    )
+
+
 class ChatRequest(ImageAttachmentsRequest):
     """Request body for POST /copilot/chat/stream."""
 
     message: str = Field(description="User question / message")
+    page: PageContext | None = Field(
+        default=None,
+        description=(
+            "The page the user has open while chatting from the sidebar. The runtime "
+            "tells the model about it every turn; on the Workflow editor the model can "
+            "propose code edits the user applies in the editor."
+        ),
+    )
     task: TaskChatTarget | None = Field(
         default=None,
         description=(
@@ -201,12 +230,6 @@ class ChatRequest(ImageAttachmentsRequest):
         default=None,
         description="Decision on the write operation the previous turn asked approval for.",
     )
-
-
-class SandboxPythonRequest(BaseModel):
-    """Request body for POST /copilot/sandbox/python."""
-
-    code: str = Field(description="Python source to run in the sandbox")
 
 
 def _rebuild_models() -> None:

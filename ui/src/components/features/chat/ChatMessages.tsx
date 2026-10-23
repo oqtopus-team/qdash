@@ -21,8 +21,11 @@ import { FigureStrip, figuresInSteps } from "@/components/features/chat/ChatFigu
 import {
   ApprovalCard,
   AskCard,
+  EditProposalCard,
   type InteractionState,
 } from "@/components/features/chat/ChatInteractionCards";
+import { useOptionalChatDock } from "@/contexts/ChatDockContext";
+import { matchesEditTarget } from "@/lib/copilotEditTarget";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
 import { Loader } from "@/components/ui/Loader";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
@@ -222,6 +225,18 @@ function BlocksContent({
   interaction: InteractionState;
 }) {
   const figures = blocks.trace ? figuresInSteps(blocks.trace.steps) : [];
+  // Preview only the proposal's target; the dock checks again when applying it.
+  const dock = useOptionalChatDock();
+  const state: InteractionState = dock?.canApplyCode
+    ? {
+        ...interaction,
+        applyCode: dock.applyCode,
+        currentCode: (edit) => {
+          const page = dock.currentPage();
+          return matchesEditTarget(edit, page) ? (page?.flow?.code ?? null) : null;
+        },
+      }
+    : interaction;
   return (
     <>
       {blocks.trace && <ChatTraceSummary trace={blocks.trace} />}
@@ -241,6 +256,9 @@ function BlocksContent({
         }
         if (block.type === "approval" && block.approval) {
           return <ApprovalCard key={i} approval={block.approval} state={interaction} />;
+        }
+        if (block.type === "edit" && block.edit) {
+          return <EditProposalCard key={i} edit={block.edit} state={state} />;
         }
         if (block.type === "chart" && block.chart) {
           return (
@@ -484,7 +502,7 @@ export function LiveAssistantMessage({
     .join("");
   const busy = turn.steps.some(
     (s) =>
-      (s.kind === "tool" && s.status === "running") ||
+      (s.kind === "tool" && (s.status === "running" || s.status === "drafting")) ||
       (s.kind === "thinking" && s.endedAt === undefined),
   );
 

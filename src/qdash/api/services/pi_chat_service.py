@@ -203,6 +203,8 @@ def _request_payload(
         # Chat only: evaluations and forum replies are built elsewhere and stay
         # the same for everyone, so their records remain comparable.
         **({"user_instructions": instructions} if instructions else {}),
+        # The page the user has open, rebuilt into the prompt every turn.
+        **({"page_context": request.page.model_dump()} if request.page else {}),
         "owner_id": username,
         "conversation_id": request.session_id,
         "request_id": request.request_id,
@@ -440,8 +442,10 @@ async def translate(
                 # on the way to the browser from timing out an idle stream.
                 yield ":\n\n"
                 continue
-            if kind == "tool_start":
+            if kind in ("tool_start", "tool_draft"):
                 label = tool_label(event["name"])
+            elif kind == "tool_args_delta" and not isinstance(event["delta"], str):
+                raise TypeError(kind)
             elif kind == "tool_end":
                 completed_tools.append(tool_label(event["name"]))
             elif kind == "chart":
@@ -459,6 +463,11 @@ async def translate(
                         "approval": event["approval"],
                     }
                 )
+            elif kind == "edit":
+                # A change proposed to the editor the user has open; the chat shows a diff.
+                interactions.append(
+                    {"type": "edit", "content": None, "chart": None, "edit": event["edit"]}
+                )
             elif kind in ("text_delta", "thinking_delta") and not isinstance(event["delta"], str):
                 raise TypeError(kind)
         except (ValueError, KeyError, TypeError):
@@ -466,13 +475,33 @@ async def translate(
             yield sse_event("error", {"step": step, "detail": "Agent runtime sent malformed data"})
             return
 
-        # ``delta``/``thinking``/``tool_start``/``tool_end`` drive the live
-        # transcript in the chat page. ``status`` stays for consumers that only
-        # show a one-line progress message.
+        # ``delta``/``thinking``/``tool_draft``/``tool_args_delta``/``tool_start``/
+        # ``tool_end`` drive the live transcript in the chat page. ``status``
+        # stays for consumers that only show a one-line progress message.
         if kind == "text_delta":
             yield sse_event("delta", {"text": event["delta"]})
         elif kind == "thinking_delta":
             yield sse_event("thinking", {"text": event["delta"]})
+        elif kind == "tool_draft":
+            # The model is writing a tool call; the chat shows the code as it is typed.
+            yield sse_event(
+                "tool_draft",
+                {
+                    "index": event["index"],
+                    "id": event.get("id"),
+                    "tool": event["name"],
+                    "label": label,
+                },
+            )
+        elif kind == "tool_args_delta":
+            yield sse_event(
+                "tool_args_delta",
+                {
+                    "index": event["index"],
+                    "path": event.get("path") or [],
+                    "delta": event["delta"],
+                },
+            )
         elif kind == "tool_start":
             yield sse_event(
                 "tool_start",
@@ -501,6 +530,18 @@ async def translate(
                     **({"figures": figures} if isinstance(figures, list) and figures else {}),
                     # What an evaluation tool sent its model; the chat shows it on request.
                     **({"evaluation": evaluation} if isinstance(evaluation, dict) else {}),
+                    # What a workspace tool (bash, read, write, edit) answered.
+                    **(
+                        {"output": event["output"]}
+                        if isinstance(event.get("output"), str) and event["output"]
+                        else {}
+                    ),
+                    **(
+                        {"exit_code": event["exitCode"]}
+                        if isinstance(event.get("exitCode"), int)
+                        and not isinstance(event.get("exitCode"), bool)
+                        else {}
+                    ),
                 },
             )
             yield sse_event(
@@ -511,7 +552,7 @@ async def translate(
                     "completed_tools": list(completed_tools),
                 },
             )
-        elif kind in ("chart", "ask", "approval"):
+        elif kind in ("chart", "ask", "approval", "edit"):
             pass
         elif kind == "error":
             yield sse_event(
