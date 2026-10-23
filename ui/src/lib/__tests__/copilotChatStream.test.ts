@@ -44,7 +44,35 @@ describe("copilotChatStream", () => {
     expect(tool(steps)).toMatchObject({ status: "running", id: "c1" });
   });
 
-  it("persists an abandoned draft as the step's arguments and keeps an output's tail", () => {
+  it("adopts the latest draft of the same tool when the call starts without a matching id", () => {
+    let steps: TraceStep[] = startDraft([], { index: 0, id: "", tool: "write", label: "Write" });
+    steps = appendArgsDelta(steps, { index: 0, path: ["path"], delta: "fit.py" });
+    expect(tool(steps).id).toMatch(/^draft-write-0-/);
+    steps = startTool(steps, {
+      id: "call_9",
+      tool: "write",
+      label: "Write",
+      args: { path: "fit.py" },
+    });
+    expect(steps).toHaveLength(1);
+    expect(tool(steps)).toMatchObject({
+      status: "running",
+      id: "call_9",
+      args: { path: "fit.py" },
+    });
+    // A draft with a real id that differs is a different call.
+    const other = startTool(
+      startDraft([], { index: 0, id: "call_1", tool: "bash", label: "Bash" }),
+      {
+        id: "call_2",
+        tool: "bash",
+        label: "Bash",
+      },
+    );
+    expect(other).toHaveLength(2);
+  });
+
+  it("persists an abandoned draft as cancelled with its arguments and keeps an output's tail", () => {
     let steps: TraceStep[] = startDraft([], { index: 0, id: "c1", tool: "bash", label: "Bash" });
     steps = appendArgsDelta(steps, { index: 0, path: ["command"], delta: "python fit.py" });
     steps = [
@@ -61,7 +89,10 @@ describe("copilotChatStream", () => {
     ];
     const trace = toPersistedTrace({ steps, startedAt: 0 }, 10);
     expect(trace?.steps).toHaveLength(2);
-    expect(trace?.steps[0]).toMatchObject({ status: "done", args: { command: "python fit.py" } });
+    expect(trace?.steps[0]).toMatchObject({
+      status: "cancelled",
+      args: { command: "python fit.py" },
+    });
     expect(trace?.steps[0]).not.toHaveProperty("draft");
     const output = tool(trace!.steps, 1).output!;
     expect(output.length).toBe(2001);

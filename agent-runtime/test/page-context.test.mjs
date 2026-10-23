@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   buildPageContextSection,
   buildProposeCodeEditTool,
+  codeFence,
   MAX_PAGE_CODE_CHARS,
   parsePageContext,
 } from "../src/page-context.ts";
@@ -33,6 +34,16 @@ test("the section names the page, and on the editor carries the code and the edi
   assert.match(section, /do not use qdash_save_flow for this flow unless they ask/);
   const long = buildPageContextSection({ path: "/w", flow: { name: "w", code: "x".repeat(MAX_PAGE_CODE_CHARS + 10) } });
   assert.match(long, /cut: the flow is longer than/);
+});
+
+test("a flow whose docstring holds a markdown fence cannot close the prompt's fence", () => {
+  const code = '"""Usage:\n\n```bash\nqdash run\n```\n"""\nx = 1\n';
+  assert.equal(codeFence(code), "````");
+  assert.equal(codeFence("x = 1"), "```");
+  assert.equal(codeFence("`````inside"), "``````");
+  const section = buildPageContextSection({ path: "/workflow/w", flow: { name: "w", code } });
+  assert.match(section, /````python\n"""Usage:/);
+  assert.match(section, /\n"""\nx = 1\n````\n/);
 });
 
 test("the edit tool ends the turn with the proposal in its details", async () => {

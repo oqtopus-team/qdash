@@ -246,9 +246,23 @@ export function ApprovalCard({
  */
 export function EditProposalCard({ edit, state }: { edit: EditProposal; state: InteractionState }) {
   const [outcome, setOutcome] = useState<"applied" | "discarded" | null>(null);
-  const current = state.currentCode?.(edit) ?? null;
+  // The editor text the diff was made against. The chat does not rerender as
+  // the user types in the editor, so Apply reads the text again first and, when
+  // it changed, shows the new diff instead of overwriting what they typed.
+  const [base, setBase] = useState<string | null>(() => state.currentCode?.(edit) ?? null);
+  const [changed, setChanged] = useState(false);
+  const current = base;
   const canApply = Boolean(state.applyCode) && current !== null && outcome === null;
   const unchanged = current !== null && current === edit.code;
+  const apply = () => {
+    const live = state.currentCode?.(edit) ?? null;
+    if (live !== base) {
+      setBase(live);
+      setChanged(true);
+      return;
+    }
+    if (state.applyCode?.(edit)) setOutcome("applied");
+  };
   return (
     <div
       className="chat-interaction-card not-prose"
@@ -281,6 +295,11 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
       {unchanged && (
         <p className="mt-2 text-[11px] text-base-content/50">The editor already holds this code.</p>
       )}
+      {changed && outcome === null && (
+        <p className="mt-2 text-[11px] text-warning" role="status">
+          The editor changed since this diff was made. Review the updated diff, then apply.
+        </p>
+      )}
       {(!state.applyCode || current === null) && (
         <p className="mt-2 text-[11px] text-base-content/50">
           Open this flow in the Workflow editor on the same chip to apply the change there.
@@ -299,13 +318,7 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
         )}
         {canApply && (
           <>
-            <button
-              type="button"
-              className="btn btn-primary btn-xs rounded-full"
-              onClick={() => {
-                if (state.applyCode?.(edit)) setOutcome("applied");
-              }}
-            >
+            <button type="button" className="btn btn-primary btn-xs rounded-full" onClick={apply}>
               Apply to editor
             </button>
             <button

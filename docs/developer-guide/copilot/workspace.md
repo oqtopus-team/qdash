@@ -46,8 +46,10 @@ sequenceDiagram
 4. pi-durable's tools call `RemoteExecutionEnv`, so results match `NodeExecutionEnv` on the
    container.
 5. Closing the conversation closes the connection; the daemon then kills every process it
-   started. Deleting a QDash chat session removes the directory
-   (`deleteSessionState` → `removeWorkspace`).
+   started. The first tool call also writes a marker file beside the session's SQLite store
+   (`<store>.workspace`); deleting a QDash chat session removes the directory only when that
+   marker exists (`deleteSessionState` → `removeWorkspace`), so a chat or evaluation that never
+   ran code starts no daemon and creates no owner directory.
 
 ## Isolation
 
@@ -61,9 +63,10 @@ sequenceDiagram
 
 The `agent-exec-socket` volume exposes the socket to the runtime as a read-only mount.
 No shared authentication token is required. `workspaceUid` reuses an owner's directory uid
-or chooses an unused uid when the name's hash collides. Existing duplicate directory uids
-cause connections to fail rather than sharing an identity; an operator must correct that
-ownership before using those workspaces.
+or chooses an unused uid when the name's hash collides. Entries under the root that are not
+owner directories (a stray file, a directory owned outside the uid range) are ignored. An
+owner whose directory shares its uid with another directory is refused rather than given a
+shared identity; an operator must correct that ownership before that owner's workspace works.
 
 Two conversations of the same owner can read each other's files through `bash`; a different
 owner's directory is unreadable. A command runs as long as the model's `timeout` allows, and

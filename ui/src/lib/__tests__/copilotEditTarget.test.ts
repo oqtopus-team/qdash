@@ -24,13 +24,21 @@ describe("matchesEditTarget", () => {
     expect(matchesEditTarget(edit, null)).toBe(false);
   });
 
-  it("allows a new flow without a chip but rejects legacy proposals without target metadata", () => {
+  it("identifies the New flow editor by its route alone, since name and chip are typed later", () => {
     const draft: PageContext = {
       ...page,
       path: "/workflow/new",
       flow: { ...page.flow!, chipId: undefined },
     };
     expect(matchesEditTarget({ ...edit, chipId: null, pagePath: draft.path }, draft)).toBe(true);
+    // Proposed before the user named the flow or picked a chip.
+    const early = { ...edit, flowName: "new_flow", chipId: null, pagePath: draft.path };
+    expect(matchesEditTarget(early, draft)).toBe(true);
+    expect(matchesEditTarget(early, { ...draft, flow: { ...draft.flow!, chipId: "chip1" } })).toBe(
+      true,
+    );
+    // But not a proposal made for a saved flow's editor.
+    expect(matchesEditTarget(edit, draft)).toBe(false);
     const legacy = { summary: "Update", code: "new", flowName: "t1" } as EditProposal;
     expect(matchesEditTarget(legacy, draft)).toBe(false);
   });

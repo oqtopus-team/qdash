@@ -181,6 +181,21 @@ export function stepTitle(step: ToolStep): string {
   const path = text(args?.path);
   const name = text(args?.name);
   const drafting = step.status === "drafting";
+  if (step.status === "cancelled") {
+    // The turn ended while the call was being written; nothing was made or run.
+    switch (step.tool) {
+      case "bash":
+        return "Command not run";
+      case "write":
+        return `Not written${path ? ` ${path}` : ""}`;
+      case "edit":
+        return `Not edited${path ? ` ${path}` : ""}`;
+      case "read":
+        return `Not read${path ? ` ${path}` : ""}`;
+      default:
+        return `${step.label} (not called)`;
+    }
+  }
   switch (step.tool) {
     case "bash":
       return drafting ? "Writing a command" : step.status === "running" ? "Running" : "Ran";

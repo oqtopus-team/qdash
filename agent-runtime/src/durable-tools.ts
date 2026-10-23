@@ -163,7 +163,11 @@ export class ToolCancelled extends Error {
  */
 export function untilAborted<T>(run: Promise<T>, signal: AbortSignal | undefined, toolName: string): Promise<T> {
   if (!signal) return run;
-  if (signal.aborted) return Promise.reject(new ToolCancelled(toolName));
+  if (signal.aborted) {
+    // The call already started; its later rejection must not go unhandled.
+    run.catch(() => undefined);
+    return Promise.reject(new ToolCancelled(toolName));
+  }
   return new Promise<T>((resolve, reject) => {
     const onAbort = () => {
       console.warn(`[agent-runtime] ${toolName} cancelled while running; its result is dropped`);

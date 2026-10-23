@@ -43,7 +43,10 @@ export default function NewFlowPage() {
   // The chat sidebar sees the flow being written here and can propose its code.
   const { registerPage } = useChatDock();
   const pageState = useRef({ name, chipId, code });
-  pageState.current = { name, chipId, code };
+  // Written after each commit, never during render; the provider below reads it when a turn is sent.
+  useEffect(() => {
+    pageState.current = { name, chipId, code };
+  });
   useEffect(
     () =>
       registerPage({

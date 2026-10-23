@@ -170,6 +170,24 @@ describe("EditProposalCard", () => {
     expect(applyCode).not.toHaveBeenCalled();
   });
 
+  it("shows the new diff instead of applying when the editor changed since the diff was made", () => {
+    const applyCode = vi.fn(() => true);
+    let live = "old code\n";
+    render(<EditProposalCard edit={edit} state={state({ applyCode, currentCode: () => live })} />);
+    expect(screen.getByTestId("diff").textContent).toBe("old code\n=>new code\n");
+    live = "old code\n# typed meanwhile\n";
+    fireEvent.click(screen.getByRole("button", { name: "Apply to editor" }));
+    expect(applyCode).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toMatch(/editor changed since this diff/);
+    expect(screen.getByTestId("diff").textContent).toBe(
+      "old code\n# typed meanwhile\n=>new code\n",
+    );
+    // The second click applies against the diff now shown.
+    fireEvent.click(screen.getByRole("button", { name: "Apply to editor" }));
+    expect(applyCode).toHaveBeenCalledWith(edit);
+    expect(screen.getByText(/Applied to the editor/)).toBeTruthy();
+  });
+
   it("does not report success if the target changed before the click", () => {
     render(
       <EditProposalCard

@@ -9,6 +9,11 @@ vi.mock("@/client/chip/chip", () => ({
   useListChips: (...args: unknown[]) => listChips(...args),
   useListChipQubits: (...args: unknown[]) => listChipQubits(...args),
 }));
+const systemPrompt = vi.fn();
+vi.mock("@/client/copilot/copilot", () => ({
+  useGetCopilotSystemPrompt: (...args: unknown[]) => systemPrompt(...args),
+}));
+const ALL_TOOLS = new Set(["bash", "qdash_save_flow"]);
 
 describe("pickChip", () => {
   it("prefers the active chip, then the newest", () => {
@@ -26,7 +31,7 @@ describe("pickChip", () => {
 
 describe("buildGeneralSuggestions", () => {
   it("names the chip's first qubits and leads with a pipeline plan", () => {
-    const texts = buildGeneralSuggestions("64Qv3", ["0", "1"]).map((s) => s.text);
+    const texts = buildGeneralSuggestions("64Qv3", ["0", "1"], ALL_TOOLS).map((s) => s.text);
     expect(texts[0]).toBe(
       "Plan a calibration on 64Qv3: coarse one-qubit check on qubits 0 and 1, then T1 and T2 on the ones that pass",
     );
@@ -48,8 +53,18 @@ describe("buildGeneralSuggestions", () => {
     expect(texts).toContain("Compare T1 and T2 for Q32");
   });
 
+  it("offers the workspace and flow prompts only when the runtime has their tools", () => {
+    const none = buildGeneralSuggestions("chip", ["0"]).map((s) => s.text);
+    expect(none.some((t) => /workspace/.test(t))).toBe(false);
+    expect(none.some((t) => /save it as/.test(t))).toBe(false);
+    expect(none[1]).toBe("Show T1 trend for Q00");
+    const bashOnly = buildGeneralSuggestions("chip", ["0"], new Set(["bash"])).map((s) => s.text);
+    expect(bashOnly[1]).toMatch(/write a Python script in the workspace/);
+    expect(bashOnly.some((t) => /save it as/.test(t))).toBe(false);
+  });
+
   it("falls back to MUX 0 and generic ids when nothing is known", () => {
-    const texts = buildGeneralSuggestions(null, []).map((s) => s.text);
+    const texts = buildGeneralSuggestions(null, [], ALL_TOOLS).map((s) => s.text);
     expect(texts[0]).toBe(
       "Plan a calibration: coarse one-qubit check on MUX 0, then T1 and T2 on the ones that pass",
     );
@@ -66,6 +81,7 @@ describe("useChatSuggestions", () => {
     listChipQubits.mockReturnValue({
       data: { data: { qubits: [{ qid: "4" }, { qid: "5" }] } },
     });
+    systemPrompt.mockReturnValue({ data: { data: { tools: ["bash", "qdash_list_chips"] } } });
     const { result } = renderHook(() => useChatSuggestions(false));
 
     expect(listChipQubits).toHaveBeenCalledWith(
@@ -74,6 +90,17 @@ describe("useChatSuggestions", () => {
       expect.objectContaining({ query: expect.objectContaining({ enabled: true }) }),
     );
     expect(result.current[0].text).toMatch(/on 64Qv3: coarse one-qubit check on qubits 4 and 5/);
+    // The runtime has bash but no flow saving: the workspace prompt, not the flow one.
+    expect(result.current[1].text).toMatch(/write a Python script in the workspace/);
+    expect(result.current.some((s) => /save it as/.test(s.text))).toBe(false);
+  });
+
+  it("hides the tool-bound prompts while the runtime's tools are unknown", () => {
+    listChips.mockReturnValue({ data: undefined });
+    listChipQubits.mockReturnValue({ data: undefined });
+    systemPrompt.mockReturnValue({ data: undefined, error: new Error("503") });
+    const { result } = renderHook(() => useChatSuggestions(false));
+    expect(result.current.some((s) => /workspace|save it as/.test(s.text))).toBe(false);
   });
 
   it("does not fetch for analysis chats and returns the analysis prompts", () => {
@@ -81,7 +108,12 @@ describe("useChatSuggestions", () => {
     listChipQubits.mockClear();
     listChips.mockReturnValue({ data: undefined });
     listChipQubits.mockReturnValue({ data: undefined });
+    systemPrompt.mockClear();
+    systemPrompt.mockReturnValue({ data: undefined });
     const { result } = renderHook(() => useChatSuggestions(true));
+    expect(systemPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ enabled: false }) }),
+    );
 
     expect(listChips).toHaveBeenCalledWith(
       expect.objectContaining({ query: expect.objectContaining({ enabled: false }) }),

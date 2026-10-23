@@ -321,7 +321,10 @@ export function WorkflowEditorPageContent() {
   // text, read when a turn is sent; a proposed edit lands in the editor unlocked.
   const { registerPage } = useChatDock();
   const pageState = useRef({ name, chipId, code, isDirty });
-  pageState.current = { name, chipId, code, isDirty };
+  // Written after each commit, never during render; the provider below reads it when a turn is sent.
+  useEffect(() => {
+    pageState.current = { name, chipId, code, isDirty };
+  });
   useEffect(
     () =>
       registerPage({

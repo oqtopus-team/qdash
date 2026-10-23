@@ -42,7 +42,9 @@ export async function startExecServer(options: ExecServerOptions): Promise<ExecS
   const socketDir = dirname(options.socketPath);
   mkdirSync(socketDir, { recursive: true });
   chmodSync(socketDir, 0o750);
-  if (options.socketGid !== undefined) chownSync(socketDir, process.getuid!(), options.socketGid);
+  // Only root may hand the socket to another group; a developer's own run keeps its group.
+  const socketGid = process.getuid?.() === 0 ? options.socketGid : undefined;
+  if (socketGid !== undefined) chownSync(socketDir, process.getuid!(), socketGid);
   const stale = lstatSync(options.socketPath, { throwIfNoEntry: false });
   if (stale) {
     if (!stale.isSocket()) throw new Error("Refusing to replace a non-socket path");
@@ -81,7 +83,8 @@ export async function startExecServer(options: ExecServerOptions): Promise<ExecS
       children.delete(child);
       socket.destroy();
     });
-    child.on("exit", (code, signal) => {
+    // `close`, not `exit`: the daemon's last stdout reaches the socket first.
+    child.on("close", (code, signal) => {
       children.delete(child);
       log(`daemon for ${name} exited (${signal ?? code})`);
       socket.end();
@@ -138,7 +141,7 @@ export async function startExecServer(options: ExecServerOptions): Promise<ExecS
     server.once("error", reject);
     server.listen(options.socketPath, () => {
       chmodSync(options.socketPath, 0o660);
-      if (options.socketGid !== undefined) chownSync(options.socketPath, process.getuid!(), options.socketGid);
+      if (socketGid !== undefined) chownSync(options.socketPath, process.getuid!(), socketGid);
       server.off("error", reject);
       resolve();
     });
@@ -155,18 +158,27 @@ export async function startExecServer(options: ExecServerOptions): Promise<ExecS
   };
 }
 
-/** Owner directories sit under a root-owned parent, so their uids form the allocation registry. */
+/**
+ * Owner directories sit under a root-owned parent, so their uids form the
+ * allocation registry. Entries that are not owner directories (a stray file,
+ * a directory owned outside the uid range) cannot collide with an allocation
+ * and are ignored; only an owner whose directory shares its uid with another
+ * is refused, so that one bad entry does not disable every other workspace.
+ */
 export function workspaceUid(root: string, owner: string): number {
   const name = workspaceName(owner);
   const used = new Set<number>();
+  const duplicated = new Set<number>();
   let existing: number | undefined;
   for (const entry of readdirSync(root)) {
     const stat = lstatSync(join(root, entry));
-    if (!stat.isDirectory() || stat.uid < UID_BASE || stat.uid >= UID_BASE + UID_SPAN || used.has(stat.uid)) {
-      throw new Error(`Invalid or duplicate workspace ownership: ${entry}`);
-    }
+    if (!stat.isDirectory() || stat.uid < UID_BASE || stat.uid >= UID_BASE + UID_SPAN) continue;
+    if (used.has(stat.uid)) duplicated.add(stat.uid);
     used.add(stat.uid);
     if (entry === name) existing = stat.uid;
+  }
+  if (existing !== undefined && duplicated.has(existing)) {
+    throw new Error(`Duplicate workspace ownership: another directory under ${root} has uid ${existing}`);
   }
   return existing ?? ownerUid(owner, used);
 }
@@ -197,6 +209,14 @@ function flag(value: string | undefined, fallback: boolean): boolean {
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
+/** A non-negative integer from the environment; blank or malformed means the default. */
+export function integer(value: string | undefined, fallback: number): number {
+  if (value === undefined || value.trim() === "") return fallback;
+  const parsed = Number(value.trim());
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`Expected a non-negative integer, got ${JSON.stringify(value)}`);
+  return parsed;
+}
+
 if (import.meta.main) {
   const root = process.getuid?.() === 0;
   const isolateUsers = flag(process.env.AGENT_EXEC_ISOLATE_USERS, root);
@@ -205,7 +225,7 @@ if (import.meta.main) {
   }
   const server = await startExecServer({
     socketPath: process.env.AGENT_EXEC_SOCKET ?? DEFAULT_EXEC_SOCKET,
-    socketGid: Number(process.env.AGENT_EXEC_SOCKET_GID ?? 1000),
+    socketGid: integer(process.env.AGENT_EXEC_SOCKET_GID, 1000),
     workspaceRoot: process.env.AGENT_EXEC_WORKSPACE_ROOT ?? "/workspace",
     daemon: process.env.AGENT_EXEC_DAEMON ?? "/usr/local/bin/pi-env",
     isolateUsers,

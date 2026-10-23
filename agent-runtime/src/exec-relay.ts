@@ -34,5 +34,6 @@ socket.on("error", (error) => {
   console.error(`exec-relay: ${error.message}`);
   process.exit(1);
 });
-socket.on("close", () => process.exit(0));
+// Let what the daemon last wrote reach stdout before the process ends.
+socket.on("close", () => process.stdout.write("", () => process.exit(0)));
 process.stdin.on("end", () => socket.end());

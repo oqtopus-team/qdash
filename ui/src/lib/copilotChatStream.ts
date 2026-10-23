@@ -19,7 +19,12 @@ function closeThinking(steps: TraceStep[], now: number): TraceStep[] {
 function closeOpenSteps(steps: TraceStep[], now: number): TraceStep[] {
   return steps.map((step) => {
     if (step.kind === "thinking" && step.endedAt === undefined) return { ...step, endedAt: now };
-    if (step.kind === "tool" && (step.status === "running" || step.status === "drafting")) {
+    // A call still being written when the turn ended was never made: it is
+    // kept as cancelled, with what was typed as its arguments, never as done.
+    if (step.kind === "tool" && step.status === "drafting") {
+      return { ...step, status: "cancelled", endedAt: now };
+    }
+    if (step.kind === "tool" && step.status === "running") {
       return { ...step, status: "done", endedAt: now };
     }
     return step;
@@ -96,15 +101,27 @@ export function startTool(
   payload: { id?: string | null; tool: string; label?: string; args?: unknown },
 ): TraceStep[] {
   const now = Date.now();
+  // The draft is the one with this call's id; a provider that streams the call
+  // without an id (the draft then got a synthetic one) leaves the latest draft
+  // of the same tool, which is the call being written.
   let idx = -1;
+  let sameTool = -1;
   for (let i = steps.length - 1; i >= 0; i--) {
     const s = steps[i];
     if (s.kind !== "tool" || s.status !== "drafting") continue;
-    if (payload.id != null ? s.id === payload.id : s.tool === payload.tool) {
+    if (payload.id != null && s.id === payload.id) {
       idx = i;
       break;
     }
+    if (
+      sameTool === -1 &&
+      s.tool === payload.tool &&
+      (payload.id == null || s.id.startsWith("draft-"))
+    ) {
+      sameTool = i;
+    }
   }
+  if (idx === -1) idx = sameTool;
   const running = {
     id: payload.id ?? `${payload.tool}-${now}`,
     tool: payload.tool,

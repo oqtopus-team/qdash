@@ -53,7 +53,8 @@ export function parsePageContext(value: unknown): PageContext | undefined {
   const record = value as Record<string, unknown>;
   const path = text(record.path, 512);
   if (!path) return undefined;
-  const page: PageContext = { path, ...(text(record.title, 200) ? { title: text(record.title, 200) } : {}) };
+  const title = text(record.title, 200);
+  const page: PageContext = { path, ...(title ? { title } : {}) };
   const flow = record.flow;
   if (flow && typeof flow === "object" && !Array.isArray(flow)) {
     const f = flow as Record<string, unknown>;
@@ -81,18 +82,28 @@ export function buildPageContextSection(page: PageContext | undefined): string |
     if (code.length > MAX_PAGE_CODE_CHARS) {
       code = `${code.slice(0, MAX_PAGE_CODE_CHARS)}\n# … cut: the flow is longer than ${MAX_PAGE_CODE_CHARS} characters`;
     }
+    // A fence longer than any backtick run in the code, so a docstring's own
+    // markdown example cannot close it and turn the rest of the file into prose.
+    const fence = codeFence(code);
     lines.push(
       "",
       `They have the flow \`${name}\`${chipId ? ` (chip ${chipId})` : ""} open in the Workflow editor${dirty ? ", with unsaved changes" : ""}. The editor currently holds:`,
       "",
-      "```python",
+      `${fence}python`,
       code,
-      "```",
+      fence,
       "",
       `To change this flow, call \`${EDIT_TOOL}\` with the complete new file and a one-line summary. The user sees a diff in the chat, applies it in the editor themselves, and saves when they are ready; do not save it for them and do not use qdash_save_flow for this flow unless they ask you to save. Answer questions about the code from this text; there is no need to fetch the flow.`,
     );
   }
   return lines.join("\n");
+}
+
+/** A markdown fence that the text cannot close: one backtick more than its longest run. */
+export function codeFence(text: string): string {
+  let longest = 0;
+  for (const run of text.match(/`+/g) ?? []) longest = Math.max(longest, run.length);
+  return "`".repeat(Math.max(3, longest + 1));
 }
 
 /** The edit tool for the flow the user has open; only offered while one is. */

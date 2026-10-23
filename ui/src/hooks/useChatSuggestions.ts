@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useListChipQubits, useListChips } from "@/client/chip/chip";
+import { useGetCopilotSystemPrompt } from "@/client/copilot/copilot";
 import type { ChipResponse } from "@/schemas";
 
 export interface ChatSuggestion {
@@ -52,9 +53,15 @@ function label(qid: string): string {
  * asks for a plan, which is read-only; running it is a separate approval. The
  * workspace suggestion has the model write and run a script (code streams into
  * the trace as it is typed), and the flow suggestion ends in a save that waits
- * for approval; neither touches hardware.
+ * for approval; neither touches hardware. Both appear only when the runtime
+ * offers the tools they need (`tools`: the names the system prompt view lists;
+ * null while unknown), so a starter prompt never asks for what the chat lacks.
  */
-export function buildGeneralSuggestions(chipId: string | null, qids: string[]): ChatSuggestion[] {
+export function buildGeneralSuggestions(
+  chipId: string | null,
+  qids: string[],
+  tools: ReadonlySet<string> | null = null,
+): ChatSuggestion[] {
   const [a, b] = qids;
   const qa = a !== undefined ? label(a) : "Q00";
   const qb = b !== undefined ? label(b) : a !== undefined ? label(a) : "Q01";
@@ -69,8 +76,8 @@ export function buildGeneralSuggestions(chipId: string | null, qids: string[]): 
   const flow = `Write a flow from the "simple" template that runs CheckT1 on ${a !== undefined ? `qubit ${a}` : "qubit 0"} and save it as t1_check_${a ?? "0"}`;
   return [
     { text: pipeline, Icon: Workflow },
-    { text: workspace, Icon: Terminal },
-    { text: flow, Icon: FileCode },
+    ...(tools?.has("bash") ? [{ text: workspace, Icon: Terminal }] : []),
+    ...(tools?.has("qdash_save_flow") ? [{ text: flow, Icon: FileCode }] : []),
     { text: `Show T1 trend for ${qa}`, Icon: LineChart },
     { text: `What are ${qa}'s current parameters?`, Icon: ListChecks },
     { text: `Compare T1 and T2 for ${qb}`, Icon: GitCompare },
@@ -91,8 +98,15 @@ export function useChatSuggestions(isAnalysis: boolean): ChatSuggestion[] {
     () => (qubits.data?.data?.qubits ?? []).map((q) => q.qid),
     [qubits.data?.data?.qubits],
   );
+  // Which tools this deployment's runtime offers (workspace, flow saving); a
+  // backend without the runtime answers 503, and those suggestions stay hidden.
+  const prompt = useGetCopilotSystemPrompt({
+    query: { enabled: !isAnalysis, staleTime: 300_000, retry: false },
+  });
+  const toolNames = prompt.data?.data?.tools;
+  const tools = useMemo(() => (toolNames ? new Set(toolNames) : null), [toolNames]);
   return useMemo(
-    () => (isAnalysis ? ANALYSIS_SUGGESTIONS : buildGeneralSuggestions(chipId, qids)),
-    [isAnalysis, chipId, qids],
+    () => (isAnalysis ? ANALYSIS_SUGGESTIONS : buildGeneralSuggestions(chipId, qids, tools)),
+    [isAnalysis, chipId, qids, tools],
   );
 }

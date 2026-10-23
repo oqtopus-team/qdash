@@ -113,8 +113,11 @@ export type TraceStep =
       tool: string;
       label: string;
       args?: unknown;
-      /** `drafting`: the model is still writing the call; `draft` holds what it has typed. */
-      status: "drafting" | "running" | "done" | "error";
+      /**
+       * `drafting`: the model is still writing the call; `draft` holds what it has typed.
+       * `cancelled`: the turn ended before the call was made; nothing ran.
+       */
+      status: "drafting" | "running" | "done" | "error" | "cancelled";
       startedAt: number;
       endedAt?: number;
       /** Arguments written so far, by JSON path such as `content` or `path` (while drafting). */

@@ -104,7 +104,9 @@ function ToolStepRow({
   return (
     <ChainOfThoughtStep
       isLast={isLast}
-      status={step.status === "drafting" ? "running" : step.status}
+      status={
+        step.status === "drafting" ? "running" : step.status === "cancelled" ? "idle" : step.status
+      }
       // A call being written opens its row; a workspace step stays open for the whole live turn.
       isStreaming={drafting && !stayOpen}
       defaultOpen={stayOpen}
@@ -113,7 +115,7 @@ function ToolStepRow({
           <PenLine className="w-3 h-3" />
         ) : step.status === "running" ? (
           <Loader2 className="w-3 h-3 animate-spin" />
-        ) : step.status === "error" ? (
+        ) : step.status === "error" || step.status === "cancelled" ? (
           <X className="w-3 h-3" />
         ) : (
           <Check className="w-3 h-3" />
@@ -137,7 +139,7 @@ function ToolStepRow({
           <span className="truncate font-mono text-[11px] text-base-content/40">{preview}</span>
         )}
         <span className="ml-auto shrink-0 tabular-nums text-[11px] text-base-content/35">
-          {step.status === "error" ? "failed · " : ""}
+          {step.status === "error" ? "failed · " : step.status === "cancelled" ? "not run · " : ""}
           {formatDuration(elapsed)}
         </span>
       </ChainOfThoughtTrigger>

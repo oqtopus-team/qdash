@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { chmod, mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,8 +10,8 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { localDaemon } from "@earendil-works/pi-env";
 
-import { startExecServer, workspaceUid } from "../exec/server.ts";
-import { workspaceName } from "../exec/protocol.ts";
+import { integer, startExecServer, workspaceUid } from "../exec/server.ts";
+import { ownerUid, workspaceName } from "../exec/protocol.ts";
 import { ExecWorkspace, removeWorkspace, WORKSPACE_TOOL_NAMES } from "../src/exec-env.ts";
 
 const daemon = localDaemon();
@@ -37,6 +37,22 @@ async function startServer(t, isolateUsers = false) {
   });
   return { root, logs, config: { socketPath: server.socketPath, workspaceRoot: join(root, "workspace") } };
 }
+
+test("entries that are not owner directories do not block uid allocation", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "agent-exec-uids-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  // A stray file, and a directory owned outside the reserved range (this test's own uid).
+  await writeFile(join(root, "README"), "");
+  await mkdir(join(root, "lost+found"));
+  assert.equal(workspaceUid(root, "alice"), ownerUid("alice"));
+});
+
+test("the socket group comes from the environment with a default for a blank value", () => {
+  assert.equal(integer(undefined, 1000), 1000);
+  assert.equal(integer("", 1000), 1000);
+  assert.equal(integer("1234", 1000), 1234);
+  assert.throws(() => integer("root", 1000), /non-negative integer/);
+});
 
 test("the coding tools are the four the workspace advertises", () => {
   const names = createCodingTools().tools.map((tool) => tool.name).sort();

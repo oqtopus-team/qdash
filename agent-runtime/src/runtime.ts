@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -157,6 +157,11 @@ export interface OpenDurableSession {
   conversation: Conversation;
   writeTools: QDashWriteTools;
   close(): Promise<void>;
+}
+
+/** The file beside a session's store that says its workspace directory was created. */
+export function workspaceMarker(storePath: string): string {
+  return `${storePath}.workspace`;
 }
 
 /** Return a stable non-identifying filename for one user's QDash session. */
@@ -603,7 +608,7 @@ export class SharedRuntime {
       try {
         await opened.close();
       } finally {
-        this.deleteSessionState(ownerId, sessionId);
+        await this.deleteSessionState(ownerId, sessionId);
       }
     }
   }
@@ -636,8 +641,13 @@ export class SharedRuntime {
   /** Delete the closed durable store and the workspace of one deleted QDash session. */
   async deleteSessionState(ownerId: string, sessionId: string): Promise<void> {
     const path = join(STATE_DIR, sessionStorageName(ownerId, sessionId));
+    // Only a session that used its workspace has a directory to remove; for the
+    // others (most evaluations, chats that never ran code) no daemon is started.
+    const marker = workspaceMarker(path);
+    const hadWorkspace = existsSync(marker);
     for (const suffix of ["", "-wal", "-shm"]) rmSync(`${path}${suffix}`, { force: true });
-    if (!EXEC_CONFIG) return;
+    rmSync(marker, { force: true });
+    if (!EXEC_CONFIG || !hadWorkspace) return;
     try {
       await removeWorkspace(EXEC_CONFIG, ownerId, sessionId);
     } catch (error) {
@@ -658,6 +668,18 @@ export class SharedRuntime {
     const workspace = EXEC_CONFIG
       ? new ExecWorkspace(EXEC_CONFIG, request.ownerId, request.sessionId)
       : undefined;
+    // Remembered next to the store once the directory exists, so deleting the
+    // session later knows whether there is a workspace to remove.
+    const marker = workspaceMarker(path);
+    let marked = existsSync(marker);
+    const workspaceEnv = async (target: { cwd?: string }) => {
+      const env = await workspace!.env(target.cwd);
+      if (!marked) {
+        writeFileSync(marker, "");
+        marked = true;
+      }
+      return env;
+    };
     let harness: DurableHarness | undefined;
     const close = async () => {
       try {
@@ -678,7 +700,7 @@ export class SharedRuntime {
         {
           models: this.modelRuntime,
           registry,
-          ...(workspace ? { env: (target: { cwd?: string }) => workspace.env(target.cwd) } : {}),
+          ...(workspace ? { env: workspaceEnv } : {}),
           settings: {
             stream: { timeoutMs: MODEL_STREAM_TIMEOUT_MS },
             compaction: {
