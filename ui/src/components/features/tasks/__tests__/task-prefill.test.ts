@@ -32,8 +32,24 @@ describe("current task form prefill", () => {
     ).toEqual({
       input: { frequency: "5", internal: "" },
       run: { shots: "200", sweep: "[0,1,10]" },
+      runTypes: { sweep: "np.linspace" },
       skipped: [],
     });
+  });
+  it("restores the sweep form a historical run used", () => {
+    const result = buildTaskPrefill(
+      task,
+      source({}, { sweep: { value: [0, 4, 16, 64], value_type: "list" } }),
+    );
+    expect(result.run.sweep).toBe("[0,4,16,64]");
+    expect(result.runTypes.sweep).toBe("list");
+    expect(result.skipped).toEqual([]);
+  });
+  it("keeps the declared sweep form when the historical value is a scalar", () => {
+    const result = buildTaskPrefill(task, source({}, { sweep: { value: 5, value_type: "float" } }));
+    expect(result.run.sweep).toBe("[0,1,10]");
+    expect(result.runTypes.sweep).toBe("np.linspace");
+    expect(result.skipped).toEqual(["run.sweep"]);
   });
   it("does not add deleted fields or apply forbidden overrides", () => {
     const result = buildTaskPrefill(task, source({ deleted: 1, internal: 2 }));

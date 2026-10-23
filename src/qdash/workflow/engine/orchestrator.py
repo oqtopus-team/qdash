@@ -535,7 +535,8 @@ class CalibOrchestrator:
         for param_name, param_data in flat_defaults.items():
             default_run_parameters.setdefault(param_name, param_data)
         if task_class is not None:
-            # A shared sweep must match the constructor of every task it reaches;
+            # A shared value must fit the declared type of every task it reaches
+            # (any sweep form for a sweep parameter, never a sweep for a scalar);
             # a task-scoped value for the same name replaces it for this task.
             for param_name, param_data in default_run_parameters.items():
                 overridden = param_name in configured[RUN] or param_name in explicit[RUN]

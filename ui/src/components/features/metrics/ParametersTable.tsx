@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 
-import { getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
+import { formatSweepValue, getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
 
 /** Manual override info for a parameter. */
 export interface ParameterOverride {
@@ -106,6 +106,11 @@ function formatValue(v: unknown): string {
   return String(v ?? "N/A");
 }
 
+/** Show a recorded sweep as the call that produced it; other values as before. */
+function formatParameterValue(parameter: Record<string, unknown>): string {
+  return formatSweepValue(parameter.value_type, parameter.value) ?? formatValue(parameter.value);
+}
+
 /** Render a fully-expanded parameters table with manual-edit markers. */
 export function ParametersTable({
   title,
@@ -127,7 +132,10 @@ export function ParametersTable({
       if (existing) {
         existing.entries.push(entry);
       } else {
-        groups.set(group.name, { collapsed: group.collapsed, entries: [entry] });
+        groups.set(group.name, {
+          collapsed: group.collapsed,
+          entries: [entry],
+        });
       }
     }
     return { regularEntries: regular, parameterGroups: [...groups.entries()] };
@@ -215,14 +223,14 @@ export function ParametersTable({
                 {override ? (
                   <span className="flex items-center gap-1.5">
                     <span className="line-through text-base-content/40">
-                      {formatValue(paramValue.value)}
+                      {formatParameterValue(paramValue)}
                     </span>
                     <span className="text-warning font-semibold">
                       {formatValue(override.currentValue)}
                     </span>
                   </span>
                 ) : (
-                  formatValue(paramValue.value)
+                  formatParameterValue(paramValue)
                 )}
               </td>
               <td className="text-xs">{String(paramValue.unit ?? "-")}</td>

@@ -19,6 +19,7 @@ from qdash.common.config.backend import (
     is_task_available,
 )
 from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
+from qdash.datamodel.task import compatible_value_type
 
 if TYPE_CHECKING:
     from qdash.api.schemas.flow import ExecuteFlowResponse
@@ -46,6 +47,24 @@ def _matches_parameter_type(value: object, value_type: object) -> bool:
     return True
 
 
+def run_override_parts(override: Any) -> tuple[Any, str | None]:
+    """Split a run override into its value and the ``value_type`` it carries, if any.
+
+    A run override is either a bare value, which takes the task's declared type, or
+    ``{"value": ..., "value_type": ...}`` when the caller picks another sweep form
+    for a parameter that declares a generated range.
+    """
+    if isinstance(override, dict) and "value" in override:
+        value_type = override.get("value_type")
+        return override["value"], str(value_type) if value_type is not None else None
+    return override, None
+
+
+def run_override_value(override: Any) -> Any:
+    """Return the value a run override carries."""
+    return run_override_parts(override)[0]
+
+
 def validate_overrides(
     task: TaskInfo,
     input_overrides: dict[str, Any],
@@ -60,16 +79,24 @@ def validate_overrides(
         if task.input_parameters.get(name, {}).get("user_override") == "forbidden"
     }
     invalid_types = []
-    for kind, overrides, parameters in (
-        ("input", input_overrides, task.input_parameters),
-        ("run", run_overrides, task.run_parameters),
-    ):
-        for name, value in overrides.items():
-            metadata = parameters.get(name)
-            if metadata is not None and not _matches_parameter_type(
-                value, metadata.get("value_type")
-            ):
-                invalid_types.append(f"{kind}.{name} must be {metadata.get('value_type')}")
+    for name, value in input_overrides.items():
+        metadata = task.input_parameters.get(name)
+        if metadata is not None and not _matches_parameter_type(value, metadata.get("value_type")):
+            invalid_types.append(f"input.{name} must be {metadata.get('value_type')}")
+    for name, override in run_overrides.items():
+        metadata = task.run_parameters.get(name)
+        if metadata is None:
+            continue
+        declared_type = metadata.get("value_type")
+        value, requested_type = run_override_parts(override)
+        if not compatible_value_type(declared_type, requested_type):
+            invalid_types.append(
+                f"run.{name} declares {declared_type} and cannot take {requested_type}"
+            )
+            continue
+        effective_type = requested_type if requested_type is not None else declared_type
+        if not _matches_parameter_type(value, effective_type):
+            invalid_types.append(f"run.{name} must be {effective_type}")
 
     errors = []
     if unknown_inputs:
@@ -143,7 +170,7 @@ async def run_catalog_task(
 
     # The session takes the same readout_duration the task runs with.
     readout_duration = (
-        run_overrides.get("readout_duration", DEFAULT_READOUT_DURATION)
+        run_override_value(run_overrides.get("readout_duration", DEFAULT_READOUT_DURATION))
         if "readout_duration" in task.run_parameters
         else None
     )
@@ -166,10 +193,21 @@ async def run_catalog_task(
         default_run_parameters=default_run_parameters,
         parameter_overrides={"input": input_overrides},
         task_run_parameters={
-            task.name: {name: {"value": value} for name, value in run_overrides.items()}
+            task.name: {
+                name: _run_parameter_entry(override) for name, override in run_overrides.items()
+            }
         },
         persist_output_parameters=persist_output_parameters,
         update_params=update_params,
         reconfigure=reconfigure,
         execution_name=execution_name,
     )
+
+
+def _run_parameter_entry(override: Any) -> dict[str, Any]:
+    """Return the ``{"value": ..., "value_type"?: ...}`` entry one run override sets."""
+    value, value_type = run_override_parts(override)
+    entry: dict[str, Any] = {"value": value}
+    if value_type is not None:
+        entry["value_type"] = value_type
+    return entry

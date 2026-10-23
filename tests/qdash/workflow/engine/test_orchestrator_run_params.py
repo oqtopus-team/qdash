@@ -342,7 +342,7 @@ class TestTaskRunParameterInjection:
         with pytest.raises(ValueError, match="requires a tuple/list of 3 values"):
             orchestrator._create_task_instance(TASK_NAME, {"run": {"time_range": "[0, 101, 4]"}})
 
-    def test_sweep_constructor_must_match_declared_run_type(self) -> None:
+    def test_sweep_constructor_may_differ_from_declared_run_type(self) -> None:
         orchestrator = CalibOrchestrator(
             _config(
                 task_parameters=normalize_task_parameters(
@@ -351,8 +351,18 @@ class TestTaskRunParameterInjection:
             )
         )
 
-        with pytest.raises(ValueError, match=r"declares 'range'.*uses 'np\.linspace'"):
-            orchestrator._create_task_instance(TASK_NAME, None)
+        task = orchestrator._create_task_instance(TASK_NAME, None)
+
+        assert task.run_parameters["time_range"].value_type == "np.linspace"
+        assert list(task.run_parameters["time_range"].get_value()) == list(range(0, 101, 10))
+
+    def test_sweep_for_scalar_run_parameter_is_rejected(self) -> None:
+        orchestrator = CalibOrchestrator(_config())
+
+        with pytest.raises(ValueError, match=r"shots declares 'int' and cannot take"):
+            orchestrator._create_task_instance(
+                TASK_NAME, {"run": {"shots": {"value": [0, 1, 2], "value_type": "np.linspace"}}}
+            )
 
 
 class TestTaskInputOverrides:

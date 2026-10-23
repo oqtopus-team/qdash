@@ -10,17 +10,36 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-SweepValueType = Literal["np.linspace", "np.logspace", "np.arange", "range"]
+from qdash.datamodel.task import (
+    SWEEP_OVERRIDE_VALUE_TYPES,
+    SWEEP_VALUE_TYPES,
+    compatible_value_type,
+    is_sweep_value_type,
+)
+
+__all__ = [
+    "SWEEP_OVERRIDE_VALUE_TYPES",
+    "SWEEP_VALUE_TYPES",
+    "Sweep",
+    "arange",
+    "compatible_value_type",
+    "is_sweep_value_type",
+    "linspace",
+    "logspace",
+    "range",
+    "values",
+]
+
+SweepValueType = Literal["np.linspace", "np.logspace", "np.arange", "range", "list"]
 SweepArgument = int | float
-SWEEP_VALUE_TYPES = frozenset({"np.linspace", "np.logspace", "np.arange", "range"})
 
 
 @dataclass(frozen=True, slots=True)
 class Sweep:
-    """A serializable declaration of a three-argument sweep."""
+    """A serializable declaration of a sweep: a constructor call or explicit values."""
 
     value_type: SweepValueType
-    arguments: tuple[SweepArgument, SweepArgument, SweepArgument]
+    arguments: tuple[SweepArgument, ...]
 
     def as_run_parameter(self) -> dict[str, object]:
         """Return the canonical run-parameter representation."""
@@ -41,6 +60,15 @@ def _require_count(constructor: str, num: object) -> None:
 def _require_step(constructor: str, step: SweepArgument) -> None:
     if step == 0:
         raise ValueError(f"sweep.{constructor} step must not be zero")
+
+
+def values(*points: SweepArgument) -> Sweep:
+    """Declare explicit sweep points for a run parameter that declares a generated range."""
+    if not points:
+        raise ValueError("sweep.values needs at least one point")
+    for index, point in enumerate(points):
+        _require_number("values", f"points[{index}]", point)
+    return Sweep("list", tuple(points))
 
 
 def linspace(start: SweepArgument, stop: SweepArgument, num: int) -> Sweep:
