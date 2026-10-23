@@ -25,6 +25,7 @@ from qdash.api.schemas.flow import (
     FlowTemplateWithCode,
     GetFlowResponse,
     ListFlowsResponse,
+    MoveFlowResponse,
     SaveFlowRequest,
     SaveFlowResponse,
 )
@@ -123,6 +124,9 @@ class FlowService:
 
         """
         self._validate_flow_name(request.name)
+        # None keeps the stored folder, so a client that does not know about
+        # folders (the Copilot's save tool) does not move the flow to the root.
+        folder = self._normalize_folder(request.folder) if request.folder is not None else None
 
         if request.flow_function_name is None:
             request.flow_function_name = request.name
@@ -180,6 +184,7 @@ class FlowService:
                     file_path=file_path_str,
                     deployment_id=deployment_id,
                     tags=request.tags,
+                    folder=folder,
                 )
                 logger.info(
                     f"Updated flow '{request.name}' in project '{project_id}' by user '{username}'"
@@ -198,6 +203,7 @@ class FlowService:
                     deployment_id=deployment_id,
                     tags=request.tags,
                     default_run_parameters=request.default_run_parameters,
+                    folder=folder or "",
                 )
                 logger.info(
                     f"Created new flow '{request.name}' in project '{project_id}' by user '{username}'"
@@ -248,6 +254,7 @@ class FlowService:
                     created_at=flow.created_at,
                     updated_at=flow.updated_at,
                     tags=flow.tags,
+                    folder=flow.folder,
                     file_exists=Path(flow.file_path).exists(),
                 )
                 for flow in flows
@@ -306,6 +313,25 @@ class FlowService:
             created_at=flow.created_at,
             updated_at=flow.updated_at,
             tags=flow.tags,
+            folder=flow.folder,
+        )
+
+    async def move_flow(self, name: str, project_id: str, folder: str) -> MoveFlowResponse:
+        """Move a Flow to another folder; only the stored metadata changes.
+
+        The name, file and Prefect deployment stay as they are, so a move is
+        instant and cannot break a running or scheduled flow.
+        """
+        flow = self._flow_repo.find_by_project_and_name(project_id, name)
+        if not flow:
+            raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
+        normalized = self._normalize_folder(folder)
+        self._flow_repo.update_flow(flow=flow, folder=normalized)
+        logger.info(f"Moved flow '{name}' in project '{project_id}' to folder '{normalized}'")
+        return MoveFlowResponse(
+            name=name,
+            folder=normalized,
+            message=f"Flow '{name}' moved to '{normalized or '/'}'",
         )
 
     async def delete_flow(self, name: str, username: str, project_id: str) -> dict[str, str]:
@@ -1144,6 +1170,27 @@ class FlowService:
                 status_code=400,
                 detail="Flow name must contain only alphanumeric characters and underscores",
             )
+
+    @staticmethod
+    def _normalize_folder(folder: str) -> str:
+        """Return the folder path in canonical form, or raise 400.
+
+        A folder is zero or more segments joined by "/"; each segment uses the
+        same characters as a flow name. Surrounding slashes and whitespace are
+        dropped so "/daily/t1/" and "daily/t1" name the same folder.
+        """
+        normalized = folder.strip().strip("/")
+        if normalized == "":
+            return ""
+        if not all(re.match(r"^[a-zA-Z0-9_]+$", part) for part in normalized.split("/")):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Folder must be segments of alphanumeric characters and underscores"
+                    ' separated by "/"'
+                ),
+            )
+        return normalized
 
     @staticmethod
     def _validate_flow_code(code: str, expected_function_name: str) -> None:

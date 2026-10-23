@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 
@@ -13,6 +13,7 @@ import type { SaveFlowRequest, FlowTemplate, SaveFlowResponse } from "@/schemas"
 import type { AxiosResponse } from "axios";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { useListChips } from "@/client/chip/chip";
 import { getFlowTemplate, listFlowTemplates, saveFlow } from "@/client/flow/flow";
 
@@ -35,9 +36,33 @@ export default function NewFlowPage() {
   const [username, setUsername] = useState("");
   const [chipId, setChipId] = useState("");
   const [tags, setTags] = useState("");
+  const [folder, setFolder] = useState("");
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+
+  // The chat sidebar sees the flow being written here and can propose its code.
+  const { registerPage } = useChatDock();
+  const pageState = useRef({ name, chipId, code });
+  // Written after each commit, never during render; the provider below reads it when a turn is sent.
+  useEffect(() => {
+    pageState.current = { name, chipId, code };
+  });
+  useEffect(
+    () =>
+      registerPage({
+        current: () => {
+          const { name, chipId, code } = pageState.current;
+          return {
+            path: "/workflow/new",
+            title: "New workflow",
+            flow: { name: name || "new_flow", chipId: chipId || undefined, code, dirty: true },
+          };
+        },
+        applyCode: setCode,
+      }),
+    [registerPage],
+  );
 
   // Fetch current user
   const { data: userData } = useGetCurrentUser();
@@ -158,6 +183,7 @@ export default function NewFlowPage() {
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
+      folder: folder.trim(),
       default_parameters: {
         username: username.trim(),
         chip_id: chipId.trim(),
@@ -405,6 +431,24 @@ export default function NewFlowPage() {
                   />
                   <label className="label">
                     <span className="label-text-alt text-xs">Comma-separated</span>
+                  </label>
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text text-xs">Folder</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="daily/t1"
+                    className="input input-bordered input-sm"
+                    value={folder}
+                    onChange={(e) => setFolder(e.target.value)}
+                  />
+                  <label className="label">
+                    <span className="label-text-alt text-xs">
+                      Where it sits in your space on the Workflow page; "/" nests
+                    </span>
                   </label>
                 </div>
               </div>

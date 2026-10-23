@@ -8,6 +8,7 @@ import type { ChatTrace, LiveTurn, ToolEvaluation, TraceStep } from "@/types/cop
 const MAX_PERSISTED_THINKING = 20_000;
 const MAX_PERSISTED_ARGS = 4_000;
 const MAX_PERSISTED_PROMPT = 12_000;
+const MAX_PERSISTED_OUTPUT = 2_000;
 
 function closeThinking(steps: TraceStep[], now: number): TraceStep[] {
   return steps.map((step) =>
@@ -18,7 +19,14 @@ function closeThinking(steps: TraceStep[], now: number): TraceStep[] {
 function closeOpenSteps(steps: TraceStep[], now: number): TraceStep[] {
   return steps.map((step) => {
     if (step.kind === "thinking" && step.endedAt === undefined) return { ...step, endedAt: now };
-    if (step.kind === "tool" && step.status === "running") return { ...step, endedAt: now };
+    // A call still being written when the turn ended was never made: it is
+    // kept as cancelled, with what was typed as its arguments, never as done.
+    if (step.kind === "tool" && step.status === "drafting") {
+      return { ...step, status: "cancelled", endedAt: now };
+    }
+    if (step.kind === "tool" && step.status === "running") {
+      return { ...step, status: "done", endedAt: now };
+    }
     return step;
   });
 }
@@ -41,23 +49,94 @@ export function appendDelta(
   ];
 }
 
-export function startTool(
+/** The model started writing a tool call: a drafting step that `appendArgsDelta` fills. */
+export function startDraft(
   steps: TraceStep[],
-  payload: { id?: string | null; tool: string; label?: string; args?: unknown },
+  payload: { index: number; id?: string | null; tool: string; label?: string },
 ): TraceStep[] {
   const now = Date.now();
   return [
     ...closeThinking(steps, now),
     {
       kind: "tool",
-      id: payload.id ?? `${payload.tool}-${now}`,
+      id: payload.id || `draft-${payload.tool}-${payload.index}-${now}`,
       tool: payload.tool,
       label: payload.label ?? payload.tool,
-      args: payload.args ?? undefined,
-      status: "running",
+      status: "drafting",
       startedAt: now,
+      draft: {},
+      draftIndex: payload.index,
     },
   ];
+}
+
+/** Text the model appended to one argument of the call it is writing. */
+export function appendArgsDelta(
+  steps: TraceStep[],
+  payload: { index: number; path?: unknown; delta?: unknown },
+): TraceStep[] {
+  if (typeof payload.delta !== "string" || !payload.delta || !Array.isArray(payload.path)) {
+    return steps;
+  }
+  const key = payload.path.map(String).join(".");
+  let idx = -1;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const s = steps[i];
+    if (s.kind === "tool" && s.status === "drafting" && s.draftIndex === payload.index) {
+      idx = i;
+      break;
+    }
+  }
+  const step = steps[idx];
+  if (!step || step.kind !== "tool") return steps;
+  const draft = { ...(step.draft ?? {}), [key]: (step.draft?.[key] ?? "") + payload.delta };
+  const next = [...steps];
+  next[idx] = { ...step, draft };
+  return next;
+}
+
+/** The call starts running: the drafting step becomes it, or a new step opens. */
+export function startTool(
+  steps: TraceStep[],
+  payload: { id?: string | null; tool: string; label?: string; args?: unknown },
+): TraceStep[] {
+  const now = Date.now();
+  // The draft is the one with this call's id; a provider that streams the call
+  // without an id (the draft then got a synthetic one) leaves the latest draft
+  // of the same tool, which is the call being written.
+  let idx = -1;
+  let sameTool = -1;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const s = steps[i];
+    if (s.kind !== "tool" || s.status !== "drafting") continue;
+    if (payload.id != null && s.id === payload.id) {
+      idx = i;
+      break;
+    }
+    if (
+      sameTool === -1 &&
+      s.tool === payload.tool &&
+      (payload.id == null || s.id.startsWith("draft-"))
+    ) {
+      sameTool = i;
+    }
+  }
+  if (idx === -1) idx = sameTool;
+  const running = {
+    id: payload.id ?? `${payload.tool}-${now}`,
+    tool: payload.tool,
+    label: payload.label ?? payload.tool,
+    args: payload.args ?? undefined,
+    status: "running" as const,
+  };
+  if (idx !== -1) {
+    const step = steps[idx] as Extract<TraceStep, { kind: "tool" }>;
+    const next = [...steps];
+    const { draft: _draft, draftIndex: _draftIndex, ...rest } = step;
+    next[idx] = { ...rest, ...running };
+    return next;
+  }
+  return [...closeThinking(steps, now), { kind: "tool", ...running, startedAt: now }];
 }
 
 /** The evaluation summary of a tool_end payload, when it is well-formed. */
@@ -82,6 +161,8 @@ export function endTool(
     is_error?: boolean;
     figures?: unknown;
     evaluation?: unknown;
+    output?: unknown;
+    exit_code?: unknown;
   },
 ): TraceStep[] {
   // Match by call id; fall back to the oldest running call of that tool.
@@ -104,6 +185,8 @@ export function endTool(
     endedAt: Date.now(),
     ...(figures.length ? { figures } : {}),
     ...(evaluation ? { evaluation } : {}),
+    ...(typeof payload.output === "string" && payload.output ? { output: payload.output } : {}),
+    ...(typeof payload.exit_code === "number" ? { exitCode: payload.exit_code } : {}),
   };
   return next;
 }
@@ -148,9 +231,19 @@ export function toPersistedTrace(turn: LiveTurn, now: number): ChatTrace | undef
         ...step.evaluation,
         prompt: step.evaluation.prompt.slice(0, MAX_PERSISTED_PROMPT),
       };
+      // A call the model never finished keeps what it wrote as its arguments.
+      const { draft, draftIndex: _draftIndex, output, ...rest } = step;
       return {
-        ...step,
-        args: truncateArgs(step.args),
+        ...rest,
+        args: truncateArgs(step.args ?? draft),
+        ...(output
+          ? {
+              output:
+                output.length > MAX_PERSISTED_OUTPUT
+                  ? `…${output.slice(-MAX_PERSISTED_OUTPUT)}`
+                  : output,
+            }
+          : {}),
         ...(evaluation ? { evaluation } : {}),
       };
     }

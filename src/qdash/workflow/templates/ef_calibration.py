@@ -30,7 +30,7 @@ EF_CALIBRATION_TASKS: list[str] = [
     "ConfigureEF",
     "CheckRabi",
     "CreateHPIPulse",
-    "CheckEFChevron",
+    "CheckAdaptiveEFChevron",
     "CheckEFRabi",
     "CreateEFHPIPulse",
     "CreateEFPIPulse",
@@ -92,26 +92,36 @@ def ef_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
+        task_parameters={
             "ConfigureEF": {
-                "configuration_mode": {"value": configuration_mode, "value_type": "str"},
+                "run": {
+                    "configuration_mode": configuration_mode,
+                },
             },
             "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "hpi_duration": 32,
+                },
             },
-            "CheckEFChevron": {
-                "shots": {"value": 256, "value_type": "int"},
+            "CheckAdaptiveEFChevron": {
+                "run": {
+                    "shots": 256,
+                },
             },
             "CreateEFHPIPulse": {
-                "ef_hpi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "ef_hpi_duration": 32,
+                },
             },
             "CreateEFPIPulse": {
-                "ef_pi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "ef_pi_duration": 32,
+                },
             },
         },
         default_run_parameters={
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

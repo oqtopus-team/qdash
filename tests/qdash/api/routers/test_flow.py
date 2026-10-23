@@ -104,6 +104,7 @@ def sample_flow(test_project):
         created_at=datetime.now(),
         updated_at=datetime.now(),
         tags=["test"],
+        folder="daily/t1",
     )
     flow.insert()
     return flow
@@ -128,6 +129,7 @@ class TestFlowRouter:
         assert len(data["flows"]) == 1
         assert data["flows"][0]["name"] == "test_flow"
         assert data["flows"][0]["created_by"] == "test_user"
+        assert data["flows"][0]["folder"] == "daily/t1"
         assert data["flows"][0]["file_exists"] is False
 
     def test_list_flows_marks_existing_files(
@@ -213,6 +215,49 @@ class TestFlowRouter:
         }
         response = test_client.get("/flows", headers=headers)
         assert response.status_code == 401
+
+
+class TestFlowMove:
+    """Tests for PATCH /flows/{name}/folder."""
+
+    def test_move_flow_updates_only_the_folder(
+        self, test_client, test_project, auth_headers, sample_flow
+    ):
+        response = test_client.patch(
+            "/flows/test_flow/folder", headers=auth_headers, json={"folder": "/weekly/"}
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["folder"] == "weekly"
+        stored = FlowDocument.find_one({"project_id": "test_project", "name": "test_flow"}).run()
+        assert stored is not None
+        assert stored.folder == "weekly"
+        assert stored.file_path == sample_flow.file_path
+        assert stored.deployment_id == sample_flow.deployment_id
+
+    def test_move_flow_to_the_root(self, test_client, test_project, auth_headers, sample_flow):
+        response = test_client.patch(
+            "/flows/test_flow/folder", headers=auth_headers, json={"folder": ""}
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["folder"] == ""
+
+    def test_move_flow_rejects_a_bad_folder(
+        self, test_client, test_project, auth_headers, sample_flow
+    ):
+        response = test_client.patch(
+            "/flows/test_flow/folder", headers=auth_headers, json={"folder": "../x"}
+        )
+
+        assert response.status_code == 400
+
+    def test_move_flow_not_found(self, test_client, test_project, auth_headers):
+        response = test_client.patch(
+            "/flows/missing/folder", headers=auth_headers, json={"folder": "a"}
+        )
+
+        assert response.status_code == 404
 
 
 class TestFlowExecution:

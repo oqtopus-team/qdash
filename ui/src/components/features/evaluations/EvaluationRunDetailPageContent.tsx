@@ -267,7 +267,8 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
           <Stat
             label="Evaluation model"
             value={
-              (run.models?.length ?? 0) > 1 ? `mixed (${run.models?.length})` : run.model || "-"
+              run.evaluation_model ||
+              ((run.models?.length ?? 0) > 1 ? `mixed (${run.models?.length})` : run.model || "-")
             }
           />
           <Stat

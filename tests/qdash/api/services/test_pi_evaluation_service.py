@@ -85,7 +85,7 @@ async def test_a_non_json_failure_reports_the_status(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_planner_mode_sends_the_planner_model(monkeypatch) -> None:
+async def test_planner_mode_sends_the_planner_and_evaluation_models(monkeypatch) -> None:
     monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "runtime-secret")
     seen: dict[str, object] = {}
 
@@ -98,6 +98,10 @@ async def test_planner_mode_sends_the_planner_model(monkeypatch) -> None:
         auth=AUTH,
         mode="planner",
         model={"provider": "openai-compatible", "name": "qwen"},
+        evaluation_model={
+            "provider": "openai-compatible-evaluation",
+            "name": "nvidia/Ising-Calibration",
+        },
         thinking_level="low",
         transport=_transport(handler),
     )
@@ -106,6 +110,10 @@ async def test_planner_mode_sends_the_planner_model(monkeypatch) -> None:
         "task_id": "t1",
         "mode": "planner",
         "model": {"provider": "openai-compatible", "name": "qwen"},
+        "evaluation_model": {
+            "provider": "openai-compatible-evaluation",
+            "name": "nvidia/Ising-Calibration",
+        },
         "thinking_level": "low",
     }
 

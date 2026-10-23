@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
+from qdash.workflow.engine.task_parameters import normalize_task_parameters
 from qdash.workflow.service.results import OneQubitResult, normalize_metric_value
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import BRINGUP_TASKS
@@ -132,14 +133,13 @@ class BringUp(CalibrationStep):
         if self.resonator_assignment_order is None:
             return
 
-        task_run_parameters = copy.deepcopy(service.task_run_parameters)
-        task_params = task_run_parameters.setdefault("CheckResonatorSpectroscopy", {})
-        task_params["resonator_assignment_order"] = {
-            "value": self.resonator_assignment_order,
-            "value_type": "list",
-        }
-        service.task_run_parameters.clear()
-        service.task_run_parameters.update(task_run_parameters)
+        task_parameters = copy.deepcopy(service.task_parameters)
+        task_settings = task_parameters.setdefault(
+            "CheckResonatorSpectroscopy", {"run": {}, "input": {}}
+        )
+        task_settings["run"]["resonator_assignment_order"] = self.resonator_assignment_order
+        service.task_parameters.clear()
+        service.task_parameters.update(normalize_task_parameters(task_parameters))
 
     def _execute_direct(
         self,
@@ -160,7 +160,7 @@ class BringUp(CalibrationStep):
             "execution_id": service.execution_id,
             "project_id": service.project_id,
             "default_run_parameters": service.default_run_parameters,
-            "task_run_parameters": service.task_run_parameters,
+            "task_parameters": service.task_parameters,
             "tags": service.tags,
             "flow_name": service.flow_name,
             "note": service.note,

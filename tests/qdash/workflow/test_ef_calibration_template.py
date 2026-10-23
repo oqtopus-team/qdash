@@ -45,7 +45,7 @@ def test_ef_calibration_runs_expected_tasks_in_one_synchronized_step() -> None:
         "ConfigureEF",
         "CheckRabi",
         "CreateHPIPulse",
-        "CheckEFChevron",
+        "CheckAdaptiveEFChevron",
         "CheckEFRabi",
         "CreateEFHPIPulse",
         "CreateEFPIPulse",
@@ -68,26 +68,36 @@ def test_ef_calibration_forwards_configuration_mode_and_shared_defaults() -> Non
         "flow_name": "ef-check",
         "tags": ["ef"],
         "project_id": "project-1",
-        "task_run_parameters": {
+        "task_parameters": {
             "ConfigureEF": {
-                "configuration_mode": {"value": "ge-ef-fh", "value_type": "str"},
+                "run": {
+                    "configuration_mode": "ge-ef-fh",
+                },
             },
             "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "hpi_duration": 32,
+                },
             },
-            "CheckEFChevron": {
-                "shots": {"value": 256, "value_type": "int"},
+            "CheckAdaptiveEFChevron": {
+                "run": {
+                    "shots": 256,
+                },
             },
             "CreateEFHPIPulse": {
-                "ef_hpi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "ef_hpi_duration": 32,
+                },
             },
             "CreateEFPIPulse": {
-                "ef_pi_duration": {"value": 32, "value_type": "int"},
+                "run": {
+                    "ef_pi_duration": 32,
+                },
             },
         },
         "default_run_parameters": {
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     }
 

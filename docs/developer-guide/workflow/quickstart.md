@@ -3,6 +3,9 @@
 Use a QDash flow template to define targets, an explicit sequence of calibration steps, and the
 parameters those steps need.
 
+To create, save, and run a workflow in the application, see
+[Creating Workflows](../../user-guide/creating-workflows.md).
+
 ## Start from an Existing Template
 
 Copy the closest file under `src/qdash/workflow/templates/` before writing a flow from scratch.
@@ -115,38 +118,52 @@ step's default list. The visible order is part of the flow contract: repeated me
 configuration checkpoints must remain reviewable in the saved source. If two templates must stay
 aligned, compare their lists in template tests.
 
-## Set Run Parameters
+## Set Task Parameters
 
-Pass shared fallbacks through `default_run_parameters` and task-specific values through
-`task_run_parameters`:
+Pass shared run-parameter fallbacks through `default_run_parameters` and settings for one task
+through `task_parameters`:
 
 ```python
+from qdash.workflow import sweep
+
 service = CalibService(
     username,
     chip_id,
     project_id=project_id,
     default_run_parameters={
-        "interval": {"value": 150 * 1024, "value_type": "int"},
+        "interval": 150 * 1024,
     },
-    task_run_parameters={
+    task_parameters={
         "CheckRamsey": {
-            "shots": {"value": 1024, "value_type": "int"},
+            "run": {
+                "shots": 1024,
+                "time_range": sweep.arange(0, 10_000, 100),
+            },
+            "input": {"control_frequency": 7.012},
             "update_calibration_parameters": False,
         },
     },
 )
 ```
 
-Explicit task settings override shared defaults. Setting
+`default_run_parameters` and `task_parameters[task_name]["run"]` use the same value syntax.
+`run` sets run parameters the task declares in its `run_spec`, and overrides shared defaults.
+`input` replaces calibration inputs the task declares in its `input_spec`; the value applies to
+every qid the task runs on. Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or
+`sweep.range` for generated run ranges, and plain values for other run values and `input` entries.
+The helper records the constructor without creating an array in the workflow process. Setting
 `update_calibration_parameters=False` retains task history without promoting validated outputs to
-the current calibration state. The complete precedence rules are in
-[Parameter Resolution](./parameter-resolution.md).
+the current calibration state. A name in the wrong section, or one the task does not declare,
+fails when the task is created. The complete precedence rules are in [Parameter
+Resolution](./parameter-resolution.md).
 
 ## Preserve Terminal Handling
 
 Every top-level flow that owns hardware reservations must register `on_flow_cancellation`,
 `on_flow_failure`, and `on_flow_crashed`. Do not reproduce their exception-classification logic in
-the template. Nested single-task flows use the `*_keep_lock` hooks supplied by the service layer.
+the template. The system `single-task-executor` also owns its reservation and uses these hooks.
+Use the `*_keep_lock` variants only for nested flows configured with `use_lock=False` that borrow
+the parent flow's reservation.
 
 The hooks finalize execution and task records that the worker cannot close itself and release only
 reservations owned by that flow. [Workflow Engine Architecture](./engine-architecture.md#cancellation)

@@ -81,6 +81,8 @@ export const EXPERIMENTAL_WRITE_TOOL_NAMES = [
   "qdash_create_forum_evidence_reply",
   "qdash_create_forum_image_reply",
   "qdash_run_pipeline",
+  "qdash_save_flow",
+  "qdash_execute_flow",
 ] as const;
 
 const EXPERIMENTAL_WRITE_TOOLS = new Set<string>(EXPERIMENTAL_WRITE_TOOL_NAMES);

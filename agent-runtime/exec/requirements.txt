@@ -1,0 +1,8 @@
+# Python packages of the Copilot workspace (exec/Dockerfile). Kept to the
+# scientific stack the chat's analyses use; the model can run nothing that
+# needs the network, so this list is the whole catalogue.
+numpy>=2,<3
+scipy>=1.14,<2
+pandas>=2.2,<3
+plotly>=5.24,<7
+matplotlib>=3.9,<4

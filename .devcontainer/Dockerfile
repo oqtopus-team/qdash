@@ -6,14 +6,17 @@ ARG TRUFFLEHOG_VERSION=3.95.3
 ARG BETTERLEAKS_VERSION=v1.3.1
 ARG LEFTHOOK_VERSION=2.1.6
 ARG LYCHEE_VERSION=0.24.2
-ARG UV_VERSION=0.11.11
-ARG BUN_VERSION=1.4.0
+ARG UV_VERSION=0.13.5
+ARG BUN_VERSION=1.4.4
 ARG CODEX_VERSION=0.130.0
 
 FROM ghcr.io/betterleaks/betterleaks:${BETTERLEAKS_VERSION} AS betterleaks-bin
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-bin
 FROM oven/bun:${BUN_VERSION} AS bun-bin
 FROM python:3.11.14-slim-bookworm AS base
+
+# Keep Python bundled trust stores at the eMudhra-remediation release.
+RUN python -m pip install --no-cache-dir --upgrade pip==26.2.2 certifi==2026.10.19
 
 # Install system packages by category
 # Docker CLI + compose plugin (Docker official installation)
@@ -52,7 +55,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2-dev \
     libgirepository1.0-dev \
     gir1.2-gtk-3.0 \
-    bubblewrap \
     && rm -rf /var/lib/apt/lists/*
 
 # 3. Development tools (Change frequency: Medium)
@@ -127,7 +129,8 @@ ARG NODE_VERSION=24
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
     apt-get install -y nodejs && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    node -v && npm -v
+    node -v && npm -v && \
+    node -e "if (require('tls').rootCertificates.some(p => new (require('crypto').X509Certificate)(p).subject.includes('emSign ECC Root CA - G3'))) throw new Error('Node.js still trusts the compromised emSign ECC Root CA - G3')"
 
 # Install bun in a shared location so either root or a dev user can run it.
 ENV BUN_INSTALL=/usr/local/bun

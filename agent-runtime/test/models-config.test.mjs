@@ -5,11 +5,11 @@ import { buildModelsConfig } from "../src/models-config.ts";
 
 const YAML = `
 chat_models:
-  - provider: ollama
+  - provider: openai-compatible-local
     name: gemma4:31b
     api_style: completion
-    base_url: env:OLLAMA_BASE_URL
-    api_key_env: OLLAMA_API_KEY
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_LOCAL
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_LOCAL
     temperature: 1.0
     top_p: 0.95
     top_k: 64
@@ -27,21 +27,21 @@ chat_models:
 
 const EVALUATION_YAML = `
 evaluation_models:
-  - provider: ollama
+  - provider: openai-compatible-local
     name: nvidia/Gemma-4-31B-IT-NVFP4
     api_style: completion
-    base_url: env:OLLAMA_BASE_URL
-    api_key_env: OLLAMA_API_KEY
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_LOCAL
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_LOCAL
     keep_alive: 30m
     temperature: 1.0
     top_p: 0.95
     top_k: 64
     max_output_tokens: 4096
-  - provider: ollama
+  - provider: openai-compatible-local
     name: gemma4:31b
     api_style: completion
-    base_url: env:OLLAMA_BASE_URL
-    api_key_env: OLLAMA_API_KEY
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_LOCAL
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_LOCAL
     keep_alive: 30m
     max_output_tokens: 2048
   - provider: openai
@@ -51,15 +51,15 @@ evaluation_models:
     max_output_tokens: 8192
 `;
 
-const env = { OLLAMA_BASE_URL: "http://ollama:11434/v1" };
+const env = { OPENAI_COMPATIBLE_BASE_URL_LOCAL: "http://ollama:11434/v1" };
 
 const OPENAI_COMPATIBLE_YAML = `
 chat_models:
-  - provider: openai-compatible
+  - provider: openai-compatible-chat
     name: qwen3.8-flash-next
     api_style: completion
-    base_url: env:OPENAI_COMPATIBLE_BASE_URL
-    api_key_env: OPENAI_COMPATIBLE_API_KEY
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
     num_ctx: 65536
     max_output_tokens: 16384
     temperature: 0.7
@@ -83,11 +83,16 @@ chat_models:
 
 test("a model with base_url becomes a provider definition", () => {
   const { providers } = buildModelsConfig(YAML, undefined, env);
-  assert.deepEqual(providers.ollama, {
+  assert.deepEqual(providers["openai-compatible-local"], {
     baseUrl: "http://ollama:11434/v1",
     api: "openai-completions",
-    apiKey: "$OLLAMA_API_KEY",
-    compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
+    apiKey: "$OPENAI_COMPATIBLE_API_KEY_LOCAL",
+    compat: {
+      supportsStore: false,
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: false,
+      maxTokensField: "max_tokens",
+    },
     models: [
       {
         id: "gemma4:31b",
@@ -102,18 +107,17 @@ test("a model with base_url becomes a provider definition", () => {
 
 test("OpenAI-compatible Qwen models preserve Pi 1.0 sampling and thinking settings", () => {
   const { providers } = buildModelsConfig(OPENAI_COMPATIBLE_YAML, undefined, {
-    OPENAI_COMPATIBLE_BASE_URL: "https://gateway.example/model",
+    OPENAI_COMPATIBLE_BASE_URL_CHAT: "https://gateway.example/model/v1",
   });
-  assert.deepEqual(providers["openai-compatible"], {
+  assert.deepEqual(providers["openai-compatible-chat"], {
     baseUrl: "https://gateway.example/model/v1",
     api: "openai-completions",
-    apiKey: "$OPENAI_COMPATIBLE_API_KEY",
+    apiKey: "$OPENAI_COMPATIBLE_API_KEY_CHAT",
     compat: {
       supportsStore: false,
       supportsDeveloperRole: false,
       supportsReasoningEffort: false,
       maxTokensField: "max_tokens",
-      thinkingFormat: "qwen-chat-template",
     },
     models: [
       {
@@ -121,6 +125,7 @@ test("OpenAI-compatible Qwen models preserve Pi 1.0 sampling and thinking settin
         contextWindow: 65536,
         maxTokens: 16384,
         reasoning: true,
+        compat: { thinkingFormat: "qwen-chat-template" },
         input: ["text", "image"],
         samplingParams: {
           min_p: 0,
@@ -146,6 +151,50 @@ test("OpenAI-compatible Qwen models preserve Pi 1.0 sampling and thinking settin
   });
 });
 
+test("Qwen thinking format stays on the Qwen model in a mixed provider", () => {
+  const yaml = `${OPENAI_COMPATIBLE_YAML}
+  - provider: openai-compatible-chat
+    name: gemma4:31b
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
+    reasoning_effort: high
+`;
+  const { providers } = buildModelsConfig(yaml, undefined, {
+    OPENAI_COMPATIBLE_BASE_URL_CHAT: "https://gateway.example/v1",
+  });
+
+  const [qwen, gemma] = providers["openai-compatible-chat"].models;
+  assert.deepEqual(qwen.compat, { thinkingFormat: "qwen-chat-template" });
+  assert.equal(gemma.compat, undefined);
+  assert.equal(providers["openai-compatible-chat"].compat.thinkingFormat, undefined);
+});
+
+test("suffixed OpenAI-compatible providers keep endpoints separate", () => {
+  const evaluationYaml = `
+evaluation_models:
+  - provider: openai-compatible-evaluation
+    name: evaluator
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_EVALUATION
+`;
+  const { providers } = buildModelsConfig(OPENAI_COMPATIBLE_YAML, evaluationYaml, {
+    OPENAI_COMPATIBLE_BASE_URL_CHAT: "https://chat.example/v1",
+    OPENAI_COMPATIBLE_BASE_URL_EVALUATION: "https://evaluation.example/v1",
+  });
+
+  assert.equal(providers["openai-compatible-chat"].baseUrl, "https://chat.example/v1");
+  assert.equal(
+    providers["openai-compatible-evaluation"].baseUrl,
+    "https://evaluation.example/v1",
+  );
+  assert.equal(
+    providers["openai-compatible-evaluation"].compat.maxTokensField,
+    "max_tokens",
+  );
+});
+
 test("a catalog model only gets overrides", () => {
   const { providers } = buildModelsConfig(YAML, undefined, env);
   assert.deepEqual(providers.openai, {
@@ -163,37 +212,34 @@ test("bedrock is renamed to pi's provider id", () => {
 
 test("an unresolvable base_url drops the model instead of writing a literal", () => {
   const { providers } = buildModelsConfig(YAML, undefined, {});
-  assert.equal(providers.ollama, undefined);
+  assert.equal(providers["openai-compatible-local"], undefined);
 });
 
-test("a base_url without /v1 gets one", () => {
-  // QDash writes OLLAMA_BASE_URL without /v1 because LiteLLM appends it. Pi
-  // hands the value to the OpenAI SDK, which only appends /chat/completions,
-  // so an unnormalized base URL 404s on every request.
+test("a base_url path is passed through without adding /v1", () => {
   const { providers } = buildModelsConfig(YAML, undefined, {
-    OLLAMA_BASE_URL: "http://ollama:11434",
+    OPENAI_COMPATIBLE_BASE_URL_LOCAL: "http://ollama:11434",
   });
-  assert.equal(providers.ollama.baseUrl, "http://ollama:11434/v1");
+  assert.equal(providers["openai-compatible-local"].baseUrl, "http://ollama:11434");
 });
 
-test("a base_url that already ends in /v1 is left alone", () => {
+test("trailing slashes are removed from a canonical base_url", () => {
   const { providers } = buildModelsConfig(YAML, undefined, {
-    OLLAMA_BASE_URL: "http://ollama:11434/v1/",
+    OPENAI_COMPATIBLE_BASE_URL_LOCAL: "http://ollama:11434/v1/",
   });
-  assert.equal(providers.ollama.baseUrl, "http://ollama:11434/v1");
+  assert.equal(providers["openai-compatible-local"].baseUrl, "http://ollama:11434/v1");
 });
 
 test("evaluation models are merged into the same providers as chat models", () => {
   const { providers } = buildModelsConfig(YAML, EVALUATION_YAML, env);
   assert.deepEqual(
-    providers.ollama.models.map((model) => model.id),
+    providers["openai-compatible-local"].models.map((model) => model.id),
     ["gemma4:31b", "nvidia/Gemma-4-31B-IT-NVFP4"],
   );
 });
 
 test("keep_alive rides along in samplingParams so ollama keeps the VLM resident", () => {
   const { providers } = buildModelsConfig(YAML, EVALUATION_YAML, env);
-  const evaluationModel = providers.ollama.models.find(
+  const evaluationModel = providers["openai-compatible-local"].models.find(
     (model) => model.id === "nvidia/Gemma-4-31B-IT-NVFP4",
   );
   assert.deepEqual(evaluationModel.samplingParams, {
@@ -208,14 +254,16 @@ test("locally hosted models are declared image-capable", () => {
   // Pi defaults an unstated `input` to text-only and then drops image content
   // while building the request, so figure analysis would silently lose its figures.
   const { providers } = buildModelsConfig(YAML, EVALUATION_YAML, env);
-  for (const model of providers.ollama.models) {
+  for (const model of providers["openai-compatible-local"].models) {
     assert.deepEqual(model.input, ["text", "image"]);
   }
 });
 
 test("a model declared in both files keeps the chat definition", () => {
   const { providers } = buildModelsConfig(YAML, EVALUATION_YAML, env);
-  const shared = providers.ollama.models.find((model) => model.id === "gemma4:31b");
+  const shared = providers["openai-compatible-local"].models.find(
+    (model) => model.id === "gemma4:31b",
+  );
   assert.equal(shared.maxTokens, 4096);
   assert.deepEqual(providers.openai.modelOverrides["gpt-5.4"], {
     maxTokens: 4096,

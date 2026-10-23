@@ -13,11 +13,12 @@
     "@earendil-works/pi-ai": "1.3.0",
     "@earendil-works/pi-coding-agent": "1.3.0",
     "@earendil-works/pi-durable": "1.3.0",
+    "@earendil-works/pi-env": "1.3.0",
     "typebox": "^1.0.55",
     "yaml": "^2.8.0"
   },
   "devDependencies": {
-    "@oqtopus-team/pi-qdash": "0.1.11-beta.19",
+    "@oqtopus-team/pi-qdash": "0.1.11-beta.22",
     "@types/node": "^22.0.0",
     "typescript": "^5.8.0"
   },

@@ -926,3 +926,31 @@ def test_build_flow_run_url_trims_trailing_slash(monkeypatch: pytest.MonkeyPatch
         flow_service._build_flow_run_url("run-1")
         == "https://prefect.example.com/runs/flow-run/run-1"
     )
+
+
+@pytest.mark.parametrize(
+    ("folder", "expected"),
+    [
+        ("", ""),
+        ("   ", ""),
+        ("daily", "daily"),
+        ("/daily/t1/", "daily/t1"),
+        (" daily/t1 ", "daily/t1"),
+    ],
+)
+def test_normalize_folder_canonicalizes_valid_paths(folder: str, expected: str) -> None:
+    assert FlowService._normalize_folder(folder) == expected
+
+
+@pytest.mark.parametrize("folder", ["daily//t1", "../t1", "daily t1", "daily/t1.py"])
+def test_normalize_folder_rejects_bad_segments(folder: str) -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        FlowService._normalize_folder(folder)
+    assert exc_info.value.status_code == 400
+
+
+def test_save_request_distinguishes_an_omitted_folder_from_the_root() -> None:
+    from qdash.api.schemas.flow import SaveFlowRequest
+
+    assert SaveFlowRequest(name="f", code="", chip_id="c").folder is None
+    assert SaveFlowRequest(name="f", code="", chip_id="c", folder="").folder == ""

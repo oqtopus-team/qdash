@@ -29,6 +29,8 @@ export const MAX_EVALUATION_FIGURES = 4;
 
 export interface EvaluateRequest {
   taskId: string;
+  /** Explicit `provider/modelId` selected to judge the figure. */
+  evaluationModel?: string;
   /** A specific question for the evaluation model, on top of the standard diagnosis. */
   question?: string;
   /** Figures of the task result to embed, newest first in pi-qdash's order (default 1). */
@@ -515,7 +517,12 @@ export function recordFromDetails(
 }
 
 /** The turn a planner is given to evaluate one task result the way the chat does. */
-export function plannerInstruction(taskId: string, question?: string, withExamples = false): string {
+export function plannerInstruction(
+  taskId: string,
+  question?: string,
+  withExamples = false,
+  evaluationModel?: string,
+): string {
   const lines = [
     `Evaluate QDash task result ${taskId} with pi-qcaleval.`,
     `First call ${EVIDENCE_TOOL} for it, then ${EVALUATION_TOOL} with task_name set to the task's name.`,
@@ -527,6 +534,9 @@ export function plannerInstruction(taskId: string, question?: string, withExampl
     );
   }
   if (question?.trim()) lines.push(`Pass this question to ${EVALUATION_TOOL}: ${question.trim()}`);
+  if (evaluationModel) {
+    lines.push(`Pass model: "${evaluationModel}" to ${EVALUATION_TOOL}.`);
+  }
   lines.push(
     "Report the status (calibration_diagnosis), the fit reliability and the outcome classification, and say in one or two sentences whether you agree with the diagnosis.",
   );
@@ -728,6 +738,7 @@ export async function evaluateTask(
   const question = request.question?.trim();
   const args = {
     context,
+    ...(request.evaluationModel ? { model: request.evaluationModel } : {}),
     ...(question ? { question } : {}),
     ...(taskName ? { task_name: taskName } : {}),
     ...(knowledge ? { knowledge: knowledge.knowledge } : {}),

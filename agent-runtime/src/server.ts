@@ -8,6 +8,7 @@ import {
 } from "@earendil-works/pi-durable";
 
 import { requestQDashAuth } from "./auth.ts";
+import { parsePageContext } from "./page-context.ts";
 import { WRAP_UP_MESSAGE } from "./budget.ts";
 import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
 import { hasBearerToken, readJsonBody, RequestError } from "./http.ts";
@@ -56,6 +57,8 @@ interface ChatBody {
   approval?: { id?: string; approve?: boolean };
   /** The user's own chat instructions, set in QDash's Settings. */
   user_instructions?: string;
+  /** What the user has open in QDash: the page, and on the Workflow editor the flow's current code. */
+  page_context?: unknown;
 }
 
 interface DeleteSessionBody {
@@ -71,6 +74,8 @@ interface EvaluateBody {
   mode?: "direct" | "planner";
   /** The planner in planner mode; in direct mode only pi-qcaleval's fallback model. */
   model?: { provider?: string; name?: string };
+  /** The model that qcal_evaluate must use, independent of the planner. */
+  evaluation_model?: { provider?: string; name?: string };
   thinking_level?: SessionRequest["thinkingLevel"];
   /** Show the task's labeled example plots before the figure (in-context examples). */
   with_examples?: boolean;
@@ -193,6 +198,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     return;
   }
   running.set(runKey, null);
+  const pageContext = parsePageContext(body.page_context);
 
   let opened;
   try {
@@ -207,6 +213,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
         thinkingLevel: body.thinking_level,
         images: toImageContent(body.images),
         ...(typeof body.user_instructions === "string" ? { userInstructions: body.user_instructions } : {}),
+        ...(pageContext ? { pageContext } : {}),
       },
       auth,
     );
@@ -431,6 +438,8 @@ async function handleEvaluate(req: IncomingMessage, res: ServerResponse): Promis
       knowledgeDraftId: draftIdOf(body.knowledge_draft_id),
       provider: body.model?.provider,
       modelName: body.model?.name,
+      evaluationProvider: body.evaluation_model?.provider,
+      evaluationModelName: body.evaluation_model?.name,
       thinkingLevel: body.thinking_level,
     };
     const result =
@@ -466,7 +475,7 @@ async function handleDeleteSession(req: IncomingMessage, res: ServerResponse): P
     sendJson(res, 409, { error: "conversation is still running" });
     return;
   }
-  runtime.deleteSessionState(body.owner_id, body.conversation_id);
+  await runtime.deleteSessionState(body.owner_id, body.conversation_id);
   sendJson(res, 200, { deleted: true });
 }
 

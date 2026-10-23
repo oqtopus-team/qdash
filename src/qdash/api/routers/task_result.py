@@ -11,7 +11,11 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
-from qdash.api.dependencies import get_flow_service, get_task_result_service
+from qdash.api.dependencies import (
+    get_flow_service,
+    get_task_file_service,
+    get_task_result_service,
+)
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
@@ -27,7 +31,9 @@ from qdash.api.schemas.task_result import (
     TaskResultListResponse,
     TimeSeriesData,
 )
+from qdash.api.services.catalog_task_run import resolve_catalog_task, validate_overrides
 from qdash.api.services.flow_service import FlowService
+from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 
 router = APIRouter()
@@ -43,6 +49,46 @@ def _parameter_value(parameters: dict[str, Any] | None, name: str) -> Any:
     if isinstance(value, dict):
         return value.get("value")
     return getattr(value, "value", value)
+
+
+def _validated_reexecution_overrides(
+    task_file_service: TaskFileService,
+    task_name: str,
+    parameter_overrides: dict[str, dict[str, Any]] | None,
+) -> dict[str, dict[str, Any]] | None:
+    """Check re-execution overrides against the task definition before starting a run.
+
+    ``readout_duration`` configures the Qubex session, so it is kept as a run
+    override only for tasks that declare it.
+    """
+    if not parameter_overrides:
+        return parameter_overrides
+    unknown_keys = set(parameter_overrides) - {"input", "run"}
+    if unknown_keys:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid parameter overrides: unknown keys {sorted(unknown_keys)}",
+        )
+    task, _ = resolve_catalog_task(task_file_service, task_name, None)
+    input_overrides = dict(parameter_overrides.get("input") or {})
+    run_overrides = dict(parameter_overrides.get("run") or {})
+    declares_readout_duration = "readout_duration" in task.run_parameters
+    if not declares_readout_duration and "readout_duration" in run_overrides:
+        # The duration still configures the Qubex session for tasks that do not
+        # expose it as a task-level run parameter. Add temporary metadata so the
+        # shared override validator rejects non-numeric or non-finite values.
+        task = task.model_copy(
+            update={
+                "run_parameters": {
+                    **task.run_parameters,
+                    "readout_duration": {"value_type": "float"},
+                }
+            }
+        )
+    validate_overrides(task, input_overrides, run_overrides)
+    if not declares_readout_duration:
+        run_overrides.pop("readout_duration", None)
+    return {"input": input_overrides, "run": run_overrides}
 
 
 def _reexecution_readout_duration(
@@ -544,6 +590,7 @@ async def re_execute_task_result(
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
+    task_file_service: Annotated[TaskFileService, Depends(get_task_file_service)],
     parameter_overrides: Annotated[
         dict[str, dict[str, Any]] | None,
         Body(
@@ -611,6 +658,9 @@ async def re_execute_task_result(
         )
 
     readout_duration = _reexecution_readout_duration(doc, parameter_overrides)
+    parameter_overrides = _validated_reexecution_overrides(
+        task_file_service, doc.name, parameter_overrides
+    )
     default_run_parameters = (
         {
             "readout_duration": {

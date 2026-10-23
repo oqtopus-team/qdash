@@ -1,3 +1,4 @@
+import { MAX_TOOL_OUTPUT_CHARS } from "../src/events.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -50,7 +51,10 @@ test("a chart in tool details is emitted before tool_end", () => {
 test("an evaluation tool's prompt and model travel with tool_end", () => {
   const details = {
     prompt: "Reference for this experiment:\n## Experiment: CheckRabi",
-    model: { provider: "vllm", modelId: "nvidia/Ising-Calibration-1.5-31B-NVFP4" },
+    model: {
+      provider: "openai-compatible-evaluation",
+      modelId: "nvidia/Ising-Calibration-1.5-31B-NVFP4",
+    },
     diagnosis: { success: true },
   };
   assert.deepEqual(
@@ -61,7 +65,7 @@ test("an evaluation tool's prompt and model travel with tool_end", () => {
         name: "qcal_evaluate",
         evaluation: {
           prompt: details.prompt,
-          model: "vllm/nvidia/Ising-Calibration-1.5-31B-NVFP4",
+          model: "openai-compatible-evaluation/nvidia/Ising-Calibration-1.5-31B-NVFP4",
         },
         isError: false,
       },
@@ -230,15 +234,84 @@ test("a stamped evaluation result also carries the record the API stores", () =>
     result: {
       details: {
         prompt: "p",
-        model: { provider: "vllm", modelId: "ising" },
+        model: { provider: "openai-compatible-evaluation", modelId: "ising" },
         diagnosis: { success: true },
         host: { context: "ctx", task_name: "CheckRabi", figures: [], knowledge: null, task_id: "task-7", duration_ms: 12 },
       },
     },
   });
-  assert.equal(end.evaluation.model, "vllm/ising");
+  assert.equal(end.evaluation.model, "openai-compatible-evaluation/ising");
   assert.equal(end.evaluation.record.task_id, "task-7");
   assert.equal(end.evaluation.record.mode, "planner");
   assert.deepEqual(end.evaluation.record.evaluation.diagnosis, { success: true });
   assert.equal(end.evaluation.record.evaluation.duration_ms, 12);
+});
+
+test("a workspace tool's answer travels with tool_end; a QDash tool's does not", () => {
+  assert.deepEqual(
+    toNdjsonEvents({
+      type: "tool_execution_end",
+      toolName: "bash",
+      isError: true,
+      result: { structuredOutput: { output: "ls: no such file\n", truncated: false, exitCode: 2 } },
+    }),
+    [{ type: "tool_end", name: "bash", output: "ls: no such file", exitCode: 2, isError: true }],
+  );
+  assert.deepEqual(
+    toNdjsonEvents({ type: "tool_execution_end", toolName: "write", result: { structuredOutput: "Wrote 12 bytes to data.csv" } }),
+    [{ type: "tool_end", name: "write", output: "Wrote 12 bytes to data.csv", isError: false }],
+  );
+  assert.deepEqual(
+    toNdjsonEvents({ type: "tool_execution_end", toolName: "qdash_query", result: { structuredOutput: "secret-ish payload" } }),
+    [{ type: "tool_end", name: "qdash_query", isError: false }],
+  );
+  // Without a structured output (a result the harness wrote), the entry's text is used.
+  assert.deepEqual(
+    toNdjsonEvents({
+      type: "tool_execution_end",
+      toolName: "edit",
+      isError: true,
+      entry: { model: [{ role: "toolResult", isError: true, content: [{ type: "text", text: "interrupted" }] }] },
+    }),
+    [{ type: "tool_end", name: "edit", output: "interrupted", isError: true }],
+  );
+});
+
+test("a long answer keeps its tail", () => {
+  const long = "x".repeat(MAX_TOOL_OUTPUT_CHARS) + "TAIL";
+  const [event] = toNdjsonEvents({ type: "tool_execution_end", toolName: "read", result: { structuredOutput: long } });
+  assert.equal(event.output.length, MAX_TOOL_OUTPUT_CHARS + 1);
+  assert.ok(event.output.startsWith("…") && event.output.endsWith("TAIL"));
+});
+
+test("a tool call being written streams as a draft and argument deltas", () => {
+  assert.deepEqual(
+    toNdjsonEvents({
+      type: "message_update",
+      changes: [
+        { type: "toolcall_start", contentIndex: 1, block: { type: "toolCall", id: "call_1", name: "write", arguments: {} } },
+        { type: "toolcall_delta", contentIndex: 1, path: ["path"], delta: "fit.py" },
+        { type: "toolcall_delta", contentIndex: 1, path: ["content"], delta: "import numpy" },
+        { type: "toolcall_delta", contentIndex: 1, path: ["content"], delta: "" },
+        { type: "text_delta", contentIndex: 0, delta: "Now " },
+      ],
+    }),
+    [
+      { type: "tool_draft", name: "write", index: 1, id: "call_1" },
+      { type: "tool_args_delta", index: 1, path: ["path"], delta: "fit.py" },
+      { type: "tool_args_delta", index: 1, path: ["content"], delta: "import numpy" },
+      { type: "text_delta", delta: "Now " },
+    ],
+  );
+});
+
+test("a proposed edit is emitted before tool_end", () => {
+  const edit = { summary: "Add T2", code: "new", flowName: "t1" };
+  assert.deepEqual(
+    toNdjsonEvents({ type: "tool_execution_end", toolName: "propose_code_edit", result: { details: { edit } } }),
+    [
+      { type: "edit", edit },
+      { type: "tool_end", name: "propose_code_edit", isError: false },
+    ],
+  );
 });

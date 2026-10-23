@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -23,6 +23,7 @@ import {
   type ModelRef,
 } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import { createCodingTools } from "@earendil-works/pi-durable/tools";
 
 import { createQDashConnection, type QDashAuth, type QDashConnection } from "./auth.ts";
 import {
@@ -35,6 +36,7 @@ import {
 import { compactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
+import { ExecWorkspace, execConfigFromEnv, removeWorkspace, WORKSPACE_TOOL_NAMES } from "./exec-env.ts";
 import { askUserTool } from "./ask-tool.ts";
 import {
   buildLocalToolGuide,
@@ -71,8 +73,13 @@ import {
 import { formatSettledDetail } from "./events.ts";
 import { fetchKnowledgeDraft, fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
 import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
+import {
+  buildPageContextSection,
+  buildProposeCodeEditTool,
+  PAGE_SECTION,
+  type PageContext,
+} from "./page-context.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
-import { buildPythonTool } from "./python-tool.ts";
 import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
 import { extractToolGuide, TOOL_GUIDE_SKILL } from "./tool-guide.ts";
 
@@ -88,6 +95,9 @@ const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 18
 const EXPERIMENTAL_WRITE_TOOLS_ENABLED = ["1", "true", "yes", "on"].includes(
   (process.env.AGENT_RUNTIME_ENABLE_WRITE_TOOLS ?? "").trim().toLowerCase(),
 );
+// The Copilot workspace (agent-exec container); without it the chat has no
+// shell or files, only QDash tools.
+const EXEC_CONFIG = execConfigFromEnv();
 // Local extension checkouts: compose mounts agent-runtime/extensions/ here. It
 // is empty in production and in a clone without checkouts. Every checkout is
 // loaded (replacing an installed copy of the same package); only those outside
@@ -110,6 +120,8 @@ export interface SessionRequest {
   images?: Array<{ type: "image"; data: string; mimeType: string }>;
   /** The user's own chat instructions from QDash; a chat only, never an evaluation. */
   userInstructions?: string;
+  /** What the user has open in QDash while chatting from the sidebar; rebuilt every turn. */
+  pageContext?: PageContext;
 }
 
 /** Section key of the user's preferences in the system prompt. */
@@ -147,6 +159,11 @@ export interface OpenDurableSession {
   close(): Promise<void>;
 }
 
+/** The file beside a session's store that says its workspace directory was created. */
+export function workspaceMarker(storePath: string): string {
+  return `${storePath}.workspace`;
+}
+
 /** Return a stable non-identifying filename for one user's QDash session. */
 export function sessionStorageName(ownerId: string, sessionId: string): string {
   return `${createHash("sha256").update(ownerId).update("\0").update(sessionId).digest("hex")}.sqlite`;
@@ -171,7 +188,11 @@ interface EnabledTool {
 export class SharedRuntime {
   private constructor(
     private readonly modelRuntime: ModelRuntime,
-    private readonly buildChatRegistry: (connection: QDashConnection, userInstructions?: string) => {
+    private readonly buildChatRegistry: (
+      connection: QDashConnection,
+      userInstructions?: string,
+      pageContext?: PageContext,
+    ) => {
       registry: ReturnType<typeof createRegistry>;
       writeTools: QDashWriteTools;
     },
@@ -196,6 +217,11 @@ export class SharedRuntime {
     mkdirSync(STATE_DIR, { recursive: true });
     if (EXPERIMENTAL_WRITE_TOOLS_ENABLED) {
       console.warn("[agent-runtime] experimental QDash write tools are enabled");
+    }
+    if (EXEC_CONFIG) {
+      console.log(`[agent-runtime] workspace tools: agent-exec at ${EXEC_CONFIG.socketPath}`);
+    } else {
+      console.warn("[agent-runtime] workspace tools disabled: AGENT_EXEC_SOCKET is not set");
     }
 
     const { responseLanguage, thinkingLanguage } = loadLanguageConfig(COPILOT_CONFIG_PATH);
@@ -282,13 +308,18 @@ export class SharedRuntime {
       skills,
       toolGuide,
       localToolGuide,
+      EXEC_CONFIG !== undefined,
     );
     const copilotExtension = defineExtension({
       name: "qdash-copilot",
       sections: [section("qdash-copilot", () => systemPrompt, { tag: false })],
       tools: [chartTool, askUserTool, ...(skills.length ? [buildSkillTool(skills)] : [])],
     });
-    const buildChatRegistry = (connection: QDashConnection, userInstructions?: string) => {
+    const buildChatRegistry = (
+      connection: QDashConnection,
+      userInstructions?: string,
+      pageContext?: PageContext,
+    ) => {
       const registry = createRegistry();
       const qdash = buildQDashExtension(
         extensions,
@@ -312,19 +343,28 @@ export class SharedRuntime {
           }),
         );
       }
-      registry.install(
-        defineExtension({
-          name: "qdash-python",
-          tools: [buildPythonTool(connection)],
-        }),
-      );
+      // The page the user has open, after their preferences; on the Workflow
+      // editor it brings the edit tool, which proposes and never saves.
+      const pageSection = buildPageContextSection(pageContext);
+      if (pageSection) {
+        registry.install(
+          defineExtension({
+            name: PAGE_SECTION,
+            sections: [section(PAGE_SECTION, () => pageSection)],
+            tools: pageContext?.flow ? [buildProposeCodeEditTool(pageContext.flow, pageContext.path)] : [],
+          }),
+        );
+      }
+      // The workspace's read/write/edit/bash, which run in the agent-exec
+      // container through the environment `openSession` gives the harness.
+      if (EXEC_CONFIG) registry.install(createCodingTools());
       return { registry, writeTools: qdash.writeTools };
     };
     const toolNames = [
       ...qdashToolNames,
       "render_chart",
-      "run_python",
       "ask_user",
+      ...(EXEC_CONFIG ? WORKSPACE_TOOL_NAMES : []),
       ...(skills.length ? ["read_skill"] : []),
     ];
     // Pinned definitions first so a trusted one replaces, as in buildQDashExtension.
@@ -358,6 +398,12 @@ export class SharedRuntime {
     return model;
   }
 
+  /** Resolve an optional request pair into qcal_evaluate's `provider/modelId` form. */
+  private resolveModelSpec(provider: string | undefined, modelName: string | undefined): string | undefined {
+    const model = this.resolveModel(provider, modelName);
+    return model ? `${model.provider}/${model.id}` : undefined;
+  }
+
   /**
    * Evaluate one task result's figure without a conversation: evidence from
    * pi-qdash, judgement from pi-qcaleval, QDash's reference in between. The
@@ -365,7 +411,12 @@ export class SharedRuntime {
    * is configured.
    */
   async evaluateTask(
-    request: EvaluateRequest & { provider?: string; modelName?: string },
+    request: EvaluateRequest & {
+      provider?: string;
+      modelName?: string;
+      evaluationProvider?: string;
+      evaluationModelName?: string;
+    },
     auth: QDashAuth,
     signal?: AbortSignal,
   ): Promise<EvaluateResult> {
@@ -376,9 +427,13 @@ export class SharedRuntime {
       throw new EvaluationError("request", `evaluation tools not loaded: ${missing.join(", ")}`, 503);
     }
     const model = this.resolveModel(request.provider, request.modelName);
+    const evaluationModel = this.resolveModelSpec(
+      request.evaluationProvider,
+      request.evaluationModelName,
+    );
     const connection = await createQDashConnection(auth);
     try {
-      return await evaluateTask(request, {
+      return await evaluateTask({ ...request, evaluationModel }, {
         runTool: async (name, args) => {
           const tool = this.enabledTools.get(name);
           if (!tool) throw new EvaluationError("request", `tool ${name} is not enabled`, 503);
@@ -451,6 +506,8 @@ export class SharedRuntime {
     request: EvaluateRequest & {
       provider?: string;
       modelName?: string;
+      evaluationProvider?: string;
+      evaluationModelName?: string;
       thinkingLevel?: ThinkingLevel;
     },
     auth: QDashAuth,
@@ -464,6 +521,10 @@ export class SharedRuntime {
       throw new EvaluationError("request", "a knowledge draft can only be evaluated in direct mode", 400);
     }
     this.resolveModel(request.provider, request.modelName);
+    const evaluationModel = this.resolveModelSpec(
+      request.evaluationProvider,
+      request.evaluationModelName,
+    );
     const evaluation = this.enabledTools.get(EVALUATION_TOOL);
     if (!evaluation) {
       throw new EvaluationError("request", `evaluation tools not loaded: ${EVALUATION_TOOL}`, 503);
@@ -491,7 +552,12 @@ export class SharedRuntime {
         const submission = await conversation.submit(
           {
             type: "input",
-            content: plannerInstruction(request.taskId, request.question, request.withExamples),
+            content: plannerInstruction(
+              request.taskId,
+              request.question,
+              request.withExamples,
+              evaluationModel,
+            ),
           },
           BACKGROUND_CONTEXT,
         );
@@ -513,6 +579,19 @@ export class SharedRuntime {
             : `planner turn ${settled.reason}${formatSettledDetail(settled.detail)}`;
         throw new EvaluationError("evaluation", why);
       }
+      const usedModel = (outcome.details as Record<string, unknown>).model as
+        | { provider?: unknown; modelId?: unknown }
+        | undefined;
+      const usedModelSpec =
+        typeof usedModel?.provider === "string" && typeof usedModel.modelId === "string"
+          ? `${usedModel.provider}/${usedModel.modelId}`
+          : undefined;
+      if (evaluationModel && usedModelSpec !== evaluationModel) {
+        throw new EvaluationError(
+          "evaluation",
+          `${EVALUATION_TOOL} used ${usedModelSpec ?? "no model"}; requested ${evaluationModel}`,
+        );
+      }
       const providerId = PROVIDER_ALIASES[request.provider] ?? request.provider;
       return recordFromDetails(request.taskId, outcome.details, {
         mode: "planner",
@@ -529,7 +608,7 @@ export class SharedRuntime {
       try {
         await opened.close();
       } finally {
-        this.deleteSessionState(ownerId, sessionId);
+        await this.deleteSessionState(ownerId, sessionId);
       }
     }
   }
@@ -559,10 +638,22 @@ export class SharedRuntime {
     return [...new Set(this.toolNames)].sort();
   }
 
-  /** Delete the closed durable store for one deleted QDash session. */
-  deleteSessionState(ownerId: string, sessionId: string): void {
+  /** Delete the closed durable store and the workspace of one deleted QDash session. */
+  async deleteSessionState(ownerId: string, sessionId: string): Promise<void> {
     const path = join(STATE_DIR, sessionStorageName(ownerId, sessionId));
+    // Only a session that used its workspace has a directory to remove; for the
+    // others (most evaluations, chats that never ran code) no daemon is started.
+    const marker = workspaceMarker(path);
+    const hadWorkspace = existsSync(marker);
     for (const suffix of ["", "-wal", "-shm"]) rmSync(`${path}${suffix}`, { force: true });
+    rmSync(marker, { force: true });
+    if (!EXEC_CONFIG || !hadWorkspace) return;
+    try {
+      await removeWorkspace(EXEC_CONFIG, ownerId, sessionId);
+    } catch (error) {
+      // The store is gone either way; a workspace left behind is only disk.
+      console.warn(`[agent-runtime] could not remove the workspace of ${sessionId}:`, error);
+    }
   }
 
   /** Open or recover the SQLite-backed root conversation for one user/session. */
@@ -574,21 +665,42 @@ export class SharedRuntime {
     } = this.resolveModelWithLimits(request.provider, request.modelName);
     const path = join(STATE_DIR, sessionStorageName(request.ownerId, request.sessionId));
     const connection = await createQDashConnection(auth);
+    const workspace = EXEC_CONFIG
+      ? new ExecWorkspace(EXEC_CONFIG, request.ownerId, request.sessionId)
+      : undefined;
+    // Remembered next to the store once the directory exists, so deleting the
+    // session later knows whether there is a workspace to remove.
+    const marker = workspaceMarker(path);
+    let marked = existsSync(marker);
+    const workspaceEnv = async (target: { cwd?: string }) => {
+      const env = await workspace!.env(target.cwd);
+      if (!marked) {
+        writeFileSync(marker, "");
+        marked = true;
+      }
+      return env;
+    };
     let harness: DurableHarness | undefined;
     const close = async () => {
       try {
         await harness?.close(BACKGROUND_CONTEXT);
       } finally {
+        workspace?.close();
         await connection.close();
       }
     };
     try {
-      const { registry, writeTools } = this.buildChatRegistry(connection, request.userInstructions);
+      const { registry, writeTools } = this.buildChatRegistry(
+        connection,
+        request.userInstructions,
+        request.pageContext,
+      );
       harness = await Harness.open(
         await openNodeSqliteStorage(path),
         {
           models: this.modelRuntime,
           registry,
+          ...(workspace ? { env: workspaceEnv } : {}),
           settings: {
             stream: { timeoutMs: MODEL_STREAM_TIMEOUT_MS },
             compaction: {
@@ -602,7 +714,9 @@ export class SharedRuntime {
       const agent = {
         model,
         ...(request.thinkingLevel ? { thinkingLevel: request.thinkingLevel } : {}),
-        cwd: WORK_DIR,
+        // Where the harness builds the workspace environment: a directory of
+        // the agent-exec container, not of this one.
+        cwd: workspace?.cwd ?? WORK_DIR,
       };
       const conversation = await harness.root(BACKGROUND_CONTEXT, { agent });
       await conversation.configure(agent, BACKGROUND_CONTEXT);

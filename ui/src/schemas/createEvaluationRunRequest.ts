@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { CreateEvaluationRunRequestDate } from './createEvaluationRunRequestDate';
+import type { CreateEvaluationRunRequestEvaluationModel } from './createEvaluationRunRequestEvaluationModel';
 import type { CreateEvaluationRunRequestKnowledgeDraftId } from './createEvaluationRunRequestKnowledgeDraftId';
 import type { CreateEvaluationRunRequestMode } from './createEvaluationRunRequestMode';
 import type { CreateEvaluationRunRequestQids } from './createEvaluationRunRequestQids';
@@ -36,4 +37,6 @@ export interface CreateEvaluationRunRequest {
   with_examples?: boolean;
   /** "direct" runs the evaluation tools; "planner" lets the chat planner call them */
   mode?: CreateEvaluationRunRequestMode;
+  /** Configured evaluation model to use; defaults to evaluation_models[0] */
+  evaluation_model?: CreateEvaluationRunRequestEvaluationModel;
 }

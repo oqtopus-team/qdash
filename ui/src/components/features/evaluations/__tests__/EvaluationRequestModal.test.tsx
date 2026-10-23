@@ -14,6 +14,23 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock("@/components/ui/Toast", () => ({ useToast: () => toast }));
 
+vi.mock("@/client/copilot/copilot", () => ({
+  useGetCopilotConfig: () => ({
+    data: {
+      data: {
+        evaluation_models: [
+          {
+            provider: "openai-compatible-evaluation",
+            name: "nvidia/Ising-Calibration",
+          },
+          { provider: "openai-compatible-chat", name: "qwen" },
+        ],
+      },
+    },
+    isLoading: false,
+  }),
+}));
+
 const mutateAsync = vi.fn();
 const uploadDraft = vi.fn();
 vi.mock("@/client/evaluation/evaluation", () => ({
@@ -97,6 +114,12 @@ describe("buildEvaluationRunRequest", () => {
       task_ids: ["t1"],
       knowledge_draft_id: "ab12",
     });
+    expect(
+      buildEvaluationRunRequest(scope, "direct", false, undefined, undefined, {
+        provider: "openai-compatible-chat",
+        name: "qwen",
+      }).evaluation_model,
+    ).toEqual({ provider: "openai-compatible-chat", name: "qwen" });
   });
 });
 
@@ -121,13 +144,21 @@ describe("EvaluationRequestModal", () => {
       </QueryClientProvider>,
     );
 
+    const modelSelect = screen.getByLabelText("Evaluation model");
+    expect(modelSelect.className).toContain("min-w-0");
+    expect(screen.getByRole("option", { name: "qwen" })).toBeTruthy();
+    expect(screen.queryByText(/qwen \(openai-compatible-chat\)/)).toBeNull();
     fireEvent.click(screen.getByLabelText(/Via Copilot/));
     fireEvent.click(screen.getByLabelText(/In-context/));
     expect(screen.getByTestId("request-summary").textContent).toContain("Via Copilot · In-context");
     fireEvent.click(screen.getByLabelText(/Zero-shot/));
+    fireEvent.change(modelSelect, {
+      target: { value: "evaluation-openai-compatible-chat:qwen" },
+    });
     expect(screen.getByTestId("request-summary").textContent).toContain(
       "all qubits on 64Qv3 with Via Copilot · Zero-shot",
     );
+    expect(screen.getByTestId("request-summary").textContent).toContain("using qwen");
     fireEvent.click(screen.getByRole("button", { name: /^Evaluate$/ }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
@@ -138,6 +169,7 @@ describe("EvaluationRequestModal", () => {
         entity_type: "qubit",
         trigger: "bulk",
         mode: "planner",
+        evaluation_model: { provider: "openai-compatible-chat", name: "qwen" },
       },
     });
     expect(toast.success).toHaveBeenCalledWith(

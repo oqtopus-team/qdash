@@ -36,8 +36,6 @@ services:
       - MYPY_CACHE_DIR=/home/vscode/.cache/mypy
       - PYTEST_ADDOPTS=-o cache_dir=/home/vscode/.cache/pytest
       - COVERAGE_FILE=/home/vscode/.cache/coverage/qdash
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-}
       # Host path of this checkout, for `docker compose` run inside the
       # container (see .devcontainer/post-start.sh). VS Code sets the same
       # variable from devcontainer.json.

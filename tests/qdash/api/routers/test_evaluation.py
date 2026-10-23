@@ -197,13 +197,13 @@ def _task_result(
 def service(project):
     """The app's evaluation service, with the runtime replaced and launches recorded."""
     calls: list[tuple[str, str | None]] = []
-    modes: list[tuple[Any, Any]] = []
+    modes: list[tuple[Any, Any, Any]] = []
 
     async def evaluate(
         task_id: str, *, auth: QDashAuth, question: str | None = None, **kwargs: Any
     ):
         calls.append((task_id, question))
-        modes.append((kwargs.get("mode"), kwargs.get("model")))
+        modes.append((kwargs.get("mode"), kwargs.get("model"), kwargs.get("evaluation_model")))
         if task_id == "task-q1":
             raise EvaluationRuntimeError("evaluation", "qcal_evaluate: HTTP 400 Non-base64")
         return {**RECORD, "task_id": task_id}
@@ -243,6 +243,9 @@ def test_run_queues_the_latest_evaluable_result_per_qubit(test_client, service):
     assert run["question"] is None
     assert (run["knowledge_draft_id"], run["knowledge_draft_name"]) == (None, None)
     assert (run["trigger"], run["mode"], run["planner_model"]) == ("bulk", "direct", None)
+    assert run["evaluation_model"] == (
+        "openai-compatible-evaluation/nvidia/Ising-Calibration-1.5-31B-NVFP4"
+    )
     assert run["requested_by"] == "eval_user"
     assert service.launched == [run["run_id"]]
 
@@ -274,6 +277,47 @@ def test_execution_records_the_judging_models_context_window(test_client, servic
 
     detail = test_client.get(f"/evaluations/runs/{run_id}", headers=HEADERS).json()
     assert detail["evaluations"][0]["output"]["context_window"] == 16384
+
+
+def test_a_configured_evaluation_model_is_selected_and_an_unknown_one_is_rejected(
+    test_client, service, monkeypatch
+):
+    from qdash.copilot.config.settings import CopilotConfig, ModelConfig
+
+    config = CopilotConfig(
+        evaluation_models=[
+            ModelConfig(provider="openai-compatible-chat", name="qwen3.8-flash-next")
+        ]
+    )
+    monkeypatch.setattr("qdash.api.services.evaluation_service.load_copilot_config", lambda: config)
+    _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
+    selected = {
+        "provider": "openai-compatible-chat",
+        "name": "qwen3.8-flash-next",
+    }
+    response = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={"chip_id": "chip-1", "task": "CheckRabi", "evaluation_model": selected},
+    )
+    assert response.status_code == 202, response.text
+    run = response.json()["run"]
+    assert run["evaluation_model"] == "openai-compatible-chat/qwen3.8-flash-next"
+
+    asyncio.run(service.execute_run(run["run_id"], AUTH))
+    assert service.modes[-1][2] == selected
+
+    rejected = test_client.post(
+        "/evaluations/runs",
+        headers=HEADERS,
+        json={
+            "chip_id": "chip-1",
+            "task": "CheckRabi",
+            "evaluation_model": {"provider": "unknown", "name": "model"},
+        },
+    )
+    assert rejected.status_code == 400
+    assert rejected.json()["detail"] == "evaluation model unknown/model is not configured"
 
 
 def test_execution_records_what_the_model_saw_and_answered(test_client, service):
@@ -699,7 +743,9 @@ def test_a_single_planner_run_records_the_planner_turn(test_client, service):
     }
 
     async def evaluate(task_id: str, **kwargs: Any):
-        service.modes.append((kwargs.get("mode"), kwargs.get("model")))
+        service.modes.append(
+            (kwargs.get("mode"), kwargs.get("model"), kwargs.get("evaluation_model"))
+        )
         return with_planner
 
     service._evaluate = evaluate
@@ -722,9 +768,13 @@ def test_a_single_planner_run_records_the_planner_turn(test_client, service):
 
     asyncio.run(service.execute_run(run["run_id"], AUTH))
 
-    mode, model = service.modes[-1]
+    mode, model, evaluation_model = service.modes[-1]
     assert mode == "planner"
     assert set(model) == {"provider", "name"}
+    assert evaluation_model == {
+        "provider": "openai-compatible-evaluation",
+        "name": "nvidia/Ising-Calibration-1.5-31B-NVFP4",
+    }
     detail = test_client.get(f"/evaluations/runs/{run['run_id']}", headers=HEADERS).json()
     planner = detail["evaluations"][0]["planner"]
     assert planner["model"] == "openai-compatible/qwen"

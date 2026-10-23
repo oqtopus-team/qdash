@@ -85,6 +85,9 @@ async def create_evaluation_run(
         knowledge_draft=draft,
         trigger=body.trigger,
         mode=body.mode,
+        evaluation_model=(
+            body.evaluation_model.model_dump() if body.evaluation_model is not None else None
+        ),
         with_examples=body.with_examples,
         requested_by=ctx.user.username,
     )

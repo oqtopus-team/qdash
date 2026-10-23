@@ -6,7 +6,6 @@ import { test } from "node:test";
 import qdashExtension from "@oqtopus-team/pi-qdash/extensions/qdash.ts";
 import { createQDashConnection, requestQDashAuth } from "../src/auth.ts";
 import { buildQDashExtension } from "../src/durable-tools.ts";
-import { buildPythonTool } from "../src/python-tool.ts";
 
 function installedTools() {
   const tools = new Map();
@@ -35,7 +34,7 @@ test("missing user credentials never fall back to an ambient administrator token
   await assert.rejects(createQDashConnection({ accessToken: "" }), /user token is required/);
 });
 
-test("real pi-qdash reads, approved writes and Python calls keep concurrent users isolated", async (t) => {
+test("real pi-qdash reads and approved writes keep concurrent users isolated", async (t) => {
   const requests = [];
   let denyWrites = false;
   const server = createServer(async (req, res) => {
@@ -120,20 +119,16 @@ test("real pi-qdash reads, approved writes and Python calls keep concurrent user
         ...requested.details.approval,
         args: { ...requested.details.approval.args, ...override },
       });
-      const pythonResult = await buildPythonTool(connection).execute(
-        { code: "result = {'output': 'ok'}" }, {}, context,
-      );
-      assert.deepEqual(pythonResult.output, [{ type: "text", text: "ok" }]);
       return [readResult, requested];
     }),
   );
   for (const user of ["alice", "bob"]) {
     const own = requests.filter((request) => request.token === `Bearer ${user}-token`);
-    assert.equal(own.length, 3);
+    assert.equal(own.length, 2);
     assert.ok(own.every((request) => request.project === `${user}-project`));
-    assert.equal(own.filter((request) => request.method === "POST").length, 2);
+    assert.equal(own.filter((request) => request.method === "POST").length, 1);
   }
-  assert.equal(requests.length, 6);
+  assert.equal(requests.length, 4);
   assert.equal(process.env.QDASH_API_TOKEN, "ambient-admin");
   assert.equal(process.env.QDASH_PROJECT_ID, "ambient-project");
   assert.ok(!JSON.stringify(results).includes("alice-token"));
@@ -149,7 +144,7 @@ test("real pi-qdash reads, approved writes and Python calls keep concurrent user
     }),
     /403|Insufficient permissions/,
   );
-  assert.equal(requests.length, 7);
+  assert.equal(requests.length, 5);
   assert.equal(requests.at(-1).token, "Bearer bob-token");
 
   const noProject = await createQDashConnection({ accessToken: "alice-token" });

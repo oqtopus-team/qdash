@@ -9,7 +9,7 @@ QDash Copilot is an AI-powered assistant that helps experimentalists interpret q
 
 Both are the same chat with the same planner; the first just opens with a task result as its context. The evaluation model's recorded judgements are a separate thing (see [Calibration Evaluation](./evaluation.md)). Forum AI replies are one planner turn each on the same runtime.
 
-Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a sandboxed Python tool served by the API, and SSE streaming for progress.
+Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a shell and files per conversation in a separate container (the [workspace](./workspace.md)), and SSE streaming for progress.
 
 ## Component Diagram
 
@@ -19,11 +19,11 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 
 | File | Responsibility |
 |------|---------------|
-| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/chat/stream` (general and task chats), `/sandbox/python`, chat sessions |
+| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/chat/stream` (general and task chats), chat sessions |
 | `src/qdash/copilot/runtime.py` | Data loading: `build_task_context()`, `build_images_sent_metadata()`, qubit/task/history queries |
 | `src/qdash/api/services/pi_chat_service.py` | Runtime bridge: request payloads, the task chat's opening message and figures, NDJSON to SSE translation, `thread_reply` / `complete_once` for forum reply turns |
 | `src/qdash/copilot/` | Shared Copilot runtime used outside the API process |
-| `src/qdash/copilot/tooling/sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
+| `agent-runtime/src/exec-env.ts` | The workspace: one `agent-exec` connection per conversation behind `bash`, `read`, `write`, `edit` |
 | `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`); request schemas |
 | `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter |
 | `src/qdash/copilot/config/settings.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `TaskChatConfig`; YAML loading with local override |
@@ -41,9 +41,29 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 
 The API forwards the authenticated user's access token and selected `X-Project-Id` to the Pi runtime on each chat or analysis turn, including approval responses. When no project header is supplied, it uses the user's default project. The internal `AGENT_RUNTIME_TOKEN` still authenticates API-to-runtime requests; user credentials travel in separate internal headers and are never added to model input or durable conversation state.
 
-Each open conversation gets its own tool registry and a private temporary pi-qdash profile. Read tools, approved writes, and the Python sandbox use that user's credentials. The runtime overrides connection arguments supplied by a model or an older stored tool call and never falls back to `QDASH_API_TOKEN` or an administrator login. QDash API endpoints enforce the user's permissions.
+Each open conversation gets its own tool registry and a private temporary pi-qdash profile. Read tools and approved writes use that user's credentials; the workspace container never sees them. The runtime overrides connection arguments supplied by a model or an older stored tool call and never falls back to `QDASH_API_TOKEN` or an administrator login. QDash API endpoints enforce the user's permissions.
 
 The pinned pi-qdash version accepts a configuration file rather than an injected client. The runtime creates the profile in a private directory with a mode-0600 file and removes it when the conversation closes, including failures. Docker Compose mounts `/tmp` as tmpfs so these credentials do not enter the container's persistent filesystem. Deployments outside Compose should provide an equivalent memory-backed temporary directory.
+
+## Page context and editor edits
+
+A chat from the sidebar or the floating window tells the assistant what the user has open.
+Every turn carries `ChatRequest.page` (`PageContext`: route, title, and on the Workflow editor
+the flow's name, chip, and the editor's current text, unsaved changes included); the runtime
+rebuilds a system prompt section from it each turn (`agent-runtime/src/page-context.ts`,
+`buildPageContextSection`). The chat page itself sends none.
+
+Pages register what they show with the chat dock (`ChatDockContext.registerPage`): the
+registration reads the page's state when a turn is sent, so an editor's buffer is current, and
+may accept code back (`applyCode`). Without a registration the dock sends the route and the
+document title.
+
+On the Workflow editor the runtime also offers `propose_code_edit`: the model passes the
+complete new file and a one-line summary, the call ends the turn, and the chat renders an
+`edit` block (`EditProposalCard`) with a diff against what the editor holds now. **Apply to
+editor** replaces the buffer and unlocks the editor; saving stays with the user and goes through
+the editor's Save, so `POST /flows` validation and deployment registration are unchanged. The
+runtime never writes the flow; `qdash_save_flow` stays for flows written from the chat alone.
 
 ## Configuration
 
@@ -62,19 +82,46 @@ task_chat:                 # How a chat about a task result opens
 
 # chat.yaml: the planner models every chat can use; the first is the default
 chat_models:
-  - provider: openai-compatible
+  - provider: openai-compatible-chat
     name: qwen3.8-flash-next
     api_style: completion
-    base_url: env:OPENAI_COMPATIBLE_BASE_URL
-    api_key_env: OPENAI_COMPATIBLE_API_KEY
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
 
-# evaluation.yaml: the model pi-qcaleval judges calibration plots with
+# evaluation.yaml: models pi-qcaleval can use to judge calibration plots
 evaluation_models:
-  - provider: vllm
+  - provider: openai-compatible-evaluation
     name: nvidia/Ising-Calibration-1.5-31B-NVFP4
-    base_url: env:VLLM_BASE_URL
-    api_key_env: VLLM_API_KEY
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_EVALUATION
+  - provider: openai-compatible-chat
+    name: qwen3.8-flash-next
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
 ```
+
+Custom OpenAI-compatible API base URLs must include `/v1`, for example
+`https://models.example.com/v1`. Do not include an operation path such as
+`/chat/completions` or `/responses`. The runtime passes the configured path to the model client
+without adding `/v1`.
+
+Name OpenAI-compatible endpoint variables with a descriptive suffix:
+`OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` and `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>`.
+The suffix is not predefined; choose one that identifies the endpoint or its purpose, then use
+the exact variable names in `base_url: env:...` and `api_key_env`. The supplied templates use
+`CHAT` and `EVALUATION`.
+
+Give each endpoint a matching identifier with the form `openai-compatible-<suffix>` in its
+`provider` field. This value is an endpoint identifier, not the serving software name: Pi uses it
+as a key in the generated configuration. Endpoints with different base URLs must not share an
+identifier. The supplied templates use `openai-compatible-chat` and
+`openai-compatible-evaluation`.
+
+The default chat model also appears in `evaluation_models`, which makes its evaluation role
+explicit. When the same endpoint identifier and model name appear in both lists, the runtime keeps
+the full definition from `chat_models`. Qwen reasoning models receive the Qwen chat-template
+thinking format on that model only; other models sharing the endpoint keep their own response
+format.
 
 YAML string values support shell-style environment variable references such
 as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be supplied
@@ -86,11 +133,24 @@ builds its `models.json` from `chat_models` and `evaluation_models` at startup.
 | Variable | Purpose |
 |----------|---------|
 | `OPENAI_API_KEY` | OpenAI API authentication |
-| `OLLAMA_BASE_URL` | Ollama / OpenAI-compatible server URL (default: `http://localhost:11434`) |
-| `OLLAMA_API_KEY` | Optional API key for the Ollama / OpenAI-compatible server |
-| `DS4_BASE_URL` | DeepSeek v4 OpenAI-compatible gateway base URL |
-| `DS4_API_KEY` | DeepSeek v4 API key |
+| `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` | OpenAI-compatible API base URL through `/v1`; the suffix is operator-defined |
+| `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` | API key for the endpoint with the matching suffix; it can be a placeholder for a keyless endpoint |
 | `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
+
+Existing deployments must rename the earlier fixed variables and add `/v1` to each base URL:
+
+| Earlier variable | Replacement in the supplied configuration |
+| --- | --- |
+| `OPENAI_COMPATIBLE_BASE_URL` | `OPENAI_COMPATIBLE_BASE_URL_CHAT` |
+| `OPENAI_COMPATIBLE_API_KEY` | `OPENAI_COMPATIBLE_API_KEY_CHAT` |
+| `VLLM_BASE_URL` | `OPENAI_COMPATIBLE_BASE_URL_EVALUATION` |
+| `VLLM_API_KEY` | `OPENAI_COMPATIBLE_API_KEY_EVALUATION` |
+
+`OLLAMA_BASE_URL` and `OLLAMA_API_KEY` no longer have special meaning. If that endpoint remains
+in use, choose a suffix such as `OLLAMA`, name its variables
+`OPENAI_COMPATIBLE_BASE_URL_OLLAMA` and `OPENAI_COMPATIBLE_API_KEY_OLLAMA`, and reference them from
+the corresponding YAML model. Variable renaming does not transform the URL: for example, migrate
+`http://ollama:11434` to `http://ollama:11434/v1`.
 
 ### Developing a pi extension against the runtime
 

@@ -96,14 +96,6 @@
     "function_name": "two_qubit_scheduled"
   },
   {
-    "id": "parallel_retry",
-    "name": "Parallel Retry Calibration",
-    "description": "Parallel execution with @task + submit(). Demonstrates retry logic with frequency offset.",
-    "category": "advanced",
-    "filename": "retry.py",
-    "function_name": "parallel_retry_calibration"
-  },
-  {
     "id": "fake_calibration",
     "name": "Fake Backend Calibration",
     "description": "Calibration with backend switching. Use backend_name='fake' for testing, 'qubex' for production. Customize tasks list for provenance testing.",
