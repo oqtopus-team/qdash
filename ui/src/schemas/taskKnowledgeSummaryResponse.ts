@@ -13,9 +13,6 @@ export interface TaskKnowledgeSummaryResponse {
   name: string;
   category?: string;
   summary: string;
-  failure_mode_count?: number;
-  case_count?: number;
-  image_count?: number;
-  has_analysis_guide?: boolean;
-  has_review_guide?: boolean;
+  example_count?: number;
+  figure_count?: number;
 }

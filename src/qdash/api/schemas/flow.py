@@ -24,6 +24,13 @@ class SaveFlowRequest(BaseModel):
         description="Default run parameters applied to all tasks (e.g., interval, shots)",
     )
     tags: list[str] = Field(default_factory=list, description="Tags for categorization")
+    folder: str | None = Field(
+        default=None,
+        description=(
+            'Folder path inside the creator\'s space, e.g. "daily/t1"; "" is the root.'
+            " Omitted keeps an existing flow's folder (a new flow goes to the root)."
+        ),
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -36,6 +43,7 @@ class SaveFlowRequest(BaseModel):
                     "chip_id": "64Qv3",
                     "default_parameters": {"qids": ["32"], "max_iterations": 10},
                     "tags": ["adaptive", "calibration"],
+                    "folder": "adaptive",
                 }
             ]
         }
@@ -61,6 +69,9 @@ class FlowSummary(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     tags: list[str] = Field(..., description="Tags")
+    folder: str = Field(
+        "", description='Folder path inside the creator\'s space, e.g. "daily/t1" (empty = root)'
+    )
     file_exists: bool = Field(True, description="Whether the flow source file exists")
 
 
@@ -88,6 +99,25 @@ class GetFlowResponse(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     tags: list[str] = Field(..., description="Tags")
+    folder: str = Field(
+        "", description='Folder path inside the creator\'s space, e.g. "daily/t1" (empty = root)'
+    )
+
+
+class MoveFlowRequest(BaseModel):
+    """Request to move a Flow to another folder of its creator's space."""
+
+    folder: str = Field(
+        ..., description='Target folder path, e.g. "daily/t1"; "" moves the flow to the root'
+    )
+
+
+class MoveFlowResponse(BaseModel):
+    """Response after moving a flow."""
+
+    name: str = Field(..., description="Flow name")
+    folder: str = Field(..., description="The folder the flow now sits in")
+    message: str = Field(..., description="Success message")
 
 
 class ExecuteFlowRequest(BaseModel):

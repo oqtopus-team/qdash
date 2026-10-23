@@ -13,13 +13,9 @@ dependencies = [
     "numpy>=1.26.0",
     "pendulum>=3.1.0",
     "pydantic>=2.8.0",
-    "pymongo>=4.8.0",
+    "pymongo>=4.18.2",
     "qdash-api",
 ]
-
-[project.scripts]
-qdash-updater = "qdash.updater.__main__:main"
-
 
 [build-system]
 requires = ["hatchling"]

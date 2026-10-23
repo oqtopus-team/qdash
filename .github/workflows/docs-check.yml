@@ -1,0 +1,89 @@
+name: Documentation Checks
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "docs/**"
+      - "lychee.toml"
+      - ".github/workflows/docs-check.yml"
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Build and Links
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.0"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        working-directory: docs
+
+      - name: Build documentation
+        run: bun run docs:build
+        working-directory: docs
+
+      - name: Select documentation files
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            git diff --name-only --diff-filter=ACMR "${BASE_SHA}" "${HEAD_SHA}" -- docs \
+              | awk '/\.md$/ { print }' > .lychee-inputs
+          else
+            git ls-files docs | awk '/\.md$/ { print }' > .lychee-inputs
+          fi
+
+          # A workflow or configuration-only change must exercise the complete link set.
+          if [[ ! -s .lychee-inputs ]]; then
+            git ls-files docs | awk '/\.md$/ { print }' > .lychee-inputs
+          fi
+
+      - name: Prepare link roots
+        shell: bash
+        run: |
+          mkdir .lychee-source-root .lychee-site-root
+          ln -s "${GITHUB_WORKSPACE}/docs/index.md" .lychee-source-root/index.md
+          for asset in docs/public/*; do
+            ln -s "${GITHUB_WORKSPACE}/${asset}" ".lychee-source-root/$(basename "${asset}")"
+          done
+          for section in developer-guide user-guide reference; do
+            ln -s "${GITHUB_WORKSPACE}/docs/${section}" ".lychee-source-root/${section}"
+          done
+          ln -s "${GITHUB_WORKSPACE}/docs/.vitepress/dist" .lychee-site-root/qdash
+
+      - name: Check external links
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: --config lychee.toml --root-dir "${{ github.workspace }}/.lychee-source-root" --files-from .lychee-inputs
+          fail: true
+          failIfEmpty: true
+          jobSummary: true
+
+      - name: Check generated site links and anchors
+        run: >-
+          lychee --config lychee.toml --offline --scheme file --include-fragments=full
+          --root-dir "${GITHUB_WORKSPACE}/.lychee-site-root"
+          -- 'docs/.vitepress/dist/**/*.html'

@@ -2,9 +2,18 @@
 
 import { useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, Crosshair, Send, Tag, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  ClipboardList,
+  Crosshair,
+  Send,
+  Tag,
+  UserRound,
+} from "lucide-react";
 
 import { useListChips } from "@/client/chip/chip";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
@@ -19,6 +28,7 @@ import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useForumAiReply } from "@/hooks/useForumAiReply";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { formatDateTimeCompact } from "@/lib/utils/datetime";
 
@@ -48,14 +58,22 @@ function formatCooldownPeriod(
   return `${start} - ${end}`;
 }
 
-function parseLabels(value: string | null): string[] {
-  return (value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 1);
+/** Splits comma-separated label params into a deduplicated list of trimmed keys. */
+export function parseLabels(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of values) {
+    for (const item of raw.split(",")) {
+      const trimmed = item.trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      result.push(trimmed);
+    }
+  }
+  return result;
 }
 
+/** Page for composing a new forum thread. */
 export function ForumNewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -74,7 +92,7 @@ export function ForumNewPage() {
   const [content, setContent] = useState(searchParams.get("content") ?? "");
   const [contentBlocks, setContentBlocks] = useState<Record<string, unknown>[]>([]);
   const [selectedLabels, setSelectedLabels] = useState<string[]>(() =>
-    parseLabels(searchParams.get("labels")),
+    parseLabels(searchParams.getAll("labels")),
   );
   const [targetDraftChipId, setTargetDraftChipId] = useState(searchParams.get("chip_id") ?? "");
   const [targetDraftType, setTargetDraftType] = useState<"qubit" | "coupling">(
@@ -82,6 +100,8 @@ export function ForumNewPage() {
   );
   const [targetDraftId, setTargetDraftId] = useState(searchParams.get("target_id") ?? "");
   const [cooldownDraftId, setCooldownDraftId] = useState(searchParams.get("cooldown_id") ?? "");
+  // The task result this thread is about, when opened from a result page.
+  const linkedTaskId = searchParams.get("task_id")?.trim() || null;
   const [assigneeUsername, setAssigneeUsername] = useState("");
 
   const { data: categoriesResponse } = useListForumCategories(undefined, {
@@ -145,9 +165,14 @@ export function ForumNewPage() {
   );
 
   const createMutation = useCreateForumPost();
+  const { labels } = useForumLabels();
 
+  /** Toggles a label in the new-thread selection. */
   const toggleLabel = (label: string) => {
-    setSelectedLabels((current) => (current.includes(label) ? [] : [label]));
+    setSelectedLabels((current) => {
+      if (current.includes(label)) return current.filter((item) => item !== label);
+      return [...current, label];
+    });
   };
 
   const clearTargetMetadata = () => {
@@ -180,6 +205,7 @@ export function ForumNewPage() {
         target_type: hasTarget ? targetDraftType : null,
         target_id: hasTarget ? targetId : null,
         cooldown_id: cooldownDraftId || null,
+        task_id: linkedTaskId,
       },
     });
     queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
@@ -217,6 +243,16 @@ export function ForumNewPage() {
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
             <span>Opened by {user?.username ?? "you"}</span>
             <span>New forum thread</span>
+            {linkedTaskId && (
+              <Link
+                href={`/task-results/${encodeURIComponent(linkedTaskId)}`}
+                className="badge badge-outline gap-1"
+                title={linkedTaskId}
+              >
+                <ClipboardList className="h-3 w-3" />
+                about task result {linkedTaskId.slice(0, 8)}
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -386,7 +422,11 @@ export function ForumNewPage() {
               <Tag className="h-3.5 w-3.5" />
               Labels
             </div>
-            <ForumLabelPicker selectedLabels={selectedLabels} onToggle={toggleLabel} />
+            <ForumLabelPicker
+              labels={labels}
+              selectedLabels={selectedLabels}
+              onToggle={toggleLabel}
+            />
           </section>
 
           <section className="space-y-2">

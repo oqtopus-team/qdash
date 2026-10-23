@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 510" role="img" aria-label="The pipeline owner reserves the union of its step scopes in the execution lock; steps and child workers run with use_lock=False and are rejected if their scope exceeds the reservation. Only the owner releases the lock: through cancel_calibration() after an in-flow cancellation exception, or through the on_flow hooks after a termination signal. Nested flows use the keep_lock hooks, which close the execution without releasing the lock.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-dash { stroke-dasharray: 5 4; }
+    .qd-ui { fill: rgba(46, 160, 67, 0.12); stroke: #2ea043; stroke-width: 1.5; }
+    .qd-api { fill: rgba(219, 109, 40, 0.12); stroke: #db6d28; stroke-width: 1.5; }
+    .qd-wf { fill: rgba(130, 80, 223, 0.12); stroke: #8250df; stroke-width: 1.5; }
+    .qd-data { fill: rgba(9, 105, 218, 0.10); stroke: #0969da; stroke-width: 1.5; }
+    .qd-ext { fill: none; stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; stroke-dasharray: 5 4; }
+      .qd-er-section { fill: var(--vp-c-text-2, #59636e); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; }
+    .qd-er-release { stroke: #0969da; stroke-width: 1.6; fill: none; }
+    .qd-er-release-head { fill: #0969da; }
+    .qd-er-release-label { fill: #0969da; font-size: 11.5px; font-weight: 600; }
+  </style>
+  <defs>
+    <marker id="qd-er-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+    <marker id="qd-er-release-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-er-release-head"/>
+    </marker>
+  </defs>
+  <g class="qd-root">
+    <path d="M850,50 V410 a85.0,10 0 0,0 170,0 V50" class="qd-data"/>
+    <ellipse cx="935.0" cy="50" rx="85.0" ry="10" class="qd-data"/>
+    <text x="935.0" y="214" class="qd-title">Execution lock</text>
+    <text x="935.0" y="232" class="qd-sub">MongoDB</text>
+    <text x="935.0" y="248" class="qd-sub">chip · resources · exclusive</text>
+    <text x="20" y="24" class="qd-er-section">RESERVATION</text>
+    <rect x="20" y="40" width="200" height="56" rx="8" class="qd-wf"/>
+    <text x="120" y="64" class="qd-title">Pipeline owner</text>
+    <text x="120" y="82" class="qd-sub">CalibService · use_lock=True</text>
+    <line x1="220" y1="68" x2="848" y2="68" class="qd-edge" marker-end="url(#qd-er-arrow)"/>
+    <text x="535.0" y="60" class="qd-label" style="text-anchor: middle">reserves the union of all step scopes before step 1</text>
+    <rect x="20" y="150" width="200" height="56" rx="8" class="qd-wf"/>
+    <text x="120" y="174" class="qd-title">Step or child worker</text>
+    <text x="120" y="192" class="qd-sub">use_lock=False</text>
+    <line x1="120.0" y1="150" x2="120.0" y2="98" class="qd-edge qd-dash" marker-end="url(#qd-er-arrow)"/>
+    <text x="128.0" y="130" class="qd-label" style="text-anchor: start">borrows the owner's execution</text>
+    <rect x="270" y="150" width="250" height="56" rx="8" class="qd-wf"/>
+    <text x="395" y="174" class="qd-title">Scope check</text>
+    <text x="395" y="192" class="qd-sub">requested ⊆ reserved</text>
+    <line x1="220" y1="178" x2="268" y2="178" class="qd-edge" marker-end="url(#qd-er-arrow)"/>
+    <rect x="570" y="150" width="220" height="56" rx="8" class="qd-ext"/>
+    <text x="680" y="174" class="qd-title">Backend call</text>
+    <text x="680" y="192" class="qd-sub">hardware operation</text>
+    <line x1="520" y1="178" x2="568" y2="178" class="qd-edge" marker-end="url(#qd-er-arrow)"/>
+    <text x="545.0" y="170" class="qd-label" style="text-anchor: middle">inside</text>
+    <text x="395.0" y="226" class="qd-label" style="text-anchor: middle">outside → rejected before the backend call</text>
+    <text x="20" y="262" class="qd-er-section">TERMINAL PATHS</text>
+    <rect x="20" y="276" width="200" height="56" rx="8" class="qd-ext"/>
+    <text x="120" y="300" class="qd-title">In-flow exception</text>
+    <text x="120" y="318" class="qd-sub">CancelledRun · CancelledError</text>
+    <rect x="20" y="356" width="200" height="136" rx="8" class="qd-ext"/>
+    <text x="120" y="420" class="qd-title">Termination signal</text>
+    <text x="120" y="438" class="qd-sub">worker process killed</text>
+    <rect x="270" y="276" width="250" height="56" rx="8" class="qd-wf"/>
+    <text x="395" y="300" class="qd-title">cancel_calibration()</text>
+    <text x="395" y="318" class="qd-sub">in the flow process</text>
+    <rect x="270" y="356" width="250" height="56" rx="8" class="qd-wf"/>
+    <text x="395" y="380" class="qd-title">on_flow_* hooks</text>
+    <text x="395" y="398" class="qd-sub">owner flow · by flow_run_id</text>
+    <rect x="270" y="436" width="250" height="56" rx="8" class="qd-wf"/>
+    <text x="395" y="460" class="qd-title">on_flow_*_keep_lock hooks</text>
+    <text x="395" y="478" class="qd-sub">nested single-task flow</text>
+    <rect x="570" y="276" width="220" height="56" rx="8" class="qd-wf"/>
+    <text x="680" y="300" class="qd-title">Close execution</text>
+    <text x="680" y="318" class="qd-sub">unfinished tasks cancelled</text>
+    <rect x="570" y="356" width="220" height="56" rx="8" class="qd-wf"/>
+    <text x="680" y="380" class="qd-title">Finalizer</text>
+    <text x="680" y="398" class="qd-sub">release_lock=True</text>
+    <rect x="570" y="436" width="220" height="56" rx="8" class="qd-wf"/>
+    <text x="680" y="460" class="qd-title">Finalizer</text>
+    <text x="680" y="478" class="qd-sub">release_lock=False</text>
+    <line x1="220" y1="304" x2="268" y2="304" class="qd-edge" marker-end="url(#qd-er-arrow)"/>
+    <line x1="220" y1="384" x2="268" y2="384" class="qd-edge" marker-end="url(#qd-er-arrow)"/>
+    <line x1="220" y1="464" x2="268" y2="464" class="qd-edge" marker-end="url(#qd-er-arrow)"/>
+    <line x1="520" y1="304" x2="568" y2="304" class="qd-edge" marker-end="url(#qd-er-arrow)"/>
+    <line x1="520" y1="384" x2="568" y2="384" class="qd-edge" marker-end="url(#qd-er-arrow)"/>
+    <line x1="520" y1="464" x2="568" y2="464" class="qd-edge" marker-end="url(#qd-er-arrow)"/>
+    <line x1="790" y1="304" x2="848" y2="304" class="qd-er-release" marker-end="url(#qd-er-release-arrow)"/>
+    <line x1="790" y1="384" x2="848" y2="384" class="qd-er-release" marker-end="url(#qd-er-release-arrow)"/>
+    <text x="820.0" y="296" class="qd-er-release-label" style="text-anchor: middle">release</text>
+    <text x="820.0" y="376" class="qd-er-release-label" style="text-anchor: middle">release</text>
+    <text x="804" y="460" class="qd-label" style="text-anchor: start">lock left to the</text>
+    <text x="804" y="476" class="qd-label" style="text-anchor: start">parent pipeline</text>
+  </g>
+</svg>

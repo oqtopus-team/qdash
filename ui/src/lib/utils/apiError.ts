@@ -22,3 +22,19 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 
   return fallback;
 }
+
+/**
+ * With `responseType: "blob"`, error bodies also arrive as a Blob, so parse the
+ * JSON body back into `response.data` before reading its `detail`.
+ */
+export async function parseBlobErrorBody(error: unknown): Promise<unknown> {
+  const response = (error as { response?: { data?: unknown } } | null)?.response;
+  if (response?.data instanceof Blob) {
+    try {
+      response.data = JSON.parse(await response.data.text());
+    } catch {
+      // Keep the original error when the body is not JSON.
+    }
+  }
+  return error;
+}

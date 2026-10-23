@@ -19,6 +19,7 @@ import {
   UserRound,
   X,
   XCircle,
+  ClipboardList,
 } from "lucide-react";
 
 import { useListChips } from "@/client/chip/chip";
@@ -46,12 +47,12 @@ import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { formatDateTimeCompact, formatRelativeTime } from "@/lib/utils/datetime";
 import type { ForumPostResponse, ListForumPostsParams } from "@/schemas";
 
 import {
   DEFAULT_FORUM_CATEGORIES,
-  FORUM_LABELS,
   FORUM_STATUSES,
   getForumCategory,
   formatForumPostNumber,
@@ -60,7 +61,10 @@ import {
   isForumTerminalStatus,
   toForumCategoryDefinition,
   type ForumCategoryDefinition,
+  type ForumLabelDefinition,
 } from "./categories";
+import { ForumLabelBadge } from "./ForumLabelBadge";
+import { ForumLabelManager } from "./ForumLabelManager";
 import { ForumLabelPicker } from "./ForumLabelSelector";
 import { ForumPostContent } from "./ForumPostContent";
 
@@ -68,6 +72,13 @@ const PAGE_SIZE = 30;
 
 type CategoryFilter = "all" | NonNullable<ListForumPostsParams["category"]>;
 type StatusFilter = "open" | "investigating" | "identified" | "resolved" | "all";
+
+function taskStatusClass(status: string): string {
+  if (status === "completed" || status === "success") return "badge-success";
+  if (status === "failed") return "badge-error";
+  if (status === "running") return "badge-warning";
+  return "badge-ghost";
+}
 
 function parseForumPage(value: string | null): number {
   const page = Number.parseInt(value ?? "1", 10);
@@ -146,11 +157,13 @@ function postTargetContext(post: ForumPostResponse): ForumTargetContext | null {
 function ForumThreadCard({
   post,
   categories,
+  labels,
   isSelected,
   onSelect,
 }: {
   post: ForumPostResponse;
   categories: ForumCategoryDefinition[];
+  labels: ForumLabelDefinition[];
   isSelected: boolean;
   onSelect: () => void;
 }) {
@@ -158,8 +171,7 @@ function ForumThreadCard({
   const targetContext = postTargetContext(post);
   const Icon = category.icon;
   const displayNumber = formatForumPostNumber(post.number);
-  const primaryLabel = (post.labels ?? [])[0];
-  const labelDef = primaryLabel ? getForumLabel(primaryLabel) : null;
+  const postLabels = post.labels ?? [];
   const statusDef = getForumStatus(post.status);
   const StatusIcon = statusDef.icon;
   const isTerminal = isForumTerminalStatus(post.status);
@@ -193,7 +205,7 @@ function ForumThreadCard({
                     {displayNumber}
                   </span>
                 )}
-                {post.title || "Untitled topic"}
+                {post.title || "Untitled thread"}
               </h2>
             </div>
 
@@ -205,9 +217,9 @@ function ForumThreadCard({
                 <Icon className="h-3 w-3" />
                 {category.shortLabel}
               </span>
-              {labelDef && (
-                <span className={`badge badge-sm ${labelDef.badgeClass}`}>{labelDef.label}</span>
-              )}
+              {postLabels.map((labelKey) => (
+                <ForumLabelBadge key={labelKey} label={getForumLabel(labelKey, labels)} />
+              ))}
               <span className={`badge badge-sm gap-1 ${statusDef.badgeClass}`}>
                 <StatusIcon className="h-3 w-3" />
                 {statusDef.label}
@@ -247,6 +259,20 @@ function ForumThreadCard({
                 {post.cooldown_id}
               </span>
             )}
+            {post.task_result && (
+              <span
+                className="inline-flex min-w-0 items-center gap-1"
+                title={`Task result ${post.task_result.task_id}`}
+              >
+                <ClipboardList className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {post.task_result.task_name} · Q{post.task_result.qid}
+                </span>
+                <span className={`badge badge-xs ${taskStatusClass(post.task_result.status)}`}>
+                  {post.task_result.status}
+                </span>
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -254,9 +280,11 @@ function ForumThreadCard({
   );
 }
 
+/** Sidebar previewing a selected forum thread with editable metadata. */
 function ForumThreadPreviewSidebar({
   postId,
   categories,
+  labels,
   currentUsername,
   canEditMetadata,
   projectId,
@@ -265,6 +293,7 @@ function ForumThreadPreviewSidebar({
 }: {
   postId: string | null;
   categories: ForumCategoryDefinition[];
+  labels: ForumLabelDefinition[];
   currentUsername?: string;
   canEditMetadata: boolean;
   projectId?: string | null;
@@ -302,7 +331,7 @@ function ForumThreadPreviewSidebar({
   const isOpen = !!postId;
   const category = post ? getForumCategory(post.category, categories) : null;
   const CategoryIcon = category?.icon;
-  const label = post?.labels?.[0] ? getForumLabel(post.labels[0]) : null;
+  const postLabels = post?.labels ?? [];
   const statusDef = getForumStatus(post?.status);
   const StatusIcon = statusDef.icon;
   const targetContext = post ? postTargetContext(post) : null;
@@ -401,10 +430,13 @@ function ForumThreadPreviewSidebar({
     syncPostCache(response.data);
   };
 
+  /** Toggles a label on the thread. */
   const togglePostLabel = (labelId: string) => {
     if (!post) return;
     const currentLabels = post.labels ?? [];
-    const nextLabels = currentLabels.includes(labelId) ? [] : [labelId];
+    const nextLabels = currentLabels.includes(labelId)
+      ? currentLabels.filter((item) => item !== labelId)
+      : [...currentLabels, labelId];
     updateMetadata({ labels: nextLabels });
   };
 
@@ -470,9 +502,9 @@ function ForumThreadPreviewSidebar({
                       {category.shortLabel}
                     </span>
                   )}
-                  {label && (
-                    <span className={`badge badge-sm ${label.badgeClass}`}>{label.label}</span>
-                  )}
+                  {postLabels.map((labelKey) => (
+                    <ForumLabelBadge key={labelKey} label={getForumLabel(labelKey, labels)} />
+                  ))}
                   <span className={`badge badge-sm gap-1 ${statusDef.badgeClass}`}>
                     <StatusIcon className="h-3 w-3" />
                     {statusDef.label}
@@ -484,7 +516,7 @@ function ForumThreadPreviewSidebar({
                       {formatForumPostNumber(post.number)}
                     </span>
                   )}
-                  {post.title || "Untitled topic"}
+                  {post.title || "Untitled thread"}
                 </h2>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
                   <span>Opened by {post.username}</span>
@@ -699,6 +731,7 @@ function ForumThreadPreviewSidebar({
                         Labels
                       </div>
                       <ForumLabelPicker
+                        labels={labels}
                         selectedLabels={post.labels ?? []}
                         onToggle={togglePostLabel}
                         disabled={updateMutation.isPending}
@@ -761,6 +794,7 @@ function ForumThreadPreviewSidebar({
   );
 }
 
+/** Forum page listing threads with filters, category and label management, and thread creation. */
 export function ForumPageContent() {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -784,6 +818,7 @@ export function ForumPageContent() {
     () => (parseForumPage(searchParams.get("forum_page")) - 1) * PAGE_SIZE,
   );
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [showLabelManager, setShowLabelManager] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [categoryKey, setCategoryKey] = useState("");
   const [categoryName, setCategoryName] = useState("");
@@ -831,6 +866,7 @@ export function ForumPageContent() {
       DEFAULT_FORUM_CATEGORIES,
     [categoriesResponse?.data.categories],
   );
+  const { labels } = useForumLabels();
 
   const { data: cooldownsResponse } = useListCooldowns(undefined, {
     query: { staleTime: 60_000 },
@@ -996,6 +1032,15 @@ export function ForumPageContent() {
                 Categories
               </button>
             )}
+            {canEdit && (
+              <button
+                className="btn btn-ghost btn-sm gap-2"
+                onClick={() => setShowLabelManager((open) => !open)}
+              >
+                <Tag className="h-4 w-4" />
+                Labels
+              </button>
+            )}
             <Link
               className="btn btn-primary btn-sm gap-2"
               href={
@@ -1077,7 +1122,7 @@ export function ForumPageContent() {
               onChange={(event) => setLabelFilterValue(event.target.value)}
             >
               <option value="all">All labels</option>
-              {FORUM_LABELS.map((item) => (
+              {labels.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.label}
                 </option>
@@ -1233,6 +1278,8 @@ export function ForumPageContent() {
         </div>
       )}
 
+      {showLabelManager && canEdit && <ForumLabelManager labels={labels} />}
+
       {!isLoading && !isError && posts.length > 0 && (
         <div className="mb-3 flex items-center justify-between gap-3 text-xs text-base-content/60">
           <span>
@@ -1293,6 +1340,7 @@ export function ForumPageContent() {
                 key={post.id}
                 post={post}
                 categories={categories}
+                labels={labels}
                 isSelected={selectedPostId === post.id}
                 onSelect={() => setSelectedPostId(post.id)}
               />
@@ -1325,6 +1373,7 @@ export function ForumPageContent() {
       <ForumThreadPreviewSidebar
         postId={selectedPostId}
         categories={categories}
+        labels={labels}
         currentUsername={user?.username}
         canEditMetadata={canEdit}
         projectId={projectId}

@@ -3,11 +3,12 @@
 These tests verify the CalibService API and helper functions for custom calibration flows.
 """
 
+import asyncio
 import re
 import sys
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -86,6 +87,7 @@ class MockBackend:
 
     def __init__(self, *args, **kwargs):
         self.name = "fake"
+        self.disconnect = MagicMock()
 
     def connect(self):
         pass
@@ -522,6 +524,9 @@ class TestCalibServiceInitialization:
             session.cancel_calibration()
 
         getattr(execution_service.reload.return_value, terminal).assert_called_once()
+        backend = session.backend
+        assert backend is not None
+        cast("MagicMock", backend.disconnect).assert_called_once_with()
         if terminal == "fail":
             execution_service.reload.return_value.fail.assert_called_once_with("measurement failed")
         assert lock_repo.locked is False
@@ -552,6 +557,9 @@ class TestCalibServiceInitialization:
         session.execution_service = execution_service
 
         session.finish_calibration(update_chip_history=False, push_to_github=False)
+        backend = session.backend
+        assert backend is not None
+        cast("MagicMock", backend.disconnect).assert_called_once_with()
         session.fail_calibration()
         session.cancel_calibration()
 
@@ -757,7 +765,16 @@ class TestCalibServiceParameterManagement:
                         qid="0",
                         task_type=TaskTypes.QUBIT,
                         task_id="task-1",
-                        output_parameters={"control_amplitude": {"value": 0.25}},
+                        output_parameters={
+                            "control_amplitude": {
+                                "value": 0.25,
+                                "database_updated": True,
+                            },
+                            "measurement_only": {
+                                "value": 0.75,
+                                "database_updated": False,
+                            },
+                        },
                     )
                 ]
 
@@ -781,6 +798,7 @@ class TestCalibServiceParameterManagement:
         merged = execution_service.calib_data.qubit["0"]["control_amplitude"]
         assert isinstance(merged, ParameterModel)
         assert merged.value == 0.25
+        assert "measurement_only" not in execution_service.calib_data.qubit["0"]
 
 
 class TestGlobalSessionHelpers:
@@ -1082,9 +1100,7 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
         lock_repo=env.lock,
         counter_repo=FakeExecutionCounterRepository(2),
         default_run_parameters={"interval": {"value": 1024, "value_type": "int"}},
-        task_run_parameters={
-            "CheckCrossResonance": {"shots": {"value": 2048, "value_type": "int"}}
-        },
+        task_parameters={"CheckRabi": {"run": {"shots": {"value": 2048, "value_type": "int"}}}},
     )
     session.run(
         QubitTargets(["0", "1"]),
@@ -1102,7 +1118,7 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
     assert all(
         config["default_run_parameters"] == session.default_run_parameters for config in configs
     )
-    assert all(config["task_run_parameters"] == session.task_run_parameters for config in configs)
+    assert all(config["task_parameters"] == session.task_parameters for config in configs)
     assert [record.status for record in env.records] == ["completed", "completed"]
     assert env.lock.locked is False
 
@@ -1214,6 +1230,10 @@ def test_pipeline_retains_whole_plan_and_releases_its_original_owner(
         session.run(QubitTargets(["0"]), [CustomOneQubit(), ConfigureAll(mux_ids=[1])])
     assert seen[0] == "exec-reserved"
     assert seen[1] != seen[0]
+    assert [record.config.connect_backend for record in pipeline_execution_env.records] == [
+        False,
+        True,
+    ]
     assert repo.try_lock("project-1", "next-run", "chip-1", (), True)
     assert not repo.try_lock("project-1", "other", "chip-2", ("mux:0",), False)
 
@@ -1265,9 +1285,7 @@ def test_task_and_isolated_worker_reject_unreserved_hardware(pipeline_wiring, mo
     with pytest.raises(RuntimeError, match="outside the workflow"):
         session.execute_task_batch("CheckRabi", ["0", "4"])
     with pytest.raises(RuntimeError, match="outside the workflow"):
-        session.execute_task(
-            "ConfigureAll", "", {"ConfigureAll": {"run_parameters": {"mux_ids": {"value": [1]}}}}
-        )
+        session.execute_task("ConfigureAll", "", parameters={"run": {"mux_ids": {"value": [1]}}})
     orchestrator.run_task.assert_not_called()
     orchestrator.run_task_batch.assert_not_called()
     with pytest.raises(RuntimeError, match="outside the workflow"):
@@ -1288,6 +1306,28 @@ def test_task_and_isolated_worker_reject_unreserved_hardware(pipeline_wiring, mo
             },
             ["4"],
         )
+
+
+def test_configure_all_scope_uses_service_task_parameters(pipeline_wiring):
+    """Service-level MUX settings should be used for operation scope validation."""
+    from qdash.common.execution_resources import resolve_execution_resource_scope
+
+    scope = resolve_execution_resource_scope("chip-1", {"mux_ids": [0]})
+    session = CalibService(
+        "alice",
+        "chip-1",
+        project_id="project-1",
+        use_lock=False,
+        resource_scope=scope,
+        enable_github=False,
+        task_parameters={"ConfigureAll": {"run": {"mux_ids": [0]}}},
+    )
+    orchestrator = MagicMock()
+    session._orchestrator = orchestrator
+
+    session.execute_task("ConfigureAll", "")
+
+    orchestrator.run_task.assert_called_once()
 
 
 def test_pipeline_keeps_supplied_reservation_owner(pipeline_execution_env, monkeypatch):
@@ -1470,3 +1510,32 @@ class TestRunPipelineAbortHandling:
         execution_service.complete.assert_not_called()
         execution_service.fail.assert_not_called()
         execution_service.cancel.assert_not_called()
+
+
+@pytest.mark.parametrize("signal", [TerminationSignal("SIGTERM"), asyncio.CancelledError()])
+def test_initialization_interrupt_releases_auto_resolved_project_lock(
+    mock_flow_session_deps, monkeypatch, signal
+):
+    """A constructor abort frees its claim even when the caller has no CalibService instance."""
+    lock = MockExecutionLockRepository()
+    user = MockUserRepository()
+    monkeypatch.setattr(user, "get_default_project_id", lambda username: "test_project")
+
+    def interrupt(self):
+        """Interrupt initialization after its reservation has been acquired."""
+        assert lock.locked
+        raise signal
+
+    monkeypatch.setattr(MockCalibOrchestrator, "initialize", interrupt)
+    with pytest.raises(type(signal)) as raised:
+        CalibService(
+            username="test_user",
+            chip_id="chip_1",
+            qids=["0"],
+            execution_id="20261022-008",
+            lock_repo=lock,
+            user_repo=user,
+        )
+    assert raised.value is signal
+    assert not lock.locked
+    assert lock.unlock_calls == ["20261022-008"]

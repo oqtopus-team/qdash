@@ -66,7 +66,11 @@ def build_catalog(base_path: Path) -> dict[str, object]:
     ]
     if unresolved_defaults:
         unresolved = ", ".join(unresolved_defaults)
-        raise RuntimeError(f"Run parameter defaults could not be resolved: {unresolved}")
+        raise RuntimeError(
+            "Run parameter defaults could not be resolved. Ensure all workspace dependencies "
+            "are available by running this script with `uv run --all-packages`: "
+            f"{unresolved}"
+        )
 
     backends: dict[str, list[dict[str, object]]] = {}
     for backend, tasks_by_name in discovered_backends.items():
@@ -92,7 +96,7 @@ def main() -> None:
     rendered = json.dumps(catalog, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if args.check:
         if not output.is_file() or output.read_text(encoding="utf-8") != rendered:
-            raise SystemExit(f"Task catalog is stale; run: uv run {__file__}")
+            raise SystemExit(f"Task catalog is stale; run: uv run --all-packages {__file__}")
         return
 
     output.parent.mkdir(parents=True, exist_ok=True)

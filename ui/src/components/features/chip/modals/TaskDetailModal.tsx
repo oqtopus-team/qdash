@@ -9,7 +9,6 @@ import type { Task } from "@/schemas";
 import { useGetTaskResult } from "@/client/task/task";
 import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureContent";
 import { TaskFigure } from "@/components/charts/TaskFigure";
-import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { CalibrationUpdateStatusBadge } from "@/components/features/metrics/ParametersTable";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
@@ -27,6 +26,7 @@ import {
   formatTime as formatTimeUtil,
   formatDateTime as formatDateTimeUtil,
 } from "@/lib/utils/datetime";
+import { formatSweepValue } from "@/lib/utils/task-parameters";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
 
@@ -476,9 +476,6 @@ export function TaskDetailModal({
                 </div>
               )}
 
-              {noteTaskId && (
-                <TaskResultAiReviewNote note={fetchedTaskData?.ai_review_note} hideWhenEmpty />
-              )}
               {noteTaskId && <TaskResultMemo taskId={noteTaskId} chipId={chipId} hideWhenEmpty />}
 
               {/* Parameters Tables (detailed variant only) */}
@@ -564,11 +561,13 @@ export function TaskDetailModal({
                                 value_type?: string;
                                 description?: string;
                               };
-                              const displayValue = Array.isArray(paramValue.value)
-                                ? paramValue.value.join(", ")
-                                : paramValue.value !== null && paramValue.value !== undefined
-                                  ? String(paramValue.value)
-                                  : "-";
+                              const displayValue =
+                                formatSweepValue(paramValue.value_type, paramValue.value) ??
+                                (Array.isArray(paramValue.value)
+                                  ? paramValue.value.join(", ")
+                                  : paramValue.value !== null && paramValue.value !== undefined
+                                    ? String(paramValue.value)
+                                    : "-");
                               return (
                                 <tr key={key}>
                                   <td className="font-medium">{key}</td>

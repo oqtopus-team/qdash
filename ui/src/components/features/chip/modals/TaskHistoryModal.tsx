@@ -1,21 +1,15 @@
 "use client";
 
-import { CalibrationGitHubSyncNotice } from "@/components/features/task-results/CalibrationGitHubSyncNotice";
-import type { ManualParameterUpdateResponse } from "@/schemas";
-
 import React, { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, History, FileText, GitBranch, Bot, ListTodo } from "lucide-react";
+import { ChevronRight, History, FileText, GitBranch, ListTodo } from "lucide-react";
 
 import type { TaskResult as Task } from "@/schemas";
 
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
-import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 
 import { useGetExecution } from "@/client/execution/execution";
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
-import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import {
@@ -24,14 +18,14 @@ import {
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
-import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
-import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
+import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
+import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
-import type { AnalysisContext } from "@/hooks/useAnalysisChat";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
-import { AnalysisChatPanel } from "@/components/features/metrics/AnalysisChatPanel";
+import type { TaskChatContext } from "@/types/copilotChat";
+import { useChatDock } from "@/contexts/ChatDockContext";
+import { DockedChatPanel } from "@/components/features/chat/DockedChatPanel";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
-import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 interface TaskHistoryModalProps {
   chipId: string;
@@ -42,6 +36,7 @@ interface TaskHistoryModalProps {
   selectedDate?: string;
 }
 
+/** Task execution history of a qubit, with the selected result's details. */
 export function TaskHistoryModal({
   chipId,
   qid,
@@ -53,70 +48,24 @@ export function TaskHistoryModal({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedExecutionTaskIndex, setSelectedExecutionTaskIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
-  const [githubResult, setGithubResult] = useState<ManualParameterUpdateResponse | null>(null);
-  const [saveMessage, setSaveMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
-  const { createNewSession, switchSession, sessions } = useAnalysisChatContext();
+  const { focusTaskChat } = useChatDock();
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   const handleAskAi = useCallback(
-    (ctx: AnalysisContext) => {
-      // Reuse an existing session for this task context if present, otherwise
-      // create a new one. We deliberately do NOT open the global sidebar —
-      // the chat is shown inline as a split view inside this modal.
-      const key = `${ctx.taskId}:${ctx.executionId}:${ctx.qid}`;
-      const existing = sessions.find(
-        (s) => s.context && `${s.context.taskId}:${s.context.executionId}:${s.context.qid}` === key,
-      );
-      if (existing) {
-        switchSession(existing.id);
-      } else {
-        createNewSession(ctx);
-      }
+    (ctx: TaskChatContext) => {
+      // Resume or start the chat for this result. We deliberately do NOT open
+      // the global sidebar — the chat is shown inline as a split view here.
+      focusTaskChat(ctx);
       setIsChatOpen(true);
     },
-    [sessions, switchSession, createNewSession],
+    [focusTaskChat],
   );
 
   // Reset chat pane when modal closes so re-opening starts clean.
   React.useEffect(() => {
     if (!isOpen) setIsChatOpen(false);
   }, [isOpen]);
-  const queryClient = useQueryClient();
-  const updateParamsMutation = useUpdateCalibrationParameters();
   const manualOverrides = useManualOverrides(qid);
-
-  const handleSaveParameters = useCallback(
-    async (updatedParams: Record<string, unknown>) => {
-      setSaveMessage(null);
-      try {
-        const res = await updateParamsMutation.mutateAsync({
-          data: {
-            chip_id: chipId,
-            qid: qid,
-            parameters: updatedParams as Record<string, Record<string, unknown>>,
-          },
-        });
-        await queryClient.invalidateQueries({ predicate: isChipMetricsQuery });
-        await queryClient.invalidateQueries({
-          queryKey: [`/calibrations/manual-edits/${qid}`],
-        });
-        setGithubResult(res.data);
-        const count = res.data?.updated_count ?? 0;
-        setSaveMessage({
-          type: "success",
-          text: `${count} parameter(s) saved`,
-        });
-        setTimeout(() => setSaveMessage(null), 5000);
-      } catch (err) {
-        const message = getApiErrorMessage(err, "Failed to save");
-        setSaveMessage({ type: "error", text: message });
-      }
-    },
-    [chipId, qid, updateParamsMutation, queryClient],
-  );
 
   const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
     const p = encodeURIComponent(parameterName);
@@ -213,7 +162,7 @@ export function TaskHistoryModal({
     : [];
   const rawDataPaths = selectedTask?.raw_data_path ?? [];
 
-  const analysisContext: AnalysisContext | null = useMemo(() => {
+  const chatContext: TaskChatContext | null = useMemo(() => {
     if (!selectedTask?.task_id) return null;
     return {
       taskName: selectedTask.name || taskName,
@@ -531,22 +480,21 @@ export function TaskHistoryModal({
               <GitBranch className="h-3 w-3" />
               View Provenance Lineage
             </Link>
-            {analysisContext && (
-              <button
-                onClick={() => handleAskAi(analysisContext)}
-                className="btn btn-xs btn-primary gap-1"
-              >
-                <Bot className="h-3 w-3" />
-                Ask AI
-              </button>
+            {chatContext && (
+              <AskAiButton
+                taskId={chatContext.taskId}
+                chipId={chatContext.chipId}
+                taskName={chatContext.taskName}
+                qid={chatContext.qid}
+                chatContext={chatContext}
+                onChat={() => handleAskAi(chatContext)}
+                size="xs"
+              />
             )}
           </div>
         </div>
       )}
 
-      {selectedTask?.task_id && (
-        <TaskResultAiReviewNote taskId={selectedTask.task_id} hideWhenEmpty />
-      )}
       {selectedTask?.task_id && (
         <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} hideWhenEmpty />
       )}
@@ -567,25 +515,8 @@ export function TaskHistoryModal({
                 <ParametersTable
                   title="Output Parameters"
                   parameters={selectedTask.output_parameters as Record<string, unknown>}
-                  editable
-                  onSave={handleSaveParameters}
-                  isSaving={updateParamsMutation.isPending}
                   overrides={manualOverrides}
                 />
-                {githubResult && (
-                  <CalibrationGitHubSyncNotice key={githubResult.task_id} result={githubResult} />
-                )}
-                {saveMessage && (
-                  <div
-                    className={`text-xs px-2 py-1 rounded ${
-                      saveMessage.type === "success"
-                        ? "text-success bg-success/10"
-                        : "text-error bg-error/10"
-                    }`}
-                  >
-                    {saveMessage.text}
-                  </div>
-                )}
               </>
             )}
           {selectedTask.run_parameters && Object.keys(selectedTask.run_parameters).length > 0 && (
@@ -597,8 +528,19 @@ export function TaskHistoryModal({
         </div>
       )}
 
-      {/* Issues */}
-      {selectedTask?.task_id && <TaskResultIssues taskId={selectedTask.task_id} />}
+      {/* Forum threads about this result */}
+      {/* AI evaluations of this result, requested the same way as from the chip page */}
+      {selectedTask?.task_id && (
+        <TaskResultEvaluations
+          taskId={selectedTask.task_id}
+          chipId={chipId}
+          taskName={selectedTask.name || taskName}
+          qid={qid}
+          onChat={chatContext ? () => handleAskAi(chatContext) : undefined}
+        />
+      )}
+
+      {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
     </div>
   );
 
@@ -669,7 +611,7 @@ export function TaskHistoryModal({
           {isChatOpen && (
             <div className="hidden md:flex w-[26rem] xl:w-[30rem] flex-shrink-0 border-l border-base-300 bg-base-100 min-h-0">
               <div className="w-full h-full min-h-0">
-                <AnalysisChatPanel context={analysisContext} onClose={() => setIsChatOpen(false)} />
+                <DockedChatPanel onClose={() => setIsChatOpen(false)} />
               </div>
             </div>
           )}

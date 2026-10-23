@@ -58,8 +58,9 @@ logger = logging.getLogger(__name__)
 BATCH_SIZE = 1000  # Process documents in batches for memory efficiency
 MIGRATION_LOCK_LEASE = timedelta(minutes=30)
 RENAME_CHECK_CHEVRON_MIGRATION_ID = "rename-check-chevron-to-adaptive-v1"
+RENAME_CHECK_EF_CHEVRON_MIGRATION_ID = "rename-check-ef-chevron-to-adaptive-v1"
 
-_CHECK_CHEVRON_HISTORY_FIELDS: tuple[tuple[str, str], ...] = (
+_TASK_NAME_HISTORY_FIELDS: tuple[tuple[str, str], ...] = (
     ("task_result_history", "name"),
     ("parameter_versions", "task_name"),
     ("provenance_activities", "task_name"),
@@ -1486,16 +1487,40 @@ def migrate_remove_coupling_from_qubit(dry_run: bool = True) -> dict[str, Any]:
 
 def migrate_rename_check_chevron(database: Database[Any], dry_run: bool = True) -> dict[str, Any]:
     """Rename historical adaptive CheckChevron references without touching the task catalog."""
+    return _migrate_task_name(
+        database,
+        old_name="CheckChevron",
+        new_name="CheckAdaptiveChevron",
+        dry_run=dry_run,
+    )
+
+
+def migrate_rename_check_ef_chevron(
+    database: Database[Any], dry_run: bool = True
+) -> dict[str, Any]:
+    """Rename historical adaptive EF-chevron references."""
+    return _migrate_task_name(
+        database,
+        old_name="CheckEFChevron",
+        new_name="CheckAdaptiveEFChevron",
+        dry_run=dry_run,
+    )
+
+
+def _migrate_task_name(
+    database: Database[Any], *, old_name: str, new_name: str, dry_run: bool
+) -> dict[str, Any]:
+    """Rename a task in historical records without touching the task catalog."""
     stats: dict[str, Any] = {"collections": {}, "matched": 0, "updated": 0}
-    for collection_name, field_name in _CHECK_CHEVRON_HISTORY_FIELDS:
+    for collection_name, field_name in _TASK_NAME_HISTORY_FIELDS:
         collection = database[collection_name]
-        query = {field_name: "CheckChevron"}
+        query = {field_name: old_name}
         matched = collection.count_documents(query)
         updated = 0
         if not dry_run and matched:
             result = collection.update_many(
                 query,
-                {"$set": {field_name: "CheckAdaptiveChevron"}},
+                {"$set": {field_name: new_name}},
             )
             updated = result.modified_count
         stats["collections"][collection_name] = {
@@ -1602,6 +1627,7 @@ def _run_versioned_migration(
 
 DATABASE_MIGRATIONS: tuple[tuple[str, DatabaseMigration], ...] = (
     (RENAME_CHECK_CHEVRON_MIGRATION_ID, migrate_rename_check_chevron),
+    (RENAME_CHECK_EF_CHEVRON_MIGRATION_ID, migrate_rename_check_ef_chevron),
 )
 
 

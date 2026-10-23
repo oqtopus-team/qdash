@@ -14,6 +14,7 @@ import {
   Tag,
   Trash2,
   UserRound,
+  ClipboardList,
 } from "lucide-react";
 
 import { useListChips } from "@/client/chip/chip";
@@ -39,6 +40,7 @@ import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useForumAiReply } from "@/hooks/useForumAiReply";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { formatDateTimeCompact, formatRelativeTime } from "@/lib/utils/datetime";
 import type { ForumPostResponse } from "@/schemas";
@@ -52,6 +54,7 @@ import {
   isForumTerminalStatus,
   toForumCategoryDefinition,
 } from "./categories";
+import { ForumLabelBadge } from "./ForumLabelBadge";
 import { ForumLabelPicker } from "./ForumLabelSelector";
 import { type ForumBlockSnapshotGetter, type ForumMentionCandidate } from "./ForumBlockEditor";
 import { ForumPostContent } from "./ForumPostContent";
@@ -255,12 +258,14 @@ function PostBody({
           content={post.content}
           contentBlocks={post.content_blocks}
           markdownClassName="text-sm text-base-content/80"
+          aboutTaskId={post.parent_id ? null : post.task_id}
         />
       )}
     </div>
   );
 }
 
+/** Page showing a forum thread with its replies and metadata controls. */
 export function ForumDetailPage({ postId }: { postId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -388,6 +393,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const createMutation = useCreateForumPost();
   const updateMutation = useUpdateForumPost();
   const deleteMutation = useDeleteForumPost();
+  const { labels } = useForumLabels();
   const {
     isGenerating,
     statusMessage: aiStatus,
@@ -584,10 +590,13 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     invalidateThread();
   };
 
+  /** Toggles a label on the thread. */
   const togglePostLabel = (label: string) => {
     if (!post) return;
     const currentLabels = post.labels ?? [];
-    const nextLabels = currentLabels.includes(label) ? [] : [label];
+    const nextLabels = currentLabels.includes(label)
+      ? currentLabels.filter((item) => item !== label)
+      : [...currentLabels, label];
     updateRootMetadata({ labels: nextLabels });
   };
 
@@ -712,7 +721,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               </div>
             ) : (
               <h1 className="min-w-0 flex-1 truncate text-xl font-bold">
-                {post.title || "Untitled topic"}
+                {post.title || "Untitled thread"}
               </h1>
             )}
             {canManageMetadata && !editingTitle && (
@@ -900,6 +909,20 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <Crosshair className="h-3.5 w-3.5" />
               Target
             </div>
+            {post.task_id && (
+              <Link
+                href={`/task-results/${encodeURIComponent(post.task_id)}`}
+                className="btn btn-outline btn-sm w-full justify-start gap-2 rounded-md normal-case"
+                title={post.task_id}
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                <span className="min-w-0 truncate">
+                  {post.task_result
+                    ? `${post.task_result.task_name} · Q${post.task_result.qid} · ${post.task_result.status}`
+                    : `Task result ${post.task_id.slice(0, 8)}`}
+                </span>
+              </Link>
+            )}
             {targetContext && (
               <Link
                 href={dashboardTargetHref(targetContext)}
@@ -1013,7 +1036,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                         className="block rounded-md border border-base-300 px-2 py-1.5 text-xs hover:border-primary/50"
                       >
                         <div className="truncate font-medium">
-                          {formatForumPostNumber(thread.number)} {thread.title || "Untitled topic"}
+                          {formatForumPostNumber(thread.number)} {thread.title || "Untitled thread"}
                         </div>
                         <div className="mt-0.5 text-base-content/55">
                           {getForumStatus(thread.status).label}
@@ -1117,6 +1140,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             </div>
             {canManageMetadata ? (
               <ForumLabelPicker
+                labels={labels}
                 selectedLabels={post.labels ?? []}
                 onToggle={togglePostLabel}
                 disabled={updateMutation.isPending}
@@ -1124,14 +1148,9 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {(post.labels ?? []).length > 0 ? (
-                  (post.labels ?? []).map((label) => {
-                    const labelDef = getForumLabel(label);
-                    return (
-                      <span key={label} className={`badge badge-sm ${labelDef.badgeClass}`}>
-                        {labelDef.label}
-                      </span>
-                    );
-                  })
+                  (post.labels ?? []).map((label) => (
+                    <ForumLabelBadge key={label} label={getForumLabel(label, labels)} />
+                  ))
                 ) : (
                   <span className="text-xs text-base-content/45">No labels</span>
                 )}

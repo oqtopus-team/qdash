@@ -34,6 +34,7 @@ backends:
         - RabiOscillation
         - CheckRabi
         - CheckCoarseReadoutParams
+        - CheckCKP
         - CreateHPIPulse
         - CheckHPIPulse
         - CreatePIPulse
@@ -45,12 +46,20 @@ backends:
         - CheckDRAGHPIPulse
         - CreateDRAGPIPulse
         - CheckDRAGPIPulse
+        - CheckAdaptiveEFChevron
+        - CheckEFRabi
+        - CreateEFHPIPulse
+        - CreateEFPIPulse
+        - CheckAdaptiveFHChevron
+        - EFReadoutClassification
+        - CheckThermalExcitation
         - ReadoutClassification
         - RandomizedBenchmarking
         - X90InterleavedRandomizedBenchmarking
         - X180InterleavedRandomizedBenchmarking
 
       Two Qubit:
+        - CheckJAZZ
         - CheckCrossResonance
         - CreateZX90
         - CheckZX90
@@ -66,6 +75,7 @@ backends:
 
       Other:
         - Configure
+        - ConfigureEF
         - ConfigureAll
         - LinkUp
         - CheckStatus

@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 560" role="img" aria-label="The agent outside QDash only sends requests. QDash checks each action against the session grant, runs it through the system-single-task deployment without writing parameters, gates the staged output on bounds and quality metrics, commits accepted values with one Qubit save and an audit record, and applies a commit to the Qubex parameter files in a separate system-candidate-apply run.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-dash { stroke-dasharray: 5 4; }
+    .qd-api { fill: rgba(219, 109, 40, 0.12); stroke: #db6d28; stroke-width: 1.5; }
+    .qd-wf { fill: rgba(130, 80, 223, 0.12); stroke: #8250df; stroke-width: 1.5; }
+    .qd-data { fill: rgba(9, 105, 218, 0.10); stroke: #0969da; stroke-width: 1.5; }
+    .qd-ext { fill: none; stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; stroke-dasharray: 5 4; }
+    .qd-reject { stroke: #e5484d; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+    .qd-reject-head { fill: #e5484d; }
+    .qd-reject-text { fill: #e5484d; font-size: 11.5px; text-anchor: middle; }
+  </style>
+  <defs>
+    <marker id="qd-agentplat-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+    <marker id="qd-agentplat-reject" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-reject-head"/>
+    </marker>
+  </defs>
+
+  <g class="qd-root">
+    <!-- Agent outside QDash -->
+    <rect x="25" y="20" width="990" height="52" rx="8" class="qd-ext"/>
+    <text x="520" y="42" class="qd-title">Agent (runs outside QDash)</text>
+    <text x="520" y="60" class="qd-sub">model · skills from pi-qdash · diagnosis · proposes the next action</text>
+
+    <!-- Boundary -->
+    <line x1="25" y1="110" x2="1015" y2="110" class="qd-edge qd-dash"/>
+    <text x="208" y="102" class="qd-label" text-anchor="middle">agent side</text>
+    <text x="208" y="126" class="qd-label" text-anchor="middle">QDash side</text>
+
+    <!-- Requests from the agent -->
+    <line x1="105" y1="72" x2="105" y2="198" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="113" y="160" class="qd-label">create</text>
+    <line x1="312" y1="72" x2="312" y2="198" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="320" y="160" class="qd-label">propose</text>
+    <line x1="520" y1="72" x2="520" y2="198" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="528" y="160" class="qd-label">execute</text>
+    <line x1="728" y1="72" x2="728" y2="198" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="736" y="160" class="qd-label">list candidates</text>
+    <line x1="935" y1="72" x2="935" y2="198" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="943" y="160" class="qd-label">commit</text>
+
+    <!-- Main row -->
+    <rect x="25" y="200" width="160" height="60" rx="8" class="qd-api"/>
+    <text x="105" y="225" class="qd-title">Session</text>
+    <text x="105" y="243" class="qd-sub">scope · bounds · budget</text>
+
+    <rect x="232" y="200" width="160" height="60" rx="8" class="qd-api"/>
+    <text x="312" y="225" class="qd-title">Action</text>
+    <text x="312" y="243" class="qd-sub">idempotency · version</text>
+
+    <rect x="440" y="200" width="160" height="60" rx="8" class="qd-wf"/>
+    <text x="520" y="225" class="qd-title">system-single-task</text>
+    <text x="520" y="243" class="qd-sub">update_params=false</text>
+
+    <rect x="648" y="200" width="160" height="60" rx="8" class="qd-api"/>
+    <text x="728" y="225" class="qd-title">Candidate gate</text>
+    <text x="728" y="243" class="qd-sub">bounds · quality gates</text>
+
+    <rect x="855" y="200" width="160" height="60" rx="8" class="qd-api"/>
+    <text x="935" y="225" class="qd-title">Commit</text>
+    <text x="935" y="243" class="qd-sub">Qubit save + audit</text>
+
+    <line x1="185" y1="230" x2="230" y2="230" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="208" y="222" class="qd-label" text-anchor="middle">grant</text>
+    <line x1="392" y1="230" x2="438" y2="230" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="416" y="222" class="qd-label" text-anchor="middle">run</text>
+    <line x1="808" y1="230" x2="853" y2="230" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="831" y="222" class="qd-label" text-anchor="middle">pass</text>
+
+    <!-- Task result -->
+    <path d="M440,348 v40 a80,8 0 0,0 160,0 v-40" class="qd-data"/>
+    <ellipse cx="520" cy="348" rx="80" ry="8" class="qd-data"/>
+    <text x="520" y="371" class="qd-title">Task result</text>
+    <text x="520" y="387" class="qd-sub">staged outputs · r2</text>
+
+    <line x1="520" y1="260" x2="520" y2="338" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="512" y="304" class="qd-label" text-anchor="end">writes</text>
+    <line x1="600" y1="364" x2="690" y2="262" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="654" y="330" class="qd-label">reads</text>
+
+    <!-- Rejections -->
+    <line x1="312" y1="260" x2="312" y2="324" class="qd-reject" marker-end="url(#qd-agentplat-reject)"/>
+    <text x="312" y="344" class="qd-reject-text">outside grant: recorded</text>
+    <text x="312" y="360" class="qd-reject-text">as rejected, never run</text>
+    <text x="312" y="384" class="qd-reject-text">stale version or reused</text>
+    <text x="312" y="400" class="qd-reject-text">key: 409</text>
+
+    <line x1="770" y1="260" x2="770" y2="324" class="qd-reject" marker-end="url(#qd-agentplat-reject)"/>
+    <text x="770" y="344" class="qd-reject-text">out of bounds or</text>
+    <text x="770" y="360" class="qd-reject-text">missing metric:</text>
+    <text x="770" y="376" class="qd-reject-text">not written</text>
+
+    <!-- Backend apply -->
+    <rect x="855" y="330" width="160" height="60" rx="8" class="qd-wf"/>
+    <text x="935" y="355" class="qd-title">Backend apply</text>
+    <text x="935" y="373" class="qd-sub">system-candidate-apply</text>
+    <line x1="935" y1="260" x2="935" y2="328" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="927" y="298" class="qd-label" text-anchor="end">apply</text>
+
+    <path d="M855,456 h80 l8,-6 h68 a4,4 0 0,1 4,4 v52 h-160 z" class="qd-data"/>
+    <text x="935" y="480" class="qd-title">Qubex params</text>
+    <text x="935" y="496" class="qd-sub">YAML · optional Git push</text>
+    <line x1="935" y1="390" x2="935" y2="448" class="qd-edge" marker-end="url(#qd-agentplat-arrow)"/>
+    <text x="927" y="424" class="qd-label" text-anchor="end">update · read back</text>
+
+    <!-- Legend -->
+    <g transform="translate(25,524)">
+      <rect x="0" y="0" width="22" height="14" rx="3" class="qd-api"/>
+      <text x="30" y="11" class="qd-label">API</text>
+      <rect x="85" y="0" width="22" height="14" rx="3" class="qd-wf"/>
+      <text x="115" y="11" class="qd-label">Prefect deployment</text>
+      <rect x="250" y="0" width="22" height="14" rx="3" class="qd-data"/>
+      <text x="280" y="11" class="qd-label">Data</text>
+      <rect x="335" y="0" width="22" height="14" rx="3" class="qd-ext"/>
+      <text x="365" y="11" class="qd-label">Outside QDash</text>
+      <line x1="475" y1="7" x2="497" y2="7" class="qd-reject"/>
+      <text x="505" y="11" class="qd-label">Rejected</text>
+    </g>
+  </g>
+</svg>

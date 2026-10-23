@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
+from qdash.workflow.engine.task_parameters import normalize_default_run_parameters
 from qdash.workflow.paths import get_path_resolver
 
 
@@ -26,7 +27,12 @@ class CalibConfig:
         project_id: Project ID for multi-tenancy
         enable_github_pull: Whether to pull config from GitHub
         enable_provenance_tracking: Whether to track data provenance for lineage
-        task_run_parameters: Explicit run parameters keyed by task name
+        connect_backend: Whether to connect hardware during session initialization
+        task_parameters: Task-scoped run parameters, input overrides, and
+            ``update_calibration_parameters`` in the canonical form of
+            :mod:`qdash.workflow.engine.task_parameters`
+        default_run_parameters: Shared run fallbacks in the canonical form of
+            :mod:`qdash.workflow.engine.task_parameters`.
     """
 
     username: str
@@ -42,6 +48,7 @@ class CalibConfig:
     enable_github_pull: bool = True
     enable_provenance_tracking: bool = True
     skip_execution: bool = False  # Isolated worker borrowing its step's Execution
+    connect_backend: bool = True  # Parent may delegate all hardware work to isolated workers
     force_update_params: bool = False  # Force backend params update regardless of R² validation
     persist_output_parameters: bool = True  # Write task outputs to calibration/backend stores
     configuration_mode: str | None = field(
@@ -50,7 +57,7 @@ class CalibConfig:
     default_run_parameters: dict[str, Any] = field(
         default_factory=dict
     )  # Shared fallback run parameters for all tasks.
-    task_run_parameters: dict[str, dict[str, Any]] = field(default_factory=dict)
+    task_parameters: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     # Derived paths (computed after initialization)
     calib_data_path: str = field(default="", init=False)
@@ -58,6 +65,7 @@ class CalibConfig:
 
     def __post_init__(self) -> None:
         """Compute derived paths from execution_id."""
+        self.default_run_parameters = normalize_default_run_parameters(self.default_run_parameters)
         if not self.project_id:
             raise ValueError("project_id is required for calibration paths")
         resolver = get_path_resolver()

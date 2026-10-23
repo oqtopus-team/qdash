@@ -1,8 +1,10 @@
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any, ClassVar
 
 from qdash.datamodel.task import (
+    SWEEP_VALUE_TYPES,
     InputParameterModel,
     InputParameterSpec,
     OutputParameterModel,
@@ -10,6 +12,7 @@ from qdash.datamodel.task import (
     RunParameterModel,
     RunParameterSpec,
     TaskTypes,
+    compatible_value_type,
 )
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.backend.base import BaseBackend
@@ -21,6 +24,9 @@ __all__ = [
     "RunParameterModel",
     "RunResult",
 ]
+
+
+logger = logging.getLogger(__name__)
 
 
 class BaseTask(ABC):
@@ -86,6 +92,12 @@ class BaseTask(ABC):
         }
         # Set by TaskExecutor after a complete re-execution snapshot is applied.
         self.input_parameters_from_snapshot = False
+        # Explicit calibration input overrides; TaskExecutor applies them after
+        # preprocess so they replace the database or snapshot baseline.
+        self.input_overrides: dict[str, Any] = {}
+        # Explicit run parameter values; TaskExecutor applies them on top of a
+        # re-execution snapshot, which otherwise replaces every run parameter.
+        self.run_overrides: dict[str, Any] = {}
 
         if params is not None:
             self._convert_and_set_parameters(params)
@@ -141,6 +153,10 @@ class BaseTask(ABC):
             return int(value)
         elif value_type == "float":
             return float(value)
+        elif value_type == "list":
+            if not isinstance(value, (list, tuple)):
+                raise ValueError(f"list requires a JSON array, got {value!r}")
+            return list(value)
         return value
 
     def _convert_and_set_parameters(self, params: dict[str, Any]) -> None:
@@ -151,19 +167,29 @@ class BaseTask(ABC):
             params: Dictionary containing task parameters
 
         """
-        # Handle run_parameters (experiment configuration)
+        # Handle run_parameters (shared experiment configuration fallbacks)
         if "run_parameters" in params:
             self._set_run_parameters(params["run_parameters"])
         # Backward compatibility: old input_parameters -> run_parameters
         elif "input_parameters" in params:
             self._set_run_parameters(params["input_parameters"])
+        # Explicit run parameter values set for this task
+        if "run" in params:
+            self._set_run_overrides(params["run"])
 
-        # Handle input_parameters (calibration inputs for provenance)
+        # Calibration input overrides. ``calibration_inputs`` is the legacy key.
         if "calibration_inputs" in params:
-            self._set_calibration_inputs(params["calibration_inputs"])
+            self._set_input_overrides(params["calibration_inputs"])
+        if "input" in params:
+            self._set_input_overrides(params["input"])
 
     def _set_run_parameters(self, run_params: dict[str, Any]) -> None:
         """Set run parameters (experiment configuration).
+
+        Only parameters the task declares in ``run_spec`` are set. A task reads
+        its run parameters by name, so a value under any other name (a flow's
+        shared default meant for another task, a stale template entry) would
+        never be used, and recording it would misstate the task's settings.
 
         Args:
         ----
@@ -171,56 +197,81 @@ class BaseTask(ABC):
 
         """
         for name, param_data in run_params.items():
-            if name in self.run_parameters:
-                # Parameter already exists - update its value
-                value = param_data.get("value")
-                if value is not None:
-                    value_type = param_data.get("value_type", self.run_parameters[name].value_type)
-                    converted_value = self._convert_value_to_type(value, value_type)
-                    self.run_parameters[name].value = converted_value
-            else:
-                # Create new RunParameterModel
-                value = param_data.get("value")
-                if value is not None:
-                    value_type = param_data.get("value_type", "float")
-                    unit = param_data.get("unit", "")
-                    description = param_data.get("description", "")
-                    converted_value = self._convert_value_to_type(value, value_type)
+            if name not in self.run_parameters:
+                logger.debug(
+                    "%s ignores run parameter %r: not declared in run_spec",
+                    self.__class__.__name__,
+                    name,
+                )
+                continue
+            value = param_data.get("value")
+            if value is not None:
+                value_type = self._resolve_run_value_type(name, param_data.get("value_type"))
+                converted_value = self._convert_value_to_type(value, value_type)
+                self.run_parameters[name].value = converted_value
+                self.run_parameters[name].value_type = value_type
 
-                    self.run_parameters[name] = RunParameterModel(
-                        unit=unit,
-                        description=description,
-                        value=converted_value,
-                        value_type=value_type,
-                    )
+    def _set_run_overrides(self, overrides: Mapping[str, Any]) -> None:
+        """Set and record explicit run parameter values.
 
-    def _set_calibration_inputs(self, calib_inputs: dict[str, Any]) -> None:
-        """Set calibration input parameters (for provenance tracking).
+        Unlike ``_set_run_parameters``, an undeclared name fails because the value
+        was set for this task specifically.
 
         Args:
         ----
-            calib_inputs: Dictionary of calibration input parameters
+            overrides: Run parameter names mapped to a value or ``{"value": ...}``
 
         """
-        for name, param_data in calib_inputs.items():
-            if name in self.input_parameters:
-                # Update existing parameter
-                param = self.input_parameters[name]
-                if param is not None:
-                    if "value" in param_data:
-                        param.value = param_data["value"]
-                    if "unit" in param_data:
-                        param.unit = param_data["unit"]
-                    if "error" in param_data:
-                        param.error = param_data["error"]
-            else:
-                # Create new ParameterModel for calibration input
-                self.input_parameters[name] = InputParameterModel(
-                    value=param_data.get("value", 0),
-                    unit=param_data.get("unit", ""),
-                    error=param_data.get("error", 0.0),
-                    description=param_data.get("description", ""),
-                )
+        for name, data in overrides.items():
+            if name not in self.run_parameters:
+                raise ValueError(f"{self.name} does not declare run parameter {name!r}")
+            param_data = data if isinstance(data, Mapping) else {"value": data}
+            value = param_data.get("value")
+            if value is None:
+                raise ValueError(f"Run parameter {name!r} for {self.name} needs a value")
+            value_type = self._resolve_run_value_type(name, param_data.get("value_type"))
+            converted_value = self._convert_value_to_type(value, value_type)
+            self.run_parameters[name].value = converted_value
+            self.run_parameters[name].value_type = value_type
+            self.run_overrides[name] = converted_value
+
+    def _resolve_run_value_type(self, name: str, requested: Any) -> str:
+        """Return the ``value_type`` a run value sets on the parameter ``name``.
+
+        A parameter declared with a sweep constructor takes any sweep constructor or
+        explicit ``list`` values, and the parameter then records the type it ran
+        with. A scalar parameter keeps its declared type: a scalar type hint is
+        informational, and a sweep for a scalar (or a scalar for a sweep) fails.
+        """
+        declared = self.run_parameters[name].value_type
+        if not compatible_value_type(declared, requested):
+            raise ValueError(
+                f"{self.name}.{name} declares {declared!r} and cannot take a {requested!r} value"
+            )
+        if declared in SWEEP_VALUE_TYPES and requested is not None:
+            return str(requested)
+        return declared
+
+    def _set_input_overrides(self, overrides: Mapping[str, Any]) -> None:
+        """Record explicit calibration input overrides.
+
+        Values are validated against ``input_spec`` here, so an undeclared name or a
+        forbidden override fails when the task is created rather than being dropped.
+        TaskExecutor applies the recorded values after preprocess.
+
+        Args:
+        ----
+            overrides: Input names mapped to a value or ``{"value": ...}``
+
+        """
+        for name, data in overrides.items():
+            declaration = self.__class__.input_spec.get(name)
+            if declaration is None:
+                raise ValueError(f"{self.name} does not declare calibration input {name!r}")
+            value = data.get("value") if isinstance(data, Mapping) else data
+            if value is None:
+                raise ValueError(f"Input override {name!r} for {self.name} needs a value")
+            self.input_overrides[name] = declaration.coerce_override(name, value)
 
     @abstractmethod
     def preprocess(self, backend: BaseBackend, qid: str) -> PreProcessResult:

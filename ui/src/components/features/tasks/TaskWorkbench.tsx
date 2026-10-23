@@ -21,8 +21,27 @@ import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 import { isExecutionInProgress, isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
-import { getTaskParameterUiGroup, parseTaskParameter } from "@/lib/utils/task-parameters";
+import {
+  convertSweep,
+  expandSweep,
+  getTaskParameterUiGroup,
+  isSweepFormType,
+  isSweepValueType,
+  parseTaskParameter,
+  type SweepFormType,
+} from "@/lib/utils/task-parameters";
+import { SweepParameterField, sweepFieldValue } from "./SweepParameterField";
 import { buildTaskPrefill } from "./task-prefill";
+
+function sweepParts(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length === 3) return parsed.map(String);
+  } catch {
+    // A blank or malformed value starts with empty arguments.
+  }
+  return ["", "", ""];
+}
 
 interface TaskWorkbenchProps {
   task: TaskInfo;
@@ -67,6 +86,8 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
   const submittedTarget = submittedTargetQuery ?? "";
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [runValues, setRunValues] = useState<Record<string, string>>({});
+  const [runTypes, setRunTypes] = useState<Record<string, SweepFormType>>({});
+  const [runSweepParts, setRunSweepParts] = useState<Record<string, string[]>>({});
   const [reconfigure, setReconfigure] = useState(false);
   const [persistOutputParameters, setPersistOutputParameters] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
@@ -88,6 +109,14 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     if (initializedTask.current === formKey) return;
     initializedTask.current = formKey;
     setRunValues(prefill.run);
+    setRunTypes(prefill.runTypes);
+    setRunSweepParts(
+      Object.fromEntries(
+        Object.entries(prefill.runTypes)
+          .filter(([, type]) => type !== "list")
+          .map(([name]) => [name, sweepParts(prefill.run[name] ?? "")]),
+      ),
+    );
     setReconfigure(false);
     setPersistOutputParameters(false);
     setInputValues(prefill.input);
@@ -181,12 +210,10 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
     setIsStarting(true);
     try {
       const runParameterOverrides = Object.fromEntries(
-        Object.entries(runValues)
-          .filter(([name, value]) => name in (task.run_parameters ?? {}) && value.trim() !== "")
-          .map(([name, value]) => [
-            name,
-            parseTaskParameter(value, task.run_parameters?.[name]?.value_type),
-          ]),
+        Object.entries(task.run_parameters ?? {}).flatMap(([name, parameter]) => {
+          const override = buildRunOverride(name, parameter.value_type);
+          return override === undefined ? [] : [[name, override]];
+        }),
       );
       const inputParameterOverrides = Object.fromEntries(
         Object.entries(inputValues)
@@ -223,11 +250,56 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
       toast.error(getApiErrorMessage(error, "Failed to start task"));
     } finally {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() }),
+        queryClient.invalidateQueries({
+          queryKey: getGetExecutionLockStatusQueryKey(),
+        }),
         queryClient.invalidateQueries({ queryKey: ["execution-availability"] }),
       ]);
       setIsStarting(false);
     }
+  };
+
+  /** The run override one field sends, or undefined when the field is blank. */
+  const buildRunOverride = (name: string, declaredType: unknown): unknown => {
+    if (!isSweepValueType(declaredType)) {
+      const raw = runValues[name] ?? "";
+      return raw.trim() === "" ? undefined : parseTaskParameter(raw, declaredType);
+    }
+    const type = runTypes[name] ?? declaredType;
+    const parts = runSweepParts[name] ?? ["", "", ""];
+    const listValue = runValues[name] ?? "";
+    const isBlank =
+      type === "list" ? listValue.trim() === "" : parts.every((part) => part.trim() === "");
+    if (isBlank) return undefined;
+    const value = sweepFieldValue(type, parts, listValue);
+    if (value === null || expandSweep(type, value) === null) {
+      throw new Error(`Enter numbers that produce a ${type} sweep for ${name}`);
+    }
+    return type === declaredType ? value : { value, value_type: type };
+  };
+
+  const handleSweepTypeChange = (name: string, type: SweepFormType) => {
+    const previous = runTypes[name] ?? task.run_parameters?.[name]?.value_type;
+    if (isSweepFormType(previous) && previous !== type) {
+      // The new form starts from the sweep the old form produced.
+      const converted = convertSweep(
+        previous,
+        sweepFieldValue(previous, runSweepParts[name] ?? [], runValues[name] ?? ""),
+        type,
+      );
+      if (type === "list") {
+        setRunValues((current) => ({
+          ...current,
+          [name]: converted === null ? "" : JSON.stringify(converted),
+        }));
+      } else if (converted !== null) {
+        setRunSweepParts((current) => ({
+          ...current,
+          [name]: converted.map(String),
+        }));
+      }
+    }
+    setRunTypes((current) => ({ ...current, [name]: type }));
   };
 
   const handleReloadInputParameters = async () => {
@@ -484,28 +556,58 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 <div>
                   <h3 className="mb-2 text-sm font-semibold">Run parameters</h3>
                   <div className="grid max-h-80 gap-3 overflow-y-auto rounded-lg border border-base-300 p-3">
-                    {Object.entries(task.run_parameters ?? {}).map(([name, parameter]) => (
-                      <label key={name} className="form-control min-w-0">
-                        <span className="label-text mb-1 flex min-w-0 items-start justify-between gap-2">
-                          <span className="min-w-0 break-words">{name}</span>
-                          <span className="max-w-[45%] shrink-0 break-all text-right text-base-content/40">
-                            {String(parameter.unit ?? "")}
-                          </span>
-                        </span>
-                        <input
-                          className="input input-sm input-bordered font-mono"
-                          value={runValues[name] ?? ""}
-                          onChange={(event) =>
-                            setRunValues((current) => ({ ...current, [name]: event.target.value }))
+                    {Object.entries(task.run_parameters ?? {}).map(([name, parameter]) =>
+                      isSweepValueType(parameter.value_type) ? (
+                        <SweepParameterField
+                          key={name}
+                          name={name}
+                          unit={String(parameter.unit ?? "")}
+                          description={String(parameter.description ?? "")}
+                          declaredType={parameter.value_type}
+                          type={runTypes[name] ?? parameter.value_type}
+                          parts={runSweepParts[name] ?? ["", "", ""]}
+                          listValue={runValues[name] ?? ""}
+                          onTypeChange={(type) => handleSweepTypeChange(name, type)}
+                          onPartChange={(index, value) =>
+                            setRunSweepParts((current) => {
+                              const parts = [...(current[name] ?? ["", "", ""])];
+                              parts[index] = value;
+                              return { ...current, [name]: parts };
+                            })
+                          }
+                          onListChange={(value) =>
+                            setRunValues((current) => ({
+                              ...current,
+                              [name]: value,
+                            }))
                           }
                         />
-                        {Boolean(parameter.description) && (
-                          <span className="mt-1 break-words text-xs text-base-content/45">
-                            {String(parameter.description)}
+                      ) : (
+                        <label key={name} className="form-control min-w-0">
+                          <span className="label-text mb-1 flex min-w-0 items-start justify-between gap-2">
+                            <span className="min-w-0 break-words">{name}</span>
+                            <span className="max-w-[45%] shrink-0 break-all text-right text-base-content/40">
+                              {String(parameter.unit ?? "")}
+                            </span>
                           </span>
-                        )}
-                      </label>
-                    ))}
+                          <input
+                            className="input input-sm input-bordered font-mono"
+                            value={runValues[name] ?? ""}
+                            onChange={(event) =>
+                              setRunValues((current) => ({
+                                ...current,
+                                [name]: event.target.value,
+                              }))
+                            }
+                          />
+                          {Boolean(parameter.description) && (
+                            <span className="mt-1 break-words text-xs text-base-content/45">
+                              {String(parameter.description)}
+                            </span>
+                          )}
+                        </label>
+                      ),
+                    )}
                   </div>
                 </div>
               )}

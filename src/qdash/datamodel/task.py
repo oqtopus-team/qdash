@@ -43,6 +43,32 @@ class TaskTypes:
     MUX: Final[TaskType] = "mux"
 
 
+SWEEP_VALUE_TYPES = frozenset({"np.linspace", "np.logspace", "np.arange", "range"})
+# A run parameter declared with a sweep constructor accepts any constructor, or
+# explicit values, because the experiment only consumes the generated points.
+SWEEP_OVERRIDE_VALUE_TYPES = SWEEP_VALUE_TYPES | {"list"}
+
+
+def is_sweep_value_type(value_type: object) -> bool:
+    """Return whether ``value_type`` declares a generated range."""
+    return value_type in SWEEP_VALUE_TYPES
+
+
+def compatible_value_type(declared: object, requested: object) -> bool:
+    """Return whether a value of ``requested`` type may set a parameter declared as ``declared``.
+
+    A sweep parameter takes any sweep constructor or explicit ``list`` values. A
+    scalar parameter never takes a sweep, and a sweep parameter never takes a
+    scalar. Two scalar types are compatible: the task converts the value with the
+    declared type.
+    """
+    if requested is None or requested == declared:
+        return True
+    if declared in SWEEP_VALUE_TYPES:
+        return requested in SWEEP_OVERRIDE_VALUE_TYPES
+    return requested not in SWEEP_OVERRIDE_VALUE_TYPES
+
+
 class ParameterSpec(BaseModel):
     """Common metadata declared for a task parameter."""
 
@@ -152,6 +178,7 @@ class InputParameterSpec(ParameterSpec):
     default: float | int | None
     parameter_name: str = ""
     parameter_aliases: tuple[str, ...] = ()
+    fallback_parameter_names: tuple[str, ...] = ()
     qid_role: Literal["self", "control", "target", "coupling"] = "self"
     greater_than: float | None = None
     less_than: float | None = None
@@ -221,6 +248,21 @@ class InputParameterSpec(ParameterSpec):
                 if lower > upper or (lower == upper and not (lower_inclusive and upper_inclusive)):
                     raise ValueError("Numeric bounds must define a non-empty interval")
         return self
+
+    def coerce_override(self, name: str, value: Any) -> Any:
+        """Return a user override converted to ``value_type`` after the policy check."""
+        if self.user_override == "forbidden":
+            raise ValueError(f"Input parameter '{name}' does not allow user overrides")
+        try:
+            if self.value_type == "float":
+                return float(value)
+            if self.value_type == "int":
+                return int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Input parameter {name!r} must be a valid {self.value_type}, got {value!r}"
+            ) from exc
+        return value
 
     def validate_effective_value(self, name: str, value: Any) -> None:
         """Validate a resolved value without changing it or applying a fallback."""
@@ -362,11 +404,35 @@ class TaskResultInputParameterModel(TaskResultParameterModel):
     ui_group_collapsed: bool = False
 
 
+class DatabaseUpdateModel(BaseModel):
+    """One calibration database update produced from a task output."""
+
+    parameter_name: str
+    previous_value: Any = None
+    updated_value: Any = None
+    updated: bool = False
+
+
+def _validate_database_update(value: Any) -> dict[str, Any]:
+    """Validate one database update while storing it as a plain dictionary."""
+    if hasattr(value, "model_dump"):
+        value = value.model_dump()
+    return DatabaseUpdateModel.model_validate(value).model_dump(exclude_unset=True)
+
+
+DatabaseUpdate = Annotated[
+    Any,
+    BeforeValidator(_validate_database_update),
+    WithJsonSchema(DatabaseUpdateModel.model_json_schema()),
+]
+
+
 class TaskResultOutputParameterModel(TaskResultParameterModel):
     """Output parameter persisted in task-result history with DB comparison metadata."""
 
     previous_database_value: Any = None
     database_updated: bool = False
+    database_updates: list[DatabaseUpdate] = Field(default_factory=list)
 
 
 def _validate_task_result_input_parameter(value: Any) -> Any:
@@ -440,6 +506,7 @@ class OutputParameterSpec(ParameterSpec):
 
     default: float | int | None = 0
     qid_role: str = ""
+    publish_targets: tuple[str, ...] = ()
 
     def create_model(self) -> OutputParameterModel:
         """Create an independent runtime model from this declaration."""

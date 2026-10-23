@@ -49,6 +49,11 @@ class Step(ABC):
         """
         return {self.name}
 
+    @property
+    def connect_parent_backend(self) -> bool:
+        """Whether the pipeline owner needs a hardware connection for this step."""
+        return True
+
     @abstractmethod
     def execute(
         self,

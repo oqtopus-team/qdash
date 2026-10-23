@@ -19,7 +19,7 @@ tasks:
   generate:
     dotenv: [.env]
     cmds:
-      - uv run scripts/generate_task_catalog.py
+      - uv run --all-packages scripts/generate_task_catalog.py
       - |
         OPENAPI_TMP="$(mktemp)"
         ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
@@ -33,7 +33,7 @@ tasks:
   generate-task-catalog:
     desc: Generate task metadata catalog from workflow classes
     cmds:
-      - uv run scripts/generate_task_catalog.py
+      - uv run --all-packages scripts/generate_task_catalog.py
 
   generate-python-schema:
     desc: Generate Python Pydantic schema models from OpenAPI
@@ -64,11 +64,6 @@ tasks:
           --output {{.PY_SCHEMA_OUTPUT}}
       - uv run ruff format {{.PY_SCHEMA_OUTPUT}}
 
-  knowledge:
-    desc: Generate task knowledge JSON from markdown files
-    cmds:
-      - uv run scripts/generate_task_knowledge.py
-
   knowledge-pull:
     desc: Pull task-knowledge.json from the knowledge repository (KNOWLEDGE_REPO_URL)
     dotenv: [.env]
@@ -79,25 +74,32 @@ tasks:
           echo "KNOWLEDGE_REPO_URL not set, skipping pull"
           exit 0
         fi
-        # Build auth URL if credentials available
-        AUTH_URL="$KNOWLEDGE_REPO_URL"
-        if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_TOKEN" ]; then
-          AUTH_URL=$(echo "$KNOWLEDGE_REPO_URL" | sed "s|https://|https://${GITHUB_USER}:${GITHUB_TOKEN}@|")
-        fi
+        # Credentials go through a one-shot credential helper, never into the
+        # remote URL: a URL with a token embedded is written to .git/config and
+        # stays there in plain text.
+        git_auth() {
+          if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_TOKEN" ]; then
+            git -c credential.helper= \
+              -c "credential.helper=!f() { echo username=$GITHUB_USER; echo password=$GITHUB_TOKEN; }; f" "$@"
+          else
+            git "$@"
+          fi
+        }
         # Clone or pull
         if [ -d "$KNOWLEDGE_DIR/.git" ]; then
           echo "Pulling latest from $KNOWLEDGE_REPO_URL..."
-          git -C "$KNOWLEDGE_DIR" remote set-url origin "$AUTH_URL"
-          git -C "$KNOWLEDGE_DIR" fetch origin && git -C "$KNOWLEDGE_DIR" reset --hard origin/main || {
+          # Also scrubs a token that an earlier version of this task embedded.
+          git -C "$KNOWLEDGE_DIR" remote set-url origin "$KNOWLEDGE_REPO_URL"
+          git_auth -C "$KNOWLEDGE_DIR" fetch origin && git -C "$KNOWLEDGE_DIR" reset --hard origin/main || {
             echo "Pull failed, re-cloning..."
             rm -rf "$KNOWLEDGE_DIR"
-            git clone --depth 1 "$AUTH_URL" "$KNOWLEDGE_DIR"
+            git_auth clone --depth 1 "$KNOWLEDGE_REPO_URL" "$KNOWLEDGE_DIR"
           }
         else
           echo "Cloning $KNOWLEDGE_REPO_URL..."
           rm -rf "$KNOWLEDGE_DIR"
           mkdir -p config
-          git clone --depth 1 "$AUTH_URL" "$KNOWLEDGE_DIR"
+          git_auth clone --depth 1 "$KNOWLEDGE_REPO_URL" "$KNOWLEDGE_DIR"
         fi
         # Verify JSON exists in the cloned repo
         if [ -f "$KNOWLEDGE_DIR/task-knowledge.json" ]; then
@@ -194,8 +196,9 @@ tasks:
       - docker compose down
 
   dev-local-setup:
-    desc: Install dependencies needed by host-side API/UI development
+    desc: Install dependencies and tools needed by local development
     cmds:
+      - .devcontainer/install-lychee.sh
       - uv sync --locked --all-groups --all-packages
       - mkdir -p "${CONFIG_PATH:-./config/qubex-config}"
       - bun install --cwd ui --frozen-lockfile
@@ -319,6 +322,37 @@ tasks:
     cmds:
       - bun run docs:build
 
+  check-docs-links:
+    desc: Build docs and check external links, local links, and anchors
+    deps: [build-docs]
+    cmds:
+      - |
+        LYCHEE_ROOT_DIR="$(mktemp -d)"
+        trap 'rm -rf "${LYCHEE_ROOT_DIR}"' EXIT
+        mkdir "${LYCHEE_ROOT_DIR}/source" "${LYCHEE_ROOT_DIR}/site"
+        ln -s "$(pwd)/docs/index.md" "${LYCHEE_ROOT_DIR}/source/index.md"
+        for asset in docs/public/*; do
+          ln -s "$(pwd)/${asset}" "${LYCHEE_ROOT_DIR}/source/$(basename "${asset}")"
+        done
+        for section in developer-guide user-guide reference; do
+          ln -s "$(pwd)/docs/${section}" "${LYCHEE_ROOT_DIR}/source/${section}"
+        done
+        git ls-files --cached --others --exclude-standard docs |
+          while IFS= read -r file; do
+            case "${file}" in
+              *.md)
+                if [ -f "${file}" ]; then
+                  printf '%s\n' "${file}"
+                fi
+                ;;
+            esac
+          done > "${LYCHEE_ROOT_DIR}/inputs"
+        lychee --config lychee.toml --root-dir "${LYCHEE_ROOT_DIR}/source" \
+          --files-from "${LYCHEE_ROOT_DIR}/inputs"
+        ln -s "$(pwd)/docs/.vitepress/dist" "${LYCHEE_ROOT_DIR}/site/qdash"
+        lychee --config lychee.toml --offline --scheme file --include-fragments=full \
+          --root-dir "${LYCHEE_ROOT_DIR}/site" -- 'docs/.vitepress/dist/**/*.html'
+
   # =============================================================================
   # Linting & Formatting (local development - auto-fix)
   # =============================================================================
@@ -364,7 +398,7 @@ tasks:
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0=safe.directory \
             GIT_CONFIG_VALUE_0="$PWD" \
-            betterleaks git . --verbose
+            betterleaks git "$(git rev-parse --absolute-git-dir)" --config .betterleaks.toml --verbose
         else
           echo "betterleaks not installed; skipping leak scan"
         fi
@@ -407,7 +441,7 @@ tasks:
   ci-lint:
     desc: Check Python linting (no auto-fix)
     cmds:
-      - uv run scripts/generate_task_catalog.py --check
+      - uv run --all-packages scripts/generate_task_catalog.py --check
       - uv run ruff check .
       - uv run ruff format --check .
 
@@ -445,6 +479,13 @@ tasks:
       - bun run knip
       # Bun <1.4 cannot read the current lockfile format, even when other UI commands succeed.
       - bunx bun@1.4.0 audit
+
+  ci-agent-runtime:
+    desc: Run all agent-runtime CI checks
+    dir: agent-runtime
+    cmds:
+      - bun test
+      - bunx tsc --noEmit
 
   ci-ui-build:
     desc: Build UI for production
@@ -492,7 +533,6 @@ tasks:
   deploy-local:
     cmds:
       - task: knowledge-pull
-      - task: updater-start
       - docker compose up -d --build
     desc: Deploy the application with Docker Compose in dev mode
 
@@ -502,7 +542,6 @@ tasks:
       ENV: dev-fake
     cmds:
       - task: knowledge-pull
-      - task: updater-start
       - docker compose up -d --build
     desc: Deploy the application locally with the fake QUBEX-compatible backend
 
@@ -518,34 +557,12 @@ tasks:
     desc: Start the UI development server
 
   deploy:
+    dotenv: [.env]
     cmds:
       - task: knowledge-pull
-      - task: updater-start
-      - docker compose --profile tunnel up -d --build
+      - |
+        COMPOSE_PROFILES="${COMPOSE_PROFILES:+${COMPOSE_PROFILES},}tunnel" \
+          docker compose up -d --build
       - sleep 3
       - docker compose restart api
     desc: Deploy the application with Docker Compose
-
-  updater:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater run
-    desc: Run the host-side QDash updater in the foreground
-
-  updater-start:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater start
-    desc: Start the host-side QDash updater in the background
-
-  updater-stop:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater stop
-    desc: Stop the background QDash updater
-
-  updater-status:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater status
-    desc: Show whether the host-side QDash updater is running

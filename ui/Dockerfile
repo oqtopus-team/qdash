@@ -34,7 +34,7 @@ RUN --mount=type=cache,target=/app/.next/cache \
     bun run next build --turbo
 
 # Standalone output - no need for bun install in runner
-FROM node:24-alpine AS runner
+FROM node:24.22.1-alpine AS runner
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_ENV
 ARG NEXT_PUBLIC_DEFAULT_THEME

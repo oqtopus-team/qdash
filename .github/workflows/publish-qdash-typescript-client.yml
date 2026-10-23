@@ -1,5 +1,10 @@
 name: Publish @oqtopus-team/qdash-client
 
+# Pull requests build and check the package. Pushes to develop publish a
+# prerelease under the `beta` dist-tag (next patch version + `-beta.<run>`), so
+# downstream packages such as pi-qdash can build against unreleased endpoints
+# with `npm install @oqtopus-team/qdash-client@beta`. Release tags publish
+# `latest`.
 on:
   pull_request:
     branches: [develop]
@@ -9,6 +14,11 @@ on:
       - "Taskfile.yaml"
       - ".github/workflows/publish-qdash-typescript-client.yml"
   push:
+    branches: [develop]
+    paths:
+      - "clients/typescript/**"
+      - "docs/oas/openapi.json"
+      - ".github/workflows/publish-qdash-typescript-client.yml"
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
@@ -16,18 +26,28 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build TypeScript client
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          # Tags are needed to derive the beta version from the latest release.
+          fetch-depth: 0
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: "1.4.0"
+          no-cache: true
 
       - name: Install dependencies
         working-directory: clients/typescript
@@ -48,6 +68,22 @@ jobs:
         working-directory: clients/typescript
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
 
+      - name: Set beta version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        working-directory: clients/typescript
+        shell: bash
+        run: |
+          # Next patch after the highest release tag, as a prerelease of it:
+          # v1.9.20 -> 1.9.21-beta.<run number>. Sorts before the eventual 1.9.21.
+          # Release tags are cut from main, so they are not ancestors of develop
+          # and `git describe` would pick a stale one; take the highest by version.
+          latest="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -1)"
+          latest="${latest:-v0.0.0}"
+          IFS=. read -r major minor patch <<< "${latest#v}"
+          version="${major}.${minor}.$((patch + 1))-beta.${GITHUB_RUN_NUMBER}"
+          echo "Beta version: ${version} (latest release ${latest})"
+          npm version "${version}" --no-git-tag-version
+
       - name: Build package
         working-directory: clients/typescript
         run: |
@@ -55,7 +91,7 @@ jobs:
           npm pack --pack-destination dist --ignore-scripts
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: qdash-typescript-client-dist
           path: clients/typescript/dist/oqtopus-team-qdash-client-*.tgz
@@ -64,29 +100,36 @@ jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop')
     permissions:
       contents: read
       id-token: write
     steps:
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Update npm
-        run: npm install --global npm@latest
-
       - name: Download package artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: qdash-typescript-client-dist
           path: dist
 
       - name: Publish package
-        run: npm publish ./dist/oqtopus-team-qdash-client-*.tgz --access public --provenance
+        # Release tags go to `latest`; develop builds go to `beta` so they never
+        # become the default install.
+        # Keep token publishing until npm Trusted Publishing is configured.
+        # jactionlint ignore=use-trusted-publishing
+        run: |
+          tag=latest
+          if [ "${GITHUB_REF}" = "refs/heads/develop" ]; then tag=beta; fi
+          npm publish ./dist/oqtopus-team-qdash-client-*.tgz --access public --provenance --tag "${tag}"
         env:
           # Used only to bootstrap the package before npm Trusted Publishing can be configured.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

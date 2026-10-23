@@ -56,6 +56,10 @@
   ],
 
   "containerEnv": {
+    // Where this checkout lives on the host. qdash-post-start links it to
+    // /workspace/qdash so `docker compose` run inside the devcontainer binds
+    // the host paths the daemon can see (see post-start.sh).
+    "QDASH_HOST_WORKSPACE": "${localWorkspaceFolder}",
     "NODE_OPTIONS": "--max-old-space-size=4096",
     "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
     "POWERLEVEL9K_DISABLE_GITSTATUS": "true",

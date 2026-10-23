@@ -69,7 +69,7 @@ function TaskResultLinkPreview({ taskId }: { taskId: string }) {
             path={figurePath ?? jsonFigurePath}
             jsonFigurePath={jsonFigurePath}
             qid={taskResult.qid}
-            className="max-h-full max-w-full object-contain"
+            fit
             hideExpandButton
           />
         </div>
@@ -78,13 +78,21 @@ function TaskResultLinkPreview({ taskId }: { taskId: string }) {
   );
 }
 
-export function TaskResultLinkPreviews({ taskIds }: { taskIds: string[] }) {
+export function TaskResultLinkPreviews({
+  taskIds,
+  heading = "Linked task results",
+  className = "mt-4 space-y-2",
+}: {
+  taskIds: string[];
+  heading?: string;
+  className?: string;
+}) {
   if (taskIds.length === 0) return null;
 
   return (
-    <div className="mt-4 space-y-2">
+    <div className={className}>
       <div className="text-xs font-semibold uppercase tracking-wide text-base-content/45">
-        Linked task results
+        {heading}
       </div>
       {taskIds.map((taskId) => (
         <TaskResultLinkPreview key={taskId} taskId={taskId} />

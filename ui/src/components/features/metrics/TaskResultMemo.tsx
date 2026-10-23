@@ -25,7 +25,7 @@ interface TaskResultMemoProps {
 }
 
 /**
- * Free-form note attached to a task result. Renders right above the issues
+ * Free-form note attached to a task result. Renders right above the threads
  * thread inside QubitMetricHistoryModal.
  */
 export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskResultMemoProps) {
@@ -110,7 +110,7 @@ export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskRe
               className="textarea textarea-bordered w-full h-32 text-sm"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Anything notable about this measurement (anomaly, parameter intent, follow-up…). Notes show up above issues."
+              placeholder="Anything notable about this measurement (anomaly, parameter intent, follow-up…). Notes show up above threads."
               maxLength={5000}
               autoFocus
             />

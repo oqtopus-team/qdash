@@ -31,6 +31,7 @@ from qdash.api.schemas.agent_session import (
     ListAgentCandidatesResponse,
     SubmitAgentActionRequest,
 )
+from qdash.api.services.catalog_task_run import resolve_catalog_task, run_catalog_task
 from qdash.common.agent_gate import evaluate_numeric_candidate
 from qdash.common.utils.datetime import ensure_timezone, now
 from qdash.datamodel.agent_session import (
@@ -50,7 +51,18 @@ from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 if TYPE_CHECKING:
+    from qdash.api.schemas.task_file import TaskInfo
     from qdash.api.services.flow_service import FlowService
+    from qdash.api.services.task_file_service import TaskFileService
+
+
+def _typed_overrides(task: TaskInfo, overrides: dict[str, float]) -> dict[str, Any]:
+    """Agent overrides arrive as floats; give whole numbers to integer inputs as ints."""
+    typed: dict[str, Any] = {}
+    for name, value in overrides.items():
+        value_type = task.input_parameters.get(name, {}).get("value_type")
+        typed[name] = int(value) if value_type == "int" and float(value).is_integer() else value
+    return typed
 
 
 class AgentSessionService:
@@ -101,10 +113,15 @@ class AgentSessionService:
         """Resolve a Prefect operation to its QDash execution without changing flow IDs."""
         if doc.operation_id is None:
             return doc
+        # operation_id is the Prefect flow run ID. Actions dispatched before that
+        # was fixed stored the QDash execution ID there instead, so match both.
         execution = ExecutionHistoryDocument.find_one(
             {
                 "project_id": doc.project_id,
-                "note.flow_run_id": doc.operation_id,
+                "$or": [
+                    {"note.flow_run_id": doc.operation_id},
+                    {"execution_id": doc.operation_id},
+                ],
             }
         ).run()
         if execution is None:
@@ -1090,8 +1107,14 @@ class AgentSessionService:
         action_id: str,
         body: ExecuteAgentActionRequest,
         flow_service: FlowService,
+        task_file_service: TaskFileService,
     ) -> AgentActionResponse:
-        """Dispatch one authorized run-task action to the system workflow."""
+        """Dispatch one authorized run-task action to the system workflow.
+
+        The action runs the way the Task Workbench runs a task: inputs from the
+        current calibration state, the session's readout_duration from the task,
+        and the same override checks. Outputs stay staged for the candidate gate.
+        """
         action = AgentActionDocument.find_one(
             {"project_id": project_id, "session_id": session_id, "action_id": action_id}
         ).run()
@@ -1129,6 +1152,9 @@ class AgentSessionService:
                 detail="Hardware reconfiguration is not allowed by the agent session policy",
             )
 
+        task, backend_name = resolve_catalog_task(task_file_service, action.task_name, None)
+        input_overrides = _typed_overrides(task, action.parameter_overrides)
+
         reserved = AgentActionDocument.get_motor_collection().find_one_and_update(
             {
                 "project_id": project_id,
@@ -1150,21 +1176,21 @@ class AgentSessionService:
             return self._action_response(latest)
 
         try:
-            operation = await flow_service.execute_single_task_from_snapshot(
-                task_name=action.task_name,
-                qid=action.qids[0],
+            operation = await run_catalog_task(
+                flow_service=flow_service,
+                task=task,
+                backend_name=backend_name,
                 chip_id=session.chip_id,
-                source_execution_id=body.source_execution_id,
+                qid=action.qids[0],
                 username=session.created_by,
                 project_id=project_id,
-                tags=[f"agent-session:{session_id}"],
-                execution_name=f"agent:{action.task_name}",
-                parameter_overrides={"input": action.parameter_overrides}
-                if action.parameter_overrides
-                else None,
-                update_params=body.update_params,
+                input_overrides=input_overrides,
+                run_overrides={},
                 persist_output_parameters=False,
+                update_params=body.update_params,
                 reconfigure=body.reconfigure,
+                execution_name=f"agent:{action.task_name}",
+                tags=[f"agent-session:{session_id}"],
             )
         except Exception as exc:
             action.execution_status = "failed"
@@ -1173,6 +1199,9 @@ class AgentSessionService:
             raise
 
         action.execution_status = "queued"
-        action.operation_id = operation.execution_id
+        action.operation_id = operation.flow_run_id
+        if body.source_execution_id:
+            # Provenance only: the run reads the current calibration state.
+            action.metadata = {**action.metadata, "source_execution_id": body.source_execution_id}
         action.save()
-        return self._action_response(action)
+        return self._action_response(self._refresh_action_execution(action))

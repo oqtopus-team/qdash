@@ -104,22 +104,27 @@ class CopilotSupportService:
         knowledge: Any,
         max_images: int | None = None,
         *,
-        include_case_images: bool = True,
-        include_review_images: bool = True,
+        include_example_images: bool = True,
     ) -> list[tuple[str, str]]:
-        """Collect expected reference images from TaskKnowledge."""
+        """Reference figures of a task as (base64, alt): the expected plot, then labeled examples."""
         if knowledge is None:
             return []
-        result = [(img.base64_data, img.alt_text) for img in knowledge.images if img.base64_data]
-        if include_review_images:
-            for img in getattr(knowledge, "review_images", []):
-                if img.base64_data:
-                    result.append((img.base64_data, f"[AI review guide] {img.alt_text}"))
-        if include_case_images:
-            for case in knowledge.cases:
-                for img in case.images:
-                    if img.base64_data:
-                        result.append((img.base64_data, f"[Case: {case.title}] {img.alt_text}"))
+        result: list[tuple[str, str]] = []
+        for figure in knowledge.figures:
+            loaded = knowledge.load_figure_base64(figure.path)
+            if loaded:
+                result.append((loaded[0], figure.alt or "expected plot"))
+        if include_example_images:
+            for example in knowledge.examples:
+                for figure in example.figures:
+                    loaded = knowledge.load_figure_base64(figure.path)
+                    if loaded:
+                        result.append(
+                            (
+                                loaded[0],
+                                f"[Example: {example.title} — {example.outcome}] {figure.alt}",
+                            )
+                        )
         if max_images is not None and max_images >= 0:
             return result[:max_images]
         return result

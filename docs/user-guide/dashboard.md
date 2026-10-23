@@ -1,67 +1,55 @@
 # Dashboard
 
-The `/dashboard` page is the at-a-glance view of a chip's calibration health. It shows every metric on a single page — heatmap + per-metric CDF — and lets you leave free-form notes anywhere it makes sense.
+Use **Dashboard** to scan every configured metric for one chip, then open a target when a value
+needs investigation or context.
 
-## What's on the page
+## Select the Data Scope
 
-From top to bottom:
+1. Open **Dashboard** and select a chip.
+2. Select a relative or absolute time range, or choose a cool-down.
+3. Set **Value selection** to latest, best, or average.
 
-1. **Filter bar** — chip selector, time range (relative / absolute), selection mode (latest / best / average).
-2. **Notes summary** — every note attached to this chip in one place, grouped by qubit / coupling and by experiment (task result).
-3. **All metrics summary table** (collapsed by default) — coverage / median / min / max for every metric in the active time range.
-4. **Qubit Metrics** — one row per metric, with the topology heatmap (2/3 width) and its CDF chart (1/3 width).
-5. **Coupling Metrics** — same layout, coupling chips on the left, CDF on the right.
+The selected time range and value mode apply to the summary and every metric section. Include
+them when sharing an observation because another scope can show a different record.
 
-Each per-metric section also carries its own coverage gauge.
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/dashboard-scope-and-metrics.gif
+Start: Dashboard for a populated chip with the default scope visible.
+Sequence: Select a cool-down, change Value selection, and expand one populated metric.
+Alt: Dashboard scope controls above the chip summary and expanded metric topology.
+-->
 
-## Notes
+## Scan Chip Health
 
-QDash supports six levels of notes, all sharing the same `NoteModel` schema (`content`, `updated_by`, `updated_at`):
+Start with the collapsed all-metrics summary. It shows coverage, median, minimum, and maximum for
+each metric in the selected scope.
 
-| Scope                 | Where it lives                       | When to use                                                              |
-| --------------------- | ------------------------------------ | ------------------------------------------------------------------------ |
-| **Qubit summary**     | `TargetNoteDocument` / `QubitDocument.note` | Pinned target summary for the selected cool-down or time range; legacy global notes fall back to `QubitDocument.note` |
-| **Qubit + Metric**    | `MetricNoteDocument`                 | Legacy per-metric notes shown read-only in the dashboard                 |
-| **Coupling summary**  | `TargetNoteDocument` / `CouplingDocument.note` | Pinned target summary for the selected cool-down or time range; legacy global notes fall back to `CouplingDocument.note` |
-| **Coupling + Metric** | `MetricNoteDocument`                 | Legacy per-metric notes shown read-only in the dashboard                 |
-| **Task Result**       | `TaskResultHistoryDocument.user_note`| Notes about this specific measurement (anomaly, parameter intent)        |
-| **Chip**              | `ChipNoteDocument` / `ChipDocument.note` | Chip-level summary for the selected cool-down or time range; legacy global notes remain on `ChipDocument.note` |
+Continue to **Qubit Metrics** and **Coupling Metrics** for topology and distribution views. Each
+metric shows its own coverage. Metrics without data stay grouped separately so missing data does
+not obscure the populated metrics.
 
-### How to write a note
+## Investigate a Target
 
-- Edit **Chip note** above Target Summaries to record chip-level context for the selected cool-down or time range.
-- Click any qubit cell or coupling chip on a metric → opens the metric history modal.
-  - The side panel shows / lets you edit the **pinned target summary** for the selected cool-down or time range.
-  - The body of the modal includes a **Note** section (above issues) for the **task result** currently selected.
-- Cells with an existing note show a sticky-note icon. A faint outlined icon indicates a note exists on **another** metric for the same qubit.
-- Hovering a cell reveals a tooltip listing **all notes on that target across metrics**, plus the value and unit.
+Select a qubit or coupling in a metric to open its history. Use the history and selected task
+result to decide whether the value is an isolated measurement, part of a trend, or related to
+another target.
 
-### Notes visibility
+Open **Metrics** when the investigation starts from one metric across many targets. Open
+**Task Results** when it starts from a specific measurement or failure.
 
-- The notes summary at the top of the dashboard is the canonical "what's been written" view for the current cool-down or selected time range. Click any target summary or legacy per-metric note row to jump to the relevant dashboard modal; click any task-result note to open the task result detail page.
-- Notes are shared within a project (no per-user filtering). The `updated_by` field tracks the last editor.
+## Record Context
 
-### Target summary scoping
+Use a pinned summary for context that should remain visible with a chip, qubit, or coupling in
+the selected cool-down or time range. Use a task-result note for context about one measurement,
+such as an anomaly or the reason for a parameter choice.
 
-Dashboard pinned target summaries are scoped by the operational context:
+1. Edit the chip note above the target summaries for chip-wide context.
+2. Select a qubit or coupling to edit its pinned summary.
+3. Select a task result in the history view to add a note about that measurement.
 
-- If a cool-down is explicitly selected, summaries are saved under that `cooldown_id`.
-- If no cool-down is selected, summaries use the current dashboard `start_at` / `end_at` range.
-- If the selected time range matches a single cool-down document, QDash stores the summary in that cool-down scope.
-- Existing global chip, qubit, and coupling notes remain available as legacy fallback when no operational scope is selected.
-- Per-metric notes are legacy read-only dashboard context; use pinned summaries or forum discussions for new notes.
+The notes summary gathers the notes visible in the current scope. Select a target summary to
+return to its dashboard view, or select a task-result note to open the result. Notes are shared
+with the project, and QDash records the last editor.
 
-## Knowledge feed
-
-Every note edit (upsert / delete) appends a row to the immutable `note_event` collection. This drives:
-
-- Per-chip annotation timeline: `GET /chips/{chip_id}/note-events`
-- Per-target timeline (e.g. all events on Q5): `GET /note-events/by-target?scope=qubit&target_id=5`
-- Cross-chip text search: `GET /note-events/search?q=unstable`
-
-Use these for retrospective audits, knowledge mining, or feeding LLM contexts. The current dashboard does not yet surface a UI for these endpoints — they are available for future work and external integrations.
-
-## Performance
-
-- The dashboard fetches all notes via `GET /chips/{chip_id}/notes-summary`, a single query that joins inline notes from `qubit`, `coupling`, and (filtered) `task_result_history`.
-- A partial sparse index on `task_result_history.user_note.updated_at` ensures the summary scans only annotated rows, even when the chip has hundreds of thousands of task results.
+Existing per-metric notes remain visible as read-only context. Add new context as a pinned summary
+or a forum discussion. How this works: [Notes architecture](../developer-guide/architecture/notes.md).

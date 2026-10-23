@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -24 1040 704" role="img" aria-label="Calibration run: the API claims the execution lock and mints the execution ID, creates a Prefect flow run, and records a scheduled execution; the user flow worker picks up the run, adopts the execution, and runs each task through preprocess, run, postprocess, validate, and save before finishing and releasing the lock. A cancel request sets the flow run to Cancelling, Prefect stops the worker, and the on_cancellation hook closes the execution and releases the lock.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-calflow-lane-label { fill: var(--vp-c-text-2, #59636e); font-size: 12.5px; font-weight: 600; }
+    .qd-calflow-lane { fill: rgba(128, 128, 128, 0.07); }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-dash { stroke-dasharray: 5 4; }
+    .qd-cancel { stroke: #cf222e; stroke-width: 1.4; fill: none; stroke-dasharray: 5 4; }
+    .qd-cancel-head { fill: #cf222e; }
+    .qd-cancel-label { fill: #cf222e; font-size: 11.5px; }
+    .qd-api { fill: rgba(219, 109, 40, 0.12); stroke: #db6d28; stroke-width: 1.5; }
+    .qd-wf { fill: rgba(130, 80, 223, 0.12); stroke: #8250df; stroke-width: 1.5; }
+    .qd-data { fill: rgba(9, 105, 218, 0.10); stroke: #0969da; stroke-width: 1.5; }
+    .qd-ext { fill: none; stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; stroke-dasharray: 5 4; }
+    .qd-loop { fill: none; stroke: #8250df; stroke-width: 1.2; stroke-dasharray: 6 4; }
+    .qd-loop-label { fill: #8250df; font-size: 12px; font-weight: 600; }
+  </style>
+  <defs>
+    <marker id="qd-calflow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+    <marker id="qd-calflow-cancel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-cancel-head"/>
+    </marker>
+  </defs>
+
+  <g class="qd-root">
+    <!-- Lanes -->
+    <rect x="0" y="20" width="1040" height="130" rx="6" class="qd-calflow-lane"/>
+    <text x="14" y="42" class="qd-calflow-lane-label">API</text>
+    <rect x="0" y="165" width="1040" height="90" rx="6" class="qd-calflow-lane"/>
+    <text x="14" y="187" class="qd-calflow-lane-label">Prefect</text>
+    <rect x="0" y="270" width="1040" height="230" rx="6" class="qd-calflow-lane"/>
+    <text x="14" y="292" class="qd-calflow-lane-label">Worker</text>
+    <rect x="0" y="515" width="1040" height="150" rx="6" class="qd-calflow-lane"/>
+    <text x="14" y="537" class="qd-calflow-lane-label">Stores</text>
+
+    <!-- API lane -->
+    <rect x="110" y="50" width="170" height="56" rx="8" class="qd-api"/>
+    <text x="195" y="74" class="qd-title">Claim lock</text>
+    <text x="195" y="92" class="qd-sub">mint execution_id</text>
+    <text x="195" y="126" class="qd-label" text-anchor="middle">409 if another run holds it</text>
+
+    <rect x="330" y="50" width="170" height="56" rx="8" class="qd-api"/>
+    <text x="415" y="74" class="qd-title">Create flow run</text>
+    <text x="415" y="92" class="qd-sub">from the deployment</text>
+
+    <rect x="550" y="50" width="170" height="56" rx="8" class="qd-api"/>
+    <text x="635" y="74" class="qd-title">Record execution</text>
+    <text x="635" y="92" class="qd-sub">status: scheduled</text>
+
+    <rect x="830" y="50" width="170" height="56" rx="8" class="qd-api"/>
+    <text x="915" y="74" class="qd-title">Cancel</text>
+    <text x="915" y="92" class="qd-sub">mark cancelling</text>
+
+    <!-- Prefect lane -->
+    <rect x="330" y="182" width="170" height="56" rx="8" class="qd-wf"/>
+    <text x="415" y="206" class="qd-title">Flow run</text>
+    <text x="415" y="224" class="qd-sub">scheduled → running</text>
+
+    <rect x="830" y="182" width="170" height="56" rx="8" class="qd-wf"/>
+    <text x="915" y="206" class="qd-title">Cancelling</text>
+    <text x="915" y="224" class="qd-sub">stops the flow process</text>
+
+    <!-- Worker lane -->
+    <rect x="330" y="290" width="170" height="56" rx="8" class="qd-wf"/>
+    <text x="415" y="314" class="qd-title">Adopt execution</text>
+    <text x="415" y="332" class="qd-sub">claims the scheduled row</text>
+
+    <rect x="550" y="290" width="170" height="56" rx="8" class="qd-wf"/>
+    <text x="635" y="314" class="qd-title">Finish</text>
+    <text x="635" y="332" class="qd-sub">close · release lock</text>
+
+    <rect x="830" y="290" width="170" height="56" rx="8" class="qd-wf"/>
+    <text x="915" y="314" class="qd-title">Cancel hook</text>
+    <text x="915" y="332" class="qd-sub">cancelled · release lock</text>
+
+    <rect x="110" y="380" width="910" height="105" rx="10" class="qd-loop"/>
+    <text x="124" y="400" class="qd-loop-label">For each task</text>
+
+    <rect x="156" y="412" width="140" height="50" rx="8" class="qd-wf"/>
+    <text x="226" y="433" class="qd-title">Preprocess</text>
+    <text x="226" y="450" class="qd-sub">resolve inputs</text>
+
+    <rect x="328" y="412" width="140" height="50" rx="8" class="qd-wf"/>
+    <text x="398" y="433" class="qd-title">Run</text>
+    <text x="398" y="450" class="qd-sub">measure</text>
+
+    <rect x="500" y="412" width="140" height="50" rx="8" class="qd-wf"/>
+    <text x="570" y="433" class="qd-title">Postprocess</text>
+    <text x="570" y="450" class="qd-sub">fit · figures</text>
+
+    <rect x="672" y="412" width="140" height="50" rx="8" class="qd-wf"/>
+    <text x="742" y="433" class="qd-title">Validate</text>
+    <text x="742" y="450" class="qd-sub">R² · fidelity</text>
+
+    <rect x="844" y="412" width="140" height="50" rx="8" class="qd-wf"/>
+    <text x="914" y="433" class="qd-title">Save</text>
+    <text x="914" y="450" class="qd-sub">params · artifacts</text>
+
+    <!-- Stores lane -->
+    <rect x="313" y="560" width="170" height="56" rx="8" class="qd-ext"/>
+    <text x="398" y="584" class="qd-title">Quantum hardware</text>
+    <text x="398" y="602" class="qd-sub">control electronics</text>
+
+    <path d="M655,568 v40 a85,8 0 0,0 170,0 v-40" class="qd-data"/>
+    <ellipse cx="740" cy="568" rx="85" ry="8" class="qd-data"/>
+    <text x="740" y="591" class="qd-title">MongoDB</text>
+    <text x="740" y="607" class="qd-sub">results · parameters</text>
+
+    <path d="M850,566 h100 l8,-6 h58 a4,4 0 0,1 4,4 v52 h-170 z" class="qd-data"/>
+    <text x="935" y="594" class="qd-title">calib_data</text>
+    <text x="935" y="610" class="qd-sub">figures · raw data</text>
+
+    <!-- Main path -->
+    <line x1="195" y1="-18" x2="195" y2="48" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+    <text x="205" y="6" class="qd-label">execute flow</text>
+
+    <line x1="280" y1="78" x2="328" y2="78" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+    <line x1="500" y1="78" x2="548" y2="78" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+
+    <line x1="415" y1="106" x2="415" y2="180" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+    <text x="425" y="146" class="qd-label">creates</text>
+
+    <line x1="415" y1="238" x2="415" y2="288" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+    <text x="405" y="267" class="qd-label" text-anchor="end">worker picks up</text>
+
+    <line x1="600" y1="106" x2="482" y2="288" class="qd-edge qd-dash" marker-end="url(#qd-calflow-arrow)"/>
+    <text x="568" y="182" class="qd-label">same execution_id</text>
+
+    <line x1="415" y1="346" x2="415" y2="378" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+
+    <line x1="635" y1="380" x2="635" y2="348" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+    <text x="645" y="368" class="qd-label">after the last task</text>
+
+    <line x1="296" y1="437" x2="326" y2="437" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+    <line x1="468" y1="437" x2="498" y2="437" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+    <line x1="640" y1="437" x2="670" y2="437" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+    <line x1="812" y1="437" x2="842" y2="437" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+
+    <line x1="398" y1="462" x2="398" y2="558" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+    <text x="408" y="530" class="qd-label">measure via qubex</text>
+
+    <line x1="880" y1="462" x2="770" y2="558" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+    <text x="808" y="508" class="qd-label" text-anchor="end">results · params</text>
+
+    <line x1="950" y1="462" x2="950" y2="558" class="qd-edge" marker-end="url(#qd-calflow-arrow)"/>
+    <text x="960" y="530" class="qd-label">writes</text>
+
+    <path d="M740,616 V648 H226 V464" class="qd-edge qd-dash" marker-end="url(#qd-calflow-arrow)"/>
+    <text x="483" y="642" class="qd-label" text-anchor="middle">later tasks read the accepted parameters</text>
+
+    <!-- Cancellation path -->
+    <line x1="915" y1="-18" x2="915" y2="48" class="qd-cancel" marker-end="url(#qd-calflow-cancel)"/>
+    <text x="925" y="6" class="qd-cancel-label">cancel</text>
+
+    <line x1="915" y1="106" x2="915" y2="180" class="qd-cancel" marker-end="url(#qd-calflow-cancel)"/>
+    <text x="925" y="146" class="qd-cancel-label">set state</text>
+
+    <line x1="915" y1="238" x2="915" y2="288" class="qd-cancel" marker-end="url(#qd-calflow-cancel)"/>
+    <text x="925" y="267" class="qd-cancel-label">SIGTERM</text>
+  </g>
+</svg>

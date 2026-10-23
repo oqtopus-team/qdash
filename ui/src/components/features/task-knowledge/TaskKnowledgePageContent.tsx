@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, BookOpen, Image as ImageIcon, FileText } from "lucide-react";
+import { Image as ImageIcon, Tag } from "lucide-react";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -11,14 +11,17 @@ import { useListTaskKnowledge } from "@/client/task/task";
 import type { TaskKnowledgeSummaryResponse } from "@/schemas";
 
 // Category order for display
+// calibtasks packages, in calibration order
 const CATEGORY_ORDER = [
-  "box-setup",
+  "box_setup",
   "system",
-  "cw-characterization",
-  "td-characterization",
-  "one-qubit-gate-calibration",
-  "two-qubit-gate-calibration",
-  "benchmarking",
+  "cw",
+  "measurement",
+  "one_qubit_coarse",
+  "one_qubit_fine",
+  "two_qubit",
+  "benchmark",
+  "analysis",
 ];
 
 function TaskCard({ item }: { item: TaskKnowledgeSummaryResponse }) {
@@ -26,35 +29,23 @@ function TaskCard({ item }: { item: TaskKnowledgeSummaryResponse }) {
 
   return (
     <div
-      onClick={() => router.push(`/task-knowledge/${item.name}`)}
+      onClick={() => router.push(`/knowledge/${item.name}`)}
       className="bg-base-100 rounded-lg border border-base-300 cursor-pointer hover:border-primary/50 transition-colors"
     >
       <div className="p-4">
         <h3 className="text-sm font-semibold font-mono text-primary mb-1">{item.name}</h3>
         <p className="text-sm text-base-content/70 line-clamp-2 mb-2">{item.summary}</p>
         <div className="flex items-center gap-3 text-xs text-base-content/50">
-          {(item.failure_mode_count ?? 0) > 0 && (
-            <span className="flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" />
-              {item.failure_mode_count} failure modes
+          {(item.example_count ?? 0) > 0 && (
+            <span className="flex items-center gap-1" title="Expert-labeled example plots">
+              <Tag className="h-3 w-3" />
+              {item.example_count} examples
             </span>
           )}
-          {(item.case_count ?? 0) > 0 && (
-            <span className="flex items-center gap-1">
-              <FileText className="h-3 w-3" />
-              {item.case_count} cases
-            </span>
-          )}
-          {(item.image_count ?? 0) > 0 && (
+          {(item.figure_count ?? 0) > 0 && (
             <span className="flex items-center gap-1">
               <ImageIcon className="h-3 w-3" />
-              {item.image_count} images
-            </span>
-          )}
-          {item.has_analysis_guide && (
-            <span className="flex items-center gap-1">
-              <BookOpen className="h-3 w-3" />
-              Guide
+              {item.figure_count} figures
             </span>
           )}
         </div>
@@ -104,8 +95,8 @@ export function TaskKnowledgePageContent() {
   return (
     <PageContainer maxWidth>
       <PageHeader
-        title="Task Knowledge"
-        description="Calibration task knowledge base — physics, expected results, failure patterns, and analysis guides"
+        title="Knowledge"
+        description="The background of each calibration task and its expert-labeled example plots, laid out like the calibtasks packages, as published in the task-knowledge repository. To try a change, download a task as a zip and upload the edited zip as a knowledge draft in an AI evaluation."
       />
 
       {/* Search bar */}
@@ -124,7 +115,7 @@ export function TaskKnowledgePageContent() {
           description={
             searchInput
               ? "No tasks match your search."
-              : "No task knowledge entries available. Run 'task knowledge-pull' to fetch."
+              : "No task knowledge entries available. Pull the knowledge repository to fetch them."
           }
           emoji="brain"
         />

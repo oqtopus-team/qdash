@@ -12,24 +12,19 @@ import type {
   AgentCampaignCommitResponse,
   AgentCandidateCommitResponse,
   AgentSessionResponse,
-  AiReviewListResponse,
-  AiReviewRunDetailResponse,
-  AiReviewRunListResponse,
   AllConfigResponse,
-  AnalysisResponse,
-  AnalyzeRequest,
   ApplyAgentCandidateRequest,
   ArtifactPreviewResponse,
   BackendConfigResponse,
   BodyBulkImportUsers,
+  BodyCreateKnowledgeDraft,
   BodyLogin,
   BodyReExecuteTaskResult,
   BodyUploadForumImage,
-  BulkAiReviewRequest,
-  BulkAiReviewResponse,
   BulkUserImportResponse,
   CalibrationGitHubSync,
   CalibrationNoteResponse,
+  CalibrationParameterDeleteResponse,
   CancelExecutionResponse,
   CandidateGateResponse,
   ChangePassword200,
@@ -50,16 +45,20 @@ import type {
   CooldownWiringCheckpointRequest,
   CooldownWiringEventResponse,
   CopilotChatSessionResponse,
+  CopilotPreferences,
+  CopilotPreferencesUpdate,
+  CopilotSystemPrompt,
   CouplingResponse,
   CreateAgentSessionRequest,
   CreateChipRequest,
   CreateCopilotChatSessionRequest,
   CreateCouplingNoteCommentParams,
+  CreateEvaluationRunRequest,
+  CreateEvaluationRunResponse,
   CreateQubitNoteCommentParams,
   CryostatCreateRequest,
   CryostatResponse,
   CryostatUpdateRequest,
-  DashboardAiInsightsResponse,
   DegradationTrendsResponse,
   DeleteChipNoteParams,
   DeleteChipParams,
@@ -82,9 +81,15 @@ import type {
   DownloadMetricsPdfParams,
   DownloadZipFileParams,
   EvaluateCandidateGateRequest,
+  EvaluationItem,
+  EvaluationPromptPreviewResponse,
+  EvaluationRunDetailResponse,
+  EvaluationRunSummary,
   ExecuteAgentActionRequest,
   ExecuteFlowRequest,
   ExecuteFlowResponse,
+  ExecutePipelineRequest,
+  ExecutePipelineResponse,
   ExecutionAvailabilityRequest,
   ExecutionAvailabilityResponse,
   ExecutionComparisonResponse,
@@ -97,20 +102,24 @@ import type {
   ForumCategoryResponse,
   ForumCategoryUpdate,
   ForumImageUploadResponse,
+  ForumLabelCreate,
+  ForumLabelResponse,
+  ForumLabelUpdate,
   ForumPostCreate,
   ForumPostResponse,
   ForumPostUpdate,
+  GetCalibrationPipelineCatalogParams,
   GetChipMetricsParams,
   GetChipNoteParams,
   GetChipNotesSummaryParams,
   GetCopilotConfig200,
   GetCouplingMetricHistoryParams,
   GetCouplingTaskHistoryParams,
-  GetDashboardAiInsightsParams,
   GetDegradationTrendsParams,
   GetFigureByPathParams,
   GetFileContent200,
   GetFileContentParams,
+  GetFileImageParams,
   GetFlowResponse,
   GetForumPostRepliesParams,
   GetGitStatus200,
@@ -127,6 +136,7 @@ import type {
   GetRecalibrationRecommendationsParams,
   GetRecentChangesParams,
   GetRecentExecutionsParams,
+  GetTaskEvaluationPromptsParams,
   GetTaskKnowledgeParams,
   GetTimeseriesTaskResultsParams,
   GetTopologyById200,
@@ -134,11 +144,7 @@ import type {
   GitPushConfig200,
   GitPushRequest,
   ImpactResponse,
-  IssueCreate,
-  IssueKnowledgeResponse,
-  IssueKnowledgeUpdate,
-  IssueResponse,
-  IssueUpdate,
+  KnowledgeDraftResponse,
   LatestTaskResultResponse,
   LineageResponse,
   ListAgentActionsResponse,
@@ -158,6 +164,10 @@ import type {
   ListCopilotChatSessionsResponse,
   ListCouplingsResponse,
   ListCryostatsResponse,
+  ListEvaluationRunsParams,
+  ListEvaluationRunsResponse,
+  ListEvaluationsParams,
+  ListEvaluationsResponse,
   ListExecutionsParams,
   ListExecutionsResponse,
   ListFlowSchedulesParams,
@@ -165,12 +175,9 @@ import type {
   ListFlowsResponse,
   ListForumCategoriesParams,
   ListForumCategoriesResponse,
+  ListForumLabelsResponse,
   ListForumPostsParams,
   ListForumPostsResponse,
-  ListIssueKnowledgeParams,
-  ListIssueKnowledgeResponse,
-  ListIssuesParams,
-  ListIssuesResponse,
   ListMuxResponse,
   ListNoteEventsResponse,
   ListNotificationsParams,
@@ -183,8 +190,6 @@ import type {
   ListTaskInfoResponse,
   ListTaskKnowledgeResponse,
   ListTaskResponse,
-  ListTaskResultAiReviewRunsParams,
-  ListTaskResultAiReviewsParams,
   ListTaskResultsParams,
   ListTasksParams,
   ListTopologies200,
@@ -200,6 +205,8 @@ import type {
   MemberUpdate,
   MetricHeatmapResponse,
   MetricsSummaryResponse,
+  MoveFlowRequest,
+  MoveFlowResponse,
   MuxDetailResponse,
   NoteCommentModel,
   NoteCommentRequest,
@@ -211,6 +218,7 @@ import type {
   PasswordChange,
   PasswordReset,
   PasswordResetResponse,
+  PipelineCatalogResponse,
   PreviewArtifactByPathParams,
   ProjectCreate,
   ProjectResponse,
@@ -230,6 +238,7 @@ import type {
   RecentChangesResponse,
   RecentExecutionsResponse,
   RemoveProjectMemberAdmin200,
+  RetryEvaluationRunResponse,
   SaveFileContent200,
   SaveFileRequest,
   SaveFlowRequest,
@@ -239,12 +248,10 @@ import type {
   SearchNoteEventsParams,
   SeedImportRequest,
   SeedImportResponse,
+  SetEvaluationVerdictRequest,
   SettingsResponse,
-  StartSystemUpdateRequest,
   SubmitAgentActionRequest,
   SuccessResponse,
-  SystemUpdateOperationResponse,
-  SystemUpdateStatusResponse,
   TaskFileSettings,
   TaskHistoryResponse,
   TaskKnowledgeResponse,
@@ -274,7 +281,9 @@ import type {
   UserProfileUpdate,
   UserWithToken,
   ValidateFileContent200,
-  ValidateFileRequest
+  ValidateFileRequest,
+  ValidatePipelineRequest,
+  ValidatePipelineResponse
 } from '../../../../ui/src/schemas';
 
 import { qdashRequest } from '../orval-request';
@@ -462,47 +471,6 @@ const resetPassword = (
       {url: `/auth/reset-password`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: passwordReset
-    },
-      options);
-    }
-
-/**
- * Return current/latest release information for system administrators.
- * @summary Get QDash system update status
- */
-const getSystemUpdateStatus = (
-
- options?: SecondParameter<typeof qdashRequest<SystemUpdateStatusResponse>>,) => {
-      return qdashRequest<SystemUpdateStatusResponse>(
-      {url: `/admin/system-updates/status`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Start the latest safe stable update when no calibration is running.
- * @summary Start a QDash system update
- */
-const startSystemUpdate = (
-    startSystemUpdateRequest: StartSystemUpdateRequest,
- options?: SecondParameter<typeof qdashRequest<SystemUpdateOperationResponse>>,) => {
-      return qdashRequest<SystemUpdateOperationResponse>(
-      {url: `/admin/system-updates`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: startSystemUpdateRequest
-    },
-      options);
-    }
-
-/**
- * Return updater progress after the API becomes available again.
- * @summary Get QDash system update progress
- */
-const getSystemUpdateOperation = (
-    operationId: string,
- options?: SecondParameter<typeof qdashRequest<SystemUpdateOperationResponse>>,) => {
-      return qdashRequest<SystemUpdateOperationResponse>(
-      {url: `/admin/system-updates/${operationId}`, method: 'GET'
     },
       options);
     }
@@ -1080,61 +1048,38 @@ const downloadZipFile = (
     }
 
 /**
- * Get file tree structure for entire config directory.
- *
- * Returns
- * -------
- *     File tree structure
- * @summary Get file tree for entire config directory
+ * @summary Get file tree of the config directory
  */
 const getFileTree = (
 
  options?: SecondParameter<typeof qdashRequest<FileTreeNode[]>>,) => {
       return qdashRequest<FileTreeNode[]>(
-      {url: `/files/tree`, method: 'GET'
+      {url: `/config/files/tree`, method: 'GET'
     },
       options);
     }
 
 /**
- * Get file content for editing.
- *
- * Args:
- * ----
- *     path: Relative path from CONFIG_BASE_PATH
- *
- * Returns:
- * -------
- *     File content and metadata
- * @summary Get file content for editing
+ * @summary Get config file content for editing
  */
 const getFileContent = (
     params: GetFileContentParams,
  options?: SecondParameter<typeof qdashRequest<GetFileContent200>>,) => {
       return qdashRequest<GetFileContent200>(
-      {url: `/files/content`, method: 'GET',
+      {url: `/config/files/content`, method: 'GET',
         params
     },
       options);
     }
 
 /**
- * Save file content.
- *
- * Args:
- * ----
- *     request: Save file request with path and content
- *
- * Returns:
- * -------
- *     Success message
- * @summary Save file content
+ * @summary Save config file content
  */
 const saveFileContent = (
     saveFileRequest: SaveFileRequest,
  options?: SecondParameter<typeof qdashRequest<SaveFileContent200>>,) => {
       return qdashRequest<SaveFileContent200>(
-      {url: `/files/content`, method: 'PUT',
+      {url: `/config/files/content`, method: 'PUT',
       headers: {'Content-Type': 'application/json', },
       data: saveFileRequest
     },
@@ -1142,22 +1087,27 @@ const saveFileContent = (
     }
 
 /**
- * Validate YAML or JSON content.
- *
- * Args:
- * ----
- *     request: Validation request with content and file_type
- *
- * Returns:
- * -------
- *     Validation result
+ * @summary Get an image from the config directory
+ */
+const getFileImage = (
+    params: GetFileImageParams,
+ options?: SecondParameter<typeof qdashRequest<Blob>>,) => {
+      return qdashRequest<Blob>(
+      {url: `/config/files/image`, method: 'GET',
+        params,
+        responseType: 'blob'
+    },
+      options);
+    }
+
+/**
  * @summary Validate file content (YAML/JSON)
  */
 const validateFileContent = (
     validateFileRequest: ValidateFileRequest,
  options?: SecondParameter<typeof qdashRequest<ValidateFileContent200>>,) => {
       return qdashRequest<ValidateFileContent200>(
-      {url: `/files/validate`, method: 'POST',
+      {url: `/config/files/validate`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: validateFileRequest
     },
@@ -1165,56 +1115,37 @@ const validateFileContent = (
     }
 
 /**
- * Get Git status of config directory.
- *
- * Returns
- * -------
- *     Git status information
- * @summary Get Git status of config directory
+ * @summary Get Git status of the config directory
  */
 const getGitStatus = (
 
  options?: SecondParameter<typeof qdashRequest<GetGitStatus200>>,) => {
       return qdashRequest<GetGitStatus200>(
-      {url: `/files/git/status`, method: 'GET'
+      {url: `/config/files/git/status`, method: 'GET'
     },
       options);
     }
 
 /**
- * Pull latest config from Git repository.
- *
- * Returns
- * -------
- *     Pull operation result
- * @summary Pull latest config from Git repository
+ * @summary Pull the latest config from its Git repository
  */
 const gitPullConfig = (
 
  options?: SecondParameter<typeof qdashRequest<GitPullConfig200>>,) => {
       return qdashRequest<GitPullConfig200>(
-      {url: `/files/git/pull`, method: 'POST'
+      {url: `/config/files/git/pull`, method: 'POST'
     },
       options);
     }
 
 /**
- * Push config changes to Git repository.
- *
- * Args:
- * ----
- *     request: Push request with commit message
- *
- * Returns:
- * -------
- *     Push operation result
- * @summary Push config changes to Git repository
+ * @summary Open a pull request with the config changes
  */
 const gitPushConfig = (
     gitPushRequest: GitPushRequest,
  options?: SecondParameter<typeof qdashRequest<GitPushConfig200>>,) => {
       return qdashRequest<GitPushConfig200>(
-      {url: `/files/git/push`, method: 'POST',
+      {url: `/config/files/git/push`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: gitPushRequest
     },
@@ -1617,6 +1548,21 @@ const updateCalibrationParameters = (
     }
 
 /**
+ * Delete one current qubit or coupling value without deleting its history.
+ * @summary Delete a current calibration parameter
+ */
+const deleteCalibrationParameter = (
+    chipId: string,
+    qid: string,
+    parameterName: string,
+ options?: SecondParameter<typeof qdashRequest<CalibrationParameterDeleteResponse>>,) => {
+      return qdashRequest<CalibrationParameterDeleteResponse>(
+      {url: `/calibrations/parameters/${chipId}/${qid}/${parameterName}`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
  * Get the most recent manual edit for each parameter of a qid.
  * @summary Get manual edits for a qubit or coupling
  */
@@ -1630,14 +1576,61 @@ const getManualEdits = (
     }
 
 /**
+ * Everything an agent needs to compose a spec: step types with their
+ * dependencies and default tasks, the backend's tasks by type, and the JSON
+ * schema of the spec.
+ * @summary Step types, tasks, and spec schema for writing a calibration pipeline
+ */
+const getCalibrationPipelineCatalog = (
+    params?: GetCalibrationPipelineCatalogParams,
+ options?: SecondParameter<typeof qdashRequest<PipelineCatalogResponse>>,) => {
+      return qdashRequest<PipelineCatalogResponse>(
+      {url: `/calibration-pipelines/catalog`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Dry run: reports every problem with a path into the spec, and the
+ * resolved steps and tasks when it would run.
+ * @summary Check a calibration pipeline spec without running it
+ */
+const validateCalibrationPipeline = (
+    validatePipelineRequest: ValidatePipelineRequest,
+ options?: SecondParameter<typeof qdashRequest<ValidatePipelineResponse>>,) => {
+      return qdashRequest<ValidatePipelineResponse>(
+      {url: `/calibration-pipelines/validate`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: validatePipelineRequest
+    },
+      options);
+    }
+
+/**
+ * Runs the spec as one execution through the worker's calibration-pipeline
+ * deployment. A spec with problems is rejected with 422 and the same problem
+ * list that /validate returns.
+ * @summary Validate and run a calibration pipeline spec
+ */
+const executeCalibrationPipeline = (
+    executePipelineRequest: ExecutePipelineRequest,
+ options?: SecondParameter<typeof qdashRequest<ExecutePipelineResponse>>,) => {
+      return qdashRequest<ExecutePipelineResponse>(
+      {url: `/calibration-pipelines/execute`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: executePipelineRequest
+    },
+      options);
+    }
+
+/**
  * Get Copilot configuration for the metrics assistant.
  *
  * Retrieves the Copilot configuration from YAML, including:
  * - enabled: Whether Copilot is enabled
- * - evaluation_metrics: Which metrics to use for multi-metric evaluation
- * - scoring: Thresholds for good/excellent ratings per metric
- * - system_prompt: The AI assistant's system prompt
- * - initial_message: The initial greeting message
+ * - chat_models: The planner models the UI offers
+ * - evaluation_models: The calibration evaluation model
  *
  * Returns
  * -------
@@ -1650,34 +1643,6 @@ const getCopilotConfig = (
  options?: SecondParameter<typeof qdashRequest<GetCopilotConfig200>>,) => {
       return qdashRequest<GetCopilotConfig200>(
       {url: `/copilot/config`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Analyze a calibration task result using LLM.
- *
- * Constructs a rich context from task knowledge, qubit parameters,
- * and experimental data, then sends it to the configured LLM for analysis.
- *
- * Parameters
- * ----------
- * request : AnalyzeRequest
- *     The analysis request containing task info, IDs, and user message.
- *
- * Returns
- * -------
- * AnalysisResponse
- *     Structured analysis from the LLM.
- * @summary Analyze calibration result with AI
- */
-const analyzeCopilot = (
-    analyzeRequest: AnalyzeRequest,
- options?: SecondParameter<typeof qdashRequest<AnalysisResponse>>,) => {
-      return qdashRequest<AnalysisResponse>(
-      {url: `/copilot/analyze`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: analyzeRequest
     },
       options);
     }
@@ -1748,6 +1713,47 @@ const deleteCopilotChatSession = (
  options?: SecondParameter<typeof qdashRequest<DeleteCopilotChatSession200>>,) => {
       return qdashRequest<DeleteCopilotChatSession200>(
       {url: `/copilot/chat/sessions/${sessionId}`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
+ * The instructions this user added to their chats.
+ * @summary Get the current user's Copilot preferences
+ */
+const getCopilotPreferences = (
+
+ options?: SecondParameter<typeof qdashRequest<CopilotPreferences>>,) => {
+      return qdashRequest<CopilotPreferences>(
+      {url: `/copilot/preferences`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Replace this user's chat instructions; an empty text clears them.
+ * @summary Update the current user's Copilot preferences
+ */
+const updateCopilotPreferences = (
+    copilotPreferencesUpdate: CopilotPreferencesUpdate,
+ options?: SecondParameter<typeof qdashRequest<CopilotPreferences>>,) => {
+      return qdashRequest<CopilotPreferences>(
+      {url: `/copilot/preferences`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: copilotPreferencesUpdate
+    },
+      options);
+    }
+
+/**
+ * QDash's chat system prompt and this user's instructions as appended to it (read-only).
+ * @summary Show what QDash tells the chat model
+ */
+const getCopilotSystemPrompt = (
+
+ options?: SecondParameter<typeof qdashRequest<CopilotSystemPrompt>>,) => {
+      return qdashRequest<CopilotSystemPrompt>(
+      {url: `/copilot/system-prompt`, method: 'GET'
     },
       options);
     }
@@ -2344,7 +2350,7 @@ const listTaskKnowledge = (
 /**
  * Get raw markdown content for a task knowledge entry.
  *
- * Returns the index.md content with image references replaced
+ * Returns the task.md content with image references replaced
  * by inline base64 data URIs for self-contained rendering.
  * @summary Get raw markdown for a task knowledge entry
  */
@@ -2353,6 +2359,44 @@ const getTaskKnowledgeMarkdown = (
  options?: SecondParameter<typeof qdashRequest<void>>,) => {
       return qdashRequest<void>(
       {url: `/tasks/${taskName}/knowledge/markdown`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * The task's ``task.md``, examples and figures, zipped under ``<task_name>/``.
+ *
+ * The zip is the starting point of a knowledge draft: edit it locally and
+ * upload it from the evaluation dialog. Raises 404 when the task has no
+ * knowledge directory.
+ * @summary Download a task's knowledge directory as a zip
+ */
+const downloadTaskKnowledgeArchive = (
+    taskName: string,
+ options?: SecondParameter<typeof qdashRequest<Blob>>,) => {
+      return qdashRequest<Blob>(
+      {url: `/tasks/${taskName}/knowledge/archive`, method: 'GET',
+        responseType: 'blob'
+    },
+      options);
+    }
+
+/**
+ * The prompts the evaluation model would receive for a task.
+ *
+ * The Agent Runtime builds them the way a direct evaluation does, from the
+ * task's reference in Knowledge, or from an uploaded draft, and its labeled
+ * examples when asked, as the requesting user, without a figure or a model
+ * call.
+ * @summary Preview the prompts an AI evaluation of a task would send
+ */
+const getTaskEvaluationPrompts = (
+    taskName: string,
+    params?: GetTaskEvaluationPromptsParams,
+ options?: SecondParameter<typeof qdashRequest<EvaluationPromptPreviewResponse>>,) => {
+      return qdashRequest<EvaluationPromptPreviewResponse>(
+      {url: `/tasks/${taskName}/evaluation-prompts`, method: 'GET',
+        params
     },
       options);
     }
@@ -2764,62 +2808,6 @@ const getTimeseriesTaskResults = (
     }
 
 /**
- * Return bulk AI review runs for run-oriented browsing.
- * @summary List bulk AI review runs
- */
-const listTaskResultAiReviewRuns = (
-    params?: ListTaskResultAiReviewRunsParams,
- options?: SecondParameter<typeof qdashRequest<AiReviewRunListResponse>>,) => {
-      return qdashRequest<AiReviewRunListResponse>(
-      {url: `/task-results/ai-review/runs`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * Return one bulk AI review run and its task-result review rows.
- * @summary Get one bulk AI review run
- */
-const getTaskResultAiReviewRun = (
-    reviewRunId: string,
- options?: SecondParameter<typeof qdashRequest<AiReviewRunDetailResponse>>,) => {
-      return qdashRequest<AiReviewRunDetailResponse>(
-      {url: `/task-results/ai-review/runs/${reviewRunId}`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Return task-result AI reviews for review queue style browsing.
- * @summary List task-result AI reviews
- */
-const listTaskResultAiReviews = (
-    params?: ListTaskResultAiReviewsParams,
- options?: SecondParameter<typeof qdashRequest<AiReviewListResponse>>,) => {
-      return qdashRequest<AiReviewListResponse>(
-      {url: `/task-results/ai-review`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * Enqueue AI review for the current latest task result per entity.
- * @summary Request bulk AI review for latest task results
- */
-const requestBulkAiReview = (
-    bulkAiReviewRequest: BulkAiReviewRequest,
- options?: SecondParameter<typeof qdashRequest<BulkAiReviewResponse>>,) => {
-      return qdashRequest<BulkAiReviewResponse>(
-      {url: `/task-results/ai-review/bulk`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: bulkAiReviewRequest
-    },
-      options);
-    }
-
-/**
  * Re-execute a single task using the system single-task-executor deployment.
  *
  * Looks up the TaskResultHistoryDocument to extract task_name, qid, chip_id,
@@ -2911,6 +2899,185 @@ const downloadFiguresAsZip = (
     }
 
 /**
+ * Queue the latest evaluable result of a task for every entity on a chip.
+ *
+ * The evaluations run in the background as the requesting user; poll the run
+ * for progress. Entities without an evaluable result are reported as skipped.
+ * With `knowledge_draft_id` the run reads that uploaded draft instead of the
+ * task's shared knowledge.
+ * @summary Start a bulk calibration evaluation run
+ */
+const createEvaluationRun = (
+    createEvaluationRunRequest: CreateEvaluationRunRequest,
+ options?: SecondParameter<typeof qdashRequest<CreateEvaluationRunResponse>>,) => {
+      return qdashRequest<CreateEvaluationRunResponse>(
+      {url: `/evaluations/runs`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createEvaluationRunRequest
+    },
+      options);
+    }
+
+/**
+ * List runs of the project, newest first.
+ * @summary List calibration evaluation runs
+ */
+const listEvaluationRuns = (
+    params?: ListEvaluationRunsParams,
+ options?: SecondParameter<typeof qdashRequest<ListEvaluationRunsResponse>>,) => {
+      return qdashRequest<ListEvaluationRunsResponse>(
+      {url: `/evaluations/runs`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * One run with every evaluation, including what the model saw and answered.
+ * @summary Get a calibration evaluation run
+ */
+const getEvaluationRun = (
+    runId: string,
+ options?: SecondParameter<typeof qdashRequest<EvaluationRunDetailResponse>>,) => {
+      return qdashRequest<EvaluationRunDetailResponse>(
+      {url: `/evaluations/runs/${runId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Reset failed, interrupted or cancelled items and execute them again.
+ * @summary Retry unfinished calibration evaluations
+ */
+const retryEvaluationRun = (
+    runId: string,
+ options?: SecondParameter<typeof qdashRequest<RetryEvaluationRunResponse>>,) => {
+      return qdashRequest<RetryEvaluationRunResponse>(
+      {url: `/evaluations/runs/${runId}/retry`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Cancel evaluations in this run that have not completed.
+ * @summary Cancel a calibration evaluation run
+ */
+const cancelEvaluationRun = (
+    runId: string,
+ options?: SecondParameter<typeof qdashRequest<EvaluationRunSummary>>,) => {
+      return qdashRequest<EvaluationRunSummary>(
+      {url: `/evaluations/runs/${runId}/cancel`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Every evaluation of one task result across runs, newest first.
+ * @summary List evaluations of a task result
+ */
+const listEvaluations = (
+    params: ListEvaluationsParams,
+ options?: SecondParameter<typeof qdashRequest<ListEvaluationsResponse>>,) => {
+      return qdashRequest<ListEvaluationsResponse>(
+      {url: `/evaluations`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Record whether a person agrees with an evaluation; null agree and no note clears it.
+ * @summary Judge a calibration evaluation
+ */
+const setEvaluationVerdict = (
+    evaluationId: string,
+    setEvaluationVerdictRequest: SetEvaluationVerdictRequest,
+ options?: SecondParameter<typeof qdashRequest<EvaluationItem>>,) => {
+      return qdashRequest<EvaluationItem>(
+      {url: `/evaluations/${evaluationId}/verdict`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: setEvaluationVerdictRequest
+    },
+      options);
+    }
+
+/**
+ * The exact image bytes supplied to the model for this evaluation.
+ * @summary Get a snapshotted evaluation figure
+ */
+const getEvaluationFigure = (
+    evaluationId: string,
+    sha256: string,
+ options?: SecondParameter<typeof qdashRequest<void>>,) => {
+      return qdashRequest<void>(
+      {url: `/evaluations/${evaluationId}/figures/${sha256}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Store one task's knowledge directory, zipped, as a draft of the project.
+ *
+ * The draft is parsed by the knowledge repository's own generator and is
+ * read only by the evaluation runs and prompt previews that name it; the
+ * shared knowledge does not change. Uploading the same zip again returns
+ * the stored draft.
+ * @summary Upload a task-knowledge draft to evaluate against
+ */
+const createKnowledgeDraft = (
+    bodyCreateKnowledgeDraft: BodyCreateKnowledgeDraft,
+ options?: SecondParameter<typeof qdashRequest<KnowledgeDraftResponse>>,) => {const formData = new FormData();
+formData.append(`file`, bodyCreateKnowledgeDraft.file);
+
+      return qdashRequest<KnowledgeDraftResponse>(
+      {url: `/evaluations/knowledge-drafts`, method: 'POST',
+      headers: {'Content-Type': 'multipart/form-data', },
+       data: formData
+    },
+      options);
+    }
+
+/**
+ * The draft's task, uploader, generator warnings and derived reference.
+ * @summary Get a task-knowledge draft
+ */
+const getKnowledgeDraft = (
+    draftId: string,
+ options?: SecondParameter<typeof qdashRequest<KnowledgeDraftResponse>>,) => {
+      return qdashRequest<KnowledgeDraftResponse>(
+      {url: `/evaluations/knowledge-drafts/${draftId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * The draft in the shape of `GET /tasks/{name}/knowledge`, for the Agent Runtime.
+ * @summary Get a task-knowledge draft as task knowledge
+ */
+const getKnowledgeDraftKnowledge = (
+    draftId: string,
+ options?: SecondParameter<typeof qdashRequest<TaskKnowledgeResponse>>,) => {
+      return qdashRequest<TaskKnowledgeResponse>(
+      {url: `/evaluations/knowledge-drafts/${draftId}/knowledge`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * The uploaded zip, byte for byte, so the knowledge a run read can be reused.
+ * @summary Download the zip a task-knowledge draft was uploaded as
+ */
+const downloadKnowledgeDraftArchive = (
+    draftId: string,
+ options?: SecondParameter<typeof qdashRequest<Blob>>,) => {
+      return qdashRequest<Blob>(
+      {url: `/evaluations/knowledge-drafts/${draftId}/archive`, method: 'GET',
+        responseType: 'blob'
+    },
+      options);
+    }
+
+/**
  * List forum categories for the active project.
  * @summary List forum categories
  */
@@ -2964,6 +3131,63 @@ const deleteForumCategory = (
  options?: SecondParameter<typeof qdashRequest<SuccessResponse>>,) => {
       return qdashRequest<SuccessResponse>(
       {url: `/forum/categories/${categoryKey}`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
+ * List forum labels for the active project.
+ * @summary List forum labels
+ */
+const listForumLabels = (
+
+ options?: SecondParameter<typeof qdashRequest<ListForumLabelsResponse>>,) => {
+      return qdashRequest<ListForumLabelsResponse>(
+      {url: `/forum/labels`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Create a forum label. Only project owners and editors can manage labels; the key is server-generated.
+ * @summary Create a forum label
+ */
+const createForumLabel = (
+    forumLabelCreate: ForumLabelCreate,
+ options?: SecondParameter<typeof qdashRequest<ForumLabelResponse>>,) => {
+      return qdashRequest<ForumLabelResponse>(
+      {url: `/forum/labels`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: forumLabelCreate
+    },
+      options);
+    }
+
+/**
+ * Update a forum label. Only project owners and editors can manage labels.
+ * @summary Update a forum label
+ */
+const updateForumLabel = (
+    labelKey: string,
+    forumLabelUpdate: ForumLabelUpdate,
+ options?: SecondParameter<typeof qdashRequest<ForumLabelResponse>>,) => {
+      return qdashRequest<ForumLabelResponse>(
+      {url: `/forum/labels/${labelKey}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: forumLabelUpdate
+    },
+      options);
+    }
+
+/**
+ * Delete a forum label. Only project owners and editors can manage labels.
+ * @summary Delete a forum label
+ */
+const deleteForumLabel = (
+    labelKey: string,
+ options?: SecondParameter<typeof qdashRequest<SuccessResponse>>,) => {
+      return qdashRequest<SuccessResponse>(
+      {url: `/forum/labels/${labelKey}`, method: 'DELETE'
     },
       options);
     }
@@ -3093,225 +3317,6 @@ const reopenForumPost = (
  options?: SecondParameter<typeof qdashRequest<SuccessResponse>>,) => {
       return qdashRequest<SuccessResponse>(
       {url: `/forum/posts/${postId}/reopen`, method: 'PATCH'
-    },
-      options);
-    }
-
-/**
- * List all root issues across the project, with reply counts.
- * @summary List all issues across tasks
- */
-const listIssues = (
-    params?: ListIssuesParams,
- options?: SecondParameter<typeof qdashRequest<ListIssuesResponse>>,) => {
-      return qdashRequest<ListIssuesResponse>(
-      {url: `/issues`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * Get a single root issue by its ID, including reply count.
- * @summary Get a single issue by ID
- */
-const getIssue = (
-    issueId: string,
- options?: SecondParameter<typeof qdashRequest<IssueResponse>>,) => {
-      return qdashRequest<IssueResponse>(
-      {url: `/issues/${issueId}`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Delete an issue. Only the author can delete their own issue.
- * @summary Delete an issue
- */
-const deleteIssue = (
-    issueId: string,
- options?: SecondParameter<typeof qdashRequest<SuccessResponse>>,) => {
-      return qdashRequest<SuccessResponse>(
-      {url: `/issues/${issueId}`, method: 'DELETE'
-    },
-      options);
-    }
-
-/**
- * Update an issue's content (and title for root issues). Only the author can edit.
- * @summary Update an issue
- */
-const updateIssue = (
-    issueId: string,
-    issueUpdate: IssueUpdate,
- options?: SecondParameter<typeof qdashRequest<IssueResponse>>,) => {
-      return qdashRequest<IssueResponse>(
-      {url: `/issues/${issueId}`, method: 'PATCH',
-      headers: {'Content-Type': 'application/json', },
-      data: issueUpdate
-    },
-      options);
-    }
-
-/**
- * List all replies to a specific issue, sorted by creation time ascending.
- * @summary List replies for an issue
- */
-const getIssueReplies = (
-    issueId: string,
- options?: SecondParameter<typeof qdashRequest<IssueResponse[]>>,) => {
-      return qdashRequest<IssueResponse[]>(
-      {url: `/issues/${issueId}/replies`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Close an issue thread. Only the author or project owner can close.
- * @summary Close an issue
- */
-const closeIssue = (
-    issueId: string,
- options?: SecondParameter<typeof qdashRequest<SuccessResponse>>,) => {
-      return qdashRequest<SuccessResponse>(
-      {url: `/issues/${issueId}/close`, method: 'PATCH'
-    },
-      options);
-    }
-
-/**
- * Reopen a closed issue thread. Only the author or project owner can reopen.
- * @summary Reopen an issue
- */
-const reopenIssue = (
-    issueId: string,
- options?: SecondParameter<typeof qdashRequest<SuccessResponse>>,) => {
-      return qdashRequest<SuccessResponse>(
-      {url: `/issues/${issueId}/reopen`, method: 'PATCH'
-    },
-      options);
-    }
-
-/**
- * List all issues for a task result, sorted by creation time ascending.
- * @summary List issues for a task result
- */
-const getTaskResultIssues = (
-    taskId: string,
- options?: SecondParameter<typeof qdashRequest<IssueResponse[]>>,) => {
-      return qdashRequest<IssueResponse[]>(
-      {url: `/task-results/${taskId}/issues`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Create a new issue on a task result.
- * @summary Create an issue on a task result
- */
-const createIssue = (
-    taskId: string,
-    issueCreate: IssueCreate,
- options?: SecondParameter<typeof qdashRequest<IssueResponse>>,) => {
-      return qdashRequest<IssueResponse>(
-      {url: `/task-results/${taskId}/issues`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: issueCreate
-    },
-      options);
-    }
-
-/**
- * List issue-derived knowledge cases with optional filters.
- * @summary List knowledge cases
- */
-const listIssueKnowledge = (
-    params?: ListIssueKnowledgeParams,
- options?: SecondParameter<typeof qdashRequest<ListIssueKnowledgeResponse>>,) => {
-      return qdashRequest<ListIssueKnowledgeResponse>(
-      {url: `/issue-knowledge`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * Get a single knowledge case by ID.
- * @summary Get a knowledge case
- */
-const getIssueKnowledge = (
-    knowledgeId: string,
- options?: SecondParameter<typeof qdashRequest<IssueKnowledgeResponse>>,) => {
-      return qdashRequest<IssueKnowledgeResponse>(
-      {url: `/issue-knowledge/${knowledgeId}`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Update a knowledge draft's content. Only drafts can be edited.
- * @summary Update a knowledge draft
- */
-const updateIssueKnowledge = (
-    knowledgeId: string,
-    issueKnowledgeUpdate: IssueKnowledgeUpdate,
- options?: SecondParameter<typeof qdashRequest<IssueKnowledgeResponse>>,) => {
-      return qdashRequest<IssueKnowledgeResponse>(
-      {url: `/issue-knowledge/${knowledgeId}`, method: 'PATCH',
-      headers: {'Content-Type': 'application/json', },
-      data: issueKnowledgeUpdate
-    },
-      options);
-    }
-
-/**
- * Delete a knowledge case.
- * @summary Delete a knowledge case
- */
-const deleteIssueKnowledge = (
-    knowledgeId: string,
- options?: SecondParameter<typeof qdashRequest<SuccessResponse>>,) => {
-      return qdashRequest<SuccessResponse>(
-      {url: `/issue-knowledge/${knowledgeId}`, method: 'DELETE'
-    },
-      options);
-    }
-
-/**
- * Generate an AI knowledge draft from a closed issue thread.
- * @summary Generate knowledge draft from issue
- */
-const extractIssueKnowledge = (
-    issueId: string,
- options?: SecondParameter<typeof qdashRequest<IssueKnowledgeResponse>>,) => {
-      return qdashRequest<IssueKnowledgeResponse>(
-      {url: `/issues/${issueId}/extract-knowledge`, method: 'POST'
-    },
-      options);
-    }
-
-/**
- * Approve a knowledge draft for inclusion in task knowledge.
- * @summary Approve a knowledge draft
- */
-const approveIssueKnowledge = (
-    knowledgeId: string,
- options?: SecondParameter<typeof qdashRequest<IssueKnowledgeResponse>>,) => {
-      return qdashRequest<IssueKnowledgeResponse>(
-      {url: `/issue-knowledge/${knowledgeId}/approve`, method: 'PATCH'
-    },
-      options);
-    }
-
-/**
- * Reject a knowledge draft.
- * @summary Reject a knowledge draft
- */
-const rejectIssueKnowledge = (
-    knowledgeId: string,
- options?: SecondParameter<typeof qdashRequest<IssueKnowledgeResponse>>,) => {
-      return qdashRequest<IssueKnowledgeResponse>(
-      {url: `/issue-knowledge/${knowledgeId}/reject`, method: 'PATCH'
     },
       options);
     }
@@ -3548,6 +3553,22 @@ const executeFlow = (
       {url: `/flows/${name}/execute`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: executeFlowRequest
+    },
+      options);
+    }
+
+/**
+ * Change the folder a Flow is filed under; its code and deployment are untouched.
+ * @summary Move a flow to another folder
+ */
+const moveFlow = (
+    name: string,
+    moveFlowRequest: MoveFlowRequest,
+ options?: SecondParameter<typeof qdashRequest<MoveFlowResponse>>,) => {
+      return qdashRequest<MoveFlowResponse>(
+      {url: `/flows/${name}/folder`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: moveFlowRequest
     },
       options);
     }
@@ -4372,25 +4393,6 @@ const getConfigAll = (
     }
 
 /**
- * Return compact operational insights for the dashboard.
- *
- * The first implementation is deterministic: it extracts high-signal patterns
- * from persisted AI review notes and task-result metadata. A later LLM
- * synthesis layer can consume the same structured candidate contract.
- * @summary Generate dashboard-level AI insight candidates
- */
-const getDashboardAiInsights = (
-    chipId: string,
-    params?: GetDashboardAiInsightsParams,
- options?: SecondParameter<typeof qdashRequest<DashboardAiInsightsResponse>>,) => {
-      return qdashRequest<DashboardAiInsightsResponse>(
-      {url: `/dashboard/chips/${chipId}/ai-insights`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
  * Get a specific parameter version by entity ID.
  *
  * Parameters
@@ -4733,7 +4735,7 @@ const getRecalibrationRecommendations = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,getSystemUpdateStatus,startSystemUpdate,getSystemUpdateOperation,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCampaignCandidates,getAgentCampaignCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,getManualEdits,getCopilotConfig,analyzeCopilot,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,getSettings,listChips,createChip,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,listTaskResultAiReviewRuns,getTaskResultAiReviewRun,listTaskResultAiReviews,requestBulkAiReview,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listIssues,getIssue,deleteIssue,updateIssue,getIssueReplies,closeIssue,reopenIssue,getTaskResultIssues,createIssue,listIssueKnowledge,getIssueKnowledge,updateIssueKnowledge,deleteIssueKnowledge,extractIssueKnowledge,approveIssueKnowledge,rejectIssueKnowledge,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,executeFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getDashboardAiInsights,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCampaignCandidates,getAgentCampaignCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -4741,9 +4743,6 @@ export type UpdateCurrentUserProfileResult = NonNullable<Awaited<ReturnType<Retu
 export type LogoutResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['logout']>>>
 export type ChangePasswordResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['changePassword']>>>
 export type ResetPasswordResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['resetPassword']>>>
-export type GetSystemUpdateStatusResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getSystemUpdateStatus']>>>
-export type StartSystemUpdateResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['startSystemUpdate']>>>
-export type GetSystemUpdateOperationResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getSystemUpdateOperation']>>>
 export type ReloadConfigCachesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['reloadConfigCaches']>>>
 export type ListAllUsersResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listAllUsers']>>>
 export type GetUserDetailsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getUserDetails']>>>
@@ -4780,6 +4779,7 @@ export type DownloadZipFileResult = NonNullable<Awaited<ReturnType<ReturnType<ty
 export type GetFileTreeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getFileTree']>>>
 export type GetFileContentResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getFileContent']>>>
 export type SaveFileContentResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['saveFileContent']>>>
+export type GetFileImageResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getFileImage']>>>
 export type ValidateFileContentResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['validateFileContent']>>>
 export type GetGitStatusResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getGitStatus']>>>
 export type GitPullConfigResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['gitPullConfig']>>>
@@ -4803,14 +4803,20 @@ export type ImportSeedParametersResult = NonNullable<Awaited<ReturnType<ReturnTy
 export type GetAvailableSeedParametersResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getAvailableSeedParameters']>>>
 export type CompareSeedValuesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['compareSeedValues']>>>
 export type UpdateCalibrationParametersResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateCalibrationParameters']>>>
+export type DeleteCalibrationParameterResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteCalibrationParameter']>>>
 export type GetManualEditsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getManualEdits']>>>
+export type GetCalibrationPipelineCatalogResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCalibrationPipelineCatalog']>>>
+export type ValidateCalibrationPipelineResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['validateCalibrationPipeline']>>>
+export type ExecuteCalibrationPipelineResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['executeCalibrationPipeline']>>>
 export type GetCopilotConfigResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotConfig']>>>
-export type AnalyzeCopilotResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['analyzeCopilot']>>>
 export type ListCopilotChatSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCopilotChatSessions']>>>
 export type CreateCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createCopilotChatSession']>>>
 export type GetCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotChatSession']>>>
 export type UpdateCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateCopilotChatSession']>>>
 export type DeleteCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteCopilotChatSession']>>>
+export type GetCopilotPreferencesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotPreferences']>>>
+export type UpdateCopilotPreferencesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateCopilotPreferences']>>>
+export type GetCopilotSystemPromptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotSystemPrompt']>>>
 export type GetSettingsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getSettings']>>>
 export type ListChipsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listChips']>>>
 export type CreateChipResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createChip']>>>
@@ -4837,6 +4843,8 @@ export type QuickRunTaskResult = NonNullable<Awaited<ReturnType<ReturnType<typeo
 export type GetTaskResultResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTaskResult']>>>
 export type ListTaskKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTaskKnowledge']>>>
 export type GetTaskKnowledgeMarkdownResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTaskKnowledgeMarkdown']>>>
+export type DownloadTaskKnowledgeArchiveResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['downloadTaskKnowledgeArchive']>>>
+export type GetTaskEvaluationPromptsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTaskEvaluationPrompts']>>>
 export type GetTaskKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTaskKnowledge']>>>
 export type GetTaskFileSettingsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTaskFileSettings']>>>
 export type ListTaskFileBackendsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTaskFileBackends']>>>
@@ -4850,17 +4858,29 @@ export type GetLatestCouplingTaskResultsResult = NonNullable<Awaited<ReturnType<
 export type GetHistoricalCouplingTaskResultsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getHistoricalCouplingTaskResults']>>>
 export type GetCouplingTaskHistoryResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCouplingTaskHistory']>>>
 export type GetTimeseriesTaskResultsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTimeseriesTaskResults']>>>
-export type ListTaskResultAiReviewRunsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTaskResultAiReviewRuns']>>>
-export type GetTaskResultAiReviewRunResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTaskResultAiReviewRun']>>>
-export type ListTaskResultAiReviewsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTaskResultAiReviews']>>>
-export type RequestBulkAiReviewResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['requestBulkAiReview']>>>
 export type ReExecuteTaskResultResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['reExecuteTaskResult']>>>
 export type SetTaskResultExcludedResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['setTaskResultExcluded']>>>
 export type DownloadFiguresAsZipResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['downloadFiguresAsZip']>>>
+export type CreateEvaluationRunResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createEvaluationRun']>>>
+export type ListEvaluationRunsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listEvaluationRuns']>>>
+export type GetEvaluationRunResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getEvaluationRun']>>>
+export type RetryEvaluationRunResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['retryEvaluationRun']>>>
+export type CancelEvaluationRunResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['cancelEvaluationRun']>>>
+export type ListEvaluationsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listEvaluations']>>>
+export type SetEvaluationVerdictResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['setEvaluationVerdict']>>>
+export type GetEvaluationFigureResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getEvaluationFigure']>>>
+export type CreateKnowledgeDraftResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createKnowledgeDraft']>>>
+export type GetKnowledgeDraftResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getKnowledgeDraft']>>>
+export type GetKnowledgeDraftKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getKnowledgeDraftKnowledge']>>>
+export type DownloadKnowledgeDraftArchiveResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['downloadKnowledgeDraftArchive']>>>
 export type ListForumCategoriesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listForumCategories']>>>
 export type CreateForumCategoryResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createForumCategory']>>>
 export type UpdateForumCategoryResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateForumCategory']>>>
 export type DeleteForumCategoryResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteForumCategory']>>>
+export type ListForumLabelsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listForumLabels']>>>
+export type CreateForumLabelResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createForumLabel']>>>
+export type UpdateForumLabelResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateForumLabel']>>>
+export type DeleteForumLabelResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteForumLabel']>>>
 export type ListForumPostsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listForumPosts']>>>
 export type CreateForumPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createForumPost']>>>
 export type GetForumPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getForumPost']>>>
@@ -4870,22 +4890,6 @@ export type GetForumPostRepliesResult = NonNullable<Awaited<ReturnType<ReturnTyp
 export type UploadForumImageResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['uploadForumImage']>>>
 export type CloseForumPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['closeForumPost']>>>
 export type ReopenForumPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['reopenForumPost']>>>
-export type ListIssuesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listIssues']>>>
-export type GetIssueResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getIssue']>>>
-export type DeleteIssueResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteIssue']>>>
-export type UpdateIssueResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateIssue']>>>
-export type GetIssueRepliesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getIssueReplies']>>>
-export type CloseIssueResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['closeIssue']>>>
-export type ReopenIssueResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['reopenIssue']>>>
-export type GetTaskResultIssuesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTaskResultIssues']>>>
-export type CreateIssueResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createIssue']>>>
-export type ListIssueKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listIssueKnowledge']>>>
-export type GetIssueKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getIssueKnowledge']>>>
-export type UpdateIssueKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateIssueKnowledge']>>>
-export type DeleteIssueKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteIssueKnowledge']>>>
-export type ExtractIssueKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['extractIssueKnowledge']>>>
-export type ApproveIssueKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['approveIssueKnowledge']>>>
-export type RejectIssueKnowledgeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['rejectIssueKnowledge']>>>
 export type ListTagsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTags']>>>
 export type GetDeviceTopologyResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getDeviceTopology']>>>
 export type GetDeviceTopologyPlotResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getDeviceTopologyPlot']>>>
@@ -4902,6 +4906,7 @@ export type UpdateFlowScheduleResult = NonNullable<Awaited<ReturnType<ReturnType
 export type GetFlowResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getFlow']>>>
 export type DeleteFlowResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteFlow']>>>
 export type ExecuteFlowResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['executeFlow']>>>
+export type MoveFlowResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['moveFlow']>>>
 export type ScheduleFlowResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['scheduleFlow']>>>
 export type ListFlowSchedulesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listFlowSchedules']>>>
 export type GetMetricsConfigResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getMetricsConfig']>>>
@@ -4951,7 +4956,6 @@ export type ListCooldownWiringEventsResult = NonNullable<Awaited<ReturnType<Retu
 export type ListTopologiesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTopologies']>>>
 export type GetTopologyByIdResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTopologyById']>>>
 export type GetConfigAllResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getConfigAll']>>>
-export type GetDashboardAiInsightsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getDashboardAiInsights']>>>
 export type GetProvenanceEntityResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getProvenanceEntity']>>>
 export type GetProvenanceLineageResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getProvenanceLineage']>>>
 export type GetProvenanceImpactResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getProvenanceImpact']>>>

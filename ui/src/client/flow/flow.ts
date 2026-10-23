@@ -37,6 +37,8 @@ import type {
   ListFlowSchedulesParams,
   ListFlowSchedulesResponse,
   ListFlowsResponse,
+  MoveFlowRequest,
+  MoveFlowResponse,
   SaveFlowRequest,
   SaveFlowResponse,
   ScheduleFlowRequest,
@@ -1041,6 +1043,72 @@ export const useExecuteFlow = <TError = HTTPValidationError,
         TContext
       > => {
       return useMutation(getExecuteFlowMutationOptions(options), queryClient);
+    }
+    /**
+ * Change the folder a Flow is filed under; its code and deployment are untouched.
+ * @summary Move a flow to another folder
+ */
+export const moveFlow = (
+    name: string,
+    moveFlowRequest: MoveFlowRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<MoveFlowResponse>(
+      {url: `/flows/${name}/folder`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: moveFlowRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getMoveFlowMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof moveFlow>>, TError,{name: string;data: MoveFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof moveFlow>>, TError,{name: string;data: MoveFlowRequest}, TContext> => {
+
+const mutationKey = ['moveFlow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof moveFlow>>, {name: string;data: MoveFlowRequest}> = (props) => {
+          const {name,data} = props ?? {};
+
+          return  moveFlow(name,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MoveFlowMutationResult = NonNullable<Awaited<ReturnType<typeof moveFlow>>>
+    export type MoveFlowMutationBody = MoveFlowRequest
+    export type MoveFlowMutationError = HTTPValidationError
+
+    /**
+ * @summary Move a flow to another folder
+ */
+export const useMoveFlow = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof moveFlow>>, TError,{name: string;data: MoveFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof moveFlow>>,
+        TError,
+        {name: string;data: MoveFlowRequest},
+        TContext
+      > => {
+      return useMutation(getMoveFlowMutationOptions(options), queryClient);
     }
     /**
  * Schedule a Flow execution with cron or one-time schedule.

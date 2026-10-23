@@ -28,6 +28,7 @@ import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import type { MentionCandidate } from "@/components/ui/MarkdownEditor";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useMetricsUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
@@ -59,27 +60,17 @@ const SUMMARY_TOPOLOGY_HEADER_CLASS = "flex flex-wrap items-center justify-betwe
 const MIGRATED_METRIC_NOTES_TO_LATEST_CD_MARKER =
   "<!-- qdash:migrated-metric-notes-to-latest-cooldown -->";
 
-const FORUM_LABEL_PRIORITY = [
-  "anomaly",
-  "review",
-  "discussion",
-  "mtg",
-  "info",
-  "resolved",
-] as const;
-
-function representativeForumLabel(labels: string[] | undefined): string {
-  const values = new Set(labels ?? []);
-  const label = FORUM_LABEL_PRIORITY.find((item) => values.has(item));
-  if (label === "discussion" || label === "mtg" || label === "info" || label === "resolved") {
-    return "review";
-  }
-  return label ?? "review";
+/** Picks the first label as the marker label, or null when the post has no labels. */
+function representativeForumLabel(labels: string[] | undefined): string | null {
+  return labels?.[0] ?? null;
 }
 
-function mergeForumMarkerLabel(current: string | undefined, labels: string[] | undefined): string {
-  const next = representativeForumLabel(labels);
-  return current === "anomaly" || next === "anomaly" ? "anomaly" : next;
+/** Merges marker labels for a target so the first label found wins and null means a label-less post. */
+function mergeForumMarkerLabel(
+  current: string | null | undefined,
+  labels: string[] | undefined,
+): string | null {
+  return current ?? representativeForumLabel(labels);
 }
 
 function coverageOf(
@@ -320,9 +311,10 @@ export function DashboardPageContent() {
     },
     { query: { enabled: !!selectedChip, staleTime: 30_000 } },
   );
+  const { labels: forumLabels } = useForumLabels();
 
   const forumLinkedQids = useMemo(() => {
-    const targets: Record<string, string> = {};
+    const targets: Record<string, string | null> = {};
     (forumPostsResponse?.data.posts ?? []).forEach((post) => {
       if (post.target_type === "qubit" && post.target_id) {
         targets[post.target_id] = mergeForumMarkerLabel(targets[post.target_id], post.labels);
@@ -332,7 +324,7 @@ export function DashboardPageContent() {
   }, [forumPostsResponse?.data.posts]);
 
   const forumLinkedCouplings = useMemo(() => {
-    const targets: Record<string, string> = {};
+    const targets: Record<string, string | null> = {};
     (forumPostsResponse?.data.posts ?? []).forEach((post) => {
       if (post.target_type === "coupling" && post.target_id) {
         targets[post.target_id] = mergeForumMarkerLabel(targets[post.target_id], post.labels);
@@ -723,6 +715,7 @@ export function DashboardPageContent() {
                         presentation="summary"
                         targetNotedQids={targetNotedQids}
                         forumLinkedQids={forumLinkedQids}
+                        forumLabels={forumLabels}
                         forumLinksByTarget={forumLinksByTarget}
                         notesByTarget={notesByTarget}
                         targetNotesByTarget={targetNotesByTarget}
@@ -765,6 +758,7 @@ export function DashboardPageContent() {
                         reverseDirection={isReverseCouplingDirection}
                         targetNotedTargets={targetNotedCouplings}
                         forumLinkedTargets={forumLinkedCouplings}
+                        forumLabels={forumLabels}
                         forumLinksByTarget={forumLinksByTarget}
                         notesByTarget={notesByTarget}
                         targetNotesByTarget={targetNotesByTarget}
@@ -887,6 +881,7 @@ export function DashboardPageContent() {
                               notedQids={noted}
                               targetNotedQids={targetNotedQids}
                               forumLinkedQids={forumLinkedQids}
+                              forumLabels={forumLabels}
                               forumLinksByTarget={forumLinksByTarget}
                               crossMetricNotedQids={crossMetricNoted}
                               notesByTarget={notesByTarget}
@@ -913,6 +908,7 @@ export function DashboardPageContent() {
                                 notedQids={noted}
                                 targetNotedQids={targetNotedQids}
                                 forumLinkedQids={forumLinkedQids}
+                                forumLabels={forumLabels}
                                 forumLinksByTarget={forumLinksByTarget}
                                 crossMetricNotedQids={crossMetricNoted}
                                 notesByTarget={notesByTarget}
@@ -1045,6 +1041,7 @@ export function DashboardPageContent() {
                               notedTargets={noted}
                               targetNotedTargets={targetNotedCouplings}
                               forumLinkedTargets={forumLinkedCouplings}
+                              forumLabels={forumLabels}
                               forumLinksByTarget={forumLinksByTarget}
                               crossMetricNotedTargets={crossMetricNoted}
                               notesByTarget={notesByTarget}
@@ -1072,6 +1069,7 @@ export function DashboardPageContent() {
                                 notedTargets={noted}
                                 targetNotedTargets={targetNotedCouplings}
                                 forumLinkedTargets={forumLinkedCouplings}
+                                forumLabels={forumLabels}
                                 forumLinksByTarget={forumLinksByTarget}
                                 crossMetricNotedTargets={crossMetricNoted}
                                 notesByTarget={notesByTarget}
