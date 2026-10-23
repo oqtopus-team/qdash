@@ -12,6 +12,23 @@ from qdash.common.config.path_resolver import (
     resolve_workflow_path,
     to_container_user_flow_path,
 )
+from qdash.config import Settings
+
+
+def _set_public_origin(monkeypatch: pytest.MonkeyPatch, client_url: str) -> None:
+    """Configure the flow service with a test public origin."""
+    settings = Settings.model_validate(
+        {
+            "env": "test",
+            "client_url": client_url,
+            "ui_port": 5714,
+            "prefect_api_url": "http://prefect.example.test/api",
+            "postgres_data_path": "/tmp/postgres",
+            "mongo_data_path": "/tmp/mongo",
+            "calib_data_path": "/tmp/calib",
+        }
+    )
+    monkeypatch.setattr(flow_service, "get_settings", lambda: settings)
 
 
 @pytest.mark.asyncio
@@ -182,6 +199,7 @@ async def test_execute_single_task_from_snapshot_creates_scheduled_execution(
         return "exec-1"
 
     monkeypatch.setattr(FlowService, "_create_scheduled_execution", _stub)
+    _set_public_origin(monkeypatch, "https://qdash.example.test:8443")
 
     class FakeClient:
         """Fake Prefect client that returns stub deployment and flow run objects."""
@@ -225,8 +243,10 @@ async def test_execute_single_task_from_snapshot_creates_scheduled_execution(
     assert kwargs["username"] == "operator"
     assert response.execution_id == "exec-1"
     assert response.flow_run_id == "flow-run-1"
-    assert "flow-run-1" in response.flow_run_url
-    assert response.qdash_ui_url.endswith("/execution/chip-1/exec-1")
+    assert response.flow_run_url == (
+        "https://qdash.example.test:8443/prefect/runs/flow-run/flow-run-1"
+    )
+    assert response.qdash_ui_url == ("https://qdash.example.test:8443/execution/chip-1/exec-1")
 
 
 def _make_fake_flow(
@@ -285,6 +305,7 @@ async def test_execute_flow_resolves_chip_id_from_request_parameters(
         return "exec-1"
 
     monkeypatch.setattr(FlowService, "_create_scheduled_execution", _stub)
+    _set_public_origin(monkeypatch, "https://qdash.example.test:8443/")
     monkeypatch.setattr(
         flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-2")
     )
@@ -303,8 +324,12 @@ async def test_execute_flow_resolves_chip_id_from_request_parameters(
     assert captured_calls[0]["flow_run_id"] == "flow-run-2"
     assert response.execution_id == "exec-1"
     assert response.flow_run_id == "flow-run-2"
-    assert "flow-run-2" in response.flow_run_url
-    assert response.qdash_ui_url.endswith("/execution/explicit-chip/exec-1")
+    assert response.flow_run_url == (
+        "https://qdash.example.test:8443/prefect/runs/flow-run/flow-run-2"
+    )
+    assert response.qdash_ui_url == (
+        "https://qdash.example.test:8443/execution/explicit-chip/exec-1"
+    )
 
 
 @pytest.mark.asyncio
@@ -352,6 +377,7 @@ async def test_execute_flow_falls_back_to_flow_run_id_when_execution_not_precrea
         """Simulate a failed scheduled-execution pre-creation."""
 
     monkeypatch.setattr(FlowService, "_create_scheduled_execution", _stub)
+    _set_public_origin(monkeypatch, "")
     monkeypatch.setattr(
         flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-4")
     )
@@ -368,8 +394,64 @@ async def test_execute_flow_falls_back_to_flow_run_id_when_execution_not_precrea
 
     assert response.execution_id == "flow-run-4"
     assert response.flow_run_id == "flow-run-4"
-    assert "flow-run-4" in response.flow_run_url
-    assert response.qdash_ui_url.endswith("/execution")
+    assert response.flow_run_url == "http://localhost:5714/prefect/runs/flow-run/flow-run-4"
+    assert response.qdash_ui_url == "http://localhost:5714/execution"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_and_operation_urls_use_public_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pipeline and common operation responses use the same public origin as flow runs."""
+    _set_public_origin(monkeypatch, "https://qdash.example.test:9443/")
+    monkeypatch.setattr(
+        FlowService, "_create_scheduled_execution", lambda self, **_kwargs: "exec-1"
+    )
+
+    class FakeClient:
+        """Fake Prefect client for pipeline and operation dispatch."""
+
+        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
+            """Return a stub system deployment."""
+            return SimpleNamespace(id="deployment-1")
+
+        async def create_flow_run_from_deployment(self, **_kwargs: object) -> SimpleNamespace:
+            """Return a stub flow run."""
+            return SimpleNamespace(id="flow-run-1")
+
+    class FakeClientContext:
+        """Fake async context manager providing the Prefect stub."""
+
+        async def __aenter__(self) -> FakeClient:
+            """Return the fake Prefect client."""
+            return FakeClient()
+
+        async def __aexit__(self, *_args: object) -> None:
+            """Do nothing when the client context exits."""
+
+    monkeypatch.setattr(flow_service, "get_client", FakeClientContext)
+    service = FlowService(flow_repository=MagicMock())
+
+    pipeline_response = await service.execute_calibration_pipeline(
+        spec={"name": "test-pipeline", "steps": []},
+        chip_id="chip-1",
+        username="operator",
+        project_id="project-1",
+    )
+    operation_response = await service.execute_agent_candidate_apply(
+        project_id="project-1",
+        session_id="session-1",
+        commit_id="commit-1",
+        push_to_github=False,
+    )
+
+    expected_flow_run_url = "https://qdash.example.test:9443/prefect/runs/flow-run/flow-run-1"
+    assert pipeline_response.flow_run_url == expected_flow_run_url
+    assert pipeline_response.qdash_ui_url == (
+        "https://qdash.example.test:9443/execution/chip-1/exec-1"
+    )
+    assert operation_response.flow_run_url == expected_flow_run_url
+    assert operation_response.qdash_ui_url == "https://qdash.example.test:9443/"
 
 
 @pytest.mark.asyncio

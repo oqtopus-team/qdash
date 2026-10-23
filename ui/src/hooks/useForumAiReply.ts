@@ -2,8 +2,10 @@
 
 import { useCallback, useRef, useState } from "react";
 
+import { API_BASE_URL } from "@/lib/api/base-url";
 import { buildHeaders, consumeSSEEvents } from "@/lib/sse-utils";
 
+/** Streams an AI generated reply for a forum post and exposes its progress. */
 export function useForumAiReply() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -21,8 +23,7 @@ export function useForumAiReply() {
       setError(null);
 
       try {
-        const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
-        const response = await fetch(`${baseURL}/forum/posts/${postId}/ai-reply/stream`, {
+        const response = await fetch(`${API_BASE_URL}/forum/posts/${postId}/ai-reply/stream`, {
           method: "POST",
           headers: buildHeaders(),
           body: JSON.stringify({ user_message: userMessage }),

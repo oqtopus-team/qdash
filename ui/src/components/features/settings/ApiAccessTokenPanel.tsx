@@ -5,6 +5,7 @@ import { Check, Copy, Eye, EyeOff, Info, Loader2, Play } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { API_BASE_URL } from "@/lib/api/base-url";
 
 type CurlMode = "standard" | "cloudflare";
 
@@ -16,22 +17,20 @@ type TestResult = {
 
 const TEST_PATH = "/auth/me";
 
+/** Returns the browser API path used in generated curl commands. */
 function getConfiguredApiUrl() {
-  return process.env.NEXT_PUBLIC_API_URL || "/api";
+  return API_BASE_URL;
 }
 
+/** Resolves the same-origin API path for display in the token settings panel. */
 function resolveApiUrl() {
   const normalizedApiUrl = getConfiguredApiUrl().replace(/\/$/, "");
-
-  if (/^https?:\/\//.test(normalizedApiUrl)) {
-    return normalizedApiUrl;
-  }
 
   if (typeof window !== "undefined") {
     return `${window.location.origin}${normalizedApiUrl.startsWith("/") ? "" : "/"}${normalizedApiUrl}`;
   }
 
-  return normalizedApiUrl || "http://127.0.0.1:5715";
+  return normalizedApiUrl;
 }
 
 function maskSecret(value: string) {
@@ -57,6 +56,7 @@ function formatResponseBody(responseText: string, contentType: string) {
   }
 }
 
+/** Shows the user's API token and copyable same-origin request examples. */
 export function ApiAccessTokenPanel() {
   const { accessToken } = useAuth();
   const { projectId } = useProject();

@@ -60,9 +60,11 @@ helpers over handwritten string keys.
 
 ## Shared Request Behavior
 
-`ui/src/lib/api/custom-instance.ts` chooses `/api` by default and uses
-`NEXT_PUBLIC_API_URL` when configured. Its interceptor adds the bearer token and active project
-header. Its returned promise exposes cancellation for TanStack Query.
+`ui/src/lib/api/base-url.ts` fixes browser API requests to the same-origin `/api` path;
+`NEXT_PUBLIC_API_URL` is not used. Caddy routes this prefix directly to FastAPI in the standard
+deployment. When the UI server is opened directly for development, the Next.js rewrite uses
+`INTERNAL_API_URL`. The shared Axios instance in `ui/src/lib/api/custom-instance.ts` adds the bearer
+token and active project header, and its returned promise exposes cancellation for TanStack Query.
 
 Feature code does not add those headers itself. A missing project or authorization error must be
 handled as an application state, not bypassed with another Axios instance.

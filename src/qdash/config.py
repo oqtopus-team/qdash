@@ -1,7 +1,10 @@
 from functools import lru_cache
+from urllib.parse import urlsplit
 
-from pydantic import field_validator
+from pydantic import AnyHttpUrl, TypeAdapter, ValidationError, field_validator
 from pydantic_settings import BaseSettings
+
+_HTTP_URL_ADAPTER = TypeAdapter(AnyHttpUrl)
 
 
 class Settings(BaseSettings):
@@ -31,6 +34,47 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # Timezone
     timezone: str = "Asia/Tokyo"
+
+    @field_validator("client_url", mode="before")
+    @classmethod
+    def _normalize_client_url(cls, value: object) -> str:
+        """Canonicalize CLIENT_URL as an HTTP(S) origin and trim whitespace/trailing slashes."""
+        if value is None:
+            return ""
+        if not isinstance(value, str):
+            raise ValueError("CLIENT_URL must be an HTTP(S) origin")
+        origin = value.strip().rstrip("/")
+        if not origin:
+            return ""
+        if any(character.isspace() for character in origin):
+            raise ValueError("CLIENT_URL must not contain whitespace")
+        try:
+            parsed = urlsplit(origin)
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError("CLIENT_URL must be a valid HTTP(S) origin") from exc
+        if (
+            parsed.username is not None
+            or parsed.password is not None
+            or "?" in origin
+            or "#" in origin
+            or parsed.path
+            or parsed.netloc.endswith(":")
+            or (port is not None and port < 1)
+        ):
+            raise ValueError(
+                "CLIENT_URL must contain only an HTTP(S) scheme, host, and optional port"
+            )
+        try:
+            normalized_url = _HTTP_URL_ADAPTER.validate_python(origin)
+        except ValidationError as exc:
+            raise ValueError("CLIENT_URL must be a valid HTTP(S) origin") from exc
+        return str(normalized_url).rstrip("/")
+
+    @property
+    def public_origin(self) -> str:
+        """Return the configured public origin or the local UI origin as a fallback."""
+        return self.client_url or f"http://localhost:{self.ui_port}"
 
     @field_validator("slack_forum_notification", mode="before")
     @classmethod

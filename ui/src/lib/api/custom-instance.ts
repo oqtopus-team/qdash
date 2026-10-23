@@ -3,11 +3,10 @@ import Axios, { AxiosHeaders } from "axios";
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
 
 import { getAccessToken, getProjectId } from "@/lib/auth/session";
+import { API_BASE_URL } from "@/lib/api/base-url";
 
 export const AXIOS_INSTANCE = Axios.create({
-  // Use /api proxy route (handled by Next.js rewrites)
-  // Falls back to direct API URL for backward compatibility
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "/api",
+  baseURL: API_BASE_URL,
 });
 
 // Add request interceptor

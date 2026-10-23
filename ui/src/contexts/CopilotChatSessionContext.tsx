@@ -10,6 +10,7 @@ import React, {
   useState,
 } from "react";
 import type { ChatThinkingLevel } from "@/lib/chatThinking";
+import { API_BASE_URL } from "@/lib/api/base-url";
 import type { ModelOverride } from "@/lib/copilotModels";
 import {
   appendArgsDelta,
@@ -92,7 +93,6 @@ interface CopilotChatSessionContextValue {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 const SESSIONS_PATH = "/copilot/chat/sessions";
 const DEFAULT_TITLE = "New Chat";
 
@@ -194,23 +194,26 @@ function summaryToSession(s: ServerSessionSummary): CopilotChatSession {
 // API helpers
 // ---------------------------------------------------------------------------
 
+/** Lists the sessions available to the current user. */
 async function apiListSessions(): Promise<ServerSessionSummary[]> {
-  const res = await fetch(`${BASE_URL}${SESSIONS_PATH}`, { headers: buildHeaders() });
+  const res = await fetch(`${API_BASE_URL}${SESSIONS_PATH}`, { headers: buildHeaders() });
   if (!res.ok) throw new Error(`Failed to list sessions: ${res.status}`);
   const data = (await res.json()) as { sessions: ServerSessionSummary[] };
   return data.sessions;
 }
 
+/** Loads one session and its messages. */
 async function apiGetSession(sessionId: string): Promise<ServerSessionDetail> {
-  const res = await fetch(`${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
+  const res = await fetch(`${API_BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
     headers: buildHeaders(),
   });
   if (!res.ok) throw new Error(`Failed to get session: ${res.status}`);
   return (await res.json()) as ServerSessionDetail;
 }
 
+/** Creates an empty persisted session before its first turn. */
 async function apiCreateSession(session: CopilotChatSession): Promise<void> {
-  const res = await fetch(`${BASE_URL}${SESSIONS_PATH}`, {
+  const res = await fetch(`${API_BASE_URL}${SESSIONS_PATH}`, {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify({
@@ -223,11 +226,12 @@ async function apiCreateSession(session: CopilotChatSession): Promise<void> {
   if (!res.ok) throw new Error(`Failed to create session: ${res.status}`);
 }
 
+/** Persists a session title or its current messages. */
 async function apiUpdateSession(
   sessionId: string,
   patch: { title?: string; messages?: ServerMessage[] },
 ): Promise<void> {
-  const res = await fetch(`${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
+  const res = await fetch(`${API_BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
     method: "PATCH",
     headers: buildHeaders(),
     body: JSON.stringify(patch),
@@ -235,8 +239,9 @@ async function apiUpdateSession(
   if (!res.ok) throw new Error(`Failed to update session: ${res.status}`);
 }
 
+/** Deletes a persisted session, treating an already missing session as deleted. */
 async function apiDeleteSession(sessionId: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
+  const res = await fetch(`${API_BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
     headers: buildHeaders(),
   });
@@ -259,7 +264,7 @@ function buildTurnRequest(
 ): { url: string; body: Record<string, unknown> } {
   const context = session?.context;
   return {
-    url: `${BASE_URL}/copilot/chat/stream`,
+    url: `${API_BASE_URL}/copilot/chat/stream`,
     body: {
       ...(approval ? { approval } : {}),
       ...(images.length ? { images } : {}),
@@ -706,7 +711,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
     controller.abort("stop");
     // Closing the stream keeps the partial answer here, but the runtime keeps
     // working on the turn until told otherwise.
-    fetch(`${BASE_URL}/copilot/chat/stop`, {
+    fetch(`${API_BASE_URL}/copilot/chat/stop`, {
       method: "POST",
       headers: buildHeaders(),
       body: JSON.stringify({ session_id: sessionId }),

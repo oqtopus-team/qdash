@@ -1,12 +1,32 @@
 name: ${ENV:-default}
 services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: always
+    environment:
+      CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-:80}
+      CADDY_BIND_ADDRESS: ${CADDY_BIND_ADDRESS:-0.0.0.0}
+      CADDY_UI_UPSTREAM: ${CADDY_UI_UPSTREAM:-ui:5714}
+      CADDY_API_UPSTREAM: ${CADDY_API_UPSTREAM:-api:${API_PORT:-5715}}
+      CADDY_PREFECT_UPSTREAM: ${CADDY_PREFECT_UPSTREAM:-prefect-server:4200}
+      CADDY_TRUSTED_PROXIES: ${CADDY_TRUSTED_PROXIES:-127.0.0.1/32 ::1/128}
+    ports:
+      - "${UI_PORT:-5714}:80"
+    volumes:
+      - ./config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - ui
+      - api
+      - prefect-server
+    networks:
+      - custom_net
   mongo:
     image: mongo
     restart: always
     env_file:
       - .env
-    ports:
-      - "${MONGO_PORT:-27017}:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -45,12 +65,12 @@ services:
     networks:
       - custom_net
   mongo-express:
+    profiles:
+      - admin
     image: mongo-express
     restart: always
     env_file:
       - .env
-    ports:
-      - "${MONGO_EXPRESS_PORT:-8081}:8081"
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -69,8 +89,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${POSTGRES_DATA_PATH:-./postgres_data}:/var/lib/postgresql/data
     healthcheck:
@@ -88,10 +106,13 @@ services:
       - .env
     entrypoint: ["/bin/bash", "-c"]
     command: ["prefect server start --host 0.0.0.0"]
-    ports:
-      - "${PREFECT_PORT:-4200}:4200"
     environment:
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - PREFECT_SERVER_API_BASE_PATH=/prefect/api
+      - PREFECT_SERVER_UI_SERVE_BASE=/prefect
+      - PREFECT_SERVER_UI_API_URL=/prefect/api
+      - PREFECT_SERVER_API_CSRF_PROTECTION_ENABLED=true
+      - FORWARDED_ALLOW_IPS=*
     depends_on:
       postgres:
         condition: service_healthy
@@ -122,10 +143,8 @@ services:
       - deployment-logs:/app/logs
     working_dir: /app/qdash/workflow
     command: uvicorn deployment_service:app --host 0.0.0.0 --port 8001 --reload
-    ports:
-      - "${DEPLOYMENT_SERVICE_PORT:-8001}:8001"
     environment:
-      - PREFECT_API_URL=http://prefect-server:4200/api
+      - PREFECT_API_URL=http://prefect-server:4200/prefect/api
       - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
     networks:
@@ -160,7 +179,7 @@ services:
     working_dir: /app/qdash/workflow
     command: python start_worker.py
     environment:
-      - PREFECT_API_URL=http://prefect-server:4200/api
+      - PREFECT_API_URL=http://prefect-server:4200/prefect/api
       - PREFECT_LOGGING_SETTINGS_PATH=/app/config/app/logging/prefect.yaml
       - PYTHONPATH=/app:/app/qdash:/app/qdash/workflow:/app/qdash/dbmodel
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
@@ -173,8 +192,6 @@ services:
     restart: always
     env_file:
       - .env
-    ports:
-      - "${API_PORT:-5715}:${API_PORT:-5715}"
     volumes:
       - ./src/qdash/api:/app/qdash/api
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (used by reanalysis service)
@@ -212,7 +229,8 @@ services:
     environment:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/api:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
       - CALIB_DATA_PATH=/app/calib_data
-      - PREFECT_API_URL=http://prefect-server:4200/api
+      - PREFECT_API_URL=http://prefect-server:4200/prefect/api
+      - FORWARDED_ALLOW_IPS=*
       - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
       - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
@@ -323,19 +341,15 @@ services:
       context: .
       dockerfile: ./ui/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_ENV: ${ENV}
         NEXT_PUBLIC_DEFAULT_THEME: ${NEXT_PUBLIC_DEFAULT_THEME:-light}
-        NEXT_PUBLIC_PREFECT_URL: ${NEXT_PUBLIC_PREFECT_URL}
         INTERNAL_API_URL: http://api:${API_PORT:-5715}
         NEXT_PUBLIC_COPILOT_ENABLED: ${NEXT_PUBLIC_COPILOT_ENABLED:-}
     restart: always
     env_file:
       - .env
     environment:
-      - PORT=${UI_PORT:-5714}
-    ports:
-      - "${UI_PORT:-5714}:${UI_PORT:-5714}"
+      - PORT=5714
     depends_on:
       - api
     networks:
@@ -357,6 +371,8 @@ networks:
   custom_net:
     external: false
 volumes:
+  caddy-data:
+  caddy-config:
   deployment-logs:
   worker-logs:
   api-logs:

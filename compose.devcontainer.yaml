@@ -1,6 +1,8 @@
 name: ${ENV:-default}
 services:
   devcontainer:
+    ports:
+      - "127.0.0.1:${UI_PORT:-5714}:${UI_PORT:-5714}"
     security_opt:
       - seccomp=unconfined
       - apparmor=unconfined
@@ -31,6 +33,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /workspace/qdash/ui/node_modules
     environment:
+      - QDASH_DEV_CONTAINER=1
       - PYTHONPATH=/workspace/qdash/src
       - RUFF_CACHE_DIR=/home/vscode/.cache/ruff
       - MYPY_CACHE_DIR=/home/vscode/.cache/mypy

@@ -452,9 +452,7 @@ class FlowService:
                 )
 
                 flow_run_id = str(flow_run.id)
-                flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
-                )
+                flow_run_url = f"{settings.public_origin}/prefect/runs/flow-run/{flow_run_id}"
 
                 logger.info(f"Flow run created: {flow_run_id}")
         except Exception as e:
@@ -473,7 +471,7 @@ class FlowService:
         )
         if qdash_execution_id is None:
             self._release_execution_lock(project_id, claimed_execution_id)
-        qdash_ui_url = self._build_qdash_ui_url(settings.ui_port, chip_id, qdash_execution_id)
+        qdash_ui_url = self._build_qdash_ui_url(settings.public_origin, chip_id, qdash_execution_id)
 
         return ExecuteFlowResponse(
             execution_id=qdash_execution_id or flow_run_id,
@@ -591,9 +589,7 @@ class FlowService:
                 )
 
                 flow_run_id = str(flow_run.id)
-                flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
-                )
+                flow_run_url = f"{settings.public_origin}/prefect/runs/flow-run/{flow_run_id}"
 
                 logger.info(f"Single-task flow run created: {flow_run_id}")
         except Exception as e:
@@ -615,7 +611,7 @@ class FlowService:
         )
         if qdash_execution_id is None:
             self._release_execution_lock(project_id, claimed_execution_id)
-        qdash_ui_url = self._build_qdash_ui_url(settings.ui_port, chip_id, qdash_execution_id)
+        qdash_ui_url = self._build_qdash_ui_url(settings.public_origin, chip_id, qdash_execution_id)
 
         return ExecuteFlowResponse(
             execution_id=qdash_execution_id or flow_run_id,
@@ -692,9 +688,7 @@ class FlowService:
                     parameters=parameters,
                 )
                 flow_run_id = str(flow_run.id)
-                flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{flow_run_id}"
-                )
+                flow_run_url = f"{settings.public_origin}/prefect/runs/flow-run/{flow_run_id}"
                 logger.info(f"Pipeline flow run created: {flow_run_id}")
         except Exception as e:
             self._release_execution_lock(project_id, claimed_execution_id)
@@ -715,7 +709,7 @@ class FlowService:
         )
         if qdash_execution_id is None:
             self._release_execution_lock(project_id, claimed_execution_id)
-        qdash_ui_url = self._build_qdash_ui_url(settings.ui_port, chip_id, qdash_execution_id)
+        qdash_ui_url = self._build_qdash_ui_url(settings.public_origin, chip_id, qdash_execution_id)
 
         return ExecuteFlowResponse(
             execution_id=qdash_execution_id or flow_run_id,
@@ -769,8 +763,8 @@ class FlowService:
         return ExecuteFlowResponse(
             execution_id=operation_id,
             flow_run_id=operation_id,
-            flow_run_url=f"http://localhost:{settings.prefect_port}/runs/flow-run/{operation_id}",
-            qdash_ui_url=f"http://localhost:{settings.ui_port}/",
+            flow_run_url=f"{settings.public_origin}/prefect/runs/flow-run/{operation_id}",
+            qdash_ui_url=f"{settings.public_origin}/",
             message=f"Agent candidate commit '{commit_id}' queued for backend application",
         )
 
@@ -1125,13 +1119,15 @@ class FlowService:
             return None
 
     @staticmethod
-    def _build_qdash_ui_url(ui_port: int, chip_id: str | None, execution_id: str | None) -> str:
+    def _build_qdash_ui_url(
+        public_origin: str, chip_id: str | None, execution_id: str | None
+    ) -> str:
         """Build the QDash UI URL for an execution.
 
         Parameters
         ----------
-        ui_port : int
-            The port the QDash UI is served on.
+        public_origin : str
+            The public origin used to access QDash.
         chip_id : str | None
             The chip ID targeted by the execution, if known.
         execution_id : str | None
@@ -1140,12 +1136,12 @@ class FlowService:
         Returns
         -------
         str
-            ``http://localhost:{ui_port}/execution/{chip_id}/{execution_id}`` when both
-            ``chip_id`` and ``execution_id`` are known, ``http://localhost:{ui_port}/execution/{chip_id}``
-            when only ``chip_id`` is known, and ``http://localhost:{ui_port}/execution`` otherwise.
+            ``{public_origin}/execution/{chip_id}/{execution_id}`` when both ``chip_id`` and
+            ``execution_id`` are known, ``{public_origin}/execution/{chip_id}`` when only
+            ``chip_id`` is known, and ``{public_origin}/execution`` otherwise.
 
         """
-        base = f"http://localhost:{ui_port}/execution"
+        base = f"{public_origin}/execution"
         if not chip_id:
             return base
         if not execution_id:

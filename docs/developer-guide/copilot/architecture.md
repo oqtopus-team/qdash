@@ -135,7 +135,6 @@ builds its `models.json` from `chat_models` and `evaluation_models` at startup.
 | `OPENAI_API_KEY` | OpenAI API authentication |
 | `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` | OpenAI-compatible API base URL through `/v1`; the suffix is operator-defined |
 | `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` | API key for the endpoint with the matching suffix; it can be a placeholder for a keyless endpoint |
-| `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
 
 Existing deployments must rename the earlier fixed variables and add `/v1` to each base URL:
 

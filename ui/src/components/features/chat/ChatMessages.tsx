@@ -27,6 +27,7 @@ import {
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { matchesEditTarget } from "@/lib/copilotEditTarget";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
+import { API_BASE_URL } from "@/lib/api/base-url";
 import { Loader } from "@/components/ui/Loader";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
@@ -161,6 +162,7 @@ function AssessmentBadge({ assessment }: { assessment: string | null }) {
   );
 }
 
+/** Shows the figures attached to a Copilot request with a preview dialog. */
 function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"] }) {
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
 
@@ -172,19 +174,18 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
   if (experiment_figure) parts.push("実験結果画像");
   if (expected_images.length > 0) parts.push(`参照画像${expected_images.length}枚`);
 
-  const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
   const sources = [
     ...(experiment_figure
       ? experiment_figure_paths.map((fp) => ({
           key: fp,
           alt: "実験結果",
-          src: `${baseURL}/executions/figure?path=${encodeURIComponent(fp)}`,
+          src: `${API_BASE_URL}/executions/figure?path=${encodeURIComponent(fp)}`,
         }))
       : []),
     ...expected_images.map((img) => ({
       key: `expected-${img.index}`,
       alt: img.alt_text,
-      src: `${baseURL}/copilot/expected-image?task_name=${encodeURIComponent(task_name)}&index=${img.index}`,
+      src: `${API_BASE_URL}/copilot/expected-image?task_name=${encodeURIComponent(task_name)}&index=${img.index}`,
     })),
   ];
 

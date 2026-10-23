@@ -62,6 +62,19 @@ docker compose up -d --build
 `git merge --ff-only` refuses a divergent update instead of combining release code with local
 commits. Resolve the branch state before retrying; do not force the merge.
 
+If the deployment uses the HTTPS override, include the same file arguments in each Compose command
+before and after the update. Keep the release change between the stop and validation commands:
+
+```bash
+docker compose -f compose.yaml -f compose.https.yaml down
+git merge --ff-only <target-tag>
+docker compose -f compose.yaml -f compose.https.yaml config --quiet
+docker compose -f compose.yaml -f compose.https.yaml up -d --build
+```
+
+Use only overrides present in both the current and target release. Keep the `-f` list identical
+for each command in that release so Compose does not target a different stack.
+
 ## Verify the Deployment
 
 Check the containers and browser-facing services after the build finishes:
@@ -71,12 +84,14 @@ docker compose ps
 ```
 
 - QDash UI: <http://localhost:5714/login>
-- API documentation: <http://localhost:5715/docs>
-- Prefect: <http://localhost:4200>
+- API documentation: <http://localhost:5714/api/docs>
+- Prefect dashboard: <http://localhost:5714/prefect/dashboard>
 
-Use the ports from `.env` if the deployment overrides the defaults. Follow service logs as
-described in [Operations](./operations.md#inspect-logs) when a container is unhealthy or a page is
-unavailable.
+Use the configured `UI_PORT` if the deployment overrides the default Caddy port. The normal
+Compose stack publishes no direct API or Prefect ports. Follow service logs as described in
+[Operations](./operations.md#inspect-logs) when a container is unhealthy or a page is unavailable.
+For HTTPS deployments, open the origin configured in `CLIENT_URL`; the `localhost:5714` links
+above describe the default HTTP configuration.
 
 ## Recover from a Failed Update
 
@@ -94,3 +109,6 @@ docker compose up -d --build
 
 `git reset --hard` discards tracked changes. Confirm the target tag and preserve any local work
 before running it.
+
+For an HTTPS deployment, include `-f compose.yaml -f compose.https.yaml` on the recovery start
+command as well. Use the override files available in the checked-out release.

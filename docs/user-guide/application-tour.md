@@ -79,5 +79,7 @@ them.
 ## External Tools
 
 The bottom of the sidebar links to this documentation, the Prefect dashboard, and the interactive
-API documentation. Prefect and API documentation links are available to project editors. Use the
-QDash UI or API for workflow changes so QDash project metadata remains synchronized with Prefect.
+API documentation. Prefect and API documentation links are available to project editors. Prefect
+uses the QDash sign-in, but every signed-in QDash user can view orchestration state across projects;
+QDash project permissions do not restrict Prefect's view. Use the QDash UI or API for workflow
+changes so QDash project metadata remains synchronized with Prefect.

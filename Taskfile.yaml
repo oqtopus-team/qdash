@@ -138,7 +138,7 @@ tasks:
   dev-services:
     desc: Start only the services needed by host-side API/UI development
     cmds:
-      - docker compose up -d mongo postgres prefect-server deployment-service user-flow-worker
+      - docker compose -f compose.yaml -f compose.host.yaml up -d mongo postgres prefect-server deployment-service user-flow-worker
 
   dev-local-down:
     desc: Stop host API/UI processes and Docker Compose services started for development
@@ -159,41 +159,22 @@ tasks:
           command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
           if [ -n "$command" ] && echo "$command" | grep -F "$expected" >/dev/null; then
             echo "Stopping ${name}: ${pid}"
-            /bin/kill "$pid" 2>/dev/null || true
+            pgid="$(ps -p "$pid" -o pgid= 2>/dev/null | tr -d ' ')"
+            if [ "$pgid" = "$pid" ]; then
+              python3 -c 'import os,signal,sys; os.killpg(int(sys.argv[1]), signal.SIGTERM)' "$pid" 2>/dev/null || true
+            else
+              /bin/kill "$pid" 2>/dev/null || true
+            fi
           else
             echo "${name} pid file is stale: ${pid}"
           fi
           rm -f "$pid_file"
         }
 
-        stop_command() {
-          pattern="$1"
-          name="$2"
-          pids="$(ps ax -o pid= -o command= | awk -v pattern="$pattern" -v self="$$" 'index($0, pattern) > 0 && $1 != self {print $1}')"
-          if [ -n "$pids" ]; then
-            echo "Stopping ${name} processes: ${pids}"
-            /bin/kill $pids 2>/dev/null || true
-          fi
-        }
-
-        stop_port() {
-          port="$1"
-          name="$2"
-          pids="$(lsof -ti "tcp:${port}" -sTCP:LISTEN || true)"
-          if [ -n "$pids" ]; then
-            echo "Stopping ${name} on port ${port}: ${pids}"
-            /bin/kill $pids 2>/dev/null || true
-          else
-            echo "${name} is not listening on port ${port}"
-          fi
-        }
         stop_pidfile ".tmp/dev-api-local.pid" "API" "uvicorn src.qdash.api.main:app"
         stop_pidfile ".tmp/dev-ui-local.pid" "UI" "bun run dev"
-        stop_command "uvicorn src.qdash.api.main:app" "API"
-        stop_command "bun run dev" "UI"
-        stop_port "${API_PORT:-5715}" "API"
-        stop_port "${UI_PORT:-5714}" "UI"
-      - docker compose down
+        stop_pidfile ".tmp/dev-proxy-local.pid" "Caddy" "caddy run --config config/caddy/Caddyfile"
+      - docker compose -f compose.yaml -f compose.host.yaml down
 
   dev-local-setup:
     desc: Install dependencies and tools needed by local development
@@ -209,16 +190,40 @@ tasks:
       - uv sync --all-groups --all-packages --no-cache --upgrade
 
   dev-api-local:
-    desc: Start the API on the host against Docker services
+    desc: Start the API against Docker services from the host or devcontainer
     dotenv: [.env]
     silent: true
     cmds:
       - |
-        /bin/sh -c '
         mkdir -p .tmp
-        echo "$$" > .tmp/dev-api-local.pid
-        MONGO_HOST="${MONGO_HOST:-localhost}" PREFECT_API_URL="http://127.0.0.1:${PREFECT_PORT:-4200}/api" DEPLOYMENT_SERVICE_URL="http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}" exec uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
-        '
+        if [ "${QDASH_DEV_CONTAINER:-}" = "1" ]; then
+          mongo_host="${MONGO_HOST:-mongo}"
+          prefect_api_url="${PREFECT_API_URL:-http://prefect-server:4200/prefect/api}"
+          deployment_service_url="${DEPLOYMENT_SERVICE_URL:-http://deployment-service:8001}"
+          forwarded_allow_ips="${FORWARDED_ALLOW_IPS:-*}"
+        else
+          mongo_host="${MONGO_HOST:-localhost}"
+          prefect_api_url="${PREFECT_API_URL:-http://127.0.0.1:${PREFECT_PORT:-4200}/prefect/api}"
+          deployment_service_url="${DEPLOYMENT_SERVICE_URL:-http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}}"
+          forwarded_allow_ips="${FORWARDED_ALLOW_IPS:-127.0.0.1}"
+        fi
+        MONGO_HOST="$mongo_host" PREFECT_API_URL="$prefect_api_url" DEPLOYMENT_SERVICE_URL="$deployment_service_url" FORWARDED_ALLOW_IPS="$forwarded_allow_ips" python3 -c '
+        import os, signal, subprocess, sys
+        pid_file, *command = sys.argv[1:]
+        child = subprocess.Popen(command, start_new_session=True)
+        with open(pid_file, "w") as output:
+            output.write(str(child.pid) + chr(10))
+        forward = lambda signum, _frame: os.killpg(child.pid, signum)
+        signal.signal(signal.SIGINT, forward)
+        signal.signal(signal.SIGTERM, forward)
+        status = child.wait()
+        try:
+            if open(pid_file).read().strip() == str(child.pid):
+                os.unlink(pid_file)
+        except FileNotFoundError:
+            pass
+        sys.exit(status)
+        ' .tmp/dev-api-local.pid uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
 
   dev-ui-local:
     desc: Start the UI on the host against the local API
@@ -227,17 +232,70 @@ tasks:
     silent: true
     cmds:
       - |
-        /bin/sh -c '
         mkdir -p ../.tmp
-        echo "$$" > ../.tmp/dev-ui-local.pid
-        PORT="${UI_PORT:-5714}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" exec bun run dev
-        '
+        PORT="${UI_INTERNAL_PORT:-5716}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" python3 -c '
+        import os, signal, subprocess, sys
+        pid_file, *command = sys.argv[1:]
+        child = subprocess.Popen(command, start_new_session=True)
+        with open(pid_file, "w") as output:
+            output.write(str(child.pid) + chr(10))
+        forward = lambda signum, _frame: os.killpg(child.pid, signum)
+        signal.signal(signal.SIGINT, forward)
+        signal.signal(signal.SIGTERM, forward)
+        status = child.wait()
+        try:
+            if open(pid_file).read().strip() == str(child.pid):
+                os.unlink(pid_file)
+        except FileNotFoundError:
+            pass
+        sys.exit(status)
+        ' ../.tmp/dev-ui-local.pid bun run dev --hostname 127.0.0.1
+
+  dev-proxy-local:
+    desc: Start Caddy as the shared local browser entry point
+    dotenv: [.env]
+    silent: true
+    cmds:
+      - |
+        mkdir -p .tmp
+        if [ "${QDASH_DEV_CONTAINER:-}" = "1" ]; then
+          site_address_default="http://:${UI_PORT:-5714}"
+          bind_address_default="0.0.0.0"
+          prefect_upstream_default="prefect-server:4200"
+        else
+          site_address_default="http://localhost:${UI_PORT:-5714}"
+          bind_address_default="127.0.0.1"
+          prefect_upstream_default="127.0.0.1:${PREFECT_PORT:-4200}"
+        fi
+        CADDY_SITE_ADDRESS="${CADDY_LOCAL_SITE_ADDRESS:-$site_address_default}" \
+        CADDY_BIND_ADDRESS="${CADDY_LOCAL_BIND_ADDRESS:-$bind_address_default}" \
+        CADDY_UI_UPSTREAM="${CADDY_UI_UPSTREAM:-127.0.0.1:${UI_INTERNAL_PORT:-5716}}" \
+        CADDY_API_UPSTREAM="${CADDY_API_UPSTREAM:-127.0.0.1:${API_PORT:-5715}}" \
+        CADDY_PREFECT_UPSTREAM="${CADDY_PREFECT_UPSTREAM:-$prefect_upstream_default}" \
+        CADDY_TRUSTED_PROXIES="${CADDY_TRUSTED_PROXIES:-127.0.0.1/32 ::1/128}" \
+        python3 -c '
+        import os, signal, subprocess, sys
+        pid_file, *command = sys.argv[1:]
+        child = subprocess.Popen(command, start_new_session=True)
+        with open(pid_file, "w") as output:
+            output.write(str(child.pid) + chr(10))
+        forward = lambda signum, _frame: os.killpg(child.pid, signum)
+        signal.signal(signal.SIGINT, forward)
+        signal.signal(signal.SIGTERM, forward)
+        status = child.wait()
+        try:
+            if open(pid_file).read().strip() == str(child.pid):
+                os.unlink(pid_file)
+        except FileNotFoundError:
+            pass
+        sys.exit(status)
+        ' .tmp/dev-proxy-local.pid caddy run --config config/caddy/Caddyfile --adapter caddyfile
 
   dev-local:
-    desc: Start lightweight local development services, API, and UI
+    desc: Start lightweight local development services, API, UI, and Caddy
     cmds:
       - task: dev-services
-      - task --parallel dev-api-local dev-ui-local
+      - task --parallel dev-api-local dev-ui-local dev-proxy-local
 
   # =============================================================================
   # Python Tests (all tests run in-memory, no MongoDB required)
@@ -552,8 +610,9 @@ tasks:
 
   dev-ui:
     dir: ui
+    dotenv: [../.env]
     cmds:
-      - bun run dev
+      - INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" PORT="${UI_INTERNAL_PORT:-5716}" bun run dev --hostname 127.0.0.1
     desc: Start the UI development server
 
   deploy:

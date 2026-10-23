@@ -16,6 +16,11 @@ docker compose up -d --build
 If Go Task is installed, `task deploy-local` runs this command and also pulls the optional
 Copilot knowledge repository configured by `KNOWLEDGE_REPO_URL`.
 
+For HTTPS, use `compose.https.yaml` with the command shown in
+[Serve QDash over HTTPS](./setup.md#serve-qdash-over-https). When you start with an override file,
+include the same `-f` arguments on `ps`, `logs`, `restart`, and `down` commands so they target the
+same Compose project configuration.
+
 The `agent-runtime` service is opt-in. Set `COMPOSE_PROFILES=agent-runtime` in `.env` when
 `config/copilot/config.yaml` uses `copilot_backend: pi`. Leave it unset for the in-process
 `litellm` backend. For a remote deployment, follow
@@ -36,8 +41,26 @@ docker compose ps
 After the containers start, check the browser-facing services:
 
 - QDash UI: <http://localhost:5714/login>
-- API documentation: <http://localhost:5715/docs>
-- Prefect: <http://localhost:4200>
+- API documentation: <http://localhost:5714/api/docs>
+- Prefect dashboard: <http://localhost:5714/prefect/dashboard>
+
+The normal Compose stack publishes only the Caddy entry point on `UI_PORT` (default `5714`).
+Prefect requires QDash sign-in. Every signed-in QDash user can view orchestration state across
+projects in Prefect because QDash project permissions are not applied there. Use QDash for
+workflow changes so project metadata stays synchronized.
+For HTTPS deployments, open the origin in `CLIENT_URL`; the `localhost:5714` links above describe
+the default HTTP configuration.
+
+For local database administration, start the `admin` profile with its override file:
+
+```bash
+docker compose -f compose.yaml -f compose.admin.yaml --profile admin up -d
+```
+
+The extra MongoDB, PostgreSQL, and Mongo Express ports bind to loopback; Mongo Express is at
+<http://localhost:8081>. Stop this configuration with
+`docker compose -f compose.yaml -f compose.admin.yaml --profile admin down` so Compose uses the
+same file list and profile.
 
 ## Inspect Logs
 
@@ -88,13 +111,16 @@ Stop and remove the Compose containers and network:
 docker compose down
 ```
 
+If the stack uses an override, include its original `-f` arguments here too. For example, stop an
+HTTPS deployment with `docker compose -f compose.yaml -f compose.https.yaml down`.
+
 This command preserves named volumes and bind-mounted data. Do not add `--volumes` unless you
 intend to delete persistent service state.
 
 ## Resolve Common Failures
 
-If the UI cannot reach the API, check `INTERNAL_API_URL` and whether the API is listening on
-`API_PORT`.
+If the UI cannot reach the API, check the Caddy logs and API health. In host development mode,
+also confirm that `INTERNAL_API_URL` points to the host API.
 
 If workflow execution fails with a missing work pool, restart `deployment-service` and
 `user-flow-worker`; the deployment service creates the `user-flows-pool` when registering flows.

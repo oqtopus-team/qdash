@@ -7,10 +7,17 @@ Run commands from the repository root unless noted.
 ```bash
 task -l                  # list tasks
 task dev-local-setup     # install host-side Python/UI dependencies
-task dev-local           # Docker services + host API/UI
-task dev-local-down      # stop host API/UI and local Docker Compose services
+task dev-services        # Docker services with loopback ports for host development
+task dev-api-local       # host API on API_PORT (default 5715)
+task dev-ui-local        # host UI on UI_INTERNAL_PORT (default 5716)
+task dev-proxy-local     # Caddy browser entry point on UI_PORT (default 5714)
+task dev-local           # Docker services + host API/UI/Caddy
+task dev-local-down      # stop host processes and the compose.host.yaml stack
 task deploy-local        # full Docker Compose stack
 ```
+
+Open the host development stack at `http://localhost:5714`; its API and Prefect destinations are
+`/api` and `/prefect`. Use the same Compose file list when managing an override stack.
 
 ## Checks
 

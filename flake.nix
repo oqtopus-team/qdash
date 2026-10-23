@@ -35,6 +35,7 @@
             bashInteractive
             betterleaks
             bun
+            caddy
             curl
             docker-client
             docker-compose

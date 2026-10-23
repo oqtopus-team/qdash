@@ -30,8 +30,6 @@ import { DARK_THEMES } from "@/constants/themes";
 import { getNavigationSections } from "@/components/layout/navigation";
 import type { NavItem, NavSection } from "@/components/layout/navigation";
 
-const PREFECT_URL = process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
-
 type ExternalNavItem = {
   href: string;
   label: string;
@@ -258,7 +256,7 @@ export function Sidebar() {
       icon: BookOpen,
     },
     {
-      href: `${PREFECT_URL}/dashboard`,
+      href: "/prefect/dashboard",
       label: "Prefect",
       title: "Prefect",
       icon: Workflow,

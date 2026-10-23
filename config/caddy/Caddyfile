@@ -1,0 +1,47 @@
+{
+	admin off
+	servers {
+		trusted_proxies static {$CADDY_TRUSTED_PROXIES:127.0.0.1/32 ::1/128}
+	}
+}
+
+{$CADDY_SITE_ADDRESS::80} {
+	bind {$CADDY_BIND_ADDRESS:0.0.0.0}
+
+	@api path /api /api/*
+	handle @api {
+		uri strip_prefix /api
+		reverse_proxy {$CADDY_API_UPSTREAM:api:5715}
+	}
+
+	@prefect path /prefect /prefect/*
+	handle @prefect {
+		reverse_proxy {$CADDY_API_UPSTREAM:api:5715} {
+			method GET
+			rewrite /auth/me
+			header_up Authorization "Bearer {http.request.cookie.access_token}"
+			header_up X-Forwarded-Method {method}
+			header_up X-Forwarded-Uri {uri}
+
+			@good status 2xx
+			handle_response @good {
+				request_header X-QDash-Authenticated true
+			}
+
+			@unauthorized status 401
+			handle_response @unauthorized {
+				@page {
+					method GET HEAD
+					header Accept *text/html*
+				}
+				redir @page /login 302
+				respond 401
+			}
+		}
+		reverse_proxy {$CADDY_PREFECT_UPSTREAM:prefect-server:4200}
+	}
+
+	handle {
+		reverse_proxy {$CADDY_UI_UPSTREAM:ui:5714}
+	}
+}

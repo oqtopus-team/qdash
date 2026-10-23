@@ -3,13 +3,12 @@
 import { useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
+import { API_BASE_URL } from "@/lib/api/base-url";
 import type { TraceStep } from "@/types/copilotChat";
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 /** URL the API serves a calibration figure from, by its stored path. */
 export function figureUrl(path: string): string {
-  return `${BASE_URL}/executions/figure?path=${encodeURIComponent(path)}`;
+  return `${API_BASE_URL}/executions/figure?path=${encodeURIComponent(path)}`;
 }
 
 /** File name without extension, e.g. "CheckRabi_0" from a figure path. */
