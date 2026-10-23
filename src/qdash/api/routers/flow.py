@@ -19,6 +19,8 @@ from qdash.api.schemas.flow import (
     GetFlowResponse,
     ListFlowSchedulesResponse,
     ListFlowsResponse,
+    MoveFlowRequest,
+    MoveFlowResponse,
     SaveFlowRequest,
     SaveFlowResponse,
     ScheduleFlowRequest,
@@ -221,6 +223,22 @@ async def execute_flow(
 ) -> ExecuteFlowResponse:
     """Execute a Flow via Prefect deployment."""
     return await service.execute_flow(name, request, ctx.user.username, ctx.project_id)
+
+
+@router.patch(
+    "/flows/{name}/folder",
+    response_model=MoveFlowResponse,
+    summary="Move a flow to another folder",
+    operation_id="moveFlow",
+)
+async def move_flow(
+    name: str,
+    request: MoveFlowRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[FlowService, Depends(get_flow_service)],
+) -> MoveFlowResponse:
+    """Change the folder a Flow is filed under; its code and deployment are untouched."""
+    return await service.move_flow(name, ctx.project_id, request.folder)
 
 
 @router.delete(

@@ -36,6 +36,7 @@ export default function NewFlowPage() {
   const [username, setUsername] = useState("");
   const [chipId, setChipId] = useState("");
   const [tags, setTags] = useState("");
+  const [folder, setFolder] = useState("");
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
@@ -182,6 +183,7 @@ export default function NewFlowPage() {
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
+      folder: folder.trim(),
       default_parameters: {
         username: username.trim(),
         chip_id: chipId.trim(),
@@ -429,6 +431,24 @@ export default function NewFlowPage() {
                   />
                   <label className="label">
                     <span className="label-text-alt text-xs">Comma-separated</span>
+                  </label>
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text text-xs">Folder</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="daily/t1"
+                    className="input input-bordered input-sm"
+                    value={folder}
+                    onChange={(e) => setFolder(e.target.value)}
+                  />
+                  <label className="label">
+                    <span className="label-text-alt text-xs">
+                      Where it sits in your space on the Workflow page; "/" nests
+                    </span>
                   </label>
                 </div>
               </div>

@@ -8,7 +8,9 @@ when you are learning the editor or checking a new task sequence without laborat
 
 ## Start from a Template
 
-1. Confirm the active project, then open **Workflow**.
+1. Confirm the active project, then open **Workflow**. Saved workflows are listed in one folder
+   per creator, with the subfolders set by each workflow's **Folder** property inside. Your own
+   folder comes first and starts open; select another creator's folder header to open it.
 2. Select **New Flow**.
 3. Under **TEMPLATE**, select the workflow closest to the procedure you need. **Simple
    Calibration** is the smallest general-purpose starting point.
@@ -28,6 +30,7 @@ making source changes.
 | **Username** | Required default shown in the editor; the signed-in user owns each execution |
 | **Chip ID** | Chip reserved while the workflow runs |
 | **Tags** | Comma-separated labels added to execution history |
+| **Folder** | Optional `a/b` path that files the workflow under subfolders in your space on the **Workflow** page; see [Organize your workflows](#organize-your-workflows) |
 
 Saving checks the Python syntax and entrypoint, then registers the workflow for execution. Correct
 any reported source, entrypoint, or registration error and save again.
@@ -133,3 +136,25 @@ Use a small target and non-destructive task settings for the first run. Confirm 
 order and effective parameters before adding a schedule or expanding the targets.
 
 How this works: [Workflow Authoring Quickstart](../developer-guide/workflow/quickstart.md).
+
+## Organize Your Workflows
+
+The **Workflow** page lists each workflow under its creator and, inside that space, under the
+folders you choose. Filing happens in the editor's **Explorer** panel, which shows one creator's
+space as `folder/name.py`; the selector at its top switches to another creator, and **Open in
+editor** on a creator's folder on the **Workflow** page opens the editor on that space. Moving a
+workflow changes only where it is listed: its name, source file, schedules, and running
+executions are untouched.
+
+- **Move a workflow**: drag its row onto a folder, or onto the empty area below the tree for the
+  top of the space; or right-click it and pick a folder from **Move … to**. Dragging a folder
+  moves everything in it.
+- **Make a folder**: select the folder button at the top of the Explorer, or right-click a
+  folder and choose **New folder**, then type its name. The folder stays in the Explorer until
+  you move a workflow into it or reload.
+- **Rename a folder**: right-click it and choose **Rename folder**, or press F2 on it. Every
+  workflow under it follows.
+- **Set the folder while saving**: the **Folder** property takes a path such as `daily/t1`;
+  `/` nests, and every level it names is created.
+
+Workflows stay in their creator's space. Moving needs project edit permission, like saving.

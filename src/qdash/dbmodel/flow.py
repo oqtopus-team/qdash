@@ -25,6 +25,7 @@ class FlowDocument(Document):
         created_at (datetime): Timestamp when flow was created.
         updated_at (datetime): Timestamp when flow was last updated.
         tags (list[str]): Tags for categorization and search.
+        folder (str): Slash-separated folder path inside the creator's space; "" is the root.
 
     """
 
@@ -47,6 +48,10 @@ class FlowDocument(Document):
     created_at: datetime = Field(default_factory=now, description="Creation timestamp")
     updated_at: datetime = Field(default_factory=now, description="Last update timestamp")
     tags: list[str] = Field(default_factory=list, description="Tags for categorization")
+    folder: str = Field(
+        default="",
+        description="Slash-separated folder path inside the creator's space (empty = root)",
+    )
 
     model_config = ConfigDict(
         from_attributes=True,
