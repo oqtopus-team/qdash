@@ -602,6 +602,7 @@ export function ForumNewPage() {
               labels={labels}
               selectedLabels={selectedLabels}
               onToggle={toggleLabel}
+              disabled={isSubmitting || createMutation.isPending}
             />
           </section>
 

@@ -58,7 +58,11 @@ vi.mock("@/client/forum/forum", () => ({
 vi.mock("@/client/projects/projects", () => ({
   useListProjectMembers: () => ({ data: undefined }),
 }));
-vi.mock("../ForumLabelSelector", () => ({ ForumLabelPicker: () => null }));
+vi.mock("../ForumLabelSelector", () => ({
+  ForumLabelPicker: ({ disabled }: { disabled?: boolean }) => (
+    <div data-testid="label-picker" data-disabled={String(Boolean(disabled))} />
+  ),
+}));
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({ user: { username: "alice" } }),
 }));
@@ -130,6 +134,17 @@ describe("ForumNewPage", () => {
 
     expect(await screen.findByText("Content is required")).toBeTruthy();
     expect(mocks.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("disables the label picker while the thread is being created", async () => {
+    mocks.params = new URLSearchParams({ title: "T", content: "C" });
+    mocks.mutateAsync.mockReturnValue(new Promise(() => {}));
+    render(<ForumNewPage />);
+    expect(screen.getByTestId("label-picker").dataset.disabled).toBe("false");
+    submit();
+
+    await waitFor(() => expect(mocks.mutateAsync).toHaveBeenCalled());
+    expect(screen.getByTestId("label-picker").dataset.disabled).toBe("true");
   });
 
   it("does not submit when Enter is pressed in the title", async () => {
