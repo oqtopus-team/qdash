@@ -188,7 +188,7 @@ export function ProfileSettingsPanel() {
                 </div>
               )}
               {saved && (
-                <div className="alert alert-success">
+                <div className="alert alert-success" role="alert">
                   <span>Profile updated.</span>
                 </div>
               )}
