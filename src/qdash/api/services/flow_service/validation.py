@@ -15,12 +15,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("uvicorn.app")
 
+# Use full-string matching (fullmatch) so trailing newlines are rejected
 _NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
 
 
 def validate_flow_name(name: str) -> None:
     """Reject a flow name that is not alphanumeric or underscores."""
-    if not _NAME_PATTERN.match(name):
+    if not _NAME_PATTERN.fullmatch(name):
         raise HTTPException(
             status_code=400,
             detail="Flow name must contain only alphanumeric characters and underscores",
@@ -37,13 +38,10 @@ def normalize_folder(folder: str) -> str:
     normalized = folder.strip().strip("/")
     if normalized == "":
         return ""
-    if not all(_NAME_PATTERN.match(part) for part in normalized.split("/")):
+    if not all(_NAME_PATTERN.fullmatch(part) for part in normalized.split("/")):
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Folder must be segments of alphanumeric characters and underscores"
-                ' separated by "/"'
-            ),
+            detail="Folder must be segments of alphanumeric characters and underscores separated by /",
         )
     return normalized
 
@@ -67,10 +65,7 @@ def validate_flow_code(code: str, expected_function_name: str) -> None:
     if not flow_functions:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "No @flow decorated function found in code."
-                " Please add @flow decorator to your flow function."
-            ),
+            detail="No @flow decorated function found in code. Please add @flow decorator to your flow function.",
         )
 
     if expected_function_name not in flow_functions:
