@@ -46,8 +46,11 @@ Prefer schema or domain values at the service boundary. Existing services can ra
 domain that already owns it instead of spreading it to unrelated services.
 
 Match domain filenames across layers when one domain owns the code, for example
-`routers/flow.py`, `schemas/flow.py`, and `services/flow_service.py`. A large service can become a
-package, as `services/chip/` does, without changing the router's public contract.
+`routers/flow.py`, `schemas/flow.py`, and `services/flow_service/`. A large service can become a
+package, as `services/chip/` and `services/flow_service/` do, without changing the router's public
+contract. A service package keeps `FlowService` in `service.py` and gives each external side effect
+(file storage, validation, deployment HTTP, Prefect dispatch, templates) its own module behind a
+constructor-injected collaborator.
 
 ## Wire Dependencies Through Providers
 
