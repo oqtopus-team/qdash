@@ -248,3 +248,4 @@ scripts/estimate_qubit_frequency
 scripts/estimate-resonator-frequency
 .direnv
 tmp
+/notes
