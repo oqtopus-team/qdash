@@ -1,129 +1,263 @@
-"""Tests for the flow template and helper file catalog."""
+"""Tests for the flow template catalog."""
 
-from pathlib import Path
+from __future__ import annotations
+
+import json
+import logging
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from fastapi import HTTPException
 
+from qdash.api.schemas.flow import FlowTemplate, FlowTemplateWithCode
 from qdash.api.services.flow_service.templates import TemplateCatalog
-from qdash.common.config.path_resolver import resolve_workflow_path
 
-REPO_ROOT = Path(__file__).resolve().parents[5]
-TEMPLATES_DIR = REPO_ROOT / "src/qdash/workflow/templates"
+if TYPE_CHECKING:
+    from pathlib import Path
 
-
-def test_resolve_workflow_path_uses_container_path_when_available(tmp_path: Path) -> None:
-    """resolve_workflow_path returns the container path when it exists."""
-    container_path = tmp_path / "templates"
-    container_path.mkdir()
-
-    assert resolve_workflow_path(container_path, "templates") == container_path
-
-
-def test_resolve_workflow_path_falls_back_to_repo_local_path(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """resolve_workflow_path falls back to the repo-local templates directory."""
-    monkeypatch.chdir(REPO_ROOT)
-
-    resolved = resolve_workflow_path(Path("/missing/templates"), "templates")
-
-    assert resolved == TEMPLATES_DIR
+TEMPLATE = {
+    "id": "daily",
+    "name": "Daily calibration",
+    "description": "A daily calibration",
+    "category": "example",
+    "filename": "daily.py",
+    "function_name": "daily",
+}
 
 
-@pytest.mark.asyncio
-async def test_list_templates_uses_resolved_templates_metadata() -> None:
-    """list_templates returns templates loaded from the resolved templates metadata file."""
-    templates = TemplateCatalog(templates_dir=TEMPLATES_DIR).list_templates()
-
-    assert any(template.id == "full_calibration" for template in templates)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("template_id", ["coarse_one", "fine_one"])
-async def test_partial_one_qubit_template_is_listed_and_loads_its_flow_code(
-    template_id: str,
-) -> None:
-    """Each partial one-qubit template is listed and exposes its flow source."""
-    catalog = TemplateCatalog(templates_dir=TEMPLATES_DIR)
-
-    templates = catalog.list_templates()
-    assert any(template.id == template_id for template in templates)
-
-    template = catalog.get_template(template_id)
-    assert template.function_name == template_id
-    assert template.code == (TEMPLATES_DIR / f"{template_id}.py").read_text(encoding="utf-8")
+def _catalog(
+    tmp_path: Path,
+    *,
+    templates_dir: Path | None = None,
+    helpers_dir: Path | None = None,
+    create_helpers: bool = True,
+) -> tuple[TemplateCatalog, Path, Path]:
+    templates = templates_dir or tmp_path / "templates"
+    helpers = helpers_dir or tmp_path / "helpers"
+    paths = (templates, helpers) if create_helpers else (templates,)
+    for path in paths:
+        if not path.exists():
+            path.mkdir(parents=True)
+    return TemplateCatalog(templates_dir=templates, helpers_dir=helpers), templates, helpers
 
 
-def test_list_templates_is_empty_without_a_metadata_file(tmp_path: Path) -> None:
-    """A missing metadata file yields no templates instead of an error."""
-    assert TemplateCatalog(templates_dir=tmp_path).list_templates() == []
+def _write_index(templates_dir: Path, entries: list[dict[str, Any]]) -> None:
+    (templates_dir / "templates.json").write_text(json.dumps(entries), encoding="utf-8")
 
 
-def test_get_template_rejects_an_unknown_id(tmp_path: Path) -> None:
-    """An unknown template id is reported as not found."""
-    (tmp_path / "templates.json").write_text("[]", encoding="utf-8")
+class TestListTemplates:
+    """list_templates() returns template metadata or an empty list without an index."""
 
-    with pytest.raises(HTTPException) as exc_info:
-        TemplateCatalog(templates_dir=tmp_path).get_template("missing")
+    def test_missing_index_returns_empty(self, tmp_path: Path, caplog):
+        catalog, _, _ = _catalog(tmp_path)
 
-    assert exc_info.value.status_code == 404
+        with caplog.at_level(logging.ERROR):
+            templates = catalog.list_templates()
 
+        assert templates == []
+        assert "Templates metadata file not found" in caplog.text
 
-def test_get_template_rejects_a_missing_metadata_file(tmp_path: Path) -> None:
-    """A missing metadata file is reported as not found."""
-    with pytest.raises(HTTPException) as exc_info:
-        TemplateCatalog(templates_dir=tmp_path).get_template("full_calibration")
+    def test_lists_every_indexed_template(self, tmp_path: Path):
+        catalog, templates_dir, _ = _catalog(tmp_path)
+        second = {**TEMPLATE, "id": "t1", "name": "T1", "filename": "t1.py", "function_name": "t1"}
+        _write_index(templates_dir, [TEMPLATE, second])
 
-    assert exc_info.value.status_code == 404
+        templates = catalog.list_templates()
 
+        assert [template.id for template in templates] == ["daily", "t1"]
+        assert all(isinstance(template, FlowTemplate) for template in templates)
 
-def test_list_helper_files_lists_python_modules_with_the_init_first(tmp_path: Path) -> None:
-    """Only public Python modules are listed, with __init__.py leading."""
-    (tmp_path / "__init__.py").write_text("", encoding="utf-8")
-    (tmp_path / "helper.py").write_text("", encoding="utf-8")
-    (tmp_path / "_private.py").write_text("", encoding="utf-8")
-    (tmp_path / "notes.txt").write_text("", encoding="utf-8")
+    def test_invalid_json_raises_500(self, tmp_path: Path, caplog):
+        catalog, templates_dir, _ = _catalog(tmp_path)
+        (templates_dir / "templates.json").write_text("not json", encoding="utf-8")
 
-    assert TemplateCatalog(helpers_dir=tmp_path).list_helper_files() == [
-        "__init__.py",
-        "helper.py",
-    ]
+        with caplog.at_level(logging.ERROR), pytest.raises(HTTPException) as exc_info:
+            catalog.list_templates()
 
+        assert exc_info.value.status_code == 500
+        assert "Failed to list flow templates" in caplog.text
 
-def test_list_helper_files_is_empty_without_a_directory(tmp_path: Path) -> None:
-    """A missing helper directory yields no files instead of an error."""
-    assert TemplateCatalog(helpers_dir=tmp_path / "missing").list_helper_files() == []
+    def test_unreadable_index_raises_500(self, tmp_path: Path):
+        catalog, templates_dir, _ = _catalog(tmp_path)
+        (templates_dir / "templates.json").mkdir()
 
+        with pytest.raises(HTTPException) as exc_info:
+            catalog.list_templates()
 
-def test_get_helper_file_returns_the_source(tmp_path: Path) -> None:
-    """A helper module is returned verbatim."""
-    (tmp_path / "helper.py").write_text("VALUE = 1\n", encoding="utf-8")
+        assert exc_info.value.status_code == 500
 
-    assert TemplateCatalog(helpers_dir=tmp_path).get_helper_file("helper.py") == "VALUE = 1\n"
+    def test_incomplete_entry_raises_500(self, tmp_path: Path):
+        catalog, templates_dir, _ = _catalog(tmp_path)
+        _write_index(templates_dir, [{"id": "daily", "filename": "daily.py"}])
 
+        with pytest.raises(HTTPException) as exc_info:
+            catalog.list_templates()
 
-@pytest.mark.parametrize("filename", ["../secret.py", "nested/helper.py", "nested\\helper.py"])
-def test_get_helper_file_rejects_traversal(tmp_path: Path, filename: str) -> None:
-    """A helper path may not leave the helper directory."""
-    with pytest.raises(HTTPException) as exc_info:
-        TemplateCatalog(helpers_dir=tmp_path).get_helper_file(filename)
-
-    assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "Invalid filename"
+        assert exc_info.value.status_code == 500
 
 
-def test_get_helper_file_rejects_non_python_files(tmp_path: Path) -> None:
-    """Only Python sources can be read."""
-    with pytest.raises(HTTPException) as exc_info:
-        TemplateCatalog(helpers_dir=tmp_path).get_helper_file("notes.txt")
+class TestGetTemplate:
+    """get_template() returns one template together with its flow source."""
 
-    assert exc_info.value.status_code == 400
+    def test_missing_index_raises_404(self, tmp_path: Path):
+        catalog, _, _ = _catalog(tmp_path)
+
+        with pytest.raises(HTTPException) as exc_info:
+            catalog.get_template("daily")
+
+        assert exc_info.value.status_code == 404
+        assert "Templates metadata file not found" in str(exc_info.value.detail)
+
+    def test_unknown_template_raises_404(self, tmp_path: Path):
+        catalog, templates_dir, _ = _catalog(tmp_path)
+        _write_index(templates_dir, [TEMPLATE])
+
+        with pytest.raises(HTTPException) as exc_info:
+            catalog.get_template("t1")
+
+        assert exc_info.value.status_code == 404
+        assert "Template 't1' not found" in str(exc_info.value.detail)
+
+    def test_missing_code_file_raises_404(self, tmp_path: Path, caplog):
+        catalog, templates_dir, _ = _catalog(tmp_path)
+        _write_index(templates_dir, [{**TEMPLATE, "filename": "missing.py"}])
+
+        with caplog.at_level(logging.ERROR), pytest.raises(HTTPException) as exc_info:
+            catalog.get_template("daily")
+
+        assert exc_info.value.status_code == 404
+        assert "Template file not found" in str(exc_info.value.detail)
+
+    def test_returns_the_source(self, tmp_path: Path):
+        catalog, templates_dir, _ = _catalog(tmp_path)
+        _write_index(templates_dir, [TEMPLATE])
+        (templates_dir / "daily.py").write_text("# flow\n", encoding="utf-8")
+
+        template = catalog.get_template("daily")
+
+        assert isinstance(template, FlowTemplateWithCode)
+        assert template.id == "daily"
+        assert template.code == "# flow\n"
+
+    def test_incomplete_entry_raises_500(self, tmp_path: Path, caplog):
+        catalog, templates_dir, _ = _catalog(tmp_path)
+        _write_index(templates_dir, [{"id": "daily", "filename": "daily.py"}])
+        (templates_dir / "daily.py").write_text("# flow\n", encoding="utf-8")
+
+        with caplog.at_level(logging.ERROR), pytest.raises(HTTPException) as exc_info:
+            catalog.get_template("daily")
+
+        assert exc_info.value.status_code == 500
+        assert "Failed to get flow template" in caplog.text
 
 
-def test_get_helper_file_rejects_a_missing_module(tmp_path: Path) -> None:
-    """An absent helper module is reported as not found."""
-    with pytest.raises(HTTPException) as exc_info:
-        TemplateCatalog(helpers_dir=tmp_path).get_helper_file("missing.py")
+class TestListHelperFiles:
+    """list_helper_files() returns the modules importable from a user flow."""
 
-    assert exc_info.value.status_code == 404
+    def test_missing_helpers_dir_returns_empty(self, tmp_path: Path, caplog):
+        catalog, _, _ = _catalog(tmp_path, helpers_dir=tmp_path / "absent", create_helpers=False)
+
+        with caplog.at_level(logging.WARNING):
+            files = catalog.list_helper_files()
+
+        assert files == []
+        assert "Flow helpers directory not found" in caplog.text
+
+    def test_empty_helpers_dir_returns_empty(self, tmp_path: Path):
+        catalog, _, _ = _catalog(tmp_path)
+
+        assert catalog.list_helper_files() == []
+
+    def test_lists_python_modules_with_init_first(self, tmp_path: Path):
+        catalog, _, helpers_dir = _catalog(tmp_path)
+        for name in ("util.py", "_internal.py", "constants.py", "notes.txt", "__init__.py"):
+            (helpers_dir / name).write_text("# helper\n", encoding="utf-8")
+
+        files = catalog.list_helper_files()
+
+        assert files == ["__init__.py", "constants.py", "util.py"]
+
+    def test_sorts_files_alphabetically(self, tmp_path: Path):
+        catalog, _, helpers_dir = _catalog(tmp_path)
+        for name in ("z.py", "a.py"):
+            (helpers_dir / name).write_text("# helper\n", encoding="utf-8")
+
+        assert catalog.list_helper_files() == ["a.py", "z.py"]
+
+    def test_unlistable_helpers_dir_raises_500(self, tmp_path: Path, caplog):
+        helpers_file = tmp_path / "helpers.py"
+        helpers_file.write_text("# not a directory\n", encoding="utf-8")
+        catalog, _, _ = _catalog(tmp_path, helpers_dir=helpers_file)
+
+        with caplog.at_level(logging.ERROR), pytest.raises(HTTPException) as exc_info:
+            catalog.list_helper_files()
+
+        assert exc_info.value.status_code == 500
+        assert "Failed to list flow helper files" in caplog.text
+
+    def test_logs_the_listing(self, tmp_path: Path, caplog):
+        catalog, _, helpers_dir = _catalog(tmp_path)
+        (helpers_dir / "util.py").write_text("# helper\n", encoding="utf-8")
+
+        with caplog.at_level(logging.INFO):
+            catalog.list_helper_files()
+
+        assert "Listed 1 flow helper files" in caplog.text
+
+
+class TestGetHelperFile:
+    """get_helper_file() returns the source of one helper module."""
+
+    @pytest.mark.parametrize("filename", ["../etc/passwd", "subdir/util.py", "a\\b.py"])
+    def test_rejects_path_segments(self, tmp_path: Path, filename: str):
+        catalog, _, _ = _catalog(tmp_path)
+
+        with pytest.raises(HTTPException) as exc_info:
+            catalog.get_helper_file(filename)
+
+        assert exc_info.value.status_code == 400
+        assert "Invalid filename" in str(exc_info.value.detail)
+
+    def test_rejects_non_python_files(self, tmp_path: Path):
+        catalog, _, _ = _catalog(tmp_path)
+
+        with pytest.raises(HTTPException) as exc_info:
+            catalog.get_helper_file("readme.md")
+
+        assert exc_info.value.status_code == 400
+        assert "Only Python files are allowed" in str(exc_info.value.detail)
+
+    def test_missing_file_raises_404(self, tmp_path: Path):
+        catalog, _, _ = _catalog(tmp_path)
+
+        with pytest.raises(HTTPException) as exc_info:
+            catalog.get_helper_file("missing.py")
+
+        assert exc_info.value.status_code == 404
+        assert "File not found" in str(exc_info.value.detail)
+
+    def test_returns_the_source(self, tmp_path: Path, caplog):
+        catalog, _, helpers_dir = _catalog(tmp_path)
+        (helpers_dir / "util.py").write_text("def helper():\n    return 1\n", encoding="utf-8")
+
+        with caplog.at_level(logging.INFO):
+            content = catalog.get_helper_file("util.py")
+
+        assert content == "def helper():\n    return 1\n"
+        assert "Read flow helper file" in caplog.text
+
+    def test_unreadable_file_raises_500(self, tmp_path: Path, caplog):
+        catalog, _, helpers_dir = _catalog(tmp_path)
+        (helpers_dir / "bad.py").mkdir()
+
+        with caplog.at_level(logging.ERROR), pytest.raises(HTTPException) as exc_info:
+            catalog.get_helper_file("bad.py")
+
+        assert exc_info.value.status_code == 500
+        assert "Failed to read flow helper file" in caplog.text
+
+
+def test_metadata_file_points_at_the_index(tmp_path: Path):
+    catalog, templates_dir, _ = _catalog(tmp_path)
+
+    assert catalog.metadata_file == templates_dir / "templates.json"

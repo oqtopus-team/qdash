@@ -38,13 +38,16 @@ class _FakeFlowRepository:
         self.create_failure: Exception | None = None
         self.delete_failure: Exception | None = None
         self.update_failure: Exception | None = None
+        self.list_failure: Exception | None = None
 
     def find_by_project_and_name(self, project_id: str, name: str) -> SimpleNamespace | None:
         """Return the configured flow."""
         return self.flow
 
     def list_by_project(self, project_id: str) -> list[SimpleNamespace]:
-        """Return the configured flow list."""
+        """Return the configured flow list, raising when a failure is configured."""
+        if self.list_failure is not None:
+            raise self.list_failure
         return self.listed
 
     def create_flow(self, **kwargs: Any) -> None:
@@ -362,6 +365,28 @@ async def test_get_flow_rejects_a_missing_source_file(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_move_flow_records_the_normalized_folder(tmp_path: Path) -> None:
+    """Moving a flow rewrites its folder and nothing else."""
+    repo = _FakeFlowRepository(flow=_make_flow(Path("/tmp/my_flow.py")))
+    service = _service(tmp_path, repo=repo)
+
+    response = await service.move_flow("my_flow", "project-1", "/daily/t1/")
+
+    assert repo.updated == [{"flow": repo.flow, "folder": "daily/t1"}]
+    assert response.folder == "daily/t1"
+    assert response.message == "Flow 'my_flow' moved to 'daily/t1'"
+
+
+@pytest.mark.asyncio
+async def test_move_flow_rejects_an_unknown_flow(tmp_path: Path) -> None:
+    """Moving a flow that does not exist is reported as not found."""
+    with pytest.raises(HTTPException) as exc_info:
+        await _service(tmp_path).move_flow("missing", "project-1", "daily")
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_list_flows_reports_whether_each_file_exists(tmp_path: Path) -> None:
     """A summary flags flows whose source is gone."""
     present = tmp_path / "user_flows" / "project-1" / "my_flow.py"
@@ -377,6 +402,19 @@ async def test_list_flows_reports_whether_each_file_exists(tmp_path: Path) -> No
     response = await service.list_flows("operator", "project-1")
 
     assert [summary.file_exists for summary in response.flows] == [True, False]
+
+
+@pytest.mark.asyncio
+async def test_list_flows_reports_a_repository_failure(tmp_path: Path) -> None:
+    """A failing flow list is reported as a server error."""
+    repo = _FakeFlowRepository()
+    repo.list_failure = RuntimeError("mongo is down")
+
+    with pytest.raises(HTTPException) as exc_info:
+        await _service(tmp_path, repo=repo).list_flows("operator", "project-1")
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to list flows: mongo is down"
 
 
 @pytest.mark.asyncio
@@ -412,6 +450,30 @@ async def test_delete_flow_reports_a_metadata_failure(tmp_path: Path) -> None:
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail == "Failed to delete flow metadata: mongo is down"
+
+
+@pytest.mark.asyncio
+async def test_delete_flow_rejects_an_unknown_flow(tmp_path: Path) -> None:
+    """Deleting a flow that does not exist is reported as not found."""
+    with pytest.raises(HTTPException) as exc_info:
+        await _service(tmp_path).delete_flow("missing", "operator", "project-1")
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_flow_skips_an_absent_deployment_and_file(tmp_path: Path) -> None:
+    """Metadata without a deployment or a file on disk is still deleted."""
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    repo = _FakeFlowRepository(flow=_make_flow(file_path, deployment_id=""))
+    coordinator = _StubCoordinator()
+    service = _service(tmp_path, repo=repo, coordinator=coordinator)
+
+    response = await service.delete_flow("my_flow", "operator", "project-1")
+
+    assert coordinator.deleted_deployments == []
+    assert repo.deleted == [("project-1", "my_flow")]
+    assert response["message"] == "Flow 'my_flow' deleted successfully"
 
 
 @pytest.mark.asyncio
@@ -489,6 +551,20 @@ async def test_execute_flow_requires_a_registered_deployment(tmp_path: Path) -> 
         )
 
     assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_rejects_an_unknown_flow(tmp_path: Path) -> None:
+    """Executing an unknown flow is reported as not found."""
+    with pytest.raises(HTTPException) as exc_info:
+        await _service(tmp_path).execute_flow(
+            name="missing",
+            request=ExecuteFlowRequest(parameters={}),
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -597,6 +673,28 @@ async def test_execute_single_task_reports_an_unavailable_system_deployment(
 
 
 @pytest.mark.asyncio
+async def test_execute_single_task_reports_a_dispatch_failure(tmp_path: Path) -> None:
+    """A failed single-task dispatch is surfaced as a server error."""
+    service = _service(
+        tmp_path,
+        coordinator=_StubCoordinator(dispatch_failure=FlowDispatchError("prefect is down")),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_single_task_from_snapshot(
+            task_name="CheckRabi",
+            qid="Q00",
+            chip_id="chip-1",
+            source_execution_id="execution-1",
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to execute single task: prefect is down"
+
+
+@pytest.mark.asyncio
 async def test_execute_calibration_pipeline_adds_the_pipeline_tag(tmp_path: Path) -> None:
     """Pipeline runs merge their own tags, request tags and the pipeline marker."""
     coordinator = _StubCoordinator()
@@ -617,6 +715,26 @@ async def test_execute_calibration_pipeline_adds_the_pipeline_tag(tmp_path: Path
     assert call["parameters"]["spec"] == spec
     assert call["workflow"] is True
     assert response.message == "Calibration pipeline 'pipe' started"
+
+
+@pytest.mark.asyncio
+async def test_execute_calibration_pipeline_reports_a_dispatch_failure(tmp_path: Path) -> None:
+    """A failed pipeline dispatch is surfaced as a server error."""
+    service = _service(
+        tmp_path,
+        coordinator=_StubCoordinator(dispatch_failure=FlowDispatchError("prefect is down")),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_calibration_pipeline(
+            spec={"name": "pipe", "steps": []},
+            chip_id="chip-1",
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to execute calibration pipeline: prefect is down"
 
 
 @pytest.mark.asyncio

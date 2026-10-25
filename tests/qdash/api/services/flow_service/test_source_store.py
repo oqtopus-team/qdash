@@ -89,3 +89,16 @@ def test_to_deployment_path_leaves_unrelated_path_unchanged(tmp_path: Path) -> N
     store = FlowSourceStore(tmp_path / "user_flows")
 
     assert store.to_deployment_path(Path("/tmp/myflow.py")) == Path("/tmp/myflow.py")
+
+
+def test_base_dir_returns_configured_root(tmp_path: Path) -> None:
+    store = FlowSourceStore(tmp_path)
+    assert store.base_dir == tmp_path
+
+
+def test_exists_reports_presence(tmp_path: Path) -> None:
+    store = FlowSourceStore(tmp_path)
+    path = tmp_path / "missing.py"
+    assert store.exists(path) is False
+    path.write_text("# ok\n", encoding="utf-8")
+    assert store.exists(path) is True
