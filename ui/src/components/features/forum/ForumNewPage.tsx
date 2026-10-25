@@ -117,6 +117,8 @@ export function ForumNewPage() {
   const { uploadImage } = useImageUpload("forum");
   const { triggerAiReply } = useForumAiReply();
   const editorSnapshotRef = useRef<ForumBlockSnapshotGetter | null>(null);
+  const submitLockRef = useRef(false);
+  const createdRef = useRef(false);
   const fromQuery = searchParams.get("from");
   const forumReturnHref = fromQuery ? `/forum?${fromQuery.replace(/^\?/, "")}` : "/forum";
 
@@ -258,6 +260,7 @@ export function ForumNewPage() {
           task_id: linkedTaskId,
         },
       });
+      createdRef.current = true;
       queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
       if (/@qdash\b/i.test(values.content)) {
         triggerAiReply(response.data.id, values.content, () => {
@@ -287,12 +290,19 @@ export function ForumNewPage() {
   /** Takes the editor snapshot, syncs it into the form, then validates and submits. */
   const handleCreate = async (event?: React.BaseSyntheticEvent) => {
     event?.preventDefault();
-    const snapshot = await editorSnapshotRef.current?.();
-    if (snapshot) {
-      contentBlocksRef.current = snapshot.blocks;
-      setValue("content", snapshot.markdown);
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
+    try {
+      const snapshot = await editorSnapshotRef.current?.();
+      if (snapshot) {
+        contentBlocksRef.current = snapshot.blocks;
+        setValue("content", snapshot.markdown);
+      }
+      await handleSubmit(submit)(event);
+    } finally {
+      // Keep the lock after creation until navigation unmounts the page.
+      if (!createdRef.current) submitLockRef.current = false;
     }
-    await handleSubmit(submit)(event);
   };
 
   const chipField = register("chipId");

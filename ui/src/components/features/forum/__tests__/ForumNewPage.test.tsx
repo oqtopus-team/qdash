@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ForumNewPage } from "../ForumNewPage";
@@ -147,14 +147,88 @@ describe("ForumNewPage", () => {
     expect(screen.getByTestId("label-picker").dataset.disabled).toBe("true");
   });
 
-  it("does not submit when Enter is pressed in the title", async () => {
+  it("cancels non-composing Enter in the title", () => {
     mocks.params = new URLSearchParams({ title: "T", content: "C" });
     mocks.mutateAsync.mockResolvedValue({ data: { id: "post-5" } });
     render(<ForumNewPage />);
-    fireEvent.keyDown(screen.getByLabelText("Thread title"), { key: "Enter" });
+    const notCancelled = fireEvent.keyDown(screen.getByLabelText("Thread title"), {
+      key: "Enter",
+    });
 
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(notCancelled).toBe(false);
     expect(mocks.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("does not cancel composing Enter in the title", () => {
+    render(<ForumNewPage />);
+    const notCancelled = fireEvent.keyDown(screen.getByLabelText("Thread title"), {
+      key: "Enter",
+      isComposing: true,
+    });
+
+    expect(notCancelled).toBe(true);
+    expect(mocks.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("ignores repeated submissions while the editor snapshot is pending", async () => {
+    mocks.params = new URLSearchParams({ title: "T", content: "C" });
+    const snapshot = Promise.withResolvers<undefined>();
+    mocks.snapshot.mockReturnValue(snapshot.promise);
+    mocks.mutateAsync.mockResolvedValue({ data: { id: "post-1" } });
+    render(<ForumNewPage />);
+    submit();
+    submit();
+
+    expect(mocks.snapshot).toHaveBeenCalledTimes(1);
+    expect(mocks.mutateAsync).not.toHaveBeenCalled();
+    await act(async () => snapshot.resolve(undefined));
+
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores repeated submissions after creation while navigation is pending", async () => {
+    mocks.params = new URLSearchParams({ title: "T", content: "C" });
+    mocks.mutateAsync.mockResolvedValue({ data: { id: "post-1" } });
+    render(<ForumNewPage />);
+    await act(async () => submit());
+    expect(mocks.push).toHaveBeenCalledWith("/forum/post-1");
+
+    await act(async () => submit());
+
+    expect(mocks.snapshot).toHaveBeenCalledTimes(1);
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows retrying after correcting a validation error", async () => {
+    mocks.params = new URLSearchParams({ content: "C" });
+    mocks.mutateAsync.mockResolvedValue({ data: { id: "post-1" } });
+    render(<ForumNewPage />);
+    await act(async () => submit());
+    expect(screen.getByText("Title is required")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Thread title"), { target: { value: "T" } });
+
+    await act(async () => submit());
+
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith("/forum/post-1");
+  });
+
+  it("allows retrying after a failed create request", async () => {
+    mocks.params = new URLSearchParams({ title: "T", content: "C" });
+    mocks.mutateAsync
+      .mockRejectedValueOnce(new Error("Request failed"))
+      .mockResolvedValueOnce({ data: { id: "post-1" } });
+    render(<ForumNewPage />);
+    await act(async () => submit());
+    expect(screen.getByRole("alert")).toBeTruthy();
+
+    await act(async () => submit());
+
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(2);
+    expect(mocks.push).toHaveBeenCalledWith("/forum/post-1");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("clears the category error once a valid category is chosen", async () => {
