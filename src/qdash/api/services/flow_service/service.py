@@ -117,7 +117,10 @@ class FlowService:
             logger.info(f"Registered deployment: {deployment_id}")
         except Exception as exc:
             logger.error(f"Failed to register deployment: {exc}")
-            self._discard_file(file_path)
+            if existing_flow and old_source is not None:
+                self._sources.write(file_path, old_source)
+            else:
+                self._discard_file(file_path)
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to register deployment: {exc}",
