@@ -3761,6 +3761,214 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CheckSpinLockSpectroscopy",
+        "description": "Measure T1-rho and T2-rho over a hardware-feasible Rabi-frequency sweep.",
+        "file_path": "measurement/check_spin_lock_spectroscopy.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "parameter_name": "control_amplitude",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_frequency": {
+            "default_value": null,
+            "description": "Calibrated GE control frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "hpi_amplitude": {
+            "default_value": null,
+            "description": "Calibrated half-pi pulse amplitude",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_duration": {
+            "default_value": null,
+            "description": "Calibrated half-pi pulse duration",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "maximum_rabi_frequency": {
+            "default_value": null,
+            "parameter_name": "maximum_rabi_frequency",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "MHz/a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_amplitude": {
+            "default_value": null,
+            "parameter_name": "rabi_amplitude",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_angle": {
+            "default_value": null,
+            "parameter_name": "rabi_angle",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "rad",
+            "user_override": "allowed"
+          },
+          "rabi_distance": {
+            "default_value": null,
+            "parameter_name": "rabi_distance",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_noise": {
+            "default_value": null,
+            "parameter_name": "rabi_noise",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_offset": {
+            "default_value": null,
+            "parameter_name": "rabi_offset",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_phase",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_r2": {
+            "default_value": null,
+            "parameter_name": "rabi_r2",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "",
+            "user_override": "allowed"
+          },
+          "rabi_reference_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_reference_phase",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "description": "Calibrated readout amplitude",
+            "greater_than": 0,
+            "less_than_or_equal": 1,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "description": "Calibrated readout frequency",
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "t1": {
+            "default_value": 0,
+            "description": "T1 used to derive the duration sweep; zero means unavailable",
+            "greater_than_or_equal": 0,
+            "resolution": "database_or_default",
+            "unit": "μs",
+            "user_override": "allowed"
+          },
+          "t2_echo": {
+            "default_value": 0,
+            "description": "T2 echo used to derive the duration sweep; zero means unavailable",
+            "greater_than_or_equal": 0,
+            "resolution": "database_or_default",
+            "unit": "μs",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckSpinLockSpectroscopy",
+        "run_parameters": {
+          "duration_range": {
+            "description": "Explicit flat-top duration sweep. When unset, derive it from QDash T1/T2 echo values or use 100 ns to 200 μs when both are unavailable.",
+            "unit": "ns",
+            "value": null,
+            "value_type": "list"
+          },
+          "interval": {
+            "description": "Interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Shots per expectation value",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "spin_lock_frequency_range": {
+            "description": "Requested spin-lock Rabi-frequency sweep",
+            "unit": "GHz",
+            "value": [
+              0.004,
+              0.1,
+              25
+            ],
+            "value_type": "np.linspace"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckStatus",
         "description": "Task to check the status of the experiment.",
         "file_path": "box_setup/check_status.py",
