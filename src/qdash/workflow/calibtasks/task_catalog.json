@@ -3680,6 +3680,9 @@
           }
         },
         "name": "CheckQuantumEfficiency",
+        "output_parameters": [
+          "quantum_efficiency"
+        ],
         "run_parameters": {
           "amplitude_range": {
             "description": "Readout-amplitude sweep. Uses Qubex's target-specific geometric default when unset.",
