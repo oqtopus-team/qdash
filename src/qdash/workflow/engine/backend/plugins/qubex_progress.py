@@ -183,6 +183,8 @@ def _select_progress_bar(task_name: str, description: str) -> bool:
     if task_name == "CheckResonatorSpectroscopy":
         ignored = ("electrical delay", "subrange", "within subrange")
         return not any(fragment in normalized for fragment in ignored)
+    if task_name == "CheckCPMGNoiseSpectroscopy":
+        return normalized.endswith("frequencies")
     return True
 
 
@@ -226,6 +228,7 @@ def _install_adapter() -> None:
         characterization_service,
         measurement_service,
         ckp_characterization,
+        importlib.import_module("qubex.contrib.experiment.cpmg_noise_spectroscopy"),
         importlib.import_module("qubex.contrib.experiment.quantum_efficiency_measurement"),
         importlib.import_module("qubex.contrib.experiment.spin_lock_relaxation"),
     ]

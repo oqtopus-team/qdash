@@ -774,6 +774,62 @@ class TestRestoreCalibrationContext:
         if pulse_type.startswith("drag_"):
             assert pulse["beta"] == 0.25
 
+    @pytest.mark.parametrize(
+        ("amplitude", "duration", "beta"),
+        [
+            (0.0, 0.0, 0.0),
+            (0.1, 0.0, -0.4),
+            (0.0, 40.0, -0.4),
+            (0.1, 40.0, float("inf")),
+        ],
+    )
+    def test_skips_unusable_optional_drag_fallback_values(
+        self,
+        amplitude: float,
+        duration: float,
+        beta: float,
+    ) -> None:
+        """An absent optional DRAG calibration should not replace the Qubex context."""
+        optional_drag_spec = {
+            name: InputParameterSpec.database_or_default(default=0)
+            for name in ("drag_pi_amplitude", "drag_pi_duration", "drag_pi_beta")
+        }
+        with patch.object(ConcreteQubexTask, "input_spec", optional_drag_spec):
+            task = ConcreteQubexTask()
+            task.input_parameters = {
+                "drag_pi_amplitude": ParameterModel(value=amplitude),
+                "drag_pi_duration": ParameterModel(value=duration),
+                "drag_pi_beta": ParameterModel(value=beta),
+            }
+            exp = MagicMock()
+            backend = MagicMock()
+            backend.get_instance.return_value = exp
+
+            task._restore_qubit_pulse_context(backend, "0")
+
+        exp.calib_note.update_drag_pi_param.assert_not_called()
+
+    def test_does_not_treat_required_drag_values_as_optional_fallbacks(self) -> None:
+        """The optional sentinel policy should not alter existing required DRAG groups."""
+        required_drag_spec = {
+            name: InputParameterSpec.required_database()
+            for name in ("drag_pi_amplitude", "drag_pi_duration", "drag_pi_beta")
+        }
+        with patch.object(ConcreteQubexTask, "input_spec", required_drag_spec):
+            task = ConcreteQubexTask()
+            task.input_parameters = {
+                "drag_pi_amplitude": ParameterModel(value=0.0),
+                "drag_pi_duration": ParameterModel(value=0.0),
+                "drag_pi_beta": ParameterModel(value=0.0),
+            }
+            exp = MagicMock()
+            backend = MagicMock()
+            backend.get_instance.return_value = exp
+
+            task._restore_qubit_pulse_context(backend, "0")
+
+        exp.calib_note.update_drag_pi_param.assert_called_once()
+
     def test_restores_two_qubit_pulses_using_each_qubit_id(self) -> None:
         task = ConcreteQubexTask()
         task.input_parameters = {

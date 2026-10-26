@@ -237,6 +237,21 @@ def test_capture_qubex_progress_patches_spin_lock_spectroscopy() -> None:
     assert {event.description for event in events} == {"Spin-lock spectroscopy: Q00"}
 
 
+def test_capture_qubex_progress_selects_cpmg_frequency_sweep() -> None:
+    """CPMG progress should follow frequencies instead of the outer repeat loop."""
+    cpmg = importlib.import_module("qubex.contrib.experiment.cpmg_noise_spectroscopy")
+
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(events.append, task_name="CheckCPMGNoiseSpectroscopy"):
+        list(_service_tqdm(cpmg)(range(1), desc="CPMG repetitions", file=StringIO()))
+        list(_service_tqdm(cpmg)(range(3), desc="Q00 frequencies", file=StringIO()))
+
+    assert events[0].current == 0
+    assert events[-1].current == 3
+    assert events[-1].total == 3
+    assert {event.description for event in events} == {"Q00 frequencies"}
+
+
 def test_rabi_progress_labels_disabled_qubex_sweep() -> None:
     """Disabled internal bars should count and receive a task-specific label."""
     from qubex.experiment.services import measurement_service
