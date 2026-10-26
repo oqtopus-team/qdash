@@ -195,6 +195,27 @@ def test_capture_qubex_progress_patches_filtered_ckp() -> None:
     assert events[-1].has_multiple_phases is True
 
 
+def test_capture_qubex_progress_patches_quantum_efficiency() -> None:
+    """Quantum efficiency's combined sweep should be visible in QDash."""
+    import importlib
+
+    module = importlib.import_module("qubex.contrib.experiment.quantum_efficiency_measurement")
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(events.append, task_name="CheckQuantumEfficiency"):
+        progress = _service_tqdm(module)(
+            total=4,
+            desc="Quantum efficiency: Q00",
+            file=StringIO(),
+        )
+        progress.update(4)
+        progress.close()
+
+    assert events[0].current == 0
+    assert events[-1].current == 4
+    assert events[-1].total == 4
+    assert {event.description for event in events} == {"Quantum efficiency: Q00"}
+
+
 def test_rabi_progress_labels_disabled_qubex_sweep() -> None:
     """Disabled internal bars should count and receive a task-specific label."""
     from qubex.experiment.services import measurement_service

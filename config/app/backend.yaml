@@ -35,6 +35,7 @@ backends:
         - CheckRabi
         - CheckCoarseReadoutParams
         - CheckCKP
+        - CheckQuantumEfficiency
         - CreateHPIPulse
         - CheckHPIPulse
         - CreatePIPulse

@@ -217,6 +217,8 @@ def _install_adapter() -> None:
     if _installed:
         return
 
+    import importlib
+
     from qubex.contrib.experiment import ckp_characterization
     from qubex.experiment.services import characterization_service, measurement_service
 
@@ -224,6 +226,7 @@ def _install_adapter() -> None:
         characterization_service,
         measurement_service,
         ckp_characterization,
+        importlib.import_module("qubex.contrib.experiment.quantum_efficiency_measurement"),
     ):
         module.__dict__["tqdm"] = ReportingTqdm
     _installed = True
