@@ -1,5 +1,6 @@
 """Tests for the Qubex quantum-efficiency task."""
 
+import inspect
 from contextlib import contextmanager
 from types import SimpleNamespace
 from typing import Any, cast
@@ -108,6 +109,16 @@ def _result(efficiency: float = 0.42) -> Any:
         figure=overview,
         figures={"overview": overview, "snr": go.Figure(), "dephasing": go.Figure()},
     )
+
+
+def test_qubex_api_provides_the_defaults_used_by_the_task() -> None:
+    """Keep the locked Qubex revision aligned with this task's thin wrapper."""
+    parameters = inspect.signature(qubex.contrib.quantum_efficiency_measurement).parameters
+
+    assert parameters["amplitude_range"].default is None
+    assert parameters["phase_range"].default is None
+    assert parameters["readout_amplitude"].default is None
+    assert parameters["enable_tqdm"].default is True
 
 
 def test_run_passes_only_supported_measurement_options(
