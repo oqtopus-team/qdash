@@ -27,15 +27,13 @@ matchesAny(attributes[?"path"].orValue(""), [
 # `filter` runs *after* a regex match and can inspect the finding.
 # betterleaks exposes the clean value in finding["secret"]; we match the mongodb
 # URI here (Gitleaks used regexTarget="match") because betterleaks' finding["match"]
-# includes a trailing quote that would break the `$` anchor. The WebSocket
-# value below is the fixed RFC 6455 handshake example ("the sample nonce").
+# includes a trailing quote that would break the `$` anchor.
 # ---------------------------------------------------------------------------
 filter = '''
 matchesAny(finding["secret"], [
   r"""^mongodb://root:example@mongo:27017(/.*)?$""",
   r"""^ADMIN_TOKEN$""",
   r"""^YOUR_TOKEN$""",
-  r"""^dGhlIHNhbXBsZSBub25jZQ==$""",
   r"""^x90_gate_fidelity$""",
   r"""^x180_gate_fidelity$""",
   r"""^zx90_gate_fidelity$""",
