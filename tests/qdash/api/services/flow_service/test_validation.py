@@ -174,8 +174,9 @@ class TestFormatWithRuff:
 
     @patch("subprocess.run")
     def test_success_logs_info(self, mock_run, caplog):
+        """A successful ruff run logs at INFO."""
         mock_run.return_value = MagicMock(returncode=0, stderr="")
-        with caplog.at_level(logging.INFO):
+        with caplog.at_level(logging.INFO, logger="uvicorn.app"):
             format_with_ruff(Path("/tmp/test_flow.py"))
         assert mock_run.called
         cmd = mock_run.call_args[0][0]

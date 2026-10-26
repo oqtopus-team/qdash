@@ -196,10 +196,11 @@ class TestListHelperFiles:
         assert "Failed to list flow helper files" in caplog.text
 
     def test_logs_the_listing(self, tmp_path: Path, caplog):
+        """Listing helper files logs how many were found."""
         catalog, _, helpers_dir = _catalog(tmp_path)
         (helpers_dir / "util.py").write_text("# helper\n", encoding="utf-8")
 
-        with caplog.at_level(logging.INFO):
+        with caplog.at_level(logging.INFO, logger="uvicorn.app"):
             catalog.list_helper_files()
 
         assert "Listed 1 flow helper files" in caplog.text
@@ -237,10 +238,11 @@ class TestGetHelperFile:
         assert "File not found" in str(exc_info.value.detail)
 
     def test_returns_the_source(self, tmp_path: Path, caplog):
+        """Reading a helper file returns its source."""
         catalog, _, helpers_dir = _catalog(tmp_path)
         (helpers_dir / "util.py").write_text("def helper():\n    return 1\n", encoding="utf-8")
 
-        with caplog.at_level(logging.INFO):
+        with caplog.at_level(logging.INFO, logger="uvicorn.app"):
             content = catalog.get_helper_file("util.py")
 
         assert content == "def helper():\n    return 1\n"

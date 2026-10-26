@@ -79,8 +79,9 @@ class FlowService:
     ) -> SaveFlowResponse:
         """Validate, store and deploy a flow, then upsert its metadata.
 
-        A failed registration or metadata write removes the file it just wrote,
-        so a half-saved flow never keeps a source that is not registered.
+        On an update with an existing file, a failed registration or metadata
+        write puts the previous source back; otherwise it removes the file it
+        just wrote. The previous deployment may already have been replaced.
         """
         validate_flow_name(request.name)
         # None keeps the stored folder, so a client that does not know about
@@ -98,7 +99,7 @@ class FlowService:
         old_deployment_id = existing_flow.deployment_id if existing_flow else None
 
         # Read the old source on an update path, so we can restore it if the
-        # metadata write fails later.
+        # registration or the metadata write fails later.
         old_source: str | None = None
         if existing_flow and self._sources.exists(file_path):
             old_source = self._sources.read(file_path)

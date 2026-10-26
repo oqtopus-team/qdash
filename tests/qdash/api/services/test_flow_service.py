@@ -881,3 +881,37 @@ async def test_save_flow_restores_old_source_when_update_metadata_fails(
     assert exc_info.value.detail == "Failed to save flow metadata: mongo is down"
     assert file_path.exists()
     assert file_path.read_text(encoding="utf-8") == FLOW_CODE
+
+
+@pytest.mark.asyncio
+async def test_save_flow_restores_old_source_when_update_registration_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """On update, a failed registration restores the previous source."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text(FLOW_CODE, encoding="utf-8")
+    repo = _FakeFlowRepository(flow=_make_flow(file_path))
+    service = _service(
+        tmp_path,
+        repo=repo,
+        deployment=_StubDeploymentClient(
+            failure=DeploymentRegistrationError("500: worker is down")
+        ),
+    )
+
+    new_code = FLOW_CODE + "\n# updated\n"
+    with pytest.raises(HTTPException) as exc_info:
+        await service.save_flow(
+            SaveFlowRequest(name="my_flow", code=new_code, chip_id="chip-1"),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to register deployment: 500: worker is down"
+    assert file_path.exists()
+    assert file_path.read_text(encoding="utf-8") == FLOW_CODE
+    assert repo.updated == []
