@@ -33,6 +33,9 @@ from qdash.workflow.calibtasks.qubex.measurement.check_ckp import CheckCKP
 from qdash.workflow.calibtasks.qubex.measurement.check_quantum_efficiency import (
     CheckQuantumEfficiency,
 )
+from qdash.workflow.calibtasks.qubex.measurement.check_spin_lock_spectroscopy import (
+    CheckSpinLockSpectroscopy,
+)
 from qdash.workflow.calibtasks.qubex.measurement.check_thermal_excitation import (
     CheckThermalExcitation,
 )
@@ -114,6 +117,7 @@ __all__ = [
     "CheckRabi",
     "CheckRamsey",
     "CheckResonatorSpectroscopy",
+    "CheckSpinLockSpectroscopy",
     "CheckStatus",
     "CheckT1",
     "CheckT1Average",

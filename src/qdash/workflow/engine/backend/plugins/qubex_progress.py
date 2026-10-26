@@ -222,12 +222,19 @@ def _install_adapter() -> None:
     from qubex.contrib.experiment import ckp_characterization
     from qubex.experiment.services import characterization_service, measurement_service
 
-    for module in (
+    modules = [
         characterization_service,
         measurement_service,
         ckp_characterization,
-        importlib.import_module("qubex.contrib.experiment.quantum_efficiency_measurement"),
-    ):
+        importlib.import_module(
+            "qubex.contrib.experiment.quantum_efficiency_measurement"
+        ),
+        importlib.import_module(
+            "qubex.contrib.experiment.spin_lock_relaxation"
+        ),
+    ]
+
+    for module in modules:
         module.__dict__["tqdm"] = ReportingTqdm
     _installed = True
 
