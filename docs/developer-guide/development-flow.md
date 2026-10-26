@@ -83,11 +83,15 @@ Betterleaks runs on every commit via a Lefthook-managed pre-commit hook and bloc
 | Command                  | Description                                              |
 | ------------------------ | -------------------------------------------------------- |
 | `task scan-leaks`        | Scan the entire repository with Betterleaks              |
+| `task scan-leaks-local` | Scan tracked working files and commits absent from the target branch |
 | `task scan-leaks-staged` | Scan staged files only                                   |
 | `task scan-secrets`      | Scan git history with Trufflehog (verified secrets only) |
 | `task scan-secrets-all`  | Scan git history with Trufflehog (all findings)          |
 
-`task check` includes `scan-leaks`.
+`task check` includes `scan-leaks-local`. The default target is `origin/develop`;
+use `task check LEAKS_BASE=origin/main` for another target. See the
+[local scan boundaries](./conventions/credential-scan.md#running-locally) for prerequisites
+and excluded files.
 
 ## Pull Requests
 
