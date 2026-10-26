@@ -63,7 +63,6 @@ Value exemptions (in `filter`):
 | --- | --- | --- |
 | `mongodb://root:example@mongo:27017` | `finding["secret"]` | Local-dev compose default. The hostname `mongo` resolves only inside the compose network and the password is literally the word `example` — it is not a secret in any environment, just an example value. (Gitleaks used `regexTarget = "match"`; Betterleaks captures the clean URI in `finding["secret"]`, so the filter matches there.) |
 | `ADMIN_TOKEN`, `YOUR_TOKEN` | `finding["secret"]` | Documentation placeholder token names, not real credentials. |
-| `dGhlIHNhbXBsZSBub25jZQ==` | `finding["secret"]` | Fixed WebSocket handshake example from RFC 6455. It decodes to `the sample nonce` and is not a credential. |
 | `x90_gate_fidelity`, `x180_gate_fidelity`, `zx90_gate_fidelity` | `finding["secret"]` | Quantum gate fidelity metric names that resemble high-entropy tokens. |
 
 The shared property of every path entry is **generation-owned**: the file is rewritten by a tool, not by a human. A developer pasting a real credential into one of these files would lose it on the next regeneration step, so the scanning blind spot has no practical attack surface. The value entries cover fixed sample/placeholder strings that are identical across every developer's machine.
