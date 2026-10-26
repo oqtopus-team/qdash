@@ -217,14 +217,24 @@ def _install_adapter() -> None:
     if _installed:
         return
 
+    import importlib
+
     from qubex.contrib.experiment import ckp_characterization
     from qubex.experiment.services import characterization_service, measurement_service
 
-    for module in (
+    modules = [
         characterization_service,
         measurement_service,
         ckp_characterization,
-    ):
+    ]
+    module_name = "qubex.contrib.experiment.spin_lock_relaxation"
+    try:
+        modules.append(importlib.import_module(module_name))
+    except ModuleNotFoundError as exc:
+        if exc.name != module_name:
+            raise
+
+    for module in modules:
         module.__dict__["tqdm"] = ReportingTqdm
     _installed = True
 

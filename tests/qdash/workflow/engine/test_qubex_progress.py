@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 from io import StringIO
 from typing import TYPE_CHECKING, cast
 
@@ -193,6 +194,26 @@ def test_capture_qubex_progress_patches_filtered_ckp() -> None:
     assert events[-1].total == 2
     assert {event.description for event in events} == {"Filtered CKP sweep"}
     assert events[-1].has_multiple_phases is True
+
+
+def test_capture_qubex_progress_patches_spin_lock_spectroscopy() -> None:
+    """Spin-lock's outer frequency sweep should be visible in QDash."""
+    spin_lock = importlib.import_module("qubex.contrib.experiment.spin_lock_relaxation")
+
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(events.append, task_name="CheckSpinLockSpectroscopy"):
+        list(
+            _service_tqdm(spin_lock)(
+                range(2),
+                desc="Spin-lock spectroscopy: Q00",
+                file=StringIO(),
+            )
+        )
+
+    assert events[0].current == 0
+    assert events[-1].current == 2
+    assert events[-1].total == 2
+    assert {event.description for event in events} == {"Spin-lock spectroscopy: Q00"}
 
 
 def test_rabi_progress_labels_disabled_qubex_sweep() -> None:

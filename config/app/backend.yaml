@@ -53,6 +53,7 @@ backends:
         - CheckAdaptiveFHChevron
         - EFReadoutClassification
         - CheckThermalExcitation
+        - CheckSpinLockSpectroscopy
         - ReadoutClassification
         - RandomizedBenchmarking
         - X90InterleavedRandomizedBenchmarking
