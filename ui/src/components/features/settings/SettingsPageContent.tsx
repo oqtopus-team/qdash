@@ -38,6 +38,7 @@ type Tab = (typeof TABS)[number];
 
 const editableProjectRoles: ProjectRole[] = ["viewer", "editor"];
 
+/** Returns the DaisyUI badge class for a project role. */
 function roleBadgeClass(role: ProjectRole) {
   if (role === "owner") return "badge-secondary";
   if (role === "editor") return "badge-primary";
