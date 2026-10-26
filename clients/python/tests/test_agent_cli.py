@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 from qdash.client.services import agent_cli
 from qdash.client.services.agent_runner import (
-    AgentCampaignOutcome,
+    AgentPlanOutcome,
     AgentSkillTransition,
     AgentStepOutcome,
 )
@@ -62,6 +62,8 @@ def test_start_session_uses_profile_and_bounded_policy(
             "quality_gates": {},
             "allow_reconfigure": False,
             "max_actions": 100,
+            "autonomy": "confirm_each",
+            "max_rounds_per_target": 3,
         },
         expires_in_seconds=21_600,
         skill_name="qubit-characterize",
@@ -168,7 +170,7 @@ def test_run_step_prints_typed_transition(
     client.close.assert_called_once()
 
 
-def test_run_campaign_parses_plan_and_prints_audit_outcome(
+def test_run_plan_parses_plan_and_prints_audit_outcome(
     monkeypatch,
     capsys,
 ) -> None:
@@ -176,16 +178,16 @@ def test_run_campaign_parses_plan_and_prints_audit_outcome(
     captured: dict[str, object] = {}
     monkeypatch.setattr(agent_cli.QDashClient, "from_profile", lambda profile: client)
 
-    class FakeCampaignRunner:
+    class FakePlanRunner:
         def __init__(self, runner_client, **kwargs):
             captured["client"] = runner_client
             captured["runner_kwargs"] = kwargs
 
-        def run_campaign(self, **kwargs):
-            captured["campaign_kwargs"] = kwargs
-            return AgentCampaignOutcome(
+        def run_plan(self, **kwargs):
+            captured["plan_kwargs"] = kwargs
+            return AgentPlanOutcome(
                 transition=AgentSkillTransition.PASS,
-                reason="Campaign completed 2 nodes",
+                reason="Plan completed 2 nodes",
                 session_id="session-1",
                 qid="Q00",
                 source_execution_id="source-1",
@@ -196,13 +198,13 @@ def test_run_campaign_parses_plan_and_prints_audit_outcome(
                 node_path=("calibrate", "verify"),
             )
 
-    monkeypatch.setattr(agent_cli, "AgentCampaignRunner", FakeCampaignRunner)
+    monkeypatch.setattr(agent_cli, "AgentPlanRunner", FakePlanRunner)
 
     exit_code = agent_cli.run(
         [
             "--profile",
             "lab",
-            "run-campaign",
+            "run-plan",
             "--session-id",
             "session-1",
             "--qid",
@@ -227,7 +229,7 @@ def test_run_campaign_parses_plan_and_prints_audit_outcome(
                 ]
             ),
             "--idempotency-prefix",
-            "campaign-key",
+            "plan-key",
             "--max-node-executions",
             "4",
             "--commit-on-success",
@@ -239,14 +241,14 @@ def test_run_campaign_parses_plan_and_prints_audit_outcome(
     assert payload["transition"] == "pass"
     assert payload["completed_nodes"] == 2
     assert payload["node_path"] == ["calibrate", "verify"]
-    assert payload["campaign_commit"] is None
+    assert payload["candidate_set_commit"] is None
     assert payload["planner_decisions"] == []
-    campaign_kwargs = captured["campaign_kwargs"]
-    assert isinstance(campaign_kwargs, dict)
-    assert campaign_kwargs["idempotency_prefix"] == "campaign-key"
-    assert campaign_kwargs["max_node_executions"] == 4
-    assert campaign_kwargs["commit_on_success"] is True
-    nodes = campaign_kwargs["nodes"]
+    plan_kwargs = captured["plan_kwargs"]
+    assert isinstance(plan_kwargs, dict)
+    assert plan_kwargs["idempotency_prefix"] == "plan-key"
+    assert plan_kwargs["max_node_executions"] == 4
+    assert plan_kwargs["commit_on_success"] is True
+    nodes = plan_kwargs["nodes"]
     assert isinstance(nodes, list)
     assert [node.task_name for node in nodes] == ["CheckT1", "CheckT2"]
     assert nodes[0].node_id == "calibrate"
@@ -255,3 +257,128 @@ def test_run_campaign_parses_plan_and_prints_audit_outcome(
     assert nodes[0].commit_candidate is False
     assert nodes[1].apply_backend is False
     client.close.assert_called_once()
+
+
+def _auto_session(autonomy: str):
+    from qdash.client.services.models import AgentSessionResponse
+
+    return AgentSessionResponse.model_validate(
+        {
+            "session_id": "session-1",
+            "project_id": "project-1",
+            "chip_id": "chip-1",
+            "created_by": "tester",
+            "policy": {
+                "qids": ["Q00"],
+                "allowed_tasks": ["CheckRabi", "CheckChevron"],
+                "allowed_actions": ["run_task"],
+                "allowed_overrides": {"control_amplitude": {"minimum": 0.01, "maximum": 0.05}},
+                "max_actions": 10,
+                "autonomy": autonomy,
+                "max_rounds_per_target": 2,
+            },
+            "skill_name": "qdash-calibration-agent",
+            "skill_version": "1",
+            "skill_hash": "sha256:test",
+            "model_name": "local-model",
+            "status": "active",
+            "state_version": 0,
+            "action_count": 0,
+            "created_at": "2026-07-13T00:00:00Z",
+            "updated_at": "2026-07-13T00:00:00Z",
+            "expires_at": "2026-07-14T00:00:00Z",
+        }
+    )
+
+
+_PLAN = json.dumps(
+    [
+        {"id": "rabi", "task_name": "CheckRabi", "candidate_parameter": "control_amplitude"},
+        {"id": "chevron", "task_name": "CheckChevron", "candidate_parameter": "control_amplitude"},
+    ]
+)
+
+
+def test_run_plan_evaluation_planner_needs_an_auto_session(monkeypatch, capsys) -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _auto_session("confirm_each")
+    monkeypatch.setattr(agent_cli.QDashClient, "from_profile", lambda profile: client)
+    runner = MagicMock()
+    monkeypatch.setattr(agent_cli, "AgentPlanRunner", runner)
+
+    exit_code = agent_cli.run(
+        [
+            "--profile",
+            "lab",
+            "run-plan",
+            "--session-id",
+            "session-1",
+            "--qid",
+            "Q00",
+            "--plan",
+            _PLAN,
+            "--planner",
+            "evaluation",
+        ]
+    )
+
+    assert exit_code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["transition"] == "human_escalation"
+    assert "autonomy='auto'" in payload["reason"]
+    runner.return_value.run_plan.assert_not_called()
+
+
+def test_run_plan_evaluation_planner_is_built_from_the_session(monkeypatch, capsys) -> None:
+    from qdash.client.services.evaluation_planner import EvaluationPlanner
+
+    client = MagicMock()
+    client.get_agent_session.return_value = _auto_session("auto")
+    monkeypatch.setattr(agent_cli.QDashClient, "from_profile", lambda profile: client)
+    captured: dict[str, object] = {}
+
+    class FakePlanRunner:
+        def __init__(self, runner_client, **kwargs):
+            pass
+
+        def run_plan(self, **kwargs):
+            captured.update(kwargs)
+            return AgentPlanOutcome(
+                transition=AgentSkillTransition.PASS,
+                reason="Plan completed 1 nodes",
+                session_id="session-1",
+                qid="Q00",
+                source_execution_id=None,
+                completed_nodes=1,
+                attempts=1,
+                outcomes=(),
+                node_path=("rabi",),
+            )
+
+    monkeypatch.setattr(agent_cli, "AgentPlanRunner", FakePlanRunner)
+
+    exit_code = agent_cli.run(
+        [
+            "--profile",
+            "lab",
+            "run-plan",
+            "--session-id",
+            "session-1",
+            "--qid",
+            "Q00",
+            "--plan",
+            _PLAN,
+            "--planner",
+            "evaluation",
+            "--evaluation-timeout-seconds",
+            "42",
+        ]
+    )
+
+    assert exit_code == 0
+    planner = captured["planner"]
+    assert isinstance(planner, EvaluationPlanner)
+    assert planner.max_rounds_per_target == 2
+    assert captured["max_node_executions"] == 4  # 2 nodes x 2 rounds
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["evaluations"] == []

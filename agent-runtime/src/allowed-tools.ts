@@ -74,7 +74,7 @@ export const EXPERIMENTAL_WRITE_TOOL_NAMES = [
   "qdash_submit_agent_action",
   "qdash_commit_agent_candidate",
   "qdash_execute_agent_action",
-  "qdash_commit_agent_campaign_candidates",
+  "qdash_commit_agent_candidate_set",
   "qdash_apply_agent_candidate_commit",
   "qdash_create_forum_post",
   "qdash_update_forum_post",

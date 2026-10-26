@@ -36,6 +36,10 @@ class TaskInfo(BaseModel):
     enabled: bool = True  # Whether task is in enabled_tasks list
     input_parameters: dict[str, dict[str, object]] = Field(default_factory=dict)
     run_parameters: dict[str, dict[str, object]] = Field(default_factory=dict)
+    output_parameters: list[str] = Field(
+        default_factory=list,
+        description="Names of the calibration parameters the task writes when it completes.",
+    )
 
 
 class ListTaskInfoResponse(BaseModel):

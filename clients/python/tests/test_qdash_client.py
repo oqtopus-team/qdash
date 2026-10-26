@@ -1609,11 +1609,11 @@ def test_agent_session_client_methods() -> None:
         client.close()
 
 
-def test_agent_campaign_commit_client_methods() -> None:
+def test_agent_candidate_set_commit_client_methods() -> None:
     payload = {
-        "commit_id": "campaign-commit-1",
+        "commit_id": "candidate-set-commit-1",
         "session_id": "session-1",
-        "idempotency_key": "campaign-key",
+        "idempotency_key": "plan-key",
         "chip_id": "chip-a",
         "qid": "Q00",
         "candidates": [
@@ -1644,9 +1644,9 @@ def test_agent_campaign_commit_client_methods() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
-            assert request.url.path == "/agent-sessions/session-1/campaign-commits"
+            assert request.url.path == "/agent-sessions/session-1/candidate-set-commits"
             assert json.loads(request.read()) == {
-                "idempotency_key": "campaign-key",
+                "idempotency_key": "plan-key",
                 "expected_state_version": 1,
                 "candidates": [
                     {
@@ -1657,12 +1657,14 @@ def test_agent_campaign_commit_client_methods() -> None:
                 ],
             }
             return httpx.Response(201, json=payload)
-        assert request.url.path == ("/agent-sessions/session-1/campaign-commits/campaign-commit-1")
+        assert request.url.path == (
+            "/agent-sessions/session-1/candidate-set-commits/candidate-set-commit-1"
+        )
         return httpx.Response(200, json=payload)
 
     client = _build_client(httpx.MockTransport(handler), api_token="api-token")
     try:
-        committed = client.commit_agent_campaign_candidates(
+        committed = client.commit_agent_candidate_set(
             "session-1",
             [
                 {
@@ -1671,11 +1673,11 @@ def test_agent_campaign_commit_client_methods() -> None:
                     "task_id": "task-1",
                 }
             ],
-            idempotency_key="campaign-key",
+            idempotency_key="plan-key",
             expected_state_version=1,
         )
         assert committed.candidates[0].parameter_name == "t1"
-        fetched = client.get_agent_campaign_commit("session-1", "campaign-commit-1")
+        fetched = client.get_agent_candidate_set_commit("session-1", "candidate-set-commit-1")
         assert fetched.commit_id == committed.commit_id
     finally:
         client.close()

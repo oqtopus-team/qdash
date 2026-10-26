@@ -22,6 +22,11 @@ from qdash.api.schemas.calibration_pipeline import (
     ResolvedPipelineTargets,
     ValidatePipelineResponse,
 )
+from qdash.api.services.calibration_pipeline_preflight import (
+    PreflightTask,
+    prerequisite_problems,
+    run_parameter_problems,
+)
 from qdash.common.config.backend import (
     get_available_backends,
     get_default_backend,
@@ -40,8 +45,9 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.qubit import QubitDocument
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
+    from qdash.api.schemas.task_file import TaskInfo
     from qdash.repository.task_definition import MongoTaskDefinitionRepository
 
 logger = logging.getLogger(__name__)
@@ -81,11 +87,30 @@ class CalibrationPipelineService:
         default_backend: Callable[[], str] = get_default_backend,
         available_backends: Callable[[], list[str]] = get_available_backends,
         backend_tasks: Callable[[str], list[str]] = get_tasks,
+        task_catalog: Callable[[str], Mapping[str, TaskInfo]] | None = None,
+        qubit_data: Callable[[str, str, str], Mapping[str, Any]] | None = None,
+        source_run_parameters: Callable[[str, str], Mapping[str, Any] | None] | None = None,
     ) -> None:
+        """Create the service.
+
+        Args:
+            task_definition_repository: Project task definitions (names and types).
+            default_backend: The backend to validate against when none is named.
+            available_backends: The backends a spec may name.
+            backend_tasks: Task names a backend enables.
+            task_catalog: backend -> task metadata by name, for the preflight
+                checks. When None, the preflight checks are skipped.
+            qubit_data: (project_id, chip_id, qid) -> the qubit's calibration data.
+            source_run_parameters: (project_id, task_id) -> run parameters recorded
+                on that task result, or None when the task is unknown.
+        """
         self._task_definitions = task_definition_repository
         self._default_backend = default_backend
         self._available_backends = available_backends
         self._backend_tasks = backend_tasks
+        self._task_catalog = task_catalog
+        self._qubit_data = qubit_data
+        self._source_run_parameters = source_run_parameters
 
     # ------------------------------------------------------------------ catalog
 
@@ -158,10 +183,12 @@ class CalibrationPipelineService:
             problems.extend(_pydantic_problems(error))
             return ValidatePipelineResponse(valid=False, problems=problems, backend_name=backend)
 
-        targets = self._validate_targets(project_id, chip_id, parsed, problems)
+        targets, target_qids = self._validate_targets(project_id, chip_id, parsed, problems)
         if not backend_problem:
             self._validate_tasks(project_id, backend, parsed, problems)
         self._validate_run_parameters(parsed, problems)
+        if not backend_problem:
+            self._preflight(project_id, chip_id, backend, parsed, target_qids, problems)
 
         steps = [
             ResolvedPipelineStep(
@@ -207,11 +234,12 @@ class CalibrationPipelineService:
         chip_id: str,
         spec: CalibrationPipelineSpec,
         problems: list[PipelineProblem],
-    ) -> ResolvedPipelineTargets | None:
+    ) -> tuple[ResolvedPipelineTargets | None, list[str]]:
+        """The resolved targets, and the target qubits that exist on the chip."""
         chip = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
         if chip is None:
             problems.append(_problem("chip_id", f"chip {chip_id!r} is not in this project"))
-            return None
+            return None, []
         known = {
             doc.qid
             for doc in QubitDocument.find({"project_id": project_id, "chip_id": chip_id}).run()
@@ -225,7 +253,10 @@ class CalibrationPipelineService:
                             f"targets.qids[{index}]", f"qubit {qid!r} is not on chip {chip_id}"
                         )
                     )
-            return ResolvedPipelineTargets(qids=list(targets.qids))
+            return (
+                ResolvedPipelineTargets(qids=list(targets.qids)),
+                [qid for qid in targets.qids if qid in known],
+            )
 
         mux_count = max(1, int(chip.size) // QUBITS_PER_MUX)
         for index, mux in enumerate(targets.mux_ids or []):
@@ -244,10 +275,57 @@ class CalibrationPipelineService:
                         f"qubit {qid!r} is not on chip {chip_id}",
                     )
                 )
-        return ResolvedPipelineTargets(
-            qids=[],
-            mux_ids=list(targets.mux_ids or []),
-            exclude_qids=list(targets.exclude_qids),
+        excluded = set(targets.exclude_qids)
+        mux_qids = [
+            str(qid)
+            for mux in targets.mux_ids or []
+            if 0 <= mux < mux_count
+            for qid in range(mux * QUBITS_PER_MUX, (mux + 1) * QUBITS_PER_MUX)
+        ]
+        return (
+            ResolvedPipelineTargets(
+                qids=[],
+                mux_ids=list(targets.mux_ids or []),
+                exclude_qids=list(targets.exclude_qids),
+            ),
+            [qid for qid in mux_qids if qid in known and qid not in excluded],
+        )
+
+    def _preflight(
+        self,
+        project_id: str,
+        chip_id: str,
+        backend: str,
+        spec: CalibrationPipelineSpec,
+        target_qids: list[str],
+        problems: list[PipelineProblem],
+    ) -> None:
+        """Report what a task would reject before measuring, from metadata and the database."""
+        if self._task_catalog is None:
+            return
+        tasks = {
+            name: PreflightTask.from_task_info(info)
+            for name, info in self._task_catalog(backend).items()
+        }
+        if not tasks:
+            return
+        problems.extend(run_parameter_problems(spec, tasks))
+        if self._qubit_data is None or not target_qids:
+            return
+        qubit_data = self._qubit_data
+        source_run_parameters = self._source_run_parameters
+        problems.extend(
+            prerequisite_problems(
+                spec,
+                target_qids,
+                tasks,
+                lambda qid: qubit_data(project_id, chip_id, qid),
+                (
+                    (lambda task_id: source_run_parameters(project_id, task_id))
+                    if source_run_parameters is not None
+                    else None
+                ),
+            )
         )
 
     def _validate_tasks(

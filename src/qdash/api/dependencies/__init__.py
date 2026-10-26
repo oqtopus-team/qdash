@@ -4,9 +4,10 @@ This module provides FastAPI dependency functions for injecting
 repositories and services into route handlers.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from qdash.api.schemas.task_file import TaskInfo
     from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
     from qdash.api.services.flow_schedule_service import FlowScheduleService
     from qdash.api.services.flow_service import FlowService
@@ -518,10 +519,34 @@ def get_flow_repository() -> MongoFlowRepository:
 @cached_dependency_provider
 def get_calibration_pipeline_service() -> "CalibrationPipelineService":
     """Get the calibration pipeline service instance."""
+    from fastapi import HTTPException
+
     from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
+
+    def task_catalog(backend: str) -> "dict[str, TaskInfo]":
+        try:
+            tasks = get_task_file_service().list_task_info(backend).tasks
+        except HTTPException:
+            # No task files for this backend: the preflight checks are skipped.
+            return {}
+        return {task.name: task for task in tasks}
+
+    def qubit_data(project_id: str, chip_id: str, qid: str) -> dict[str, Any]:
+        return get_qubit_calibration_repository().get_calibration_data(
+            project_id=project_id, chip_id=chip_id, qid=qid
+        )
+
+    def source_run_parameters(project_id: str, task_id: str) -> dict[str, Any] | None:
+        results = get_task_result_repository().find(
+            {"project_id": project_id, "task_id": task_id}, limit=1
+        )
+        return dict(results[0].run_parameters) if results else None
 
     return CalibrationPipelineService(
         task_definition_repository=get_task_definition_repository(),
+        task_catalog=task_catalog,
+        qubit_data=qubit_data,
+        source_run_parameters=source_run_parameters,
     )
 
 

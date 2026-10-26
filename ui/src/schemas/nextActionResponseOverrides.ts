@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type AgentCampaignCommitResponseAfterSnapshot = { [key: string]: unknown };
+export type NextActionResponseOverrides = {[key: string]: number};

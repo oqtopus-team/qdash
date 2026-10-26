@@ -7,9 +7,9 @@
  */
 
 /**
- * Identify one authoritative accepted candidate for campaign finalization.
+ * Identify one authoritative accepted candidate for plan finalization.
  */
-export interface AgentCampaignCandidateReference {
+export interface AgentCandidateReference {
   /**
      * @minLength 1
      * @maxLength 200

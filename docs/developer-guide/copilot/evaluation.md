@@ -67,6 +67,11 @@ to the first `;`. A bullet without a separator uses its first four words as the 
 whole text as the criterion. A code seen twice keeps its first criterion. The model reads the
 criterion verbatim as its decision rule, so write it as a test a reader could apply to the plot.
 
+A task's frontmatter and its `## Recovery` section are not derived either: the frontmatter's
+`next_actions` table and that prose steer an autonomous plan after the evaluation and never
+reach the prompt. Because a task's criteria replace the evaluator's built-in statuses, a task
+without `## Common failures` can only be judged `SUCCESS`.
+
 `guidance` and `range_format` are not derived from `task.md`. The significance question uses
 the extension's default guidance, and the suggested-range format comes from the result's sweep
 (below). Only prose paragraphs feed the background, so a section that opens with a bullet list

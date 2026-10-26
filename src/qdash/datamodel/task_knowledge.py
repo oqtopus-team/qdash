@@ -18,7 +18,7 @@ import json
 import logging
 import os
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
@@ -241,6 +241,49 @@ def derive_reference(name: str, background: str) -> TaskReference:
     return TaskReference(background=text, statuses=statuses, parameters=parameters)
 
 
+NextActionKind = Literal["continue", "retry", "run_task", "request_human"]
+
+
+class NextAction(BaseModel):
+    """What an autonomous plan does after the evaluation reports one status.
+
+    Declared in ``task.md``'s frontmatter under ``next_actions``, keyed by the
+    status codes the evaluation offers for the task: ``SUCCESS`` plus one code per
+    bullet under ``## Common failures``. A task without that section offers only
+    ``SUCCESS``, so it cannot branch. The frontmatter never reaches the evaluation
+    prompt.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    action: NextActionKind = Field(description="continue, retry, run_task, or request_human")
+    task: str | None = Field(default=None, description="The task to run next, for run_task")
+    overrides: dict[str, float] = Field(
+        default_factory=dict,
+        description="Calibration input overrides for the next run (retry or run_task)",
+    )
+    suggested_range_parameter: str | None = Field(
+        default=None,
+        description=(
+            "Input to set from the midpoint of the evaluation's suggested range, for retry; "
+            "the session's override bounds still apply"
+        ),
+    )
+    note: str = Field(default="", description="Why this step follows, for the reviewer")
+
+    @model_validator(mode="after")
+    def _shape(self) -> NextAction:
+        if self.action == "run_task" and not self.task:
+            raise ValueError("next action run_task needs a task")
+        if self.action != "run_task" and self.task:
+            raise ValueError(f"next action {self.action} takes no task")
+        if self.action in {"continue", "request_human"} and (
+            self.overrides or self.suggested_range_parameter
+        ):
+            raise ValueError(f"next action {self.action} takes no overrides")
+        return self
+
+
 class TaskKnowledge(BaseModel):
     """What the knowledge repository says about one calibration task.
 
@@ -262,6 +305,10 @@ class TaskKnowledge(BaseModel):
         default_factory=list, description="Figures task.md references"
     )
     examples: list[KnowledgeExample] = Field(default_factory=list)
+    next_actions: dict[str, NextAction] = Field(
+        default_factory=dict,
+        description="Autonomous-plan step per evaluation status code, from the frontmatter",
+    )
 
     # A draft's figures live in its own directory, not the shared repository.
     _task_dir: Any = PrivateAttr(default=None)
@@ -292,6 +339,24 @@ class TaskKnowledge(BaseModel):
     def reference(self) -> TaskReference:
         """The background and question-template parts for the evaluation model."""
         return derive_reference(self.name, self.background)
+
+    def status_codes(self) -> tuple[str, ...]:
+        """The Q6 statuses the evaluation offers for this task, in the order shown.
+
+        The task's criteria replace the evaluator's built-in statuses, so these
+        are exactly ``SUCCESS`` and the common-failure codes derived from task.md.
+        """
+        return tuple(self.reference().statuses)
+
+    def next_action_problems(self) -> list[str]:
+        """Why a ``next_actions`` entry can never apply: its key is not a status the evaluation offers."""
+        offered = set(self.status_codes())
+        return [
+            f"next_actions.{code}: {self.name} evaluation never reports {code} "
+            f"(it offers {', '.join(self.status_codes())})"
+            for code in self.next_actions
+            if code not in offered
+        ]
 
     def to_prompt(self, *, include_examples: bool = False) -> str:
         """Render the task's reference text for a model: the background as written.

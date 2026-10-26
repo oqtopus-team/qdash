@@ -104,7 +104,7 @@ const action = await client.submitAgentAction(session.session_id, {
 });
 ```
 
-The client also provides helpers for waiting on action dispatch, QDash execution linkage, candidate commits, campaign commits, and backend application.
+The client also provides helpers for waiting on action dispatch, QDash execution linkage, candidate commits, candidate set commits, and backend application.
 
 ## Figures and Binary Files
 

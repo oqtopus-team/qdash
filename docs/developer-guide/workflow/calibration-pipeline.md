@@ -27,6 +27,20 @@ The spec cannot reference code. Each `type` maps to one Step class, task names m
 
 `validate` never fails with a 422 for a bad spec. It returns `valid: false` and a `problems` list such as `targets.qids[1]: qubit '99' is not on chip 64Qv3`, so a caller can correct the spec. `execute` returns the same list in the 422 detail when the spec is not valid, and 503 when the worker has not registered the deployment yet.
 
+### Preflight checks
+
+Beyond the spec's shape, `validate` reports what a task would reject before it measures anything, so a run does not fail at step 1 with empty results. The checks read the task metadata the API already has (`TaskInfo`: declared inputs, run parameters, and outputs), the target qubits' calibration data, and the run parameters recorded on the task that produced a persisted parameter. They do not import workflow code.
+
+| Check | Problem path | What it catches |
+| --- | --- | --- |
+| Run parameter names | `task_run_parameters.<task>.<name>` | A name the task does not declare |
+| Run parameter types | `task_run_parameters.<task>.<name>`, `default_run_parameters.<name>` | A value whose type the declaration cannot take, such as a sweep for `shots`; a shared value is checked against every pipeline task that declares it, and one that no task declares is reported because it would be ignored |
+| Session readout duration | `default_run_parameters.readout_duration`, `task_run_parameters.<task>.readout_duration` | A non-positive shared value, or a per-task value that differs from the session (`readout_duration` is session-scoped in Qubex; the session uses the shared value, or 1024 ns when none is set) |
+| Required inputs | `steps[i].tasks[j]` | A `database_required` input of a qubit task that no earlier task in the pipeline writes and that a target qubit lacks in its calibration data, such as `CheckT1` without Rabi parameters |
+| Rabi readout duration | `steps[i].tasks[j]` | Rabi parameters a task restores that were measured under a different readout duration than this pipeline's session, when no earlier `CheckRabi` in the pipeline refreshes them |
+
+Coupling steps are not checked for required inputs; their inputs span two qubits and a coupling. For `mux_ids` targets the checks cover the MUX's four qubits minus `exclude_qids`.
+
 ## Steps
 
 | Type | Kind | Runs | Needs before it |
@@ -60,6 +74,7 @@ Readers that want the whole run use that field rather than the first execution's
 | `src/qdash/workflow/service/pipeline_flow.py` | The `calibration-pipeline` system flow: builds Step and Target objects from a spec and calls `CalibService.run` |
 | `src/qdash/workflow/register_system_flows.py` | Registers `system-calibration-pipeline` on worker startup |
 | `src/qdash/api/services/calibration_pipeline_service.py` | Chip, backend, task-type, and run-parameter checks; the catalog |
+| `src/qdash/api/services/calibration_pipeline_preflight.py` | The preflight checks: run-parameter types, the session readout duration, required inputs, and the Rabi readout duration |
 | `src/qdash/api/services/flow_service.py` | `execute_calibration_pipeline`: lock claim, Prefect run, execution row |
 | `src/qdash/api/routers/calibration_pipeline.py` | The three endpoints |
 

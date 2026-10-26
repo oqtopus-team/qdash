@@ -7,6 +7,10 @@
         "file_path": "fake_check_fine_chevron.py",
         "input_parameters": {},
         "name": "CheckFineChevron",
+        "output_parameters": [
+          "qubit_frequency",
+          "readout_frequency"
+        ],
         "run_parameters": {
           "control_amplitude": {
             "description": "Control pulse amplitude",
@@ -51,6 +55,14 @@
           }
         },
         "name": "CheckRabi",
+        "output_parameters": [
+          "rabi_amplitude",
+          "rabi_frequency",
+          "rabi_phase",
+          "rabi_offset",
+          "control_amplitude",
+          "maximum_rabi_frequency"
+        ],
         "run_parameters": {
           "shots": {
             "description": "Number of shots",
@@ -92,6 +104,11 @@
           }
         },
         "name": "CheckRamsey",
+        "output_parameters": [
+          "qubit_frequency",
+          "t2_star",
+          "ramsey_frequency"
+        ],
         "run_parameters": {
           "artificial_detuning": {
             "description": "Artificial detuning for Ramsey fringes",
@@ -139,6 +156,9 @@
           }
         },
         "name": "CheckT1",
+        "output_parameters": [
+          "t1"
+        ],
         "run_parameters": {
           "shots": {
             "description": "Number of shots",
@@ -180,6 +200,10 @@
           }
         },
         "name": "CheckT1Average",
+        "output_parameters": [
+          "t1_average",
+          "t1_std"
+        ],
         "run_parameters": {
           "n_runs": {
             "description": "Number of T1 measurement repetitions",
@@ -227,6 +251,9 @@
           }
         },
         "name": "CheckT2Echo",
+        "output_parameters": [
+          "t2_echo"
+        ],
         "run_parameters": {
           "shots": {
             "description": "Number of shots",
@@ -268,6 +295,10 @@
           }
         },
         "name": "CheckT2EchoAverage",
+        "output_parameters": [
+          "t2_echo_average",
+          "t2_echo_std"
+        ],
         "run_parameters": {
           "n_runs": {
             "description": "Number of T2 echo measurement repetitions",
@@ -300,6 +331,7 @@
         "file_path": "legacy_fake_chevron_pattern.py",
         "input_parameters": {},
         "name": "ChevronPattern",
+        "output_parameters": [],
         "run_parameters": {},
         "task_type": "qubit"
       },
@@ -317,6 +349,10 @@
           }
         },
         "name": "CreateHPIPulse",
+        "output_parameters": [
+          "hpi_amplitude",
+          "hpi_duration"
+        ],
         "run_parameters": {
           "amplitude_range": {
             "description": "Amplitude range for HPI calibration",
@@ -349,6 +385,7 @@
         "file_path": "fake_rabi.py",
         "input_parameters": {},
         "name": "FakeRabi",
+        "output_parameters": [],
         "run_parameters": {
           "interval": {
             "description": "Time interval for Rabi oscillation",
@@ -410,6 +447,10 @@
           }
         },
         "name": "RandomizedBenchmarking",
+        "output_parameters": [
+          "gate_fidelity",
+          "error_per_gate"
+        ],
         "run_parameters": {
           "num_cliffords": {
             "description": "Number of Clifford gates per sequence",
@@ -461,6 +502,9 @@
           }
         },
         "name": "Check1QGateCoherenceLimit",
+        "output_parameters": [
+          "one_qubit_gate_coherence_limit"
+        ],
         "run_parameters": {
           "drag_hpi_duration": {
             "description": "DRAG half-pi pulse duration",
@@ -518,6 +562,9 @@
           }
         },
         "name": "Check2QGateCoherenceLimit",
+        "output_parameters": [
+          "two_qubit_gate_coherence_limit"
+        ],
         "run_parameters": {},
         "task_type": "coupling"
       },
@@ -558,6 +605,10 @@
           }
         },
         "name": "CheckAdaptiveChevron",
+        "output_parameters": [
+          "qubit_frequency",
+          "control_amplitude"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval between shots",
@@ -636,6 +687,10 @@
           }
         },
         "name": "CheckAdaptiveEFChevron",
+        "output_parameters": [
+          "ef_frequency",
+          "anharmonicity"
+        ],
         "run_parameters": {
           "detuning_range": {
             "description": "Final EF detuning sweep around the adaptively estimated frequency",
@@ -755,6 +810,9 @@
           }
         },
         "name": "CheckAdaptiveFHChevron",
+        "output_parameters": [
+          "fh_frequency"
+        ],
         "run_parameters": {
           "detuning_range": {
             "description": "Final FH detuning sweep around the adaptively estimated frequency",
@@ -1039,6 +1097,7 @@
           }
         },
         "name": "CheckBellState",
+        "output_parameters": [],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -1297,6 +1356,9 @@
           }
         },
         "name": "CheckBellStateTomography",
+        "output_parameters": [
+          "bell_state_fidelity"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -1470,6 +1532,15 @@
           }
         },
         "name": "CheckCKP",
+        "output_parameters": [
+          "resonator_frequency",
+          "readout_frequency",
+          "purcell_filter_frequency",
+          "resonator_purcell_filter_coupling",
+          "purcell_filter_linewidth",
+          "dispersive_shift",
+          "critical_photon_number"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Shot interval",
@@ -1547,6 +1618,10 @@
           }
         },
         "name": "CheckChevron",
+        "output_parameters": [
+          "qubit_frequency",
+          "control_amplitude"
+        ],
         "run_parameters": {
           "detuning_range": {
             "description": "Drive-frequency detuning sweep around control_frequency",
@@ -1647,6 +1722,10 @@
           }
         },
         "name": "CheckCoarseReadoutParams",
+        "output_parameters": [
+          "readout_frequency",
+          "readout_amplitude"
+        ],
         "run_parameters": {
           "detuning_range": {
             "description": "Offsets from readout_frequency (start, stop, number of points)",
@@ -1732,6 +1811,10 @@
           }
         },
         "name": "CheckControlAmplitude",
+        "output_parameters": [
+          "coarse_control_amplitude",
+          "coarse_qubit_frequency"
+        ],
         "run_parameters": {
           "frequency_span": {
             "description": "Half-span around control_frequency for the sweep (±span, default ±150 MHz)",
@@ -2093,6 +2176,18 @@
           }
         },
         "name": "CheckCrossResonance",
+        "output_parameters": [
+          "cr_duration",
+          "cr_amplitude",
+          "cr_phase",
+          "cr_beta",
+          "cancel_amplitude",
+          "cancel_phase",
+          "cancel_beta",
+          "rotary_amplitude",
+          "zx_rotation_rate",
+          "cr_ramptime"
+        ],
         "run_parameters": {
           "adiabatic_safe_factor": {
             "description": "Safety factor for the adiabatic condition",
@@ -2279,6 +2374,7 @@
           }
         },
         "name": "CheckDRAGHPIPulse",
+        "output_parameters": [],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -2453,6 +2549,7 @@
           }
         },
         "name": "CheckDRAGPIPulse",
+        "output_parameters": [],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -2633,6 +2730,17 @@
           }
         },
         "name": "CheckEFRabi",
+        "output_parameters": [
+          "ef_rabi_amplitude",
+          "ef_rabi_frequency",
+          "ef_rabi_phase",
+          "ef_rabi_offset",
+          "ef_rabi_angle",
+          "ef_rabi_noise",
+          "ef_rabi_distance",
+          "ef_rabi_reference_phase",
+          "ef_rabi_r2"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval between shots",
@@ -2803,6 +2911,7 @@
           }
         },
         "name": "CheckHPIPulse",
+        "output_parameters": [],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -3130,6 +3239,9 @@
           }
         },
         "name": "CheckJAZZ",
+        "output_parameters": [
+          "static_zz_interaction"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval between shots",
@@ -3168,6 +3280,7 @@
         "file_path": "box_setup/check_noise.py",
         "input_parameters": {},
         "name": "CheckNoise",
+        "output_parameters": [],
         "run_parameters": {},
         "task_type": "global"
       },
@@ -3177,6 +3290,9 @@
         "file_path": "one_qubit_coarse/check_optimal_readout_amplitude.py",
         "input_parameters": {},
         "name": "CheckOptimalReadoutAmplitude",
+        "output_parameters": [
+          "readout_amplitude"
+        ],
         "run_parameters": {
           "amplitude_range": {
             "description": "Readout amplitude range",
@@ -3215,6 +3331,9 @@
         "file_path": "one_qubit_coarse/check_optimal_readout_frequency.py",
         "input_parameters": {},
         "name": "CheckOptimalReadoutFrequency",
+        "output_parameters": [
+          "readout_frequency"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval for Rabi oscillation",
@@ -3378,6 +3497,7 @@
           }
         },
         "name": "CheckPIPulse",
+        "output_parameters": [],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -3426,6 +3546,12 @@
           }
         },
         "name": "CheckQubitSpectroscopy",
+        "output_parameters": [
+          "coarse_qubit_frequency",
+          "f01_repr_db",
+          "f01_quality_level",
+          "coarse_control_amplitude"
+        ],
         "run_parameters": {
           "frequency_range": {
             "description": "Frequency range as [start, stop, step] in GHz. Leave blank to use the connected control box's qubex default: low band [3.0, 5.75, 0.005], high band [6.5, 9.75, 0.005].",
@@ -3503,6 +3629,19 @@
           }
         },
         "name": "CheckRabi",
+        "output_parameters": [
+          "rabi_amplitude",
+          "rabi_frequency",
+          "rabi_phase",
+          "rabi_offset",
+          "rabi_angle",
+          "rabi_noise",
+          "rabi_distance",
+          "rabi_reference_phase",
+          "rabi_r2",
+          "control_amplitude",
+          "maximum_rabi_frequency"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval for Rabi oscillation",
@@ -3673,6 +3812,11 @@
           }
         },
         "name": "CheckRamsey",
+        "output_parameters": [
+          "ramsey_frequency",
+          "qubit_frequency",
+          "t2_star"
+        ],
         "run_parameters": {
           "detuning": {
             "description": "Detuning for Ramsey oscillation",
@@ -3717,6 +3861,11 @@
         "file_path": "cw/check_resonator_spectroscopy.py",
         "input_parameters": {},
         "name": "CheckResonatorSpectroscopy",
+        "output_parameters": [
+          "resonator_frequency",
+          "optimal_power",
+          "readout_amplitude"
+        ],
         "run_parameters": {
           "frequency_range": {
             "description": "Frequency range as [start, stop, step] in GHz. Leave blank to use the connected readout box's qubex default: low band [5.75, 6.75, 0.002], high band [9.75, 10.75, 0.002].",
@@ -3766,6 +3915,7 @@
         "file_path": "box_setup/check_status.py",
         "input_parameters": {},
         "name": "CheckStatus",
+        "output_parameters": [],
         "run_parameters": {},
         "task_type": "global"
       },
@@ -3907,6 +4057,9 @@
           }
         },
         "name": "CheckT1",
+        "output_parameters": [
+          "t1"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval for T1 time",
@@ -4077,6 +4230,10 @@
           }
         },
         "name": "CheckT1Average",
+        "output_parameters": [
+          "t1_average",
+          "t1_std"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval for T1 time",
@@ -4266,6 +4423,9 @@
           }
         },
         "name": "CheckT2Echo",
+        "output_parameters": [
+          "t2_echo"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval for T2 echo time",
@@ -4449,6 +4609,10 @@
           }
         },
         "name": "CheckT2EchoAverage",
+        "output_parameters": [
+          "t2_echo_average",
+          "t2_echo_std"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval for T2 echo time",
@@ -4551,6 +4715,9 @@
           }
         },
         "name": "CheckThermalExcitation",
+        "output_parameters": [
+          "thermal_excitation_probability"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval between shots",
@@ -4579,6 +4746,7 @@
         "file_path": "cw/check_waveform.py",
         "input_parameters": {},
         "name": "CheckWaveform",
+        "output_parameters": [],
         "run_parameters": {
           "interval": {
             "description": "Shot interval for waveform measurement",
@@ -5028,6 +5196,7 @@
           }
         },
         "name": "CheckZX90",
+        "output_parameters": [],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -5062,6 +5231,7 @@
         "file_path": "box_setup/configure.py",
         "input_parameters": {},
         "name": "Configure",
+        "output_parameters": [],
         "run_parameters": {
           "configuration_mode": {
             "description": "Control layout: ge-cr-cr, ge-ef-cr, or ge-ef-fh.",
@@ -5077,6 +5247,7 @@
         "file_path": "box_setup/configure_all.py",
         "input_parameters": {},
         "name": "ConfigureAll",
+        "output_parameters": [],
         "run_parameters": {
           "mux_ids": {
             "description": "List of MUX IDs to configure",
@@ -5093,6 +5264,7 @@
         "file_path": "box_setup/configure.py",
         "input_parameters": {},
         "name": "ConfigureEF",
+        "output_parameters": [],
         "run_parameters": {
           "configuration_mode": {
             "description": "EF control layout: ge-ef-cr or ge-ef-fh.",
@@ -5230,6 +5402,11 @@
           }
         },
         "name": "CreateDRAGHPIPulse",
+        "output_parameters": [
+          "drag_hpi_beta",
+          "drag_hpi_amplitude",
+          "drag_hpi_duration"
+        ],
         "run_parameters": {
           "drag_hpi_duration": {
             "description": "HPI pulse duration",
@@ -5386,6 +5563,11 @@
           }
         },
         "name": "CreateDRAGPIPulse",
+        "output_parameters": [
+          "drag_pi_beta",
+          "drag_pi_amplitude",
+          "drag_pi_duration"
+        ],
         "run_parameters": {
           "drag_pi_duration": {
             "description": "PI pulse duration",
@@ -5543,6 +5725,10 @@
           }
         },
         "name": "CreateEFHPIPulse",
+        "output_parameters": [
+          "ef_hpi_amplitude",
+          "ef_hpi_duration"
+        ],
         "run_parameters": {
           "ef_hpi_duration": {
             "description": "EF half-pi pulse duration",
@@ -5700,6 +5886,10 @@
           }
         },
         "name": "CreateEFPIPulse",
+        "output_parameters": [
+          "ef_pi_amplitude",
+          "ef_pi_duration"
+        ],
         "run_parameters": {
           "ef_pi_duration": {
             "description": "EF pi pulse duration",
@@ -5856,6 +6046,10 @@
           }
         },
         "name": "CreateHPIPulse",
+        "output_parameters": [
+          "hpi_amplitude",
+          "hpi_duration"
+        ],
         "run_parameters": {
           "hpi_duration": {
             "description": "HPI pulse duration",
@@ -6012,6 +6206,10 @@
           }
         },
         "name": "CreatePIPulse",
+        "output_parameters": [
+          "pi_amplitude",
+          "pi_duration"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval for calibration",
@@ -6441,6 +6639,19 @@
           }
         },
         "name": "CreateZX90",
+        "output_parameters": [
+          "cr_duration",
+          "cr_amplitude",
+          "cr_phase",
+          "cr_beta",
+          "cancel_amplitude",
+          "cancel_phase",
+          "cancel_beta",
+          "rotary_amplitude",
+          "zx_rotation_rate",
+          "zx90_gate_time",
+          "cr_ramptime"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -6469,6 +6680,7 @@
         "file_path": "box_setup/dump_box.py",
         "input_parameters": {},
         "name": "DumpBox",
+        "output_parameters": [],
         "run_parameters": {},
         "task_type": "global"
       },
@@ -6536,6 +6748,12 @@
           }
         },
         "name": "EFReadoutClassification",
+        "output_parameters": [
+          "average_ef_readout_fidelity",
+          "ef_readout_fidelity_g",
+          "ef_readout_fidelity_e",
+          "ef_readout_fidelity_f"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval between shots",
@@ -6564,6 +6782,7 @@
         "file_path": "box_setup/link_up.py",
         "input_parameters": {},
         "name": "LinkUp",
+        "output_parameters": [],
         "run_parameters": {},
         "task_type": "global"
       },
@@ -6713,6 +6932,10 @@
           }
         },
         "name": "RandomizedBenchmarking",
+        "output_parameters": [
+          "average_gate_fidelity",
+          "depolarizing_rate"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -6787,6 +7010,11 @@
           }
         },
         "name": "ReadoutClassification",
+        "output_parameters": [
+          "average_readout_fidelity",
+          "readout_fidelity_0",
+          "readout_fidelity_1"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -6815,6 +7043,7 @@
         "file_path": "box_setup/readout_configure.py",
         "input_parameters": {},
         "name": "ReadoutConfigure",
+        "output_parameters": [],
         "run_parameters": {
           "qubits": {
             "description": "List of muxes to update readout settings",
@@ -6989,6 +7218,10 @@
           }
         },
         "name": "X180InterleavedRandomizedBenchmarking",
+        "output_parameters": [
+          "x180_gate_fidelity",
+          "x180_depolarizing_rate"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -7163,6 +7396,10 @@
           }
         },
         "name": "X90InterleavedRandomizedBenchmarking",
+        "output_parameters": [
+          "x90_gate_fidelity",
+          "x90_depolarizing_rate"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval",
@@ -7627,6 +7864,10 @@
           }
         },
         "name": "ZX90InterleavedRandomizedBenchmarking",
+        "output_parameters": [
+          "zx90_gate_fidelity",
+          "zx90_depolarizing_rate"
+        ],
         "run_parameters": {
           "interval": {
             "description": "Time interval",

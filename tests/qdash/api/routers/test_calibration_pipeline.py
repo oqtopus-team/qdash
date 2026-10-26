@@ -19,6 +19,19 @@ from qdash.dbmodel.user import UserDocument
 CHIP = "64Qv3"
 
 
+def calibrated_qubit_data() -> dict[str, Any]:
+    """Calibration data that satisfies the one-qubit check and coherence tasks.
+
+    The pipeline's CheckRabi writes the Rabi set and the pulse tasks write the
+    pulse parameters, so only the spectroscopy-level values need to exist.
+    """
+    return {
+        "qubit_frequency": {"value": 7.5, "unit": "GHz"},
+        "resonator_frequency": {"value": 10.1, "unit": "GHz"},
+        "readout_amplitude": {"value": 0.02, "unit": "a.u."},
+    }
+
+
 @pytest.fixture
 def test_project(init_db):
     user = UserDocument(
@@ -70,7 +83,7 @@ def chip(test_project):
             chip_id=CHIP,
             qid=str(i),
             status="pending",
-            data={},
+            data=calibrated_qubit_data(),
             system_info={},
         ).insert()
     for name, task_type in [
@@ -286,3 +299,66 @@ class TestExecute:
             json={"chip_id": CHIP, "spec": good_spec()},
         )
         assert response.status_code == 403
+
+
+class TestPreflight:
+    """Problems a task would raise before measuring are reported by the dry run."""
+
+    def test_missing_calibration_data_is_a_problem(self, test_client, chip, auth_headers):
+        spec = {
+            "targets": {"qids": ["0", "1"]},
+            "steps": [{"type": "CustomOneQubit", "step_name": "t1", "tasks": ["CheckT1"]}],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        messages = [p["message"] for p in data["problems"] if p["path"] == "steps[0].tasks[0]"]
+        assert any("'rabi_amplitude'" in m and "qubit(s) 0, 1" in m for m in messages), data[
+            "problems"
+        ]
+        assert any("'hpi_amplitude'" in m for m in messages)
+
+    def test_task_readout_duration_must_match_the_session(self, test_client, chip, auth_headers):
+        spec = good_spec()
+        spec["task_run_parameters"] = {"CheckT1": {"readout_duration": 2048}}
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.status_code == 200
+        problems = {p["path"]: p["message"] for p in response.json()["problems"]}
+        assert "session-scoped" in problems["task_run_parameters.CheckT1.readout_duration"]
+
+        spec["default_run_parameters"] = {"readout_duration": 2048}
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.json()["valid"] is True, response.json()["problems"]
+
+    def test_mux_targets_are_checked_per_qubit(self, test_client, chip, auth_headers):
+        QubitDocument.find_one(
+            {"project_id": "test_project", "chip_id": CHIP, "qid": "5"}
+        ).run().set({"data": {}})
+        spec = {
+            "targets": {"mux_ids": [1], "exclude_qids": ["7"]},
+            "steps": [{"type": "OneQubitCheck"}],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is False
+        messages = [p["message"] for p in data["problems"] if p["path"] == "steps[0].tasks[0]"]
+        assert any("'control_frequency'" in m and "qubit(s) 5" in m for m in messages), data[
+            "problems"
+        ]
