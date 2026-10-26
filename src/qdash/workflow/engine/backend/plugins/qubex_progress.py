@@ -226,12 +226,8 @@ def _install_adapter() -> None:
         characterization_service,
         measurement_service,
         ckp_characterization,
-        importlib.import_module(
-            "qubex.contrib.experiment.quantum_efficiency_measurement"
-        ),
-        importlib.import_module(
-            "qubex.contrib.experiment.spin_lock_relaxation"
-        ),
+        importlib.import_module("qubex.contrib.experiment.quantum_efficiency_measurement"),
+        importlib.import_module("qubex.contrib.experiment.spin_lock_relaxation"),
     ]
 
     for module in modules:
