@@ -344,9 +344,11 @@ class TestPreflight:
         assert response.json()["valid"] is True, response.json()["problems"]
 
     def test_mux_targets_are_checked_per_qubit(self, test_client, chip, auth_headers):
-        QubitDocument.find_one(
+        qubit = QubitDocument.find_one(
             {"project_id": "test_project", "chip_id": CHIP, "qid": "5"}
-        ).run().set({"data": {}})
+        ).run()
+        assert qubit is not None
+        qubit.set({"data": {}})
         spec = {
             "targets": {"mux_ids": [1], "exclude_qids": ["7"]},
             "steps": [{"type": "OneQubitCheck"}],

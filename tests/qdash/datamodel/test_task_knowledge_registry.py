@@ -251,15 +251,17 @@ Damped oscillation. A good result: clear oscillation with high contrast.
 
 
 def test_next_actions_load_and_are_checked_against_the_offered_statuses() -> None:
-    knowledge = tk.TaskKnowledge(
-        name="CheckRabi",
-        background=RABI_BACKGROUND,
-        next_actions={
-            "SUCCESS": {"action": "continue"},
-            "LOW_CONTRAST": {"action": "retry", "overrides": {"readout_amplitude": 0.02}},
-            "NO_SIGNAL": {"action": "run_task", "task": "CheckChevron", "note": "find f01"},
-            "SUBOPTIMAL": {"action": "request_human"},
-        },
+    knowledge = tk.TaskKnowledge.model_validate(
+        {
+            "name": "CheckRabi",
+            "background": RABI_BACKGROUND,
+            "next_actions": {
+                "SUCCESS": {"action": "continue"},
+                "LOW_CONTRAST": {"action": "retry", "overrides": {"readout_amplitude": 0.02}},
+                "NO_SIGNAL": {"action": "run_task", "task": "CheckChevron", "note": "find f01"},
+                "SUBOPTIMAL": {"action": "request_human"},
+            },
+        }
     )
 
     assert knowledge.status_codes() == ("SUCCESS", "LOW_CONTRAST", "NO_SIGNAL")
@@ -276,10 +278,12 @@ def test_next_actions_load_and_are_checked_against_the_offered_statuses() -> Non
 def test_tasks_without_common_failures_offer_only_success() -> None:
     # The task's criteria replace the evaluator's built-in statuses, so a task.md
     # without "## Common failures" can only ever be judged SUCCESS.
-    knowledge = tk.TaskKnowledge(
-        name="CheckChevron",
-        background="Measure a Chevron pattern.",
-        next_actions={"NO_SIGNAL": {"action": "request_human"}},
+    knowledge = tk.TaskKnowledge.model_validate(
+        {
+            "name": "CheckChevron",
+            "background": "Measure a Chevron pattern.",
+            "next_actions": {"NO_SIGNAL": {"action": "request_human"}},
+        }
     )
     assert knowledge.status_codes() == ("SUCCESS",)
     assert knowledge.next_action_problems() == [
