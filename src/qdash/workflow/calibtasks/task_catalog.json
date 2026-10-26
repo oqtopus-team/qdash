@@ -4079,6 +4079,7 @@
           }
         },
         "name": "CheckSpinLockSpectroscopy",
+        "output_parameters": [],
         "run_parameters": {
           "duration_range": {
             "description": "Explicit flat-top duration sweep. When unset, derive it from QDash T1/T2 echo values or use 100 ns to 200 μs when both are unavailable.",
