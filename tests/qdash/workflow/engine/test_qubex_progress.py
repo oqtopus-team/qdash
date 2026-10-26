@@ -196,6 +196,27 @@ def test_capture_qubex_progress_patches_filtered_ckp() -> None:
     assert events[-1].has_multiple_phases is True
 
 
+def test_capture_qubex_progress_patches_quantum_efficiency() -> None:
+    """Quantum efficiency's combined sweep should be visible in QDash."""
+    import importlib
+
+    module = importlib.import_module("qubex.contrib.experiment.quantum_efficiency_measurement")
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(events.append, task_name="CheckQuantumEfficiency"):
+        progress = _service_tqdm(module)(
+            total=4,
+            desc="Quantum efficiency: Q00",
+            file=StringIO(),
+        )
+        progress.update(4)
+        progress.close()
+
+    assert events[0].current == 0
+    assert events[-1].current == 4
+    assert events[-1].total == 4
+    assert {event.description for event in events} == {"Quantum efficiency: Q00"}
+
+
 def test_capture_qubex_progress_patches_spin_lock_spectroscopy() -> None:
     """Spin-lock's outer frequency sweep should be visible in QDash."""
     spin_lock = importlib.import_module("qubex.contrib.experiment.spin_lock_relaxation")

@@ -3527,6 +3527,191 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CheckQuantumEfficiency",
+        "description": "Measure the readout-chain quantum efficiency of one qubit.",
+        "file_path": "measurement/check_quantum_efficiency.py",
+        "input_parameters": {
+          "control_amplitude": {
+            "default_value": null,
+            "parameter_name": "control_amplitude",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_frequency": {
+            "default_value": null,
+            "description": "Calibrated GE control frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "hpi_amplitude": {
+            "default_value": null,
+            "description": "Calibrated half-pi pulse amplitude",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "hpi_duration": {
+            "default_value": null,
+            "description": "Calibrated half-pi pulse duration",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "maximum_rabi_frequency": {
+            "default_value": null,
+            "parameter_name": "maximum_rabi_frequency",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "MHz/a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_amplitude": {
+            "default_value": null,
+            "parameter_name": "rabi_amplitude",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_angle": {
+            "default_value": null,
+            "parameter_name": "rabi_angle",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "rad",
+            "user_override": "allowed"
+          },
+          "rabi_distance": {
+            "default_value": null,
+            "parameter_name": "rabi_distance",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_noise": {
+            "default_value": null,
+            "parameter_name": "rabi_noise",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_offset": {
+            "default_value": null,
+            "parameter_name": "rabi_offset",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_phase",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "rabi_r2": {
+            "default_value": null,
+            "parameter_name": "rabi_r2",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "",
+            "user_override": "allowed"
+          },
+          "rabi_reference_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_reference_phase",
+            "qid_role": "self",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "description": "Calibrated readout amplitude",
+            "greater_than": 0,
+            "less_than_or_equal": 1,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "description": "Calibrated readout frequency",
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckQuantumEfficiency",
+        "output_parameters": [
+          "quantum_efficiency"
+        ],
+        "run_parameters": {
+          "amplitude_range": {
+            "description": "Readout-amplitude sweep. Uses Qubex's target-specific geometric default when unset.",
+            "unit": "a.u.",
+            "value": null,
+            "value_type": "list"
+          },
+          "interval": {
+            "description": "Interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Shots per Ramsey phase and readout-state measurement",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckQubitSpectroscopy",
         "description": "Task to check the qubit frequencies.\n\nThis task performs qubit spectroscopy with the dedicated 1024 ns Qubex\nreadout pulse and estimates the qubit frequency (f01) and optionally the f12\ntransition frequency from the spectroscopy data. The f12 estimate remains\ndiagnostic and is not published as calibrated anharmonicity.",
         "file_path": "cw/check_qubit_spectroscopy.py",
