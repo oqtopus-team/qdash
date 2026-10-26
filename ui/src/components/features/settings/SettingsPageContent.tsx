@@ -44,6 +44,7 @@ function roleBadgeClass(role: ProjectRole) {
   return "badge-ghost";
 }
 
+/** Copilot settings for the chat model, custom instructions and system prompt. */
 function CopilotSettingsPanel() {
   const [selectedModelKey, setSelectedModelKey] = useState(getStoredChatModelKey);
   const { data: copilotConfigResponse, isLoading } = useGetCopilotConfig();
@@ -112,6 +113,7 @@ function CopilotSettingsPanel() {
   );
 }
 
+/** Project member list with owner controls to invite, change roles and remove members. */
 function ProjectMembersPanel() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
