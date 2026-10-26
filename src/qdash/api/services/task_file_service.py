@@ -267,6 +267,7 @@ class TaskFileService:
             task_type_value = None
             input_parameters: dict[str, dict[str, object]] = {}
             run_parameters: dict[str, dict[str, object]] = {}
+            output_parameters: list[str] = []
             docstring = ast.get_docstring(node)
 
             for item in node.body:
@@ -282,6 +283,8 @@ class TaskFileService:
                         "input_spec",
                     }:
                         input_parameters = self._extract_parameter_metadata(item.value, constants)
+                    elif item.target.id in {"output_parameters", "output_spec"}:
+                        output_parameters = self._extract_parameter_names(item.value)
                 elif isinstance(item, ast.Assign):
                     for target in item.targets:
                         if isinstance(target, ast.Name):
@@ -301,6 +304,8 @@ class TaskFileService:
                                 input_parameters = self._extract_parameter_metadata(
                                     item.value, constants
                                 )
+                            elif target.id in {"output_parameters", "output_spec"}:
+                                output_parameters = self._extract_parameter_names(item.value)
 
             if name_value and isinstance(name_value, str):
                 tasks.append(
@@ -312,10 +317,22 @@ class TaskFileService:
                         file_path=relative_path,
                         input_parameters=input_parameters,
                         run_parameters=run_parameters,
+                        output_parameters=output_parameters,
                     )
                 )
 
         return tasks
+
+    @staticmethod
+    def _extract_parameter_names(node: ast.expr | None) -> list[str]:
+        """Return the string keys of a parameter declaration dict, in order."""
+        if not isinstance(node, ast.Dict):
+            return []
+        return [
+            key.value
+            for key in node.keys
+            if isinstance(key, ast.Constant) and isinstance(key.value, str)
+        ]
 
     @staticmethod
     def _extract_run_parameters(

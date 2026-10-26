@@ -59,6 +59,11 @@ BATCH_SIZE = 1000  # Process documents in batches for memory efficiency
 MIGRATION_LOCK_LEASE = timedelta(minutes=30)
 RENAME_CHECK_CHEVRON_MIGRATION_ID = "rename-check-chevron-to-adaptive-v1"
 RENAME_CHECK_EF_CHEVRON_MIGRATION_ID = "rename-check-ef-chevron-to-adaptive-v1"
+RENAME_AGENT_CANDIDATE_SET_COMMITS_MIGRATION_ID = (
+    "rename-agent-campaign-commits-to-candidate-set-v1"
+)
+AGENT_CAMPAIGN_COMMITS_COLLECTION = "agent_campaign_commits"
+AGENT_CANDIDATE_SET_COMMITS_COLLECTION = "agent_candidate_set_commits"
 
 _TASK_NAME_HISTORY_FIELDS: tuple[tuple[str, str], ...] = (
     ("task_result_history", "name"),
@@ -1507,6 +1512,38 @@ def migrate_rename_check_ef_chevron(
     )
 
 
+def migrate_rename_agent_candidate_set_commits(
+    database: Database[Any], dry_run: bool = True
+) -> dict[str, Any]:
+    """Move audited agent candidate-set commits from the old campaign-named collection."""
+    old_name = AGENT_CAMPAIGN_COMMITS_COLLECTION
+    new_name = AGENT_CANDIDATE_SET_COMMITS_COLLECTION
+    stats: dict[str, Any] = {"matched": 0, "moved": 0, "renamed": False}
+    if old_name not in database.list_collection_names():
+        return stats
+    old = database[old_name]
+    new = database[new_name]
+    stats["matched"] = old.count_documents({})
+    if dry_run:
+        return stats
+    # The API creates the new collection (with its indexes) at start-up, so an
+    # empty target is the common case: drop it and rename, keeping the records
+    # and indexes as they are. Only a target that already holds commits is merged.
+    if new_name not in database.list_collection_names() or new.count_documents({}) == 0:
+        if new_name in database.list_collection_names():
+            new.drop()
+        old.rename(new_name)
+        stats["renamed"] = True
+        stats["moved"] = stats["matched"]
+        return stats
+    for doc in old.find({}):
+        if new.find_one({"commit_id": doc.get("commit_id")}, {"_id": 1}) is None:
+            new.insert_one(doc)
+            stats["moved"] += 1
+    old.drop()
+    return stats
+
+
 def _migrate_task_name(
     database: Database[Any], *, old_name: str, new_name: str, dry_run: bool
 ) -> dict[str, Any]:
@@ -1628,6 +1665,7 @@ def _run_versioned_migration(
 DATABASE_MIGRATIONS: tuple[tuple[str, DatabaseMigration], ...] = (
     (RENAME_CHECK_CHEVRON_MIGRATION_ID, migrate_rename_check_chevron),
     (RENAME_CHECK_EF_CHEVRON_MIGRATION_ID, migrate_rename_check_ef_chevron),
+    (RENAME_AGENT_CANDIDATE_SET_COMMITS_MIGRATION_ID, migrate_rename_agent_candidate_set_commits),
 )
 
 

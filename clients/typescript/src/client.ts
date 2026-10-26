@@ -6,12 +6,12 @@ import { QDashConfig } from "./config.js";
 import { QDashNotFoundError } from "./errors.js";
 import type {
   AgentActionResponse,
-  AgentCampaignCommitResponse,
+  AgentCandidateSetCommitResponse,
   AgentCandidateCommitResponse,
   AgentCandidateResponse,
   AgentSessionPolicy,
   AgentActionType,
-  AgentCampaignCandidateReference,
+  AgentCandidateReference,
   FileTreeNode,
   ForumImageUploadResponse,
   ForumPostCreate,
@@ -562,24 +562,24 @@ export class QDashClient {
     );
   }
 
-  async commitAgentCampaignCandidates(
+  async commitAgentCandidateSet(
     sessionId: string,
-    candidates: AgentCampaignCandidateReference[],
+    candidates: AgentCandidateReference[],
     options: { idempotencyKey: string; expectedStateVersion: number },
-  ): Promise<AgentCampaignCommitResponse> {
-    return this.post(`/agent-sessions/${pathPart(sessionId)}/campaign-commits`, {
+  ): Promise<AgentCandidateSetCommitResponse> {
+    return this.post(`/agent-sessions/${pathPart(sessionId)}/candidate-set-commits`, {
       idempotency_key: options.idempotencyKey,
       expected_state_version: options.expectedStateVersion,
       candidates,
     });
   }
 
-  async getAgentCampaignCommit(
+  async getAgentCandidateSetCommit(
     sessionId: string,
     commitId: string,
-  ): Promise<AgentCampaignCommitResponse> {
+  ): Promise<AgentCandidateSetCommitResponse> {
     return this.get(
-      `/agent-sessions/${pathPart(sessionId)}/campaign-commits/${pathPart(commitId)}`,
+      `/agent-sessions/${pathPart(sessionId)}/candidate-set-commits/${pathPart(commitId)}`,
     );
   }
 

@@ -190,6 +190,7 @@ export default withMermaid(
               items: [
                 { text: "Architecture", link: "/developer-guide/copilot/architecture" },
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },
+                { text: "Agentic Calibration", link: "/developer-guide/copilot/agentic-calibration" },
                 { text: "Knowledge Layout", link: "/developer-guide/copilot/knowledge-layout" },
                 { text: "Calibration Evaluation", link: "/developer-guide/copilot/evaluation" },
                 { text: "Workspace", link: "/developer-guide/copilot/workspace" },

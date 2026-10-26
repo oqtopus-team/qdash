@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from prefect import get_run_logger
 
+from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
 from qdash.datamodel.task import RunParameterModel, TaskTypes
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.execution.service import ExecutionService
@@ -260,6 +261,12 @@ class CalibOrchestrator:
         if config.configuration_mode is not None:
             session_config["configuration_mode"] = config.configuration_mode
 
+        # readout_duration is session-scoped in Qubex. Every task that declares it
+        # defaults to DEFAULT_READOUT_DURATION, so the session must start from the
+        # same value when no shared default is given; otherwise Qubex falls back to
+        # its own default (or the chip's measurement_defaults.yaml) and every such
+        # task fails its session check before acquiring data.
+        session_config["readout_duration"] = float(DEFAULT_READOUT_DURATION)
         readout_duration = config.default_run_parameters.get("readout_duration")
         if isinstance(readout_duration, dict) and (
             "value" in readout_duration or "value_type" in readout_duration

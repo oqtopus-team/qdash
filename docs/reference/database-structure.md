@@ -92,10 +92,15 @@ their audit events.
 | `agent_sessions` | `AgentSessionDocument` | `agent_session.py` |
 | `agent_actions` | `AgentActionDocument` | `agent_session.py` |
 | `agent_candidate_commits` | `AgentCandidateCommitDocument` | `agent_session.py` |
-| `agent_campaign_commits` | `AgentCampaignCommitDocument` | `agent_session.py` |
+| `agent_candidate_set_commits` | `AgentCandidateSetCommitDocument` | `agent_session.py` |
 | `parameter_versions` | `ParameterVersionDocument` | `provenance.py` |
 | `provenance_relations` | `ProvenanceRelationDocument` | `provenance.py` |
 | `provenance_activities` | `ActivityDocument` | `provenance.py` |
+
+`agent_candidate_set_commits` was called `agent_campaign_commits` before the agent plan
+vocabulary replaced "campaign". The `calibration-migration` container in `compose.yaml` runs
+`python -m qdash.dbmodel.migration run --execute` before the API starts, and that run moves
+the records of an existing deployment into the new collection once.
 
 [Provenance Architecture](../developer-guide/architecture/provenance.md) explains version,
 relationship, and activity records.
