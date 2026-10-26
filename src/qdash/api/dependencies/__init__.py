@@ -526,9 +526,9 @@ def get_calibration_pipeline_service() -> "CalibrationPipelineService":
     def task_catalog(backend: str) -> "dict[str, TaskInfo]":
         try:
             tasks = get_task_file_service().list_task_info(backend).tasks
-        except HTTPException:
-            # No task files for this backend: the preflight checks are skipped.
-            return {}
+        except HTTPException as exc:
+            # The preflight must not pass a spec it could not check.
+            raise LookupError(str(exc.detail)) from exc
         return {task.name: task for task in tasks}
 
     def qubit_data(project_id: str, chip_id: str, qid: str) -> dict[str, Any]:

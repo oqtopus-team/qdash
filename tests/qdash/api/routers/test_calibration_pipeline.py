@@ -323,6 +323,29 @@ class TestPreflight:
         ]
         assert any("'hpi_amplitude'" in m for m in messages)
 
+    def test_unreadable_task_catalog_fails_closed(self, test_client, chip, auth_headers):
+        from fastapi import HTTPException
+
+        from qdash.api.services.task_file_service import TaskFileService
+
+        with patch.object(
+            TaskFileService,
+            "list_task_info",
+            side_effect=HTTPException(status_code=404, detail="Backend directory not found"),
+        ):
+            response = test_client.post(
+                "/calibration-pipelines/validate",
+                headers=auth_headers,
+                json={"chip_id": CHIP, "spec": good_spec()},
+            )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        messages = [p["message"] for p in data["problems"] if p["path"] == "backend_name"]
+        assert any("task catalog" in m and "Backend directory not found" in m for m in messages), (
+            data["problems"]
+        )
+
     def test_task_readout_duration_must_match_the_session(self, test_client, chip, auth_headers):
         spec = good_spec()
         spec["task_run_parameters"] = {"CheckT1": {"readout_duration": 2048}}

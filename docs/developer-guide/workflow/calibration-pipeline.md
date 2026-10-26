@@ -39,7 +39,7 @@ Beyond the spec's shape, `validate` reports what a task would reject before it m
 | Required inputs | `steps[i].tasks[j]` | A `database_required` input of a qubit task that no earlier task in the pipeline writes and that a target qubit lacks in its calibration data, such as `CheckT1` without Rabi parameters |
 | Rabi readout duration | `steps[i].tasks[j]` | Rabi parameters a task restores that were measured under a different readout duration than this pipeline's session, when no earlier `CheckRabi` in the pipeline refreshes them |
 
-Coupling steps are not checked for required inputs; their inputs span two qubits and a coupling. For `mux_ids` targets the checks cover the MUX's four qubits minus `exclude_qids`.
+Coupling steps are not checked for required inputs; their inputs span two qubits and a coupling. For `mux_ids` targets the checks cover the MUX's four qubits minus `exclude_qids`. When the backend's task catalog cannot be read, the spec is reported invalid at `backend_name` rather than passed unchecked.
 
 ## Steps
 

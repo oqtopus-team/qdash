@@ -18,7 +18,7 @@ The design keeps three loops apart so that each can be bounded and audited on it
 | Loop | Where it runs | Decides | Bounded by |
 | --- | --- | --- | --- |
 | Step | `AgentCalibrationRunner.run_step` (client) | Whether one measurement produced an accepted candidate | The session grant: tasks, qubits, overrides, quality gates, state version |
-| Plan | `AgentPlanRunner.run_plan` (client) | Which node runs next | `max_node_executions`, the remaining action budget, the node graph |
+| Plan | `AgentPlanRunner.run_plan` (client) | Which node runs next | `max_node_executions`, `max_node_visits` per node, the remaining action budget, the node graph |
 | Evaluation | `EvaluationPlanner.choose_next` (client) with `POST /evaluations/runs` (API) | Which plan node the evaluated status leads to | `next_actions`, `max_rounds_per_target`, the session's override bounds |
 
 Every decision crosses the boundary as a request QDash can refuse. The agent never writes a
@@ -47,7 +47,9 @@ duration the stored Rabi parameters were measured with. See
 
 <Diagram name="agentic-calibration-plan-states" caption="A node visit: budget, run, outcome, planner decision, node rule. Red boxes end the plan for a person; the evaluation planner's rules fill the decision box." />
 
-The runner checks the node budget, then runs the node with three override layers: the values
+The runner checks the node budget (`max_node_executions` for the plan, `max_node_visits` for
+the node about to run, whichever rule led back to it), then runs the node with three override
+layers: the values
 earlier nodes accepted (carried), the node's own `parameter_overrides`, and the one-shot
 overrides a planner attached to its last decision. Each visit gets a deterministic idempotency
 key from the plan prefix, the node index, and the visit count, so a revisit is a new action
@@ -125,7 +127,9 @@ Each layer keeps its own status, and the plan reads them from the outside in.
 
 The session's `autonomy` (`confirm_each` or `auto`) and `max_rounds_per_target` are policy,
 not status: they never change after creation, and `run-plan --planner evaluation` refuses a
-session without `auto`.
+session without `auto`. With that planner, `max_rounds_per_target` is passed to the runner as
+`max_node_visits`, and a plan node that commits or applies on its own is refused, because the
+planner may escalate after the value is already written; only `commit_on_success` writes.
 
 ## What the design does not do yet
 

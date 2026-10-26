@@ -211,8 +211,12 @@ qdash-agent --profile local run-plan \
 With CheckRabi's knowledge, `SUCCESS` completes the plan and `NO_SIGNAL` runs the
 `chevron` node; its accepted `qubit_frequency` is carried into `rabi-reconfigured`, which
 reconfigures the hardware and measures again. Every other CheckRabi status stops for a person.
-Without `--max-node-executions` the bound is the plan length times the round budget. The
-output adds `evaluations`: for each decision, the evaluation id, the status, the suggested
+The session's round budget (`--max-rounds-per-target` at `start-session`) bounds every node
+on its own, whichever rule led back to it; a node past the budget stops the plan for a person.
+Without `--max-node-executions` the whole plan is bounded by the plan length times that
+budget. Per-node `commit_candidate`, `apply_backend`, and `push_to_github` are refused with
+`--planner evaluation`, because the planner may stop the plan after a node whose value is
+already written; use `--commit-on-success`. The output adds `evaluations`: for each decision, the evaluation id, the status, the suggested
 range, the fit assessment, the chosen node, and the overrides it carried, so a reviewer can
 retrace the run and record a verdict on each evaluation.
 

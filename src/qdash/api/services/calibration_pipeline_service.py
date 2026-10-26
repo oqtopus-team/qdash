@@ -99,7 +99,9 @@ class CalibrationPipelineService:
             available_backends: The backends a spec may name.
             backend_tasks: Task names a backend enables.
             task_catalog: backend -> task metadata by name, for the preflight
-                checks. When None, the preflight checks are skipped.
+                checks. When None, the preflight checks are skipped. A LookupError
+                from it makes the spec invalid: the preflight fails closed rather
+                than pass a spec it could not check.
             qubit_data: (project_id, chip_id, qid) -> the qubit's calibration data.
             source_run_parameters: (project_id, task_id) -> run parameters recorded
                 on that task result, or None when the task is unknown.
@@ -303,10 +305,18 @@ class CalibrationPipelineService:
         """Report what a task would reject before measuring, from metadata and the database."""
         if self._task_catalog is None:
             return
-        tasks = {
-            name: PreflightTask.from_task_info(info)
-            for name, info in self._task_catalog(backend).items()
-        }
+        try:
+            catalog = self._task_catalog(backend)
+        except LookupError as exc:
+            problems.append(
+                _problem(
+                    "backend_name",
+                    f"task catalog for backend {backend!r} is unavailable, "
+                    f"so the spec could not be checked: {exc}",
+                )
+            )
+            return
+        tasks = {name: PreflightTask.from_task_info(info) for name, info in catalog.items()}
         if not tasks:
             return
         problems.extend(run_parameter_problems(spec, tasks))

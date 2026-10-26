@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from qdash.client.services.agent_runner import (
     PLAN_DEFAULT,
     PLAN_ESCALATE,
@@ -1007,3 +1009,67 @@ def test_plan_rejects_reserved_planner_node_ids() -> None:
     )
     assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
     assert "reserved" in outcome.reason
+
+
+def test_plan_planner_rejects_per_node_commits() -> None:
+    client = MagicMock()
+    runner = AgentPlanRunner(client, step_runner=MagicMock())
+    planner = MagicMock()
+
+    with pytest.raises(ValueError, match="planner-controlled plan cannot use per-node commit"):
+        runner.run_plan(
+            session_id="session-1",
+            qid="Q00",
+            nodes=[
+                AgentPlanNode(task_name="CheckT1", candidate_parameter="t1", commit_candidate=True)
+            ],
+            planner=planner,
+        )
+
+    client.get_agent_session.assert_not_called()
+    planner.choose_next.assert_not_called()
+
+
+def test_plan_max_node_visits_bounds_a_cycle_before_dispatch() -> None:
+    client = MagicMock()
+    client.get_agent_session.return_value = _plan_session(max_actions=10)
+    step_runner = MagicMock()
+    step_runner.run_step.return_value = _plan_step("t1", 95.0)
+    planner = MagicMock()
+    planner.choose_next.return_value = AgentPlannerDecision(
+        target_node_id=PLAN_DEFAULT, reason="evaluation: SUCCESS"
+    )
+    runner = AgentPlanRunner(client, step_runner=step_runner)
+
+    outcome = runner.run_plan(
+        session_id="session-1",
+        qid="Q00",
+        nodes=[
+            AgentPlanNode(
+                node_id="calibrate",
+                task_name="CheckT1",
+                candidate_parameter="t1",
+                on_pass="calibrate",
+            )
+        ],
+        max_node_executions=10,
+        max_node_visits=2,
+        planner=planner,
+    )
+
+    assert outcome.transition == AgentSkillTransition.HUMAN_ESCALATION
+    assert "calibrate (CheckT1) already ran 2 times (limit 2)" in outcome.reason
+    assert outcome.node_path == ("calibrate", "calibrate")
+    assert step_runner.run_step.call_count == 2
+    assert outcome.completed_nodes == 2
+
+
+def test_plan_max_node_visits_must_be_positive() -> None:
+    runner = AgentPlanRunner(MagicMock(), step_runner=MagicMock())
+    with pytest.raises(ValueError, match="max_node_visits must be positive"):
+        runner.run_plan(
+            session_id="session-1",
+            qid="Q00",
+            nodes=[AgentPlanNode(task_name="CheckT1", candidate_parameter="t1")],
+            max_node_visits=0,
+        )

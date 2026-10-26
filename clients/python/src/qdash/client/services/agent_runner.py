@@ -624,9 +624,15 @@ class AgentPlanRunner:
         max_node_executions: int | None = None,
         commit_on_success: bool = False,
         planner: AgentPlanner | None = None,
+        max_node_visits: int | None = None,
         idempotency_prefix: str | None = None,
     ) -> AgentPlanOutcome:
-        """Run a bounded decision graph while preserving a fixed source snapshot."""
+        """Run a bounded decision graph while preserving a fixed source snapshot.
+
+        ``max_node_visits`` bounds how often any one node runs, whichever rule
+        (planner, ``$default``, ``on_pass``, ``on_rollback``) led back to it; a visit
+        past the limit ends the plan as ``human_escalation`` before dispatch.
+        """
         if not nodes:
             raise ValueError("plan requires at least one node")
         if max_pre_dispatch_retries < 0:
@@ -638,11 +644,20 @@ class AgentPlanRunner:
             not idempotency_prefix or len(idempotency_prefix) > 96
         ):
             raise ValueError("idempotency_prefix must contain 1 to 96 characters")
-        if commit_on_success and any(
+        if max_node_visits is not None and max_node_visits <= 0:
+            raise ValueError("max_node_visits must be positive")
+        per_node_writes = any(
             node.commit_candidate or node.apply_backend or node.push_to_github for node in nodes
-        ):
+        )
+        if commit_on_success and per_node_writes:
             raise ValueError(
                 "commit_on_success cannot be combined with per-node commit or backend apply"
+            )
+        if planner is not None and per_node_writes:
+            # A planner may escalate after a node; a per-node commit would already be written.
+            raise ValueError(
+                "a planner-controlled plan cannot use per-node commit or backend apply; "
+                "use commit_on_success"
             )
 
         node_ids, graph_error = self._validate_graph(nodes)
@@ -769,6 +784,23 @@ class AgentPlanRunner:
             node = nodes[current_index]
             node_id = node_ids[current_index]
             visit = visit_counts.get(current_index, 0)
+            if max_node_visits is not None and visit >= max_node_visits:
+                return AgentPlanOutcome(
+                    transition=AgentSkillTransition.HUMAN_ESCALATION,
+                    reason=(
+                        f"Plan node {node_id} ({node.task_name}) already ran {visit} times "
+                        f"(limit {max_node_visits})"
+                    ),
+                    session_id=session_id,
+                    qid=qid,
+                    source_execution_id=source_execution_id,
+                    completed_nodes=completed_nodes,
+                    attempts=len(outcomes),
+                    outcomes=tuple(outcomes),
+                    carried_overrides=dict(carried),
+                    node_path=tuple(node_path),
+                    planner_decisions=tuple(planner_decisions),
+                )
             visit_counts[current_index] = visit + 1
             node_path.append(node_id)
             overrides = {**carried, **node.parameter_overrides, **planner_overrides}

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
+import pytest
+
 from qdash.client.services import agent_cli
 from qdash.client.services.agent_runner import (
     AgentPlanOutcome,
@@ -380,5 +382,45 @@ def test_run_plan_evaluation_planner_is_built_from_the_session(monkeypatch, caps
     assert isinstance(planner, EvaluationPlanner)
     assert planner.max_rounds_per_target == 2
     assert captured["max_node_executions"] == 4  # 2 nodes x 2 rounds
+    assert captured["max_node_visits"] == 2
     payload = json.loads(capsys.readouterr().out)
     assert payload["evaluations"] == []
+
+
+def test_run_plan_evaluation_planner_refuses_per_node_commits(monkeypatch, capsys) -> None:
+    client = MagicMock()
+    monkeypatch.setattr(agent_cli.QDashClient, "from_profile", lambda profile: client)
+    runner = MagicMock()
+    monkeypatch.setattr(agent_cli, "AgentPlanRunner", runner)
+    plan = json.dumps(
+        [
+            {
+                "id": "rabi",
+                "task_name": "CheckRabi",
+                "candidate_parameter": "control_amplitude",
+                "commit_candidate": True,
+            }
+        ]
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        agent_cli.run(
+            [
+                "--profile",
+                "lab",
+                "run-plan",
+                "--session-id",
+                "session-1",
+                "--qid",
+                "Q00",
+                "--plan",
+                plan,
+                "--planner",
+                "evaluation",
+            ]
+        )
+
+    assert exc_info.value.code == 2
+    assert "--commit-on-success" in capsys.readouterr().err
+    client.get_agent_session.assert_not_called()
+    runner.return_value.run_plan.assert_not_called()

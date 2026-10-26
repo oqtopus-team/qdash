@@ -334,6 +334,17 @@ def run(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "run-step" and args.apply_backend and not args.commit_candidate:
         parser.error("--apply-backend requires --commit")
+    if (
+        args.command == "run-plan"
+        and args.planner == "evaluation"
+        and any(
+            node.commit_candidate or node.apply_backend or node.push_to_github for node in args.plan
+        )
+    ):
+        parser.error(
+            "--planner evaluation cannot be combined with per-node commit_candidate, "
+            "apply_backend, or push_to_github; use --commit-on-success"
+        )
     client = (
         QDashClient.from_env()
         if args.from_env
@@ -372,14 +383,17 @@ def run(argv: list[str] | None = None) -> int:
             )
             planner = None
             max_node_executions = args.max_node_executions
+            max_node_visits = None
             if args.planner == "evaluation":
                 planner, refusal = _evaluation_planner(client, args)
                 if refusal is not None:
                     print(json.dumps(refusal, sort_keys=True))
                     return 2
                 assert planner is not None
+                # The session's round budget bounds every node visit, whichever rule
+                # led back to the node, and the plan as a whole.
+                max_node_visits = planner.max_rounds_per_target
                 if max_node_executions is None:
-                    # Every node may be revisited up to the session's round budget.
                     max_node_executions = len(args.plan) * planner.max_rounds_per_target
             plan_outcome = plan_runner.run_plan(
                 session_id=args.session_id,
@@ -390,6 +404,7 @@ def run(argv: list[str] | None = None) -> int:
                 max_node_executions=max_node_executions,
                 commit_on_success=args.commit_on_success,
                 planner=planner,
+                max_node_visits=max_node_visits,
                 idempotency_prefix=args.idempotency_prefix,
             )
             payload = _plan_outcome_payload(plan_outcome)
