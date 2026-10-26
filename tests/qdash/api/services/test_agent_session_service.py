@@ -14,10 +14,10 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from qdash.api.schemas.agent_session import (
-    AgentCampaignCandidateReference,
+    AgentCandidateReference,
     ApplyAgentCandidateRequest,
-    CommitAgentCampaignRequest,
     CommitAgentCandidateRequest,
+    CommitAgentCandidateSetRequest,
     CreateAgentSessionRequest,
     EvaluateCandidateGateRequest,
     ExecuteAgentActionRequest,
@@ -513,10 +513,10 @@ def test_commit_action_candidate_revalidates_and_audits_parameter_write(
     assert qubit.data["drive_amplitude"]["execution_id"] == "execution-1"
 
 
-def test_commit_campaign_candidates_updates_final_set_once(
+def test_commit_candidate_set_updates_final_set_once(
     service: AgentSessionService,
 ) -> None:
-    """All accepted final candidates are persisted in one audited campaign commit."""
+    """All accepted final candidates are persisted in one audited candidate set commit."""
     session = _create_session(service, max_actions=2)
     first = service.submit_action(
         project_id="project-1",
@@ -539,16 +539,16 @@ def test_commit_campaign_candidates_updates_final_set_once(
         output_parameters={"qubit_frequency": {"value": 4.8, "unit": "GHz"}},
         sequence=2,
     )
-    body = CommitAgentCampaignRequest(
-        idempotency_key="campaign-commit-1",
+    body = CommitAgentCandidateSetRequest(
+        idempotency_key="candidate-set-commit-1",
         expected_state_version=2,
         candidates=[
-            AgentCampaignCandidateReference(
+            AgentCandidateReference(
                 action_id=first.action_id,
                 parameter_name="drive_amplitude",
                 task_id="task-result-1",
             ),
-            AgentCampaignCandidateReference(
+            AgentCandidateReference(
                 action_id=second.action_id,
                 parameter_name="qubit_frequency",
                 task_id="task-result-2",
@@ -556,13 +556,13 @@ def test_commit_campaign_candidates_updates_final_set_once(
         ],
     )
 
-    committed = service.commit_campaign_candidates(
+    committed = service.commit_candidate_set(
         project_id="project-1",
         session_id=session.session_id,
         username="reviewer",
         body=body,
     )
-    retried = service.commit_campaign_candidates(
+    retried = service.commit_candidate_set(
         project_id="project-1",
         session_id=session.session_id,
         username="reviewer",
@@ -596,7 +596,7 @@ def test_commit_campaign_candidates_updates_final_set_once(
     assert qubit.data["qubit_frequency"]["value"] == 4.8
 
 
-def test_commit_campaign_candidates_rejects_set_before_any_write(
+def test_commit_candidate_set_rejects_set_before_any_write(
     service: AgentSessionService,
 ) -> None:
     """One rejected candidate prevents the complete final set from being persisted."""
@@ -624,20 +624,20 @@ def test_commit_campaign_candidates_rejects_set_before_any_write(
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        service.commit_campaign_candidates(
+        service.commit_candidate_set(
             project_id="project-1",
             session_id=session.session_id,
             username="reviewer",
-            body=CommitAgentCampaignRequest(
-                idempotency_key="campaign-commit-rejected",
+            body=CommitAgentCandidateSetRequest(
+                idempotency_key="candidate-set-commit-rejected",
                 expected_state_version=2,
                 candidates=[
-                    AgentCampaignCandidateReference(
+                    AgentCandidateReference(
                         action_id=first.action_id,
                         parameter_name="drive_amplitude",
                         task_id="task-result-1",
                     ),
-                    AgentCampaignCandidateReference(
+                    AgentCandidateReference(
                         action_id=second.action_id,
                         parameter_name="qubit_frequency",
                         task_id="task-result-2",

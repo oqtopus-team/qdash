@@ -24,4 +24,6 @@ export interface TaskInfo {
   enabled?: boolean;
   input_parameters?: TaskInfoInputParameters;
   run_parameters?: TaskInfoRunParameters;
+  /** Names of the calibration parameters the task writes when it completes. */
+  output_parameters?: string[];
 }

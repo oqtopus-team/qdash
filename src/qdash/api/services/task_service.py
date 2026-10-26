@@ -15,6 +15,7 @@ from qdash.api.schemas.task import (
     KnowledgeFigureResponse,
     ListTaskKnowledgeResponse,
     ListTaskResponse,
+    NextActionResponse,
     ReExecutionEntry,
     TaskKnowledgeResponse,
     TaskKnowledgeSummaryResponse,
@@ -67,6 +68,10 @@ def knowledge_response(knowledge: TaskKnowledge) -> TaskKnowledgeResponse:
             for example in knowledge.examples
         ],
         prompt_text=knowledge.to_prompt(),
+        next_actions={
+            code: NextActionResponse(**action.model_dump())
+            for code, action in knowledge.next_actions.items()
+        },
         reference=TaskReferenceResponse(**knowledge.reference().model_dump()),
     )
 

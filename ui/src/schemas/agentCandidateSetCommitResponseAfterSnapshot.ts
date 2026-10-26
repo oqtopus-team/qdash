@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type AgentCampaignCommitResponseBeforeSnapshot = { [key: string]: unknown };
+export type AgentCandidateSetCommitResponseAfterSnapshot = { [key: string]: unknown };

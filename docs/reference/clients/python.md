@@ -115,7 +115,7 @@ clients after each request. Call `close()` to release the persistent synchronous
 
 ## Agent Calibration
 
-`AgentCalibrationRunner` runs one bounded step and `AgentCampaignRunner` runs an approved graph of
+`AgentCalibrationRunner` runs one bounded step and `AgentPlanRunner` runs an approved graph of
 steps. Both use `QDashClient` for session policy, execution, candidate validation, commit, and
 backend-apply operations.
 

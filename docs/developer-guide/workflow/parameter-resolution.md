@@ -122,7 +122,10 @@ non-positive count when the workflow is defined.
 
 `readout_duration` is session-scoped in Qubex. QDash passes the shared value when constructing the
 Experiment, records the effective value on each task that uses the session readout pulse, and rejects
-a per-task value that differs from the session. Qubex spectroscopy is an intentional exception:
+a per-task value that differs from the session. When no shared value is set, the session starts
+from `DEFAULT_READOUT_DURATION` (1024 ns), the same default every declaring task uses, rather than
+from the Qubex default or the chip's `measurement_defaults.yaml`; a pipeline spec or flow therefore
+only needs a shared `readout_duration` to run with a different value. Qubex spectroscopy is an intentional exception:
 qubit/control spectroscopy uses its dedicated 1024 ns pulse and resonator spectroscopy uses its
 dedicated 8192 ns pulse, so those tasks do not expose the shared `readout_duration` parameter.
 

@@ -7,6 +7,7 @@
  */
 import type { KnowledgeExampleResponse } from './knowledgeExampleResponse';
 import type { KnowledgeFigureResponse } from './knowledgeFigureResponse';
+import type { TaskKnowledgeResponseNextActions } from './taskKnowledgeResponseNextActions';
 import type { TaskReferenceResponse } from './taskReferenceResponse';
 
 /**
@@ -21,6 +22,8 @@ export interface TaskKnowledgeResponse {
   examples?: KnowledgeExampleResponse[];
   /** The background as Markdown, headed by the experiment name */
   prompt_text: string;
+  /** Autonomous-plan step per evaluation status code, from task.md's frontmatter. A status without an entry stops the plan for human review. */
+  next_actions?: TaskKnowledgeResponseNextActions;
   /** The background and question-template parts for the evaluation model */
   reference?: TaskReferenceResponse;
 }

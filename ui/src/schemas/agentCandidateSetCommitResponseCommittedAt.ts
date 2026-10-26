@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type AgentCampaignCommitResponseCommittedAt = string | null;
+export type AgentCandidateSetCommitResponseCommittedAt = string | null;

@@ -16,6 +16,17 @@ an example declares `type: qdash.calibration-example`, the same profile, and its
 Markdown body remains the reviewable scientific explanation. The generator accepts legacy
 `index.md` and bullet metadata while older drafts are migrated, but new content uses frontmatter.
 
+The frontmatter may also carry `next_actions`, the table an autonomous plan follows: for
+each status the evaluation can report (`SUCCESS` and one code per `## Common failures` bullet,
+derived as [Calibration Evaluation](./evaluation.md) describes), an `action` of `continue`,
+`retry`, `run_task` with a `task`, or `request_human`, with optional `overrides`, a
+`suggested_range_parameter`, and a `note`. The generator rejects a key the task never reports,
+and the API serves the table as `next_actions` on `GET /tasks/{name}/knowledge` while
+`TaskKnowledge.next_action_problems` reports a stale key. A `## Recovery` section holds the
+prose behind the table for the planner and the reviewer. Neither the frontmatter nor that section
+reaches the evaluation prompt, which reads only the intro, the expected plot, the common failures,
+and the parameters to extract.
+
 The split follows what changes together. A skill that names `qdash_list_cooldowns` must ship with the version of pi-qdash that defines that tool, so skills live next to the tools. Task physics is the same whether it is read by Ask AI in the analysis sidebar, the chat, or a pi CLI user, so it has one source that every consumer queries. The approval-card flow exists only in the QDash UI, so its instructions stay here.
 
 ## Rules

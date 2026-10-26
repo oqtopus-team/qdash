@@ -408,6 +408,13 @@ tasks:
     cmds:
       - bash scripts/scan_staged_leaks.sh --verbose
 
+  scan-leaks-local:
+    desc: Scan tracked working files and commits not in LEAKS_BASE (default origin/develop)
+    env:
+      LEAKS_BASE: '{{.LEAKS_BASE | default "origin/develop"}}'
+    cmds:
+      - bash scripts/scan_local_leaks.sh
+
   # =============================================================================
   # Local Check (run before push)
   # =============================================================================
@@ -420,7 +427,7 @@ tasks:
       - task: ci-typecheck
       - task: ci-test
       - task: ci-ui
-      - task: scan-leaks
+      - task: scan-leaks-local
 
   check-all:
     desc: Run the full local check suite

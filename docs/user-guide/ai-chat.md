@@ -9,7 +9,7 @@ replacing operator judgment.
 | --- | --- |
 | AI Chat | Explore a question interactively with project-aware tools and cited QDash records. |
 | Analysis chat panel | Discuss the metric and filters already open on the Metrics page. |
-| Agent calibration | Run a separately authorized, bounded calibration campaign through the client. |
+| Agent calibration | Run a separately authorized, bounded calibration plan through the client. |
 
 Agent calibration performs hardware-affecting operations and is documented separately in
 [Agent Calibration](./agent-calibration.md).
