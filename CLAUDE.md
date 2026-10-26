@@ -73,6 +73,7 @@ For detailed setup instructions, see [docs/developer-guide/setup.md](docs/develo
 
 ## Notes for AI Assistants
 
+- **Required before every push**: Run `task check` from the repository root and require exit status 0, including documentation-only changes and updates to existing PRs. Stage intended new files first, review auto-fixes, and rerun after further edits. If it fails or cannot run, report the blocker and do not push. Follow [Before Pushing](docs/developer-guide/development-flow.md#before-pushing) for the target branch and result reporting.
 - **Don't edit generated code**: `ui/src/client/` and `ui/src/schemas/` are auto-generated from OpenAPI
 - **Regenerate after API changes**: Run `task generate` when backend API changes
 - **Follow existing patterns**: Check `docs/developer-guide/ui/guidelines.md` for coding standards
