@@ -19,7 +19,7 @@ from qdash.datamodel.agent_session import (
 
 
 class AgentSessionDocument(Document):
-    """Authoritative state for a bounded local-agent campaign."""
+    """Authoritative state for a bounded local-agent session."""
 
     session_id: str
     project_id: str
@@ -122,8 +122,8 @@ class AgentCandidateCommitDocument(Document):
         ]
 
 
-class AgentCampaignCommitDocument(Document):
-    """Audit record for one same-qubit campaign candidate-set commit."""
+class AgentCandidateSetCommitDocument(Document):
+    """Audit record for one same-qubit candidate-set commit."""
 
     commit_id: str
     session_id: str
@@ -148,7 +148,7 @@ class AgentCampaignCommitDocument(Document):
     class Settings:
         """MongoDB collection settings."""
 
-        name = "agent_campaign_commits"
+        name = "agent_candidate_set_commits"
         indexes: ClassVar = [
             IndexModel([("commit_id", ASCENDING)], unique=True),
             IndexModel(

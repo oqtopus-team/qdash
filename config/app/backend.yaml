@@ -35,6 +35,7 @@ backends:
         - CheckRabi
         - CheckCoarseReadoutParams
         - CheckCKP
+        - CheckQuantumEfficiency
         - CreateHPIPulse
         - CheckHPIPulse
         - CreatePIPulse
@@ -53,6 +54,7 @@ backends:
         - CheckAdaptiveFHChevron
         - EFReadoutClassification
         - CheckThermalExcitation
+        - CheckSpinLockSpectroscopy
         - ReadoutClassification
         - RandomizedBenchmarking
         - X90InterleavedRandomizedBenchmarking

@@ -2,7 +2,8 @@
 
 QDash is the execution and safety boundary for AI agents that run calibration: the agent
 proposes, QDash measures, judges, records, and writes. The user-facing procedure is in
-[Agent Calibration](../../user-guide/agent-calibration.md).
+[Agent Calibration](../../user-guide/agent-calibration.md); the closed loop built on this
+contract, with its statuses and stop rules, is in [Agentic Calibration](./agentic-calibration.md).
 
 ## Responsibility boundary
 
@@ -26,6 +27,14 @@ and a duplicate request whose idempotency key carries different arguments. The b
 proposed actions; committing an accepted candidate advances the state version without spending
 one.
 
+The policy also records how much a person delegated: `autonomy` is `confirm_each` (every
+measurement confirmed by a person, the default) or `auto` (the plan, bounds, and budget
+confirmed once; the plan then chooses each next node from the calibration evaluation of the
+last result and the task knowledge's `next_actions` table), and `max_rounds_per_target` caps how
+often one node runs on a target in `auto`. The grant changes nothing server-side: every action
+still passes the same policy checks. It is what the client's evaluation planner requires before
+it runs unattended, and what the audit shows a reviewer.
+
 ## Operation dispatch
 
 An authorised single-task action runs through the system Prefect deployment that the workers
@@ -42,7 +51,7 @@ writes.
 Task output parameters stay staged until the session's parameter bounds and quality gates accept
 them. The candidate is derived from the authoritative task result; R² is normalised to `r2` and
 persisted as task-result provenance, and a missing required metric rejects the candidate. A
-campaign ending in `pass` may revalidate the latest accepted candidate per parameter and persist
+plan ending in `pass` may revalidate the latest accepted candidate per parameter and persist
 the same-qid set with one Qubit save and one audit record. There is no multi-document MongoDB
 transaction behind that save.
 
@@ -80,7 +89,7 @@ The client package carries the runners and the `qdash-agent` command
   maximum visits must fit within the session's remaining budget.
 - A dynamic planner cannot grow the graph or the budget. Invalid choices, planner failures, and
   completion after a rollback escalate to a human.
-- Campaign finalisation re-resolves every referenced task result and validates the whole set
+- Plan finalisation re-resolves every referenced task result and validates the whole set
   before writing calibration data.
 
 ## Relation to Vibe Calibration
@@ -89,7 +98,7 @@ The client package carries the runners and the `qdash-agent` command
 QDash has reached the same autonomy: the paper reports reusable decision-tree skills,
 quantitative acceptance gates, rollback and self-healing, audited write-back, topology-defined
 parallel groups, and transfer to unseen devices. QDash implements the single-qubit closed loop,
-backend commit, and bounded skill campaigns described above; parallel campaigns and a
+backend commit, and bounded skill plans described above; parallel plans and a
 comparative evaluation against expert calibration are not implemented, and any performance
 claim needs results measured on QDash's own hardware, tasks, and gates.
 
@@ -101,5 +110,5 @@ claim needs results measured on QDash's own hardware, tasks, and gates.
 - `src/qdash/workflow/register_system_flows.py`,
   `src/qdash/workflow/service/agent_candidate_apply_flow.py`: system deployments, backend apply
 - `clients/python/src/qdash/client/services/agent_runner.py`,
-  `clients/python/src/qdash/client/services/agent_cli.py`: step and campaign runners, command
+  `clients/python/src/qdash/client/services/agent_cli.py`: step and plan runners, command
 - `tests/qdash/api/services/test_agent_session_service.py`

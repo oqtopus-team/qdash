@@ -49,8 +49,8 @@ qdash-agent --profile local start-session \
   --model-name local-agent-model
 ```
 
-Keep the returned `session_id`. Review the whole scope before authorising a campaign on
-hardware. Leave out `--allow-reconfigure` when the campaign must not reconfigure the device.
+Keep the returned `session_id`. Review the whole scope before authorising a plan on
+hardware. Leave out `--allow-reconfigure` when the plan must not reconfigure the device.
 The action budget counts proposed measurements; checking and committing a result do not use
 actions.
 
@@ -95,20 +95,20 @@ never substitute a number of its own.
 | `rollback` | The bounds or quality gates rejected the candidate. |
 | `human_escalation` | Policy, persistence, backend verification, or versioning failed. Inspect before continuing. |
 
-## Run a campaign
+## Run a plan
 
-`run-campaign` runs an ordered plan of steps inside one approved session. Before the first
+`run-plan` runs an ordered plan of steps inside one approved session. Before the first
 measurement it checks the qubit, the tasks, the candidate parameters, the reconfiguration
 permission, and the remaining action budget against the session. A `rollback` or
-`human_escalation` stops the campaign at once.
+`human_escalation` stops the plan at once.
 
 ```bash
-qdash-agent --profile local run-campaign \
+qdash-agent --profile local run-plan \
   --session-id SESSION_ID \
   --qid Q00 \
   --source-execution-id SOURCE_EXECUTION_ID \
   --commit-on-success \
-  --idempotency-prefix operator-approved-campaign-001 \
+  --idempotency-prefix operator-approved-plan-001 \
   --plan '[
     {"task_name":"CheckRabi","candidate_parameter":"control_amplitude"},
     {"task_name":"CreateHPIPulse","candidate_parameter":"hpi_amplitude"},
@@ -124,12 +124,12 @@ value, and every override is checked against the session bounds first.
 ### Recovery branches
 
 Nodes may carry an `id`, `on_pass`, and `on_rollback` to form a small decision graph. Without
-`on_pass` the next node follows; `$complete` ends the campaign successfully; without
-`on_rollback` a rejected candidate stops the campaign. A rejected candidate is not carried into
+`on_pass` the next node follows; `$complete` ends the plan successfully; without
+`on_rollback` a rejected candidate stops the plan. A rejected candidate is not carried into
 the recovery node.
 
 ```bash
-qdash-agent --profile local run-campaign \
+qdash-agent --profile local run-plan \
   --session-id SESSION_ID \
   --qid Q00 \
   --source-execution-id SOURCE_EXECUTION_ID \
@@ -159,12 +159,12 @@ remaining action budget. A graph that does not finish within the bound ends in
 
 ### Committing
 
-With `--commit-on-success`, nothing is written until the campaign ends in `pass`; QDash then
+With `--commit-on-success`, nothing is written until the plan ends in `pass`; QDash then
 re-checks the latest accepted value of each parameter and saves the set in one step with one
 audit record. Any other ending leaves the values uncommitted. This option cannot be combined
 with per-node `commit_candidate`, `apply_backend`, or `push_to_github`; without it, a node may set
 those itself (`apply_backend` needs `commit_candidate`, and `push_to_github` needs both). A
-campaign commit updates the calibration state only; applying the whole set to the backend files
+candidate set commit updates the calibration state only; applying the whole set to the backend files
 is a separate operation.
 
 The runner retries by itself only failures that happen before a measurement has started, reusing
@@ -172,9 +172,58 @@ the same request so nothing runs twice. Once a measurement exists, a timeout ret
 you rather than measuring again. The result lists every step, execution, candidate, commit,
 and planner decision, and the final set of carried parameters.
 
-A planner that chooses the next node at run time, backed by a model, is injected through the
-[Python API](../reference/clients/python.md#agent-calibration); the command runs the plan as
-written.
+### Autonomous plan
+
+With `--planner evaluation` the plan chooses its next node from the calibration evaluation
+of each result instead of following `on_pass` and `on_rollback` alone. After a node, QDash
+evaluates the node's task result with the calibration-evaluation model (the QCalEval
+questions), the planner reads the status the model chose, and the task's knowledge says what
+that status leads to: the table under `next_actions` in the task's `task.md` frontmatter
+(see the [knowledge layout](../developer-guide/copilot/knowledge-layout.md)). The planner never
+invents a step: `continue` follows the plan, `retry` runs the same node again, `run_task` jumps
+to the node of the plan that runs the named task, and `request_human` stops. A status the
+table does not cover stops the plan too.
+
+The session must grant it. Create the session with `--autonomy auto`; the policy then records
+that a person approved the plan, the bounds, and the budget once, and the command refuses any
+other session. `--max-rounds-per-target` (default 3) caps how often one node may run on the
+target. The plan also stops for a person when the same status comes back three times, when
+the fit was judged unreliable twice in a row, when an evaluation does not complete, when a
+suggested range falls outside the session's override bounds, or when the node budget runs out.
+
+```bash
+qdash-agent --profile local start-session \
+  --chip-id chip-001 --qid Q00 \
+  --task CheckRabi --task CheckChevron \
+  --allowed-overrides '{"control_amplitude":{"minimum":0.01,"maximum":0.08},"qubit_frequency":{"minimum":7.4,"maximum":7.6}}' \
+  --allow-reconfigure --autonomy auto --max-rounds-per-target 3 \
+  --max-actions 12 ...
+
+qdash-agent --profile local run-plan \
+  --session-id SESSION_ID --qid Q00 --planner evaluation \
+  --plan '[
+    {"id":"rabi","task_name":"CheckRabi","candidate_parameter":"control_amplitude","on_pass":"$complete"},
+    {"id":"chevron","task_name":"CheckChevron","candidate_parameter":"qubit_frequency","on_pass":"rabi-reconfigured"},
+    {"id":"rabi-reconfigured","task_name":"CheckRabi","candidate_parameter":"control_amplitude","reconfigure_before_task":true,"on_pass":"$complete"}
+  ]'
+```
+
+With CheckRabi's knowledge, `SUCCESS` completes the plan and `NO_SIGNAL` runs the
+`chevron` node; its accepted `qubit_frequency` is carried into `rabi-reconfigured`, which
+reconfigures the hardware and measures again. Every other CheckRabi status stops for a person.
+The session's round budget (`--max-rounds-per-target` at `start-session`) bounds every node
+on its own, whichever rule led back to it; a node past the budget stops the plan for a person.
+Without `--max-node-executions` the whole plan is bounded by the plan length times that
+budget. Per-node `commit_candidate`, `apply_backend`, and `push_to_github` are refused with
+`--planner evaluation`, because the planner may stop the plan after a node whose value is
+already written; use `--commit-on-success`. The output adds `evaluations`: for each decision, the evaluation id, the status, the suggested
+range, the fit assessment, the chosen node, and the overrides it carried, so a reviewer can
+retrace the run and record a verdict on each evaluation.
+
+Any other planner, backed by a model, is injected through the
+[Python API](../reference/clients/python.md#agent-calibration); without `--planner` the command
+runs the plan as written. How this works:
+[Agentic Calibration](../developer-guide/copilot/agentic-calibration.md).
 
 ## Before the first run on hardware
 
@@ -183,4 +232,4 @@ next step builds the backend from those files, connects to the hardware, and rec
 when the session allows. Run a single-qubit canary under supervision first, and confirm the
 chip, qubit, task, source execution, bounds, quality gates, action budget, reconfiguration
 permission, commit behaviour, and Git branch before starting it. Unattended multi-qubit
-campaigns are not supported.
+plans are not supported.

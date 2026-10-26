@@ -5,12 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { AgentCampaignCandidateReference } from './agentCampaignCandidateReference';
+import type { AgentCandidateReference } from './agentCandidateReference';
 
 /**
- * Commit the final accepted candidate set for one same-qubit campaign.
+ * Commit the final accepted candidate set for one same-qubit plan.
  */
-export interface CommitAgentCampaignRequest {
+export interface CommitAgentCandidateSetRequest {
   /**
      * @minLength 1
      * @maxLength 128
@@ -22,5 +22,5 @@ export interface CommitAgentCampaignRequest {
      * @minItems 1
      * @maxItems 100
      */
-  candidates: AgentCampaignCandidateReference[];
+  candidates: AgentCandidateReference[];
 }

@@ -18,13 +18,13 @@ from qdash.api.lib.project import (
 )
 from qdash.api.schemas.agent_session import (
     AgentActionResponse,
-    AgentCampaignCommitResponse,
     AgentCandidateCommitResponse,
+    AgentCandidateSetCommitResponse,
     AgentSessionResponse,
     ApplyAgentCandidateRequest,
     CandidateGateResponse,
-    CommitAgentCampaignRequest,
     CommitAgentCandidateRequest,
+    CommitAgentCandidateSetRequest,
     CreateAgentSessionRequest,
     EvaluateCandidateGateRequest,
     ExecuteAgentActionRequest,
@@ -177,20 +177,20 @@ def commit_agent_action_candidate(
 
 
 @router.post(
-    "/{session_id}/campaign-commits",
-    response_model=AgentCampaignCommitResponse,
+    "/{session_id}/candidate-set-commits",
+    response_model=AgentCandidateSetCommitResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Commit final agent campaign candidates",
-    operation_id="commitAgentCampaignCandidates",
+    summary="Commit the final agent candidate set",
+    operation_id="commitAgentCandidateSet",
 )
-def commit_agent_campaign_candidates(
+def commit_agent_candidate_set(
     session_id: str,
-    body: CommitAgentCampaignRequest,
+    body: CommitAgentCandidateSetRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
-) -> AgentCampaignCommitResponse:
+) -> AgentCandidateSetCommitResponse:
     """Validate a final candidate set and persist it with one Qubit save."""
-    return service.commit_campaign_candidates(
+    return service.commit_candidate_set(
         project_id=ctx.project_id,
         session_id=session_id,
         username=ctx.user.username,
@@ -199,19 +199,19 @@ def commit_agent_campaign_candidates(
 
 
 @router.get(
-    "/{session_id}/campaign-commits/{commit_id}",
-    response_model=AgentCampaignCommitResponse,
-    summary="Get an agent campaign commit",
-    operation_id="getAgentCampaignCommit",
+    "/{session_id}/candidate-set-commits/{commit_id}",
+    response_model=AgentCandidateSetCommitResponse,
+    summary="Get an agent candidate set commit",
+    operation_id="getAgentCandidateSetCommit",
 )
-def get_agent_campaign_commit(
+def get_agent_candidate_set_commit(
     session_id: str,
     commit_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[AgentSessionService, Depends(get_agent_session_service)],
-) -> AgentCampaignCommitResponse:
-    """Get one audited final campaign candidate-set commit."""
-    return service.get_campaign_commit(
+) -> AgentCandidateSetCommitResponse:
+    """Get one audited final candidate-set commit."""
+    return service.get_candidate_set_commit(
         project_id=ctx.project_id,
         session_id=session_id,
         commit_id=commit_id,

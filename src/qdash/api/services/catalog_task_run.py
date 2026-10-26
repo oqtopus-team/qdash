@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from qdash.api.services.task_file_service import TaskFileService
 
 
-def _matches_parameter_type(value: object, value_type: object) -> bool:
+def matches_parameter_type(value: object, value_type: object) -> bool:
     """Return whether a JSON value matches a known task parameter type."""
     if value_type == "int":
         return isinstance(value, int) and not isinstance(value, bool)
@@ -81,7 +81,7 @@ def validate_overrides(
     invalid_types = []
     for name, value in input_overrides.items():
         metadata = task.input_parameters.get(name)
-        if metadata is not None and not _matches_parameter_type(value, metadata.get("value_type")):
+        if metadata is not None and not matches_parameter_type(value, metadata.get("value_type")):
             invalid_types.append(f"input.{name} must be {metadata.get('value_type')}")
     for name, override in run_overrides.items():
         metadata = task.run_parameters.get(name)
@@ -95,7 +95,7 @@ def validate_overrides(
             )
             continue
         effective_type = requested_type if requested_type is not None else declared_type
-        if not _matches_parameter_type(value, effective_type):
+        if not matches_parameter_type(value, effective_type):
             invalid_types.append(f"run.{name} must be {effective_type}")
 
     errors = []

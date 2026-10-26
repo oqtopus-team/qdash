@@ -30,6 +30,12 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
 )
 from qdash.workflow.calibtasks.qubex.cw.check_waveform import CheckWaveform
 from qdash.workflow.calibtasks.qubex.measurement.check_ckp import CheckCKP
+from qdash.workflow.calibtasks.qubex.measurement.check_quantum_efficiency import (
+    CheckQuantumEfficiency,
+)
+from qdash.workflow.calibtasks.qubex.measurement.check_spin_lock_spectroscopy import (
+    CheckSpinLockSpectroscopy,
+)
 from qdash.workflow.calibtasks.qubex.measurement.check_thermal_excitation import (
     CheckThermalExcitation,
 )
@@ -106,10 +112,12 @@ __all__ = [
     "CheckOptimalReadoutAmplitude",
     "CheckOptimalReadoutFrequency",
     "CheckPIPulse",
+    "CheckQuantumEfficiency",
     "CheckQubitSpectroscopy",
     "CheckRabi",
     "CheckRamsey",
     "CheckResonatorSpectroscopy",
+    "CheckSpinLockSpectroscopy",
     "CheckStatus",
     "CheckT1",
     "CheckT1Average",
