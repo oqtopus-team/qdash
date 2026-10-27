@@ -22,7 +22,7 @@ from qdash.api.services.admin_service import AdminService
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
-from qdash.api.services.chip import ChipService
+from qdash.api.services.chip import ChipConfigScaffolder, ChipService
 from qdash.api.services.config_service import ConfigService
 from qdash.api.services.cooldown_service import CooldownService
 from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEventService
@@ -117,6 +117,15 @@ def get_task_result_repository() -> MongoTaskResultHistoryRepository:
 
     """
     return MongoTaskResultHistoryRepository()
+
+
+def get_chip_config_scaffolder() -> ChipConfigScaffolder:
+    """Get the writer of new chips' Qubex configuration directories.
+
+    Not cached: the configuration tree is resolved per request, so a mount
+    that appears after startup is picked up.
+    """
+    return ChipConfigScaffolder()
 
 
 @cached_dependency_provider

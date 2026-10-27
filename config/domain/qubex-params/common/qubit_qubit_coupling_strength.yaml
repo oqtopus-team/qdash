@@ -1,0 +1,6 @@
+meta:
+  description: Coupling strength (g) between qubits (the coefficient of a^dag b + a b^dag in the Hamiltonian)
+  unit: MHz
+  default: null
+  scope: coupling
+data: {}

@@ -1,0 +1,5 @@
+meta:
+  description: Thermal excitation probability of the qubit
+  default: null
+  scope: qubit
+data: {}

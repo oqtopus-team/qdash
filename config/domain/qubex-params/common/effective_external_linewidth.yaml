@@ -1,0 +1,6 @@
+meta:
+  description: Effective external linewidth κ of the readout resonator
+  unit: MHz
+  default: null
+  scope: qubit
+data: {}
