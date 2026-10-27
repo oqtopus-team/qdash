@@ -66,6 +66,34 @@ for chat, and the corresponding `EVALUATION` pair for figure analysis. Base URLs
 Set `AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true` only in a trusted experimental deployment. QDash still
 requires the signed-in user to approve each proposed write in the chat.
 
+#### Authenticate AI endpoints with Cloudflare Access
+
+Use one Cloudflare Access service token for chat and figure analysis. Create the token and add it
+to a **Service Auth** policy on each AI endpoint's Access application, following
+[Cloudflare's service token instructions](https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/).
+
+Set the shared credentials in `.env`:
+
+```dotenv
+CF_ACCESS_CLIENT_ID=<service-token-client-id>
+CF_ACCESS_CLIENT_SECRET=<service-token-client-secret>
+```
+
+Keep the existing `OPENAI_COMPATIBLE_BASE_URL_CHAT` and `OPENAI_COMPATIBLE_BASE_URL_EVALUATION`
+settings pointed at the protected HTTPS URLs, including `/v1`. The shared token is sent to every
+endpoint configured through `base_url: env:OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>`, including custom
+suffixes. Literal URLs and built-in providers do not receive it.
+
+Keep each endpoint's API key if the model server requires it. If authentication is handled only
+by Cloudflare Access, leave that API key empty. Both Access values must be set together; leave
+both empty to keep using API-key-only authentication.
+
+After changing `.env`, recreate the runtime to load the values:
+
+```bash
+docker compose up -d --build --force-recreate agent-runtime
+```
+
 ### Set the Default Color Theme
 
 Set `NEXT_PUBLIC_DEFAULT_THEME` to `light`, `dark`, `cupcake`, `emerald`, `corporate`,
