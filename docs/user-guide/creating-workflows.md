@@ -88,6 +88,27 @@ The `mode` value controls how one-qubit work is arranged:
 Keep the template's mode unless the procedure requires a specific ordering. The selected tasks
 must support the chosen mode and backend.
 
+## Align Readout Capture Before Spectroscopy
+
+Use **Box Setup** before resonator spectroscopy on QuEL-1 or QuEL-3. Set
+`mux_ids` to the MUXes connected to the hardware before saving the workflow; for
+example, use `mux_ids=[0]` for MUX 0. Each selected MUX needs at least one active
+qubit with readout and control frequencies configured.
+
+Box Setup configures the selected hardware, then measures each active qubit
+separately with a fixed readout tone. Qubits that pass pulse detection and
+verification contribute to a shared capture delay with at least 32 ns before
+and after each accepted pulse. A failed measurement does not contribute to the
+fit. If no qubit passes, or the successful pulses cannot fit a common capture
+window, the task saves no new delay. A hardware or communication error stops
+the task.
+
+Inspect each qubit's sweep and final-capture figures in its task results. Figure
+titles identify the qubit and show acceptance or a rejection reason. If the
+whole MUX fails, its representative task retains the individual figures for
+diagnosis. The saved delay applies to the entire MUX, including qubits whose
+measurements were rejected. Later workflow steps reload the saved delay.
+
 ## Set Parameters for One Task
 
 Add `task_parameters` to the workflow's calibration service when one named task needs different

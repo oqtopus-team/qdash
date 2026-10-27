@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import copy
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
@@ -22,6 +22,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from qdash.analysis.capture_delay import (
+    MARGIN_NS,
     QUEL1_RESOLUTION_NS,
     QUEL3_RESOLUTION_NS,
     WORD_STEP,
@@ -75,18 +76,20 @@ class CaptureDelayRun:
     verification: list[EdgeResult] = field(default_factory=list)
     final: FinalReport | None = None
     final_check: list[EdgeResult] = field(default_factory=list)
+    targets: list[str] = field(default_factory=list)
+    accepted_targets: list[str] = field(default_factory=list)
+    rejected_targets: dict[str, str] = field(default_factory=dict)
     error: str | None = None
 
 
 class CorrectCaptureDelay(QubexTask):
     """Center the readout pulse in the capture window of each MUX.
 
-    This is a MUX-level task: it runs once for the representative qubit and
-    writes the same capture delay to every qubit in the MUX: ``capture_delay``
-    and ``capture_delay_word`` on QuEL-1, ``capture_delay`` in ns on QuEL-3.
-    The delay is a setting of the MUX, so the task captures only the
-    representative qubit's readout at a fixed tone frequency. The capture units
-    of a MUX read the same ADC samples, so capturing more qubits adds no information.
+    This MUX-level task measures each active qubit separately. Only qubits with
+    supported pulse edges and successful verification contribute to the common
+    delay. A shared delay must fit every accepted qubit with 32 ns margins;
+    incompatible successful measurements fail the task without publishing values.
+    The accepted delay applies to the MUX, including qubits rejected by the fit.
     """
 
     name: str = "CorrectCaptureDelay"
@@ -167,26 +170,30 @@ class CorrectCaptureDelay(QubexTask):
         ),
     }
 
-    def _mux(self, exp: Any, label: str) -> int:
-        """Return the MUX of ``label``, requiring ``label`` to be active."""
+    def _targets(self, exp: Any, label: str) -> tuple[int, list[str]]:
+        """Resolve active session qubits in the MUX, even if its first qubit is inactive."""
         system = exp.system_manager.experiment_system
         mux = int(system.get_mux_by_qubit(label).index)
-        if label not in exp.qubit_labels:
-            # Qubex activates a qubit only when its readout and control frequencies
-            # resolve; without them the MUX has no readout target to capture with.
+        targets = [
+            target
+            for target in exp.qubit_labels
+            if int(system.get_mux_by_qubit(target).index) == mux
+        ]
+        if not targets:
             raise ValueError(
-                f"MUX{mux}: {label} is not active in the Qubex session. Set "
+                f"MUX{mux}: no active qubits in the Qubex session. Set "
                 "readout_frequency and control_frequency for the "
                 "MUX qubits in the params files before correcting the capture delay."
             )
-        return mux
+        return mux, targets
 
     def resolve_run_parameters(self, backend: QubexBackend, qid: str) -> None:
         """Record the effective readout tone frequency before the run."""
         super().resolve_run_parameters(backend, qid)
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
-        self._mux(exp, label)
+        _, targets = self._targets(exp, label)
+        label = targets[0]
         parameter = self.run_parameters["readout_frequency"]
         if parameter.value is not None:
             return
@@ -229,7 +236,7 @@ class CorrectCaptureDelay(QubexTask):
             raise ValueError(f"{self.name} supports QuEL-1 and QuEL-3 capture delays only")
         resolution = RESOLUTION_NS[backend_kind]
         target = self.get_qubit_label(backend, qid)
-        mux = self._mux(exp, target)
+        mux, targets = self._targets(exp, target)
 
         coarse_settings = self._coarse_settings(backend_kind)
         frequency = float(self.run_parameters["readout_frequency"].get_value())
@@ -238,8 +245,16 @@ class CorrectCaptureDelay(QubexTask):
         snr_threshold = float(self.run_parameters["snr_threshold"].get_value())
         smoothing = int(self.run_parameters["smoothing"].get_value())
 
-        def measure_and_analyze(settings: list[Setting]) -> list[EdgeResult]:
-            waveforms = self._measure(exp, backend_kind, mux, target, frequency, settings)
+        def measure_and_analyze(
+            settings: list[Setting], measured_targets: list[str]
+        ) -> list[EdgeResult]:
+            waveforms = [
+                waveform
+                for measured_target in measured_targets
+                for waveform in self._measure(
+                    exp, backend_kind, mux, measured_target, frequency, settings
+                )
+            ]
             return analyze_waveforms(waveforms, snr_threshold=snr_threshold, smoothing=smoothing)
 
         def setting(total_ns: float) -> Setting:
@@ -247,15 +262,44 @@ class CorrectCaptureDelay(QubexTask):
                 return _quel1_setting(*split_total_delay(total_ns))
             return _quel3_setting(total_ns)
 
-        coarse = measure_and_analyze(coarse_settings)
+        coarse = measure_and_analyze(coarse_settings, targets)
         center = float(np.median([result.waveform.window_center_ns for result in coarse]))
         result = CaptureDelayRun(
-            backend=backend_kind, mux=mux, target=target, center_ns=center, coarse=coarse
+            backend=backend_kind,
+            mux=mux,
+            target=target,
+            center_ns=center,
+            coarse=coarse,
+            targets=targets,
         )
 
-        result.coarse_selection = select_delay(
-            coarse, mux=mux, center=center, resolution_ns=resolution
-        )
+        def supported_targets(
+            edges: list[EdgeResult], candidates: list[str], stage: str
+        ) -> list[str]:
+            supported = []
+            for candidate in candidates:
+                report = select_delay(
+                    [edge for edge in edges if edge.target == candidate],
+                    mux=mux,
+                    center=center,
+                    resolution_ns=resolution,
+                )
+                if report.selected_total_ns is None:
+                    result.rejected_targets[candidate] = f"{stage}: {report.reason}"
+                else:
+                    supported.append(candidate)
+            return supported
+
+        def common_selection(edges: list[EdgeResult], candidates: list[str]) -> SelectionReport:
+            return select_delay(
+                [edge for edge in edges if edge.target in candidates],
+                mux=mux,
+                center=center,
+                resolution_ns=resolution,
+            )
+
+        candidates = supported_targets(coarse, targets, "coarse sweep")
+        result.coarse_selection = common_selection(coarse, candidates)
         selection = result.coarse_selection
         selected_total = selection.selected_total_ns
         if selected_total is None:
@@ -263,33 +307,60 @@ class CorrectCaptureDelay(QubexTask):
             return RunResult(raw_result=result)
 
         if backend_kind == "quel1":
-            # Confirm the 32 ns word offset at the chosen 128 ns block.
             delay, _ = split_total_delay(selected_total)
             words = self._sweep_values("capture_delay_word_range")
-            result.fine = measure_and_analyze([_quel1_setting(delay, int(w)) for w in words])
-            result.fine_selection = select_delay(
-                result.fine, mux=mux, center=center, resolution_ns=resolution
+            result.fine = measure_and_analyze(
+                [_quel1_setting(delay, int(w)) for w in words], candidates
             )
+            candidates = supported_targets(result.fine, candidates, "word sweep")
+            result.fine_selection = common_selection(result.fine, candidates)
             selection = result.fine_selection
             selected_total = selection.selected_total_ns
             if selected_total is None:
                 result.error = f"word sweep: {selection.reason}"
                 return RunResult(raw_result=result)
 
-        result.verification = measure_and_analyze([setting(selected_total)])
+        result.verification = measure_and_analyze([setting(selected_total)], candidates)
+        verified = []
+        for candidate in candidates:
+            edges = [edge for edge in result.verification if edge.target == candidate]
+            single_selection = replace(selection, supporting_targets=(candidate,))
+            report = finalize_delay(
+                edges, single_selection, center=center, resolution_ns=resolution
+            )
+            if report.final_total_ns is None:
+                result.rejected_targets[candidate] = f"verification: {report.reason}"
+            else:
+                verified.append(candidate)
+        selection = replace(selection, supporting_targets=tuple(verified))
         result.final = finalize_delay(
-            result.verification, selection, center=center, resolution_ns=resolution
+            [edge for edge in result.verification if edge.target in verified],
+            selection,
+            center=center,
+            resolution_ns=resolution,
         )
         if result.final.final_total_ns is None:
             result.error = f"verification: {result.final.reason}"
             return RunResult(raw_result=result)
 
-        result.final_check = measure_and_analyze([setting(result.final.final_total_ns)])
-        if not all(
-            check.success and check.rise_ns is not None and check.fall_ns is not None
-            for check in result.final_check
-        ):
-            result.error = f"final check: pulse edges not captured for {target}"
+        result.final_check = measure_and_analyze([setting(result.final.final_total_ns)], verified)
+        for candidate in verified:
+            checks = [edge for edge in result.final_check if edge.target == candidate]
+            if checks and all(
+                check.success
+                and check.rise_ns is not None
+                and check.fall_ns is not None
+                and check.rise_ns - check.time_start_ns >= MARGIN_NS - 1e-6
+                and check.time_stop_ns - check.fall_ns >= MARGIN_NS - 1e-6
+                for check in checks
+            ):
+                result.accepted_targets.append(candidate)
+            else:
+                result.rejected_targets[candidate] = (
+                    "final check: missing edges or insufficient margins"
+                )
+        if not result.accepted_targets:
+            result.error = "final check: no qubits passed verification"
         return RunResult(raw_result=result)
 
     def _measure(
@@ -351,11 +422,13 @@ class CorrectCaptureDelay(QubexTask):
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         """Publish the final delay of the MUX with the sweep and check figures."""
-        del backend, qid
         result: CaptureDelayRun = run_result.raw_result
-        figures = _figures(result)
+        target = self.get_qubit_label(backend, qid)
+        # A MUX-wide failure stops distribution, so retain all individual
+        # experiments on the representative task for diagnosis.
+        figures = _figures(result, target=None if result.error else target)
         final_total = result.final.final_total_ns if result.final is not None else None
-        if result.error is not None or final_total is None:
+        if result.error is not None or final_total is None or not result.accepted_targets:
             return PostProcessResult(
                 output_parameters={},
                 figures=figures,
@@ -381,18 +454,51 @@ _FALL_COLOR = "#ff7f0e"
 _CENTER_COLOR = "#7f7f7f"
 
 
-def _figures(result: CaptureDelayRun) -> list[go.Figure]:
+def _figures(result: CaptureDelayRun, *, target: str | None = None) -> list[go.Figure]:
     """Return sweep heatmaps and the final capture, most decisive first."""
-    figures: list[tuple[str, go.Figure]] = []
-    if result.final_check:
-        figures.append(("final", _capture_figure(result, result.final_check, "Final capture")))
-    if result.fine:
-        figures.append(("word_sweep", _sweep_figure(result, result.fine, "capture_delay_word")))
-    if result.coarse:
-        figures.append(("delay_sweep", _sweep_figure(result, result.coarse, "capture_delay")))
-    for role, figure in figures:
-        set_figure_role(figure, role)
-    return [figure for _, figure in figures]
+    figures: list[go.Figure] = []
+    for measured_target in result.targets or [result.target]:
+        if target is not None and measured_target != target:
+            continue
+        qubit = measured_target
+        individual = replace(
+            result,
+            target=qubit,
+            coarse=[edge for edge in result.coarse if edge.target == qubit],
+            fine=[edge for edge in result.fine if edge.target == qubit],
+            verification=[edge for edge in result.verification if edge.target == qubit],
+            final_check=[edge for edge in result.final_check if edge.target == qubit],
+        )
+        status = (
+            "accepted"
+            if qubit in result.accepted_targets
+            else result.rejected_targets.get(qubit, result.error or "not accepted")
+        )
+        captures: list[tuple[str, go.Figure]] = []
+        if individual.final_check:
+            captures.append(
+                ("final", _capture_figure(individual, individual.final_check, "Final capture"))
+            )
+        elif individual.verification:
+            captures.append(
+                (
+                    "verification",
+                    _capture_figure(individual, individual.verification, "Verification"),
+                )
+            )
+        if individual.fine:
+            captures.append(
+                ("word_sweep", _sweep_figure(individual, individual.fine, "capture_delay_word"))
+            )
+        if individual.coarse:
+            captures.append(
+                ("delay_sweep", _sweep_figure(individual, individual.coarse, "capture_delay"))
+            )
+        for role, figure in captures:
+            figure.update_layout(title=f"{figure.layout.title.text} — {status}")
+            set_figure_role(figure, role)
+            figures.append(figure)
+    return figures
 
 
 def _sweep_figure(result: CaptureDelayRun, edges: list[EdgeResult], title: str) -> go.Figure:
@@ -448,7 +554,7 @@ def _sweep_figure(result: CaptureDelayRun, edges: list[EdgeResult], title: str) 
         )
         figure.update_yaxes(title_text="Time in capture (ns)", row=row, col=1)
     figure.update_layout(
-        title=f"MUX{result.mux} {title} sweep |IQ|",
+        title=f"MUX{result.mux} {result.target} {title} sweep |IQ|",
         height=260 * len(targets) + 120,
         width=700,
     )
@@ -485,7 +591,7 @@ def _capture_figure(result: CaptureDelayRun, edges: list[EdgeResult], title: str
         figure.update_xaxes(title_text="Time (ns)", row=row, col=1)
         figure.update_yaxes(title_text="Signal (arb. units)", row=row, col=1)
     figure.update_layout(
-        title=f"MUX{result.mux} {title}",
+        title=f"MUX{result.mux} {result.target} {title}",
         height=260 * len(edges) + 120,
         width=700,
     )

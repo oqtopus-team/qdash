@@ -1,10 +1,11 @@
 """Box setup for selected MUXes with capture delay correction.
 
 This template pushes the current configuration to the selected MUXes, then runs
-CorrectCaptureDelay once per MUX. The task centers the readout pulse in the
-capture window and writes capture_delay.yaml, plus capture_delay_word.yaml on
-QuEL-1. Its figures show the delay sweep before correction and the capture
-after it. QuEL-1 and QuEL-3 chips are supported.
+CorrectCaptureDelay once per MUX, measuring each active qubit separately. Only
+verified qubits contribute to a shared delay with 32 ns margins. The task writes
+capture_delay.yaml, plus capture_delay_word.yaml on QuEL-1. Each qubit's figures
+show its delay sweep and verification capture, with acceptance or rejection
+reasons. QuEL-1 and QuEL-3 chips are supported.
 
 Run it first, before resonator spectroscopy: it uses a fixed readout tone and
 does not require calibrated readout parameters. Later steps and flows start new

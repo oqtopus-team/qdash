@@ -5911,7 +5911,7 @@
       },
       {
         "class_name": "CorrectCaptureDelay",
-        "description": "Center the readout pulse in the capture window of each MUX.\n\nThis is a MUX-level task: it runs once for the representative qubit and\nwrites the same capture delay to every qubit in the MUX: ``capture_delay``\nand ``capture_delay_word`` on QuEL-1, ``capture_delay`` in ns on QuEL-3.\nThe delay is a setting of the MUX, so the task captures only the\nrepresentative qubit's readout at a fixed tone frequency. The capture units\nof a MUX read the same ADC samples, so capturing more qubits adds no information.",
+        "description": "Center the readout pulse in the capture window of each MUX.\n\nThis MUX-level task measures each active qubit separately. Only qubits with\nsupported pulse edges and successful verification contribute to the common\ndelay. A shared delay must fit every accepted qubit with 32 ns margins;\nincompatible successful measurements fail the task without publishing values.\nThe accepted delay applies to the MUX, including qubits rejected by the fit.",
         "file_path": "box_setup/correct_capture_delay.py",
         "input_parameters": {},
         "name": "CorrectCaptureDelay",
