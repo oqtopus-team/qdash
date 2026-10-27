@@ -19180,7 +19180,8 @@
         "properties": {
           "chip_id": {
             "type": "string",
-            "title": "Chip Id"
+            "title": "Chip Id",
+            "description": "Chip ID: starts with a letter or digit; contains only letters, digits, '.', '-' and '_'. Reserved names template, archive, schemas and scripts are not allowed."
           },
           "size": {
             "type": "integer",

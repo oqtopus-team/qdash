@@ -65,7 +65,11 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
   const toast = useToast();
 
   // Systems in the Qubex configuration tree whose wiring a new chip can copy
-  const { data: configSourcesData, isLoading: isLoadingSources } = useListChipConfigSources({
+  const {
+    data: configSourcesData,
+    isLoading: isLoadingSources,
+    isError: isConfigSourcesError,
+  } = useListChipConfigSources({
     query: { enabled: isOpen },
   });
   const configAvailable = configSourcesData?.data?.available ?? false;
@@ -145,7 +149,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
   });
 
   const submit = (data: CreateChipFormData) => {
-    if (isLoadingSources) return;
+    if (isLoadingSources || isConfigSourcesError) return;
     setServerError(null);
     if (!selectedTopology) {
       setError("topologyId", { message: "Please select a topology template" });
@@ -256,6 +260,10 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
                 <span className="loading loading-spinner loading-sm"></span>
                 <span className="text-sm text-base-content/60">Checking configuration...</span>
               </div>
+            ) : isConfigSourcesError ? (
+              <p className="text-sm text-error" role="alert">
+                Unable to check the Qubex configuration tree. Close and reopen this dialog to retry.
+              </p>
             ) : !configAvailable ? (
               <p className="text-sm text-base-content/60">
                 No Qubex configuration tree is mounted, so only the chip record is created.
@@ -357,7 +365,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={createChipMutation.isPending || isLoadingSources}
+              disabled={createChipMutation.isPending || isLoadingSources || isConfigSourcesError}
               data-tour="submit-chip"
             >
               {createChipMutation.isPending ? (

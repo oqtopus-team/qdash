@@ -5,6 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
+from qdash.common.utils.chip_id import validate_chip_id
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.note import NoteModel
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
@@ -65,13 +66,20 @@ class CreateChipRequest(BaseModel):
 
     """
 
-    chip_id: str
+    chip_id: str = Field(
+        description="Chip ID: starts with a letter or digit; contains only letters, digits, '.', '-' and '_'. Reserved names template, archive, schemas and scripts are not allowed."
+    )
     size: int = 64
     topology_id: str | None = None
     config: ChipConfigOptions | None = Field(
         default=None,
         description="Qubex configuration directory to create; defaults to creating one",
     )
+
+    @field_validator("chip_id")
+    @classmethod
+    def validate_directory_name(cls, value: str) -> str:
+        return validate_chip_id(value)
 
 
 class ChipConfigResult(BaseModel):

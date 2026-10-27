@@ -36,6 +36,7 @@ import yaml
 
 from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.path_resolver import resolve_config_base_path
+from qdash.common.utils.chip_id import CHIP_ID_PATTERN, RESERVED_CHIP_IDS, validate_chip_id
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +50,8 @@ PARAMS_TEMPLATES_DIR = "domain/qubex-params"
 # file in the source's config/ is hardware description and copied verbatim.
 _KEYED_FILES = frozenset({"chip.yaml", "system.yaml", "wiring.yaml"})
 _HARDWARE_FILES = ("box.yaml", "skew.yaml", "cable_delay.yaml", "external_devices.yaml")
-_SKIP_DIRS = frozenset({"template", "archive", "schemas", "scripts"})
-_DIR_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_SKIP_DIRS = RESERVED_CHIP_IDS
+_DIR_NAME = re.compile(CHIP_ID_PATTERN)
 
 
 class ChipConfigError(ValueError):
@@ -125,7 +126,7 @@ class ChipConfigScaffolder:
         for directory in sorted(self._base.iterdir()):
             if (
                 not directory.is_dir()
-                or directory.name.startswith(".")
+                or not _DIR_NAME.fullmatch(directory.name)
                 or directory.name in _SKIP_DIRS
             ):
                 continue
@@ -177,19 +178,16 @@ class ChipConfigScaffolder:
         backend: str | None = None,
     ) -> ScaffoldResult:
         """Write the chip directory; an existing one is left untouched."""
+        try:
+            validate_chip_id(chip_id)
+        except ValueError as exc:
+            raise ChipConfigError(str(exc)) from exc
         if not self.available:
             return ScaffoldResult(
                 status="skipped",
                 path=chip_id,
                 message="No Qubex configuration tree is mounted; no files were created.",
             )
-        if not _DIR_NAME.match(chip_id):
-            raise ChipConfigError(
-                "A chip ID used as a configuration directory may contain letters, digits, "
-                "'.', '-' and '_' only"
-            )
-        if chip_id in _SKIP_DIRS:
-            raise ChipConfigError(f"Chip ID '{chip_id}' is a reserved configuration directory")
         target = self.chip_dir(chip_id)
         if target.exists():
             return ScaffoldResult(
@@ -263,7 +261,7 @@ class ChipConfigScaffolder:
 
         source = self.chip_dir(source_system_id)
         if (
-            not _DIR_NAME.match(source_system_id)
+            not _DIR_NAME.fullmatch(source_system_id)
             or source_system_id in _SKIP_DIRS
             or not (source / "config" / "wiring.yaml").is_file()
         ):

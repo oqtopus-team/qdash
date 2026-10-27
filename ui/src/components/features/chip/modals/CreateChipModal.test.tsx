@@ -6,6 +6,7 @@ import { CreateChipModal } from "@/components/features/chip/modals/CreateChipMod
 const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
   isLoadingSources: false,
+  isConfigSourcesError: false,
   configSources: {
     available: true,
     sources: [{ system_id: "64Qv3", backend: "quel1", mux_count: 16, files: ["box.yaml"] }],
@@ -21,7 +22,11 @@ vi.mock("@/client/chip/chip", () => ({
   useCreateChip: () => ({ mutate: mocks.mutate, isPending: false }),
   useListChipConfigSources: () => ({
     isLoading: mocks.isLoadingSources,
-    data: mocks.isLoadingSources ? undefined : { data: mocks.configSources },
+    isError: mocks.isConfigSourcesError,
+    data:
+      mocks.isLoadingSources || mocks.isConfigSourcesError
+        ? undefined
+        : { data: mocks.configSources },
   }),
 }));
 
@@ -46,6 +51,7 @@ describe("CreateChipModal", () => {
     mocks.mutate.mockReset();
     mocks.configSources.available = true;
     mocks.isLoadingSources = false;
+    mocks.isConfigSourcesError = false;
   });
 
   it("validates the chip ID inline", async () => {
@@ -70,6 +76,38 @@ describe("CreateChipModal", () => {
 
     mocks.isLoadingSources = false;
     rerender(<CreateChipModal isOpen onClose={onClose} />);
+    fireEvent.click(screen.getByRole("button", { name: "Create Chip" }));
+    await waitFor(() =>
+      expect(mocks.mutate).toHaveBeenCalledWith({
+        data: {
+          chip_id: "chip-01",
+          size: 64,
+          topology_id: "grid-64",
+          config: { backend: "quel1" },
+        },
+      }),
+    );
+  });
+
+  it("blocks submission on configuration errors and recovers after a successful query", async () => {
+    mocks.isConfigSourcesError = true;
+    const onClose = vi.fn();
+    const { rerender } = render(<CreateChipModal isOpen onClose={onClose} />);
+    const input = screen.getByPlaceholderText("e.g., 64Q, Chip001");
+    fireEvent.change(input, { target: { value: "chip-01" } });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Unable to check the Qubex configuration tree",
+    );
+    expect(screen.queryByText(/No Qubex configuration tree is mounted/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Create Chip" })).toBeDisabled();
+    await act(async () => {
+      fireEvent.submit(input.closest("form")!);
+    });
+    expect(mocks.mutate).not.toHaveBeenCalled();
+
+    mocks.isConfigSourcesError = false;
+    rerender(<CreateChipModal isOpen onClose={onClose} />);
+    expect(screen.queryByRole("alert")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Create Chip" }));
     await waitFor(() =>
       expect(mocks.mutate).toHaveBeenCalledWith({

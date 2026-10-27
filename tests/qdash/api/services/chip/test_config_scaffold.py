@@ -118,13 +118,36 @@ def test_scaffold_keeps_existing_directory(scaffolder, tree):
     assert (tree / "64Qv3/config/wiring.yaml").read_text() == before
 
 
-@pytest.mark.parametrize("chip_id", ["64Qv4", "my chip", "../escape", "template"])
+@pytest.mark.parametrize("chip_id", ["64Qv4", "chip-01.v2_test"])
 def test_scaffold_skips_without_tree(tmp_path, chip_id):
     scaffolder = ChipConfigScaffolder(config_base=tmp_path / "missing", templates_dir=TEMPLATES)
 
     assert scaffolder.scaffold(chip_id=chip_id, n_qubits=64).status == "skipped"
     assert scaffolder.list_sources() == []
     assert not (tmp_path / "missing").exists()
+
+
+@pytest.mark.parametrize("chip_id", ["my chip", "../escape", "template", "64Qv4\n"])
+def test_scaffold_rejects_invalid_id_without_tree(tmp_path, chip_id):
+    scaffolder = ChipConfigScaffolder(config_base=tmp_path / "missing", templates_dir=TEMPLATES)
+    with pytest.raises(ChipConfigError):
+        scaffolder.scaffold(chip_id=chip_id, n_qubits=64)
+    assert not (tmp_path / "missing").exists()
+
+
+def test_scaffold_rejects_trailing_newline_in_chip_id(scaffolder, tree):
+    with pytest.raises(ChipConfigError):
+        scaffolder.scaffold(chip_id="64Qv4\n", n_qubits=64)
+    assert not (tree / "64Qv4\n").exists()
+
+
+def test_scaffold_rejects_trailing_newline_in_existing_source(scaffolder, tree):
+    source_id = "source\n"
+    _write(tree / source_id / "config/wiring.yaml", {source_id: []})
+    assert source_id not in [source.system_id for source in scaffolder.list_sources()]
+    with pytest.raises(ChipConfigError):
+        scaffolder.scaffold(chip_id="64Qv4", n_qubits=64, source_system_id=source_id)
+    assert not (tree / "64Qv4").exists()
 
 
 @pytest.mark.parametrize("chip_id", ["template", "archive", "schemas", "scripts"])

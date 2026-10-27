@@ -88,6 +88,25 @@ def auth_headers():
 class TestChipRouter:
     """Tests for chip-related API endpoints."""
 
+    @pytest.mark.parametrize(
+        "chip_id", ["../escape", "my chip", "template", "archive", "schemas", "scripts", "chip\n"]
+    )
+    @pytest.mark.parametrize("create_config", [True, False])
+    @pytest.mark.parametrize("mounted", [True, False])
+    def test_rejects_unsafe_chip_ids_before_creation(
+        self, test_client, test_project, auth_headers, monkeypatch, chip_id, create_config, mounted
+    ):
+        from qdash.api.services.chip import ChipConfigScaffolder
+
+        monkeypatch.setattr(ChipConfigScaffolder, "available", property(lambda self: mounted))
+        response = test_client.post(
+            "/chips",
+            headers=auth_headers,
+            json={"chip_id": chip_id, "size": 64, "config": {"create": create_config}},
+        )
+        assert response.status_code == 422
+        assert ChipDocument.find_one({"chip_id": chip_id}).run() is None
+
     def test_list_chips_empty(self, test_client, test_project, auth_headers):
         """Test listing chips when no chips exist."""
         response = test_client.get("/chips", headers=auth_headers)

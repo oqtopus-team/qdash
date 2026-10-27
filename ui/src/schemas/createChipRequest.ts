@@ -18,6 +18,7 @@ import type { CreateChipRequestTopologyId } from './createChipRequestTopologyId'
  *     topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'.
  */
 export interface CreateChipRequest {
+  /** Chip ID: starts with a letter or digit; contains only letters, digits, '.', '-' and '_'. Reserved names template, archive, schemas and scripts are not allowed. */
   chip_id: string;
   size?: number;
   topology_id?: CreateChipRequestTopologyId;
