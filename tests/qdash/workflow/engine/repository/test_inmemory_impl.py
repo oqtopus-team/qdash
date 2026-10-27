@@ -185,6 +185,13 @@ class TestInMemoryExecutionCounterRepository:
         index4 = repo.get_next_index("20240101", "bob", "chip_1", "proj-2")
         assert index4 == 0
 
+    def test_different_chips_share_project_daily_counter(self):
+        repo = InMemoryExecutionCounterRepository()
+        assert repo.get_next_index("20240101", "alice", "chip_1", "proj-1") == 0
+        assert repo.get_next_index("20240101", "bob", "chip_2", "proj-1") == 1
+        assert repo.get_next_index("20240101", "alice", "chip_1", "proj-1") == 2
+        assert repo.get_dates_for_chip("proj-1", "chip_2") == ["20240101"]
+
     def test_clear(self):
         """Test clearing repository."""
         repo = InMemoryExecutionCounterRepository()

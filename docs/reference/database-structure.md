@@ -54,6 +54,7 @@ how accepted parameters, task results, and history differ.
 | --- | --- | --- |
 | `execution_history` | `ExecutionHistoryDocument` | `execution_history.py` |
 | `task_result_history` | `TaskResultHistoryDocument` | `task_result_history.py` |
+| `project_execution_counter` | `ProjectExecutionCounterDocument` | `project_execution_counter.py` |
 | `execution_counter` | `ExecutionCounterDocument` | `execution_counter.py` |
 | `execution_lock` | `ExecutionLockDocument` | `execution_lock.py` |
 | `calibration_note` | `CalibrationNoteDocument` | `calibration_note.py` |
