@@ -54,21 +54,17 @@ Set a unique initial administrator password in `.env` before exposing QDash to a
 The example files also list optional AI provider, Slack, knowledge repository, and tunnel
 settings. Leave an optional credential empty when that integration is not in use.
 
-### Enable the Pi Agent Runtime
+### Configure AI
 
-The Pi Agent Runtime is an optional Compose service. Enable it only when the deployment uses the
-Pi Copilot backend:
+The AI runtime and its workspace start with the standard Compose stack. Internal authentication
+is generated automatically; no AI service profile or UI enable flag is required.
 
-```dotenv
-COMPOSE_PROFILES=agent-runtime
-AGENT_RUNTIME_TOKEN=<random-shared-secret>
-```
+Set the `OPENAI_COMPATIBLE_BASE_URL_CHAT` and `OPENAI_COMPATIBLE_API_KEY_CHAT` pair in `.env`
+for chat, and the corresponding `EVALUATION` pair for figure analysis. Base URLs must include
+`/v1`. Select models in `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml`.
 
-Leave `COMPOSE_PROFILES` unset for the in-process `litellm` backend. Set
-`AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true` only in a trusted experimental deployment. QDash still
+Set `AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true` only in a trusted experimental deployment. QDash still
 requires the signed-in user to approve each proposed write in the chat.
-
-Multiple profiles use a comma-separated value, such as `agent-runtime,tunnel`.
 
 ### Set the Default Color Theme
 
@@ -120,12 +116,11 @@ hardware configuration before starting a task.
 ## Enable Remote Access
 
 Set `CLIENT_URL` to the public UI URL, set `TUNNEL_TOKEN`, and enable the `tunnel` Compose profile.
-Keep `agent-runtime` in the comma-separated value when Pi is enabled:
 
 ```dotenv
 CLIENT_URL=https://qdash.example.com
 TUNNEL_TOKEN=<cloudflare-tunnel-token>
-COMPOSE_PROFILES=agent-runtime,tunnel
+COMPOSE_PROFILES=tunnel
 ```
 
 Start the stack again with `docker compose up -d --build`. `task deploy` is the equivalent Go

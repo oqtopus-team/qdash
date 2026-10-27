@@ -39,7 +39,15 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 
 ## Pi runtime authentication
 
-The API forwards the authenticated user's access token and selected `X-Project-Id` to the Pi runtime on each chat or analysis turn, including approval responses. When no project header is supplied, it uses the user's default project. The internal `AGENT_RUNTIME_TOKEN` still authenticates API-to-runtime requests; user credentials travel in separate internal headers and are never added to model input or durable conversation state.
+The API forwards the authenticated user's access token and selected `X-Project-Id` to the Pi runtime on each chat or analysis turn, including approval responses. When no project header is supplied, it uses the user's default project. An internal bearer secret authenticates API-to-runtime requests; user credentials travel in separate internal headers and are never added to model input or durable conversation state.
+
+Compose starts the runtime and workspace by default. The `agent-runtime-auth` initialization
+service generates a random secret once in a dedicated volume, mounted read-only by the API and
+runtime. Both read `AGENT_RUNTIME_TOKEN_FILE`; no manual secret or UI enable flag is needed.
+The file is owned by the runtime user (UID 1000) with mode `0400`; the API reads it as root.
+For standalone processes, provide the same credential file through `AGENT_RUNTIME_TOKEN_FILE`
+or set `AGENT_RUNTIME_TOKEN` on both processes. The explicit token takes precedence for existing
+deployments. Missing or empty credentials never permit unauthenticated runtime requests.
 
 Each open conversation gets its own tool registry and a private temporary pi-qdash profile. Read tools and approved writes use that user's credentials; the workspace container never sees them. The runtime overrides connection arguments supplied by a model or an older stored tool call and never falls back to `QDASH_API_TOKEN` or an administrator login. QDash API endpoints enforce the user's permissions.
 

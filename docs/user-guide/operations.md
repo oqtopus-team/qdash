@@ -16,11 +16,9 @@ docker compose up -d --build
 If Go Task is installed, `task deploy-local` runs this command and also pulls the optional
 Copilot knowledge repository configured by `KNOWLEDGE_REPO_URL`.
 
-The `agent-runtime` service is opt-in. Set `COMPOSE_PROFILES=agent-runtime` in `.env` when
-`config/copilot/config.yaml` uses `copilot_backend: pi`. Leave it unset for the in-process
-`litellm` backend. For a remote deployment, follow
-[Enable Remote Access](./setup.md#enable-remote-access)
-instead of changing profiles at the command line.
+The `agent-runtime` and `agent-exec` services start by default. Compose generates and preserves
+internal authentication in the `agent-runtime-auth` volume. For a remote deployment, follow
+[Enable Remote Access](./setup.md#enable-remote-access).
 
 Host-side API and UI processes are a development workflow. Use
 [Development Environment Setup](../developer-guide/setup.md) instead of the commands on this page.

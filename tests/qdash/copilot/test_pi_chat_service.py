@@ -624,3 +624,38 @@ def test_the_open_page_travels_with_the_turn(monkeypatch: pytest.MonkeyPatch) ->
         "title": "Workflow t1",
         "flow": {"name": "t1", "chip_id": "64Qv3", "code": "x = 1\n", "dirty": True},
     }
+
+
+@pytest.mark.parametrize("contents", ["runtime-secret\n", ""])
+def test_runtime_headers_from_file(monkeypatch, tmp_path, contents):
+    from qdash.api.services.pi_chat_service import _runtime_headers
+
+    token_file = tmp_path / "token"
+    token_file.write_text(contents)
+    monkeypatch.delenv("AGENT_RUNTIME_TOKEN", raising=False)
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN_FILE", str(token_file))
+    if contents:
+        assert _runtime_headers() == {"Authorization": "Bearer runtime-secret"}
+    else:
+        with pytest.raises(RuntimeError, match="credential is unavailable"):
+            _runtime_headers()
+
+
+def test_runtime_headers_explicit_token_takes_precedence(monkeypatch):
+    from qdash.api.services.pi_chat_service import _runtime_headers
+
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "explicit-secret")
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN_FILE", "/missing/credential")
+    assert _runtime_headers() == {"Authorization": "Bearer explicit-secret"}
+
+
+def test_runtime_headers_missing_credentials_fail_closed(monkeypatch, tmp_path):
+    from qdash.api.services.pi_chat_service import _runtime_headers
+
+    monkeypatch.delenv("AGENT_RUNTIME_TOKEN", raising=False)
+    monkeypatch.delenv("AGENT_RUNTIME_TOKEN_FILE", raising=False)
+    with pytest.raises(RuntimeError, match="credential is unavailable"):
+        _runtime_headers()
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN_FILE", str(tmp_path / "missing"))
+    with pytest.raises(FileNotFoundError):
+        _runtime_headers()

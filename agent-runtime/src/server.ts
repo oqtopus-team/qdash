@@ -11,7 +11,7 @@ import { requestQDashAuth } from "./auth.ts";
 import { parsePageContext } from "./page-context.ts";
 import { WRAP_UP_MESSAGE } from "./budget.ts";
 import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
-import { hasBearerToken, readJsonBody, RequestError } from "./http.ts";
+import { hasBearerToken, readJsonBody, RequestError, runtimeToken } from "./http.ts";
 import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
 import { EvaluationError } from "./evaluate.ts";
 import {
@@ -34,7 +34,7 @@ const CHAT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 0);
 // proxies between here and the browser do not take silence for a dead stream.
 const CHAT_PING_MS = Number(process.env.CHAT_PING_MS ?? 15_000);
 const MAX_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES ?? 20 * 1024 * 1024);
-const RUNTIME_TOKEN = process.env.AGENT_RUNTIME_TOKEN;
+const RUNTIME_TOKEN = runtimeToken();
 
 interface ImageBody {
   data: string;
