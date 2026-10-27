@@ -272,7 +272,6 @@ services:
       - PORT=${AGENT_RUNTIME_PORT:-8002}
       - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
       - AGENT_RUNTIME_TOKEN_FILE=/run/agent-runtime-auth/token
-      - AGENT_RUNTIME_ENABLE_WRITE_TOOLS=${AGENT_RUNTIME_ENABLE_WRITE_TOOLS:-false}
       - PI_CODING_AGENT_DIR=/app/.pi-agent
       - AGENT_STATE_DIR=/app/state
       # A turn runs until it answers or the user stops it; calibrations a tool

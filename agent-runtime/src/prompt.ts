@@ -10,7 +10,6 @@
 export function buildSystemPrompt(
   responseLanguage: string,
   thinkingLanguage: string,
-  experimentalWriteTools = false,
   skills: ReadonlyArray<{ name: string; description: string }> = [],
   /** Routing guide from the pi-qdash `qdash` skill; see tool-guide.ts. */
   toolGuide: string | null = null,
@@ -42,11 +41,7 @@ export function buildSystemPrompt(
         ]
       : []),
     "- When you need the user to choose between concrete options (which qubit, which task, whether to proceed), call `ask_user` with 2-4 short options instead of asking in prose. The turn ends there and their pick arrives as the next message.",
-    ...(experimentalWriteTools
-      ? [
-          "- Write-capable QDash tools are experimental and never run from your call: calling one shows the user an approval card with the exact arguments, and the turn ends there. Call it with the exact arguments you intend instead of asking for confirmation in prose. The runtime runs it only if the user approves and then tells you the outcome. If they decline, do not call it again unless they ask.",
-        ]
-      : []),
+    "- Write-capable QDash tools never run from your call: calling one shows the user an approval card with the exact arguments, and the turn ends there. Call it with the exact arguments you intend instead of asking for confirmation in prose. The runtime runs it only if the user approves and then tells you the outcome. If they decline, do not call it again unless they ask.",
     `- Reason internally in ${thinkingLanguageName}. ${responseInstruction(responseLanguage)}`,
     ...(toolGuide
       ? [

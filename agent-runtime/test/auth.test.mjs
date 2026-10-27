@@ -86,7 +86,6 @@ test("real pi-qdash reads and approved writes keep concurrent users isolated", a
         {},
         "/tmp",
         connection,
-        true,
       );
       const read = extension.tools.find((tool) => tool.name === "qdash_list_chips");
       for (const tool of extension.tools) {
@@ -134,7 +133,7 @@ test("real pi-qdash reads and approved writes keep concurrent users isolated", a
   assert.ok(!JSON.stringify(results).includes("alice-token"));
   assert.ok(!JSON.stringify(results).includes("bob-token"));
   denyWrites = true;
-  const { writeTools } = buildQDashExtension(extensions, {}, "/tmp", connections[1], true);
+  const { writeTools } = buildQDashExtension(extensions, {}, "/tmp", connections[1]);
   await assert.rejects(
     writeTools.runApproved({
       id: "denied",
