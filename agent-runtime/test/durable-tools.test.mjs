@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { Type } from "typebox";
+import { REVIEWED_WRITE_TOOL_NAMES } from "../src/allowed-tools.ts";
 
 import { boundToolText, buildQDashExtension, decisionMessage, MAX_TOOL_TEXT_CHARS, ToolCancelled, untilAborted } from "../src/durable-tools.ts";
 
@@ -48,11 +49,11 @@ test("only explicitly reviewed pi-qdash tools enter the durable registry", () =>
 
   assert.deepEqual(
     extension.tools.map((tool) => tool.name),
-    ["qdash_get_default_chip"],
+    ["qdash_get_default_chip", "qdash_create_forum_post"],
   );
 });
 
-test("local extension checkouts are trusted by path, not by tool name", () => {
+test("local extension checkouts are trusted by path, not by tool name", async () => {
   const roots = ["/app/extensions/pi-qcaleval"];
   const readOnly = registered("qcal_evaluate");
   readOnly.definition.annotations = { readOnlyHint: true };
@@ -68,7 +69,7 @@ test("local extension checkouts are trusted by path, not by tool name", () => {
     tools: new Map([
       ["qcal_evaluate", readOnly],
       ["qcal_store_result", registered("qcal_store_result")],
-      // An experimental write name keeps its opt-in even from a checkout.
+      // Reviewed write names remain subject to approval even from a checkout.
       ["qdash_create_forum_post", registered("qdash_create_forum_post")],
     ]),
   };
@@ -77,19 +78,23 @@ test("local extension checkouts are trusted by path, not by tool name", () => {
     {},
     "/tmp/work",
     connection,
-    false,
     roots,
   );
   const byName = new Map(extension.tools.map((tool) => [tool.name, tool]));
 
   assert.deepEqual(
     [...byName.keys()].sort(),
-    ["qcal_evaluate", "qcal_store_result", "qdash_get_default_chip"],
+    ["qcal_evaluate", "qcal_store_result", "qdash_create_forum_post", "qdash_get_default_chip"],
   );
   // Only a tool annotated read-only may rerun after an interruption.
   assert.equal(byName.get("qcal_evaluate").replay, "safe");
   assert.equal(byName.get("qcal_store_result").replay, "unsafe");
   assert.equal(byName.get("qdash_get_default_chip").replay, "safe");
+  const approval = await byName.get("qdash_create_forum_post").execute(
+    {}, { callId: "local-write" }, { abortSignal: undefined },
+  );
+  assert.equal(approval.details.approval.tool, "qdash_create_forum_post");
+  assert.equal(local.tools.get("qdash_create_forum_post").calls(), 0);
 });
 
 test("a checkout tool with a pinned name replaces the pinned implementation", async () => {
@@ -103,7 +108,6 @@ test("a checkout tool with a pinned name replaces the pinned implementation", as
     {},
     "/tmp/work",
     connection,
-    false,
     ["/app/extensions/dev"],
   );
 
@@ -137,7 +141,6 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
     { getModel: (provider, id) => (provider === qwen.provider && id === qwen.id ? qwen : undefined) },
     "/tmp/work",
     connection,
-    false,
     ["/app/extensions/pi-qcaleval"],
   );
   const scans = [];
@@ -238,50 +241,51 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
   );
 });
 
-test("experimental write tools require opt-in and never run from the model's call", async () => {
-  const write = registered("qdash_create_forum_post");
-  const { extension, writeTools } = buildQDashExtension(
-    [
-      {
-        tools: new Map([
-          ["qdash_get_default_chip", registered("qdash_get_default_chip")],
-          ["qdash_create_forum_post", write],
-          ["qdash_future_unreviewed_tool", registered("qdash_future_unreviewed_tool")],
-        ]),
-      },
-    ],
-    {},
-    "/tmp/work",
-    connection,
-    true,
-  );
+for (const name of REVIEWED_WRITE_TOOL_NAMES) {
+  test(`${name} is available by default but only runs after approval`, async () => {
+    const write = registered(name);
+    const { extension, writeTools } = buildQDashExtension(
+      [
+        {
+          tools: new Map([
+            ["qdash_get_default_chip", registered("qdash_get_default_chip")],
+            [name, write],
+            ["qdash_future_unreviewed_tool", registered("qdash_future_unreviewed_tool")],
+          ]),
+        },
+      ],
+      {},
+      "/tmp/work",
+      connection,
+    );
 
-  assert.deepEqual(
-    extension.tools.map((tool) => tool.name),
-    ["qdash_get_default_chip", "qdash_create_forum_post"],
-  );
-  const writeTool = extension.tools.find((tool) => tool.name === "qdash_create_forum_post");
-  const context = { abortSignal: new AbortController().signal };
+    assert.deepEqual(
+      extension.tools.map((tool) => tool.name),
+      ["qdash_get_default_chip", name],
+    );
+    const writeTool = extension.tools.find((tool) => tool.name === name);
+    const context = { abortSignal: new AbortController().signal };
 
-  // Even a model that sets confirmWrite only gets an approval request.
-  const requested = await writeTool.execute(
-    { title: "T1 drop", confirmWrite: true, profile: "default" },
-    { callId: "call-1" },
-    context,
-  );
-  assert.equal(write.calls(), 0);
-  assert.match(requested.output[0].text, /Approval requested/);
-  assert.deepEqual(requested.control, { terminate: true });
-  assert.deepEqual(requested.details.approval, {
-    id: "call-1",
-    tool: "qdash_create_forum_post",
-    label: "qdash_create_forum_post",
-    args: { title: "T1 drop" },
+    // Even a model that sets confirmWrite only gets an approval request.
+    const requested = await writeTool.execute(
+      { title: "T1 drop", confirmWrite: true, profile: "default" },
+      { callId: "call-1" },
+      context,
+    );
+    assert.equal(write.calls(), 0);
+    assert.match(requested.output[0].text, /Approval requested/);
+    assert.deepEqual(requested.control, { terminate: true });
+    assert.deepEqual(requested.details.approval, {
+      id: "call-1",
+      tool: name,
+      label: name,
+      args: { title: "T1 drop" },
+    });
+
+    await writeTools.runApproved(requested.details.approval);
+    assert.equal(write.calls(), 1);
   });
-
-  await writeTools.runApproved(requested.details.approval);
-  assert.equal(write.calls(), 1);
-});
+}
 
 test("the model is not offered the confirmation flag", () => {
   const tool = registered("qdash_create_forum_post");
@@ -294,7 +298,6 @@ test("the model is not offered the confirmation flag", () => {
     {},
     "/tmp/work",
     connection,
-    true,
   );
   assert.deepEqual(Object.keys(extension.tools[0].parameters.properties), ["title"]);
 });
@@ -334,7 +337,6 @@ test("a trusted installed package gets the checkout treatment", () => {
     {},
     "/tmp/work",
     connection,
-    false,
     [],
     ["@orangekame3/pi-qcaleval"],
   );

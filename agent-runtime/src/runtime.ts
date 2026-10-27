@@ -29,11 +29,10 @@ import { createQDashConnection, type QDashAuth, type QDashConnection } from "./a
 import {
   ALLOWED_TOOL_NAMES,
   ALLOWLISTED_PACKAGES,
-  EXPERIMENTAL_WRITE_TOOL_NAMES,
+  REVIEWED_WRITE_TOOL_NAMES,
   TRUSTED_EXTENSION_PACKAGES,
-  isExperimentalWriteTool,
 } from "./allowed-tools.ts";
-import { compactionBudget } from "./budget.ts";
+import { compactionBudget, type CompactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { ExecWorkspace, execConfigFromEnv, removeWorkspace, WORKSPACE_TOOL_NAMES } from "./exec-env.ts";
@@ -71,8 +70,9 @@ import {
   type ToolRun,
 } from "./evaluate.ts";
 import { formatSettledDetail } from "./events.ts";
+import { logDurableReport } from "./durable-report.ts";
 import { fetchKnowledgeDraft, fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
-import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
+import { chatCompactionOverrides, PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
 import {
   buildPageContextSection,
   buildProposeCodeEditTool,
@@ -92,9 +92,6 @@ const EVALUATION_CONFIG_PATH =
   process.env.EVALUATION_CONFIG_PATH ?? "/app/config/copilot/evaluation.yaml";
 // One model request; a whole turn is bounded by the server's own timers.
 const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 180_000);
-const EXPERIMENTAL_WRITE_TOOLS_ENABLED = ["1", "true", "yes", "on"].includes(
-  (process.env.AGENT_RUNTIME_ENABLE_WRITE_TOOLS ?? "").trim().toLowerCase(),
-);
 // The Copilot workspace (agent-exec container); without it the chat has no
 // shell or files, only QDash tools.
 const EXEC_CONFIG = execConfigFromEnv();
@@ -201,6 +198,7 @@ export class SharedRuntime {
     private readonly enabledTools: ReadonlyMap<string, EnabledTool>,
     /** QDash's system prompt for chats, as built at startup. */
     private readonly systemPrompt: string,
+    private readonly modelCompactionOverrides: Readonly<Record<string, CompactionBudget>> = {},
   ) {}
 
   /**
@@ -215,9 +213,6 @@ export class SharedRuntime {
   /** Load the Pi model catalog and adapt the installed pi-qdash extension once. */
   static async create(): Promise<SharedRuntime> {
     mkdirSync(STATE_DIR, { recursive: true });
-    if (EXPERIMENTAL_WRITE_TOOLS_ENABLED) {
-      console.warn("[agent-runtime] experimental QDash write tools are enabled");
-    }
     if (EXEC_CONFIG) {
       console.log(`[agent-runtime] workspace tools: agent-exec at ${EXEC_CONFIG.socketPath}`);
     } else {
@@ -266,11 +261,8 @@ export class SharedRuntime {
 
     const extensions = withoutReplacedInstalls(loader.getExtensions().extensions, CHECKOUTS);
     // Local checkouts and trusted installed packages are trusted as a whole
-    // (see buildQDashExtension); the experimental write opt-in still applies
-    // to their tool names.
-    const localTools = localToolNames(extensions, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES).filter(
-      (name) => EXPERIMENTAL_WRITE_TOOLS_ENABLED || !isExperimentalWriteTool(name),
-    );
+    // (see buildQDashExtension); reviewed write names still require approval.
+    const localTools = localToolNames(extensions, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES);
     if (CHECKOUT_PATHS.length || localTools.length) {
       console.log(
         `[agent-runtime] trusted extensions: packages=${TRUSTED_EXTENSION_PACKAGES.join(", ") || "none"}; local=${EXTENSION_PATHS.join(", ") || "none"} (tools: ${localTools.join(", ") || "none"}); allowlisted checkouts=${CHECKOUT_PATHS.filter((path) => !EXTENSION_PATHS.includes(path)).join(", ") || "none"}`,
@@ -278,7 +270,7 @@ export class SharedRuntime {
     }
     const allowed = new Set<string>([
       ...ALLOWED_TOOL_NAMES,
-      ...(EXPERIMENTAL_WRITE_TOOLS_ENABLED ? EXPERIMENTAL_WRITE_TOOL_NAMES : []),
+      ...REVIEWED_WRITE_TOOL_NAMES,
       ...localTools,
     ]);
     const qdashToolNames = [
@@ -304,7 +296,6 @@ export class SharedRuntime {
     const systemPrompt = buildSystemPrompt(
       responseLanguage,
       thinkingLanguage,
-      EXPERIMENTAL_WRITE_TOOLS_ENABLED,
       skills,
       toolGuide,
       localToolGuide,
@@ -326,7 +317,6 @@ export class SharedRuntime {
         modelRuntime,
         WORK_DIR,
         connection,
-        EXPERIMENTAL_WRITE_TOOLS_ENABLED,
         EXTENSION_PATHS,
         TRUSTED_EXTENSION_PACKAGES,
       );
@@ -377,7 +367,18 @@ export class SharedRuntime {
       }
     }
 
-    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames, enabledTools, systemPrompt);
+    const modelCompactionOverrides = chatCompactionOverrides(
+      readFileSync(CHAT_CONFIG_PATH, "utf8"),
+      (provider, modelId) => modelRuntime.getModel(provider, modelId),
+    );
+    return new SharedRuntime(
+      modelRuntime,
+      buildChatRegistry,
+      toolNames,
+      enabledTools,
+      systemPrompt,
+      modelCompactionOverrides,
+    );
   }
 
   /** A configured model named by the request, or none when the request names none. */
@@ -663,7 +664,8 @@ export class SharedRuntime {
       contextWindow,
       maxTokens,
     } = this.resolveModelWithLimits(request.provider, request.modelName);
-    const path = join(STATE_DIR, sessionStorageName(request.ownerId, request.sessionId));
+    const storageName = sessionStorageName(request.ownerId, request.sessionId);
+    const path = join(STATE_DIR, storageName);
     const connection = await createQDashConnection(auth);
     const workspace = EXEC_CONFIG
       ? new ExecWorkspace(EXEC_CONFIG, request.ownerId, request.sessionId)
@@ -695,17 +697,23 @@ export class SharedRuntime {
         request.userInstructions,
         request.pageContext,
       );
+      const selectedBudget = compactionBudget(contextWindow, maxTokens);
       harness = await Harness.open(
         await openNodeSqliteStorage(path),
         {
           models: this.modelRuntime,
           registry,
           ...(workspace ? { env: workspaceEnv } : {}),
+          onReport: (error, info) => logDurableReport(storageName, error, info),
           settings: {
             stream: { timeoutMs: MODEL_STREAM_TIMEOUT_MS },
             compaction: {
               enabled: true,
-              ...compactionBudget(contextWindow, maxTokens),
+              ...selectedBudget,
+              modelOverrides: {
+                ...this.modelCompactionOverrides,
+                [`${model.provider}/${model.modelId}`]: selectedBudget,
+              },
             },
           },
         },

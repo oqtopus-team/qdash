@@ -34,7 +34,9 @@ vi.mock("@/contexts/ProjectContext", () => ({
 vi.mock("@/hooks/useExecutionAvailability", () => ({
   useExecutionAvailability: mocks.availability,
 }));
-vi.mock("@/lib/api/custom-instance", () => ({ AXIOS_INSTANCE: { post: mocks.post } }));
+vi.mock("@/lib/api/custom-instance", () => ({
+  AXIOS_INSTANCE: { post: mocks.post },
+}));
 vi.mock("@/components/ui/Toast", () => ({ useToast: () => mocks.toast }));
 vi.mock("@/components/charts/TaskFigure", () => ({ TaskFigure: () => null }));
 vi.mock("@/components/features/metrics/ParametersTable", () => ({
@@ -48,7 +50,11 @@ const task: TaskInfo = {
   task_type: "qubit",
   enabled: true,
   input_parameters: {
-    qubit_frequency: { resolution: "database_required", value_type: "float", unit: "GHz" },
+    qubit_frequency: {
+      resolution: "database_required",
+      value_type: "float",
+      unit: "GHz",
+    },
   },
 };
 
@@ -57,7 +63,9 @@ function renderWorkbench(
   searchParams = "?chip=chip-1&target=0",
   sourceTask?: TaskResultResponse,
 ) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <NuqsTestingAdapter searchParams={searchParams} hasMemory>
       <QueryClientProvider client={queryClient}>
@@ -72,9 +80,14 @@ function renderWorkbench(
 }
 
 beforeEach(() => {
-  mocks.chips.mockReturnValue({ data: { data: { chips: [{ chip_id: "chip-1" }] } } });
+  mocks.chips.mockReturnValue({
+    data: { data: { chips: [{ chip_id: "chip-1" }] } },
+  });
   mocks.refetchAvailability.mockResolvedValue({});
-  mocks.availability.mockReturnValue({ disabledReason: null, refetch: mocks.refetchAvailability });
+  mocks.availability.mockReturnValue({
+    disabledReason: null,
+    refetch: mocks.refetchAvailability,
+  });
   mocks.execution.mockReturnValue({});
   mocks.post.mockResolvedValue({ data: { execution_id: "execution-1" } });
 });
@@ -121,7 +134,9 @@ describe("TaskWorkbench run availability", () => {
   it("prefills the current form and submits all entered values through the catalog API", async () => {
     renderWorkbench(
       {
-        input_parameters: { qubit_frequency: { value: 5.2, value_type: "float" } },
+        input_parameters: {
+          qubit_frequency: { value: 5.2, value_type: "float" },
+        },
         run_parameters: { shots: { value: 100, value_type: "int" } },
       },
       "?chip=chip-1&target=0",
@@ -132,7 +147,9 @@ describe("TaskWorkbench run availability", () => {
     expect(screen.getByRole("textbox", { name: "Qubit or coupling" })).toHaveValue("2");
     expect(screen.getByRole("textbox", { name: "Qubit or coupling" })).toBeDisabled();
     expect(screen.getByRole("textbox", { name: "qubit_frequency" })).toHaveValue("5.2");
-    fireEvent.change(screen.getByRole("textbox", { name: "shots" }), { target: { value: "200" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "shots" }), {
+      target: { value: "200" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Run task" }));
     await waitFor(() =>
       expect(mocks.post).toHaveBeenCalledWith("/tasks/CheckCoarseReadoutParams/execute", {
@@ -150,14 +167,187 @@ describe("TaskWorkbench run availability", () => {
     expect(mocks.post).toHaveBeenCalledTimes(1);
   });
 
+  it("runs a sweep parameter in its declared form as a bare value", async () => {
+    renderWorkbench({
+      run_parameters: {
+        time_range: { value: [0, 401, 8], value_type: "range", unit: "ns" },
+      },
+    });
+    expect(screen.getByRole("combobox", { name: "time_range type" })).toHaveValue("range");
+    expect(screen.getByRole("textbox", { name: "time_range start" })).toHaveValue("0");
+    expect(screen.getByRole("textbox", { name: "time_range stop" })).toHaveValue("401");
+    expect(screen.getByRole("textbox", { name: "time_range step" })).toHaveValue("8");
+    expect(screen.getByText("51 points: 0 to 400")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "time_range step" }), {
+      target: { value: "16" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Run task" }));
+    await waitFor(() =>
+      expect(mocks.post).toHaveBeenCalledWith(
+        "/tasks/CheckCoarseReadoutParams/execute",
+        expect.objectContaining({
+          run_parameter_overrides: { time_range: [0, 401, 16] },
+        }),
+      ),
+    );
+  });
+
+  it("runs a sweep parameter in another form with its type", async () => {
+    renderWorkbench({
+      run_parameters: {
+        time_range: { value: [0, 401, 8], value_type: "range", unit: "ns" },
+      },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "time_range type" }), {
+      target: { value: "np.linspace" },
+    });
+    // The new form starts from the same 51 points the range produced.
+    expect(screen.getByRole("textbox", { name: "time_range stop" })).toHaveValue("400");
+    expect(screen.getByRole("textbox", { name: "time_range num" })).toHaveValue("51");
+    expect(screen.getByText("51 points: 0 to 400")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "time_range num" }), {
+      target: { value: "11" },
+    });
+    expect(screen.getByText("11 points: 0 to 400")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Run task" }));
+    await waitFor(() =>
+      expect(mocks.post).toHaveBeenCalledWith(
+        "/tasks/CheckCoarseReadoutParams/execute",
+        expect.objectContaining({
+          run_parameter_overrides: {
+            time_range: { value: [0, 400, 11], value_type: "np.linspace" },
+          },
+        }),
+      ),
+    );
+  });
+
+  it("switches a sweep to explicit values starting from the generated points", async () => {
+    renderWorkbench({
+      run_parameters: {
+        time_range: { value: [0, 41, 10], value_type: "range", unit: "ns" },
+      },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "time_range type" }), {
+      target: { value: "list" },
+    });
+    expect(screen.getByRole("textbox", { name: "time_range values" })).toHaveValue(
+      "[0,10,20,30,40]",
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "time_range values" }), {
+      target: { value: "[0, 10, 40, 160]" },
+    });
+    expect(screen.getByText("4 points: 0 to 160")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Run task" }));
+    await waitFor(() =>
+      expect(mocks.post).toHaveBeenCalledWith(
+        "/tasks/CheckCoarseReadoutParams/execute",
+        expect.objectContaining({
+          run_parameter_overrides: {
+            time_range: { value: [0, 10, 40, 160], value_type: "list" },
+          },
+        }),
+      ),
+    );
+  });
+
+  it("switches a sweep from explicit values to a form that spans them", () => {
+    renderWorkbench({
+      run_parameters: {
+        time_range: { value: [0, 41, 10], value_type: "range", unit: "ns" },
+      },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "time_range type" }), {
+      target: { value: "list" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "time_range values" }), {
+      target: { value: "[1, 10, 100, 1000]" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "time_range type" }), {
+      target: { value: "np.logspace" },
+    });
+    expect(screen.getByRole("textbox", { name: "time_range start (10^)" })).toHaveValue("0");
+    expect(screen.getByRole("textbox", { name: "time_range stop (10^)" })).toHaveValue("3");
+    expect(screen.getByRole("textbox", { name: "time_range num" })).toHaveValue("4");
+    expect(screen.getByText("4 points: 1 to 1000")).toBeInTheDocument();
+  });
+
+  it("keeps the typed arguments when the new form cannot express the sweep", () => {
+    renderWorkbench({
+      run_parameters: {
+        time_range: {
+          value: [0, 1, 11],
+          value_type: "np.linspace",
+          unit: "ns",
+        },
+      },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "time_range type" }), {
+      target: { value: "range" },
+    });
+    expect(screen.getByRole("textbox", { name: "time_range stop" })).toHaveValue("1");
+    expect(screen.getByRole("textbox", { name: "time_range step" })).toHaveValue("11");
+  });
+
+  it("rejects a sweep that produces no points before submitting", async () => {
+    renderWorkbench({
+      run_parameters: {
+        time_range: { value: [0, 401, 8], value_type: "range", unit: "ns" },
+      },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "time_range step" }), {
+      target: { value: "0" },
+    });
+    expect(screen.getByText("Enter numbers that produce a sweep.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Run task" }));
+    await waitFor(() =>
+      expect(mocks.toast.error).toHaveBeenCalledWith(
+        "Enter numbers that produce a range sweep for time_range",
+      ),
+    );
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
+
+  it("restores the sweep form of a source result", () => {
+    renderWorkbench(
+      {
+        run_parameters: {
+          time_range: { value: [0, 401, 8], value_type: "range", unit: "ns" },
+        },
+      },
+      undefined,
+      {
+        ...source,
+        run_parameters: {
+          time_range: {
+            value: [2, 5, 11],
+            value_type: "np.logspace",
+            unit: "ns",
+          },
+        },
+      },
+    );
+    expect(screen.getByRole("combobox", { name: "time_range type" })).toHaveValue("np.logspace");
+    expect(screen.getByRole("textbox", { name: "time_range start (10^)" })).toHaveValue("2");
+    expect(screen.getByText("11 points: 100 to 100000")).toBeInTheDocument();
+  });
+
   it("uses the same save and reconfigure controls for re-execution", async () => {
     renderWorkbench(
-      { input_parameters: { qubit_frequency: { value: 5.2, value_type: "float" } } },
+      {
+        input_parameters: {
+          qubit_frequency: { value: 5.2, value_type: "float" },
+        },
+      },
       undefined,
       source,
     );
-    const save = screen.getByRole("checkbox", { name: /Save calibrated outputs to DB/ });
-    const reconfigure = screen.getByRole("checkbox", { name: /Reconfigure hardware first/ });
+    const save = screen.getByRole("checkbox", {
+      name: /Save calibrated outputs to DB/,
+    });
+    const reconfigure = screen.getByRole("checkbox", {
+      name: /Reconfigure hardware first/,
+    });
     expect(save).not.toBeChecked();
     expect(reconfigure).not.toBeChecked();
     expect(screen.queryByRole("checkbox", { name: /Update backend params/ })).toBeNull();
@@ -191,16 +381,24 @@ describe("TaskWorkbench run availability", () => {
       undefined,
       source,
     );
-    fireEvent.change(screen.getByRole("textbox", { name: "shots" }), { target: { value: "1.5" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "shots" }), {
+      target: { value: "1.5" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Run task" }));
     await waitFor(() => expect(mocks.toast.error).toHaveBeenCalled());
     expect(mocks.post).not.toHaveBeenCalled();
   });
 
   it("reloads current input values only on request and submits them as snapshot overrides", async () => {
-    mocks.qubit.mockResolvedValue({ data: { data: { qubit_frequency: { value: 5.5 } } } });
+    mocks.qubit.mockResolvedValue({
+      data: { data: { qubit_frequency: { value: 5.5 } } },
+    });
     renderWorkbench(
-      { input_parameters: { qubit_frequency: { value: 5.2, value_type: "float" } } },
+      {
+        input_parameters: {
+          qubit_frequency: { value: 5.2, value_type: "float" },
+        },
+      },
       undefined,
       source,
     );
@@ -226,7 +424,11 @@ describe("TaskWorkbench run availability", () => {
   it("keeps the source input when no current calibration value can be found", async () => {
     mocks.qubit.mockResolvedValue({ data: { data: {} } });
     renderWorkbench(
-      { input_parameters: { qubit_frequency: { value: 5.2, value_type: "float" } } },
+      {
+        input_parameters: {
+          qubit_frequency: { value: 5.2, value_type: "float" },
+        },
+      },
       undefined,
       source,
     );
@@ -250,7 +452,10 @@ describe("TaskWorkbench run availability", () => {
       undefined,
       {
         ...source,
-        run_parameters: { removed: { value: 2 }, shots: { value: 1.5, value_type: "float" } },
+        run_parameters: {
+          removed: { value: 2 },
+          shots: { value: 1.5, value_type: "float" },
+        },
       },
     );
     expect(screen.getByRole("textbox", { name: "qubit_frequency" })).toHaveValue("");
@@ -295,7 +500,11 @@ describe("TaskWorkbench run availability", () => {
     await waitFor(() =>
       expect(mocks.post).toHaveBeenCalledWith(
         "/tasks/CheckCoarseReadoutParams/execute",
-        expect.objectContaining({ chip_id: "chip-1", qid: "0", input_parameter_overrides: {} }),
+        expect.objectContaining({
+          chip_id: "chip-1",
+          qid: "0",
+          input_parameter_overrides: {},
+        }),
       ),
     );
   });
@@ -399,7 +608,9 @@ describe("TaskWorkbench run availability", () => {
     >("@/hooks/useExecutionAvailability");
     mocks.availability.mockImplementation(useExecutionAvailability);
     mocks.check.mockResolvedValueOnce({ data: { available: true } });
-    mocks.qubit.mockResolvedValue({ data: { data: { qubit_frequency: { value: 5.5 } } } });
+    mocks.qubit.mockResolvedValue({
+      data: { data: { qubit_frequency: { value: 5.5 } } },
+    });
     renderWorkbench();
     const button = screen.getByRole("button", { name: "Run task" });
     await waitFor(() => expect(button).toBeEnabled());
@@ -477,7 +688,9 @@ describe("TaskWorkbench run availability", () => {
   it("still displays a conflict rejected by final API admission", async () => {
     mocks.post.mockRejectedValueOnce({
       response: {
-        data: { detail: "Another calibration execution is using overlapping hardware resources" },
+        data: {
+          detail: "Another calibration execution is using overlapping hardware resources",
+        },
       },
     });
     renderWorkbench();
@@ -529,7 +742,9 @@ describe("TaskWorkbench run availability", () => {
   });
 
   it("shows preparation status before the worker reports task progress", () => {
-    mocks.execution.mockReturnValue({ data: { data: { status: "running", task: [] } } });
+    mocks.execution.mockReturnValue({
+      data: { data: { status: "running", task: [] } },
+    });
     renderWorkbench({}, "?chip=chip-1&target=0&execution=execution-1");
     expect(screen.getByText("Preparing measurement")).toBeTruthy();
     expect(screen.queryByRole("progressbar")).toBeNull();
@@ -546,7 +761,11 @@ describe("TaskWorkbench run availability", () => {
               qid: "0",
               status: "running",
               note: {
-                progress: { current: 13, total: 26, updated_at: new Date().toISOString() },
+                progress: {
+                  current: 13,
+                  total: 26,
+                  updated_at: new Date().toISOString(),
+                },
               },
             },
           ],

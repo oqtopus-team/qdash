@@ -47,7 +47,15 @@ class QuickRunTaskRequest(BaseModel):
         description="Source result for provenance only; execution uses current task definitions",
     )
     input_parameter_overrides: dict[str, Any] = Field(default_factory=dict)
-    run_parameter_overrides: dict[str, Any] = Field(default_factory=dict)
+    run_parameter_overrides: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Run parameter values keyed by name. A bare value takes the task's declared "
+            "type. A parameter that declares a generated range also takes "
+            '{"value": [...], "value_type": ...} with np.linspace, np.logspace, '
+            "np.arange, range, or list to run the sweep in another form."
+        ),
+    )
     reconfigure: bool = False
     persist_output_parameters: bool = False
     update_params: bool = False
@@ -90,6 +98,19 @@ class KnowledgeExampleResponse(BaseModel):
     )
 
 
+class NextActionResponse(BaseModel):
+    """One autonomous-plan step, keyed by the evaluation status that triggers it."""
+
+    action: str = Field(description="continue, retry, run_task, or request_human")
+    task: str | None = Field(default=None, description="The task to run next, for run_task")
+    overrides: dict[str, float] = Field(default_factory=dict)
+    suggested_range_parameter: str | None = Field(
+        default=None,
+        description="Input set from the midpoint of the evaluation's suggested range, for retry",
+    )
+    note: str = ""
+
+
 class TaskReferenceResponse(BaseModel):
     """The task's reference for the evaluation model, in QCalEval's shape.
 
@@ -125,6 +146,13 @@ class TaskKnowledgeResponse(BaseModel):
     examples: list[KnowledgeExampleResponse] = []
     prompt_text: str = Field(
         description="The background as Markdown, headed by the experiment name"
+    )
+    next_actions: dict[str, NextActionResponse] = Field(
+        default_factory=dict,
+        description=(
+            "Autonomous-plan step per evaluation status code, from task.md's frontmatter. "
+            "A status without an entry stops the plan for human review."
+        ),
     )
     reference: TaskReferenceResponse = Field(
         default_factory=TaskReferenceResponse,

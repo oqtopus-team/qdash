@@ -112,7 +112,9 @@ task_parameters={
 
 Values under `run` control the experiment. Use `sweep.linspace`, `sweep.logspace`,
 `sweep.arange`, or `sweep.range` for generated ranges so their construction remains visible in the
-workflow. Other run parameters use plain values. Values under `input` replace the current
+workflow, or `sweep.values(0, 4, 16, 64)` for points you list yourself. A parameter that the task
+defines as one kind of range accepts any of these forms. Other run parameters use plain values.
+Values under `input` replace the current
 calibration input for every selected target in that task. Set `update_calibration_parameters` to
 `False` for an exploratory measurement whose outputs must remain in history without becoming the
 current calibration values.

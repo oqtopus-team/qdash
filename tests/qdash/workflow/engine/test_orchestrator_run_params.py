@@ -8,6 +8,7 @@ import pytest
 
 # Import fake tasks to trigger registration in BaseTask.registry
 import qdash.workflow.calibtasks.fake  # noqa: F401
+from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
 from qdash.workflow import sweep
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
 from qdash.workflow.calibtasks.base import BaseTask
@@ -46,6 +47,34 @@ def test_shared_readout_duration_configures_backend_session(monkeypatch: Any) ->
     orchestrator._create_backend()
 
     assert factory.call_args.kwargs["config"]["readout_duration"] == 2048.0
+
+
+def test_missing_shared_readout_duration_uses_task_default_for_session(
+    monkeypatch: Any,
+) -> None:
+    """The session starts from the value every declaring task defaults to.
+
+    A pipeline spec or flow that sets no shared readout_duration must not leave
+    the session on the Qubex default, which differs from the task default and
+    makes every task that declares readout_duration fail its session check.
+    """
+    config = CalibConfig(
+        username="alice",
+        chip_id="chip-1",
+        qids=["0"],
+        execution_id="exec-1",
+        project_id="project-1",
+        backend_name="fake",
+        default_run_parameters={"shots": 1024},
+    )
+    orchestrator = CalibOrchestrator(config)
+    orchestrator._task_context = cast("TaskContext", SimpleNamespace(id="manager-1"))
+    factory = MagicMock(return_value=SimpleNamespace(name="fake"))
+    monkeypatch.setattr("qdash.workflow.engine.orchestrator.create_backend", factory)
+
+    orchestrator._create_backend()
+
+    assert factory.call_args.kwargs["config"]["readout_duration"] == float(DEFAULT_READOUT_DURATION)
 
 
 def test_coupling_qid_configures_coupling_backend_session(monkeypatch: Any) -> None:
@@ -342,7 +371,7 @@ class TestTaskRunParameterInjection:
         with pytest.raises(ValueError, match="requires a tuple/list of 3 values"):
             orchestrator._create_task_instance(TASK_NAME, {"run": {"time_range": "[0, 101, 4]"}})
 
-    def test_sweep_constructor_must_match_declared_run_type(self) -> None:
+    def test_sweep_constructor_may_differ_from_declared_run_type(self) -> None:
         orchestrator = CalibOrchestrator(
             _config(
                 task_parameters=normalize_task_parameters(
@@ -351,8 +380,18 @@ class TestTaskRunParameterInjection:
             )
         )
 
-        with pytest.raises(ValueError, match=r"declares 'range'.*uses 'np\.linspace'"):
-            orchestrator._create_task_instance(TASK_NAME, None)
+        task = orchestrator._create_task_instance(TASK_NAME, None)
+
+        assert task.run_parameters["time_range"].value_type == "np.linspace"
+        assert list(task.run_parameters["time_range"].get_value()) == list(range(0, 101, 10))
+
+    def test_sweep_for_scalar_run_parameter_is_rejected(self) -> None:
+        orchestrator = CalibOrchestrator(_config())
+
+        with pytest.raises(ValueError, match=r"shots declares 'int' and cannot take"):
+            orchestrator._create_task_instance(
+                TASK_NAME, {"run": {"shots": {"value": [0, 1, 2], "value_type": "np.linspace"}}}
+            )
 
 
 class TestTaskInputOverrides:

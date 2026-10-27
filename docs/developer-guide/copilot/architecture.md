@@ -39,11 +39,38 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 
 ## Pi runtime authentication
 
-The API forwards the authenticated user's access token and selected `X-Project-Id` to the Pi runtime on each chat or analysis turn, including approval responses. When no project header is supplied, it uses the user's default project. The internal `AGENT_RUNTIME_TOKEN` still authenticates API-to-runtime requests; user credentials travel in separate internal headers and are never added to model input or durable conversation state.
+The API forwards the authenticated user's access token and selected `X-Project-Id` to the Pi runtime on each chat or analysis turn, including approval responses. When no project header is supplied, it uses the user's default project. An internal bearer secret authenticates API-to-runtime requests; user credentials travel in separate internal headers and are never added to model input or durable conversation state.
+
+Compose starts the runtime and workspace by default. The `agent-runtime-auth` initialization
+service generates a random secret once in a dedicated volume, mounted read-only by the API and
+runtime. Both read `AGENT_RUNTIME_TOKEN_FILE`; no manual secret or UI enable flag is needed.
+The file is owned by the runtime user (UID 1000) with mode `0400`; the API reads it as root.
+For standalone processes, provide the same credential file through `AGENT_RUNTIME_TOKEN_FILE`
+or set `AGENT_RUNTIME_TOKEN` on both processes. The explicit token takes precedence for existing
+deployments. Missing or empty credentials never permit unauthenticated runtime requests.
 
 Each open conversation gets its own tool registry and a private temporary pi-qdash profile. Read tools and approved writes use that user's credentials; the workspace container never sees them. The runtime overrides connection arguments supplied by a model or an older stored tool call and never falls back to `QDASH_API_TOKEN` or an administrator login. QDash API endpoints enforce the user's permissions.
 
 The pinned pi-qdash version accepts a configuration file rather than an injected client. The runtime creates the profile in a private directory with a mode-0600 file and removes it when the conversation closes, including failures. Docker Compose mounts `/tmp` as tmpfs so these credentials do not enter the container's persistent filesystem. Deployments outside Compose should provide an equivalent memory-backed temporary directory.
+
+## Durable conversations
+
+`agent-runtime/src/runtime.ts` opens one Pi SQLite store per user and session in the
+`agent-runtime-state` volume. Pi 1.4 upgrades existing stores to schema version 2 on first open;
+Pi 1.3 cannot reopen an upgraded store. Back up the stopped volume before upgrading, and restore
+that backup before a rollback to Pi 1.3. See [System Updates](../../user-guide/system-updates.md#deploy-the-release).
+
+Each chat model in `config/copilot/chat.yaml` gets compaction thresholds based on its own context
+window and output limit. `agent-runtime/src/models-config.ts` resolves those models at startup,
+and `agent-runtime/src/budget.ts` calculates their thresholds. The runtime gives Pi 1.4 a
+`modelOverrides` entry for each resolved model, so a resumed task uses the budget of the model it
+started with even if the next request selects another model. The selected request model also gets
+an entry when it is absent from the startup list.
+
+Pi reports session failures, faulted or parked tasks, migrations, and extension errors through
+`onReport`. `agent-runtime/src/durable-report.ts` logs the report type, task and extension names,
+and error type under the hashed session filename. It omits error messages, prompts, tool
+arguments, and user identifiers from these logs.
 
 ## Page context and editor edits
 
@@ -128,6 +155,25 @@ as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be su
 through environment variables instead of committed template files. The Pi runtime
 builds its `models.json` from `chat_models` and `evaluation_models` at startup.
 
+### Cloudflare Access Authentication
+
+`agent-runtime/src/models-config.ts` maps the shared `CF_ACCESS_CLIENT_ID` and
+`CF_ACCESS_CLIENT_SECRET` environment variables to Pi provider headers. It applies them to
+endpoints whose `base_url` references `env:OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>`, for both chat
+and evaluation. Literal URLs and catalog providers are unaffected.
+
+The generated `models.json` stores environment references, not credential values. Pi 1.4.0
+resolves these headers when making requests through `ModelRuntime`, including evaluation calls
+through the model registry. Both Chat Completions and Responses preserve the origin server's
+Bearer authentication alongside the two Access headers. With Access configured and no origin
+API key, the runtime supplies Pi's required placeholder key automatically.
+
+Setting only one Access variable, or a whitespace-only value, fails configuration rather than
+sending partial authentication. Leaving both unset or empty preserves existing behavior.
+`agent-runtime/test/cloudflare-access.test.mjs` captures requests from the installed Pi runtime
+for both API styles and both model roles. Deployment steps are in
+[Configure AI](../../user-guide/setup.md#configure-ai).
+
 ### Environment Variables
 
 | Variable | Purpose |
@@ -135,6 +181,7 @@ builds its `models.json` from `chat_models` and `evaluation_models` at startup.
 | `OPENAI_API_KEY` | OpenAI API authentication |
 | `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` | OpenAI-compatible API base URL through `/v1`; the suffix is operator-defined |
 | `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` | API key for the endpoint with the matching suffix; it can be a placeholder for a keyless endpoint |
+| `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` | Shared Cloudflare Access service token for configured OpenAI-compatible endpoints; optional, set both |
 
 Existing deployments must rename the earlier fixed variables and add `/v1` to each base URL:
 
@@ -189,9 +236,9 @@ in production to the packages listed in `TRUSTED_EXTENSION_PACKAGES` (for exampl
 pi-qdash in `agent-runtime/Dockerfile`; a package is added to that list only after
 review, and the version pin is the release gate.
 
-- An experimental write name (`EXPERIMENTAL_WRITE_TOOL_NAMES`) still needs
-  `AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true`, and then goes through the same
-  approval card as the pinned tool.
+- Reviewed write names (`REVIEWED_WRITE_TOOL_NAMES`) are available by default and go through
+  the same approval card as the pinned tool. Each operation runs only after the user approves
+  its arguments, using that user's credentials and project permissions.
 - A checkout tool is rerun after an interrupted turn only when its pi
   `annotations.readOnlyHint` is `true`; other local tools are reported to the
   model as interrupted instead, so a side-effecting tool never runs twice.

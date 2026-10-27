@@ -57,21 +57,47 @@ ports. Leave an optional credential empty when that integration is not in use.
 Set `CLIENT_URL` to an HTTP or HTTPS origin with a host and optional port, without a path. QDash
 removes a trailing slash. When it is unset, generated links use `http://localhost:<UI_PORT>`.
 
-### Enable the Pi Agent Runtime
+### Configure AI
 
-The Pi Agent Runtime is an optional Compose service. Enable it only when the deployment uses the
-Pi Copilot backend:
+The AI runtime and its workspace start with the standard Compose stack. Internal authentication
+is generated automatically; no AI service profile or UI enable flag is required.
+
+Set the `OPENAI_COMPATIBLE_BASE_URL_CHAT` and `OPENAI_COMPATIBLE_API_KEY_CHAT` pair in `.env`
+for chat, and the corresponding `EVALUATION` pair for figure analysis. Base URLs must include
+`/v1`. Select models in `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml`.
+
+Copilot can propose supported write operations without an extra enable setting. The signed-in
+user must approve each proposed write in the chat, and their project permissions still apply.
+The retired `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` variable has no effect and can be removed from
+existing `.env` files.
+
+#### Authenticate AI endpoints with Cloudflare Access
+
+Use one Cloudflare Access service token for chat and figure analysis. Create the token and add it
+to a **Service Auth** policy on each AI endpoint's Access application, following
+[Cloudflare's service token instructions](https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/).
+
+Set the shared credentials in `.env`:
 
 ```dotenv
-COMPOSE_PROFILES=agent-runtime
-AGENT_RUNTIME_TOKEN=<random-shared-secret>
+CF_ACCESS_CLIENT_ID=<service-token-client-id>
+CF_ACCESS_CLIENT_SECRET=<service-token-client-secret>
 ```
 
-Leave `COMPOSE_PROFILES` unset for the in-process `litellm` backend. Set
-`AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true` only in a trusted experimental deployment. QDash still
-requires the signed-in user to approve each proposed write in the chat.
+Keep the existing `OPENAI_COMPATIBLE_BASE_URL_CHAT` and `OPENAI_COMPATIBLE_BASE_URL_EVALUATION`
+settings pointed at the protected HTTPS URLs, including `/v1`. The shared token is sent to every
+endpoint configured through `base_url: env:OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>`, including custom
+suffixes. Literal URLs and built-in providers do not receive it.
 
-Multiple profiles use a comma-separated value, such as `agent-runtime,tunnel`.
+Keep each endpoint's API key if the model server requires it. If authentication is handled only
+by Cloudflare Access, leave that API key empty. Both Access values must be set together; leave
+both empty to keep using API-key-only authentication.
+
+After changing `.env`, recreate the runtime to load the values:
+
+```bash
+docker compose up -d --build --force-recreate agent-runtime
+```
 
 ### Set the Default Color Theme
 
@@ -174,7 +200,7 @@ Set `CADDY_TRUSTED_PROXIES` to the source IP or smallest CIDR that Caddy actuall
 connections from `cloudflared`. Check the peer address using the host or container network
 diagnostics; Docker may present the bridge gateway instead of `127.0.0.1`. Keep the loopback
 default only when that is the observed peer, and do not trust an entire Docker subnet or other
-broad network. Keep `agent-runtime` in the comma-separated value when Pi is enabled:
+broad network.
 
 ```dotenv
 CLIENT_URL=https://qdash.example.com
@@ -182,8 +208,6 @@ TUNNEL_TOKEN=<cloudflare-tunnel-token>
 COMPOSE_PROFILES=tunnel
 CADDY_TRUSTED_PROXIES=<tunnel-peer-ip-or-cidr>
 ```
-
-When the Pi Copilot backend is enabled, use `COMPOSE_PROFILES=agent-runtime,tunnel`.
 
 Start the stack again with `docker compose up -d --build`. `task deploy` is the equivalent Go
 Task command; it enables the tunnel while preserving profiles already configured in `.env`.

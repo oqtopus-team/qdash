@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnavailable
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
@@ -17,6 +18,19 @@ from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.user import UserDocument
 
 CHIP = "64Qv3"
+
+
+def calibrated_qubit_data() -> dict[str, Any]:
+    """Calibration data that satisfies the one-qubit check and coherence tasks.
+
+    The pipeline's CheckRabi writes the Rabi set and the pulse tasks write the
+    pulse parameters, so only the spectroscopy-level values need to exist.
+    """
+    return {
+        "qubit_frequency": {"value": 7.5, "unit": "GHz"},
+        "resonator_frequency": {"value": 10.1, "unit": "GHz"},
+        "readout_amplitude": {"value": 0.02, "unit": "a.u."},
+    }
 
 
 @pytest.fixture
@@ -70,7 +84,7 @@ def chip(test_project):
             chip_id=CHIP,
             qid=str(i),
             status="pending",
-            data={},
+            data=calibrated_qubit_data(),
             system_info={},
         ).insert()
     for name, task_type in [
@@ -207,24 +221,25 @@ class TestValidate:
         assert data["targets"]["mux_ids"] == [0, 16]
 
 
-def prefect_client_mock() -> tuple[MagicMock, MagicMock]:
-    flow_run = MagicMock()
-    flow_run.id = "flow-run-1"
-    deployment = MagicMock()
-    deployment.id = "deployment-1"
-    client = MagicMock()
-    client.read_deployment_by_name = AsyncMock(return_value=deployment)
-    client.create_flow_run_from_deployment = AsyncMock(return_value=flow_run)
-    cm = MagicMock()
-    cm.__aenter__ = AsyncMock(return_value=client)
-    cm.__aexit__ = AsyncMock(return_value=None)
-    return cm, client
+def prefect_gateway_mocks() -> tuple[AsyncMock, AsyncMock]:
+    read_deployment = AsyncMock(return_value="deployment-1")
+    create_flow_run = AsyncMock(return_value="flow-run-1")
+    return read_deployment, create_flow_run
 
 
 class TestExecute:
     def test_execute_dispatches_the_system_deployment(self, test_client, chip, auth_headers):
-        cm, client = prefect_client_mock()
-        with patch("qdash.api.services.flow_service.get_client", return_value=cm):
+        read_deployment, create_flow_run = prefect_gateway_mocks()
+        with (
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.read_deployment_id",
+                new=read_deployment,
+            ),
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+                new=create_flow_run,
+            ),
+        ):
             response = test_client.post(
                 "/calibration-pipelines/execute",
                 headers=auth_headers,
@@ -235,10 +250,8 @@ class TestExecute:
         assert data["flow_run_id"] == "flow-run-1"
         assert [step["name"] for step in data["steps"]][-1] == "coherence"
 
-        client.read_deployment_by_name.assert_awaited_once_with(
-            "calibration-pipeline/system-calibration-pipeline"
-        )
-        parameters = client.create_flow_run_from_deployment.call_args.kwargs["parameters"]
+        read_deployment.assert_awaited_once_with("calibration-pipeline/system-calibration-pipeline")
+        parameters = create_flow_run.call_args.kwargs["parameters"]
         assert parameters["project_id"] == "test_project"
         assert parameters["username"] == "test_user"
         assert parameters["chip_id"] == CHIP
@@ -250,10 +263,13 @@ class TestExecute:
         assert parameters["spec"]["steps"][2]["mode"] == "synchronized"
 
     def test_execute_rejects_invalid_spec_before_dispatch(self, test_client, chip, auth_headers):
-        cm, client = prefect_client_mock()
+        _, create_flow_run = prefect_gateway_mocks()
         spec = good_spec()
         spec["targets"] = {"qids": ["99"]}
-        with patch("qdash.api.services.flow_service.get_client", return_value=cm):
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
             response = test_client.post(
                 "/calibration-pipelines/execute",
                 headers=auth_headers,
@@ -262,12 +278,14 @@ class TestExecute:
         assert response.status_code == 422
         detail = response.json()["detail"]
         assert detail["problems"][0]["path"] == "targets.qids[0]"
-        client.create_flow_run_from_deployment.assert_not_called()
+        create_flow_run.assert_not_called()
 
     def test_execute_without_worker_deployment_is_503(self, test_client, chip, auth_headers):
-        cm, client = prefect_client_mock()
-        client.read_deployment_by_name = AsyncMock(side_effect=RuntimeError("missing"))
-        with patch("qdash.api.services.flow_service.get_client", return_value=cm):
+        unavailable = AsyncMock(side_effect=SystemDeploymentUnavailable("missing"))
+        with patch(
+            "qdash.api.services.flow_service.execution.ExecutionCoordinator.read_deployment_id",
+            new=unavailable,
+        ):
             response = test_client.post(
                 "/calibration-pipelines/execute",
                 headers=auth_headers,
@@ -286,3 +304,91 @@ class TestExecute:
             json={"chip_id": CHIP, "spec": good_spec()},
         )
         assert response.status_code == 403
+
+
+class TestPreflight:
+    """Problems a task would raise before measuring are reported by the dry run."""
+
+    def test_missing_calibration_data_is_a_problem(self, test_client, chip, auth_headers):
+        spec = {
+            "targets": {"qids": ["0", "1"]},
+            "steps": [{"type": "CustomOneQubit", "step_name": "t1", "tasks": ["CheckT1"]}],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        messages = [p["message"] for p in data["problems"] if p["path"] == "steps[0].tasks[0]"]
+        assert any("'rabi_amplitude'" in m and "qubit(s) 0, 1" in m for m in messages), data[
+            "problems"
+        ]
+        assert any("'hpi_amplitude'" in m for m in messages)
+
+    def test_unreadable_task_catalog_fails_closed(self, test_client, chip, auth_headers):
+        from fastapi import HTTPException
+
+        from qdash.api.services.task_file_service import TaskFileService
+
+        with patch.object(
+            TaskFileService,
+            "list_task_info",
+            side_effect=HTTPException(status_code=404, detail="Backend directory not found"),
+        ):
+            response = test_client.post(
+                "/calibration-pipelines/validate",
+                headers=auth_headers,
+                json={"chip_id": CHIP, "spec": good_spec()},
+            )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        messages = [p["message"] for p in data["problems"] if p["path"] == "backend_name"]
+        assert any("task catalog" in m and "Backend directory not found" in m for m in messages), (
+            data["problems"]
+        )
+
+    def test_task_readout_duration_must_match_the_session(self, test_client, chip, auth_headers):
+        spec = good_spec()
+        spec["task_run_parameters"] = {"CheckT1": {"readout_duration": 2048}}
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.status_code == 200
+        problems = {p["path"]: p["message"] for p in response.json()["problems"]}
+        assert "session-scoped" in problems["task_run_parameters.CheckT1.readout_duration"]
+
+        spec["default_run_parameters"] = {"readout_duration": 2048}
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.json()["valid"] is True, response.json()["problems"]
+
+    def test_mux_targets_are_checked_per_qubit(self, test_client, chip, auth_headers):
+        qubit = QubitDocument.find_one(
+            {"project_id": "test_project", "chip_id": CHIP, "qid": "5"}
+        ).run()
+        assert qubit is not None
+        qubit.set({"data": {}})
+        spec = {
+            "targets": {"mux_ids": [1], "exclude_qids": ["7"]},
+            "steps": [{"type": "OneQubitCheck"}],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is False
+        messages = [p["message"] for p in data["problems"] if p["path"] == "steps[0].tasks[0]"]
+        assert any("'control_frequency'" in m and "qubit(s) 5" in m for m in messages), data[
+            "problems"
+        ]

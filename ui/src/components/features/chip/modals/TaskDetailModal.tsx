@@ -26,6 +26,7 @@ import {
   formatTime as formatTimeUtil,
   formatDateTime as formatDateTimeUtil,
 } from "@/lib/utils/datetime";
+import { formatSweepValue } from "@/lib/utils/task-parameters";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
 
@@ -560,11 +561,13 @@ export function TaskDetailModal({
                                 value_type?: string;
                                 description?: string;
                               };
-                              const displayValue = Array.isArray(paramValue.value)
-                                ? paramValue.value.join(", ")
-                                : paramValue.value !== null && paramValue.value !== undefined
-                                  ? String(paramValue.value)
-                                  : "-";
+                              const displayValue =
+                                formatSweepValue(paramValue.value_type, paramValue.value) ??
+                                (Array.isArray(paramValue.value)
+                                  ? paramValue.value.join(", ")
+                                  : paramValue.value !== null && paramValue.value !== undefined
+                                    ? String(paramValue.value)
+                                    : "-");
                               return (
                                 <tr key={key}>
                                   <td className="font-medium">{key}</td>

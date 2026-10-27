@@ -360,6 +360,16 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
     assert task.run_parameters["readout_duration"]["value"] == 1024
 
 
+def test_list_task_info_extracts_output_parameter_names() -> None:
+    clear_backend_config_cache()
+    service = TaskFileService()
+
+    tasks = {t.name: t for t in service.list_task_info("qubex").tasks}
+
+    assert "rabi_amplitude" in tasks["CheckRabi"].output_parameters
+    assert tasks["CreateHPIPulse"].output_parameters[:1] == ["hpi_amplitude"]
+
+
 def test_cross_resonance_catalog_groups_control_and_target_rabi_inputs() -> None:
     task = next(
         task

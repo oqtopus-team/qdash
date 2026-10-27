@@ -150,8 +150,10 @@ service = CalibService(
 `run` sets run parameters the task declares in its `run_spec`, and overrides shared defaults.
 `input` replaces calibration inputs the task declares in its `input_spec`; the value applies to
 every qid the task runs on. Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or
-`sweep.range` for generated run ranges, and plain values for other run values and `input` entries.
-The helper records the constructor without creating an array in the workflow process. Setting
+`sweep.range` for generated run ranges, `sweep.values(...)` for explicit points, and plain values
+for other run values and `input` entries. The helper records the constructor without creating an
+array in the workflow process, and a parameter that declares one sweep constructor accepts any of
+them. Setting
 `update_calibration_parameters=False` retains task history without promoting validated outputs to
 the current calibration state. A name in the wrong section, or one the task does not declare,
 fails when the task is created. The complete precedence rules are in [Parameter

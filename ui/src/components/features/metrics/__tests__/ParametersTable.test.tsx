@@ -93,6 +93,25 @@ describe("ParametersTable", () => {
     expect(within(destinations).queryByText("5.000000 → 5.200000")).toBeNull();
   });
 
+  it("shows a recorded sweep as the constructor call that produced it", () => {
+    render(
+      <ParametersTable
+        title="Run Parameters"
+        parameters={{
+          time_range: {
+            value: [100, 500000, 51],
+            value_type: "np.linspace",
+            unit: "ns",
+          },
+          points: { value: [0, 4, 16], value_type: "list", unit: "ns" },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("np.linspace(100, 500000, 51)")).toBeTruthy();
+    expect(screen.getByText("[0,4,16]")).toBeTruthy();
+  });
+
   it("labels a legacy result without update metadata as unknown", () => {
     render(
       <ParametersTable

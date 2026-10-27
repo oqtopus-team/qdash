@@ -26,13 +26,13 @@ import type {
 
 import type {
   AgentActionResponse,
-  AgentCampaignCommitResponse,
   AgentCandidateCommitResponse,
+  AgentCandidateSetCommitResponse,
   AgentSessionResponse,
   ApplyAgentCandidateRequest,
   CandidateGateResponse,
-  CommitAgentCampaignRequest,
   CommitAgentCandidateRequest,
+  CommitAgentCandidateSetRequest,
   CreateAgentSessionRequest,
   EvaluateCandidateGateRequest,
   ExecuteAgentActionRequest,
@@ -617,19 +617,19 @@ export const useCommitAgentActionCandidate = <TError = HTTPValidationError,
     }
     /**
  * Validate a final candidate set and persist it with one Qubit save.
- * @summary Commit final agent campaign candidates
+ * @summary Commit the final agent candidate set
  */
-export const commitAgentCampaignCandidates = (
+export const commitAgentCandidateSet = (
     sessionId: string,
-    commitAgentCampaignRequest: CommitAgentCampaignRequest,
+    commitAgentCandidateSetRequest: CommitAgentCandidateSetRequest,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
 
 
-      return customInstance<AgentCampaignCommitResponse>(
-      {url: `/agent-sessions/${sessionId}/campaign-commits`, method: 'POST',
+      return customInstance<AgentCandidateSetCommitResponse>(
+      {url: `/agent-sessions/${sessionId}/candidate-set-commits`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: commitAgentCampaignRequest, signal
+      data: commitAgentCandidateSetRequest, signal
     },
       options);
     }
@@ -637,11 +637,11 @@ export const commitAgentCampaignCandidates = (
 
 
 
-export const getCommitAgentCampaignCandidatesMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitAgentCampaignCandidates>>, TError,{sessionId: string;data: CommitAgentCampaignRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof commitAgentCampaignCandidates>>, TError,{sessionId: string;data: CommitAgentCampaignRequest}, TContext> => {
+export const getCommitAgentCandidateSetMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitAgentCandidateSet>>, TError,{sessionId: string;data: CommitAgentCandidateSetRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof commitAgentCandidateSet>>, TError,{sessionId: string;data: CommitAgentCandidateSetRequest}, TContext> => {
 
-const mutationKey = ['commitAgentCampaignCandidates'];
+const mutationKey = ['commitAgentCandidateSet'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -651,10 +651,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commitAgentCampaignCandidates>>, {sessionId: string;data: CommitAgentCampaignRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commitAgentCandidateSet>>, {sessionId: string;data: CommitAgentCandidateSetRequest}> = (props) => {
           const {sessionId,data} = props ?? {};
 
-          return  commitAgentCampaignCandidates(sessionId,data,requestOptions)
+          return  commitAgentCandidateSet(sessionId,data,requestOptions)
         }
 
 
@@ -664,36 +664,36 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type CommitAgentCampaignCandidatesMutationResult = NonNullable<Awaited<ReturnType<typeof commitAgentCampaignCandidates>>>
-    export type CommitAgentCampaignCandidatesMutationBody = CommitAgentCampaignRequest
-    export type CommitAgentCampaignCandidatesMutationError = HTTPValidationError
+    export type CommitAgentCandidateSetMutationResult = NonNullable<Awaited<ReturnType<typeof commitAgentCandidateSet>>>
+    export type CommitAgentCandidateSetMutationBody = CommitAgentCandidateSetRequest
+    export type CommitAgentCandidateSetMutationError = HTTPValidationError
 
     /**
- * @summary Commit final agent campaign candidates
+ * @summary Commit the final agent candidate set
  */
-export const useCommitAgentCampaignCandidates = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitAgentCampaignCandidates>>, TError,{sessionId: string;data: CommitAgentCampaignRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+export const useCommitAgentCandidateSet = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitAgentCandidateSet>>, TError,{sessionId: string;data: CommitAgentCandidateSetRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof commitAgentCampaignCandidates>>,
+        Awaited<ReturnType<typeof commitAgentCandidateSet>>,
         TError,
-        {sessionId: string;data: CommitAgentCampaignRequest},
+        {sessionId: string;data: CommitAgentCandidateSetRequest},
         TContext
       > => {
-      return useMutation(getCommitAgentCampaignCandidatesMutationOptions(options), queryClient);
+      return useMutation(getCommitAgentCandidateSetMutationOptions(options), queryClient);
     }
     /**
- * Get one audited final campaign candidate-set commit.
- * @summary Get an agent campaign commit
+ * Get one audited final candidate-set commit.
+ * @summary Get an agent candidate set commit
  */
-export const getAgentCampaignCommit = (
+export const getAgentCandidateSetCommit = (
     sessionId: string,
     commitId: string,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
 
 
-      return customInstance<AgentCampaignCommitResponse>(
-      {url: `/agent-sessions/${sessionId}/campaign-commits/${commitId}`, method: 'GET', signal
+      return customInstance<AgentCandidateSetCommitResponse>(
+      {url: `/agent-sessions/${sessionId}/candidate-set-commits/${commitId}`, method: 'GET', signal
     },
       options);
     }
@@ -701,75 +701,75 @@ export const getAgentCampaignCommit = (
 
 
 
-export const getGetAgentCampaignCommitQueryKey = (sessionId: string,
+export const getGetAgentCandidateSetCommitQueryKey = (sessionId: string,
     commitId: string,) => {
     return [
-    `/agent-sessions/${sessionId}/campaign-commits/${commitId}`
+    `/agent-sessions/${sessionId}/candidate-set-commits/${commitId}`
     ] as const;
     }
 
 
-export const getGetAgentCampaignCommitQueryOptions = <TData = Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError = HTTPValidationError>(sessionId: string,
-    commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetAgentCandidateSetCommitQueryOptions = <TData = Awaited<ReturnType<typeof getAgentCandidateSetCommit>>, TError = HTTPValidationError>(sessionId: string,
+    commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCandidateSetCommit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAgentCampaignCommitQueryKey(sessionId,commitId);
+  const queryKey =  queryOptions?.queryKey ?? getGetAgentCandidateSetCommitQueryKey(sessionId,commitId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentCampaignCommit>>> = ({ signal }) => getAgentCampaignCommit(sessionId,commitId, requestOptions, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAgentCandidateSetCommit>>> = ({ signal }) => getAgentCandidateSetCommit(sessionId,commitId, requestOptions, signal);
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined && commitId !== null && commitId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined && commitId !== null && commitId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAgentCandidateSetCommit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetAgentCampaignCommitQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentCampaignCommit>>>
-export type GetAgentCampaignCommitQueryError = HTTPValidationError
+export type GetAgentCandidateSetCommitQueryResult = NonNullable<Awaited<ReturnType<typeof getAgentCandidateSetCommit>>>
+export type GetAgentCandidateSetCommitQueryError = HTTPValidationError
 
 
-export function useGetAgentCampaignCommit<TData = Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError = HTTPValidationError>(
+export function useGetAgentCandidateSetCommit<TData = Awaited<ReturnType<typeof getAgentCandidateSetCommit>>, TError = HTTPValidationError>(
  sessionId: string,
-    commitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError, TData>> & Pick<
+    commitId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCandidateSetCommit>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getAgentCampaignCommit>>,
+          Awaited<ReturnType<typeof getAgentCandidateSetCommit>>,
           TError,
-          Awaited<ReturnType<typeof getAgentCampaignCommit>>
+          Awaited<ReturnType<typeof getAgentCandidateSetCommit>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAgentCampaignCommit<TData = Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError = HTTPValidationError>(
+export function useGetAgentCandidateSetCommit<TData = Awaited<ReturnType<typeof getAgentCandidateSetCommit>>, TError = HTTPValidationError>(
  sessionId: string,
-    commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError, TData>> & Pick<
+    commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCandidateSetCommit>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getAgentCampaignCommit>>,
+          Awaited<ReturnType<typeof getAgentCandidateSetCommit>>,
           TError,
-          Awaited<ReturnType<typeof getAgentCampaignCommit>>
+          Awaited<ReturnType<typeof getAgentCandidateSetCommit>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAgentCampaignCommit<TData = Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError = HTTPValidationError>(
+export function useGetAgentCandidateSetCommit<TData = Awaited<ReturnType<typeof getAgentCandidateSetCommit>>, TError = HTTPValidationError>(
  sessionId: string,
-    commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+    commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCandidateSetCommit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get an agent campaign commit
+ * @summary Get an agent candidate set commit
  */
 
-export function useGetAgentCampaignCommit<TData = Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError = HTTPValidationError>(
+export function useGetAgentCandidateSetCommit<TData = Awaited<ReturnType<typeof getAgentCandidateSetCommit>>, TError = HTTPValidationError>(
  sessionId: string,
-    commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCampaignCommit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+    commitId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAgentCandidateSetCommit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetAgentCampaignCommitQueryOptions(sessionId,commitId,options)
+  const queryOptions = getGetAgentCandidateSetCommitQueryOptions(sessionId,commitId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

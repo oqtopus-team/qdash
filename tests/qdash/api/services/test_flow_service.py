@@ -1,26 +1,35 @@
+"""Tests for the flow application service."""
+
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from fastapi import HTTPException
 
-from qdash.api.schemas.flow import ExecuteFlowRequest
-from qdash.api.services import flow_service
-from qdash.api.services.flow_service import FlowService
-from qdash.common.config.path_resolver import (
-    resolve_workflow_path,
-    to_container_user_flow_path,
-)
+from qdash.api.schemas.execution import ExecutionAvailabilityRequest
+from qdash.api.schemas.flow import ExecuteFlowRequest, SaveFlowRequest
+from qdash.api.services.flow_service import service as flow_service_module
+from qdash.api.services.flow_service.deployment_client import DeploymentRegistrationError
+from qdash.api.services.flow_service.execution import DispatchResult, FlowDispatchError
+from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnavailable
+from qdash.api.services.flow_service.service import FlowService
+from qdash.api.services.flow_service.source_store import FlowSourceStore
 from qdash.config import Settings
 
+if TYPE_CHECKING:
+    from qdash.api.services.flow_service.deployment_client import DeploymentServiceClient
+    from qdash.api.services.flow_service.execution import ExecutionCoordinator
+    from qdash.repository import MongoFlowRepository
 
-def _set_public_origin(monkeypatch: pytest.MonkeyPatch, client_url: str) -> None:
-    """Configure the flow service with a test public origin."""
-    settings = Settings.model_validate(
+
+def _public_settings() -> Settings:
+    """Return settings with a test public origin."""
+    return Settings.model_validate(
         {
             "env": "test",
-            "client_url": client_url,
+            "client_url": "https://qdash.example.test:9443/",
             "ui_port": 5714,
             "prefect_api_url": "http://prefect.example.test/api",
             "postgres_data_path": "/tmp/postgres",
@@ -28,20 +37,643 @@ def _set_public_origin(monkeypatch: pytest.MonkeyPatch, client_url: str) -> None
             "calib_data_path": "/tmp/calib",
         }
     )
-    monkeypatch.setattr(flow_service, "get_settings", lambda: settings)
+
+
+FLOW_CODE = "from prefect import flow\n\n\n@flow\ndef my_flow():\n    pass\n"
+TIMESTAMP = datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+
+class _FakeFlowRepository:
+    """Flow repository stub that records writes."""
+
+    def __init__(self, *, flow: SimpleNamespace | None = None) -> None:
+        self.flow = flow
+        self.listed: list[SimpleNamespace] = []
+        self.created: list[dict[str, Any]] = []
+        self.updated: list[dict[str, Any]] = []
+        self.deleted: list[tuple[str, str]] = []
+        self.create_failure: Exception | None = None
+        self.delete_failure: Exception | None = None
+        self.update_failure: Exception | None = None
+        self.list_failure: Exception | None = None
+
+    def find_by_project_and_name(self, project_id: str, name: str) -> SimpleNamespace | None:
+        """Return the configured flow."""
+        return self.flow
+
+    def list_by_project(self, project_id: str) -> list[SimpleNamespace]:
+        """Return the configured flow list, raising when a failure is configured."""
+        if self.list_failure is not None:
+            raise self.list_failure
+        return self.listed
+
+    def create_flow(self, **kwargs: Any) -> None:
+        """Record the created flow, raising when a failure is configured."""
+        if self.create_failure is not None:
+            raise self.create_failure
+        self.created.append(kwargs)
+
+    def update_flow(self, flow: Any = None, **kwargs: Any) -> None:
+        """Record the updated fields, raising when a failure is configured."""
+        if self.update_failure is not None:
+            raise self.update_failure
+        self.updated.append({"flow": flow, **kwargs})
+
+    def delete_by_project_and_name(self, project_id: str, name: str) -> None:
+        """Record the deletion, raising when a failure is configured."""
+        if self.delete_failure is not None:
+            raise self.delete_failure
+        self.deleted.append((project_id, name))
+
+
+class _StubCoordinator:
+    """Execution coordinator stub with configurable results."""
+
+    def __init__(
+        self,
+        *,
+        execution_id: str | None = "exec-1",
+        flow_run_id: str = "flow-run-1",
+        dispatch_failure: Exception | None = None,
+        background_failure: Exception | None = None,
+        unavailable: bool = False,
+        available: tuple[bool, str | None] = (True, None),
+    ) -> None:
+        self.execution_id = execution_id
+        self.flow_run_id = flow_run_id
+        self.dispatch_failure = dispatch_failure
+        self.background_failure = background_failure
+        self.unavailable = unavailable
+        self.available = available
+        self.run_calls: list[dict[str, Any]] = []
+        self.background_calls: list[dict[str, Any]] = []
+        self.availability_calls: list[dict[str, Any]] = []
+        self.deleted_deployments: list[str] = []
+
+    async def dispatch_run(self, **kwargs: Any) -> DispatchResult:
+        """Record the dispatch and return a result built from the request."""
+        self.run_calls.append(kwargs)
+        if self.dispatch_failure is not None:
+            raise self.dispatch_failure
+        chip_id = cast("str", kwargs["chip_id"])
+        return DispatchResult(
+            flow_run_id=self.flow_run_id,
+            flow_run_url=f"http://localhost:4200/runs/flow-run/{self.flow_run_id}",
+            execution_id=self.execution_id,
+            qdash_ui_url=_ui_url(chip_id, self.execution_id),
+        )
+
+    async def dispatch_background(self, **kwargs: Any) -> str:
+        """Record the background dispatch and return the configured run ID."""
+        self.background_calls.append(kwargs)
+        if self.background_failure is not None:
+            raise self.background_failure
+        return self.flow_run_id
+
+    async def read_deployment_id(self, deployment_name: str) -> Any:
+        """Return a stub deployment ID or report it as unavailable."""
+        if self.unavailable:
+            raise SystemDeploymentUnavailable(deployment_name)
+        return "deployment-1"
+
+    async def delete_deployment(self, deployment_id: str) -> None:
+        """Record the deleted deployment."""
+        self.deleted_deployments.append(deployment_id)
+
+    def availability(self, **kwargs: Any) -> tuple[bool, str | None]:
+        """Record the availability question and return the configured answer."""
+        self.availability_calls.append(kwargs)
+        return self.available
+
+
+class _StubDeploymentClient:
+    """Deployment client stub that records registrations."""
+
+    def __init__(
+        self,
+        *,
+        deployment_id: str = "deployment-9",
+        failure: Exception | None = None,
+    ) -> None:
+        self.deployment_id = deployment_id
+        self.failure = failure
+        self.calls: list[dict[str, Any]] = []
+
+    async def register(self, **kwargs: Any) -> str:
+        """Record the registration and return the configured deployment ID."""
+        self.calls.append(kwargs)
+        if self.failure is not None:
+            raise self.failure
+        return self.deployment_id
+
+
+def _ui_url(chip_id: str | None, execution_id: str | None) -> str:
+    """Mirror the QDash UI URL the coordinator builds."""
+    base = "http://localhost:3000/execution"
+    if not chip_id:
+        return base
+    if not execution_id:
+        return f"{base}/{chip_id}"
+    return f"{base}/{chip_id}/{execution_id}"
+
+
+def _make_flow(file_path: Path, **overrides: Any) -> SimpleNamespace:
+    """Build a flow record with the fields the service reads."""
+    values: dict[str, Any] = {
+        "name": "my_flow",
+        "username": "operator",
+        "description": "",
+        "chip_id": "chip-1",
+        "flow_function_name": "my_flow",
+        "default_parameters": {},
+        "default_run_parameters": {},
+        "file_path": str(file_path),
+        "deployment_id": "deployment-1",
+        "created_at": TIMESTAMP,
+        "updated_at": TIMESTAMP,
+        "tags": [],
+        "folder": "",
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def _service(
+    tmp_path: Path,
+    *,
+    repo: _FakeFlowRepository | None = None,
+    coordinator: _StubCoordinator | None = None,
+    deployment: _StubDeploymentClient | None = None,
+) -> FlowService:
+    """Build a service with fakes and a temporary flow tree."""
+    return FlowService(
+        flow_repository=cast("MongoFlowRepository", repo or _FakeFlowRepository()),
+        coordinator=cast("ExecutionCoordinator", coordinator or _StubCoordinator()),
+        source_store=FlowSourceStore(tmp_path / "user_flows"),
+        deployment_client=cast(
+            "DeploymentServiceClient",
+            deployment or _StubDeploymentClient(),
+        ),
+    )
 
 
 @pytest.mark.asyncio
-async def test_execute_single_task_rejects_conflicting_resources(
+async def test_save_flow_writes_the_source_and_registers_the_deployment(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(flow_service, "generate_execution_id", lambda *args, **kwargs: "exec-1")
-    lock_repository = MagicMock()
-    lock_repository.try_lock.return_value = False
-    service = FlowService(
-        flow_repository=MagicMock(),
-        execution_lock_repository=lock_repository,
+    """Saving writes the file, registers the deployment and records metadata."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    repo = _FakeFlowRepository()
+    deployment = _StubDeploymentClient()
+    service = _service(tmp_path, repo=repo, deployment=deployment)
+
+    response = await service.save_flow(
+        SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1"),
+        "operator",
+        "project-1",
     )
+
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    assert file_path.read_text(encoding="utf-8") == FLOW_CODE
+    assert Path(deployment.calls[0]["file_path"]) == Path(
+        "/app/qdash/workflow/user_flows/project-1/my_flow.py"
+    )
+    assert deployment.calls[0]["flow_function_name"] == "my_flow"
+    assert deployment.calls[0]["deployment_name"] == "project-1-my_flow"
+    assert deployment.calls[0]["old_deployment_id"] is None
+    assert repo.created[0]["deployment_id"] == "deployment-9"
+    assert repo.created[0]["folder"] == ""
+    assert repo.created[0]["flow_function_name"] == "my_flow"
+    assert response.file_path == str(file_path)
+    assert response.message == "Flow 'my_flow' created successfully"
+
+
+@pytest.mark.asyncio
+async def test_save_flow_keeps_the_stored_folder_when_the_request_omits_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An omitted folder leaves the existing folder and replaces the deployment."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    repo = _FakeFlowRepository(flow=_make_flow(file_path, folder="daily"))
+    service = _service(tmp_path, repo=repo)
+
+    response = await service.save_flow(
+        SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1", description="updated"),
+        "operator",
+        "project-1",
+    )
+
+    assert repo.created == []
+    assert repo.updated[0]["folder"] is None
+    assert repo.updated[0]["description"] == "updated"
+    assert response.message == "Flow 'my_flow' updated successfully"
+
+
+@pytest.mark.asyncio
+async def test_save_flow_removes_the_file_when_registration_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed registration does not leave the new source behind."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    service = _service(
+        tmp_path,
+        deployment=_StubDeploymentClient(
+            failure=DeploymentRegistrationError("500: worker is down")
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.save_flow(
+            SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1"),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to register deployment: 500: worker is down"
+    assert not (tmp_path / "user_flows" / "project-1" / "my_flow.py").exists()
+
+
+@pytest.mark.asyncio
+async def test_save_flow_removes_the_file_when_metadata_cannot_be_saved(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed metadata write does not leave the new source behind."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    repo = _FakeFlowRepository()
+    repo.create_failure = RuntimeError("mongo is down")
+    service = _service(tmp_path, repo=repo)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.save_flow(
+            SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1"),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to save flow metadata: mongo is down"
+    assert not (tmp_path / "user_flows" / "project-1" / "my_flow.py").exists()
+
+
+@pytest.mark.asyncio
+async def test_save_flow_rejects_an_invalid_name_before_touching_storage(
+    tmp_path: Path,
+) -> None:
+    """A rejected name never reaches the filesystem or the repository."""
+    repo = _FakeFlowRepository()
+    service = _service(tmp_path, repo=repo)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.save_flow(
+            SaveFlowRequest(name="my flow", code=FLOW_CODE, chip_id="chip-1"),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 400
+    assert repo.created == []
+    assert not (tmp_path / "user_flows" / "project-1").exists()
+
+
+@pytest.mark.asyncio
+async def test_get_flow_returns_the_stored_source(tmp_path: Path) -> None:
+    """Reading a flow returns its metadata and code."""
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text(FLOW_CODE, encoding="utf-8")
+    service = _service(
+        tmp_path,
+        repo=_FakeFlowRepository(flow=_make_flow(file_path, description="daily run")),
+    )
+
+    response = await service.get_flow("my_flow", "operator", "project-1")
+
+    assert response.code == FLOW_CODE
+    assert response.description == "daily run"
+    assert response.file_path == str(file_path)
+
+
+@pytest.mark.asyncio
+async def test_get_flow_rejects_an_unknown_flow(tmp_path: Path) -> None:
+    """A flow without metadata is reported as not found."""
+    with pytest.raises(HTTPException) as exc_info:
+        await _service(tmp_path).get_flow("missing", "operator", "project-1")
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_flow_rejects_a_missing_source_file(tmp_path: Path) -> None:
+    """Metadata whose file disappeared is reported as not found."""
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    service = _service(tmp_path, repo=_FakeFlowRepository(flow=_make_flow(file_path)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.get_flow("my_flow", "operator", "project-1")
+
+    assert exc_info.value.status_code == 404
+    assert "Flow file not found" in str(exc_info.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_move_flow_records_the_normalized_folder(tmp_path: Path) -> None:
+    """Moving a flow rewrites its folder and nothing else."""
+    repo = _FakeFlowRepository(flow=_make_flow(Path("/tmp/my_flow.py")))
+    service = _service(tmp_path, repo=repo)
+
+    response = await service.move_flow("my_flow", "project-1", "/daily/t1/")
+
+    assert repo.updated == [{"flow": repo.flow, "folder": "daily/t1"}]
+    assert response.folder == "daily/t1"
+    assert response.message == "Flow 'my_flow' moved to 'daily/t1'"
+
+
+@pytest.mark.asyncio
+async def test_move_flow_rejects_an_unknown_flow(tmp_path: Path) -> None:
+    """Moving a flow that does not exist is reported as not found."""
+    with pytest.raises(HTTPException) as exc_info:
+        await _service(tmp_path).move_flow("missing", "project-1", "daily")
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_flows_reports_whether_each_file_exists(tmp_path: Path) -> None:
+    """A summary flags flows whose source is gone."""
+    present = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    present.parent.mkdir(parents=True)
+    present.write_text(FLOW_CODE, encoding="utf-8")
+    repo = _FakeFlowRepository()
+    repo.listed = [
+        _make_flow(present),
+        _make_flow(present.with_name("gone.py"), name="gone"),
+    ]
+    service = _service(tmp_path, repo=repo)
+
+    response = await service.list_flows("operator", "project-1")
+
+    assert [summary.file_exists for summary in response.flows] == [True, False]
+
+
+@pytest.mark.asyncio
+async def test_list_flows_reports_a_repository_failure(tmp_path: Path) -> None:
+    """A failing flow list is reported as a server error."""
+    repo = _FakeFlowRepository()
+    repo.list_failure = RuntimeError("mongo is down")
+
+    with pytest.raises(HTTPException) as exc_info:
+        await _service(tmp_path, repo=repo).list_flows("operator", "project-1")
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to list flows: mongo is down"
+
+
+@pytest.mark.asyncio
+async def test_delete_flow_drops_the_deployment_file_and_metadata(tmp_path: Path) -> None:
+    """Deleting removes the deployment, the source and the metadata."""
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text(FLOW_CODE, encoding="utf-8")
+    repo = _FakeFlowRepository(flow=_make_flow(file_path))
+    coordinator = _StubCoordinator()
+    service = _service(tmp_path, repo=repo, coordinator=coordinator)
+
+    response = await service.delete_flow("my_flow", "operator", "project-1")
+
+    assert coordinator.deleted_deployments == ["deployment-1"]
+    assert not file_path.exists()
+    assert repo.deleted == [("project-1", "my_flow")]
+    assert response["message"] == "Flow 'my_flow' deleted successfully"
+
+
+@pytest.mark.asyncio
+async def test_delete_flow_reports_a_metadata_failure(tmp_path: Path) -> None:
+    """A failed metadata delete is reported after the file is removed."""
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text(FLOW_CODE, encoding="utf-8")
+    repo = _FakeFlowRepository(flow=_make_flow(file_path))
+    repo.delete_failure = RuntimeError("mongo is down")
+    service = _service(tmp_path, repo=repo)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.delete_flow("my_flow", "operator", "project-1")
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to delete flow metadata: mongo is down"
+
+
+@pytest.mark.asyncio
+async def test_delete_flow_rejects_an_unknown_flow(tmp_path: Path) -> None:
+    """Deleting a flow that does not exist is reported as not found."""
+    with pytest.raises(HTTPException) as exc_info:
+        await _service(tmp_path).delete_flow("missing", "operator", "project-1")
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_flow_skips_an_absent_deployment_and_file(tmp_path: Path) -> None:
+    """Metadata without a deployment or a file on disk is still deleted."""
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    repo = _FakeFlowRepository(flow=_make_flow(file_path, deployment_id=""))
+    coordinator = _StubCoordinator()
+    service = _service(tmp_path, repo=repo, coordinator=coordinator)
+
+    response = await service.delete_flow("my_flow", "operator", "project-1")
+
+    assert coordinator.deleted_deployments == []
+    assert repo.deleted == [("project-1", "my_flow")]
+    assert response["message"] == "Flow 'my_flow' deleted successfully"
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_merges_defaults_and_request_parameters(tmp_path: Path) -> None:
+    """Execution combines saved defaults, request parameters and identity."""
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    repo = _FakeFlowRepository(
+        flow=_make_flow(
+            file_path,
+            default_parameters={"qids": ["0"]},
+            tags=["daily"],
+        )
+    )
+    coordinator = _StubCoordinator()
+    service = _service(tmp_path, repo=repo, coordinator=coordinator)
+
+    response = await service.execute_flow(
+        name="my_flow",
+        request=ExecuteFlowRequest(parameters={"qid": "1"}),
+        username="operator",
+        project_id="project-1",
+    )
+
+    call = coordinator.run_calls[0]
+    assert call["parameters"] == {
+        "qids": ["0"],
+        "qid": "1",
+        "tags": ["daily"],
+        "username": "operator",
+        "flow_name": "my_flow",
+        "project_id": "project-1",
+    }
+    assert call["tags"] == ["daily"]
+    assert call["workflow"] is True
+    assert call["deployment_id"] == "deployment-1"
+    assert response.execution_id == "exec-1"
+    assert response.flow_run_id == "flow-run-1"
+    assert response.qdash_ui_url.endswith("/execution/chip-1/exec-1")
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_falls_back_to_the_flow_run_id(tmp_path: Path) -> None:
+    """Without a pre-created execution row the flow run ID is returned."""
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    repo = _FakeFlowRepository(flow=_make_flow(file_path, chip_id=""))
+    service = _service(
+        tmp_path,
+        repo=repo,
+        coordinator=_StubCoordinator(execution_id=None, flow_run_id="flow-run-4"),
+    )
+
+    response = await service.execute_flow(
+        name="my_flow",
+        request=ExecuteFlowRequest(parameters={}),
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert response.execution_id == "flow-run-4"
+    assert response.qdash_ui_url.endswith("/execution")
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_requires_a_registered_deployment(tmp_path: Path) -> None:
+    """A flow saved before deployment registration cannot run."""
+    repo = _FakeFlowRepository(flow=_make_flow(Path("/tmp/my_flow.py"), deployment_id=""))
+    service = _service(tmp_path, repo=repo)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_flow(
+            name="my_flow",
+            request=ExecuteFlowRequest(parameters={}),
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_rejects_an_unknown_flow(tmp_path: Path) -> None:
+    """Executing an unknown flow is reported as not found."""
+    with pytest.raises(HTTPException) as exc_info:
+        await _service(tmp_path).execute_flow(
+            name="missing",
+            request=ExecuteFlowRequest(parameters={}),
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_reports_a_dispatch_failure(tmp_path: Path) -> None:
+    """A Prefect dispatch failure is surfaced as a server error."""
+    repo = _FakeFlowRepository(flow=_make_flow(Path("/tmp/my_flow.py")))
+    service = _service(
+        tmp_path,
+        repo=repo,
+        coordinator=_StubCoordinator(dispatch_failure=FlowDispatchError("prefect is down")),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_flow(
+            name="my_flow",
+            request=ExecuteFlowRequest(parameters={}),
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to execute flow: prefect is down"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("execution_name", "expected_flow_name"),
+    [(None, "re-execute:CheckRabi"), ("agent:CheckRabi", "agent:CheckRabi")],
+)
+async def test_execute_single_task_uses_the_requested_execution_name(
+    tmp_path: Path,
+    execution_name: str | None,
+    expected_flow_name: str,
+) -> None:
+    """The execution name becomes the flow name of the single-task run."""
+    coordinator = _StubCoordinator()
+    service = _service(tmp_path, coordinator=coordinator)
+
+    await service.execute_single_task_from_snapshot(
+        task_name="CheckRabi",
+        qid="Q00",
+        chip_id="chip-1",
+        source_execution_id="execution-1",
+        username="operator",
+        project_id="project-1",
+        execution_name=execution_name,
+    )
+
+    call = coordinator.run_calls[0]
+    assert call["name"] == expected_flow_name
+    assert call["parameters"]["flow_name"] == expected_flow_name
+    assert call["parameters"]["persist_output_parameters"] is True
+    assert call.get("workflow", False) is False
+
+
+@pytest.mark.asyncio
+async def test_execute_single_task_supports_quick_run_without_snapshot(
+    tmp_path: Path,
+) -> None:
+    """A quick run forwards the explicit overrides without a source execution."""
+    coordinator = _StubCoordinator()
+    service = _service(tmp_path, coordinator=coordinator)
+    task_run_parameters = {"CheckRabi": {"shots": {"value": 100}}}
+
+    await service.execute_single_task_from_snapshot(
+        task_name="CheckRabi",
+        qid="Q00",
+        chip_id="chip-1",
+        source_execution_id=None,
+        username="operator",
+        project_id="project-1",
+        execution_name="quick-run:CheckRabi",
+        backend_name="fake",
+        task_run_parameters=task_run_parameters,
+        persist_output_parameters=False,
+        update_params=False,
+    )
+
+    parameters = coordinator.run_calls[0]["parameters"]
+    assert parameters["source_execution_id"] is None
+    assert parameters["backend_name"] == "fake"
+    assert parameters["task_run_parameters"] == task_run_parameters
+    assert parameters["persist_output_parameters"] is False
+    assert parameters["update_params"] is False
+
+
+@pytest.mark.asyncio
+async def test_execute_single_task_reports_an_unavailable_system_deployment(
+    tmp_path: Path,
+) -> None:
+    """A worker that has not registered the deployment yet answers 503."""
+    service = _service(tmp_path, coordinator=_StubCoordinator(unavailable=True))
 
     with pytest.raises(HTTPException) as exc_info:
         await service.execute_single_task_from_snapshot(
@@ -53,946 +685,256 @@ async def test_execute_single_task_rejects_conflicting_resources(
             project_id="project-1",
         )
 
-    assert getattr(exc_info.value, "status_code", None) == 409
-    lock_repository.try_lock.assert_called_once()
-
-
-def test_resolve_workflow_path_uses_container_path_when_available(tmp_path: Path) -> None:
-    """resolve_workflow_path returns the container path when it exists."""
-    container_path = tmp_path / "templates"
-    container_path.mkdir()
-
-    assert resolve_workflow_path(container_path, "templates") == container_path
-
-
-def test_resolve_workflow_path_falls_back_to_repo_local_path(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """resolve_workflow_path falls back to the repo-local templates directory."""
-    repo_root = Path(__file__).resolve().parents[4]
-    monkeypatch.chdir(repo_root)
-
-    resolved = resolve_workflow_path(Path("/missing/templates"), "templates")
-
-    assert resolved == repo_root / "src/qdash/workflow/templates"
-
-
-def test_to_deployment_service_path_maps_host_user_flow_path(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    """to_container_user_flow_path maps a host user-flow path to its container path."""
-    host_user_flows = tmp_path / "src/qdash/workflow/user_flows"
-    flow_path = host_user_flows / "project-1" / "myflow.py"
-    assert to_container_user_flow_path(flow_path, runtime_user_flows_dir=host_user_flows) == Path(
-        "/app/qdash/workflow/user_flows/project-1/myflow.py"
-    )
-
-
-def test_to_deployment_service_path_leaves_unrelated_path_unchanged() -> None:
-    """_to_deployment_service_path leaves an unrelated path unchanged."""
-    file_path = Path("/tmp/myflow.py")
-
-    assert flow_service._to_deployment_service_path(file_path) == file_path
+    assert exc_info.value.status_code == 503
+    assert "System deployment not available" in str(exc_info.value.detail)
 
 
 @pytest.mark.asyncio
-async def test_list_templates_uses_resolved_templates_metadata(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """list_templates returns templates loaded from the resolved templates metadata file."""
-    repo_root = Path(__file__).resolve().parents[4]
-    templates_dir = repo_root / "src/qdash/workflow/templates"
-    monkeypatch.setattr(flow_service, "TEMPLATES_DIR", templates_dir)
-    monkeypatch.setattr(flow_service, "TEMPLATES_METADATA_FILE", templates_dir / "templates.json")
-
-    templates = await FlowService(flow_repository=MagicMock()).list_templates()
-
-    assert any(template.id == "full_calibration" for template in templates)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("template_id", ["coarse_one", "fine_one"])
-async def test_partial_one_qubit_template_is_listed_and_loads_its_flow_code(
-    monkeypatch: pytest.MonkeyPatch,
-    template_id: str,
-) -> None:
-    templates_dir = Path(__file__).resolve().parents[4] / "src/qdash/workflow/templates"
-    monkeypatch.setattr(flow_service, "TEMPLATES_DIR", templates_dir)
-    monkeypatch.setattr(flow_service, "TEMPLATES_METADATA_FILE", templates_dir / "templates.json")
-    service = FlowService(flow_repository=MagicMock())
-
-    templates = await service.list_templates()
-    assert any(template.id == template_id for template in templates)
-    template = await service.get_template(template_id)
-    assert template.function_name == template_id
-    assert template.code == (templates_dir / f"{template_id}.py").read_text(encoding="utf-8")
-
-
-@pytest.mark.parametrize(
-    ("execution_name", "expected_flow_name"),
-    [
-        (None, "re-execute:CheckRabi"),
-        ("agent:CheckRabi", "agent:CheckRabi"),
-    ],
-)
-@pytest.mark.asyncio
-async def test_execute_single_task_uses_requested_execution_name(
-    monkeypatch: pytest.MonkeyPatch,
-    execution_name: str | None,
-    expected_flow_name: str,
-) -> None:
-    """execute_single_task_from_snapshot uses the requested execution name as the flow name."""
-    captured_parameters: list[dict[str, object]] = []
-
-    class FakeClient:
-        """Fake Prefect client that captures flow run creation parameters."""
-
-        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
-            """Return a stub deployment regardless of the requested name."""
-            return SimpleNamespace(id="deployment-1")
-
-        async def create_flow_run_from_deployment(self, **kwargs: object) -> SimpleNamespace:
-            """Record the flow run parameters and return a stub flow run."""
-            parameters = kwargs["parameters"]
-            assert isinstance(parameters, dict)
-            captured_parameters.append(parameters)
-            return SimpleNamespace(id="flow-run-1")
-
-    class FakeClientContext:
-        """Fake async context manager that yields a FakeClient."""
-
-        async def __aenter__(self) -> FakeClient:
-            """Return a new FakeClient instance."""
-            return FakeClient()
-
-        async def __aexit__(self, *_args: object) -> None:
-            """Do nothing on context exit."""
-            return
-
-    monkeypatch.setattr(flow_service, "get_client", FakeClientContext)
-
-    await FlowService(flow_repository=MagicMock()).execute_single_task_from_snapshot(
-        task_name="CheckRabi",
-        qid="Q00",
-        chip_id="chip-1",
-        source_execution_id="execution-1",
-        username="operator",
-        project_id="project-1",
-        execution_name=execution_name,
+async def test_execute_single_task_reports_a_dispatch_failure(tmp_path: Path) -> None:
+    """A failed single-task dispatch is surfaced as a server error."""
+    service = _service(
+        tmp_path,
+        coordinator=_StubCoordinator(dispatch_failure=FlowDispatchError("prefect is down")),
     )
-
-    assert captured_parameters[0]["flow_name"] == expected_flow_name
-    assert captured_parameters[0]["persist_output_parameters"] is True
-
-
-@pytest.mark.asyncio
-async def test_execute_single_task_from_snapshot_creates_scheduled_execution(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """execute_single_task_from_snapshot creates a scheduled execution."""
-    captured_calls: list[dict[str, object]] = []
-
-    def _stub(self: FlowService, **kwargs: object) -> str:
-        """Record the scheduled-execution kwargs and return a fake execution id."""
-        captured_calls.append(kwargs)
-        return "exec-1"
-
-    monkeypatch.setattr(FlowService, "_create_scheduled_execution", _stub)
-    _set_public_origin(monkeypatch, "https://qdash.example.test:8443")
-
-    class FakeClient:
-        """Fake Prefect client that returns stub deployment and flow run objects."""
-
-        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
-            """Return a stub deployment regardless of the requested name."""
-            return SimpleNamespace(id="deployment-1")
-
-        async def create_flow_run_from_deployment(self, **kwargs: object) -> SimpleNamespace:
-            """Return a stub flow run."""
-            return SimpleNamespace(id="flow-run-1")
-
-    class FakeClientContext:
-        """Fake async context manager that yields a FakeClient."""
-
-        async def __aenter__(self) -> FakeClient:
-            """Return a new FakeClient instance."""
-            return FakeClient()
-
-        async def __aexit__(self, *_args: object) -> None:
-            """Do nothing on context exit."""
-            return
-
-    monkeypatch.setattr(flow_service, "get_client", FakeClientContext)
-
-    response = await FlowService(flow_repository=MagicMock()).execute_single_task_from_snapshot(
-        task_name="CheckRabi",
-        qid="Q00",
-        chip_id="chip-1",
-        source_execution_id="execution-1",
-        username="operator",
-        project_id="project-1",
-    )
-
-    assert len(captured_calls) == 1
-    kwargs = captured_calls[0]
-    assert kwargs["chip_id"] == "chip-1"
-    assert kwargs["name"] == "re-execute:CheckRabi"
-    assert kwargs["flow_run_id"] == "flow-run-1"
-    assert kwargs["project_id"] == "project-1"
-    assert kwargs["username"] == "operator"
-    assert response.execution_id == "exec-1"
-    assert response.flow_run_id == "flow-run-1"
-    assert response.flow_run_url == (
-        "https://qdash.example.test:8443/prefect/runs/flow-run/flow-run-1"
-    )
-    assert response.qdash_ui_url == ("https://qdash.example.test:8443/execution/chip-1/exec-1")
-
-
-def _make_fake_flow(
-    *,
-    chip_id: str = "flow-chip",
-    default_parameters: dict[str, object] | None = None,
-    tags: list[str] | None = None,
-) -> SimpleNamespace:
-    """Build a fake flow object with the given chip id, default parameters, and tags."""
-    return SimpleNamespace(
-        deployment_id="deployment-1",
-        default_parameters=default_parameters or {},
-        chip_id=chip_id,
-        tags=tags or [],
-    )
-
-
-class _FakeExecuteFlowClient:
-    """Fake Prefect client that returns a flow run with a fixed id."""
-
-    def __init__(self, flow_run_id: str) -> None:
-        """Store the flow run id to return from create_flow_run_from_deployment."""
-        self._flow_run_id = flow_run_id
-
-    async def create_flow_run_from_deployment(self, **kwargs: object) -> SimpleNamespace:
-        """Return a stub flow run with the stored id."""
-        return SimpleNamespace(id=self._flow_run_id)
-
-
-class _FakeExecuteFlowClientContext:
-    """Fake async context manager that yields a _FakeExecuteFlowClient."""
-
-    def __init__(self, flow_run_id: str) -> None:
-        """Store the flow run id to pass to the fake client."""
-        self._flow_run_id = flow_run_id
-
-    async def __aenter__(self) -> _FakeExecuteFlowClient:
-        """Return a new _FakeExecuteFlowClient instance."""
-        return _FakeExecuteFlowClient(self._flow_run_id)
-
-    async def __aexit__(self, *_args: object) -> None:
-        """Do nothing on context exit."""
-        return
-
-
-@pytest.mark.asyncio
-async def test_execute_flow_resolves_chip_id_from_request_parameters(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """execute_flow uses the chip_id from request parameters over the flow's default chip_id."""
-    captured_calls: list[dict[str, object]] = []
-
-    def _stub(self: FlowService, **kwargs: object) -> str:
-        """Record the scheduled-execution kwargs and return a fake execution id."""
-        captured_calls.append(kwargs)
-        return "exec-1"
-
-    monkeypatch.setattr(FlowService, "_create_scheduled_execution", _stub)
-    _set_public_origin(monkeypatch, "https://qdash.example.test:8443/")
-    monkeypatch.setattr(
-        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-2")
-    )
-
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="fallback-chip")
-
-    response = await FlowService(flow_repository=flow_repo).execute_flow(
-        name="my-flow",
-        request=ExecuteFlowRequest(parameters={"chip_id": "explicit-chip"}),
-        username="operator",
-        project_id="project-1",
-    )
-
-    assert captured_calls[0]["chip_id"] == "explicit-chip"
-    assert captured_calls[0]["flow_run_id"] == "flow-run-2"
-    assert response.execution_id == "exec-1"
-    assert response.flow_run_id == "flow-run-2"
-    assert response.flow_run_url == (
-        "https://qdash.example.test:8443/prefect/runs/flow-run/flow-run-2"
-    )
-    assert response.qdash_ui_url == (
-        "https://qdash.example.test:8443/execution/explicit-chip/exec-1"
-    )
-
-
-@pytest.mark.asyncio
-async def test_execute_flow_falls_back_to_flow_chip_id(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """execute_flow falls back to the flow's chip_id when request parameters omit it."""
-    captured_calls: list[dict[str, object]] = []
-
-    def _stub(self: FlowService, **kwargs: object) -> str:
-        """Record the scheduled-execution kwargs and return a fake execution id."""
-        captured_calls.append(kwargs)
-        return "exec-1"
-
-    monkeypatch.setattr(FlowService, "_create_scheduled_execution", _stub)
-    monkeypatch.setattr(
-        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-3")
-    )
-
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="fallback-chip")
-
-    response = await FlowService(flow_repository=flow_repo).execute_flow(
-        name="my-flow",
-        request=ExecuteFlowRequest(parameters={}),
-        username="operator",
-        project_id="project-1",
-    )
-
-    assert captured_calls[0]["chip_id"] == "fallback-chip"
-    assert captured_calls[0]["flow_run_id"] == "flow-run-3"
-    assert response.execution_id == "exec-1"
-    assert response.flow_run_id == "flow-run-3"
-    assert "flow-run-3" in response.flow_run_url
-    assert response.qdash_ui_url.endswith("/execution/fallback-chip/exec-1")
-
-
-@pytest.mark.asyncio
-async def test_execute_flow_falls_back_to_flow_run_id_when_execution_not_precreated(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """execute_flow falls back to the flow-run id when no execution row could be pre-created."""
-
-    def _stub(self: FlowService, **kwargs: object) -> None:
-        """Simulate a failed scheduled-execution pre-creation."""
-
-    monkeypatch.setattr(FlowService, "_create_scheduled_execution", _stub)
-    _set_public_origin(monkeypatch, "")
-    monkeypatch.setattr(
-        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-4")
-    )
-
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="")
-
-    response = await FlowService(flow_repository=flow_repo).execute_flow(
-        name="my-flow",
-        request=ExecuteFlowRequest(parameters={}),
-        username="operator",
-        project_id="project-1",
-    )
-
-    assert response.execution_id == "flow-run-4"
-    assert response.flow_run_id == "flow-run-4"
-    assert response.flow_run_url == "http://localhost:5714/prefect/runs/flow-run/flow-run-4"
-    assert response.qdash_ui_url == "http://localhost:5714/execution"
-
-
-@pytest.mark.asyncio
-async def test_pipeline_and_operation_urls_use_public_origin(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Pipeline and common operation responses use the same public origin as flow runs."""
-    _set_public_origin(monkeypatch, "https://qdash.example.test:9443/")
-    monkeypatch.setattr(
-        FlowService, "_create_scheduled_execution", lambda self, **_kwargs: "exec-1"
-    )
-
-    class FakeClient:
-        """Fake Prefect client for pipeline and operation dispatch."""
-
-        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
-            """Return a stub system deployment."""
-            return SimpleNamespace(id="deployment-1")
-
-        async def create_flow_run_from_deployment(self, **_kwargs: object) -> SimpleNamespace:
-            """Return a stub flow run."""
-            return SimpleNamespace(id="flow-run-1")
-
-    class FakeClientContext:
-        """Fake async context manager providing the Prefect stub."""
-
-        async def __aenter__(self) -> FakeClient:
-            """Return the fake Prefect client."""
-            return FakeClient()
-
-        async def __aexit__(self, *_args: object) -> None:
-            """Do nothing when the client context exits."""
-
-    monkeypatch.setattr(flow_service, "get_client", FakeClientContext)
-    service = FlowService(flow_repository=MagicMock())
-
-    pipeline_response = await service.execute_calibration_pipeline(
-        spec={"name": "test-pipeline", "steps": []},
-        chip_id="chip-1",
-        username="operator",
-        project_id="project-1",
-    )
-    operation_response = await service.execute_agent_candidate_apply(
-        project_id="project-1",
-        session_id="session-1",
-        commit_id="commit-1",
-        push_to_github=False,
-    )
-
-    expected_flow_run_url = "https://qdash.example.test:9443/prefect/runs/flow-run/flow-run-1"
-    assert pipeline_response.flow_run_url == expected_flow_run_url
-    assert pipeline_response.qdash_ui_url == (
-        "https://qdash.example.test:9443/execution/chip-1/exec-1"
-    )
-    assert operation_response.flow_run_url == expected_flow_run_url
-    assert operation_response.qdash_ui_url == "https://qdash.example.test:9443/"
-
-
-@pytest.mark.asyncio
-async def test_execute_single_task_supports_quick_run_without_snapshot(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    captured_parameters: list[dict[str, object]] = []
-
-    class FakeClient:
-        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
-            return SimpleNamespace(id="deployment-1")
-
-        async def create_flow_run_from_deployment(self, **kwargs: object) -> SimpleNamespace:
-            parameters = kwargs["parameters"]
-            assert isinstance(parameters, dict)
-            captured_parameters.append(parameters)
-            return SimpleNamespace(id="flow-run-1")
-
-    class FakeClientContext:
-        async def __aenter__(self) -> FakeClient:
-            return FakeClient()
-
-        async def __aexit__(self, *_args: object) -> None:
-            return None
-
-    monkeypatch.setattr(flow_service, "get_client", FakeClientContext)
-
-    defaults = {"CheckRabi": {"shots": {"value": 100}}}
-    await FlowService(flow_repository=MagicMock()).execute_single_task_from_snapshot(
-        task_name="CheckRabi",
-        qid="Q00",
-        chip_id="chip-1",
-        source_execution_id=None,
-        username="operator",
-        project_id="project-1",
-        execution_name="quick-run:CheckRabi",
-        backend_name="fake",
-        task_run_parameters=defaults,
-        persist_output_parameters=False,
-        update_params=False,
-    )
-
-    parameters = captured_parameters[0]
-    assert parameters["source_execution_id"] is None
-    assert parameters["backend_name"] == "fake"
-    assert parameters["task_run_parameters"] == defaults
-    assert parameters["persist_output_parameters"] is False
-
-
-def _make_lock_repo(*, locked: bool = False, acquires: bool = True) -> MagicMock:
-    """Build a lock repository stub with the given is_locked and try_lock answers."""
-    repo = MagicMock()
-    repo.is_locked.return_value = locked
-    repo.try_lock.return_value = acquires
-    return repo
-
-
-@pytest.mark.asyncio
-async def test_execute_flow_claims_the_lock_before_creating_the_flow_run(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The lock is taken before Prefect is asked for a flow run, not after."""
-    calls: list[str] = []
-
-    monkeypatch.setattr(
-        flow_service,
-        "generate_execution_id",
-        lambda *_args, **_kwargs: "20240101-001",
-    )
-    monkeypatch.setattr(
-        FlowService, "_create_scheduled_execution", lambda self, **kw: kw["execution_id"]
-    )
-
-    class _RecordingClient:
-        """Fake Prefect client that records when the flow run is created."""
-
-        async def create_flow_run_from_deployment(self, **_kwargs: object) -> SimpleNamespace:
-            """Record the dispatch and return a stub flow run."""
-            calls.append("create_flow_run")
-            return SimpleNamespace(id="flow-run-1")
-
-    class _RecordingClientContext:
-        """Fake async context manager yielding a _RecordingClient."""
-
-        async def __aenter__(self) -> _RecordingClient:
-            """Return a new _RecordingClient."""
-            return _RecordingClient()
-
-        async def __aexit__(self, *_args: object) -> None:
-            """Do nothing on context exit."""
-            return
-
-    monkeypatch.setattr(flow_service, "get_client", _RecordingClientContext)
-
-    def _record_try_lock(**_kwargs: object) -> bool:
-        """Record the claim and report that the lock was acquired."""
-        calls.append("try_lock")
-        return True
-
-    lock_repository = _make_lock_repo()
-    lock_repository.try_lock.side_effect = _record_try_lock
-
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
-
-    response = await FlowService(
-        flow_repository=flow_repo,
-        execution_lock_repository=lock_repository,
-    ).execute_flow(
-        name="my-flow",
-        request=ExecuteFlowRequest(parameters={}),
-        username="operator",
-        project_id="project-1",
-    )
-
-    assert calls == ["try_lock", "create_flow_run"]
-    assert response.execution_id == "20240101-001"
-    lock_repository.try_lock.assert_called_once_with(
-        project_id="project-1",
-        execution_id="20240101-001",
-        chip_id="chip-1",
-        resources=(),
-        exclusive=True,
-    )
-    lock_repository.unlock.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_execute_flow_rejects_when_another_run_holds_the_lock(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A concurrent dispatch that loses the race is rejected with 409."""
-    monkeypatch.setattr(
-        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-002"
-    )
-
-    lock_repository = _make_lock_repo(acquires=False)
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
 
     with pytest.raises(HTTPException) as exc_info:
-        await FlowService(
-            flow_repository=flow_repo,
-            execution_lock_repository=lock_repository,
-        ).execute_flow(
-            name="my-flow",
-            request=ExecuteFlowRequest(parameters={}),
-            username="operator",
-            project_id="project-1",
-        )
-
-    assert exc_info.value.status_code == 409
-
-
-@pytest.mark.asyncio
-async def test_execute_flow_releases_the_lock_when_the_flow_run_cannot_be_created(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A dispatch failure must not leave the project locked."""
-    monkeypatch.setattr(
-        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-003"
-    )
-
-    class _FailingClientContext:
-        """Fake async context manager whose client always fails."""
-
-        async def __aenter__(self) -> SimpleNamespace:
-            """Return a client that raises on flow run creation."""
-
-            async def _raise(**_kwargs: object) -> None:
-                raise RuntimeError("prefect is down")
-
-            return SimpleNamespace(create_flow_run_from_deployment=_raise)
-
-        async def __aexit__(self, *_args: object) -> None:
-            """Do nothing on context exit."""
-            return
-
-    monkeypatch.setattr(flow_service, "get_client", _FailingClientContext)
-
-    lock_repository = _make_lock_repo()
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
-
-    with pytest.raises(HTTPException) as exc_info:
-        await FlowService(
-            flow_repository=flow_repo,
-            execution_lock_repository=lock_repository,
-        ).execute_flow(
-            name="my-flow",
-            request=ExecuteFlowRequest(parameters={}),
-            username="operator",
-            project_id="project-1",
-        )
-
-    assert exc_info.value.status_code == 500
-    lock_repository.unlock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-003"
-    )
-
-
-@pytest.mark.asyncio
-async def test_execute_flow_releases_the_lock_when_the_scheduled_row_cannot_be_saved(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Without a scheduled row the flow cannot adopt the lock, so it is released."""
-    monkeypatch.setattr(
-        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-004"
-    )
-    monkeypatch.setattr(FlowService, "_create_scheduled_execution", lambda self, **_kwargs: None)
-    monkeypatch.setattr(
-        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-4")
-    )
-
-    lock_repository = _make_lock_repo()
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
-
-    response = await FlowService(
-        flow_repository=flow_repo,
-        execution_lock_repository=lock_repository,
-    ).execute_flow(
-        name="my-flow",
-        request=ExecuteFlowRequest(parameters={}),
-        username="operator",
-        project_id="project-1",
-    )
-
-    assert response.execution_id == "flow-run-4"
-    lock_repository.unlock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-004"
-    )
-
-
-@pytest.mark.asyncio
-async def test_execute_flow_skips_the_claim_when_no_chip_id_can_be_resolved(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """With no chip there is no execution ID to own the lock, so the flow takes it."""
-    monkeypatch.setattr(FlowService, "_create_scheduled_execution", lambda self, **_kwargs: None)
-    monkeypatch.setattr(
-        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-5")
-    )
-
-    lock_repository = _make_lock_repo()
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="")
-
-    response = await FlowService(
-        flow_repository=flow_repo,
-        execution_lock_repository=lock_repository,
-    ).execute_flow(
-        name="my-flow",
-        request=ExecuteFlowRequest(parameters={}),
-        username="operator",
-        project_id="project-1",
-    )
-
-    assert response.flow_run_id == "flow-run-5"
-    lock_repository.try_lock.assert_not_called()
-    lock_repository.unlock.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_execute_single_task_claims_the_lock(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Single-task execution claims the lock the same way as a full flow."""
-    monkeypatch.setattr(
-        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-007"
-    )
-    monkeypatch.setattr(
-        FlowService, "_create_scheduled_execution", lambda self, **kw: kw["execution_id"]
-    )
-
-    class _FakeClient:
-        """Fake Prefect client returning a stub deployment and flow run."""
-
-        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
-            """Return a stub deployment."""
-            return SimpleNamespace(id="deployment-1")
-
-        async def create_flow_run_from_deployment(self, **_kwargs: object) -> SimpleNamespace:
-            """Return a stub flow run."""
-            return SimpleNamespace(id="flow-run-7")
-
-    class _FakeClientContext:
-        """Fake async context manager yielding a _FakeClient."""
-
-        async def __aenter__(self) -> _FakeClient:
-            """Return a new _FakeClient."""
-            return _FakeClient()
-
-        async def __aexit__(self, *_args: object) -> None:
-            """Do nothing on context exit."""
-            return
-
-    monkeypatch.setattr(flow_service, "get_client", _FakeClientContext)
-
-    lock_repository = _make_lock_repo()
-
-    response = await FlowService(
-        flow_repository=MagicMock(),
-        execution_lock_repository=lock_repository,
-    ).execute_single_task_from_snapshot(
-        task_name="CheckRabi",
-        qid="Q00",
-        chip_id="chip-1",
-        source_execution_id=None,
-        username="operator",
-        project_id="project-1",
-    )
-
-    assert response.execution_id == "20240101-007"
-    lock_repository.try_lock.assert_called_once_with(
-        project_id="project-1",
-        execution_id="20240101-007",
-        chip_id="chip-1",
-        resources=(),
-        exclusive=True,
-    )
-
-
-@pytest.mark.asyncio
-async def test_execute_single_task_releases_the_lock_when_the_flow_run_cannot_be_created(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A single-task dispatch failure must not leave the project locked."""
-    monkeypatch.setattr(
-        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-011"
-    )
-
-    class _FailingClient:
-        """Fake Prefect client that resolves the deployment but fails to dispatch."""
-
-        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
-            """Return a stub deployment."""
-            return SimpleNamespace(id="deployment-1")
-
-        async def create_flow_run_from_deployment(self, **_kwargs: object) -> SimpleNamespace:
-            """Raise to simulate a Prefect dispatch failure."""
-            raise RuntimeError("prefect is down")
-
-    class _FailingClientContext:
-        """Fake async context manager yielding a _FailingClient."""
-
-        async def __aenter__(self) -> _FailingClient:
-            """Return a new _FailingClient."""
-            return _FailingClient()
-
-        async def __aexit__(self, *_args: object) -> None:
-            """Do nothing on context exit."""
-            return
-
-    monkeypatch.setattr(flow_service, "get_client", _FailingClientContext)
-
-    lock_repository = _make_lock_repo()
-
-    with pytest.raises(HTTPException) as exc_info:
-        await FlowService(
-            flow_repository=MagicMock(),
-            execution_lock_repository=lock_repository,
-        ).execute_single_task_from_snapshot(
+        await service.execute_single_task_from_snapshot(
             task_name="CheckRabi",
             qid="Q00",
             chip_id="chip-1",
-            source_execution_id=None,
+            source_execution_id="execution-1",
             username="operator",
             project_id="project-1",
         )
 
     assert exc_info.value.status_code == 500
-    lock_repository.unlock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-011"
-    )
+    assert exc_info.value.detail == "Failed to execute single task: prefect is down"
 
 
 @pytest.mark.asyncio
-async def test_execute_single_task_releases_the_lock_when_the_scheduled_row_cannot_be_saved(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Without a scheduled row the single-task flow cannot adopt the lock, so it is released."""
-    monkeypatch.setattr(
-        flow_service, "generate_execution_id", lambda *_args, **_kwargs: "20240101-012"
-    )
-    monkeypatch.setattr(FlowService, "_create_scheduled_execution", lambda self, **_kwargs: None)
+async def test_execute_calibration_pipeline_adds_the_pipeline_tag(tmp_path: Path) -> None:
+    """Pipeline runs merge their own tags, request tags and the pipeline marker."""
+    coordinator = _StubCoordinator()
+    service = _service(tmp_path, coordinator=coordinator)
+    spec = {"name": "pipe", "steps": [{"task": "CheckRabi"}], "tags": ["auto"]}
 
-    class _FakeClient:
-        """Fake Prefect client returning a stub deployment and flow run."""
-
-        async def read_deployment_by_name(self, _name: str) -> SimpleNamespace:
-            """Return a stub deployment."""
-            return SimpleNamespace(id="deployment-1")
-
-        async def create_flow_run_from_deployment(self, **_kwargs: object) -> SimpleNamespace:
-            """Return a stub flow run."""
-            return SimpleNamespace(id="flow-run-9")
-
-    class _FakeClientContext:
-        """Fake async context manager yielding a _FakeClient."""
-
-        async def __aenter__(self) -> _FakeClient:
-            """Return a new _FakeClient."""
-            return _FakeClient()
-
-        async def __aexit__(self, *_args: object) -> None:
-            """Do nothing on context exit."""
-            return
-
-    monkeypatch.setattr(flow_service, "get_client", _FakeClientContext)
-
-    lock_repository = _make_lock_repo()
-
-    response = await FlowService(
-        flow_repository=MagicMock(),
-        execution_lock_repository=lock_repository,
-    ).execute_single_task_from_snapshot(
-        task_name="CheckRabi",
-        qid="Q00",
+    response = await service.execute_calibration_pipeline(
+        spec=spec,
         chip_id="chip-1",
-        source_execution_id=None,
         username="operator",
         project_id="project-1",
+        tags=["manual"],
     )
 
-    assert response.execution_id == "flow-run-9"
-    lock_repository.unlock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-012"
+    call = coordinator.run_calls[0]
+    assert call["name"] == "pipe"
+    assert call["tags"] == ["auto", "manual", "pipeline"]
+    assert call["parameters"]["spec"] == spec
+    assert call["workflow"] is True
+    assert response.message == "Calibration pipeline 'pipe' started"
+
+
+@pytest.mark.asyncio
+async def test_execute_calibration_pipeline_reports_a_dispatch_failure(tmp_path: Path) -> None:
+    """A failed pipeline dispatch is surfaced as a server error."""
+    service = _service(
+        tmp_path,
+        coordinator=_StubCoordinator(dispatch_failure=FlowDispatchError("prefect is down")),
     )
 
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_calibration_pipeline(
+            spec={"name": "pipe", "steps": []},
+            chip_id="chip-1",
+            username="operator",
+            project_id="project-1",
+        )
 
-def test_release_execution_lock_survives_a_failing_unlock() -> None:
-    """_release_execution_lock logs and swallows an unlock failure."""
-    lock_repository = _make_lock_repo()
-    lock_repository.unlock.side_effect = RuntimeError("mongo is down")
-
-    FlowService(
-        flow_repository=MagicMock(),
-        execution_lock_repository=lock_repository,
-    )._release_execution_lock("project-1", "20240101-008")
-
-    lock_repository.unlock.assert_called_once_with(
-        project_id="project-1", execution_id="20240101-008"
-    )
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to execute calibration pipeline: prefect is down"
 
 
-def test_workflow_availability_is_chip_exclusive_despite_target_overrides(
+@pytest.mark.asyncio
+async def test_execute_agent_candidate_apply_dispatches_in_the_background(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from qdash.api.schemas.execution import ExecutionAvailabilityRequest
-    from qdash.common.execution_resources import ExecutionResourceScope
+    """Applying a candidate commit owns no lock and no execution row."""
+    monkeypatch.setattr(flow_service_module, "get_settings", _public_settings)
+    coordinator = _StubCoordinator(flow_run_id="flow-run-7")
+    service = _service(tmp_path, coordinator=coordinator)
 
-    flow_repo = MagicMock()
-    flow_repo.find_by_project_and_name.return_value = SimpleNamespace(
-        chip_id="fallback-chip", default_parameters={"mux_ids": [0], "qids": ["4"]}
+    response = await service.execute_agent_candidate_apply(
+        project_id="project-1",
+        session_id="session-1",
+        commit_id="commit-1",
+        push_to_github=True,
     )
-    lock_repo = MagicMock()
-    lock_repo.has_conflict.return_value = True
-    scope = ExecutionResourceScope("selected-chip", ("mux:1",))
-    resolve = MagicMock(return_value=scope)
-    monkeypatch.setattr(flow_service, "resolve_execution_resource_scope", resolve)
-    service = FlowService(flow_repo, lock_repo)
+
+    assert coordinator.run_calls == []
+    assert coordinator.background_calls[0]["parameters"] == {
+        "project_id": "project-1",
+        "session_id": "session-1",
+        "commit_id": "commit-1",
+        "push_to_github": True,
+    }
+    assert response.execution_id == "flow-run-7"
+    assert response.flow_run_id == "flow-run-7"
+    assert (
+        response.flow_run_url == "https://qdash.example.test:9443/prefect/runs/flow-run/flow-run-7"
+    )
+    assert response.qdash_ui_url == "https://qdash.example.test:9443/"
+
+
+@pytest.mark.asyncio
+async def test_execute_agent_candidate_apply_reports_a_dispatch_failure(
+    tmp_path: Path,
+) -> None:
+    """A failed background dispatch is surfaced as a server error."""
+    service = _service(
+        tmp_path,
+        coordinator=_StubCoordinator(background_failure=FlowDispatchError("prefect is down")),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_agent_candidate_apply(
+            project_id="project-1",
+            session_id="session-1",
+            commit_id="commit-1",
+            push_to_github=False,
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to dispatch agent candidate apply: prefect is down"
+
+
+def test_check_execution_availability_delegates_the_conflict_decision(tmp_path: Path) -> None:
+    """Availability merges saved defaults and asks the coordinator about the scope."""
+    repo = _FakeFlowRepository(
+        flow=_make_flow(Path("/tmp/my_flow.py"), default_parameters={"mux_ids": [0]})
+    )
+    coordinator = _StubCoordinator(available=(False, "busy"))
+    service = _service(tmp_path, repo=repo, coordinator=coordinator)
+
     result = service.check_execution_availability(
-        ExecutionAvailabilityRequest(
-            flow_name="my-flow", parameters={"chip_id": "selected-chip", "mux_ids": [1]}
-        ),
+        ExecutionAvailabilityRequest(flow_name="my_flow", parameters={"chip_id": "chip-9"}),
         "project-1",
     )
-    assert not result.available
-    assert result.reason and "entire chip" in result.reason
-    flow_repo.find_by_project_and_name.assert_called_once_with("project-1", "my-flow")
-    resolve.assert_not_called()
-    lock_repo.has_conflict.assert_called_once_with(
-        "project-1", ExecutionResourceScope("selected-chip", exclusive=True)
-    )
-    lock_repo.try_lock.assert_not_called()
+
+    assert result.available is False
+    assert result.reason == "busy"
+    assert coordinator.availability_calls == [
+        {
+            "project_id": "project-1",
+            "chip_id": "chip-9",
+            "parameters": {"mux_ids": [0], "chip_id": "chip-9"},
+            "workflow": True,
+        }
+    ]
 
 
-def test_availability_rejects_missing_flow() -> None:
-    from qdash.api.schemas.execution import ExecutionAvailabilityRequest
-
-    repo = MagicMock()
-    repo.find_by_project_and_name.return_value = None
+def test_availability_rejects_missing_flow(tmp_path: Path) -> None:
+    """Availability for an unknown flow is reported as not found."""
     with pytest.raises(HTTPException) as error:
-        FlowService(repo, MagicMock()).check_execution_availability(
-            ExecutionAvailabilityRequest(flow_name="missing"), "project-1"
+        _service(tmp_path).check_execution_availability(
+            ExecutionAvailabilityRequest(flow_name="missing"),
+            "project-1",
         )
+
     assert error.value.status_code == 404
 
 
-def test_workflow_dispatch_reserves_whole_chip_while_single_task_stays_scoped(
+def test_check_execution_availability_asks_for_a_chip_when_none_resolves(
+    tmp_path: Path,
+) -> None:
+    """Without a chip there is no scope to check, so the request is refused early."""
+    repo = _FakeFlowRepository(flow=_make_flow(Path("/tmp/my_flow.py"), chip_id=""))
+    coordinator = _StubCoordinator()
+    service = _service(tmp_path, repo=repo, coordinator=coordinator)
+
+    result = service.check_execution_availability(
+        ExecutionAvailabilityRequest(flow_name="my_flow"),
+        "project-1",
+    )
+
+    assert result.available is False
+    assert result.reason == "Select a chip to check execution availability."
+    assert coordinator.availability_calls == []
+
+
+@pytest.mark.asyncio
+async def test_template_accessors_delegate_to_the_catalog() -> None:
+    """Templates and helper files are served from the shipped workflow tree."""
+    service = FlowService(
+        flow_repository=cast("MongoFlowRepository", _FakeFlowRepository()),
+    )
+
+    templates = await service.list_templates()
+    helpers = await service.list_helper_files()
+
+    assert any(template.id == "full_calibration" for template in templates)
+    assert "__init__.py" in helpers
+    assert await service.get_helper_file("__init__.py") is not None
+    assert (await service.get_template("full_calibration")).code
+
+
+@pytest.mark.asyncio
+async def test_save_flow_restores_old_source_when_update_metadata_fails(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from qdash.common.execution_resources import ExecutionResourceScope
+    """On update, a failed metadata write restores the previous source."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text(FLOW_CODE, encoding="utf-8")
+    repo = _FakeFlowRepository(flow=_make_flow(file_path))
+    repo.update_failure = RuntimeError("mongo is down")
+    service = _service(tmp_path, repo=repo)
 
-    scope = ExecutionResourceScope("chip-1", ("mux:0",), False)
-    monkeypatch.setattr(flow_service, "resolve_execution_resource_scope", lambda *args: scope)
-    monkeypatch.setattr(flow_service, "generate_execution_id", lambda *args, **kwargs: "owner")
-    lock_repo = MagicMock()
-    lock_repo.try_lock.return_value = True
-    service = FlowService(MagicMock(), lock_repo)
-    for workflow in (True, False):
-        service._claim_execution_lock(
-            project_id="project-1",
-            username="alice",
-            chip_id="chip-1",
-            parameters={"qid": "0"},
-            workflow=workflow,
-        )
-        lock_repo.try_lock.assert_called_with(
-            project_id="project-1",
-            execution_id="owner",
-            chip_id="chip-1",
-            resources=() if workflow else ("mux:0",),
-            exclusive=workflow,
-        )
-
-
-@pytest.mark.parametrize(
-    ("folder", "expected"),
-    [
-        ("", ""),
-        ("   ", ""),
-        ("daily", "daily"),
-        ("/daily/t1/", "daily/t1"),
-        (" daily/t1 ", "daily/t1"),
-    ],
-)
-def test_normalize_folder_canonicalizes_valid_paths(folder: str, expected: str) -> None:
-    assert FlowService._normalize_folder(folder) == expected
-
-
-@pytest.mark.parametrize("folder", ["daily//t1", "../t1", "daily t1", "daily/t1.py"])
-def test_normalize_folder_rejects_bad_segments(folder: str) -> None:
+    new_code = FLOW_CODE + "\n# updated\n"
     with pytest.raises(HTTPException) as exc_info:
-        FlowService._normalize_folder(folder)
-    assert exc_info.value.status_code == 400
+        await service.save_flow(
+            SaveFlowRequest(name="my_flow", code=new_code, chip_id="chip-1"),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to save flow metadata: mongo is down"
+    assert file_path.exists()
+    assert file_path.read_text(encoding="utf-8") == FLOW_CODE
 
 
-def test_save_request_distinguishes_an_omitted_folder_from_the_root() -> None:
-    from qdash.api.schemas.flow import SaveFlowRequest
+@pytest.mark.asyncio
+async def test_save_flow_restores_old_source_when_update_registration_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """On update, a failed registration restores the previous source."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text(FLOW_CODE, encoding="utf-8")
+    repo = _FakeFlowRepository(flow=_make_flow(file_path))
+    service = _service(
+        tmp_path,
+        repo=repo,
+        deployment=_StubDeploymentClient(
+            failure=DeploymentRegistrationError("500: worker is down")
+        ),
+    )
 
-    assert SaveFlowRequest(name="f", code="", chip_id="c").folder is None
-    assert SaveFlowRequest(name="f", code="", chip_id="c", folder="").folder == ""
+    new_code = FLOW_CODE + "\n# updated\n"
+    with pytest.raises(HTTPException) as exc_info:
+        await service.save_flow(
+            SaveFlowRequest(name="my_flow", code=new_code, chip_id="chip-1"),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Failed to register deployment: 500: worker is down"
+    assert file_path.exists()
+    assert file_path.read_text(encoding="utf-8") == FLOW_CODE
+    assert repo.updated == []

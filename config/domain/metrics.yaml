@@ -251,6 +251,14 @@ qubit_metrics:
     evaluation:
       mode: minimize
 
+  quantum_efficiency:
+    title: Quantum Efficiency
+    unit: "%"
+    scale: 100
+    description: Readout-chain quantum measurement efficiency
+    evaluation:
+      mode: maximize
+
   purcell_filter_frequency:
     title: Purcell Filter Frequency
     unit: GHz
