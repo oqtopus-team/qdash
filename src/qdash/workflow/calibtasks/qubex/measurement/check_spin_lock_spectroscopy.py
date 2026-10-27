@@ -243,7 +243,6 @@ class CheckSpinLockSpectroscopy(QubexTask):
                 t2_echo=t2_echo_ns,
                 n_shots=self.run_parameters["shots"].get_value(),
                 shot_interval=self.run_parameters["interval"].get_value(),
-                enable_tqdm=True,
                 plot=False,
                 save_image=False,
             )

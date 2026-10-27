@@ -30,6 +30,9 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
 )
 from qdash.workflow.calibtasks.qubex.cw.check_waveform import CheckWaveform
 from qdash.workflow.calibtasks.qubex.measurement.check_ckp import CheckCKP
+from qdash.workflow.calibtasks.qubex.measurement.check_cpmg_noise_spectroscopy import (
+    CheckCPMGNoiseSpectroscopy,
+)
 from qdash.workflow.calibtasks.qubex.measurement.check_quantum_efficiency import (
     CheckQuantumEfficiency,
 )
@@ -99,6 +102,7 @@ __all__ = [
     "CheckBellState",
     "CheckBellStateTomography",
     "CheckCKP",
+    "CheckCPMGNoiseSpectroscopy",
     "CheckChevron",
     "CheckCoarseReadoutParams",
     "CheckControlAmplitude",
