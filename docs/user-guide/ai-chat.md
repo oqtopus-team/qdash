@@ -66,8 +66,8 @@ settings; the application's part is edited in the deployment, not in Settings.
 
 ### Run a calibration pipeline from chat
 
-When an operator enables write tools, the assistant can compose a calibration from QDash's step
-catalog and run it as one execution. Ask for
+The assistant can compose a calibration from QDash's step catalog and run it as one execution
+with your approval and project permissions. Ask for
 the calibration in plain terms, for example "run the coarse one-qubit check on Q00 and Q01, then
 measure T1 and T2 on the ones that pass". The assistant reads the available step types and tasks,
 validates its plan with QDash, and shows an approval card listing the targets, the steps, and the

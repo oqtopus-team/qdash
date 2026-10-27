@@ -237,9 +237,9 @@ in production to the packages listed in `TRUSTED_EXTENSION_PACKAGES` (for exampl
 pi-qdash in `agent-runtime/Dockerfile`; a package is added to that list only after
 review, and the version pin is the release gate.
 
-- An experimental write name (`EXPERIMENTAL_WRITE_TOOL_NAMES`) still needs
-  `AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true`, and then goes through the same
-  approval card as the pinned tool.
+- Reviewed write names (`REVIEWED_WRITE_TOOL_NAMES`) are available by default and go through
+  the same approval card as the pinned tool. Each operation runs only after the user approves
+  its arguments, using that user's credentials and project permissions.
 - A checkout tool is rerun after an interrupted turn only when its pi
   `annotations.readOnlyHint` is `true`; other local tools are reported to the
   model as interrupted instead, so a side-effecting tool never runs twice.

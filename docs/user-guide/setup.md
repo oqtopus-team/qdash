@@ -63,8 +63,10 @@ Set the `OPENAI_COMPATIBLE_BASE_URL_CHAT` and `OPENAI_COMPATIBLE_API_KEY_CHAT` p
 for chat, and the corresponding `EVALUATION` pair for figure analysis. Base URLs must include
 `/v1`. Select models in `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml`.
 
-Set `AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true` only in a trusted experimental deployment. QDash still
-requires the signed-in user to approve each proposed write in the chat.
+Copilot can propose supported write operations without an extra enable setting. The signed-in
+user must approve each proposed write in the chat, and their project permissions still apply.
+The retired `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` variable has no effect and can be removed from
+existing `.env` files.
 
 #### Authenticate AI endpoints with Cloudflare Access
 
