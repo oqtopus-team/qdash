@@ -308,6 +308,49 @@ def test_extract_raw_data_round_trips_reanalysis_payload(tmp_path: Any) -> None:
     assert loaded.metadata["pi_pulse_pattern"] == "+--+"
 
 
+def test_extract_raw_data_preserves_every_repeat(tmp_path: Any) -> None:
+    """Selecting the sole target must not discard the repeat axis."""
+    raw_result = _result()
+    data = raw_result.data
+    t2 = np.array([[[40_000.0, np.nan], [50_000.0, 60_000.0]]])
+    gamma2 = 1.0 / t2
+    data.update(
+        {
+            "n_repeats": 2,
+            "t2_matrix": t2,
+            "t2_error_matrix": np.full_like(t2, 500.0),
+            "gamma2_matrix": gamma2,
+            "gamma2_error_matrix": np.full_like(gamma2, 1e-6),
+            "r2_matrix": np.array([[[0.98, np.nan], [0.97, 0.96]]]),
+            "acquisition_orders": [[[1, 0], [0, 1]]],
+        }
+    )
+    data["fit_records"].append(
+        {
+            "target": "Q00",
+            "repeat_index": 1,
+            "requested_frequency_index": 0,
+            "fit_status": "ok",
+            "quality_flags": [],
+            "n_pi_values": [16, 24, 40],
+            "actual_decay_times_ns": [8_000.0, 12_000.0, 20_000.0],
+            "P_values": [0.82, 0.72, 0.58],
+        }
+    )
+
+    artifact = _task().extract_raw_data(RunResult(raw_result=raw_result))[0]
+    path = tmp_path / "cpmg_noise_spectroscopy_repeats.nc"
+    artifact.save_netcdf(path)
+    loaded = CPMGNoiseSpectroscopyData.load_netcdf(path)
+
+    assert loaded.n_repeats == 2
+    assert loaded.t2_matrix.shape == (2, 2)
+    np.testing.assert_allclose(loaded.t2_matrix[1], [50_000.0, 60_000.0])
+    np.testing.assert_allclose(loaded.gamma2_matrix[1], 1.0 / np.array([50_000.0, 60_000.0]))
+    np.testing.assert_array_equal(loaded.acquisition_orders, [[1, 0], [0, 1]])
+    assert loaded.fit_records[-1]["repeat_index"] == 1
+
+
 def test_task_defaults_dependencies_and_registration() -> None:
     """The task should expose only agreed run options and optional DRAG inputs."""
     import qdash.workflow.calibtasks.qubex  # noqa: F401

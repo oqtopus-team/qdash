@@ -172,7 +172,7 @@ def test_run_filters_unreachable_frequencies_and_uses_fallback_durations(
     assert "min_b0" not in kwargs
     assert kwargs["plot"] is False
     assert kwargs["save_image"] is False
-    assert kwargs["enable_tqdm"] is True
+    assert "enable_tqdm" not in kwargs
     assert experiment.modified_frequency_calls == [{"Q00": 5.0, "RQ00": 6.1}]
     assert experiment.params.control_amplitude["Q00"] == 0.02
     assert experiment.pulse.control_amplitudes_seen == [0.02, 0.02, 0.02]
