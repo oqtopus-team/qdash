@@ -13,6 +13,7 @@ import {
   useListChipSystems,
   useListChips,
 } from "@/client/chip/chip";
+import { useGetConfigRepositoryStatus } from "@/client/config-repository/config-repository";
 import { useListCooldowns } from "@/client/cooldown/cooldown";
 import { useListTopologies } from "@/client/topology/topology";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
@@ -49,7 +50,7 @@ const createChipSchema = z.object({
   cooldownId: z.string(),
   inheritFrom: z.string(),
   backend: z.string(),
-  provision: z.enum(["auto", "on", "off"]),
+  registerOnly: z.boolean(),
 });
 
 type CreateChipFormData = z.infer<typeof createChipSchema>;
@@ -104,13 +105,20 @@ export function CreateChipModal({
       cooldownId: defaultCooldownId ?? "",
       inheritFrom: "",
       backend: "",
-      provision: "auto",
+      registerOnly: false,
     },
   });
   const selectedTopologyId = watch("topologyId");
   const cooldownId = watch("cooldownId");
   const inheritFrom = watch("inheritFrom");
   const backend = watch("backend");
+  const registerOnly = watch("registerOnly");
+  const {
+    data: repositoryStatus,
+    isPending: isCheckingConfiguration,
+    isError: configurationError,
+  } = useGetConfigRepositoryStatus({ query: { enabled: isOpen } });
+  const configurationLayout = repositoryStatus?.data?.layout;
 
   // Fetch available topologies
   const { data: topologiesData, isLoading: isLoadingTopologies } = useListTopologies(undefined, {
@@ -244,7 +252,7 @@ export function CreateChipModal({
         cooldown_id: data.cooldownId || undefined,
         inherit_wiring_from: data.inheritFrom || undefined,
         backend: data.backend || undefined,
-        provision_config: data.provision === "auto" ? undefined : data.provision === "on",
+        provision_config: data.registerOnly ? false : undefined,
       },
     });
   };
@@ -434,24 +442,42 @@ export function CreateChipModal({
                   ))}
                 </select>
               </div>
-
-              {/* Configuration generation */}
-              <div className="form-control">
-                <label className="label" htmlFor="chip-provision-select">
-                  <span className="label-text">Generate configuration files</span>
-                </label>
-                <select
-                  id="chip-provision-select"
-                  className="select select-bordered w-full"
-                  disabled={pending}
-                  {...register("provision")}
-                >
-                  <option value="auto">Auto (shared layout only)</option>
-                  <option value="on">Always</option>
-                  <option value="off">Never (database record only)</option>
-                </select>
-              </div>
             </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Measurement configuration</p>
+              <p className="text-sm text-base-content/70" role="status">
+                {registerOnly
+                  ? "Only the chip information will be registered. Prepare measurement configuration files separately before calibration."
+                  : isCheckingConfiguration
+                    ? "Checking whether measurement configuration files can be created automatically..."
+                    : configurationError || !configurationLayout
+                      ? "Automatic configuration availability could not be confirmed. QDash will create measurement configuration files if supported; otherwise, prepare them separately before calibration."
+                      : configurationLayout === "shared"
+                        ? "Measurement configuration files will be created automatically. Review the wiring and settings before calibration."
+                        : "Only the chip information will be registered in this environment. Prepare measurement configuration files separately before calibration."}
+              </p>
+            </div>
+
+            <details className="collapse collapse-arrow border border-base-300">
+              <summary className="collapse-title text-sm font-medium">Advanced settings</summary>
+              <div className="collapse-content">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm"
+                    disabled={pending}
+                    aria-describedby="chip-register-only-help"
+                    {...register("registerOnly")}
+                  />
+                  <span className="text-sm">Register chip information only</span>
+                </label>
+                <p id="chip-register-only-help" className="mt-2 text-sm text-base-content/60">
+                  Skip automatic configuration creation if you will prepare the measurement
+                  configuration files yourself.
+                </p>
+              </div>
+            </details>
 
             {/* Error Message */}
             {serverError && (

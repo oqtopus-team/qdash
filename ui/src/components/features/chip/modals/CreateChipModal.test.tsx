@@ -8,6 +8,9 @@ import {
 
 const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
+  layout: "shared" as string | null,
+  configurationPending: false,
+  configurationError: false,
   onSuccess: undefined as ((data: unknown) => void) | undefined,
   systems: [] as Array<{ system_id: string; backend: string; is_default: boolean }>,
 }));
@@ -25,6 +28,14 @@ vi.mock("@/client/chip/chip", () => ({
   useListChips: () => ({ data: { data: { chips: [{ chip_id: "64Qv3" }, { chip_id: "64Qv2" }] } } }),
   useListChipSystems: (chipId: string) => ({
     data: chipId ? { data: { systems: mocks.systems } } : undefined,
+  }),
+}));
+
+vi.mock("@/client/config-repository/config-repository", () => ({
+  useGetConfigRepositoryStatus: () => ({
+    data: { data: { layout: mocks.layout } },
+    isPending: mocks.configurationPending,
+    isError: mocks.configurationError,
   }),
 }));
 
@@ -83,6 +94,9 @@ describe("CreateChipModal", () => {
     cleanup();
     mocks.mutate.mockReset();
     mocks.systems = [];
+    mocks.layout = "shared";
+    mocks.configurationPending = false;
+    mocks.configurationError = false;
   });
 
   it("validates the chip ID inline", async () => {
@@ -133,9 +147,6 @@ describe("CreateChipModal", () => {
     fireEvent.change(screen.getByPlaceholderText("e.g., 64Q, Chip001"), {
       target: { value: "64Qv4" },
     });
-    fireEvent.change(screen.getByLabelText("Generate configuration files"), {
-      target: { value: "on" },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Create Chip" }));
 
     await waitFor(() =>
@@ -145,8 +156,46 @@ describe("CreateChipModal", () => {
           cooldown_id: "cd-2",
           inherit_wiring_from: "64Qv2",
           backend: "quel3",
-          provision_config: true,
+          provision_config: undefined,
         }),
+      }),
+    );
+  });
+
+  it("explains automatic configuration without exposing layout choices", () => {
+    render(<CreateChipModal isOpen onClose={vi.fn()} />);
+    expect(screen.getByRole("status").textContent).toContain("will be created automatically");
+    expect(screen.queryByLabelText("Generate configuration files")).toBeNull();
+    expect(screen.getByText("Advanced settings").closest("details")?.open).toBe(false);
+  });
+
+  it("explains when configuration must be prepared separately", () => {
+    mocks.layout = "legacy";
+    render(<CreateChipModal isOpen onClose={vi.fn()} />);
+    expect(screen.getByRole("status").textContent).toContain("in this environment");
+    expect(screen.getByRole("status").textContent).toContain("Prepare measurement configuration");
+  });
+
+  it.each(["loading", "error", "unknown"])("handles %s configuration availability", (state) => {
+    mocks.layout = null;
+    mocks.configurationPending = state === "loading";
+    mocks.configurationError = state === "error";
+    render(<CreateChipModal isOpen onClose={vi.fn()} />);
+    expect(screen.getByRole("status").textContent).toContain(
+      state === "loading" ? "Checking whether" : "could not be confirmed",
+    );
+  });
+
+  it("can skip configuration creation from advanced settings", async () => {
+    render(<CreateChipModal isOpen onClose={vi.fn()} />);
+    fireEvent.click(screen.getByText("Advanced settings"));
+    fireEvent.click(screen.getByLabelText("Register chip information only"));
+    expect(screen.getByRole("status").textContent).toContain("Only the chip information");
+    fireEvent.change(screen.getByLabelText("Chip ID"), { target: { value: "chip-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Chip" }));
+    await waitFor(() =>
+      expect(mocks.mutate).toHaveBeenCalledWith({
+        data: expect.objectContaining({ provision_config: false }),
       }),
     );
   });

@@ -25,9 +25,10 @@ without editing YAML by hand.
    wiring rows.
 6. The **Backend** follows the inherited chip's default System; pick `quel1` or `quel3` to
    override it.
-7. Leave **Generate configuration files** on **Auto** to write the files in the shared layout and
-   skip them in the legacy layout. **Always** refuses to create the chip in the legacy layout;
-   **Never** creates only the database record.
+7. Review **Measurement configuration**. QDash automatically creates the measurement settings
+   when supported. If the environment cannot create them, the message explains that you need to
+   prepare them separately before calibration. To skip automatic creation, open **Advanced
+   settings** and select **Register chip information only**.
 8. Select **Create Chip**.
 
 The dialog then shows the Systems created, where the wiring came from, the repository outcome
