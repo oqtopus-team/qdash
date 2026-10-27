@@ -75,7 +75,7 @@ Readers that want the whole run use that field rather than the first execution's
 | `src/qdash/workflow/register_system_flows.py` | Registers `system-calibration-pipeline` on worker startup |
 | `src/qdash/api/services/calibration_pipeline_service.py` | Chip, backend, task-type, and run-parameter checks; the catalog |
 | `src/qdash/api/services/calibration_pipeline_preflight.py` | The preflight checks: run-parameter types, the session readout duration, required inputs, and the Rabi readout duration |
-| `src/qdash/api/services/flow_service.py` | `execute_calibration_pipeline`: lock claim, Prefect run, execution row |
+| `src/qdash/api/services/flow_service/` | `execute_calibration_pipeline` in `service.py`; lock claim, Prefect run and execution row in `execution.py` |
 | `src/qdash/api/routers/calibration_pipeline.py` | The three endpoints |
 
 `STEP_CATALOG` restates each Step class's `requires` and `provides`; `tests/qdash/workflow/service/test_pipeline_flow.py` asserts the two agree, so adding a Step means adding a spec model, a catalog entry, a `build_step` branch, and an entry in that test's `EVERY_STEP` list. The default task lists moved to the datamodel module for the same reason; `qdash.workflow.service.tasks` re-exports them.

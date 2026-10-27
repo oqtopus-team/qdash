@@ -13,6 +13,7 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 import httpx
@@ -164,8 +165,10 @@ class QDashAuth:
 def _runtime_headers() -> dict[str, str]:
     """Return the internal runtime credential, failing closed when it is absent."""
     token = os.environ.get("AGENT_RUNTIME_TOKEN")
+    if not token and (token_file := os.environ.get("AGENT_RUNTIME_TOKEN_FILE")):
+        token = Path(token_file).read_text().strip()
     if not token:
-        msg = "AGENT_RUNTIME_TOKEN is required for the Pi Agent Runtime"
+        msg = "Pi Agent Runtime credential is unavailable"
         raise RuntimeError(msg)
     return {"Authorization": f"Bearer {token}"}
 

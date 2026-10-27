@@ -193,6 +193,7 @@ services:
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - api-logs:/app/logs
+      - agent-runtime-auth:/run/agent-runtime-auth:ro
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
     develop:
@@ -209,6 +210,8 @@ services:
         condition: service_started
       calibration-migration:
         condition: service_completed_successfully
+      agent-runtime-auth:
+        condition: service_completed_successfully
     environment:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/api:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
       - CALIB_DATA_PATH=/app/calib_data
@@ -217,14 +220,35 @@ services:
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
       - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
       - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
+      - AGENT_RUNTIME_TOKEN_FILE=/run/agent-runtime-auth/token
     networks:
       - custom_net
+  agent-runtime-auth:
+    # Generate once per deployment; only API and runtime can read the secret.
+    build:
+      context: .
+      dockerfile: ./src/qdash/api/Dockerfile
+    restart: "no"
+    network_mode: none
+    volumes:
+      - agent-runtime-auth:/run/agent-runtime-auth
+    command:
+      - python
+      - -c
+      - |
+        import os, pathlib, secrets
+        path = pathlib.Path('/run/agent-runtime-auth/token')
+        if not path.exists():
+            os.umask(0o077)
+            temporary = path.with_suffix('.tmp')
+            temporary.write_text(secrets.token_hex(32))
+            temporary.chmod(0o400)
+            os.chown(temporary, 1000, 1000)
+            temporary.replace(path)
+        if not path.read_text().strip():
+            raise RuntimeError('Runtime credential file is empty')
   agent-runtime:
-    # Pi Agent Runtime backing the Copilot chat page and figure analysis when
-    # config/copilot/config.yaml sets copilot_backend: pi. Enable this opt-in
-    # service with COMPOSE_PROFILES=agent-runtime.
-    profiles:
-      - agent-runtime
+    # Pi Agent Runtime backing Copilot chat and figure analysis.
     build:
       context: .
       dockerfile: ./agent-runtime/Dockerfile
@@ -239,6 +263,7 @@ services:
       # production); the runtime trusts whatever package directories it finds.
       - ./agent-runtime/extensions:/app/extensions:ro
       - agent-runtime-state:/app/state
+      - agent-runtime-auth:/run/agent-runtime-auth:ro
       - agent-exec-socket:/run/agent-exec:ro
     # Per-turn pi-qdash credential profiles are transient, including on crashes.
     tmpfs:
@@ -246,7 +271,7 @@ services:
     environment:
       - PORT=${AGENT_RUNTIME_PORT:-8002}
       - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
-      - AGENT_RUNTIME_ENABLE_WRITE_TOOLS=${AGENT_RUNTIME_ENABLE_WRITE_TOOLS:-false}
+      - AGENT_RUNTIME_TOKEN_FILE=/run/agent-runtime-auth/token
       - PI_CODING_AGENT_DIR=/app/.pi-agent
       - AGENT_STATE_DIR=/app/state
       # A turn runs until it answers or the user stops it; calibrations a tool
@@ -276,6 +301,8 @@ services:
         condition: service_started
       agent-exec:
         condition: service_started
+      agent-runtime-auth:
+        condition: service_completed_successfully
     networks:
       - custom_net
   agent-exec:
@@ -285,8 +312,6 @@ services:
     # group (bun, gid 1000) prevents workspace users from impersonating others.
     # The server starts one pi-env daemon per conversation as that user's own
     # uid; see docs/developer-guide/copilot/workspace.md.
-    profiles:
-      - agent-runtime
     build:
       context: ./agent-runtime
       dockerfile: ./exec/Dockerfile
@@ -328,7 +353,6 @@ services:
         NEXT_PUBLIC_DEFAULT_THEME: ${NEXT_PUBLIC_DEFAULT_THEME:-light}
         NEXT_PUBLIC_PREFECT_URL: ${NEXT_PUBLIC_PREFECT_URL}
         INTERNAL_API_URL: http://api:${API_PORT:-5715}
-        NEXT_PUBLIC_COPILOT_ENABLED: ${NEXT_PUBLIC_COPILOT_ENABLED:-}
     restart: always
     env_file:
       - .env
@@ -341,7 +365,7 @@ services:
     networks:
       - custom_net
   tunnel:
-    image: cloudflare/cloudflared
+    image: cloudflare/cloudflared:2026.10.3
     restart: unless-stopped
     env_file:
       - .env
@@ -361,5 +385,6 @@ volumes:
   worker-logs:
   api-logs:
   agent-runtime-state:
+  agent-runtime-auth:
   agent-exec-workspace:
   agent-exec-socket:

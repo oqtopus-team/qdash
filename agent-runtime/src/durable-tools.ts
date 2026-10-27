@@ -16,9 +16,9 @@ import type { TSchema } from "typebox";
 
 import {
   ALLOWED_TOOL_NAMES,
-  EXPERIMENTAL_WRITE_TOOL_NAMES,
+  REVIEWED_WRITE_TOOL_NAMES,
   TRUSTED_EXTENSION_PACKAGES,
-  isExperimentalWriteTool,
+  isReviewedWriteTool,
 } from "./allowed-tools.ts";
 import type { QDashConnection } from "./auth.ts";
 import {
@@ -138,7 +138,7 @@ export async function runCodingAgentTool(
     {
       ...approvalArgs(args),
       ...connection.toolArgs,
-      ...(isExperimentalWriteTool(tool.name) ? { confirmWrite: true } : {}),
+      ...(isReviewedWriteTool(tool.name) ? { confirmWrite: true } : {}),
     } as never,
     signal,
     undefined,
@@ -182,7 +182,7 @@ export function untilAborted<T>(run: Promise<T>, signal: AbortSignal | undefined
 /**
  * Adapt one pi-coding-agent tool to pi-durable's execution contract.
  *
- * Read-only calls may be replayed after interruption. Experimental writes
+ * Read-only calls may be replayed after interruption. Reviewed writes
  * never run from the model's call: the call ends the turn with an approval
  * request, and the runtime runs it only after the user approves it in the UI
  * (see `QDashWriteTools.runApproved`).
@@ -200,7 +200,7 @@ export function adaptCodingAgentTool(
     fillKnowledge?: boolean;
   } = {},
 ): ToolRegistration {
-  const writesQDash = isExperimentalWriteTool(tool.name);
+  const writesQDash = isReviewedWriteTool(tool.name);
   const parameters = withParameterOverrides(tool.name, tool.parameters);
   return defineTool({
     name: tool.name,
@@ -397,8 +397,8 @@ export class QDashWriteTools {
  * An extension trusted as a whole, because its file lies under one of
  * `localExtensionRoots` (`AGENT_RUNTIME_EXTENSION_PATHS`, development only)
  * or it belongs to one of `trustedPackages` (installed at a pinned version),
- * offers every tool it defines, except that an experimental write name still
- * needs the opt-in, and a tool is replayed on recovery only when its
+ * offers every tool it defines. Reviewed write names still require approval,
+ * and a tool is replayed on recovery only when its
  * annotations say it is read-only. A trusted tool that reuses a pinned name
  * replaces the pinned implementation.
  */
@@ -410,13 +410,12 @@ export function buildQDashExtension(
   modelRuntime: ModelRuntime,
   cwd: string,
   connection: QDashConnection,
-  enableExperimentalWriteTools = false,
   localExtensionRoots: readonly string[] = [],
   trustedPackages: readonly string[] = TRUSTED_EXTENSION_PACKAGES,
 ): { extension: Extension; writeTools: QDashWriteTools } {
   const allowed = new Set<string>([
     ...ALLOWED_TOOL_NAMES,
-    ...(enableExperimentalWriteTools ? EXPERIMENTAL_WRITE_TOOL_NAMES : []),
+    ...REVIEWED_WRITE_TOOL_NAMES,
   ]);
   const tools = new Map<string, ToolRegistration>();
   const writes = new Map<string, CodingAgentTool>();
@@ -427,8 +426,8 @@ export function buildQDashExtension(
   for (const extension of ordered) {
     const local = trusted(extension);
     for (const [name, registered] of extension.tools ?? []) {
-      const writeName = isExperimentalWriteTool(name);
-      if (local ? writeName && !enableExperimentalWriteTools : !allowed.has(name)) continue;
+      const writeName = isReviewedWriteTool(name);
+      if (!local && !allowed.has(name)) continue;
       if (local && tools.has(name)) {
         console.warn(`[agent-runtime] trusted extension ${extension.path} replaces tool ${name}`);
       }

@@ -292,3 +292,78 @@ test("a model declared in both files keeps the chat definition", () => {
     samplingParams: { temperature: 0.7 },
   });
 });
+
+const ACCESS_CHAT = `
+chat_models:
+  - provider: openai-compatible-chat
+    name: chat-model
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT
+`;
+const ACCESS_EVALUATION = `
+evaluation_models:
+  - provider: openai-compatible-evaluation
+    name: evaluation-model
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_EVALUATION
+`;
+const accessEnv = {
+  OPENAI_COMPATIBLE_BASE_URL_CHAT: "https://chat.example.com/v1",
+  OPENAI_COMPATIBLE_BASE_URL_EVALUATION: "https://evaluation.example.com/v1",
+  OPENAI_COMPATIBLE_API_KEY_CHAT: "origin-key",
+  CF_ACCESS_CLIENT_ID: "shared-client.access",
+  CF_ACCESS_CLIENT_SECRET: "shared-secret",
+};
+
+test("Access headers share credentials across chat and evaluation without persisting secrets", () => {
+  const config = buildModelsConfig(ACCESS_CHAT, ACCESS_EVALUATION, accessEnv);
+  assert.deepEqual(config.providers["openai-compatible-chat"].headers, {
+    "CF-Access-Client-Id": "$CF_ACCESS_CLIENT_ID",
+    "CF-Access-Client-Secret": "$CF_ACCESS_CLIENT_SECRET",
+  });
+  assert.deepEqual(config.providers["openai-compatible-evaluation"].headers, {
+    "CF-Access-Client-Id": "$CF_ACCESS_CLIENT_ID",
+    "CF-Access-Client-Secret": "$CF_ACCESS_CLIENT_SECRET",
+  });
+  assert.equal(config.providers["openai-compatible-chat"].apiKey, "$OPENAI_COMPATIBLE_API_KEY_CHAT");
+  assert.equal(config.providers["openai-compatible-evaluation"].apiKey, "openai-compatible");
+  for (const secret of ["shared-client.access", "shared-secret", "origin-key"]) {
+    assert.equal(JSON.stringify(config).includes(secret), false);
+  }
+});
+
+test("Access supports arbitrary endpoint suffixes", () => {
+  const config = buildModelsConfig(ACCESS_CHAT.replaceAll("_CHAT", "_EVALUATION_VLLM"), ACCESS_EVALUATION, {
+    OPENAI_COMPATIBLE_BASE_URL_EVALUATION_VLLM: "https://vllm.example.com/v1",
+    CF_ACCESS_CLIENT_ID: "client.access",
+    CF_ACCESS_CLIENT_SECRET: "secret",
+    OPENAI_COMPATIBLE_BASE_URL_EVALUATION: "http://local:8000/v1",
+  });
+  assert.equal(config.providers["openai-compatible-chat"].headers["CF-Access-Client-Id"], "$CF_ACCESS_CLIENT_ID");
+  assert.deepEqual(config.providers["openai-compatible-evaluation"].headers, config.providers["openai-compatible-chat"].headers);
+});
+
+for (const missing of ["CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET"]) {
+  test(`Access rejects missing or blank ${missing} without exposing credentials`, () => {
+    for (const value of [undefined, "", " "]) {
+      assert.throws(() => buildModelsConfig(ACCESS_CHAT, undefined, { ...accessEnv, [missing]: value }),
+        { message: "Cloudflare Access requires both CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET" });
+    }
+  });
+}
+
+test("Access credentials are not attached to unrelated literal URLs", () => {
+  const config = buildModelsConfig(ACCESS_CHAT.replace("env:OPENAI_COMPATIBLE_BASE_URL_CHAT", "https://other.example.com/v1"), undefined, accessEnv);
+  assert.equal(config.providers["openai-compatible-chat"].headers, undefined);
+});
+
+
+test("empty Access settings preserve API-key-only configuration", () => {
+  const config = buildModelsConfig(ACCESS_CHAT, undefined, {
+    OPENAI_COMPATIBLE_BASE_URL_CHAT: "https://chat.example.com/v1",
+    CF_ACCESS_CLIENT_ID: "",
+    CF_ACCESS_CLIENT_SECRET: "",
+  });
+  assert.equal(config.providers["openai-compatible-chat"].headers, undefined);
+  assert.equal(config.providers["openai-compatible-chat"].apiKey, "$OPENAI_COMPATIBLE_API_KEY_CHAT");
+});

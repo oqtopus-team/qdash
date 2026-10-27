@@ -29,9 +29,8 @@ import { createQDashConnection, type QDashAuth, type QDashConnection } from "./a
 import {
   ALLOWED_TOOL_NAMES,
   ALLOWLISTED_PACKAGES,
-  EXPERIMENTAL_WRITE_TOOL_NAMES,
+  REVIEWED_WRITE_TOOL_NAMES,
   TRUSTED_EXTENSION_PACKAGES,
-  isExperimentalWriteTool,
 } from "./allowed-tools.ts";
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
@@ -93,9 +92,6 @@ const EVALUATION_CONFIG_PATH =
   process.env.EVALUATION_CONFIG_PATH ?? "/app/config/copilot/evaluation.yaml";
 // One model request; a whole turn is bounded by the server's own timers.
 const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 180_000);
-const EXPERIMENTAL_WRITE_TOOLS_ENABLED = ["1", "true", "yes", "on"].includes(
-  (process.env.AGENT_RUNTIME_ENABLE_WRITE_TOOLS ?? "").trim().toLowerCase(),
-);
 // The Copilot workspace (agent-exec container); without it the chat has no
 // shell or files, only QDash tools.
 const EXEC_CONFIG = execConfigFromEnv();
@@ -217,9 +213,6 @@ export class SharedRuntime {
   /** Load the Pi model catalog and adapt the installed pi-qdash extension once. */
   static async create(): Promise<SharedRuntime> {
     mkdirSync(STATE_DIR, { recursive: true });
-    if (EXPERIMENTAL_WRITE_TOOLS_ENABLED) {
-      console.warn("[agent-runtime] experimental QDash write tools are enabled");
-    }
     if (EXEC_CONFIG) {
       console.log(`[agent-runtime] workspace tools: agent-exec at ${EXEC_CONFIG.socketPath}`);
     } else {
@@ -268,11 +261,8 @@ export class SharedRuntime {
 
     const extensions = withoutReplacedInstalls(loader.getExtensions().extensions, CHECKOUTS);
     // Local checkouts and trusted installed packages are trusted as a whole
-    // (see buildQDashExtension); the experimental write opt-in still applies
-    // to their tool names.
-    const localTools = localToolNames(extensions, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES).filter(
-      (name) => EXPERIMENTAL_WRITE_TOOLS_ENABLED || !isExperimentalWriteTool(name),
-    );
+    // (see buildQDashExtension); reviewed write names still require approval.
+    const localTools = localToolNames(extensions, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES);
     if (CHECKOUT_PATHS.length || localTools.length) {
       console.log(
         `[agent-runtime] trusted extensions: packages=${TRUSTED_EXTENSION_PACKAGES.join(", ") || "none"}; local=${EXTENSION_PATHS.join(", ") || "none"} (tools: ${localTools.join(", ") || "none"}); allowlisted checkouts=${CHECKOUT_PATHS.filter((path) => !EXTENSION_PATHS.includes(path)).join(", ") || "none"}`,
@@ -280,7 +270,7 @@ export class SharedRuntime {
     }
     const allowed = new Set<string>([
       ...ALLOWED_TOOL_NAMES,
-      ...(EXPERIMENTAL_WRITE_TOOLS_ENABLED ? EXPERIMENTAL_WRITE_TOOL_NAMES : []),
+      ...REVIEWED_WRITE_TOOL_NAMES,
       ...localTools,
     ]);
     const qdashToolNames = [
@@ -306,7 +296,6 @@ export class SharedRuntime {
     const systemPrompt = buildSystemPrompt(
       responseLanguage,
       thinkingLanguage,
-      EXPERIMENTAL_WRITE_TOOLS_ENABLED,
       skills,
       toolGuide,
       localToolGuide,
@@ -328,7 +317,6 @@ export class SharedRuntime {
         modelRuntime,
         WORK_DIR,
         connection,
-        EXPERIMENTAL_WRITE_TOOLS_ENABLED,
         EXTENSION_PATHS,
         TRUSTED_EXTENSION_PACKAGES,
       );

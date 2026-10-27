@@ -59,6 +59,7 @@ interface ProviderEntry {
   baseUrl?: string;
   api?: string;
   apiKey?: string;
+  headers?: Record<string, string>;
   compat?: Record<string, unknown>;
   models?: ModelEntry[];
   modelOverrides?: Record<string, ModelOverride>;
@@ -157,12 +158,17 @@ export function buildModelsConfig(
       continue;
     }
 
+    const headers = cloudflareAccessHeaders(baseUrlSetting, env);
+    const apiKeyEnv = asString(model.api_key_env);
     const entry = (providers[providerId] ??= {
       baseUrl,
       api: apiFromStyle(asString(model.api_style)),
       // Pi hides models whose provider has no credential, even when the server
       // ignores it, so keyless local endpoints still need a placeholder.
-      ...(asString(model.api_key_env) ? { apiKey: `$${asString(model.api_key_env)}` } : {}),
+      ...(headers && (!apiKeyEnv || !env[apiKeyEnv])
+        ? { apiKey: "openai-compatible" }
+        : apiKeyEnv ? { apiKey: `$${apiKeyEnv}` } : {}),
+      ...(headers ? { headers } : {}),
       // Local OpenAI-compatible servers generally implement neither.
       compat: {
         supportsDeveloperRole: false,
@@ -199,6 +205,24 @@ export function buildModelsConfig(
   }
 
   return { providers };
+}
+
+/** Share Access authentication across configured compatible endpoints without persisting secrets. */
+function cloudflareAccessHeaders(
+  baseUrlSetting: string,
+  env: NodeJS.ProcessEnv,
+): Record<string, string> | undefined {
+  if (!/^env:OPENAI_COMPATIBLE_BASE_URL_[A-Za-z0-9_]+$/.test(baseUrlSetting)) return undefined;
+  const clientId = "CF_ACCESS_CLIENT_ID";
+  const clientSecret = "CF_ACCESS_CLIENT_SECRET";
+  if (!env[clientId] && !env[clientSecret]) return undefined;
+  if (!env[clientId]?.trim() || !env[clientSecret]?.trim()) {
+    throw new Error(`Cloudflare Access requires both ${clientId} and ${clientSecret}`);
+  }
+  return {
+    "CF-Access-Client-Id": `$${clientId}`,
+    "CF-Access-Client-Secret": `$${clientSecret}`,
+  };
 }
 
 /** A suffix gives each OpenAI-compatible endpoint its own provider namespace. */
