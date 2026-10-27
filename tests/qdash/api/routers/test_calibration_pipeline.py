@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnavailable
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
@@ -220,24 +221,25 @@ class TestValidate:
         assert data["targets"]["mux_ids"] == [0, 16]
 
 
-def prefect_client_mock() -> tuple[MagicMock, MagicMock]:
-    flow_run = MagicMock()
-    flow_run.id = "flow-run-1"
-    deployment = MagicMock()
-    deployment.id = "deployment-1"
-    client = MagicMock()
-    client.read_deployment_by_name = AsyncMock(return_value=deployment)
-    client.create_flow_run_from_deployment = AsyncMock(return_value=flow_run)
-    cm = MagicMock()
-    cm.__aenter__ = AsyncMock(return_value=client)
-    cm.__aexit__ = AsyncMock(return_value=None)
-    return cm, client
+def prefect_gateway_mocks() -> tuple[AsyncMock, AsyncMock]:
+    read_deployment = AsyncMock(return_value="deployment-1")
+    create_flow_run = AsyncMock(return_value="flow-run-1")
+    return read_deployment, create_flow_run
 
 
 class TestExecute:
     def test_execute_dispatches_the_system_deployment(self, test_client, chip, auth_headers):
-        cm, client = prefect_client_mock()
-        with patch("qdash.api.services.flow_service.get_client", return_value=cm):
+        read_deployment, create_flow_run = prefect_gateway_mocks()
+        with (
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.read_deployment_id",
+                new=read_deployment,
+            ),
+            patch(
+                "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+                new=create_flow_run,
+            ),
+        ):
             response = test_client.post(
                 "/calibration-pipelines/execute",
                 headers=auth_headers,
@@ -248,10 +250,8 @@ class TestExecute:
         assert data["flow_run_id"] == "flow-run-1"
         assert [step["name"] for step in data["steps"]][-1] == "coherence"
 
-        client.read_deployment_by_name.assert_awaited_once_with(
-            "calibration-pipeline/system-calibration-pipeline"
-        )
-        parameters = client.create_flow_run_from_deployment.call_args.kwargs["parameters"]
+        read_deployment.assert_awaited_once_with("calibration-pipeline/system-calibration-pipeline")
+        parameters = create_flow_run.call_args.kwargs["parameters"]
         assert parameters["project_id"] == "test_project"
         assert parameters["username"] == "test_user"
         assert parameters["chip_id"] == CHIP
@@ -263,10 +263,13 @@ class TestExecute:
         assert parameters["spec"]["steps"][2]["mode"] == "synchronized"
 
     def test_execute_rejects_invalid_spec_before_dispatch(self, test_client, chip, auth_headers):
-        cm, client = prefect_client_mock()
+        _, create_flow_run = prefect_gateway_mocks()
         spec = good_spec()
         spec["targets"] = {"qids": ["99"]}
-        with patch("qdash.api.services.flow_service.get_client", return_value=cm):
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
             response = test_client.post(
                 "/calibration-pipelines/execute",
                 headers=auth_headers,
@@ -275,12 +278,14 @@ class TestExecute:
         assert response.status_code == 422
         detail = response.json()["detail"]
         assert detail["problems"][0]["path"] == "targets.qids[0]"
-        client.create_flow_run_from_deployment.assert_not_called()
+        create_flow_run.assert_not_called()
 
     def test_execute_without_worker_deployment_is_503(self, test_client, chip, auth_headers):
-        cm, client = prefect_client_mock()
-        client.read_deployment_by_name = AsyncMock(side_effect=RuntimeError("missing"))
-        with patch("qdash.api.services.flow_service.get_client", return_value=cm):
+        unavailable = AsyncMock(side_effect=SystemDeploymentUnavailable("missing"))
+        with patch(
+            "qdash.api.services.flow_service.execution.ExecutionCoordinator.read_deployment_id",
+            new=unavailable,
+        ):
             response = test_client.post(
                 "/calibration-pipelines/execute",
                 headers=auth_headers,

@@ -78,7 +78,7 @@ lint.ignore = [
 "src/qdash/api/routers/auth.py" = ["S106"]  # "bearer" is standard token type
 "src/qdash/api/schemas/auth.py" = ["S105"]  # "bearer" is standard OAuth token type
 "clients/python/src/qdash/client/services/models.py" = ["TC003", "S105"]  # Generated file; keep source untouched
-"src/qdash/api/services/flow_service.py" = ["S603", "S607"]  # ruff format subprocess call
+"src/qdash/api/services/flow_service/validation.py" = ["S603", "S607"]  # ruff format subprocess call
 "src/qdash/api/lib/topology_config.py" = ["S112"]  # Skip invalid config files
 "tests/**" = [
     "ANN201",

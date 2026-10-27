@@ -127,7 +127,7 @@ in-process rules.
 
 | Concern | Source | Focused tests |
 | --- | --- | --- |
-| Flow CRUD and dispatch | `src/qdash/api/services/flow_service.py` | `tests/qdash/api/services/test_flow_service.py` |
+| Flow CRUD and dispatch | `src/qdash/api/services/flow_service/` | `tests/qdash/api/services/test_flow_service.py`, `tests/qdash/api/services/flow_service/` |
 | Schedule API policy | `src/qdash/api/services/flow_schedule_service.py` | `tests/qdash/api/services/test_flow_schedule_service.py` |
 | Prefect registration service | `src/qdash/workflow/deployment_service.py` | `tests/qdash/workflow/test_deployment_service.py` |
 | Runtime lifecycle | `src/qdash/workflow/service/calib_service.py` | `tests/qdash/workflow/service/test_calib_service.py` |
