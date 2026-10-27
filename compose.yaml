@@ -365,7 +365,7 @@ services:
     networks:
       - custom_net
   tunnel:
-    image: cloudflare/cloudflared
+    image: cloudflare/cloudflared:2026.10.3
     restart: unless-stopped
     env_file:
       - .env
