@@ -9,6 +9,7 @@ from git import Repo
 
 from qdash.common.config.qubex_layout import QubexLayout
 from qdash.common.infrastructure.config_repository import (
+    BOT_ACTOR,
     ConfigRepository,
     ConfigRepositoryError,
     DirtySharedFiles,
@@ -268,8 +269,13 @@ def test_publish_owned_pushes_from_the_root_without_resetting_other_edits(
 
 
 def test_two_sessions_publish_without_losing_each_others_changes(
-    tmp_path: Path, origin: Path
+    tmp_path: Path, origin: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # CI and service containers need not have a user-level Git identity.
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    for key in ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"):
+        monkeypatch.delenv(key, raising=False)
     root_a, root_b = tmp_path / "a", tmp_path / "b"
     _clone_root(origin, root_a)
     _clone_root(origin, root_b)
@@ -284,6 +290,7 @@ def test_two_sessions_publish_without_losing_each_others_changes(
     result_b = repo_b.publish_owned([root_b / "params/chip-1/control_frequency.yaml"], "B")
 
     assert result_b.changed
+    assert Repo(origin).head.commit.committer == BOT_ACTOR
     assert "1.0" in _remote_file(origin, "params/chip-1/readout_frequency.yaml")
     assert "2.0" in _remote_file(origin, "params/chip-1/control_frequency.yaml")
     assert (root_b / "params/chip-1/pending.yaml").read_text() == "data: {}\n"

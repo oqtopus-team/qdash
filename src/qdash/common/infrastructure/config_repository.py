@@ -434,7 +434,11 @@ class ConfigRepository:
         "dubious ownership". Credentials go through a one-shot helper so the token never
         lands in ``.git/config`` or in a URL that an error message could echo.
         """
-        entries = [("safe.directory", str(self.root))]
+        entries = [
+            ("safe.directory", str(self.root)),
+            ("user.name", str(BOT_ACTOR.name)),
+            ("user.email", str(BOT_ACTOR.email)),
+        ]
         env = {"GIT_TERMINAL_PROMPT": "0"}
         if self.settings.user and self.settings.token:
             env["QDASH_GIT_USER"] = self.settings.user
