@@ -27,12 +27,14 @@ class ExecutionNote(BaseModel):
         stage_results: Results from each calibration stage
         github_push_results: Results from GitHub push operations
         config_commit_id: Git commit ID of the config used
+        system_ids: Qubex Systems the execution's targets resolved to
         extra: Additional unstructured data for extensibility
     """
 
     stage_results: dict[str, StageResult] = Field(default_factory=dict)
     github_push_results: dict[str, Any] = Field(default_factory=dict)
     config_commit_id: str | None = None
+    system_ids: list[str] = Field(default_factory=list)
     extra: dict[str, Any] = Field(default_factory=dict)
 
     def record_stage(self, stage_name: str, result: dict[str, Any], timestamp: datetime) -> None:
@@ -76,6 +78,9 @@ class ExecutionNote(BaseModel):
         if self.config_commit_id:
             data["config_commit_id"] = self.config_commit_id
 
+        if self.system_ids:
+            data["system_ids"] = list(self.system_ids)
+
         # Merge extra fields
         data.update(self.extra)
 
@@ -104,12 +109,20 @@ class ExecutionNote(BaseModel):
                 )
 
         # Collect extra fields (anything not in known fields)
-        known_fields = {"stage_results", "github_push_results", "config_commit_id"}
+        known_fields = {"stage_results", "github_push_results", "config_commit_id", "system_ids"}
         extra = {k: v for k, v in data.items() if k not in known_fields}
+
+        raw_system_ids = data.get("system_ids")
+        system_ids = (
+            [str(system_id) for system_id in raw_system_ids]
+            if isinstance(raw_system_ids, list)
+            else []
+        )
 
         return cls(
             stage_results=stage_results,
             github_push_results=data.get("github_push_results", {}),
             config_commit_id=data.get("config_commit_id"),
+            system_ids=system_ids,
             extra=extra,
         )

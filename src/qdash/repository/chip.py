@@ -432,6 +432,7 @@ class MongoChipRepository:
         chip_id: str,
         limit: int = 100,
         offset: int = 0,
+        coupling_ids: list[str] | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         """List couplings from CouplingDocument collection with pagination.
 
@@ -445,6 +446,8 @@ class MongoChipRepository:
             Maximum number of couplings
         offset : int
             Number to skip
+        coupling_ids : list[str] | None
+            Optional list of coupling IDs to restrict the listing to
 
         Returns
         -------
@@ -453,6 +456,8 @@ class MongoChipRepository:
 
         """
         query: dict[str, Any] = {"project_id": project_id, "chip_id": chip_id}
+        if coupling_ids is not None:
+            query["qid"] = {"$in": list(coupling_ids)}
 
         total = CouplingDocument.find(query).count()
         docs = list(CouplingDocument.find(query).skip(offset).limit(limit).run())
@@ -513,6 +518,7 @@ class MongoChipRepository:
         project_id: str,
         chip_id: str,
         metric_keys: list[str] | None = None,
+        qids: list[str] | None = None,
     ) -> dict[str, Any] | None:
         """Aggregate metrics summary using MongoDB pipeline.
 
@@ -525,6 +531,8 @@ class MongoChipRepository:
         metric_keys : list[str] | None
             List of metric keys to aggregate (from metrics.yaml).
             If None, returns only counts.
+        qids : list[str] | None
+            Optional qubit IDs to aggregate over (one System of the chip)
 
         Returns
         -------
@@ -548,8 +556,11 @@ class MongoChipRepository:
             for key in metric_keys:
                 group_stage[f"avg_{key}"] = {"$avg": f"$data.{key}.value"}
 
+        match: dict[str, Any] = {"project_id": project_id, "chip_id": chip_id}
+        if qids is not None:
+            match["qid"] = {"$in": list(qids)}
         pipeline = [
-            {"$match": {"project_id": project_id, "chip_id": chip_id}},
+            {"$match": match},
             {"$group": group_stage},
         ]
 

@@ -67,6 +67,71 @@ describe("GitWorkspaceToolbar", () => {
   });
 });
 
+describe("GitWorkspaceToolbar repository badges and sync", () => {
+  it("shows the mode, layout and unpublished count, and syncs from the menu", async () => {
+    const onSync = vi.fn();
+    render(
+      <GitWorkspaceToolbar
+        status={{
+          is_git_repo: true,
+          branch: "main",
+          commit: "1",
+          mode: "github",
+          layout: "shared",
+          layout_version: "2.0",
+          manifest_present: true,
+          schemas_status: "differs",
+          review_required: true,
+          changed_files: ["params/64Qv3/t1.yaml"],
+          unpushed_commits: 2,
+        }}
+        onPull={() => {}}
+        onPush={() => {}}
+        onSync={onSync}
+        isPulling={false}
+        isPushing={false}
+      />,
+    );
+    const badges = screen.getByTestId("repository-badges");
+    expect(badges.textContent).toContain("GitHub");
+    expect(badges.textContent).toContain("shared 2.0");
+    expect(screen.getByTitle(/declared by qubex-config.json/)).toBeTruthy();
+    expect(badges.textContent).toContain("schemas");
+    expect(badges.textContent).toContain("review");
+    expect(screen.getByLabelText("3 unpublished changes")).toBeTruthy();
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: /repository menu/i }));
+    const sync = await screen.findByRole("menuitem", { name: /sync/i });
+    expect(sync.textContent).toContain("3");
+    fireEvent.click(sync);
+    expect(onSync).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers no sync without a repository", async () => {
+    render(
+      <GitWorkspaceToolbar
+        status={{
+          is_git_repo: false,
+          mode: "plain",
+          layout: "legacy",
+          layout_version: "1.0",
+          manifest_present: false,
+        }}
+        onPull={() => {}}
+        onPush={() => {}}
+        onSync={() => {}}
+        isPulling={false}
+        isPushing={false}
+      />,
+    );
+    expect(screen.getByTestId("repository-badges").textContent).toContain("no manifest");
+    expect(screen.getByTestId("repository-badges").textContent).toContain("No repository");
+    fireEvent.pointerDown(screen.getByRole("button", { name: /repository menu/i }));
+    await screen.findByRole("menuitem", { name: /pull latest/i });
+    expect(screen.queryByRole("menuitem", { name: /sync/i })).toBeNull();
+  });
+});
+
 describe("PullRequestBanner", () => {
   it("links to the created pull request and can be dismissed", () => {
     const onDismiss = vi.fn();

@@ -44,9 +44,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import yaml
-
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.common.config.qubex_layout import QubexLayout
+from qdash.common.config.system_catalog import DEFAULT_MUX_SIZE, SystemCatalog
 from qdash.workflow.engine.scheduler.cr_utils import (
     build_mux_conflict_map,
     build_qubit_to_mux_map,
@@ -86,11 +85,14 @@ class CRScheduleResult:
         cr_pairs_string: list[str],
         qid_to_mux: dict[str, int],
         mux_conflict_map: dict[int, set[int]],
+        cross_system_pairs: list[str] | None = None,
     ) -> None:
         """Initialize schedule result."""
         self.parallel_groups = parallel_groups
         self.metadata = metadata
         self.filtering_stats = filtering_stats
+        self.cross_system_pairs: list[str] = list(cross_system_pairs or [])
+        """Couplings left out because their qubits are driven by different Systems."""
         self._cr_pairs_string = cr_pairs_string
         self._qid_to_mux = qid_to_mux
         self._mux_conflict_map = mux_conflict_map
@@ -101,6 +103,7 @@ class CRScheduleResult:
             "parallel_groups": self.parallel_groups,
             "metadata": self.metadata,
             "filtering_stats": self.filtering_stats,
+            "cross_system_pairs": self.cross_system_pairs,
         }
 
     def __repr__(self) -> str:
@@ -166,7 +169,7 @@ class CRScheduler:
             username: Username for chip data access
             chip_id: Chip ID
             wiring_config_path: Path to wiring.yaml configuration file.
-                If None, uses the default QubexPaths wiring path.
+                If None, the file is resolved from the detected Qubex layout.
             chip_repo: Repository for chip data access.
                 If None, uses MongoChipRepository.
 
@@ -177,6 +180,7 @@ class CRScheduler:
         self.wiring_config_path = wiring_config_path
         self._chip_repo = chip_repo
         self._chip: ChipModel | None = None
+        self._catalog: SystemCatalog | None = None
         self._wiring_config: list[dict[str, Any]] | None = None
         self._topology: TopologyDefinition | None = None
         # Cached individual document data (scalable approach for 256+ qubits)
@@ -257,28 +261,61 @@ class CRScheduler:
         else:
             return {f"{c[0]}-{c[1]}" for c in topology.couplings}
 
+    @property
+    def catalog(self) -> SystemCatalog:
+        """Chip -> System -> MUX catalog backing this scheduler."""
+        if self._catalog is None:
+            self._catalog = SystemCatalog(
+                QubexLayout.detect(),
+                self.chip_id,
+                wiring_path=Path(self.wiring_config_path) if self.wiring_config_path else None,
+            )
+        return self._catalog
+
     def _load_wiring_config(self) -> list[dict[str, Any]]:
-        """Load wiring configuration from YAML file."""
+        """Load the chip's wiring rows (every System of the chip)."""
         if self._wiring_config is None:
-            # Use provided path or default path
-            if self.wiring_config_path is not None:
-                wiring_path = Path(self.wiring_config_path)
-            else:
-                wiring_path = get_qubex_paths().wiring_yaml(self.chip_id)
-
-            if not wiring_path.exists():
-                msg = f"Wiring config not found: {wiring_path}"
-                raise FileNotFoundError(msg)
-
-            yaml_data = yaml.safe_load(wiring_path.read_text())
-            if self.chip_id in yaml_data:
-                self._wiring_config = yaml_data[self.chip_id]
-            else:
-                # New YAML format: top-level keys are group names (e.g., "A2"),
-                # each mapping to a list of MUX configs. Flatten all lists.
-                self._wiring_config = [entry for group in yaml_data.values() for entry in group]
-
+            self._wiring_config = self.catalog.wiring_rows()
         return self._wiring_config
+
+    def _mux_size(self) -> int:
+        """Qubits per MUX for this chip (4 when the chip catalog is unreadable)."""
+        try:
+            return self.catalog.mux_size()
+        except (OSError, ValueError, LookupError):
+            return DEFAULT_MUX_SIZE
+
+    def split_cross_system_pairs(self, pairs: list[str]) -> tuple[list[str], list[str]]:
+        """``(feasible, excluded)``: a coupling is excluded when its qubits sit on different Systems.
+
+        One Experiment drives one System, so such a pair cannot be calibrated.
+        A chip with one System, or an unreadable configuration, keeps every pair.
+        """
+        try:
+            if len(self.catalog.systems()) <= 1:
+                return list(pairs), []
+        except (OSError, ValueError, LookupError):
+            return list(pairs), []
+        feasible: list[str] = []
+        excluded: list[str] = []
+        for pair in pairs:
+            qubits = pair.split("-")
+            if len(qubits) != 2:
+                feasible.append(pair)
+                continue
+            try:
+                ok = self.catalog.coupling_feasible(qubits[0], qubits[1])
+            except (KeyError, ValueError):
+                ok = True
+            (feasible if ok else excluded).append(pair)
+        if excluded:
+            logger.info(
+                "Excluded %d coupling(s) spanning Systems on chip %s: %s",
+                len(excluded),
+                self.chip_id,
+                ", ".join(excluded),
+            )
+        return feasible, excluded
 
     def _get_two_qubit_pair_list(self) -> list[str]:
         """Extract all two-qubit coupling IDs from CouplingDocument collection."""
@@ -362,7 +399,7 @@ class CRScheduler:
         # Load MUX configuration
         wiring_config = self._load_wiring_config()
         mux_conflict_map = build_mux_conflict_map(wiring_config)
-        qid_to_mux = build_qubit_to_mux_map(wiring_config)
+        qid_to_mux = build_qubit_to_mux_map(wiring_config, self._mux_size())
 
         # Determine grid size
         grid_size = 12 if "144Q" in self.chip_id else 8
@@ -378,6 +415,7 @@ class CRScheduler:
             qid_to_mux=qid_to_mux,
             qubit_models=qubit_models,
             topology_directions=topology_directions,
+            mux_size=self._mux_size(),
         )
 
         # Use default filters if not provided
@@ -391,6 +429,7 @@ class CRScheduler:
         # Get all coupling pairs from individual documents
         all_pairs = self._get_two_qubit_pair_list()
         logger.info(f"Starting with {len(all_pairs)} coupling pairs")
+        all_pairs, cross_system_pairs = self.split_cross_system_pairs(all_pairs)
 
         # Apply filters sequentially
         filtered_pairs = all_pairs
@@ -447,10 +486,12 @@ class CRScheduler:
             "grid_size": grid_size,
             "scheduler": scheduler_metadata,
             "filters": [repr(f) for f in filters],
+            "cross_system_excluded": len(cross_system_pairs),
         }
 
         filtering_stats = {
-            "all_coupling_pairs": len(all_pairs),
+            "all_coupling_pairs": len(all_pairs) + len(cross_system_pairs),
+            "cross_system_excluded_pairs": cross_system_pairs,
             "final_filtered_pairs": len(filtered_pairs),
             "filter_pipeline": filter_stats,
         }
@@ -462,6 +503,7 @@ class CRScheduler:
             cr_pairs_string=filtered_pairs,
             qid_to_mux=qid_to_mux,
             mux_conflict_map=mux_conflict_map,
+            cross_system_pairs=cross_system_pairs,
         )
 
     def generate(
@@ -554,6 +596,10 @@ class CRScheduler:
                 f"Filtered to {len(all_pairs)} pairs using {len(candidate_qubits)} candidate qubits"
             )
 
+        # A coupling whose qubits are driven by different Systems cannot run.
+        all_pairs, cross_system_pairs = self.split_cross_system_pairs(all_pairs)
+        mux_size = self._mux_size()
+
         # Filter by frequency directionality
         # Priority: topology-based > design-based > measured
         topology_directions = self._get_topology_direction_set(inverse=inverse)
@@ -574,7 +620,7 @@ class CRScheduler:
                     for pair in all_pairs
                     if (qubits := pair.split("-"))
                     and len(qubits) == 2
-                    and not infer_direction_from_design(qubits[0], qubits[1], grid_size)
+                    and not infer_direction_from_design(qubits[0], qubits[1], grid_size, mux_size)
                 ]
             else:
                 cr_pairs = [
@@ -582,7 +628,7 @@ class CRScheduler:
                     for pair in all_pairs
                     if (qubits := pair.split("-"))
                     and len(qubits) == 2
-                    and infer_direction_from_design(qubits[0], qubits[1], grid_size)
+                    and infer_direction_from_design(qubits[0], qubits[1], grid_size, mux_size)
                 ]
         else:
             direction_method = "measured"
@@ -618,7 +664,7 @@ class CRScheduler:
         # Load MUX configuration
         wiring_config = self._load_wiring_config()
         mux_conflict_map = build_mux_conflict_map(wiring_config)
-        qid_to_mux = build_qubit_to_mux_map(wiring_config)
+        qid_to_mux = build_qubit_to_mux_map(wiring_config, mux_size)
 
         # Filter out CR pairs that have qubits without MUX mappings
         pairs_before_mux_filter = len(cr_pairs)
@@ -665,10 +711,12 @@ class CRScheduler:
             "direction_method": direction_method,
             "inverse": inverse,
             "grid_size": grid_size,
+            "cross_system_excluded": len(cross_system_pairs),
         }
 
         filtering_stats = {
-            "all_coupling_pairs": len(all_pairs),
+            "all_coupling_pairs": len(all_pairs) + len(cross_system_pairs),
+            "cross_system_excluded_pairs": cross_system_pairs,
             "freq_directionality_filtered": pairs_before_mux_filter,
             "mux_config_filtered": len(cr_pairs),
             "mux_filtered_out": pairs_before_mux_filter - len(cr_pairs),
@@ -684,4 +732,5 @@ class CRScheduler:
             cr_pairs_string=cr_pairs,
             qid_to_mux=qid_to_mux,
             mux_conflict_map=mux_conflict_map,
+            cross_system_pairs=cross_system_pairs,
         )

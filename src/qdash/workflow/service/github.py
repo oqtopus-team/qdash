@@ -1,14 +1,15 @@
-"""GitHub integration for FlowSession - Pull/Push functionality.
+"""Configuration repository integration for calibration sessions.
 
-This module provides GitHub integration for calibration workflows, allowing:
-- Pull: Fetch latest configuration from GitHub repository
-- Push: Upload calibration results (calib_note.json, props.yaml, etc.)
-
-The implementation reuses existing push_props logic to maintain compatibility
-with the established merge strategy for props.yaml files.
+A session pulls the configuration root before it starts and publishes the files it
+owns when it finishes: the calibration note and the parameter YAML files of every
+System the session used. Both go through
+:class:`~qdash.common.infrastructure.config_repository.ConfigRepository`, so the
+behaviour follows the repository mode (direct push, local commit, or change log only).
 """
 
-import os
+from __future__ import annotations
+
+import json
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -17,22 +18,24 @@ from prefect import get_run_logger
 from pydantic import BaseModel, Field
 
 from qdash.common.config.loader import ConfigLoader
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.common.config.qubex_layout import QubexLayout
+from qdash.common.config.system_catalog import default_system_id
+from qdash.common.infrastructure.config_repository import (
+    ConfigRepository,
+    GitHubSettings,
+    get_config_repository,
+)
 
 
 class ConfigFileType(Enum):
-    """Configuration file types that can be pushed to GitHub.
+    """Owned files a session can publish.
 
     Attributes:
-        CALIB_NOTE: calibration/calib_note.json (simple copy)
-        PROPS: params/props.yaml (uses ChipDocument merge logic)
-        PARAMS: params/params.yaml (simple copy)
-        ALL_PARAMS: All *.yaml files in params/ directory
+        CALIB_NOTE: ``calibration/<system_id>/calib_note.json`` (the project's master note)
+        ALL_PARAMS: ``params/<system_id>/*.yaml``, narrowed by ``params_file_names``
     """
 
     CALIB_NOTE = "calib_note"
-    PROPS = "props"
-    PARAMS = "params"
     ALL_PARAMS = "all_params"
 
 
@@ -53,27 +56,16 @@ def _load_default_params_file_names() -> list[str] | None:
 
 
 class GitHubPushConfig(BaseModel):
-    """Configuration for GitHub push operations.
+    """What a session publishes when it finishes.
 
     Attributes:
-        enabled: Whether to push to GitHub on finish_calibration()
-        file_types: List of file types to push (default: [CALIB_NOTE, ALL_PARAMS])
+        enabled: Whether to publish on finish_calibration()
+        file_types: File types to publish (default: [CALIB_NOTE, ALL_PARAMS])
         params_file_names: Optional allowlist for ALL_PARAMS, such as
-            ["params.yaml", "drag.yaml"]. If omitted, defaults to
-            workflow.github.params_file_names from QDash workflow config. If neither is
-            configured, all *.yaml files are pushed.
+            ["params.yaml", "drag.yaml"]. Defaults to workflow.github.params_file_names
+            from the QDash workflow config; when neither is set every *.yaml is published.
         commit_message: Custom commit message (default: auto-generated)
         branch: Target branch (default: "main")
-        props_within_24hrs: For PROPS type, only include data from last 24 hours
-
-    Example:
-        ```python
-        config = GitHubPushConfig(
-            enabled=True,
-            file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.PROPS],
-            commit_message="Update calibration results"
-        )
-        ```
     """
 
     enabled: bool = False
@@ -83,42 +75,20 @@ class GitHubPushConfig(BaseModel):
     params_file_names: list[str] | None = Field(default_factory=_load_default_params_file_names)
     commit_message: str | None = None
     branch: str = "main"
-    props_within_24hrs: bool = False
 
     model_config = {"frozen": False}
 
 
 class GitHubIntegration:
-    """GitHub integration handler for calibration workflows.
-
-    This class manages GitHub operations for FlowSession, including:
-    - Pulling latest configuration from repository
-    - Pushing calibration results with proper merge logic
-
-    The implementation reuses existing infrastructure:
-    - pull_github task for config synchronization
-    - push_props flow for props.yaml merge logic
-    - push_github task for file uploads
+    """Pull before a session and publish the session's owned files after it.
 
     Attributes:
         username: Username for the calibration session
         chip_id: Target chip ID
         execution_id: Unique execution identifier
-
-    Example:
-        ```python
-        integration = GitHubIntegration("user", "64Qv3", "20250101-001")
-
-        # Pull latest config
-        commit_id = integration.pull_config()
-
-        # Push results
-        config = GitHubPushConfig(
-            enabled=True,
-            file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.PROPS]
-        )
-        results = integration.push_files(config)
-        ```
+        project_id: Project owning the shared calibration state
+        system_ids: Systems the session used; their params and calibration directories
+            are the files it may publish. Defaults to the chip's default System.
     """
 
     def __init__(
@@ -127,341 +97,154 @@ class GitHubIntegration:
         chip_id: str,
         execution_id: str,
         project_id: str | None = None,
+        system_ids: list[str] | None = None,
     ) -> None:
-        """Initialize GitHub integration.
-
-        Args:
-            username: Username for the calibration session
-            chip_id: Target chip ID
-            execution_id: Unique execution identifier
-            project_id: Project owning the shared calibration state
-        """
         self.username = username
         self.chip_id = chip_id
         self.execution_id = execution_id
         self.project_id = project_id
+        self.system_ids = system_ids
         self.logger = get_run_logger()
 
     @staticmethod
     def check_credentials() -> bool:
-        """Check if required GitHub credentials are configured.
+        """True when ``CONFIG_REPO_URL``, ``GITHUB_USER`` and ``GITHUB_TOKEN`` are set."""
+        return GitHubSettings.from_env().credentials_available
 
-        Returns:
-            True if all required environment variables are set
+    def _layout(self) -> QubexLayout:
+        return QubexLayout.detect()
 
-        Environment Variables:
-            GITHUB_USER: GitHub username
-            GITHUB_TOKEN: GitHub personal access token
-            CONFIG_REPO_URL: Repository URL for configuration files
-        """
-        required = ["GITHUB_USER", "GITHUB_TOKEN", "CONFIG_REPO_URL"]
-        return all(os.getenv(var) for var in required)
+    def _repository(self, layout: QubexLayout | None = None) -> ConfigRepository:
+        return get_config_repository(layout or self._layout(), actor=self.username)
+
+    def _resolved_system_ids(self, layout: QubexLayout) -> list[str]:
+        if self.system_ids:
+            return list(dict.fromkeys(self.system_ids))
+        return [default_system_id(layout, self.chip_id)]
+
+    def _chip_system_ids(self, layout: QubexLayout, used: list[str]) -> list[str]:
+        """Every System of the chip, the used ones first; the used ones alone on error."""
+        try:
+            from qdash.common.config.system_catalog import SystemCatalog
+
+            all_ids = SystemCatalog(layout, self.chip_id).system_ids()
+        except Exception as exc:  # unreadable tree: publish what the session used
+            self.logger.debug(f"Could not list the chip's Systems: {exc}")
+            return used
+        return list(dict.fromkeys([*used, *all_ids]))
 
     def pull_config(self, target_dir: str | None = None) -> str | None:
-        """Pull latest configuration from GitHub repository.
+        """Bring the configuration root up to date; returns the head commit or None.
 
-        This method uses the existing pull_github task to fetch the latest
-        configuration files from the repository. A backup of the current
-        configuration is automatically created.
-
-        Args:
-            target_dir: Directory where config files will be updated.
-                If None, uses the default Qubex config base path.
-
-        Returns:
-            Commit SHA of the pulled configuration, or None if pull failed
-
-        Example:
-            ```python
-            commit_id = integration.pull_config()
-            if commit_id:
-                print(f"Updated to commit: {commit_id}")
-            ```
+        A refused pull (shared files edited locally, remote unreachable) is logged and
+        the session continues with the local files.
         """
-        if target_dir is None:
-            target_dir = str(get_qubex_paths().config_base)
-
         try:
-            from qdash.workflow.worker.tasks.pull_github import pull_github
-
-            commit_id = pull_github(target_dir=target_dir)
-            self.logger.info(f"Pulled config from GitHub: {commit_id}")
+            layout = QubexLayout.detect(Path(target_dir)) if target_dir else self._layout()
+            commit_id = self._repository(layout).pull()
+            self.logger.info(f"Pulled config repository: {commit_id}")
             return str(commit_id) if commit_id else None
         except Exception as e:
-            self.logger.warning(f"Failed to pull from GitHub: {e}")
+            self.logger.warning(f"Failed to pull the config repository: {e}")
             return None
 
     def push_files(self, push_config: GitHubPushConfig) -> dict[str, Any]:
-        """Push calibration results to GitHub repository.
+        """Publish the session's owned files in one commit.
 
-        This method handles different file types with appropriate strategies:
-        - CALIB_NOTE: Direct copy of calib_note.json
-        - PROPS: Uses ChipDocument extraction and merge logic (existing implementation)
-        - PARAMS: Direct copy of params.yaml
-        - ALL_PARAMS: Copy all *.yaml files from params/ directory
-
-        Args:
-            push_config: Configuration specifying which files to push
-
-        Returns:
-            Dictionary mapping file types to commit SHAs or error messages
-
-        Example:
-            ```python
-            config = GitHubPushConfig(
-                enabled=True,
-                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.PROPS]
-            )
-            results = integration.push_files(config)
-            # {"calib_note": "abc123def", "props": "def456ghi"}
-            ```
+        Returns a dictionary with the commit and the files per file type, or an
+        ``error`` entry when publishing failed. Files are collected for every System
+        in :attr:`system_ids`.
         """
-        results: dict[str, Any] = {}
-        pushed_any = False
-        had_error = False
-
-        for file_type in push_config.file_types:
-            try:
-                result: str | dict[str, Any]
+        layout = self._layout()
+        system_ids = self._resolved_system_ids(layout)
+        files: list[Path] = []
+        results: dict[str, Any] = {"system_ids": system_ids}
+        try:
+            for file_type in push_config.file_types:
                 if file_type == ConfigFileType.CALIB_NOTE:
-                    result = self._push_calib_note(push_config)
-                elif file_type == ConfigFileType.PROPS:
-                    result = self._push_props(push_config)
-                elif file_type == ConfigFileType.PARAMS:
-                    result = self._push_params_file(push_config)
+                    notes = [self._write_master_note(layout, sid) for sid in system_ids]
+                    files.extend(notes)
+                    results["calib_note"] = {"files": [str(layout.repo_relpath(p)) for p in notes]}
                 elif file_type == ConfigFileType.ALL_PARAMS:
-                    result = self._push_all_params(push_config)
-                else:
-                    continue
-
-                results[file_type.value] = result
-                if self._push_result_has_commit(result):
-                    pushed_any = True
-                if isinstance(result, dict) and "error" in result:
-                    had_error = True
-            except Exception as e:
-                self.logger.error(f"Failed to push {file_type.value}: {e}")
-                results[file_type.value] = f"Error: {e}"
-                had_error = True
-
-        if pushed_any and not had_error:
-            from qdash.workflow.worker.tasks.push_github import _sync_local_repo
-
-            _sync_local_repo(push_config.branch, self.logger)
-
+                    # Physics values are projected into every System of the chip, so
+                    # the params of unused Systems changed too.
+                    params = self._collect_params(
+                        layout,
+                        self._chip_system_ids(layout, system_ids),
+                        push_config.params_file_names,
+                    )
+                    files.extend(params)
+                    results["all_params"] = {"files": [p.name for p in params]}
+        except Exception as e:
+            self.logger.error(f"Failed to collect files to publish: {e}")
+            results["error"] = str(e)
+            for key in ("calib_note", "all_params"):
+                results.setdefault(key, {})["error"] = str(e)
+            return results
+        if not files:
+            results["status"] = "No files to push"
+            return results
+        message = (
+            push_config.commit_message
+            or f"Update calibration files from execution {self.execution_id}"
+        )
+        try:
+            publish = self._repository(layout).publish_owned(files, message, chip_id=self.chip_id)
+        except Exception as e:
+            self.logger.error(f"Failed to publish calibration files: {e}")
+            results["error"] = str(e)
+            for key in ("calib_note", "all_params"):
+                if key in results:
+                    results[key]["error"] = str(e)
+            return results
+        results["mode"] = publish.mode.value
+        results["commit"] = publish.commit if publish.changed else "No changes to commit"
+        if publish.pr_url:
+            results["pr_url"] = publish.pr_url
+        for key in ("calib_note", "all_params"):
+            if key in results:
+                results[key]["commit"] = results["commit"]
+        self.logger.info(f"Published {len(files)} file(s): {results['commit']}")
         return results
 
-    @staticmethod
-    def _push_result_has_commit(result: str | dict[str, Any]) -> bool:
-        if isinstance(result, str):
-            return result not in {"No changes to commit", "No files to commit"}
-        commit = result.get("commit")
-        return isinstance(commit, str) and commit not in {
-            "No changes to commit",
-            "No files to commit",
-        }
-
-    def _push_calib_note(self, config: GitHubPushConfig) -> str:
-        """Push calib_note.json (fetch master note from MongoDB and write to config dir).
-
-        This method:
-        1. Fetches the master calibration note from MongoDB (task_id="master")
-        2. Writes it to the chip's calibration directory (calib_note.json)
-        3. Pushes to GitHub
-
-        Args:
-            config: Push configuration
-
-        Returns:
-            Commit SHA
-
-        Raises:
-            FileNotFoundError: If no master calibration note exists in MongoDB
-        """
-        import json
-
+    def _write_master_note(self, layout: QubexLayout, system_id: str) -> Path:
+        """Write the project's master calibration note into a System's calibration dir."""
         from qdash.repository import MongoCalibrationNoteRepository
-        from qdash.workflow.worker.tasks.push_github import push_github
 
-        # 1. Fetch master note from MongoDB
         repo = MongoCalibrationNoteRepository()
         latest_note = repo.find_latest_master(
             chip_id=self.chip_id,
             project_id=self.project_id,
             username=None if self.project_id else self.username,
         )
-
         if latest_note is None:
             scope = f"project {self.project_id}" if self.project_id else f"user {self.username}"
-            msg = f"No master calibration note found in MongoDB for {scope}"
-            raise FileNotFoundError(msg)
+            raise FileNotFoundError(f"No master calibration note found in MongoDB for {scope}")
+        path = layout.calib_note_path(system_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(latest_note.note, f, indent=4, ensure_ascii=False, sort_keys=True)
+        self.logger.info(f"Wrote master note to {path}")
+        return path
 
-        master_note = latest_note.note
-
-        # 2. Write to calibration/calib_note.json
-        qubex_paths = get_qubex_paths()
-        calib_note_path = qubex_paths.calib_note_json(self.chip_id)
-        calib_note_path.parent.mkdir(parents=True, exist_ok=True)
-
-        source_path = str(calib_note_path)
-        with Path(source_path).open("w", encoding="utf-8") as f:
-            json.dump(master_note, f, indent=4, ensure_ascii=False, sort_keys=True)
-
-        self.logger.info(f"Wrote master note to {source_path}")
-
-        # 3. Push to GitHub
-        repo_subpath = f"{self.chip_id}/calibration/calib_note.json"
-        commit_message = (
-            config.commit_message or f"Update calib_note.json from execution {self.execution_id}"
-        )
-
-        commit_sha = push_github(
-            source_path=source_path,
-            repo_subpath=repo_subpath,
-            commit_message=commit_message,
-            branch=config.branch,
-            sync_local=False,
-        )
-
-        self.logger.info(f"Pushed calib_note.json: {commit_sha}")
-        return str(commit_sha)
-
-    def _push_props(self, config: GitHubPushConfig) -> str:
-        """Push props.yaml using existing merge logic.
-
-        This method reuses the existing push_props implementation which:
-        1. Extracts chip properties from ChipDocument
-        2. Merges with existing props.yaml using ruamel.yaml (preserves comments)
-        3. Applies proper formatting (scientific notation, fidelity checks)
-        4. Pushes to GitHub
-
-        Args:
-            config: Push configuration
-
-        Returns:
-            Commit SHA
-        """
-        from qdash.workflow.worker.flows.push_props.create_props import create_chip_properties
-        from qdash.workflow.worker.tasks.push_github import push_github
-
-        source_path = str(get_qubex_paths().props_yaml(self.chip_id))
-        repo_subpath = f"{self.chip_id}/params/props.yaml"
-
-        # Use existing implementation to generate/merge props.yaml from ChipDocument
-        create_chip_properties(
-            username=self.username,
-            source_path=source_path,
-            target_path=source_path,
-            chip_id=self.chip_id,
-            project_id=self.project_id,
-        )
-
-        commit_message = (
-            config.commit_message or f"Update props.yaml from execution {self.execution_id}"
-        )
-
-        commit_sha = push_github(
-            source_path=source_path,
-            repo_subpath=repo_subpath,
-            commit_message=commit_message,
-            branch=config.branch,
-            sync_local=False,
-        )
-
-        self.logger.info(f"Pushed props.yaml: {commit_sha}")
-        return str(commit_sha)
-
-    def _push_params_file(self, config: GitHubPushConfig) -> str:
-        """Push params.yaml (simple copy).
-
-        Args:
-            config: Push configuration
-
-        Returns:
-            Commit SHA
-
-        Raises:
-            FileNotFoundError: If params.yaml does not exist
-        """
-        from qdash.workflow.worker.tasks.push_github import push_github
-
-        source_path = str(get_qubex_paths().params_yaml(self.chip_id))
-        repo_subpath = f"{self.chip_id}/params/params.yaml"
-
-        if not Path(source_path).exists():
-            msg = f"params.yaml not found: {source_path}"
-            raise FileNotFoundError(msg)
-
-        commit_message = (
-            config.commit_message or f"Update params.yaml from execution {self.execution_id}"
-        )
-
-        commit_sha = push_github(
-            source_path=source_path,
-            repo_subpath=repo_subpath,
-            commit_message=commit_message,
-            branch=config.branch,
-            sync_local=False,
-        )
-
-        self.logger.info(f"Pushed params.yaml: {commit_sha}")
-        return str(commit_sha)
-
-    def _push_all_params(self, config: GitHubPushConfig) -> dict[str, Any]:
-        """Push configured yaml files in params directory in a single commit.
-
-        Args:
-            config: Push configuration
-
-        Returns:
-            Dictionary with commit SHA and list of pushed files
-        """
-        from qdash.workflow.worker.tasks.push_github import push_github_batch
-
-        params_dir = get_qubex_paths().params_dir(self.chip_id)
-
-        if not params_dir.exists():
-            self.logger.warning(f"Params directory not found: {params_dir}")
-            return {"error": f"Directory not found: {params_dir}"}
-
-        # Collect yaml files. By default this preserves the historical ALL_PARAMS
-        # behavior; params_file_names narrows the batch to an explicit allowlist.
-        files: list[tuple[str, str]] = []
-        yaml_files = self._select_param_yaml_files(params_dir, config.params_file_names)
-        for yaml_file in yaml_files:
-            source_path = str(yaml_file)
-            repo_subpath = f"{self.chip_id}/params/{yaml_file.name}"
-            files.append((source_path, repo_subpath))
-
-        if not files:
-            self.logger.info("No yaml files found in params directory")
-            return {"status": "No files to push"}
-
-        # Push all files in single commit
-        commit_message = (
-            config.commit_message or f"Update params from execution {self.execution_id}"
-        )
-
-        try:
-            commit_sha = push_github_batch(
-                files=files,
-                commit_message=commit_message,
-                branch=config.branch,
-                sync_local=False,
-            )
-            file_names = [Path(f[0]).name for f in files]
-            self.logger.info(f"Pushed {len(files)} param files in single commit: {commit_sha}")
-            return {"commit": str(commit_sha), "files": file_names}
-        except Exception as e:
-            self.logger.error(f"Failed to push params: {e}")
-            return {"error": str(e)}
+    def _collect_params(
+        self, layout: QubexLayout, system_ids: list[str], params_file_names: list[str] | None
+    ) -> list[Path]:
+        files: list[Path] = []
+        for system_id in system_ids:
+            params_dir = layout.params_dir(system_id)
+            if not params_dir.exists():
+                self.logger.warning(f"Params directory not found: {params_dir}")
+                continue
+            files.extend(self._select_param_yaml_files(params_dir, params_file_names))
+        return files
 
     def _select_param_yaml_files(
         self,
         params_dir: Path,
         params_file_names: list[str] | None,
     ) -> list[Path]:
-        """Select params YAML files to push, optionally constrained by filename."""
+        """Select params YAML files to publish, optionally constrained by filename."""
         if params_file_names is None:
             return sorted(params_dir.glob("*.yaml"))
 

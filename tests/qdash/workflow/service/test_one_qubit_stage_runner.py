@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 from typing import Any, cast
 
+import pytest
+
 from qdash.workflow.service.calib_service import CalibService
 from qdash.workflow.service.one_qubit_stage_runner import OneQubitStageRunner
 
@@ -168,3 +170,57 @@ def test_execute_simultaneous_spectroscopy_schedule_uses_isolated_batch(
         "step_0": {"0": {"CheckSimultaneousQubitSpectroscopy": {"task_id": "task-0"}}},
         "step_1": {"5": {"CheckSimultaneousQubitSpectroscopy": {"task_id": "task-5"}}},
     }
+
+
+def test_simultaneous_spectroscopy_step_spanning_systems_runs_one_worker_per_system(
+    monkeypatch: Any, tmp_path: Any
+) -> None:
+    """A step whose qids sit on two Systems never runs on the owner session."""
+    import yaml
+
+    config = tmp_path / "config"
+    config.mkdir()
+    (config / "chip.yaml").write_text(yaml.safe_dump({"144Q-test": {"n_qubits": 16}}))
+    (config / "system.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "144Q-test": {"chip_id": "144Q-test", "backend": "quel1"},
+                "144Q-test-quel3": {"chip_id": "144Q-test", "backend": "quel3"},
+            }
+        )
+    )
+    rows = lambda *ids: [{"mux": m, "ctrl": [f"C{m}-0"], "read_out": f"R{m}-0"} for m in ids]  # noqa: E731
+    (config / "wiring.yaml").write_text(
+        yaml.safe_dump({"144Q-test": rows(0, 1), "144Q-test-quel3": rows(2, 3)})
+    )
+    monkeypatch.setattr(
+        "qdash.common.config.qubex_layout.resolve_config_base_path", lambda: tmp_path
+    )
+    service = _service()
+    service.execution_id = "exec-1"
+    service.flow_name = "flow-1"
+    runner = OneQubitStageRunner(service)
+    calls: list[tuple[list[str], str | None]] = []
+
+    def run_qubit_batch_calibration_isolated(
+        *, qids: list[str], tasks: list[str], session_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        calls.append((qids, session_config.get("system_id")))
+        return {qid: {tasks[0]: {"task_id": f"task-{qid}"}} for qid in qids}
+
+    monkeypatch.setattr(
+        "qdash.workflow.service.one_qubit_stage_runner.run_qubit_batch_calibration_isolated",
+        run_qubit_batch_calibration_isolated,
+    )
+    monkeypatch.setattr(
+        "qdash.workflow.service.one_qubit_stage_runner.get_session",
+        lambda: pytest.fail("the owner session must not run a step that spans Systems"),
+    )
+    schedule = SimpleNamespace(steps=[SimpleNamespace(step_index=0, parallel_qids=["0", "9"])])
+
+    result = runner.execute_simultaneous_spectroscopy_schedule(
+        schedule, tasks=["CheckSimultaneousQubitSpectroscopy"]
+    )
+
+    assert sorted(calls) == [(["0"], "144Q-test"), (["9"], "144Q-test-quel3")]
+    assert set(result["step_0"]) == {"0", "9"}

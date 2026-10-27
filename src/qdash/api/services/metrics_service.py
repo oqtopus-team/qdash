@@ -193,6 +193,7 @@ class MetricsService:
         selection_mode: Literal["latest", "best", "average"] = "latest",
         start_at: datetime | None = None,
         end_at: datetime | None = None,
+        system_id: str | None = None,
     ) -> dict[str, dict[str, MetricValue]]:
         """Extract metrics for qubits or couplings from task result history.
 
@@ -205,6 +206,7 @@ class MetricsService:
             selection_mode: "latest", "best", or "average"
             start_at: Optional absolute lower bound on ``start_at``
             end_at: Optional absolute upper bound on ``start_at``
+            system_id: Optional Qubex System; only results recorded on it count
 
         Returns:
         -------
@@ -228,6 +230,7 @@ class MetricsService:
             cutoff_time=cutoff_time,
             end_time=end_at,
             metrics_config=entity_metrics if selection_mode == "best" else None,
+            system_id=system_id,
         )
 
     def get_chip_metrics(
@@ -239,6 +242,7 @@ class MetricsService:
         selection_mode: Literal["latest", "best", "average"] = "latest",
         start_at: str | datetime | None = None,
         end_at: str | datetime | None = None,
+        system_id: str | None = None,
     ) -> ChipMetricsResponse:
         """Get chip calibration metrics for visualization.
 
@@ -273,10 +277,24 @@ class MetricsService:
         start_at_dt, end_at_dt = _parse_date_range(start_at, end_at)
 
         qubit_metrics = self.extract_entity_metrics(
-            chip_id, project_id, "qubit", within_hours, selection_mode, start_at_dt, end_at_dt
+            chip_id,
+            project_id,
+            "qubit",
+            within_hours,
+            selection_mode,
+            start_at_dt,
+            end_at_dt,
+            system_id=system_id,
         )
         coupling_metrics = self.extract_entity_metrics(
-            chip_id, project_id, "coupling", within_hours, selection_mode, start_at_dt, end_at_dt
+            chip_id,
+            project_id,
+            "coupling",
+            within_hours,
+            selection_mode,
+            start_at_dt,
+            end_at_dt,
+            system_id=system_id,
         )
 
         return ChipMetricsResponse(
@@ -300,6 +318,7 @@ class MetricsService:
         entity_type: Literal["qubit", "coupling"],
         limit: int | None = None,
         within_days: int | None = 30,
+        system_id: str | None = None,
     ) -> QubitMetricHistoryResponse:
         """Get historical metric data for a specific qubit or coupling.
 
@@ -341,6 +360,8 @@ class MetricsService:
 
         if cutoff_time:
             query["start_at"] = {"$gte": cutoff_time}
+        if system_id is not None:
+            query["system_id"] = system_id
 
         task_results = self._task_result_repo.find(
             query, sort=[("start_at", SortDirection.DESCENDING)], limit=limit
@@ -476,6 +497,7 @@ class MetricsService:
         cutoff_time: Any | None,
         end_time: Any | None = None,
         metrics_config: dict[str, Any] | None = None,
+        system_id: str | None = None,
     ) -> dict[str, dict[str, MetricValue]]:
         """Extract metrics using the appropriate aggregation strategy."""
         if not valid_metric_keys:
@@ -498,6 +520,7 @@ class MetricsService:
                     metric_modes=metric_modes,
                     cutoff_time=cutoff_time,
                     end_time=end_time,
+                    system_id=system_id,
                 )
             elif selection_mode == "average":
                 agg_results = self._task_result_repo.aggregate_average_metrics(
@@ -507,6 +530,7 @@ class MetricsService:
                     metric_keys=valid_metric_keys,
                     cutoff_time=cutoff_time,
                     end_time=end_time,
+                    system_id=system_id,
                 )
             else:  # latest
                 agg_results = self._task_result_repo.aggregate_latest_metrics(
@@ -516,6 +540,7 @@ class MetricsService:
                     metric_keys=valid_metric_keys,
                     cutoff_time=cutoff_time,
                     end_time=end_time,
+                    system_id=system_id,
                 )
         except Exception as e:
             logger.error(f"Failed to aggregate {selection_mode} metrics: {e}")

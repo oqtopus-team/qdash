@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -914,3 +915,73 @@ def test_save_request_distinguishes_an_omitted_folder_from_the_root() -> None:
 
     assert SaveFlowRequest(name="f", code="", chip_id="c").folder is None
     assert SaveFlowRequest(name="f", code="", chip_id="c", folder="").folder == ""
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_rejects_targets_that_span_systems(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Targets on two Systems are refused with the split before anything is scheduled."""
+    from fastapi import HTTPException
+
+    from qdash.common.config.system_catalog import SystemSplitRequired
+
+    scheduled: list[dict[str, object]] = []
+
+    def _record(self: object, **kwargs: object) -> str:
+        scheduled.append(kwargs)
+        return "exec-1"
+
+    monkeypatch.setattr(FlowService, "_create_scheduled_execution", _record)
+
+    class _Catalog:
+        def resolve_single(self, qids, *, mux_ids=None):
+            raise SystemSplitRequired("chip-1", {"chip-1": ["1"], "chip-1-quel3": ["9"]})
+
+    monkeypatch.setattr("qdash.api.services.system_split._catalog", lambda chip_id: _Catalog())
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
+
+    with pytest.raises(HTTPException) as info:
+        await FlowService(flow_repository=flow_repo).execute_flow(
+            name="my-flow",
+            request=ExecuteFlowRequest(parameters={"qids": ["1", "9"]}),
+            username="operator",
+            project_id="project-1",
+        )
+
+    assert info.value.status_code == 400
+    detail = cast("dict[str, Any]", info.value.detail)
+    assert detail["code"] == "system_split_required"
+    assert detail["systems"] == {"chip-1": ["1"], "chip-1-quel3": ["9"]}
+    assert scheduled == []
+
+
+@pytest.mark.asyncio
+async def test_execute_flow_with_a_declared_system_skips_the_split_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A flow that names its ``system_id`` is trusted to stay inside that System."""
+    monkeypatch.setattr(FlowService, "_create_scheduled_execution", lambda self, **kwargs: "exec-1")
+    monkeypatch.setattr(
+        flow_service, "get_client", lambda: _FakeExecuteFlowClientContext("flow-run-9")
+    )
+    calls: list[str] = []
+
+    def _catalog(chip_id: str) -> MagicMock:
+        calls.append(chip_id)
+        return MagicMock()
+
+    monkeypatch.setattr("qdash.api.services.system_split._catalog", _catalog)
+    flow_repo = MagicMock()
+    flow_repo.find_by_project_and_name.return_value = _make_fake_flow(chip_id="chip-1")
+
+    response = await FlowService(flow_repository=flow_repo).execute_flow(
+        name="my-flow",
+        request=ExecuteFlowRequest(parameters={"qids": ["1", "9"], "system_id": "chip-1"}),
+        username="operator",
+        project_id="project-1",
+    )
+
+    assert response.execution_id == "exec-1"
+    assert calls == []

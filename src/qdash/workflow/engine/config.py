@@ -24,6 +24,7 @@ class CalibConfig:
         tags: Tags for categorization
         note: Additional notes
         muxes: MUX IDs for system-level tasks
+        system_id: Qubex System this session connects to; derived from the targets when None
         project_id: Project ID for multi-tenancy
         enable_github_pull: Whether to pull config from GitHub
         enable_provenance_tracking: Whether to track data provenance for lineage
@@ -44,6 +45,7 @@ class CalibConfig:
     tags: list[str] | None = None
     note: dict[str, Any] | None = None
     muxes: list[int] | None = None
+    system_id: str | None = None  # Explicit Qubex System; otherwise derived from qids/muxes
     project_id: str | None = None
     enable_github_pull: bool = True
     enable_provenance_tracking: bool = True

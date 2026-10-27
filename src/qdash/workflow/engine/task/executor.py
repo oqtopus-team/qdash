@@ -314,6 +314,16 @@ class TaskExecutor:
             task_name, message, task_type, qid, stack_trace
         )
 
+    def _record_system_id(
+        self, backend: "BaseBackend", task_name: str, task_type: str, qid: str
+    ) -> None:
+        """Stamp the task result with the Qubex System the session resolved to."""
+        config = getattr(backend, "config", None)
+        system_id = config.get("system_id") if isinstance(config, dict) else None
+        if system_id:
+            task_model = self.state_manager.get_task(task_name, task_type, qid)
+            task_model.system_id = str(system_id)
+
     def execute(
         self,
         task: TaskProtocol,
@@ -358,6 +368,7 @@ class TaskExecutor:
 
             # 1. Start task
             self.state_manager.start_task(task_name, task_type, qid)
+            self._record_system_id(backend, task_name, task_type, qid)
 
             # 1.5 Apply snapshot overrides early so initial history record
             #     contains the correct (overridden) parameter values.
@@ -620,6 +631,7 @@ class TaskExecutor:
             for qid in qids:
                 self.state_manager.ensure_task_exists(task_name, task_type, qid)
                 self.state_manager.start_task(task_name, task_type, qid)
+                self._record_system_id(backend, task_name, task_type, qid)
                 started_qids.append(qid)
 
                 if self._snapshot_loader is not None:

@@ -11,8 +11,10 @@ from qdash.workflow.service._internal.scheduling_tasks import (
     run_qubit_batch_calibration_isolated,
 )
 from qdash.workflow.service.calib_service import get_session
+from qdash.workflow.service.system_groups import plan_system_waves
 
 if TYPE_CHECKING:
+    from qdash.common.config.system_catalog import SystemCatalog
     from qdash.workflow.service.calib_service import CalibService
 
 
@@ -22,6 +24,16 @@ class OneQubitStageRunner:
     def __init__(self, cal_service: CalibService, *, project_id: str | None = None) -> None:
         self.cal_service = cal_service
         self.project_id = project_id or cal_service.project_id
+        self._system_catalog: SystemCatalog | None = None
+
+    def _catalog(self) -> SystemCatalog:
+        """Chip -> System catalog used to keep MUX groups inside one System."""
+        if self._system_catalog is None:
+            from qdash.common.config.qubex_layout import QubexLayout
+            from qdash.common.config.system_catalog import SystemCatalog
+
+            self._system_catalog = SystemCatalog(QubexLayout.detect(), self.cal_service.chip_id)
+        return self._system_catalog
 
     def build_session_config(self, *, execution_id: str, flow_name: str | None) -> dict[str, Any]:
         """Build isolated-worker session config for the current parent execution."""
@@ -81,12 +93,14 @@ class OneQubitStageRunner:
                 parallel_groups = [group for group in parallel_groups if group]
                 if not parallel_groups:
                     continue
-                mux_results = run_mux_calibrations_parallel(
-                    mux_groups=parallel_groups,
-                    tasks=tasks,
-                    session_config=session_config,
-                )
-                stage_results.update(mux_results)
+                for wave in plan_system_waves(parallel_groups, self._catalog()):
+                    mux_results = run_mux_calibrations_parallel(
+                        mux_groups=wave.groups,
+                        tasks=tasks,
+                        session_config=session_config,
+                        **wave.worker_kwargs("group_system_ids"),
+                    )
+                    stage_results.update(mux_results)
             if stage_results:
                 all_results[f"Box_{box_type}"] = stage_results
         return all_results
@@ -111,12 +125,36 @@ class OneQubitStageRunner:
                 step.step_index,
                 len(step_qids),
             )
-            if session_config is not None:
-                all_results[f"step_{step.step_index}"] = run_qubit_batch_calibration_isolated(
-                    qids=step_qids,
-                    tasks=tasks,
-                    session_config=session_config,
+            waves = plan_system_waves([[qid] for qid in step_qids], self._catalog())
+            step_systems = {sid for wave in waves for sid in wave.group_system_ids}
+            if session_config is not None or len(step_systems) > 1:
+                # One Experiment drives one System: a step whose qids sit on
+                # several Systems runs as one isolated worker per System (Systems
+                # with different backends share a wave and run concurrently).
+                config = session_config or self.build_session_config(
+                    execution_id=self.cal_service.execution_id or "",
+                    flow_name=self.cal_service.flow_name,
                 )
+                isolated_results: dict[str, Any] = {}
+                for wave in waves:
+                    for system_id in dict.fromkeys(wave.group_system_ids):
+                        wave_qids = [
+                            qid
+                            for qid, sid in zip(wave.qids, wave.group_system_ids, strict=True)
+                            if sid == system_id
+                        ]
+                        isolated_results.update(
+                            run_qubit_batch_calibration_isolated(
+                                qids=wave_qids,
+                                tasks=tasks,
+                                session_config=(
+                                    {**config, "system_id": system_id}
+                                    if system_id is not None
+                                    else config
+                                ),
+                            )
+                        )
+                all_results[f"step_{step.step_index}"] = isolated_results
                 continue
 
             session = get_session()

@@ -2,7 +2,14 @@
 
 import type { ReactNode } from "react";
 
-import { ArrowDown, ChevronDown, ExternalLink, GitBranch, GitPullRequestArrow } from "lucide-react";
+import {
+  ArrowDown,
+  ChevronDown,
+  ExternalLink,
+  GitBranch,
+  GitPullRequestArrow,
+  RefreshCw,
+} from "lucide-react";
 
 import {
   DropdownMenu,
@@ -12,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
-import type { GitWorkspaceStatus } from "@/lib/fileWorkspace";
+import { type GitWorkspaceStatus, unpublishedCount } from "@/lib/fileWorkspace";
 
 import type { PullRequestCreated } from "./useGitWorkspace";
 
@@ -22,6 +29,9 @@ interface GitWorkspaceToolbarProps {
   onPush: () => void;
   isPulling: boolean;
   isPushing: boolean;
+  /** Publish unpublished calibration files, then pull. Absent for a workspace without a repository. */
+  onSync?: () => void;
+  isSyncing?: boolean;
   /** Hidden on small screens when the page has its own mobile controls. */
   hideOnMobile?: boolean;
   pushTitle?: string;
@@ -39,14 +49,18 @@ export function GitWorkspaceToolbar({
   onPush,
   isPulling,
   isPushing,
+  onSync,
+  isSyncing = false,
   hideOnMobile = false,
   pushTitle = "Create a pull request with the saved changes",
   menuItems,
 }: GitWorkspaceToolbarProps) {
   const responsive = hideOnMobile ? "hidden sm:inline-flex" : "inline-flex";
   const attention = status?.has_remote_updates || status?.is_dirty;
+  const unpublished = unpublishedCount(status);
   return (
     <>
+      <RepositoryBadges status={status} hideOnMobile={hideOnMobile} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -100,6 +114,24 @@ export function GitWorkspaceToolbar({
               <span className="badge badge-warning badge-xs">new</span>
             )}
           </DropdownMenuItem>
+          {onSync && status?.mode !== "plain" && (
+            <DropdownMenuItem onSelect={onSync} disabled={isSyncing}>
+              {isSyncing ? (
+                <span className="loading loading-spinner loading-xs" />
+              ) : (
+                <RefreshCw size={16} />
+              )}
+              <span className="flex-1">Sync</span>
+              {unpublished > 0 && (
+                <span
+                  className="badge badge-warning badge-xs"
+                  title={`${unpublished} unpublished ${unpublished === 1 ? "change" : "changes"}`}
+                >
+                  {unpublished}
+                </span>
+              )}
+            </DropdownMenuItem>
+          )}
           {menuItems && (
             <>
               <DropdownMenuSeparator />
@@ -123,6 +155,87 @@ export function GitWorkspaceToolbar({
         <span className="ml-1">Create PR</span>
       </button>
     </>
+  );
+}
+
+const MODE_LABEL: Record<string, string> = {
+  github: "GitHub",
+  "local-git": "Local git",
+  plain: "No repository",
+};
+
+/**
+ * How the workspace is synchronized (GitHub, local git, none), its Qubex
+ * layout, and the count of unpublished changes.
+ */
+function RepositoryBadges({
+  status,
+  hideOnMobile = false,
+}: {
+  status: GitWorkspaceStatus | undefined;
+  hideOnMobile?: boolean;
+}) {
+  if (!status?.mode) return null;
+  const unpublished = unpublishedCount(status);
+  const responsive = hideOnMobile ? "hidden sm:flex" : "flex";
+  return (
+    <div className={`${responsive} items-center gap-1`} data-testid="repository-badges">
+      <span
+        className={`badge badge-sm ${status.mode === "github" ? "badge-info" : "badge-ghost"}`}
+        title={`Repository mode: ${status.mode}`}
+      >
+        {MODE_LABEL[status.mode] ?? status.mode}
+      </span>
+      {status.layout && (
+        <span
+          className="badge badge-sm badge-outline"
+          title={
+            status.layout_version
+              ? `Qubex layout ${status.layout_version} (${status.layout})${
+                  status.manifest_present
+                    ? ", declared by qubex-config.json"
+                    : ", inferred from the tree"
+                }`
+              : `Qubex layout: ${status.layout}`
+          }
+        >
+          {status.layout_version ? `${status.layout} ${status.layout_version}` : status.layout}
+        </span>
+      )}
+      {status.layout_version && status.manifest_present === false && (
+        <span
+          className="badge badge-sm badge-warning"
+          title={`The configuration repository has no qubex-config.json; the layout version ${status.layout_version} is inferred from the tree`}
+        >
+          no manifest
+        </span>
+      )}
+      {status.schemas_status === "differs" && (
+        <span
+          className="badge badge-sm badge-warning"
+          title="schemas/ in the configuration tree differs from the schemas QDash validates with"
+        >
+          schemas
+        </span>
+      )}
+      {status.review_required && (
+        <span
+          className="badge badge-sm badge-outline"
+          title="Workflow publishes open a pull request"
+        >
+          review
+        </span>
+      )}
+      {unpublished > 0 && (
+        <span
+          className="badge badge-sm badge-warning"
+          title={`${unpublished} unpublished ${unpublished === 1 ? "change" : "changes"}`}
+          aria-label={`${unpublished} unpublished ${unpublished === 1 ? "change" : "changes"}`}
+        >
+          {unpublished} unpublished
+        </span>
+      )}
+    </div>
   );
 }
 

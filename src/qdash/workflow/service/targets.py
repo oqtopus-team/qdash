@@ -23,8 +23,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
-
 
 @dataclass
 class Target(ABC):
@@ -81,8 +79,7 @@ class MuxTargets(Target):
         """Resolve MUX IDs to qubit IDs using wiring configuration."""
         from qdash.workflow.engine import OneQubitScheduler
 
-        wiring_config_path = str(get_qubex_paths().wiring_yaml(chip_id))
-        scheduler = OneQubitScheduler(chip_id=chip_id, wiring_config_path=wiring_config_path)
+        scheduler = OneQubitScheduler(chip_id=chip_id)
         schedule = scheduler.generate_from_mux(
             mux_ids=self.mux_ids,
             exclude_qids=self.exclude_qids,
@@ -102,14 +99,12 @@ class MuxTargets(Target):
             raise ValueError("project_id is required to resolve coupling targets")
 
         qids = self.to_qids(chip_id)
-        wiring_config_path = str(get_qubex_paths().wiring_yaml(chip_id))
 
         # Use CRScheduler to get valid coupling pairs
         # Note: This returns all possible pairs, filtering happens in steps
         scheduler = CRScheduler(
             username="",  # Not needed for pair generation
             chip_id=chip_id,
-            wiring_config_path=wiring_config_path,
             project_id=project_id,
         )
         schedule = scheduler.generate(candidate_qubits=qids, max_parallel_ops=100)
@@ -148,11 +143,9 @@ class QubitTargets(Target):
         if not project_id:
             raise ValueError("project_id is required to resolve coupling targets")
 
-        wiring_config_path = str(get_qubex_paths().wiring_yaml(chip_id))
         scheduler = CRScheduler(
             username="",
             chip_id=chip_id,
-            wiring_config_path=wiring_config_path,
             project_id=project_id,
         )
         schedule = scheduler.generate(candidate_qubits=self.qids, max_parallel_ops=100)

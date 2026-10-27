@@ -9,6 +9,12 @@ Explanations and change procedures remain in the Developer Guide.
 | --- | --- |
 | Collection names and their document classes | [Database Collections](./database-structure.md) |
 
+## Configuration Files
+
+| Information | Reference |
+| --- | --- |
+| qubex-config layout versions, files and JSON Schemas | [qubex-config Layout](./qubex-config-layout.md) |
+
 ## API and Clients
 
 | Information | Reference |

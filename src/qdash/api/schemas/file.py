@@ -24,6 +24,7 @@ class ValidateFileRequest(BaseModel):
 
     content: str
     file_type: str  # "yaml" or "json"
+    path: str | None = None  # workspace-relative path; selects the layout schema to check
 
 
 class GitPushRequest(BaseModel):

@@ -305,3 +305,89 @@ def test_migrate_forum_status_moves_closed_and_legacy_labels(init_db):
     assert "is_closed" not in closed_doc
     assert review_doc["labels"] == ["review"]
     assert plain_doc["status"] == "open"
+
+
+def test_backfill_task_result_system_id_copies_the_chip(init_db):
+    from qdash.dbmodel.migration import (
+        BACKFILL_TASK_RESULT_SYSTEM_ID_MIGRATION_ID,
+        migrate_backfill_task_result_system_id,
+    )
+
+    init_db["task_result_history"].insert_many(
+        [
+            {"task_id": "a", "chip_id": "64Qv3"},
+            {"task_id": "b", "chip_id": "144Qv3", "system_id": None},
+            {"task_id": "c", "chip_id": "144Qv3", "system_id": "144Qv3-quel3"},
+        ]
+    )
+
+    assert migrate_backfill_task_result_system_id(init_db) == {"matched": 2, "updated": 0}
+    assert init_db["task_result_history"].find_one({"task_id": "a"}).get("system_id") is None
+
+    executed = run_pending_database_migrations(init_db, dry_run=False)
+
+    assert executed[BACKFILL_TASK_RESULT_SYSTEM_ID_MIGRATION_ID]["stats"]["updated"] == 2
+    by_task = {doc["task_id"]: doc["system_id"] for doc in init_db["task_result_history"].find()}
+    assert by_task == {"a": "64Qv3", "b": "144Qv3", "c": "144Qv3-quel3"}
+
+
+def test_create_chip_calibration_note_master_copies_the_newest_snapshot(init_db):
+    from qdash.dbmodel.migration import (
+        CHIP_CALIBRATION_NOTE_MASTER_MIGRATION_ID,
+        migrate_create_chip_calibration_note_master,
+    )
+
+    init_db["calibration_note"].insert_many(
+        [
+            {
+                "project_id": "p",
+                "chip_id": "a",
+                "task_id": "master",
+                "execution_id": "e1",
+                "timestamp": "2026-01-01T00:00:00",
+                "note": {"v": 1},
+                "version": 3,
+            },
+            {
+                "project_id": "p",
+                "chip_id": "a",
+                "task_id": "master",
+                "execution_id": "e2",
+                "timestamp": "2026-01-02T00:00:00",
+                "note": {"v": 2},
+                "version": 1,
+            },
+            {
+                "project_id": "p",
+                "chip_id": "b",
+                "task_id": "master",
+                "execution_id": "master",
+                "timestamp": "2026-01-01T00:00:00",
+                "note": {"v": 9},
+            },
+            {
+                "project_id": "p",
+                "chip_id": "c",
+                "task_id": "other",
+                "execution_id": "e3",
+                "timestamp": "2026-01-01T00:00:00",
+                "note": {},
+            },
+        ]
+    )
+
+    assert migrate_create_chip_calibration_note_master(init_db) == {"matched": 1, "created": 0}
+
+    executed = run_pending_database_migrations(init_db, dry_run=False)
+
+    assert executed[CHIP_CALIBRATION_NOTE_MASTER_MIGRATION_ID]["stats"] == {
+        "matched": 1,
+        "created": 1,
+    }
+    created = init_db["calibration_note"].find_one(
+        {"chip_id": "a", "execution_id": "master", "task_id": "master"}
+    )
+    assert created["note"] == {"v": 2}
+    assert created["version"] == 0
+    assert init_db["calibration_note"].count_documents({"chip_id": "a"}) == 3
+    assert init_db["calibration_note"].count_documents({"chip_id": "b"}) == 1

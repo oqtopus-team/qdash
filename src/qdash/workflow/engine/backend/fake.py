@@ -2,7 +2,10 @@ from typing import Any
 
 from qdash.datamodel.task import TaskTypes
 from qdash.workflow.engine.backend.base import BaseBackend
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.workflow.engine.backend.qubex_paths import (
+    resolve_session_system_id,
+    session_experiment_paths,
+)
 
 
 class FakeBackend(BaseBackend):
@@ -39,17 +42,18 @@ class FakeBackend(BaseBackend):
         else:
             qubits = []
 
-        chip_id = self._config.get("chip_id", "64Q")
-        qubex_paths = get_qubex_paths()
+        system_id = resolve_session_system_id(self._config)
+        self._config["system_id"] = system_id
+        paths = session_experiment_paths(self._config, system_id)
         self._exp = FakeExperiment(
-            chip_id=chip_id,
+            system_id=system_id,
             qubits=qubits or None,
             muxes=self._config.get("muxes", None),
-            config_dir=self._config.get("config_dir", str(qubex_paths.config_dir(chip_id))),
-            params_dir=self._config.get("params_dir", str(qubex_paths.params_dir(chip_id))),
+            config_dir=paths["config_dir"],
+            params_dir=paths["params_dir"],
             classifier_dir=self._config.get("classifier_dir", "."),
             readout_duration=self._config.get("readout_duration"),
-            calib_note_path=self._config.get("note_path", str(qubex_paths.default_calib_note_path)),
+            calib_note_path=paths["calib_note_path"],
         )
         self._exp.connect()
 

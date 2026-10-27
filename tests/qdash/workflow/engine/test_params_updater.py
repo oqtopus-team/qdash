@@ -23,7 +23,7 @@ class TestParamsUpdaterNoneHandling:
 
     def test_none_values_output_as_null(self):
         """Verify that None values are written as explicit 'null' in YAML."""
-        from qdash.workflow.worker.flows.push_props.formatter import represent_none
+        from qdash.common.config.params_updater import represent_none
 
         # Setup YAML the same way as _QubexParamsUpdater
         yaml_obj = YAML(typ="rt")
@@ -61,7 +61,7 @@ class TestParamsUpdaterNoneHandling:
         The key requirement is that None values are explicitly represented as 'null'
         in the YAML output, not as empty values.
         """
-        from qdash.workflow.worker.flows.push_props.formatter import represent_none
+        from qdash.common.config.params_updater import represent_none
 
         # Setup YAML with custom representer (as in params_updater)
         yaml_obj = YAML(typ="rt")
@@ -80,7 +80,7 @@ class TestParamsUpdaterNoneHandling:
 
     def test_yaml_file_roundtrip_with_none(self):
         """Test that None values survive a write/read roundtrip."""
-        from qdash.workflow.worker.flows.push_props.formatter import represent_none
+        from qdash.common.config.params_updater import represent_none
 
         yaml_obj = YAML(typ="rt")
         yaml_obj.preserve_quotes = True

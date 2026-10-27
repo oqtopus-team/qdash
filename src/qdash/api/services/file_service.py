@@ -19,7 +19,6 @@ import yaml
 from fastapi import BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
 from git import Repo
-from git.exc import GitCommandError
 
 from qdash.api.lib.file_utils import validate_relative_path
 from qdash.api.schemas.file import FileTreeNode
@@ -28,8 +27,15 @@ from qdash.common.config.path_resolver import (
     resolve_config_base_path,
     resolve_served_calib_data_path,
 )
-from qdash.common.utils.commit_message import format_machine_commit_message
-from qdash.common.utils.datetime import now_iso
+from qdash.common.config.qubex_layout import QubexLayout
+from qdash.common.infrastructure.config_repository import (
+    ConfigRepository,
+    ConfigRepositoryError,
+    DirtySharedFiles,
+    GitHubSettings,
+    RepoMode,
+    get_config_repository,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -392,8 +398,10 @@ class FileService:
             "path": path,
         }
 
-    def validate_file_content(self, content: str, file_type: str) -> dict[str, Any]:
-        """Validate YAML or JSON content.
+    def validate_file_content(
+        self, content: str, file_type: str, path: str | None = None
+    ) -> dict[str, Any]:
+        """Validate YAML or JSON content, and its layout schema when ``path`` is given.
 
         Parameters
         ----------
@@ -401,11 +409,15 @@ class FileService:
             File content to validate.
         file_type : str
             File type ("yaml", "yml", or "json").
+        path : str | None
+            Workspace-relative path the content will be saved to. In the Qubex config
+            workspace it selects the JSON Schema of that file (chip, system, wiring,
+            box, skew, params or the manifest); other paths get the syntax check only.
 
         Returns
         -------
         dict[str, Any]
-            Validation result.
+            Validation result with ``problems`` (schema violations) when a schema applies.
 
         """
         import json
@@ -413,10 +425,14 @@ class FileService:
         try:
             if file_type.lower() in ["yaml", "yml"]:
                 yaml.safe_load(content)
-                return {"valid": True, "message": "Valid YAML"}
+                return self._with_schema_problems(
+                    {"valid": True, "message": "Valid YAML"}, content, path
+                )
             elif file_type.lower() == "json":
                 json.loads(content)
-                return {"valid": True, "message": "Valid JSON"}
+                return self._with_schema_problems(
+                    {"valid": True, "message": "Valid JSON"}, content, path
+                )
             else:
                 raise HTTPException(
                     status_code=400, detail="Unsupported file type. Use 'yaml' or 'json'"
@@ -437,13 +453,54 @@ class FileService:
             logger.error(f"Error validating file content: {e}")
             raise HTTPException(status_code=500, detail=f"Validation error: {e!s}")
 
+    def _with_schema_problems(
+        self, result: dict[str, Any], content: str, path: str | None
+    ) -> dict[str, Any]:
+        """Add layout-schema problems for a Qubex config file; other workspaces pass through."""
+        if not path or self._label != "config":
+            return result
+        from qdash.common.config.qubex_config_schema import schema_for, validate_text
+
+        layout = QubexLayout.detect(self._base_path)
+        schema_name = schema_for(path, layout)
+        if schema_name is None:
+            return result
+        problems = validate_text(content, path, layout)
+        result["schema"] = schema_name
+        result["problems"] = [
+            {"location": problem.location, "message": problem.message} for problem in problems
+        ]
+        if problems:
+            result["valid"] = False
+            result["message"] = f"{len(problems)} schema problem(s) in {path}"
+        return result
+
+    def _repository(self, actor: str = "config-ui") -> ConfigRepository:
+        """The workspace's repository; the config workspace carries its Qubex layout."""
+        settings = GitHubSettings.from_env(repo_url_env=self._repo_url_env)
+        root: QubexLayout | Path = self._base_path
+        if self._label == "config":
+            root = QubexLayout.detect(self._base_path)
+        return get_config_repository(root, actor=actor, settings=settings, label=self._label)
+
+    def _require_github_mode(self, repository: ConfigRepository) -> None:
+        if repository.mode is not RepoMode.GITHUB:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Missing required environment variables: "
+                    + ", ".join(repository.settings.missing_variables)
+                ),
+            )
+
     def get_git_status(self) -> dict[str, Any]:
-        """Get Git status of config directory.
+        """Get Git status of the workspace directory.
 
         Returns
         -------
         dict[str, Any]
-            Git status information.
+            Git status information: the repository mode and layout, head, dirty
+            files, unpushed commits, and whether the remote moved on.
 
         """
         try:
@@ -452,53 +509,40 @@ class FileService:
                     status_code=404,
                     detail=f"{self._label.capitalize()} directory not found: {self._base_path}",
                 )
-
-            git_dir = self._base_path / ".git"
-            if not git_dir.exists():
+            status = self._repository().status()
+            if not status.is_git_repo:
                 return {
                     "is_git_repo": False,
+                    "mode": status.mode.value,
+                    "layout": status.layout.value if status.layout else None,
                     "message": f"{self._label.capitalize()} directory is not a Git repository",
                 }
-
-            repo = self._open_repo()
-
-            current_branch = repo.active_branch.name
-            current_commit = repo.head.commit.hexsha[:8]
-            commit_message = repo.head.commit.message.strip()
-            is_dirty = repo.is_dirty(untracked_files=True)
-            untracked_files = repo.untracked_files
-            changed_files = [item.a_path for item in repo.index.diff(None)]
-
-            has_remote_updates = False
-            try:
-                # Private repositories need the credentials; without them the
-                # fetch would fail on every status poll.
-                if not os.getenv("GITHUB_TOKEN"):
-                    raise RuntimeError("no GitHub credentials configured")
-                repo.remotes.origin.fetch()
-                local_sha = repo.head.commit.hexsha
-                remote_sha = repo.remotes.origin.refs.main.commit.hexsha
-                has_remote_updates = local_sha != remote_sha
-            except Exception:
-                logger.debug("Failed to fetch remote for update check")
-
             return {
                 "is_git_repo": True,
-                "branch": current_branch,
-                "commit": current_commit,
-                "commit_message": commit_message,
-                "is_dirty": is_dirty,
-                "changed_files": changed_files,
-                "untracked_files": untracked_files,
-                "has_remote_updates": has_remote_updates,
+                "mode": status.mode.value,
+                "layout": status.layout.value if status.layout else None,
+                "branch": status.branch,
+                "commit": status.head,
+                "commit_message": status.head_message,
+                "is_dirty": status.is_dirty,
+                "changed_files": status.changed_paths,
+                "untracked_files": status.untracked_paths,
+                "unpushed_commits": status.unpushed_commits,
+                "has_remote_updates": status.has_remote_updates,
+                "review_required": status.review_required,
             }
 
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error getting Git status: {e}")
             raise HTTPException(status_code=500, detail=f"Error getting Git status: {e!s}")
 
-    def git_pull_config(self) -> dict[str, Any]:
-        """Pull latest config from Git repository.
+    def git_pull_config(self, force: bool = False) -> dict[str, Any]:
+        """Pull latest files from the Git repository.
+
+        Unpublished changes to System-owned files (params, calibration notes) are
+        published first. Edited shared files stop the pull with 409 unless ``force``.
 
         Returns
         -------
@@ -506,85 +550,38 @@ class FileService:
             Pull operation result.
 
         """
-        import shutil
-        from urllib.parse import urlparse, urlunparse
-
-        repo_url = os.getenv(self._repo_url_env)
-
+        repository = self._repository()
+        self._require_github_mode(repository)
         try:
-            github_user = os.getenv("GITHUB_USER")
-            github_token = os.getenv("GITHUB_TOKEN")
-
-            if not all([github_user, github_token, repo_url]):
-                raise HTTPException(
-                    status_code=500,
-                    detail=(
-                        "Missing required environment variables:"
-                        f" GITHUB_USER, GITHUB_TOKEN, {self._repo_url_env}"
-                    ),
-                )
-
-            assert repo_url is not None
-
-            if (self._base_path / ".git").exists():
-                logger.info("Fetching latest changes from remote")
-                repo = self._open_repo()
-                repo.remotes.origin.set_url(repo_url)
-                repo.remotes.origin.fetch()
-                repo.git.reset("--hard", "origin/main")
-                repo.git.clean("-fd")
-            else:
-                logger.info(f"Cloning repository to the {self._label} directory")
-                if self._base_path.exists():
-                    shutil.rmtree(self._base_path)
-                self._base_path.parent.mkdir(parents=True, exist_ok=True)
-                repo = Repo.clone_from(repo_url, str(self._base_path), depth=1, env=self._git_env())
-
-            current = repo.head.commit
-            commit_sha = current.hexsha[:8]
-            commit_msg = (
-                current.message
-                if isinstance(current.message, str)
-                else current.message.decode("utf-8")
-            ).strip()
-
-            logger.info(f"Updated to commit: {commit_sha} - {commit_msg}")
-            logger.info(f"{self._label.capitalize()} files updated in: {self._base_path}")
-            self._run_hook(self._after_pull, "pull")
-
-            return {
-                "success": True,
-                "commit": commit_sha,
-                "commit_message": commit_msg,
-                "message": f"{self._label.capitalize()} files updated successfully",
-            }
-
-        except GitCommandError as e:
-            error_msg = str(e.stderr)
-            parsed_err = urlparse(repo_url or "")
-            masked_url: str = urlunparse(
-                (
-                    parsed_err.scheme,
-                    str(parsed_err.netloc).split("@")[-1],
-                    parsed_err.path,
-                    "",
-                    "",
-                    "",
-                )
+            result = repository.sync(force=force)
+        except DirtySharedFiles as e:
+            raise HTTPException(
+                status_code=409,
+                detail=f"{e!s}. Open a pull request with them or discard them with force.",
             )
-            logger.error(f"Git pull failed for {masked_url}: {error_msg}")
-            raise HTTPException(status_code=500, detail=f"Git pull failed: {error_msg}")
+        except ConfigRepositoryError as e:
+            raise HTTPException(status_code=500, detail=str(e))
         except Exception as e:
             logger.error(f"Error pulling from Git: {e}")
             raise HTTPException(status_code=500, detail=f"Error pulling from Git: {e!s}")
+        status = repository.status()
+        logger.info(f"Updated to commit: {result.commit} - {status.head_message}")
+        self._run_hook(self._after_pull, "pull")
+        return {
+            "success": True,
+            "commit": result.commit,
+            "commit_message": status.head_message,
+            "published": result.published,
+            "message": f"{self._label.capitalize()} files updated successfully",
+        }
 
     def git_push_config(self, commit_message: str) -> dict[str, Any]:
-        """Push config changes to Git repository.
+        """Open a pull request holding the workspace's changed files.
 
         Parameters
         ----------
         commit_message : str
-            Commit message for the push.
+            Commit message and pull request title.
 
         Returns
         -------
@@ -592,148 +589,33 @@ class FileService:
             Push operation result.
 
         """
-        import re
-        import shutil
-        import tempfile
-        from urllib.parse import urlparse, urlunparse
-
-        import httpx
-
-        repo_url = os.getenv(self._repo_url_env)
-
+        repository = self._repository()
+        self._require_github_mode(repository)
+        status = repository.status()
+        changed = [path for path in status.dirty_paths if path not in self._push_exclude]
+        if not changed:
+            logger.info("No changes to commit")
+            return {"success": True, "message": "No changes to commit", "commit": None}
         try:
-            github_user = os.getenv("GITHUB_USER")
-            github_token = os.getenv("GITHUB_TOKEN")
-
-            if not all([github_user, github_token, repo_url]):
-                raise HTTPException(
-                    status_code=500,
-                    detail=(
-                        "Missing required environment variables:"
-                        f" GITHUB_USER, GITHUB_TOKEN, {self._repo_url_env}"
-                    ),
-                )
-
-            assert repo_url is not None
-
-            match = re.match(r"https?://[^/]+/([^/]+)/([^/]+?)(?:\.git)?$", repo_url)
-            if not match:
-                raise HTTPException(status_code=500, detail=f"Invalid {self._repo_url_env} format")
-            owner = match.group(1)
-            repo_name = match.group(2)
-
-            temp_dir = tempfile.mkdtemp()
-            temp_dir_path = Path(temp_dir)
-
-            try:
-                logger.info("Cloning repository to temporary directory")
-                repo = Repo.clone_from(
-                    repo_url, temp_dir, branch="main", depth=1, env=self._git_env()
-                )
-
-                stamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
-                branch_name = f"{self._label}-update/{stamp}"
-                repo.git.checkout("-b", branch_name)
-
-                added_files = []
-                for rel_path in self._workspace_files():
-                    destination = temp_dir_path / rel_path
-                    destination.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(self._base_path / rel_path, destination)
-                    added_files.append(str(rel_path))
-
-                if not added_files:
-                    logger.info("No files to commit")
-                    return {
-                        "success": True,
-                        "message": "No files to commit",
-                        "commit": None,
-                    }
-
-                repo.index.add(added_files)
-
-                diff = repo.index.diff("HEAD")
-                if not diff:
-                    logger.info("No changes to commit")
-                    return {
-                        "success": True,
-                        "message": "No changes to commit",
-                        "commit": None,
-                    }
-
-                repo.git.config("user.name", "github-actions[bot]")
-                repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
-
-                now_jst = now_iso()
-                commit_msg = format_machine_commit_message(commit_message, now_jst)
-                repo.index.commit(commit_msg)
-
-                logger.info(f"Pushing branch {branch_name} to remote")
-                repo.remotes.origin.push(refspec=f"{branch_name}:{branch_name}")
-
-                commit_sha = repo.head.commit.hexsha[:8]
-
-                logger.info("Creating pull request")
-                pr_response = httpx.post(
-                    f"https://api.github.com/repos/{owner}/{repo_name}/pulls",
-                    headers={
-                        "Authorization": f"token {github_token}",
-                        "Accept": "application/vnd.github.v3+json",
-                    },
-                    json={
-                        "title": commit_message,
-                        "head": branch_name,
-                        "base": "main",
-                        "body": (
-                            f"{self._label.capitalize()} update from QDash UI\n\n"
-                            f"- Commit: `{commit_sha}`\n"
-                            f"- Timestamp: {now_jst}\n"
-                        ),
-                    },
-                    timeout=30,
-                )
-                pr_response.raise_for_status()
-                pr_data = pr_response.json()
-
-                logger.info(f"Pull request created: {pr_data['html_url']}")
-
-                return {
-                    "success": True,
-                    "commit": commit_sha,
-                    "commit_message": commit_msg,
-                    "message": "Pull request created successfully",
-                    "pr_url": pr_data["html_url"],
-                    "pr_number": pr_data["number"],
-                    "branch": branch_name,
-                }
-
-            finally:
-                if temp_dir_path.exists():
-                    shutil.rmtree(temp_dir)
-
-        except GitCommandError as e:
-            error_msg = str(e.stderr)
-            parsed_err = urlparse(repo_url or "")
-            masked_url: str = urlunparse(
-                (
-                    parsed_err.scheme,
-                    str(parsed_err.netloc).split("@")[-1],
-                    parsed_err.path,
-                    "",
-                    "",
-                    "",
-                )
-            )
-            logger.error(f"Git push failed for {masked_url}: {error_msg}")
-            raise HTTPException(status_code=500, detail=f"Git push failed: {error_msg}")
-        except httpx.HTTPStatusError as e:
-            logger.error(f"GitHub API error: {e.response.text}")
-            raise HTTPException(
-                status_code=500, detail=f"Failed to create pull request: {e.response.text}"
-            )
+            result = repository.propose(changed, commit_message, commit_message)
+        except ConfigRepositoryError as e:
+            raise HTTPException(status_code=500, detail=str(e))
         except Exception as e:
             logger.error(f"Error pushing to Git: {e}")
             raise HTTPException(status_code=500, detail=f"Error pushing to Git: {e!s}")
+        if not result.changed:
+            return {"success": True, "message": "No changes to commit", "commit": None}
+        logger.info(f"Pull request created: {result.pr_url}")
+        return {
+            "success": True,
+            "commit": result.commit,
+            "commit_message": commit_message,
+            "message": "Pull request created successfully",
+            "pr_url": result.pr_url,
+            "pr_number": result.pr_number,
+            "branch": result.branch,
+            "files": result.paths,
+        }
 
     # --- Private helpers ---
 

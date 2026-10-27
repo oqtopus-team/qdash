@@ -64,6 +64,8 @@ RENAME_AGENT_CANDIDATE_SET_COMMITS_MIGRATION_ID = (
 )
 AGENT_CAMPAIGN_COMMITS_COLLECTION = "agent_campaign_commits"
 AGENT_CANDIDATE_SET_COMMITS_COLLECTION = "agent_candidate_set_commits"
+BACKFILL_TASK_RESULT_SYSTEM_ID_MIGRATION_ID = "backfill-task-result-system-id-v1"
+CHIP_CALIBRATION_NOTE_MASTER_MIGRATION_ID = "create-chip-calibration-note-master-v1"
 
 _TASK_NAME_HISTORY_FIELDS: tuple[tuple[str, str], ...] = (
     ("task_result_history", "name"),
@@ -1544,6 +1546,67 @@ def migrate_rename_agent_candidate_set_commits(
     return stats
 
 
+def migrate_backfill_task_result_system_id(
+    database: Database[Any], dry_run: bool = True
+) -> dict[str, Any]:
+    """Set ``system_id = chip_id`` on task results recorded before Systems existed.
+
+    Every result without a System was measured when each chip had exactly one
+    System named like the chip, so the copy is exact.
+    """
+    collection = database["task_result_history"]
+    query = {"$or": [{"system_id": {"$exists": False}}, {"system_id": None}, {"system_id": ""}]}
+    stats: dict[str, Any] = {"matched": collection.count_documents(query), "updated": 0}
+    if dry_run or not stats["matched"]:
+        return stats
+    for doc in collection.find(query, {"_id": 1, "chip_id": 1}):
+        chip_id = doc.get("chip_id")
+        if not chip_id:
+            continue
+        result = collection.update_one({"_id": doc["_id"]}, {"$set": {"system_id": chip_id}})
+        stats["updated"] += result.modified_count
+    return stats
+
+
+def migrate_create_chip_calibration_note_master(
+    database: Database[Any], dry_run: bool = True
+) -> dict[str, Any]:
+    """Create the live chip master note from each chip's newest master snapshot.
+
+    Masters used to be one document per execution; the newest one was copied at
+    the start of the next run. The chip master (``execution_id == "master"``) is
+    the single merge target from now on, so each project/chip without one gets a
+    copy of its latest master. Existing documents are left untouched.
+    """
+    collection = database["calibration_note"]
+    pipeline: list[dict[str, Any]] = [
+        {"$match": {"task_id": "master"}},
+        {"$sort": {"timestamp": -1}},
+        {
+            "$group": {
+                "_id": {"project_id": "$project_id", "chip_id": "$chip_id"},
+                "has_chip_master": {
+                    "$max": {"$cond": [{"$eq": ["$execution_id", "master"]}, 1, 0]}
+                },
+                "latest": {"$first": "$$ROOT"},
+            }
+        },
+        {"$match": {"has_chip_master": 0}},
+    ]
+    missing = list(collection.aggregate(pipeline))
+    stats: dict[str, Any] = {"matched": len(missing), "created": 0}
+    if dry_run or not missing:
+        return stats
+    for group in missing:
+        latest = dict(group["latest"])
+        latest.pop("_id", None)
+        latest["execution_id"] = "master"
+        latest["version"] = 0
+        collection.insert_one(latest)
+        stats["created"] += 1
+    return stats
+
+
 def _migrate_task_name(
     database: Database[Any], *, old_name: str, new_name: str, dry_run: bool
 ) -> dict[str, Any]:
@@ -1666,6 +1729,8 @@ DATABASE_MIGRATIONS: tuple[tuple[str, DatabaseMigration], ...] = (
     (RENAME_CHECK_CHEVRON_MIGRATION_ID, migrate_rename_check_chevron),
     (RENAME_CHECK_EF_CHEVRON_MIGRATION_ID, migrate_rename_check_ef_chevron),
     (RENAME_AGENT_CANDIDATE_SET_COMMITS_MIGRATION_ID, migrate_rename_agent_candidate_set_commits),
+    (BACKFILL_TASK_RESULT_SYSTEM_ID_MIGRATION_ID, migrate_backfill_task_result_system_id),
+    (CHIP_CALIBRATION_NOTE_MASTER_MIGRATION_ID, migrate_create_chip_calibration_note_master),
 )
 
 

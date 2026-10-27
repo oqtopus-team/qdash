@@ -4,10 +4,17 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from qdash.datamodel.calibration_note import CalibrationNoteModel
+from qdash.datamodel.calibration_note import (
+    CHIP_MASTER_EXECUTION_ID,
+    MASTER_TASK_ID,
+    CalibrationNoteModel,
+)
 from qdash.datamodel.task import TaskTypes
 from qdash.workflow.engine.backend.base import BaseBackend
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.workflow.engine.backend.qubex_paths import (
+    resolve_session_system_id,
+    session_experiment_paths,
+)
 from qdash.workflow.engine.progress import ProgressPlan, ProgressReporter
 
 logger = logging.getLogger(__name__)
@@ -96,23 +103,23 @@ class QubexBackend(BaseBackend):
                 # Default to all qubits if task_type is not specified
                 qubits = []
 
-            chip_id = self._config.get("chip_id", "64Q")
-            qubex_paths = get_qubex_paths()
             classifier_dir = self._config.get("classifier_dir")
             if classifier_dir is None:
                 msg = "classifier_dir must be provided in config"
                 raise ValueError(msg)
+            # One Experiment drives one System; the targets decide which one.
+            system_id = resolve_session_system_id(self._config)
+            self._config["system_id"] = system_id
+            paths = session_experiment_paths(self._config, system_id)
             self._exp = Experiment(
-                chip_id=chip_id,
+                system_id=system_id,
                 qubits=qubits,
                 muxes=self._config.get("muxes", None),
-                config_dir=self._config.get("config_dir", str(qubex_paths.config_dir(chip_id))),
-                params_dir=self._config.get("params_dir", str(qubex_paths.params_dir(chip_id))),
+                config_dir=paths["config_dir"],
+                params_dir=paths["params_dir"],
                 classifier_dir=classifier_dir,
                 readout_duration=self._config.get("readout_duration"),
-                calib_note_path=self._config.get(
-                    "note_path", str(qubex_paths.default_calib_note_path)
-                ),
+                calib_note_path=paths["calib_note_path"],
                 **(
                     {"configuration_mode": self._config["configuration_mode"]}
                     if "configuration_mode" in self._config
@@ -159,9 +166,10 @@ class QubexBackend(BaseBackend):
     ) -> None:
         """Save the calibration note to the experiment.
 
-        Always creates a new master document for the current execution_id,
-        copying the latest master note content if one exists. This ensures
-        the document is ready before parallel workers start updating it.
+        The chip has one live master note (``execution_id == "master"``) that every
+        execution merges into. Starting a session creates it from the newest
+        legacy master when it does not exist yet, writes a per-execution snapshot
+        for history and reproduction, and loads the chip master into the session.
         """
         # Initialize calibration note
         note_path = Path(f"{calib_dir}/calib_note/{task_manager_id}.json")
@@ -171,18 +179,29 @@ class QubexBackend(BaseBackend):
         existing_master = repo.find_latest_master(chip_id=chip_id, project_id=project_id)
         initial_note = existing_master.note if existing_master is not None else {}
 
-        master_note = repo.upsert_on_insert(
+        chip_master = repo.upsert_on_insert(
             CalibrationNoteModel(
                 project_id=project_id,
                 username=username,
                 chip_id=chip_id,
-                execution_id=execution_id,
-                task_id="master",
+                execution_id=CHIP_MASTER_EXECUTION_ID,
+                task_id=MASTER_TASK_ID,
                 note=initial_note,
             )
         )
+        if execution_id != CHIP_MASTER_EXECUTION_ID:
+            repo.upsert_on_insert(
+                CalibrationNoteModel(
+                    project_id=project_id,
+                    username=username,
+                    chip_id=chip_id,
+                    execution_id=execution_id,
+                    task_id=MASTER_TASK_ID,
+                    note=chip_master.note,
+                )
+            )
 
-        note_path.write_text(json.dumps(master_note.note, indent=2))
+        note_path.write_text(json.dumps(chip_master.note, indent=2))
         self._sync_qubit_params_from_db(project_id=project_id, chip_id=chip_id)
 
     def _sync_qubit_params_from_db(self, *, project_id: str, chip_id: str) -> None:
@@ -224,7 +243,7 @@ class QubexBackend(BaseBackend):
         project_id: str,
         qid: str | None = None,
     ) -> None:
-        """Update the master calibration note in MongoDB atomically.
+        """Merge this session's note into the chip's live master note atomically.
 
         Uses per-qubit atomic $set operations to avoid TOCTOU race conditions
         when multiple Dask workers update different qubits in parallel. Each
@@ -238,7 +257,7 @@ class QubexBackend(BaseBackend):
         Note:
         ----
             task_manager_id is kept as a parameter for backward compatibility but not used.
-            Only the master note (task_id="master") is updated.
+            Only the chip master note (task_id="master", execution_id="master") is updated.
         """
         raw_note = self.get_note()
         calib_note = json.loads(raw_note)
@@ -272,12 +291,13 @@ class QubexBackend(BaseBackend):
 
         repo = self.calibration_note_repo
 
+        # Merge into the chip's live master; concurrent executions on other
+        # Systems write disjoint qubit paths of the same document.
         query_filter = {
-            "task_id": "master",
+            "task_id": MASTER_TASK_ID,
             "chip_id": chip_id,
             "project_id": project_id,
-            "username": username,
-            "execution_id": execution_id,
+            "execution_id": CHIP_MASTER_EXECUTION_ID,
         }
 
         repo.merge_note_fields(

@@ -20,6 +20,8 @@ from qdash.api.routers import (
     calibration_pipeline,
     chip,
     config,
+    config_boxes,
+    config_repository,
     cooldown,
     cooldown_wiring_event,
     copilot,
@@ -93,6 +95,8 @@ PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(cooldown_wiring_event.router, tags=("cooldown-wiring",)),
     RouterRegistration(topology.router, prefix="/topology", tags=("topology",)),
     RouterRegistration(config.router, tags=("config",)),
+    RouterRegistration(config_boxes.router, tags=("config",)),
+    RouterRegistration(config_repository.router, tags=("config-repository",)),
     RouterRegistration(provenance.router, prefix="/provenance", tags=("provenance",)),
 )
 

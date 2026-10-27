@@ -8,6 +8,7 @@
 import type { ChipResponseActivityStatus } from './chipResponseActivityStatus';
 import type { ChipResponseCurrentCooldownId } from './chipResponseCurrentCooldownId';
 import type { ChipResponseInstalledAt } from './chipResponseInstalledAt';
+import type { ChipResponseProvisioning } from './chipResponseProvisioning';
 import type { ChipResponseTopologyId } from './chipResponseTopologyId';
 import type { NoteModel } from './noteModel';
 
@@ -36,4 +37,6 @@ export interface ChipResponse {
   activity_status?: ChipResponseActivityStatus;
   current_cooldown_id?: ChipResponseCurrentCooldownId;
   note?: NoteModel;
+  /** Configuration files generated for the chip; only on creation */
+  provisioning?: ChipResponseProvisioning;
 }

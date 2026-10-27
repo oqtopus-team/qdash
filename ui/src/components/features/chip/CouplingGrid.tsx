@@ -30,6 +30,7 @@ import {
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
+import { filterCouplingEntries } from "@/lib/utils/systemQids";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
@@ -45,6 +46,8 @@ interface CouplingGridProps {
   endAt?: string | null;
   gridSize: number;
   onDateChange?: (date: string) => void;
+  /** Qubits of the selected System; couplings with a qubit elsewhere are hidden. */
+  systemQids?: Set<string> | null;
 }
 
 interface SelectedTaskInfo {
@@ -102,6 +105,7 @@ export function CouplingGrid({
   startAt,
   endAt,
   gridSize: defaultGridSize,
+  systemQids = null,
 }: CouplingGridProps) {
   // Get topology configuration
   const {
@@ -199,8 +203,8 @@ export function CouplingGrid({
     endAt,
   });
   const taskResultMap = useMemo(
-    () => taskResponse?.data?.result ?? {},
-    [taskResponse?.data?.result],
+    () => filterCouplingEntries(taskResponse?.data?.result, systemQids) ?? {},
+    [taskResponse?.data?.result, systemQids],
   );
 
   const downloadCounts = useMemo(() => {

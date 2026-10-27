@@ -19,4 +19,8 @@ limit?: number | null;
  * Filter to last N days
  */
 within_days?: number | null;
+/**
+ * Only results measured on this Qubex System.
+ */
+system_id?: string | null;
 };

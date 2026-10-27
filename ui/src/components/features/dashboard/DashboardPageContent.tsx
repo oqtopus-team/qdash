@@ -14,6 +14,7 @@ import type {
   GetChipNotesSummaryParams,
   TargetNoteEntry as SummaryTargetNoteEntry,
 } from "@/schemas";
+import { SystemSelector } from "@/components/features/chip/SystemSelector";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { Card } from "@/components/ui/Card";
@@ -32,6 +33,7 @@ import { useForumLabels } from "@/hooks/useForumLabels";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useMetricsUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
+import { useSystemUrlState } from "@/hooks/url-state/useSystemUrlState";
 import { dateToDateTimeLocal } from "@/lib/utils/datetime";
 
 import { DashboardCdfChart } from "./DashboardCdfChart";
@@ -139,6 +141,7 @@ export function DashboardPageContent() {
   const { user } = useAuth();
   const { projectId } = useProject();
   const { selectedChip, selectionMode, setSelectedChip, setSelectionMode } = useMetricsUrlState();
+  const { selectedSystemId, setSelectedSystemId } = useSystemUrlState();
 
   const { startDate, endDate, setStartDate, setEndDate, setQuickRange, hasUrlRange } =
     useRangeModeUrlState();
@@ -243,12 +246,16 @@ export function DashboardPageContent() {
     startDate,
   ]);
 
-  const { queryParams, canFetch } = useMetricsQueryParams({
+  const { queryParams: baseQueryParams, canFetch } = useMetricsQueryParams({
     selectionMode,
     startDate,
     endDate,
     selectedChip,
   });
+  const queryParams = useMemo(
+    () => ({ ...baseQueryParams, system_id: selectedSystemId ?? undefined }),
+    [baseQueryParams, selectedSystemId],
+  );
 
   const noteScopeParams = useMemo<GetChipNotesSummaryParams>(
     () =>
@@ -558,8 +565,16 @@ export function DashboardPageContent() {
                       setSelectedCooldownId(null);
                       setHasInitializedCooldownSelection(false);
                       honorUrlRangeRef.current = false;
+                      setSelectedSystemId(null);
                       setSelectedChip(chipId);
                     }}
+                  />
+                </PageFiltersBar.Item>
+                <PageFiltersBar.Item label="System" className="[&:not(:has([role=group]))]:hidden">
+                  <SystemSelector
+                    chipId={selectedChip}
+                    selectedSystemId={selectedSystemId}
+                    onSelect={setSelectedSystemId}
                   />
                 </PageFiltersBar.Item>
                 <PageFiltersBar.Item

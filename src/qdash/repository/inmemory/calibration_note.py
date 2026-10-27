@@ -7,7 +7,11 @@ useful for unit testing without requiring a MongoDB instance.
 from typing import Any
 
 from qdash.common.utils.datetime import now
-from qdash.datamodel.calibration_note import CalibrationNoteModel
+from qdash.datamodel.calibration_note import (
+    CHIP_MASTER_EXECUTION_ID,
+    MASTER_TASK_ID,
+    CalibrationNoteModel,
+)
 
 
 class InMemoryCalibrationNoteRepository:
@@ -123,7 +127,7 @@ class InMemoryCalibrationNoteRepository:
         for note in self._notes.values():
             if chip_id is not None and note.chip_id != chip_id:
                 continue
-            if note.task_id != "master":
+            if note.task_id != MASTER_TASK_ID:
                 continue
             if project_id is not None and note.project_id != project_id:
                 continue
@@ -134,9 +138,24 @@ class InMemoryCalibrationNoteRepository:
         if not candidates:
             return None
 
-        # Sort by timestamp descending and return the first
+        # The live chip master wins; otherwise the newest snapshot.
+        chip_masters = [n for n in candidates if n.execution_id == CHIP_MASTER_EXECUTION_ID]
+        if chip_masters:
+            candidates = chip_masters
         candidates.sort(key=lambda n: n.timestamp or "", reverse=True)
         return candidates[0]
+
+    def find_chip_master(self, *, chip_id: str, project_id: str) -> CalibrationNoteModel | None:
+        """The live master note of a chip (``execution_id == "master"``), if created."""
+        for note in self._notes.values():
+            if (
+                note.chip_id == chip_id
+                and note.project_id == project_id
+                and note.task_id == MASTER_TASK_ID
+                and note.execution_id == CHIP_MASTER_EXECUTION_ID
+            ):
+                return note
+        return None
 
     def find_latest_master_by_project(
         self,

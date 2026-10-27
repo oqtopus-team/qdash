@@ -10,6 +10,37 @@ from qdash.datamodel.note import NoteModel
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 
 
+class ChipPublishStatus(BaseModel):
+    """How the generated configuration files were published."""
+
+    status: Literal["published", "recorded", "failed", "skipped"] = Field(
+        description=(
+            "published: committed and pushed; recorded: written locally and logged "
+            "(no remote); failed: files and database records exist but the remote "
+            "rejected them; skipped: nothing to publish"
+        )
+    )
+    mode: str | None = Field(default=None, description="Repository mode (github, local-git, plain)")
+    commit: str | None = None
+    message: str | None = None
+
+
+class ChipProvisioningResult(BaseModel):
+    """Configuration files generated when a chip or System is created."""
+
+    provisioned: bool = Field(description="False when only database records were created")
+    layout: str = Field(description="Configuration tree layout: shared or legacy")
+    system_ids: list[str] = Field(default_factory=list)
+    inherited_from: str | None = Field(
+        default=None, description="Chip whose wiring and backend were copied"
+    )
+    files: list[str] = Field(
+        default_factory=list, description="Repository-relative paths written or updated"
+    )
+    publish: ChipPublishStatus = Field(default_factory=lambda: ChipPublishStatus(status="skipped"))
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ChipResponse(BaseModel):
     """Chip response model.
 
@@ -36,6 +67,10 @@ class ChipResponse(BaseModel):
     activity_status: Literal["active", "inactive"] = "active"
     current_cooldown_id: str | None = None
     note: NoteModel = Field(default_factory=NoteModel)
+    provisioning: ChipProvisioningResult | None = Field(
+        default=None,
+        description="Configuration files generated for the chip; only on creation",
+    )
 
 
 class CreateChipRequest(BaseModel):
@@ -46,12 +81,78 @@ class CreateChipRequest(BaseModel):
         chip_id (str): The ID of the chip to create.
         size (int): The size of the chip (64, 144, 256, or 1024).
         topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'.
+        display_name (str | None): Name written to chip.yaml; defaults to the chip ID.
+        provision_config (bool | None): Also generate the Qubex configuration files.
+            None (default) generates them when the configuration tree uses the shared layout.
+        backend (str | None): Backend of the generated System (quel1 or quel3).
+            Defaults to the inherited chip's backend, else quel1.
+        inherit_wiring_from (str | None): Chip whose wiring and Systems are copied.
+            Defaults to the previous chip on the cool-down's cryostat.
+        cooldown_id (str | None): Cool-down to load the chip into.
 
     """
 
-    chip_id: str
+    chip_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$", max_length=64)
     size: int = 64
     topology_id: str | None = None
+    display_name: str | None = Field(default=None, max_length=200)
+    provision_config: bool | None = None
+    backend: str | None = Field(default=None, pattern=r"^[a-z0-9]+$")
+    inherit_wiring_from: str | None = Field(default=None, max_length=64)
+    cooldown_id: str | None = None
+
+
+class ChipSystemInfo(BaseModel):
+    """One Qubex System driving the chip."""
+
+    system_id: str
+    chip_id: str = Field(description="Chip ID as the Qubex configuration names it")
+    driver: str = Field(description="QDash backend driver, e.g. qubex")
+    backend: str = Field(description="Hardware kind inside the driver, e.g. quel1 or quel3")
+    mux_ids: list[int] = Field(default_factory=list)
+    box_ids: list[str] = Field(default_factory=list, description="Boxes its wiring references")
+    is_default: bool = Field(description="Whether this System is named like the chip")
+    has_params: bool = Field(description="params/<system_id>/ exists")
+    has_calib_note: bool = Field(description="calibration/<system_id>/calib_note.json exists")
+    settings: dict[str, Any] = Field(default_factory=dict, description="The system.yaml entry")
+
+
+class ChipSystemsResponse(BaseModel):
+    """Systems of a chip as read from the Qubex configuration."""
+
+    chip_id: str
+    layout: str = Field(description="Configuration tree layout: shared or legacy")
+    provisionable: bool = Field(description="Whether Systems can be added (shared layout)")
+    systems: list[ChipSystemInfo] = Field(default_factory=list)
+    message: str | None = Field(
+        default=None, description="Why no Systems could be read, when the list is empty"
+    )
+
+
+class AddChipSystemRequest(BaseModel):
+    """Add a System driving some of the chip's MUXes with another backend."""
+
+    backend: str = Field(pattern=r"^[a-z0-9]+$", description="quel1 or quel3")
+    mux_ids: list[int] = Field(min_length=1, description="MUXes moved to the new System")
+    settings: dict[str, Any] = Field(
+        default_factory=dict, description="Backend section of the system.yaml entry"
+    )
+    wiring: list[dict[str, Any]] | None = Field(
+        default=None,
+        description=(
+            "Wiring rows of the moved MUXes on the new hardware. When omitted the rows "
+            "keep their current ports."
+        ),
+    )
+
+
+class AddChipSystemResponse(BaseModel):
+    """Result of adding a System."""
+
+    system: ChipSystemInfo
+    files: list[str] = Field(default_factory=list)
+    publish: ChipPublishStatus
+    warnings: list[str] = Field(default_factory=list)
 
 
 class UpdateChipRequest(BaseModel):

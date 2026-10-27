@@ -5,6 +5,7 @@ abstracting away the repository layer from the routers.
 """
 
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from functools import lru_cache
 from typing import Any
@@ -703,6 +704,7 @@ class ChipService:
         chip_id: str,
         limit: int = 100,
         offset: int = 0,
+        coupling_ids: list[str] | None = None,
     ) -> tuple[list[CouplingResponse], int]:
         """List couplings with pagination.
 
@@ -728,6 +730,7 @@ class ChipService:
             chip_id=chip_id,
             limit=limit,
             offset=offset,
+            coupling_ids=coupling_ids,
         )
         return (
             [
@@ -780,7 +783,19 @@ class ChipService:
             }
         )
 
-    def get_metrics_summary(self, project_id: str, chip_id: str) -> MetricsSummaryResponse | None:
+    def coupling_ids_within(
+        self, project_id: str, chip_id: str, include: Callable[[str], bool]
+    ) -> list[str]:
+        """Coupling IDs of the chip accepted by ``include`` (for example one System)."""
+        return [
+            coupling_id
+            for coupling_id in self._chip_repo.get_coupling_ids(project_id, chip_id)
+            if include(coupling_id)
+        ]
+
+    def get_metrics_summary(
+        self, project_id: str, chip_id: str, qids: list[str] | None = None
+    ) -> MetricsSummaryResponse | None:
         """Get aggregated metrics summary.
 
         Uses MongoDB aggregation pipeline for efficient DB-side computation.
@@ -803,7 +818,9 @@ class ChipService:
         metrics_config = load_metrics_config()
         metric_keys = list(metrics_config.qubit_metrics.keys())
 
-        summary = self._chip_repo.aggregate_metrics_summary(project_id, chip_id, metric_keys)
+        summary = self._chip_repo.aggregate_metrics_summary(
+            project_id, chip_id, metric_keys, qids=qids
+        )
         if summary is None:
             return None
         return MetricsSummaryResponse(
@@ -813,7 +830,11 @@ class ChipService:
         )
 
     def get_metric_heatmap(
-        self, project_id: str, chip_id: str, metric: str
+        self,
+        project_id: str,
+        chip_id: str,
+        metric: str,
+        include: Callable[[str], bool] | None = None,
     ) -> MetricHeatmapResponse | None:
         """Get heatmap data for a single metric.
 
@@ -847,9 +868,13 @@ class ChipService:
         if result is None:
             return None
 
+        values = result.get("values", {})
+        if include is not None:
+            values = {qid: value for qid, value in values.items() if include(qid)}
+
         return MetricHeatmapResponse(
             chip_id=chip_id,
             metric=metric,
-            values=result.get("values", {}),
+            values=values,
             unit=result.get("unit"),
         )

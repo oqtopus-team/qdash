@@ -89,5 +89,8 @@ class ConfigureAll(CalibrationStep):
             return list(targets.mux_ids)
         if service.muxes is not None:
             return list(service.muxes)
+        from qdash.workflow.service._internal.scheduling_tasks import _mux_size_for_chip
+
         qids = targets.to_qids(service.chip_id)
-        return sorted({int(qid) // 4 for qid in qids})
+        mux_size = _mux_size_for_chip(service.chip_id)
+        return sorted({int(qid) // mux_size for qid in qids})

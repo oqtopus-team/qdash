@@ -12,7 +12,11 @@ from bunnet import SortDirection
 from pymongo.errors import DuplicateKeyError
 
 from qdash.common.utils.datetime import now
-from qdash.datamodel.calibration_note import CalibrationNoteModel
+from qdash.datamodel.calibration_note import (
+    CHIP_MASTER_EXECUTION_ID,
+    MASTER_TASK_ID,
+    CalibrationNoteModel,
+)
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.user import UserDocument
 
@@ -116,7 +120,7 @@ class MongoCalibrationNoteRepository:
             The latest master note or None if not found
 
         """
-        query: dict[str, str] = {"task_id": "master"}
+        query: dict[str, str] = {"task_id": MASTER_TASK_ID}
         if chip_id is not None:
             query["chip_id"] = chip_id
         if project_id is not None:
@@ -124,17 +128,39 @@ class MongoCalibrationNoteRepository:
         if username is not None:
             query["username"] = username
 
+        # The live chip master wins over per-execution snapshots.
+        chip_master_query = {k: v for k, v in query.items() if k != "username"}
+        chip_master_query["execution_id"] = CHIP_MASTER_EXECUTION_ID
         docs = (
-            CalibrationNoteDocument.find(query)
+            CalibrationNoteDocument.find(chip_master_query)
             .sort([("timestamp", SortDirection.DESCENDING)])
             .limit(1)
             .run()
         )
+        if not docs:
+            docs = (
+                CalibrationNoteDocument.find(query)
+                .sort([("timestamp", SortDirection.DESCENDING)])
+                .limit(1)
+                .run()
+            )
 
         if not docs:
             return None
 
         return self._to_model(docs[0])
+
+    def find_chip_master(self, *, chip_id: str, project_id: str) -> CalibrationNoteModel | None:
+        """The live master note of a chip (``execution_id == "master"``), if created."""
+        doc = CalibrationNoteDocument.find_one(
+            {
+                "project_id": project_id,
+                "chip_id": chip_id,
+                "task_id": MASTER_TASK_ID,
+                "execution_id": CHIP_MASTER_EXECUTION_ID,
+            }
+        ).run()
+        return self._to_model(doc) if doc is not None else None
 
     def find_latest_master_by_project(
         self,

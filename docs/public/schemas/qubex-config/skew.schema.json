@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oqtopus-team.github.io/qdash/schemas/qubex-config/skew.schema.json",
+  "title": "skew.yaml",
+  "description": "Inter-box timing adjustment. box_setting is keyed by box id; other top-level keys are device-wide scalars that qubex defines.",
+  "type": "object",
+  "properties": {
+    "box_setting": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "port_wait": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "slot": {
+            "type": "integer"
+          },
+          "wait": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -132,6 +132,7 @@ class TaskResultHistoryRepository(Protocol):
         metric_keys: set[str],
         cutoff_time: datetime | None = None,
         end_time: datetime | None = None,
+        system_id: str | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Aggregate latest metric values for each entity.
 
@@ -167,6 +168,7 @@ class TaskResultHistoryRepository(Protocol):
         metric_modes: dict[str, Literal["maximize", "minimize"]],
         cutoff_time: datetime | None = None,
         end_time: datetime | None = None,
+        system_id: str | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Aggregate best metric values for each entity.
 
@@ -202,6 +204,7 @@ class TaskResultHistoryRepository(Protocol):
         metric_keys: set[str],
         cutoff_time: datetime | None = None,
         end_time: datetime | None = None,
+        system_id: str | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Aggregate average metric values for each entity.
 
@@ -384,8 +387,9 @@ class ChipRepository(Protocol):
         chip_id: str,
         limit: int = 100,
         offset: int = 0,
+        coupling_ids: list[str] | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
-        """List couplings with pagination."""
+        """List couplings with pagination, optionally restricted to ``coupling_ids``."""
         ...
 
     def find_coupling(
@@ -399,8 +403,9 @@ class ChipRepository(Protocol):
         project_id: str,
         chip_id: str,
         metric_keys: list[str] | None = None,
+        qids: list[str] | None = None,
     ) -> dict[str, Any] | None:
-        """Aggregate metrics summary using MongoDB pipeline."""
+        """Aggregate metrics summary using MongoDB pipeline, optionally over ``qids`` only."""
         ...
 
     def aggregate_metric_heatmap(
@@ -752,6 +757,14 @@ class CalibrationNoteRepository(Protocol):
         CalibrationNoteModel | None
             The latest master note or None if not found
 
+        """
+        ...
+
+    def find_chip_master(self, *, chip_id: str, project_id: str) -> CalibrationNoteModel | None:
+        """The live master note of a chip (``execution_id == "master"``), if created.
+
+        Executions snapshot this note when they start and merge their per-qubit
+        results back into it, so it always holds the chip's current calibration.
         """
         ...
 

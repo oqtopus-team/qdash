@@ -355,3 +355,93 @@ def test_no_target_qubits_means_no_prerequisite_problems() -> None:
     assert (
         prerequisite_problems(spec([custom("CheckT1")]), [], TASKS, calibrated_lookup(), None) == []
     )
+
+
+# --------------------------------------------------------------------------- #
+# Configuration tree checks
+# --------------------------------------------------------------------------- #
+
+
+def _catalog(root: Any) -> Any:
+    from qdash.common.config.qubex_layout import QubexLayout
+    from qdash.common.config.system_catalog import SystemCatalog
+
+    return SystemCatalog(QubexLayout.detect(root), "src16")
+
+
+def test_configuration_problems_report_targets_that_span_systems(tmp_path: Any) -> None:
+    from qdash.api.services.calibration_pipeline_preflight import configuration_problems
+    from tests.qdash.api.services.chip._trees import write_shared_tree
+
+    write_shared_tree(tmp_path)
+
+    same = configuration_problems(_catalog(tmp_path), "src16", ["0", "5"])
+    split = configuration_problems(_catalog(tmp_path), "src16", ["0", "9"])
+
+    assert same == []
+    assert [p.path for p in split] == ["targets"]
+    assert "src16: 0" in split[0].message and "src16-quel3: 9" in split[0].message
+    assert "separate pipelines" in split[0].message
+
+
+def test_configuration_problems_report_missing_boxes_and_unwired_muxes(tmp_path: Any) -> None:
+    from qdash.api.services.calibration_pipeline_preflight import configuration_problems
+    from tests.qdash.api.services.chip._trees import write_shared_tree
+
+    write_shared_tree(tmp_path, n_qubits=32)  # MUX 4-7 exist but are not wired
+    (tmp_path / "config" / "box.yaml").write_text("BOXA:\n  name: a\n  type: quel1se-riken8\n")
+
+    problems = configuration_problems(_catalog(tmp_path), "src16", ["1", "20"])
+
+    messages = [(p.path, p.message) for p in problems]
+    assert len(messages) == 2
+    assert messages[0][0] == "chip_id" and "missing from box.yaml: q3" in messages[0][1]
+    assert messages[1][0] == "targets" and "20" in messages[1][1] and "not wired" in messages[1][1]
+
+
+def test_configuration_problems_report_an_unreadable_tree(tmp_path: Any) -> None:
+    from qdash.api.services.calibration_pipeline_preflight import configuration_problems
+    from tests.qdash.api.services.chip._trees import write_shared_tree
+
+    write_shared_tree(tmp_path)
+    (tmp_path / "config" / "wiring.yaml").write_text("- not: a mapping\n")
+
+    problems = configuration_problems(_catalog(tmp_path), "src16", ["0"])
+
+    assert [p.path for p in problems] == ["chip_id"]
+    assert "could not be read" in problems[0].message
+
+
+def test_default_system_catalog_skips_chips_without_a_tree(tmp_path: Any, monkeypatch: Any) -> None:
+    from qdash.api.services.calibration_pipeline_preflight import default_system_catalog
+    from qdash.common.config.qubex_layout import QubexLayout
+    from tests.qdash.api.services.chip._trees import write_shared_tree
+
+    monkeypatch.setattr(
+        QubexLayout, "detect", classmethod(lambda cls, root=None: _detect(tmp_path))
+    )
+
+    assert default_system_catalog("64Qv3") is None
+    write_shared_tree(tmp_path)
+    catalog = default_system_catalog("src16")
+    assert catalog is not None and catalog.system_ids() == ["src16", "src16-quel3"]
+
+
+def _detect(root: Any) -> Any:
+    from qdash.common.config.qubex_layout import QubexLayout, detect_layout_kind
+
+    return QubexLayout(root, detect_layout_kind(root))
+
+
+def test_configuration_problems_report_schema_violations(tmp_path: Any) -> None:
+    from qdash.api.services.calibration_pipeline_preflight import configuration_problems
+    from tests.qdash.api.services.chip._trees import write_shared_tree
+
+    write_shared_tree(tmp_path)
+    chip_yaml = tmp_path / "config" / "chip.yaml"
+    chip_yaml.write_text(chip_yaml.read_text().replace("n_qubits: 16", "n_qubits: sixteen"))
+
+    problems = configuration_problems(_catalog(tmp_path), "src16", ["0"])
+
+    assert [p.path for p in problems] == ["chip_id"]
+    assert "config/chip.yaml at src16/n_qubits" in problems[0].message

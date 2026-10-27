@@ -32,6 +32,8 @@ interface QubitMetricHistoryModalProps {
   metricUnit: string;
   startAt?: string | null;
   endAt?: string | null;
+  /** Only results measured on this Qubex System. */
+  systemId?: string | null;
 }
 
 interface ExecutionGroup {
@@ -54,6 +56,7 @@ export function QubitMetricHistoryModal({
   metricUnit,
   startAt,
   endAt,
+  systemId = null,
 }: QubitMetricHistoryModalProps) {
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
@@ -64,7 +67,7 @@ export function QubitMetricHistoryModal({
   const { data, isLoading, isError } = useGetQubitMetricHistory(
     chipId,
     qid,
-    { metric: metricName, limit: 100, within_days: 365 },
+    { metric: metricName, limit: 100, within_days: 365, system_id: systemId ?? undefined },
     {
       query: {
         staleTime: 30000,

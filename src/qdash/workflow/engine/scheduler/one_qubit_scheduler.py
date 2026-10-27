@@ -50,9 +50,8 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import yaml
-
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.common.config.qubex_layout import QubexLayout
+from qdash.common.config.system_catalog import DEFAULT_MUX_SIZE, SystemCatalog
 from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
     BOX_B,
@@ -109,35 +108,39 @@ class OneQubitScheduler:
         Args:
             chip_id: Chip ID (e.g., "64Qv3", "144Qv2")
             wiring_config_path: Path to wiring.yaml configuration file.
-                If None, uses the default QubexPaths wiring path.
+                If None, the file is resolved from the detected Qubex layout.
         """
         self.chip_id = chip_id
         self.wiring_config_path = wiring_config_path
+        self._catalog: SystemCatalog | None = None
         self._wiring_config: list[dict[str, Any]] | None = None
         self._mux_box_map: dict[int, set[str]] | None = None
         self._qid_to_mux: dict[str, int] | None = None
         self._box_b_module_to_muxes: dict[str, list[int]] | None = None
 
+    @property
+    def catalog(self) -> SystemCatalog:
+        """Chip -> System -> MUX catalog backing this scheduler."""
+        if self._catalog is None:
+            self._catalog = SystemCatalog(
+                QubexLayout.detect(),
+                self.chip_id,
+                wiring_path=Path(self.wiring_config_path) if self.wiring_config_path else None,
+            )
+        return self._catalog
+
+    @property
+    def mux_size(self) -> int:
+        """Qubits per MUX for this chip (4 when the chip catalog is unreadable)."""
+        try:
+            return self.catalog.mux_size()
+        except (OSError, ValueError, LookupError):
+            return DEFAULT_MUX_SIZE
+
     def _load_wiring_config(self) -> list[dict[str, Any]]:
-        """Load wiring configuration from YAML file."""
+        """Load the chip's wiring rows (every System of the chip)."""
         if self._wiring_config is None:
-            if self.wiring_config_path is not None:
-                wiring_path = Path(self.wiring_config_path)
-            else:
-                wiring_path = get_qubex_paths().wiring_yaml(self.chip_id)
-
-            if not wiring_path.exists():
-                msg = f"Wiring config not found: {wiring_path}"
-                raise FileNotFoundError(msg)
-
-            yaml_data = yaml.safe_load(wiring_path.read_text())
-            if self.chip_id in yaml_data:
-                self._wiring_config = yaml_data[self.chip_id]
-            else:
-                # New YAML format: top-level keys are group names (e.g., "A2"),
-                # each mapping to a list of MUX configs. Flatten all lists.
-                self._wiring_config = [entry for group in yaml_data.values() for entry in group]
-
+            self._wiring_config = self.catalog.wiring_rows()
         return self._wiring_config
 
     @staticmethod
@@ -225,7 +228,8 @@ class OneQubitScheduler:
     def _build_qubit_to_mux_map(self, wiring_config: list[dict[str, Any]]) -> dict[str, int]:
         """Build mapping from qubit ID to MUX ID.
 
-        Each MUX controls 4 qubits: MUX_N controls qubits [4N, 4N+1, 4N+2, 4N+3].
+        MUX_N controls qubits [N*size, ..., N*size + size - 1] where size is the
+        chip's MUX size (4 unless chip.yaml says otherwise).
 
         Args:
             wiring_config: List of MUX configurations from wiring.yaml
@@ -236,11 +240,12 @@ class OneQubitScheduler:
         if self._qid_to_mux is not None:
             return self._qid_to_mux
 
+        size = self.mux_size
         qid_to_mux = {}
         for entry in wiring_config:
             mux_id = entry["mux"]
-            for offset in range(4):
-                qid_to_mux[str(mux_id * 4 + offset)] = mux_id
+            for offset in range(size):
+                qid_to_mux[str(mux_id * size + offset)] = mux_id
 
         self._qid_to_mux = qid_to_mux
         return qid_to_mux
@@ -387,7 +392,7 @@ class OneQubitScheduler:
 
         mux_groups: dict[int, list[str]] = {}
         for qid in qids:
-            mux_id = qid_to_mux.get(qid, int(qid) // 4)  # Default: 4 qubits per MUX
+            mux_id = qid_to_mux.get(qid, int(qid) // self.mux_size)
             if mux_id not in mux_groups:
                 mux_groups[mux_id] = []
             mux_groups[mux_id].append(qid)
@@ -403,6 +408,7 @@ class OneQubitScheduler:
                 grid_size=grid_size,
                 mux_grid_size=mux_grid_size,
                 qid_to_mux=qid_to_mux,
+                mux_size=self.mux_size,
             )
 
             for mux_id, mux_qids in mux_groups.items():
@@ -479,14 +485,16 @@ class OneQubitScheduler:
     def _mux_ids_to_qids(
         mux_ids: list[int],
         exclude_qids: list[str] | None = None,
+        mux_size: int = DEFAULT_MUX_SIZE,
     ) -> list[str]:
         """Convert MUX IDs to qubit IDs, optionally excluding specified qubits.
 
-        Each MUX controls 4 qubits: MUX_N → qubits [4N, 4N+1, 4N+2, 4N+3].
+        MUX_N controls qubits [N*mux_size, ..., N*mux_size + mux_size - 1].
 
         Args:
             mux_ids: List of MUX IDs to convert
             exclude_qids: Optional list of qubit IDs to exclude
+            mux_size: Qubits per MUX for the chip
 
         Returns:
             List of qubit ID strings
@@ -499,8 +507,8 @@ class OneQubitScheduler:
             raise ValueError(msg)
         qids = []
         for mux_id in mux_ids:
-            for offset in range(4):
-                qids.append(str(mux_id * 4 + offset))
+            for offset in range(mux_size):
+                qids.append(str(mux_id * mux_size + offset))
         if exclude_qids:
             exclude_set = set(exclude_qids)
             original_count = len(qids)
@@ -715,7 +723,7 @@ class OneQubitScheduler:
             )
             ```
         """
-        qids = self._mux_ids_to_qids(mux_ids, exclude_qids)
+        qids = self._mux_ids_to_qids(mux_ids, exclude_qids, self.mux_size)
         return self.generate(qids=qids, ordering_strategy=ordering_strategy)
 
     def get_mux_info(self) -> dict[int, dict[str, Any]]:
@@ -842,6 +850,7 @@ class OneQubitScheduler:
             grid_size=grid_size,
             mux_grid_size=mux_grid_size,
             qid_to_mux=qid_to_mux,
+            mux_size=self.mux_size,
         )
 
         # Select strategy
@@ -998,7 +1007,7 @@ class OneQubitScheduler:
                 print(f"Step {step.step_index}: {step.parallel_qids}")
             ```
         """
-        qids = self._mux_ids_to_qids(mux_ids, exclude_qids)
+        qids = self._mux_ids_to_qids(mux_ids, exclude_qids, self.mux_size)
         return self.generate_synchronized(qids=qids, use_checkerboard=use_checkerboard)
 
     def generate_simultaneous_spectroscopy_batches(
@@ -1054,10 +1063,11 @@ class OneQubitScheduler:
                 )
             ]
         else:
-            step_qids: list[list[str]] = [[] for _ in range(4)]
+            size = self.mux_size
+            step_qids: list[list[str]] = [[] for _ in range(size)]
 
             for qid in sorted_qids:
-                local_index = int(qid) % 4
+                local_index = int(qid) % size
                 step_qids[local_index].append(qid)
 
             steps = []
@@ -1098,5 +1108,5 @@ class OneQubitScheduler:
         mode: str = "local_index",
     ) -> MuxBatchScheduleResult:
         """Generate simultaneous spectroscopy MUX-batch schedule from MUX IDs."""
-        qids = self._mux_ids_to_qids(mux_ids, exclude_qids)
+        qids = self._mux_ids_to_qids(mux_ids, exclude_qids, self.mux_size)
         return self.generate_simultaneous_spectroscopy_batches(qids=qids, mode=mode)

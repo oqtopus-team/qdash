@@ -9,9 +9,10 @@ of those is visible from the spec, the task metadata, and the database, so the
 than letting the execution fail at step 1 with an empty result.
 
 The checks only use metadata the API already has: :class:`TaskInfo` (declared
-inputs, run parameters, and outputs), the qubit calibration data, and the run
-parameters recorded on the source task of a persisted parameter. They do not
-import workflow code.
+inputs, run parameters, and outputs), the qubit calibration data, the run
+parameters recorded on the source task of a persisted parameter, and the Qubex
+configuration tree (which System drives each target, and whether the wiring's
+boxes are defined). They do not import workflow code.
 """
 
 from __future__ import annotations
@@ -24,11 +25,13 @@ from typing import TYPE_CHECKING, Any
 from qdash.api.schemas.calibration_pipeline import PipelineProblem
 from qdash.api.services.catalog_task_run import matches_parameter_type, run_override_parts
 from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
+from qdash.common.config.qubex_config_schema import validate_shared_files
 from qdash.datamodel.calibration_pipeline import STEP_CATALOG, step_tasks
 from qdash.datamodel.task import compatible_value_type
 
 if TYPE_CHECKING:
     from qdash.api.schemas.task_file import TaskInfo
+    from qdash.common.config.system_catalog import SystemCatalog
     from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec
 
 # Inputs that ``required_rabi_normalization_inputs`` declares; restoring them
@@ -338,3 +341,134 @@ def prerequisite_problems(
                     )
             produced.update(task.output_parameters)
     return problems
+
+
+# --------------------------------------------------------------------------- #
+# Configuration tree checks
+# --------------------------------------------------------------------------- #
+
+
+def default_system_catalog(chip_id: str) -> SystemCatalog | None:
+    """The chip's :class:`SystemCatalog`, or None when the tree has nothing for it.
+
+    A missing configuration tree (the fake backend, CI) is not a problem the spec
+    can fix, so it is skipped; a tree that has the chip's directory or the shared
+    catalog but cannot be read is reported by :func:`configuration_problems`.
+    """
+    from qdash.common.config.qubex_layout import QubexLayout
+    from qdash.common.config.system_catalog import SystemCatalog
+
+    try:
+        layout = QubexLayout.detect()
+        config_dir = layout.config_dir(chip_id)
+    except ValueError:
+        return None
+    if not config_dir.is_dir():
+        return None
+    return SystemCatalog(layout, chip_id)
+
+
+def configuration_problems(
+    catalog: SystemCatalog,
+    chip_id: str,
+    qids: Iterable[str],
+) -> list[PipelineProblem]:
+    """Problems the Qubex configuration tree would raise for these targets.
+
+    One session drives one System, so targets that resolve to several Systems
+    are reported with the split, as are boxes the wiring references but
+    ``box.yaml`` does not define, and a tree that cannot be read at all.
+    """
+    problems: list[PipelineProblem] = []
+    try:
+        rows = catalog.wiring_rows()
+    except (OSError, ValueError, LookupError) as exc:
+        problems.append(
+            _problem("chip_id", f"configuration for chip {chip_id!r} could not be read: {exc}")
+        )
+        return problems
+
+    for schema_problem in validate_shared_files(catalog.layout, chip_id):
+        problems.append(
+            _problem("chip_id", f"configuration file violates its schema: {schema_problem}")
+        )
+
+    missing_boxes = _missing_boxes(catalog, rows)
+    if missing_boxes:
+        problems.append(
+            _problem(
+                "chip_id",
+                f"wiring of chip {chip_id!r} references boxes missing from box.yaml: "
+                + ", ".join(sorted(missing_boxes)),
+            )
+        )
+
+    target_qids = list(dict.fromkeys(qids))
+    if not target_qids:
+        return problems
+    assignment: dict[str, list[str]] = {}
+    unwired: list[str] = []
+    for qid in target_qids:
+        system_id = _system_of(catalog, qid)
+        if system_id is None:
+            unwired.append(qid)
+        else:
+            assignment.setdefault(system_id, []).append(qid)
+    if unwired:
+        problems.append(
+            _problem(
+                "targets",
+                f"qubit(s) {_format_qids(unwired)} are on MUXes that are not wired "
+                f"for chip {chip_id!r}",
+            )
+        )
+    if len(assignment) > 1:
+        split = "; ".join(
+            f"{system_id}: {_format_qids(members)}" for system_id, members in assignment.items()
+        )
+        problems.append(
+            _problem(
+                "targets",
+                f"targets span {len(assignment)} Systems of chip {chip_id!r} ({split}); "
+                "one run drives one System, so run them as separate pipelines",
+            )
+        )
+    return problems
+
+
+def _system_of(catalog: SystemCatalog, qid: str) -> str | None:
+    try:
+        return catalog.system_of_qid(qid)
+    except (KeyError, ValueError):
+        return None
+
+
+def _missing_boxes(catalog: SystemCatalog, rows: list[dict[str, Any]]) -> set[str]:
+    import yaml
+
+    try:
+        path = catalog.layout.box_yaml(catalog.chip_id)
+    except ValueError:
+        return set()
+    if not path.is_file():
+        boxes: dict[str, Any] = {}
+    else:
+        try:
+            loaded = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            return set()
+        boxes = loaded if isinstance(loaded, dict) else {}
+    referenced: set[str] = set()
+    for row in rows:
+        specifiers: list[Any] = [row.get("read_out"), row.get("read_in"), row.get("pump")]
+        ctrl = row.get("ctrl")
+        if isinstance(ctrl, list):
+            specifiers.extend(ctrl)
+        for specifier in specifiers:
+            if not isinstance(specifier, str) or not specifier.strip():
+                continue
+            separator = ":" if ":" in specifier else "-"
+            box_id, found, _ = specifier.rpartition(separator)
+            if found and box_id:
+                referenced.add(box_id)
+    return {box for box in referenced if box not in boxes}

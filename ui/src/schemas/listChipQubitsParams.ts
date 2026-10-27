@@ -17,4 +17,8 @@ limit?: number;
  */
 offset?: number;
 qids?: string[] | null;
+/**
+ * Only qubits of this Qubex System
+ */
+system_id?: string | null;
 };

@@ -34,6 +34,7 @@ import {
   DeleteProjectDialog,
   DeleteUserDialog,
 } from "@/components/features/admin/AdminConfirmDialogs";
+import { AdminBoxesPanel } from "@/components/features/admin/AdminBoxesPanel";
 import { AdminProjectsPanel } from "@/components/features/admin/AdminProjectsPanel";
 import { AdminUsersPanel } from "@/components/features/admin/AdminUsersPanel";
 import { CreateUserModal } from "@/components/features/admin/CreateUserModal";
@@ -50,7 +51,7 @@ import { formatDate } from "@/lib/utils/datetime";
 export function AdminPageContent() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"users" | "projects" | "system">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "projects" | "boxes" | "system">("users");
   const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
   const [selectedProject, setSelectedProject] = useState<ProjectListItem | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -432,6 +433,15 @@ export function AdminPageContent() {
         <button
           type="button"
           role="tab"
+          aria-selected={activeTab === "boxes"}
+          className={`tab ${activeTab === "boxes" ? "tab-active" : ""}`}
+          onClick={() => setActiveTab("boxes")}
+        >
+          Boxes
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={activeTab === "system"}
           className={`tab ${activeTab === "system" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("system")}
@@ -439,6 +449,9 @@ export function AdminPageContent() {
           System
         </button>
       </div>
+
+      {/* Boxes Tab */}
+      {activeTab === "boxes" && <AdminBoxesPanel />}
 
       {/* Users Tab */}
       {activeTab === "users" && (

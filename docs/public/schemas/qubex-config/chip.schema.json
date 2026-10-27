@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oqtopus-team.github.io/qdash/schemas/qubex-config/chip.schema.json",
+  "title": "chip.yaml",
+  "description": "Physical chips, keyed by chip_id. Shared by every System of the chip.",
+  "type": "object",
+  "propertyNames": {
+    "type": "string",
+    "minLength": 1,
+    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+  },
+  "additionalProperties": {
+    "type": "object",
+    "required": [
+      "n_qubits"
+    ],
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "n_qubits": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "clock_master": {
+        "type": "string",
+        "description": "Legacy quel1 clock master address; 2.0 trees carry it in system.yaml under quel1.clock_master."
+      },
+      "topology": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "mux_size": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": true
+  }
+}

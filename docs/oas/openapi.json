@@ -2428,26 +2428,51 @@
           "file"
         ],
         "summary": "Pull the latest config from its Git repository",
+        "description": "Publishes unpublished params and calibration notes first; 409 while shared\nfiles hold local edits unless ``force``.",
         "operationId": "gitPullConfig",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Discard local edits to shared files instead of refusing",
+              "default": false,
+              "title": "Force"
+            },
+            "description": "Discard local edits to shared files instead of refusing"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Gitpullconfig"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/config/files/git/push": {
@@ -4647,7 +4672,7 @@
           "chip"
         ],
         "summary": "Create a new chip",
-        "description": "Create a new chip in the current project.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\nctx : ProjectContext\n    Project context with editor permission\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
+        "description": "Create a new chip in the current project.\n\nIn the shared Qubex configuration layout the chip's configuration files are\ngenerated as well (``provision_config`` defaults to that); the response's\n``provisioning`` field says what was written and whether it was published.\n\nRaises\n------\nHTTPException\n    400 when the chip exists, the size or topology is invalid, or configuration\n    generation was requested in the legacy layout or fails validation.",
         "operationId": "createChip",
         "security": [
           {
@@ -4689,6 +4714,142 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/systems": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "List the Qubex Systems driving a chip",
+        "description": "Systems, their backends, MUXes and boxes, from the configuration tree.",
+        "operationId": "listChipSystems",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipSystemsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Add a System on another backend to a chip",
+        "description": "Move MUXes to a new ``<chip_id>-<backend>`` System and generate its files.\n\nRaises\n------\nHTTPException\n    400 when the System exists, a MUX is not wired, a box is not registered,\n    or the generated configuration does not load.",
+        "operationId": "addChipSystem",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddChipSystemRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddChipSystemResponse"
                 }
               }
             }
@@ -5120,7 +5281,7 @@
           "chip"
         ],
         "summary": "List all multiplexers for a chip",
-        "description": "List all multiplexers for a chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nListMuxResponse\n    List of multiplexer details",
+        "description": "List all multiplexers for a chip.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\nsystem_id : str | None\n    Optional Qubex System; only its MUXes are returned (404 when unknown)\n\nReturns\n-------\nListMuxResponse\n    List of multiplexer details",
         "operationId": "listChipMuxes",
         "security": [
           {
@@ -5136,6 +5297,24 @@
               "type": "string",
               "title": "Chip Id"
             }
+          },
+          {
+            "name": "system_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only MUXes of this Qubex System",
+              "title": "System Id"
+            },
+            "description": "Only MUXes of this Qubex System"
           },
           {
             "name": "X-Project-Id",
@@ -5529,7 +5708,7 @@
           "chip"
         ],
         "summary": "List qubits for a chip",
-        "description": "List qubits for a chip with pagination.\n\nRetrieves qubit data from the separate QubitDocument collection.\nSupports filtering by specific qubit IDs.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\nlimit : int\n    Maximum number of qubits to return (default 50, max 256)\noffset : int\n    Number of qubits to skip for pagination\nqids : list[str] | None\n    Optional list of specific qubit IDs to fetch\n\nReturns\n-------\nListQubitsResponse\n    List of qubits with pagination info",
+        "description": "List qubits for a chip with pagination.\n\nRetrieves qubit data from the separate QubitDocument collection.\nSupports filtering by specific qubit IDs.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\nlimit : int\n    Maximum number of qubits to return (default 50, max 256)\noffset : int\n    Number of qubits to skip for pagination\nqids : list[str] | None\n    Optional list of specific qubit IDs to fetch\nsystem_id : str | None\n    Optional Qubex System; only its qubits are returned (404 when unknown)\n\nReturns\n-------\nListQubitsResponse\n    List of qubits with pagination info",
         "operationId": "listChipQubits",
         "security": [
           {
@@ -5587,6 +5766,24 @@
               ],
               "title": "Qids"
             }
+          },
+          {
+            "name": "system_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only qubits of this Qubex System",
+              "title": "System Id"
+            },
+            "description": "Only qubits of this Qubex System"
           },
           {
             "name": "X-Project-Id",
@@ -5874,7 +6071,7 @@
           "chip"
         ],
         "summary": "List couplings for a chip",
-        "description": "List couplings for a chip with pagination.\n\nRetrieves coupling data from the separate CouplingDocument collection.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\nlimit : int\n    Maximum number of couplings to return (default 100, max 512)\noffset : int\n    Number of couplings to skip for pagination\n\nReturns\n-------\nListCouplingsResponse\n    List of couplings with pagination info",
+        "description": "List couplings for a chip with pagination.\n\nRetrieves coupling data from the separate CouplingDocument collection.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\nlimit : int\n    Maximum number of couplings to return (default 100, max 512)\noffset : int\n    Number of couplings to skip for pagination\nsystem_id : str | None\n    Optional Qubex System; couplings crossing its boundary are left out\n\nReturns\n-------\nListCouplingsResponse\n    List of couplings with pagination info",
         "operationId": "listChipCouplings",
         "security": [
           {
@@ -5913,6 +6110,24 @@
               "default": 0,
               "title": "Offset"
             }
+          },
+          {
+            "name": "system_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only couplings inside this Qubex System",
+              "title": "System Id"
+            },
+            "description": "Only couplings inside this Qubex System"
           },
           {
             "name": "X-Project-Id",
@@ -6052,6 +6267,24 @@
             }
           },
           {
+            "name": "system_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only qubits of this Qubex System",
+              "title": "System Id"
+            },
+            "description": "Only qubits of this Qubex System"
+          },
+          {
             "name": "X-Project-Id",
             "in": "header",
             "required": false,
@@ -6123,6 +6356,24 @@
               "type": "string",
               "title": "Metric"
             }
+          },
+          {
+            "name": "system_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only qubits or couplings of this Qubex System",
+              "title": "System Id"
+            },
+            "description": "Only qubits or couplings of this Qubex System"
           },
           {
             "name": "X-Project-Id",
@@ -11431,6 +11682,24 @@
             "description": "Inclusive absolute upper bound on task start time (ISO8601 or date)."
           },
           {
+            "name": "system_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only results measured on this Qubex System (404 when unknown).",
+              "title": "System Id"
+            },
+            "description": "Only results measured on this Qubex System (404 when unknown)."
+          },
+          {
             "name": "X-Project-Id",
             "in": "header",
             "required": false,
@@ -11554,6 +11823,24 @@
             "description": "Filter to last N days"
           },
           {
+            "name": "system_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only results measured on this Qubex System.",
+              "title": "System Id"
+            },
+            "description": "Only results measured on this Qubex System."
+          },
+          {
             "name": "X-Project-Id",
             "in": "header",
             "required": false,
@@ -11675,6 +11962,24 @@
               "title": "Within Days"
             },
             "description": "Filter to last N days"
+          },
+          {
+            "name": "system_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only results measured on this Qubex System.",
+              "title": "System Id"
+            },
+            "description": "Only results measured on this Qubex System."
           },
           {
             "name": "X-Project-Id",
@@ -15718,6 +16023,181 @@
         ]
       }
     },
+    "/config/boxes": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "List the control boxes in box.yaml",
+        "description": "The catalog shared by every chip, plus the box types qubex accepts.",
+        "operationId": "listConfigBoxes",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Chip whose box.yaml to read in the legacy layout",
+              "title": "Chip Id"
+            },
+            "description": "Chip whose box.yaml to read in the legacy layout"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListConfigBoxesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Register or update a control box in box.yaml",
+        "description": "Write the entry and publish it; other entries and comments are kept.\n\nRaises\n------\nHTTPException\n    400 for an unknown type, a missing address or adapter, or the legacy layout.",
+        "operationId": "upsertConfigBox",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigBox"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpsertConfigBoxResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config/repository/status": {
+      "get": {
+        "tags": [
+          "config-repository"
+        ],
+        "summary": "Mode, layout and git state of the Qubex configuration root",
+        "operationId": "getConfigRepositoryStatus",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigRepositoryStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/config/repository/sync": {
+      "post": {
+        "tags": [
+          "config-repository"
+        ],
+        "summary": "Publish unpublished calibration files, then pull the repository",
+        "description": "Refuses with 409 while shared files hold local edits, unless ``force``.",
+        "operationId": "syncConfigRepository",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigRepositorySyncRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigRepositorySyncResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/provenance/entities/{entity_id}": {
       "get": {
         "tags": [
@@ -16604,6 +17084,85 @@
         ],
         "title": "ActivityResponse",
         "description": "Response model for an activity (task execution).\n\nAttributes\n----------\nactivity_id : str\n    Unique identifier (execution_id:task_id)\nexecution_id : str\n    Parent execution ID\ntask_id : str\n    Task identifier\ntask_name : str\n    Name of the task\ntask_type : str\n    Type of task\nqid : str\n    Qubit or coupling identifier\nstarted_at : datetime | None\n    When the activity started\nended_at : datetime | None\n    When the activity ended\nstatus : str\n    Execution status\nproject_id : str\n    Project identifier\nchip_id : str\n    Chip identifier"
+      },
+      "AddChipSystemRequest": {
+        "properties": {
+          "backend": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+$",
+            "title": "Backend",
+            "description": "quel1 or quel3"
+          },
+          "mux_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Mux Ids",
+            "description": "MUXes moved to the new System"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings",
+            "description": "Backend section of the system.yaml entry"
+          },
+          "wiring": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wiring",
+            "description": "Wiring rows of the moved MUXes on the new hardware. When omitted the rows keep their current ports."
+          }
+        },
+        "type": "object",
+        "required": [
+          "backend",
+          "mux_ids"
+        ],
+        "title": "AddChipSystemRequest",
+        "description": "Add a System driving some of the chip's MUXes with another backend."
+      },
+      "AddChipSystemResponse": {
+        "properties": {
+          "system": {
+            "$ref": "#/components/schemas/ChipSystemInfo"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "publish": {
+            "$ref": "#/components/schemas/ChipPublishStatus"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "system",
+          "publish"
+        ],
+        "title": "AddChipSystemResponse",
+        "description": "Result of adding a System."
       },
       "AddMemberRequest": {
         "properties": {
@@ -18179,6 +18738,119 @@
         "title": "ChipNotesSummaryResponse",
         "description": "All notes for a chip in one fetch — drives the dashboard summary view."
       },
+      "ChipProvisioningResult": {
+        "properties": {
+          "provisioned": {
+            "type": "boolean",
+            "title": "Provisioned",
+            "description": "False when only database records were created"
+          },
+          "layout": {
+            "type": "string",
+            "title": "Layout",
+            "description": "Configuration tree layout: shared or legacy"
+          },
+          "system_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "System Ids"
+          },
+          "inherited_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inherited From",
+            "description": "Chip whose wiring and backend were copied"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Repository-relative paths written or updated"
+          },
+          "publish": {
+            "$ref": "#/components/schemas/ChipPublishStatus"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provisioned",
+          "layout"
+        ],
+        "title": "ChipProvisioningResult",
+        "description": "Configuration files generated when a chip or System is created."
+      },
+      "ChipPublishStatus": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "published",
+              "recorded",
+              "failed",
+              "skipped"
+            ],
+            "title": "Status",
+            "description": "published: committed and pushed; recorded: written locally and logged (no remote); failed: files and database records exist but the remote rejected them; skipped: nothing to publish"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode",
+            "description": "Repository mode (github, local-git, plain)"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "ChipPublishStatus",
+        "description": "How the generated configuration files were published."
+      },
       "ChipResponse": {
         "properties": {
           "chip_id": {
@@ -18245,6 +18917,17 @@
           },
           "note": {
             "$ref": "#/components/schemas/NoteModel"
+          },
+          "provisioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChipProvisioningResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Configuration files generated for the chip; only on creation"
           }
         },
         "type": "object",
@@ -18253,6 +18936,122 @@
         ],
         "title": "ChipResponse",
         "description": "Chip response model.\n\nQubit and coupling data are stored in separate collections for scalability\nand should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubit_count (int): Number of qubits in the chip.\n    coupling_count (int): Number of couplings in the chip.\n    installed_at (datetime | None): Installation timestamp."
+      },
+      "ChipSystemInfo": {
+        "properties": {
+          "system_id": {
+            "type": "string",
+            "title": "System Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Chip ID as the Qubex configuration names it"
+          },
+          "driver": {
+            "type": "string",
+            "title": "Driver",
+            "description": "QDash backend driver, e.g. qubex"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "description": "Hardware kind inside the driver, e.g. quel1 or quel3"
+          },
+          "mux_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Mux Ids"
+          },
+          "box_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Box Ids",
+            "description": "Boxes its wiring references"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "description": "Whether this System is named like the chip"
+          },
+          "has_params": {
+            "type": "boolean",
+            "title": "Has Params",
+            "description": "params/<system_id>/ exists"
+          },
+          "has_calib_note": {
+            "type": "boolean",
+            "title": "Has Calib Note",
+            "description": "calibration/<system_id>/calib_note.json exists"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings",
+            "description": "The system.yaml entry"
+          }
+        },
+        "type": "object",
+        "required": [
+          "system_id",
+          "chip_id",
+          "driver",
+          "backend",
+          "is_default",
+          "has_params",
+          "has_calib_note"
+        ],
+        "title": "ChipSystemInfo",
+        "description": "One Qubex System driving the chip."
+      },
+      "ChipSystemsResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "layout": {
+            "type": "string",
+            "title": "Layout",
+            "description": "Configuration tree layout: shared or legacy"
+          },
+          "provisionable": {
+            "type": "boolean",
+            "title": "Provisionable",
+            "description": "Whether Systems can be added (shared layout)"
+          },
+          "systems": {
+            "items": {
+              "$ref": "#/components/schemas/ChipSystemInfo"
+            },
+            "type": "array",
+            "title": "Systems"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Why no Systems could be read, when the list is empty"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "layout",
+          "provisionable"
+        ],
+        "title": "ChipSystemsResponse",
+        "description": "Systems of a chip as read from the Qubex configuration."
       },
       "CommitAgentCandidateRequest": {
         "properties": {
@@ -18360,6 +19159,79 @@
         "title": "Condition",
         "description": "Condition for filtering device topology."
       },
+      "ConfigBox": {
+        "properties": {
+          "box_id": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+            "title": "Box Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "A qubex BoxType value, e.g. quel1se-riken8 or quel3"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address",
+            "description": "Required for QuBE and QuEL-1 boxes"
+          },
+          "adapter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter",
+            "description": "Required for QuBE and QuEL-1 boxes"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options",
+            "description": "Backend-specific box options"
+          },
+          "extra": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Extra",
+            "description": "Other keys of the entry, kept as they are"
+          }
+        },
+        "type": "object",
+        "required": [
+          "box_id",
+          "name",
+          "type"
+        ],
+        "title": "ConfigBox",
+        "description": "One control box as ``box.yaml`` describes it."
+      },
       "ConfigReloadResponse": {
         "properties": {
           "cleared": {
@@ -18373,6 +19245,206 @@
         "type": "object",
         "title": "ConfigReloadResponse",
         "description": "Response model for config cache reload."
+      },
+      "ConfigRepositoryStatus": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "description": "github, local-git or plain"
+          },
+          "layout": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layout",
+            "description": "shared or legacy Qubex layout"
+          },
+          "layout_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layout Version",
+            "description": "qubex-config layout version: 1.0 (legacy) or 2.0 (shared)"
+          },
+          "manifest_present": {
+            "type": "boolean",
+            "title": "Manifest Present",
+            "description": "Whether <root>/qubex-config.json declares the version",
+            "default": false
+          },
+          "schemas_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schemas Status",
+            "description": "match, differs or absent: the tree's schemas/ copy versus the schemas QDash ships"
+          },
+          "root": {
+            "type": "string",
+            "title": "Root",
+            "description": "Configuration root on the API host"
+          },
+          "is_git_repo": {
+            "type": "boolean",
+            "title": "Is Git Repo",
+            "default": false
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "head": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head",
+            "description": "Short SHA of the local head"
+          },
+          "head_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Message"
+          },
+          "changed_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed Paths"
+          },
+          "untracked_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Untracked Paths"
+          },
+          "unpushed_commits": {
+            "type": "integer",
+            "title": "Unpushed Commits",
+            "default": 0
+          },
+          "has_remote_updates": {
+            "type": "boolean",
+            "title": "Has Remote Updates",
+            "default": false
+          },
+          "review_required": {
+            "type": "boolean",
+            "title": "Review Required",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "root"
+        ],
+        "title": "ConfigRepositoryStatus",
+        "description": "State of the Qubex configuration root and its repository."
+      },
+      "ConfigRepositorySyncRequest": {
+        "properties": {
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "description": "Discard local edits to shared files instead of refusing",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ConfigRepositorySyncRequest",
+        "description": "Options for a synchronization."
+      },
+      "ConfigRepositorySyncResult": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit",
+            "description": "Head after the pull"
+          },
+          "published": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Published",
+            "description": "Owned files pushed first"
+          },
+          "published_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Commit"
+          },
+          "changed": {
+            "type": "boolean",
+            "title": "Changed",
+            "description": "Whether the pull moved the head",
+            "default": false
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "ConfigRepositorySyncResult",
+        "description": "What a synchronization published and pulled."
       },
       "CooldownCreateRequest": {
         "properties": {
@@ -18994,6 +20066,8 @@
         "properties": {
           "chip_id": {
             "type": "string",
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
             "title": "Chip Id"
           },
           "size": {
@@ -19011,6 +20085,64 @@
               }
             ],
             "title": "Topology Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "provision_config": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provision Config"
+          },
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
+          "inherit_wiring_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inherit Wiring From"
+          },
+          "cooldown_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Id"
           }
         },
         "type": "object",
@@ -19018,7 +20150,7 @@
           "chip_id"
         ],
         "title": "CreateChipRequest",
-        "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024).\n    topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'."
+        "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024).\n    topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'.\n    display_name (str | None): Name written to chip.yaml; defaults to the chip ID.\n    provision_config (bool | None): Also generate the Qubex configuration files.\n        None (default) generates them when the configuration tree uses the shared layout.\n    backend (str | None): Backend of the generated System (quel1 or quel3).\n        Defaults to the inherited chip's backend, else quel1.\n    inherit_wiring_from (str | None): Chip whose wiring and Systems are copied.\n        Defaults to the previous chip on the cool-down's cryostat.\n    cooldown_id (str | None): Cool-down to load the chip into."
       },
       "CreateCopilotChatSessionRequest": {
         "properties": {
@@ -23359,6 +24491,51 @@
         ],
         "title": "ListChipsResponse",
         "description": "Response model for listing chips."
+      },
+      "ListConfigBoxesResponse": {
+        "properties": {
+          "layout": {
+            "type": "string",
+            "title": "Layout"
+          },
+          "editable": {
+            "type": "boolean",
+            "title": "Editable",
+            "description": "Whether boxes can be registered (shared layout)"
+          },
+          "boxes": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigBox"
+            },
+            "type": "array",
+            "title": "Boxes"
+          },
+          "box_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Box Types"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "layout",
+          "editable"
+        ],
+        "title": "ListConfigBoxesResponse",
+        "description": "The box catalog and the types a box may have."
       },
       "ListCooldownWiringEventsResponse": {
         "properties": {
@@ -30545,6 +31722,28 @@
         "title": "UpdateUserRequest",
         "description": "Request to update user settings (admin only)."
       },
+      "UpsertConfigBoxResponse": {
+        "properties": {
+          "box": {
+            "$ref": "#/components/schemas/ConfigBox"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created"
+          },
+          "publish": {
+            "$ref": "#/components/schemas/ChipPublishStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "box",
+          "created",
+          "publish"
+        ],
+        "title": "UpsertConfigBoxResponse",
+        "description": "Result of registering or updating a box."
+      },
       "User": {
         "properties": {
           "user_id": {
@@ -31032,6 +32231,17 @@
           "file_type": {
             "type": "string",
             "title": "File Type"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
           }
         },
         "type": "object",

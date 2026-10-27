@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oqtopus-team.github.io/qdash/schemas/qubex-config/params-file.schema.json",
+  "title": "params/<system_id>/<parameter>.yaml",
+  "description": "One parameter per file: meta describes the quantity, data maps a label (Q000, M00, Q000-Q001) to its value. measurement_defaults.yaml is a settings file and is not validated by this schema.",
+  "type": "object",
+  "properties": {
+    "meta": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "default": {},
+        "scope": {
+          "type": "string",
+          "enum": [
+            "qubit",
+            "mux",
+            "coupling"
+          ],
+          "description": "QDash template key; absent in files qubex reads."
+        }
+      },
+      "additionalProperties": true
+    },
+    "data": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Label (Q000, M00, Q000-Q001; MUX files may use the MUX number) to value."
+    }
+  },
+  "additionalProperties": true
+}

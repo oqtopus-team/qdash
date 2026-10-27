@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from qdash.api.schemas.calibration import ManualParameterUpdateRequest
 from qdash.api.services.manual_update_service import ManualUpdateService
+from qdash.common.infrastructure.config_repository import PublishResult, RepoMode
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling import CouplingDocument
@@ -24,8 +25,31 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 @pytest.fixture(autouse=True)
 def disable_config_push(monkeypatch):
     monkeypatch.setattr(
-        "qdash.api.services.calibration_github_service.config_github_credentials_available",
-        lambda: False,
+        "qdash.api.services.calibration_github_service.get_config_repository",
+        lambda layout, actor: _FakeRepository(RepoMode.PLAIN),
+    )
+
+
+class _FakeRepository:
+    """Stands in for ConfigRepository: records publish calls, optionally fails."""
+
+    def __init__(self, mode=RepoMode.GITHUB, publish=None):
+        self.mode = mode
+        self._publish = publish
+        self.calls = []
+
+    def publish_owned(self, paths, message, *, chip_id=None):
+        rels = sorted(str(p) for p in paths)
+        self.calls.append((rels, message, chip_id))
+        if self._publish is not None:
+            return self._publish(rels, message, chip_id)
+        return PublishResult(mode=self.mode, paths=rels, message=message, commit="abc123")
+
+
+def _use_repository(monkeypatch, repository):
+    monkeypatch.setattr(
+        "qdash.api.services.calibration_github_service.get_config_repository",
+        lambda layout, actor: repository,
     )
 
 
@@ -292,26 +316,22 @@ def test_manual_edit_pushes_after_local_commit_and_keeps_values_on_failure(
     push_failure,
 ):
     service, path = manual_backend
-    monkeypatch.setattr(
-        "qdash.api.services.calibration_github_service.config_github_credentials_available",
-        lambda: True,
-    )
     captured = []
 
-    def publish(files, message, branch):
+    def publish(files, message, chip_id):
         assert _qubit_data()["readout_frequency"]["value"] == 10.123
-        assert files == {"16Q/params/readout_frequency.yaml": path.read_bytes()}
+        assert files == [str(path)]
         assert "manual-edit-" in message
-        assert branch == "main"
+        assert chip_id == "16Q"
         captured.append(files)
         TaskResultHistoryDocument.get_motor_collection().update_one(
             {"name": "ManualParameterEdit"}, {"$set": {"note.concurrent_note": "keep me"}}
         )
         if push_failure:
             raise RuntimeError("remote unavailable")
-        return "abc123"
+        return PublishResult(mode=RepoMode.GITHUB, paths=files, message=message, commit="abc123")
 
-    monkeypatch.setattr("qdash.api.services.calibration_github_service.push_config_files", publish)
+    _use_repository(monkeypatch, _FakeRepository(publish=publish))
     result = service.update_parameters(_request(), "project", "tester")
     assert len(captured) == 1
     assert result.github_sync.status == ("failed" if push_failure else "synced")
@@ -328,37 +348,39 @@ def test_retry_publishes_current_yaml_without_another_edit(manual_backend, monke
     service, path = manual_backend
     result = service.update_parameters(_request(), "project", "tester")
     path.write_text("data:\n  Q04: 10.2\n")
-    monkeypatch.setattr(
-        "qdash.api.services.calibration_github_service.config_github_credentials_available",
-        lambda: True,
-    )
-    push = Mock(return_value="abc123")
-    monkeypatch.setattr("qdash.api.services.calibration_github_service.push_config_files", push)
+    repository = _FakeRepository()
+    _use_repository(monkeypatch, repository)
     count = TaskResultHistoryDocument.find_all().count()
     sync = service.retry_github_sync(result.task_id, "project")
-    assert sync.status == "synced"
-    assert push.call_args.args[0] == {"16Q/params/readout_frequency.yaml": path.read_bytes()}
+    assert sync.status == "synced" and sync.commit == "abc123"
+    assert repository.calls[0][0] == [str(path)]
     assert TaskResultHistoryDocument.find_all().count() == count
     assert _qubit_data()["readout_frequency"]["value"] == 10.123
     with pytest.raises(HTTPException, match="not found"):
         service.retry_github_sync(result.task_id, "other-project")
-    assert push.call_count == 1
+    assert len(repository.calls) == 1
 
 
 def test_disabled_github_never_pushes_even_with_credentials(manual_backend, monkeypatch):
     service, _ = manual_backend
     result = service.update_parameters(_request(), "project", "tester")
-    monkeypatch.setattr(
-        "qdash.api.services.calibration_github_service.config_github_credentials_available",
-        lambda: True,
-    )
+    repository = _FakeRepository()
+    _use_repository(monkeypatch, repository)
     monkeypatch.setattr(
         "qdash.api.services.calibration_github_service.ConfigLoader.load_workflow",
         lambda: {"github": {"enabled": False}},
     )
-    with patch("qdash.api.services.calibration_github_service.push_config_files") as push:
-        assert service.retry_github_sync(result.task_id, "project").status == "disabled"
-    push.assert_not_called()
+    assert service.retry_github_sync(result.task_id, "project").status == "disabled"
+    assert repository.calls == []
+
+
+def test_plain_repository_mode_records_nothing_remote(manual_backend, monkeypatch):
+    service, _ = manual_backend
+    repository = _FakeRepository(RepoMode.PLAIN)
+    _use_repository(monkeypatch, repository)
+    result = service.update_parameters(_request(), "project", "tester")
+    assert result.github_sync.status == "disabled"
+    assert repository.calls == []
 
 
 def _qubit_data():

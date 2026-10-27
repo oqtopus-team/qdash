@@ -81,7 +81,9 @@ class FrequencyDirectionalityFilter(CRPairFilter):
             for pair in pairs
             if (qubits := pair.split("-"))
             and len(qubits) == 2
-            and infer_direction_from_design(qubits[0], qubits[1], context.grid_size)
+            and infer_direction_from_design(
+                qubits[0], qubits[1], context.grid_size, context.mux_size
+            )
         ]
 
     def _filter_by_measurement(self, pairs: list[str], context: FilterContext) -> list[str]:

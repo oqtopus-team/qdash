@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.service.results import TwoQubitResult, normalize_metric_value
 from qdash.workflow.service.steps.base import CalibrationStep, TransformStep
 from qdash.workflow.service.tasks import FULL_2Q_TASKS
@@ -22,6 +21,70 @@ if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
+
+CROSS_SYSTEM_NOTE_KEY = "cross_system_couplings"
+"""Execution note entry listing couplings skipped because they span Systems."""
+
+
+def _cross_system_pairs(
+    service: CalibService, parallel_groups: list[list[tuple[str, str]]]
+) -> list[str]:
+    """Couplings of the schedule whose qubits are driven by different Systems."""
+    from qdash.common.config.qubex_layout import QubexLayout
+    from qdash.common.config.system_catalog import SystemCatalog
+
+    try:
+        catalog = SystemCatalog(QubexLayout.detect(), service.chip_id)
+        if len(catalog.systems()) <= 1:
+            return []
+    except (OSError, ValueError, LookupError):
+        return []
+    excluded: list[str] = []
+    for group in parallel_groups:
+        for control, target in group:
+            try:
+                feasible = catalog.coupling_feasible(control, target)
+            except (KeyError, ValueError):
+                feasible = True
+            if not feasible:
+                excluded.append(f"{control}-{target}")
+    return excluded
+
+
+def drop_cross_system_pairs(
+    service: CalibService,
+    parallel_groups: list[list[tuple[str, str]]],
+    *,
+    known_excluded: list[str] | None = None,
+) -> tuple[list[list[tuple[str, str]]], list[str]]:
+    """Remove couplings that span Systems and record them in the Execution note.
+
+    ``known_excluded`` lists pairs the scheduler already left out; both sets end up
+    in ``note["cross_system_couplings"]`` so the result explains what was skipped.
+    """
+    logger = get_run_logger()
+    excluded = list(known_excluded or [])
+    for pair in _cross_system_pairs(service, parallel_groups):
+        if pair not in excluded:
+            excluded.append(pair)
+    if not excluded:
+        return parallel_groups, []
+    dropped = set(excluded)
+    kept = [[(c, t) for c, t in group if f"{c}-{t}" not in dropped] for group in parallel_groups]
+    kept = [group for group in kept if group]
+    logger.warning(
+        "Skipping %d coupling(s) that span Systems on chip %s: %s",
+        len(excluded),
+        service.chip_id,
+        ", ".join(excluded),
+    )
+    execution_service = getattr(service, "execution_service", None)
+    if execution_service is not None:
+        try:
+            execution_service.update_note(CROSS_SYSTEM_NOTE_KEY, excluded)
+        except Exception as exc:  # the note must never stop the calibration
+            logger.warning("Could not record cross-System couplings: %s", exc)
+    return kept, excluded
 
 
 @dataclass
@@ -83,17 +146,16 @@ class CustomTwoQubit(CalibrationStep):
         logger.info(f"[{self.name}] Starting with {len(self.tasks)} tasks: {self.tasks}")
 
         # Use pre-generated schedule if available, otherwise generate
+        cross_system: list[str] | None = None
         if "cr_schedule" in ctx.metadata:
             parallel_groups = ctx.metadata["cr_schedule"]
             logger.info(f"[{self.name}] Using pre-generated CR schedule")
         else:
             from qdash.workflow.engine import CRScheduler
 
-            wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
             scheduler = CRScheduler(
                 service.username,
                 service.chip_id,
-                wiring_config_path=wiring_config_path,
                 project_id=service.project_id,
             )
             schedule = scheduler.generate(
@@ -101,6 +163,10 @@ class CustomTwoQubit(CalibrationStep):
                 max_parallel_ops=self.max_parallel_ops,
             )
             parallel_groups = schedule.parallel_groups
+            cross_system = getattr(schedule, "cross_system_pairs", None)
+        parallel_groups, _ = drop_cross_system_pairs(
+            service, parallel_groups, known_excluded=cross_system
+        )
 
         if not parallel_groups:
             logger.warning(f"[{self.name}] No valid CR pairs found")
@@ -299,11 +365,9 @@ class GenerateCRSchedule(TransformStep):
 
         from qdash.workflow.engine import CRScheduler
 
-        wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
         scheduler = CRScheduler(
             service.username,
             service.chip_id,
-            wiring_config_path=wiring_config_path,
             project_id=service.project_id,
         )
         schedule = scheduler.generate(
@@ -311,23 +375,28 @@ class GenerateCRSchedule(TransformStep):
             max_parallel_ops=self.max_parallel_ops,
             inverse=self.inverse,
         )
+        parallel_groups, _ = drop_cross_system_pairs(
+            service,
+            schedule.parallel_groups,
+            known_excluded=getattr(schedule, "cross_system_pairs", None),
+        )
 
-        if not schedule.parallel_groups:
+        if not parallel_groups:
             logger.warning(f"[{self.name}] No valid CR pairs found")
             ctx.candidate_couplings = []
             return ctx
 
         # Flatten to coupling IDs
-        all_couplings = [f"{c}-{t}" for group in schedule.parallel_groups for c, t in group]
+        all_couplings = [f"{c}-{t}" for group in parallel_groups for c, t in group]
         ctx.candidate_couplings = all_couplings
 
         # Store schedule in metadata for TwoQubitCalibration
-        ctx.metadata["cr_schedule"] = schedule.parallel_groups
+        ctx.metadata["cr_schedule"] = parallel_groups
 
         direction = "reverse" if self.inverse else "forward"
         logger.info(
             f"[{self.name}] Generated {len(all_couplings)} couplings in "
-            f"{len(schedule.parallel_groups)} groups (direction: {direction})"
+            f"{len(parallel_groups)} groups (direction: {direction})"
         )
         return ctx
 
@@ -376,17 +445,16 @@ class TwoQubitCalibration(CalibrationStep):
             return ctx
 
         # Use pre-generated schedule if available, otherwise generate
+        cross_system: list[str] | None = None
         if "cr_schedule" in ctx.metadata:
             parallel_groups = ctx.metadata["cr_schedule"]
             logger.info(f"[{self.name}] Using pre-generated CR schedule")
         else:
             from qdash.workflow.engine import CRScheduler
 
-            wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
             scheduler = CRScheduler(
                 service.username,
                 service.chip_id,
-                wiring_config_path=wiring_config_path,
                 project_id=service.project_id,
             )
             schedule = scheduler.generate(
@@ -394,6 +462,10 @@ class TwoQubitCalibration(CalibrationStep):
                 max_parallel_ops=self.max_parallel_ops,
             )
             parallel_groups = schedule.parallel_groups
+            cross_system = getattr(schedule, "cross_system_pairs", None)
+        parallel_groups, _ = drop_cross_system_pairs(
+            service, parallel_groups, known_excluded=cross_system
+        )
 
         if not parallel_groups:
             logger.warning(f"[{self.name}] No valid CR pairs found")

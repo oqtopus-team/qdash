@@ -33,6 +33,7 @@ import type {
   GetFileImageParams,
   GetGitStatus200,
   GitPullConfig200,
+  GitPullConfigParams,
   GitPushConfig200,
   GitPushRequest,
   HTTPValidationError,
@@ -772,16 +773,19 @@ export function useGetGitStatus<TData = Awaited<ReturnType<typeof getGitStatus>>
 
 
 /**
+ * Publishes unpublished params and calibration notes first; 409 while shared
+ * files hold local edits unless ``force``.
  * @summary Pull the latest config from its Git repository
  */
 export const gitPullConfig = (
-
+    params?: GitPullConfigParams,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
 
 
       return customInstance<GitPullConfig200>(
-      {url: `/config/files/git/pull`, method: 'POST', signal
+      {url: `/config/files/git/pull`, method: 'POST',
+        params, signal
     },
       options);
     }
@@ -789,9 +793,9 @@ export const gitPullConfig = (
 
 
 
-export const getGitPullConfigMutationOptions = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gitPullConfig>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof gitPullConfig>>, TError,void, TContext> => {
+export const getGitPullConfigMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gitPullConfig>>, TError,{params?: GitPullConfigParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof gitPullConfig>>, TError,{params?: GitPullConfigParams}, TContext> => {
 
 const mutationKey = ['gitPullConfig'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -803,10 +807,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof gitPullConfig>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof gitPullConfig>>, {params?: GitPullConfigParams}> = (props) => {
+          const {params} = props ?? {};
 
-
-          return  gitPullConfig(requestOptions)
+          return  gitPullConfig(params,requestOptions)
         }
 
 
@@ -818,17 +822,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type GitPullConfigMutationResult = NonNullable<Awaited<ReturnType<typeof gitPullConfig>>>
 
-    export type GitPullConfigMutationError = unknown
+    export type GitPullConfigMutationError = HTTPValidationError
 
     /**
  * @summary Pull the latest config from its Git repository
  */
-export const useGitPullConfig = <TError = unknown,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gitPullConfig>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+export const useGitPullConfig = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gitPullConfig>>, TError,{params?: GitPullConfigParams}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof gitPullConfig>>,
         TError,
-        void,
+        {params?: GitPullConfigParams},
         TContext
       > => {
       return useMutation(getGitPullConfigMutationOptions(options), queryClient);

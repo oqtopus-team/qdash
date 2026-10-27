@@ -31,6 +31,8 @@ interface CouplingMetricHistoryModalProps {
   metricUnit: string;
   startAt?: string | null;
   endAt?: string | null;
+  /** Only results measured on this Qubex System. */
+  systemId?: string | null;
 }
 
 interface ExecutionGroup {
@@ -53,6 +55,7 @@ export function CouplingMetricHistoryModal({
   metricUnit,
   startAt,
   endAt,
+  systemId = null,
 }: CouplingMetricHistoryModalProps) {
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
@@ -79,7 +82,7 @@ export function CouplingMetricHistoryModal({
   const { data, isLoading, isError } = useGetCouplingMetricHistory(
     chipId,
     activeCouplingId,
-    { metric: metricName, limit: 100, within_days: 365 },
+    { metric: metricName, limit: 100, within_days: 365, system_id: systemId ?? undefined },
     {
       query: {
         staleTime: 30000,

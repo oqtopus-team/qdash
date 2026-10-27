@@ -11,6 +11,17 @@ from pydantic import BaseModel, Field
 
 from qdash.datamodel.system_info import SystemInfoModel
 
+MASTER_TASK_ID = "master"
+"""``task_id`` of master notes (aggregated calibration data)."""
+
+CHIP_MASTER_EXECUTION_ID = "master"
+"""``execution_id`` of the one live master note per project and chip.
+
+Every execution snapshots this document when it starts and merges its per-qubit
+results back into it, so concurrent executions on different Systems of one chip
+never lose each other's updates.
+"""
+
 
 class CalibrationNoteModel(BaseModel):
     """Domain model for a calibration note.

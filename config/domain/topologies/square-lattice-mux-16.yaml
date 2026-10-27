@@ -2,6 +2,7 @@ name: Square Lattice with MUX
 description: Square lattice topology with 2x2 MUX groups
 grid_size: 4
 num_qubits: 16
+mux_size: 4
 direction_convention: checkerboard_cr
 mux:
   enabled: true

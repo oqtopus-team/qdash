@@ -9,6 +9,10 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from qdash.api.schemas.task_file import TaskInfo
     from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
+    from qdash.api.services.chip.provisioner import ChipProvisioningService
+    from qdash.api.services.chip.systems import ChipSystemsService
+    from qdash.api.services.config_boxes_service import ConfigBoxesService
+    from qdash.api.services.config_repository_service import ConfigRepositoryService
     from qdash.api.services.flow_schedule_service import FlowScheduleService
     from qdash.api.services.flow_service import FlowService
 
@@ -502,6 +506,38 @@ def get_task_file_service() -> TaskFileService:
 def get_file_service() -> FileService:
     """Get the file service instance."""
     return FileService()
+
+
+@cached_dependency_provider
+def get_config_repository_service() -> "ConfigRepositoryService":
+    """Get the configuration repository status/sync service instance."""
+    from qdash.api.services.config_repository_service import ConfigRepositoryService
+
+    return ConfigRepositoryService()
+
+
+@cached_dependency_provider
+def get_chip_provisioning_service() -> "ChipProvisioningService":
+    """Get the chip provisioning service (chip records plus Qubex configuration files)."""
+    from qdash.api.services.chip.provisioner import ChipProvisioningService
+
+    return ChipProvisioningService()
+
+
+@cached_dependency_provider
+def get_chip_systems_service() -> "ChipSystemsService":
+    """Get the service listing and adding a chip's Qubex Systems."""
+    from qdash.api.services.chip.systems import ChipSystemsService
+
+    return ChipSystemsService()
+
+
+@cached_dependency_provider
+def get_config_boxes_service() -> "ConfigBoxesService":
+    """Get the service over the shared Qubex box catalog."""
+    from qdash.api.services.config_boxes_service import ConfigBoxesService
+
+    return ConfigBoxesService()
 
 
 @cached_dependency_provider

@@ -337,6 +337,7 @@ class MongoTaskResultHistoryRepository:
         metric_keys: set[str],
         cutoff_time: datetime | None = None,
         end_time: datetime | None = None,
+        system_id: str | None = None,
     ) -> dict[str, dict[str, MetricAggregateResult]]:
         """Aggregate latest metric values for each entity using MongoDB aggregation.
 
@@ -380,6 +381,8 @@ class MongoTaskResultHistoryRepository:
         start_at_filter = _build_start_at_filter(cutoff_time, end_time)
         if start_at_filter:
             match_stage["start_at"] = start_at_filter
+        if system_id is not None:
+            match_stage["system_id"] = system_id
 
         # Aggregation pipeline:
         # 1. Match relevant documents
@@ -444,6 +447,7 @@ class MongoTaskResultHistoryRepository:
         metric_modes: dict[str, Literal["maximize", "minimize"]],
         cutoff_time: datetime | None = None,
         end_time: datetime | None = None,
+        system_id: str | None = None,
     ) -> dict[str, dict[str, MetricAggregateResult]]:
         """Aggregate best metric values for each entity using MongoDB aggregation.
 
@@ -488,6 +492,8 @@ class MongoTaskResultHistoryRepository:
         start_at_filter = _build_start_at_filter(cutoff_time, end_time)
         if start_at_filter:
             match_stage["start_at"] = start_at_filter
+        if system_id is not None:
+            match_stage["system_id"] = system_id
 
         # For best metrics, we need to run separate aggregations for
         # maximize and minimize modes, as MongoDB doesn't support
@@ -516,6 +522,7 @@ class MongoTaskResultHistoryRepository:
         metric_keys: set[str],
         cutoff_time: datetime | None = None,
         end_time: datetime | None = None,
+        system_id: str | None = None,
     ) -> dict[str, dict[str, MetricAggregateResult]]:
         """Aggregate average metric values for each entity using MongoDB aggregation.
 
@@ -560,6 +567,8 @@ class MongoTaskResultHistoryRepository:
         start_at_filter = _build_start_at_filter(cutoff_time, end_time)
         if start_at_filter:
             match_stage["start_at"] = start_at_filter
+        if system_id is not None:
+            match_stage["system_id"] = system_id
 
         pipeline: list[dict[str, Any]] = [
             {"$match": match_stage},

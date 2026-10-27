@@ -6,22 +6,31 @@
  * OpenAPI spec version: 0.0.1
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
-  AllConfigResponse
+  AllConfigResponse,
+  ConfigBox,
+  HTTPValidationError,
+  ListConfigBoxesParams,
+  ListConfigBoxesResponse,
+  UpsertConfigBoxResponse
 } from '../../schemas';
 
 import { customInstance } from '../../lib/api/custom-instance';
@@ -133,3 +142,173 @@ export function useGetConfigAll<TData = Awaited<ReturnType<typeof getConfigAll>>
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+/**
+ * The catalog shared by every chip, plus the box types qubex accepts.
+ * @summary List the control boxes in box.yaml
+ */
+export const listConfigBoxes = (
+    params?: ListConfigBoxesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ListConfigBoxesResponse>(
+      {url: `/config/boxes`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListConfigBoxesQueryKey = (params?: ListConfigBoxesParams,) => {
+    return [
+    `/config/boxes`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListConfigBoxesQueryOptions = <TData = Awaited<ReturnType<typeof listConfigBoxes>>, TError = HTTPValidationError>(params?: ListConfigBoxesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listConfigBoxes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListConfigBoxesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listConfigBoxes>>> = ({ signal }) => listConfigBoxes(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listConfigBoxes>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListConfigBoxesQueryResult = NonNullable<Awaited<ReturnType<typeof listConfigBoxes>>>
+export type ListConfigBoxesQueryError = HTTPValidationError
+
+
+export function useListConfigBoxes<TData = Awaited<ReturnType<typeof listConfigBoxes>>, TError = HTTPValidationError>(
+ params: undefined |  ListConfigBoxesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listConfigBoxes>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listConfigBoxes>>,
+          TError,
+          Awaited<ReturnType<typeof listConfigBoxes>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListConfigBoxes<TData = Awaited<ReturnType<typeof listConfigBoxes>>, TError = HTTPValidationError>(
+ params?: ListConfigBoxesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listConfigBoxes>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listConfigBoxes>>,
+          TError,
+          Awaited<ReturnType<typeof listConfigBoxes>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListConfigBoxes<TData = Awaited<ReturnType<typeof listConfigBoxes>>, TError = HTTPValidationError>(
+ params?: ListConfigBoxesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listConfigBoxes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List the control boxes in box.yaml
+ */
+
+export function useListConfigBoxes<TData = Awaited<ReturnType<typeof listConfigBoxes>>, TError = HTTPValidationError>(
+ params?: ListConfigBoxesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listConfigBoxes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListConfigBoxesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Write the entry and publish it; other entries and comments are kept.
+ *
+ * Raises
+ * ------
+ * HTTPException
+ *     400 for an unknown type, a missing address or adapter, or the legacy layout.
+ * @summary Register or update a control box in box.yaml
+ */
+export const upsertConfigBox = (
+    configBox: ConfigBox,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<UpsertConfigBoxResponse>(
+      {url: `/config/boxes`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: configBox, signal
+    },
+      options);
+    }
+
+
+
+
+export const getUpsertConfigBoxMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertConfigBox>>, TError,{data: ConfigBox}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertConfigBox>>, TError,{data: ConfigBox}, TContext> => {
+
+const mutationKey = ['upsertConfigBox'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertConfigBox>>, {data: ConfigBox}> = (props) => {
+          const {data} = props ?? {};
+
+          return  upsertConfigBox(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertConfigBoxMutationResult = NonNullable<Awaited<ReturnType<typeof upsertConfigBox>>>
+    export type UpsertConfigBoxMutationBody = ConfigBox
+    export type UpsertConfigBoxMutationError = HTTPValidationError
+
+    /**
+ * @summary Register or update a control box in box.yaml
+ */
+export const useUpsertConfigBox = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertConfigBox>>, TError,{data: ConfigBox}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof upsertConfigBox>>,
+        TError,
+        {data: ConfigBox},
+        TContext
+      > => {
+      return useMutation(getUpsertConfigBoxMutationOptions(options), queryClient);
+    }

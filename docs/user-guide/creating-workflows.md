@@ -46,6 +46,18 @@ targets priority when both are present.
 | `exclude_qids` | Qubits to remove from a MUX selection |
 | `qids` | An explicit list of individual qubits |
 
+When a chip is driven by more than one control System (for example quel1 and quel3 boxes),
+a calibration pipeline splits its targets by System and runs Systems with different box types
+at the same time. A single-session run such as a saved flow or a single task must stay on one
+System. **Execute** in the workflow editor and **Run** on the Tasks page refuse such a run with
+the message "The targets span more than one System, and a run drives one System at a time",
+followed by one line per System with its qubits, so you can start one run per System. A saved
+flow may name its System in `default_parameters["system_id"]` to reserve only that System and
+run alongside flows on the other Systems of the chip. Couplings whose qubits belong to different
+Systems are skipped; the execution detail page lists them under **Couplings skipped across
+Systems** next to the **Systems** badges, and the execution note keeps them as
+`cross_system_couplings`.
+
 The current **Execute Flow** dialog does not collect MUX or qubit targets. To run or schedule a
 workflow from the application, give the template a safe default target. In **Simple Calibration**,
 add this fallback immediately before the block that creates the targets:

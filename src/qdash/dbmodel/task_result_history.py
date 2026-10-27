@@ -80,6 +80,10 @@ class TaskResultHistoryDocument(Document):
     execution_id: str = Field(..., description="The execution ID")
     tags: list[str] = Field(..., description="The tags")
     chip_id: str = Field(..., description="The chip ID")
+    system_id: str | None = Field(
+        default=None,
+        description="Qubex System that drove the measurement (equals chip_id for single-System chips)",
+    )
     cooldown_id: str = Field(
         default="",
         description=(
@@ -279,6 +283,7 @@ class TaskResultHistoryDocument(Document):
             execution_id=execution_model.execution_id,
             tags=execution_model.tags,
             chip_id=execution_model.chip_id,
+            system_id=task.system_id or None,
             cooldown_id=cls._resolve_cooldown_id(
                 project_id=execution_model.project_id,
                 chip_id=execution_model.chip_id,
@@ -327,5 +332,7 @@ class TaskResultHistoryDocument(Document):
             project_id=execution_model.project_id,
             chip_id=execution_model.chip_id,
         )
+        if task.system_id:
+            doc.system_id = task.system_id
         doc.save()
         return doc

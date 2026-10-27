@@ -4,6 +4,7 @@ This module tests both the in-memory implementation (for unit tests)
 and verifies the protocol interface.
 """
 
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -371,3 +372,63 @@ class TestMongoCalibrationNoteRepository:
         assert collection.update is not None
         assert collection.update["$set"]["user_id"] == "usr_alice"
         assert "user_id" not in collection.update["$setOnInsert"]
+
+
+class TestChipMasterNote:
+    """The chip master (execution_id == "master") is the single merge target."""
+
+    def _note(self, execution_id: str, timestamp: str, value: int) -> CalibrationNoteModel:
+        return CalibrationNoteModel(
+            project_id="p",
+            username="alice",
+            chip_id="chip-1",
+            execution_id=execution_id,
+            task_id="master",
+            note={"v": value},
+            timestamp=datetime.fromisoformat(timestamp),
+        )
+
+    def test_find_latest_master_prefers_the_chip_master(self) -> None:
+        repo = InMemoryCalibrationNoteRepository()
+        repo.upsert(self._note("exec-old", "2026-01-01T00:00:00", 1))
+        repo.upsert(self._note("master", "2026-01-02T00:00:00", 2))
+        repo.upsert(self._note("exec-new", "2026-01-03T00:00:00", 3))
+
+        latest = repo.find_latest_master(chip_id="chip-1", project_id="p")
+        assert latest is not None
+        assert latest.execution_id == "master"
+        assert repo.find_chip_master(chip_id="chip-1", project_id="p") is latest
+
+    def test_find_latest_master_falls_back_to_the_newest_snapshot(self) -> None:
+        repo = InMemoryCalibrationNoteRepository()
+        repo.upsert(self._note("exec-old", "2026-01-01T00:00:00", 1))
+        repo.upsert(self._note("exec-new", "2026-01-03T00:00:00", 3))
+
+        latest = repo.find_latest_master(chip_id="chip-1", project_id="p")
+        assert latest is not None
+        assert latest.execution_id == "exec-new"
+        assert repo.find_chip_master(chip_id="chip-1", project_id="p") is None
+
+    def test_mongo_find_latest_master_prefers_the_chip_master(self, init_db: Any) -> None:
+        repo = MongoCalibrationNoteRepository()
+        for execution_id, timestamp, value in (
+            ("exec-old", "2026-01-01T00:00:00", 1),
+            ("master", "2026-01-02T00:00:00", 2),
+            ("exec-new", "2026-01-03T00:00:00", 3),
+        ):
+            CalibrationNoteDocument(
+                project_id="p",
+                username="alice",
+                chip_id="chip-1",
+                execution_id=execution_id,
+                task_id="master",
+                note={"v": value},
+                timestamp=timestamp,
+            ).insert()
+
+        latest = repo.find_latest_master(chip_id="chip-1", project_id="p")
+        assert latest is not None
+        assert latest.execution_id == "master"
+        assert latest.note == {"v": 2}
+        chip_master = repo.find_chip_master(chip_id="chip-1", project_id="p")
+        assert chip_master is not None and chip_master.note == {"v": 2}

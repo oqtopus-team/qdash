@@ -193,6 +193,7 @@ def _create_isolated_session(
         backend_name=session_config["backend_name"],
         project_id=session_config.get("project_id"),
         muxes=session_config.get("muxes"),
+        system_id=session_config.get("system_id"),
         use_lock=False,  # Parent session holds the lock
         skip_execution=True,  # Don't create new Execution, use parent's
         enable_github_pull=False,  # Parent session handles GitHub pull
@@ -206,25 +207,39 @@ def _create_isolated_session(
     )
 
 
-def _is_mux_representative(qid: str) -> bool:
+def _mux_size_for_chip(chip_id: str) -> int:
+    """Qubits per MUX for the chip, falling back to 4 when the config is unreadable."""
+    from qdash.common.config.qubex_layout import QubexLayout
+    from qdash.common.config.system_catalog import DEFAULT_MUX_SIZE, SystemCatalog
+
+    try:
+        return SystemCatalog(QubexLayout.detect(), chip_id).mux_size()
+    except (OSError, ValueError, LookupError):
+        return DEFAULT_MUX_SIZE
+
+
+def _is_mux_representative(qid: str, mux_size: int = 4) -> bool:
     """Check if the qubit is the MUX representative (first qubit in MUX).
 
-    For MUX tasks, only the representative qubit (qid % 4 == 0) executes the task.
+    For MUX tasks, only the representative qubit (qid % mux_size == 0) executes the task.
 
     Args:
         qid: Qubit ID
+        mux_size: Qubits per MUX for the chip
 
     Returns:
         True if this qubit is the MUX representative
     """
     try:
-        return int(qid) % 4 == 0
+        return int(qid) % mux_size == 0
     except ValueError:
         # If qid is not a simple integer, assume it's a representative
         return True
 
 
-def _should_skip_task_for_qid(task_name: str, qid: str, backend_name: str) -> bool:
+def _should_skip_task_for_qid(
+    task_name: str, qid: str, backend_name: str, mux_size: int = 4
+) -> bool:
     """Check if a task should be skipped for the given qubit.
 
     MUX tasks are only executed for the representative qubit of each MUX.
@@ -233,6 +248,7 @@ def _should_skip_task_for_qid(task_name: str, qid: str, backend_name: str) -> bo
         task_name: Name of the task
         qid: Qubit ID
         backend_name: Backend name (e.g., 'qubex', 'fake')
+        mux_size: Qubits per MUX for the chip
 
     Returns:
         True if the task should be skipped for this qubit
@@ -240,7 +256,7 @@ def _should_skip_task_for_qid(task_name: str, qid: str, backend_name: str) -> bo
     from qdash.workflow.calibtasks.active_protocols import is_mux_task
 
     if is_mux_task(task_name, backend_name):
-        if not _is_mux_representative(qid):
+        if not _is_mux_representative(qid, mux_size):
             return True
     return False
 
@@ -295,6 +311,7 @@ def _execute_mux_qubits_with_session(
     Internal helper that performs the actual task execution.
     """
     backend_name = session.backend_name
+    mux_size = _mux_size_for_chip(session.chip_id)
     results = {}
 
     for qid in qids:
@@ -302,7 +319,7 @@ def _execute_mux_qubits_with_session(
             result: dict[str, Any] = {}
             for task_name in tasks:
                 # Skip MUX tasks for non-representative qubits
-                if _should_skip_task_for_qid(task_name, qid, backend_name):
+                if _should_skip_task_for_qid(task_name, qid, backend_name, mux_size):
                     logger.info(
                         f"Skipping MUX task {task_name} for qid={qid} (not MUX representative)"
                     )
@@ -380,12 +397,13 @@ def _execute_single_qubit_with_session(
     Internal helper that performs the actual task execution.
     """
     backend_name = session.backend_name
+    mux_size = _mux_size_for_chip(session.chip_id)
     result: dict[str, Any] = {}
 
     try:
         for task_name in tasks:
             # Skip MUX tasks for non-representative qubits
-            if _should_skip_task_for_qid(task_name, qid, backend_name):
+            if _should_skip_task_for_qid(task_name, qid, backend_name, mux_size):
                 logger.info(f"Skipping MUX task {task_name} for qid={qid} (not MUX representative)")
                 result[task_name] = {"skipped": True, "reason": "not_mux_representative"}
                 continue
@@ -673,10 +691,20 @@ def run_qubit_batch_calibration_isolated(
     return result
 
 
+def _session_config_for_system(
+    session_config: dict[str, Any], system_id: str | None
+) -> dict[str, Any]:
+    """Session config of one isolated worker, pinned to its System when known."""
+    if system_id is None:
+        return session_config
+    return {**session_config, "system_id": system_id}
+
+
 def run_mux_calibrations_parallel(
     mux_groups: list[list[str]],
     tasks: list[str],
     session_config: dict[str, Any],
+    group_system_ids: list[str | None] | None = None,
 ) -> dict[str, Any]:
     """Run multiple MUX group calibrations in parallel using separate processes.
 
@@ -687,10 +715,17 @@ def run_mux_calibrations_parallel(
         mux_groups: List of MUX groups, where each group is a list of qubit IDs
         tasks: List of task names to execute
         session_config: Configuration for creating isolated sessions
+        group_system_ids: Qubex System of each group, in ``mux_groups`` order.
+            A group with a System gets a session pinned to it.
 
     Returns:
         Dictionary mapping qid to results (combined from all MUX groups)
     """
+    system_ids: list[str | None] = (
+        list(group_system_ids) if group_system_ids is not None else [None] * len(mux_groups)
+    )
+    if len(system_ids) != len(mux_groups):
+        raise ValueError("group_system_ids must match mux_groups")
 
     # Define flow dynamically to avoid import errors when prefect-dask not installed
     @flow(task_runner=_get_dask_task_runner())
@@ -707,9 +742,9 @@ def run_mux_calibrations_parallel(
             calibrate_mux_qubits.submit(
                 qids=group,
                 tasks=tasks,
-                session_config=session_config,
+                session_config=_session_config_for_system(session_config, system_id),
             )
-            for group in mux_groups
+            for group, system_id in zip(mux_groups, system_ids, strict=True)
         ]
 
         # Collect results and log any errors from subprocesses
@@ -734,6 +769,7 @@ def run_qubit_calibrations_parallel(
     qids: list[str],
     tasks: list[str],
     session_config: dict[str, Any],
+    qid_system_ids: list[str | None] | None = None,
 ) -> dict[str, Any]:
     """Run multiple qubit calibrations in parallel using separate processes.
 
@@ -744,10 +780,16 @@ def run_qubit_calibrations_parallel(
         qids: List of qubit IDs to calibrate in parallel
         tasks: List of task names to execute
         session_config: Configuration for creating isolated sessions
+        qid_system_ids: Qubex System of each qubit, in ``qids`` order.
 
     Returns:
         Dictionary mapping qid to results
     """
+    system_ids: list[str | None] = (
+        list(qid_system_ids) if qid_system_ids is not None else [None] * len(qids)
+    )
+    if len(system_ids) != len(qids):
+        raise ValueError("qid_system_ids must match qids")
 
     # Define flow dynamically to avoid import errors when prefect-dask not installed
     @flow(task_runner=_get_dask_task_runner())
@@ -764,9 +806,9 @@ def run_qubit_calibrations_parallel(
             calibrate_single_qubit.submit(
                 qid=qid,
                 tasks=tasks,
-                session_config=session_config,
+                session_config=_session_config_for_system(session_config, system_id),
             )
-            for qid in qids
+            for qid, system_id in zip(qids, system_ids, strict=True)
         ]
 
         # Collect results and log any errors from subprocesses

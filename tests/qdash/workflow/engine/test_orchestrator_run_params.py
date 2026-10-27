@@ -725,3 +725,81 @@ class TestBaseTaskSetRunParameters:
 
         assert task.run_parameters["shots"].value == 2048
         assert isinstance(task.run_parameters["shots"].value, int)
+
+
+def _write_two_system_tree(root: Any) -> None:
+    import yaml
+
+    config = root / "config"
+    config.mkdir(parents=True)
+    (config / "chip.yaml").write_text(yaml.safe_dump({"chip-1": {"n_qubits": 16}}))
+    (config / "system.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "chip-1": {"chip_id": "chip-1", "backend": "quel1"},
+                "chip-1-quel3": {"chip_id": "chip-1", "backend": "quel3"},
+            }
+        )
+    )
+    rows = lambda *ids: [{"mux": m, "ctrl": [f"C{m}-0"], "read_out": f"R{m}-0"} for m in ids]  # noqa: E731
+    (config / "wiring.yaml").write_text(
+        yaml.safe_dump({"chip-1": rows(0, 1), "chip-1-quel3": rows(2, 3)})
+    )
+
+
+def _orchestrator(monkeypatch: Any, qids: list[str]) -> tuple[CalibOrchestrator, MagicMock]:
+    config = CalibConfig(
+        username="alice",
+        chip_id="chip-1",
+        qids=qids,
+        execution_id="exec-1",
+        project_id="project-1",
+        backend_name="fake",
+    )
+    orchestrator = CalibOrchestrator(config)
+    orchestrator._task_context = cast("TaskContext", SimpleNamespace(id="manager-1"))
+    factory = MagicMock(return_value=SimpleNamespace(name="fake"))
+    monkeypatch.setattr("qdash.workflow.engine.orchestrator.create_backend", factory)
+    return orchestrator, factory
+
+
+def test_session_records_the_single_system_of_its_targets(monkeypatch: Any, tmp_path: Any) -> None:
+    _write_two_system_tree(tmp_path)
+    monkeypatch.setattr(
+        "qdash.common.config.qubex_layout.resolve_config_base_path", lambda: tmp_path
+    )
+    orchestrator, factory = _orchestrator(monkeypatch, ["8", "10-11"])
+
+    orchestrator._create_backend()
+
+    session_config = factory.call_args.kwargs["config"]
+    assert session_config["system_ids"] == ["chip-1-quel3"]
+    assert session_config["system_id"] == "chip-1-quel3"
+    assert (orchestrator.config.note or {})["system_ids"] == ["chip-1-quel3"]
+
+
+def test_owner_session_spanning_systems_gets_no_single_system(
+    monkeypatch: Any, tmp_path: Any
+) -> None:
+    _write_two_system_tree(tmp_path)
+    monkeypatch.setattr(
+        "qdash.common.config.qubex_layout.resolve_config_base_path", lambda: tmp_path
+    )
+    orchestrator, factory = _orchestrator(monkeypatch, ["0", "8"])
+
+    orchestrator._create_backend()
+
+    session_config = factory.call_args.kwargs["config"]
+    assert session_config["system_ids"] == ["chip-1", "chip-1-quel3"]
+    assert "system_id" not in session_config
+
+
+def test_unreadable_tree_falls_back_to_the_chip_as_system(monkeypatch: Any, tmp_path: Any) -> None:
+    monkeypatch.setattr(
+        "qdash.common.config.qubex_layout.resolve_config_base_path", lambda: tmp_path
+    )
+    orchestrator, factory = _orchestrator(monkeypatch, ["0"])
+
+    orchestrator._create_backend()
+
+    assert factory.call_args.kwargs["config"]["system_id"] == "chip-1"

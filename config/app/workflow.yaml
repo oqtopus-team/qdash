@@ -49,6 +49,10 @@ github:
   # Publish manual edits and saved Tasks runs when GitHub credentials are configured.
   enabled: true
   branch: main
+  # true: workflows open a pull request for their params/calib_note changes instead of
+  # pushing to the branch directly. A pull then refuses while the proposal is unmerged
+  # and edited locally, so enable it only when someone reviews the proposals.
+  review_required: false
   # Optional allowlist for params/*.yaml files pushed by ALL_PARAMS.
   # Leave empty to preserve the historical behavior of pushing all *.yaml files.
   # Example:
@@ -76,3 +80,8 @@ github:
     - purcell_filter_linewidth.yaml
     - dispersive_shift.yaml
     - critical_photon_number.yaml
+
+systems:
+  # Systems of one chip with different backends (quel1 / quel3) run in parallel.
+  # Systems that share a backend run one after another unless this is true.
+  parallel_same_backend: false

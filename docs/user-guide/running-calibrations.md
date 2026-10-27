@@ -75,7 +75,11 @@ for the review workflow.
 ## Edit Workflow Configuration
 
 Open **Config** to edit the active project's Qubex configuration files. Save local changes before
-pulling or creating a pull request; pulling can replace the working copy.
+pulling or creating a pull request. A pull publishes unpublished parameter and calibration-note
+files first and refuses while edited hardware files (`config/*.yaml`) are unpublished; a pull
+request holds only the files that changed. See
+[Use a Configuration Repository](./setup/qubex-backend.md#use-a-configuration-repository) for
+the synchronization modes.
 
 Figures and raw data stay associated with the project, chip, execution, and task result that
 produced them. See

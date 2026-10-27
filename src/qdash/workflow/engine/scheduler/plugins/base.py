@@ -30,6 +30,8 @@ class FilterContext:
     qid_to_mux: dict[str, int] = field(default_factory=dict)
     qubit_models: dict[str, Any] = field(default_factory=dict)
     topology_directions: set[str] | None = None
+    mux_size: int = 4
+    """Qubits per MUX (``chip.yaml`` ``topology.mux_size``)."""
 
 
 @dataclass

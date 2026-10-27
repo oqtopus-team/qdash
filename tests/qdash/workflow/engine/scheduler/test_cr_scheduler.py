@@ -648,3 +648,64 @@ def test_generate_measured_inverse(
     all_pairs = [pair for group in schedule.parallel_groups for pair in group]
     assert ("1", "0") in all_pairs
     assert ("0", "1") not in all_pairs
+
+
+# Cross-System exclusion
+
+
+def _two_system_tree(tmp_path, monkeypatch):
+    import yaml
+
+    config = tmp_path / "config"
+    config.mkdir(parents=True)
+    (config / "chip.yaml").write_text(yaml.safe_dump({"test_chip": {"n_qubits": 16}}))
+    (config / "system.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "test_chip": {"chip_id": "test_chip", "backend": "quel1"},
+                "test_chip-quel3": {"chip_id": "test_chip", "backend": "quel3"},
+            }
+        )
+    )
+    rows = lambda *ids: [{"mux": m, "ctrl": [f"C{m}-0"], "read_out": f"R{m}-0"} for m in ids]  # noqa: E731
+    (config / "wiring.yaml").write_text(
+        yaml.safe_dump({"test_chip": rows(0, 1), "test_chip-quel3": rows(2, 3)})
+    )
+    monkeypatch.setattr(
+        "qdash.common.config.qubex_layout.resolve_config_base_path", lambda: tmp_path
+    )
+
+
+def test_split_cross_system_pairs_excludes_couplings_between_systems(tmp_path, monkeypatch):
+    _two_system_tree(tmp_path, monkeypatch)
+    scheduler = CRScheduler(username="alice", chip_id="test_chip")
+
+    feasible, excluded = scheduler.split_cross_system_pairs(["0-1", "7-8", "8-9", "3-12"])
+
+    assert feasible == ["0-1", "8-9"]
+    assert excluded == ["7-8", "3-12"]
+
+
+def test_split_cross_system_pairs_keeps_everything_on_a_single_system_chip(scheduler):
+    pairs = ["0-1", "1-2"]
+    assert scheduler.split_cross_system_pairs(pairs) == (pairs, [])
+
+
+def test_schedule_result_reports_cross_system_pairs():
+    result = CRScheduleResult(
+        parallel_groups=[[("0", "1")]],
+        metadata={},
+        filtering_stats={},
+        cr_pairs_string=["0-1"],
+        qid_to_mux={"0": 0, "1": 0},
+        mux_conflict_map={},
+        cross_system_pairs=["7-8"],
+    )
+    assert result.to_dict()["cross_system_pairs"] == ["7-8"]
+
+
+def test_qid_to_coords_honours_the_mux_size():
+    assert qid_to_coords(5, 8) == qid_to_coords(5, 8, mux_size=4)
+    # One-row MUXes of 8 qubits on a 16-wide lattice: MUX 1 covers columns 8..15 of row 0.
+    assert qid_to_coords(9, 16, mux_size=8) == (0, 9)
+    assert qid_to_coords(17, 16, mux_size=8) == (1, 1)

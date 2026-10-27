@@ -92,6 +92,7 @@ class CalibOrchestrator:
         self._execution_service: ExecutionService | None = None
         self._task_context: TaskContext | None = None
         self._backend: BaseBackend | None = None
+        self._session_system_ids: list[str] = []
         self._initialized = False
 
         # Task execution state
@@ -122,6 +123,11 @@ class CalibOrchestrator:
     def is_initialized(self) -> bool:
         """Check if the session is initialized."""
         return self._initialized
+
+    @property
+    def session_system_ids(self) -> list[str]:
+        """Qubex Systems the session's targets resolve to (empty until initialized)."""
+        return list(self._session_system_ids)
 
     def _create_history_recorder(self) -> TaskHistoryRecorder:
         """Create a TaskHistoryRecorder with optional provenance tracking.
@@ -193,7 +199,15 @@ class CalibOrchestrator:
 
             # Initialize Backend
             self._backend = self._create_backend()
-            if config.connect_backend:
+            if config.connect_backend and len(self._session_system_ids) > 1:
+                # One Experiment drives one System. The owner only prepares notes
+                # and parameters; isolated sessions connect, one per System.
+                logger.info(
+                    "Targets span Systems %s; the owner session delegates hardware work "
+                    "to one isolated session per System",
+                    ", ".join(self._session_system_ids),
+                )
+            elif config.connect_backend:
                 self._backend.connect()
         except Exception:
             if self._backend is not None:
@@ -210,6 +224,36 @@ class CalibOrchestrator:
 
         self._initialized = True
         logger.info(f"Session initialized: execution_id={config.execution_id}")
+
+    def _resolve_system_ids(self) -> list[str]:
+        """Systems that drive this session's targets, in resolution order.
+
+        Falls back to the chip ID (the System name of every single-System chip)
+        when the configuration tree cannot be read, so unchanged deployments keep
+        working. A coupling whose qubits sit on different Systems is an error.
+        """
+        from qdash.common.config.qubex_layout import QubexLayout
+        from qdash.common.config.system_catalog import CrossSystemCoupling, SystemCatalog
+
+        config = self.config
+        if config.system_id:
+            return [config.system_id]
+        catalog = SystemCatalog(QubexLayout.detect(), config.chip_id)
+        try:
+            assignment: dict[str, list[Any]] = dict(catalog.resolve(config.qids))
+            if config.muxes is not None:
+                for system_id, muxes in catalog.resolve_muxes(config.muxes).items():
+                    assignment.setdefault(system_id, []).extend(muxes)
+            if not assignment:
+                return [catalog.default_system_id()]
+            return list(assignment)
+        except CrossSystemCoupling:
+            raise
+        except (OSError, ValueError, LookupError, TypeError) as exc:
+            logger.warning(
+                "Could not resolve Systems for chip %s (%s); using the chip ID", config.chip_id, exc
+            )
+            return [config.chip_id]
 
     def _create_directories(self) -> None:
         """Create the calibration directory structure."""
@@ -257,6 +301,19 @@ class CalibOrchestrator:
 
         if config.muxes is not None:
             session_config["muxes"] = config.muxes
+
+        # Resolve which Qubex Systems the targets belong to. One Experiment drives
+        # one System, so a session whose targets span Systems can only own the
+        # execution (prepare notes and parameters) and must not connect.
+        system_ids = self._resolve_system_ids()
+        self._session_system_ids = system_ids
+        session_config["system_ids"] = system_ids
+        if len(system_ids) == 1:
+            session_config["system_id"] = system_ids[0]
+        if config.note is not None and system_ids:
+            config.note["system_ids"] = system_ids
+        if self._execution_service is not None and system_ids and not config.skip_execution:
+            self._execution_service.update_note("system_ids", system_ids)
 
         if config.configuration_mode is not None:
             session_config["configuration_mode"] = config.configuration_mode

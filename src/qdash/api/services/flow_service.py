@@ -29,6 +29,7 @@ from qdash.api.schemas.flow import (
     SaveFlowRequest,
     SaveFlowResponse,
 )
+from qdash.api.services.system_split import ensure_single_system, targets_from_parameters
 from qdash.common.config.path_resolver import (
     execution_calib_data_dir,
     resolve_user_flows_dir,
@@ -435,6 +436,11 @@ class FlowService:
         )
 
         chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
+        if not parameters.get("system_id"):
+            # A flow that declares its System runs inside it; explicit targets
+            # must otherwise stay within one System (one run = one Experiment).
+            flow_qids, flow_mux_ids = targets_from_parameters(parameters)
+            ensure_single_system(chip_id, flow_qids, mux_ids=flow_mux_ids)
         claimed_execution_id = self._claim_execution_lock(
             project_id=project_id,
             username=username,
@@ -575,6 +581,9 @@ class FlowService:
             f"Executing single task '{task_name}' for qid={qid} "
             f"(deployment={deployment.id}) with parameters: {parameters}"
         )
+
+        # A coupling whose qubits sit on different Systems cannot be driven.
+        ensure_single_system(chip_id, [qid])
 
         claimed_execution_id = self._claim_execution_lock(
             project_id=project_id,
@@ -922,8 +931,17 @@ class FlowService:
             )
         if self._execution_lock_repo is None:
             raise HTTPException(status_code=503, detail="Execution availability is unavailable")
+        if request.flow_name is None:
+            try:
+                run_qids, run_mux_ids = targets_from_parameters(parameters)
+                ensure_single_system(chip_id, run_qids, mux_ids=run_mux_ids)
+            except HTTPException as exc:
+                detail: dict[str, Any] = exc.detail if isinstance(exc.detail, dict) else {}
+                return ExecutionAvailabilityResponse(
+                    available=False, reason=str(detail.get("message") or exc.detail)
+                )
         scope = (
-            resolve_workflow_resource_scope(chip_id)
+            resolve_workflow_resource_scope(chip_id, parameters.get("system_id"))
             if request.flow_name is not None
             else resolve_execution_resource_scope(chip_id, parameters)
         )
@@ -989,7 +1007,7 @@ class FlowService:
 
         execution_id = generate_execution_id(username, chip_id, project_id=project_id)
         scope = (
-            resolve_workflow_resource_scope(chip_id)
+            resolve_workflow_resource_scope(chip_id, parameters.get("system_id"))
             if workflow
             else resolve_execution_resource_scope(chip_id, parameters)
         )

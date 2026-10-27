@@ -239,3 +239,127 @@ def test_git_env_without_credentials_only_marks_the_mount_safe(tmp_path: Path, m
 
     assert env["GIT_CONFIG_COUNT"] == "1"
     assert "QDASH_GIT_TOKEN" not in env
+
+
+def _bare_origin(tmp_path: Path) -> Path:
+    bare = tmp_path / "origin.git"
+    Repo.init(bare, bare=True, initial_branch="main").close()
+    seed = tmp_path / "seed"
+    repo = Repo.clone_from(bare, seed)
+    (seed / "config").mkdir()
+    (seed / "config" / "chip.yaml").write_text("chip-1: {}\n", encoding="utf-8")
+    (seed / "params" / "chip-1").mkdir(parents=True)
+    (seed / "params" / "chip-1" / "a.yaml").write_text("a: 1\n", encoding="utf-8")
+    repo.git.checkout("-b", "main")
+    repo.git.add("-A")
+    repo.index.commit("seed")
+    repo.remotes.origin.push(refspec="main:main")
+    repo.close()
+    return bare
+
+
+def _github_service(tmp_path: Path, monkeypatch) -> tuple[FileService, Path]:
+    origin = _bare_origin(tmp_path)
+    root = tmp_path / "qubex-config"
+    Repo.clone_from(origin, root, branch="main").close()
+    monkeypatch.setenv("GITHUB_USER", "bot")
+    monkeypatch.setenv("GITHUB_TOKEN", "s3cret")
+    monkeypatch.setenv("CONFIG_REPO_URL", str(origin))
+    return FileService(config_base_path=root), origin
+
+
+def test_status_reports_the_repository_mode_and_layout(tmp_path: Path, monkeypatch) -> None:
+    service, _ = _github_service(tmp_path, monkeypatch)
+    (tmp_path / "qubex-config" / "params" / "chip-1" / "a.yaml").write_text("a: 2\n")
+
+    status = service.get_git_status()
+
+    assert status["mode"] == "github" and status["layout"] == "shared"
+    assert status["branch"] == "main" and status["is_dirty"] is True
+    assert status["changed_files"] == ["params/chip-1/a.yaml"]
+    assert status["unpushed_commits"] == 0 and status["review_required"] is False
+
+
+def test_pull_publishes_owned_edits_and_refuses_edited_shared_files(
+    tmp_path: Path, monkeypatch
+) -> None:
+    service, origin = _github_service(tmp_path, monkeypatch)
+    root = tmp_path / "qubex-config"
+    (root / "params" / "chip-1" / "a.yaml").write_text("a: 2\n")
+
+    result = service.git_pull_config()
+
+    assert result["success"] is True and result["published"] == ["params/chip-1/a.yaml"]
+    assert Repo(origin).git.show("main:params/chip-1/a.yaml").strip() == "a: 2"
+
+    (root / "config" / "chip.yaml").write_text("chip-1: {n_qubits: 4}\n")
+    with pytest.raises(HTTPException) as exc_info:
+        service.git_pull_config()
+    assert exc_info.value.status_code == 409
+    assert "config/chip.yaml" in exc_info.value.detail
+    assert service.git_pull_config(force=True)["success"] is True
+    assert (root / "config" / "chip.yaml").read_text() == "chip-1: {}\n"
+
+
+def test_push_proposes_only_the_changed_files(tmp_path: Path, monkeypatch) -> None:
+    service, origin = _github_service(tmp_path, monkeypatch)
+    root = tmp_path / "qubex-config"
+    (root / "config" / "chip.yaml").write_text("chip-1: {n_qubits: 4}\n")
+    (root / "config" / "wiring.yaml").write_text("chip-1: []\n")
+    (root / "config" / "wiring.yaml.lock").write_text("")
+    opened: list[dict[str, str]] = []
+
+    def create_pr(settings, *, head, base, title, body):
+        opened.append({"head": head, "base": base, "title": title})
+        return "https://example.test/pr/1", 1
+
+    monkeypatch.setattr(
+        "qdash.common.infrastructure.config_repository.create_github_pull_request", create_pr
+    )
+
+    result = service.git_push_config("Resize chip-1")
+
+    assert result["pr_url"] == "https://example.test/pr/1" and result["pr_number"] == 1
+    assert result["files"] == ["config/chip.yaml", "config/wiring.yaml"]
+    assert opened == [{"head": result["branch"], "base": "main", "title": "Resize chip-1"}]
+    assert Repo(origin).git.show("main:config/chip.yaml").strip() == "chip-1: {}"
+
+
+def test_push_without_credentials_names_the_missing_variables(tmp_path: Path, monkeypatch) -> None:
+    for name in ("GITHUB_USER", "GITHUB_TOKEN", "CONFIG_REPO_URL"):
+        monkeypatch.delenv(name, raising=False)
+    service = FileService(_workspace_repo(tmp_path))
+
+    with pytest.raises(HTTPException) as exc_info:
+        service.git_push_config("x")
+    assert "CONFIG_REPO_URL" in exc_info.value.detail
+
+
+def test_validate_file_content_checks_the_layout_schema_of_config_files(tmp_path: Path) -> None:
+    from tests.qdash.api.services.chip._trees import write_shared_tree
+
+    write_shared_tree(tmp_path)
+    service = FileService(config_base_path=tmp_path)
+
+    good = service.validate_file_content("64Qv3:\n  n_qubits: 64\n", "yaml", "config/chip.yaml")
+    bad = service.validate_file_content("64Qv3:\n  n_qubits: many\n", "yaml", "config/chip.yaml")
+    other = service.validate_file_content("anything: 1\n", "yaml", "config/cable_delay.yaml")
+    no_path = service.validate_file_content("64Qv3:\n  n_qubits: many\n", "yaml")
+
+    assert good["valid"] is True
+    assert good["schema"] == "chip.schema.json"
+    assert good["problems"] == []
+    assert bad["valid"] is False
+    assert bad["problems"] == [
+        {"location": "64Qv3/n_qubits", "message": "'many' is not of type 'integer'"}
+    ]
+    assert "schema" not in other
+    assert no_path == {"valid": True, "message": "Valid YAML"}
+
+
+def test_validate_file_content_skips_schemas_outside_the_config_workspace(tmp_path: Path) -> None:
+    service = FileService(config_base_path=tmp_path, label="knowledge")
+
+    result = service.validate_file_content("64Qv3:\n  n_qubits: many\n", "yaml", "config/chip.yaml")
+
+    assert result == {"valid": True, "message": "Valid YAML"}

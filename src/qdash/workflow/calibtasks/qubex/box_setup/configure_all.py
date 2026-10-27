@@ -11,7 +11,10 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.workflow.engine.backend.qubex_paths import (
+    resolve_session_system_id,
+    session_experiment_paths,
+)
 
 
 class ConfigureAll(QubexTask):
@@ -48,16 +51,15 @@ class ConfigureAll(QubexTask):
             mux_ids = []
         mux_ids = list(mux_ids)
 
-        qubex_paths = get_qubex_paths()
-        config_dir = backend.config.get("config_dir", str(qubex_paths.config_dir(chip_id)))
-        params_dir = backend.config.get("params_dir", str(qubex_paths.params_dir(chip_id)))
+        system_id = resolve_session_system_id({**backend.config, "muxes": mux_ids, "qids": []})
+        paths = session_experiment_paths(backend.config, system_id)
 
-        print(f"[ConfigureAll] Loading system_manager for mux_ids={mux_ids}")
+        print(f"[ConfigureAll] Loading system_manager for system={system_id} mux_ids={mux_ids}")
         exp = Experiment(
-            chip_id=chip_id,
+            system_id=system_id,
             muxes=mux_ids,
-            config_dir=config_dir,
-            params_dir=params_dir,
+            config_dir=paths["config_dir"],
+            params_dir=paths["params_dir"],
         )
         exp.system_manager.load(
             chip_id=exp.chip_id,

@@ -351,6 +351,7 @@ class CalibService:
         enable_github: bool = True,
         github_push_config: GitHubPushConfig | None = None,
         muxes: list[int] | None = None,
+        system_id: str | None = None,
         project_id: str | None = None,
         skip_execution: bool = False,
         default_run_parameters: dict[str, Any] | None = None,
@@ -400,6 +401,8 @@ class CalibService:
             enable_github: Enable GitHub integration (default: True). Sets both pull and push.
             github_push_config: Configuration for GitHub push operations
             muxes: List of MUX IDs for system-level tasks (default: None)
+            system_id: Qubex System to connect to. Isolated workers receive the
+                System of their MUX group; otherwise it is derived from the targets.
             project_id: Project ID for multi-tenancy support. If None, auto-resolved
                 from username's default_project_id.
             skip_execution: Internal option for isolated workers borrowing an existing
@@ -430,6 +433,7 @@ class CalibService:
         self.chip_id = chip_id
         self.qids = qids
         self.muxes = muxes
+        self.system_id = system_id
         self.backend_name = backend_name or get_default_backend()
         self.use_lock = use_lock
         self.skip_execution = skip_execution
@@ -726,6 +730,7 @@ class CalibService:
                 tags=tags,
                 note=note,
                 muxes=self.muxes,
+                system_id=self.system_id,
                 project_id=self.project_id,
                 enable_github_pull=self._enable_github_pull,
                 skip_execution=self.skip_execution,
@@ -791,6 +796,14 @@ class CalibService:
         """Set execution_service (for backward compatibility with reload)."""
         if self._orchestrator is not None:
             self._orchestrator._execution_service = value
+
+    @property
+    def session_system_ids(self) -> list[str]:
+        """Systems the session's targets span; more than one means the owner is not connected."""
+        if self._orchestrator is None:
+            return []
+        # Test doubles may not implement the property.
+        return list(getattr(self._orchestrator, "session_system_ids", []))
 
     @property
     def task_context(self) -> TaskContext | None:
@@ -1401,6 +1414,10 @@ class CalibService:
         self._sync_backend_params_before_push(logger)
         if GitHubIntegration.check_credentials() and self.github_integration is not None:
             try:
+                # Publish only the Systems this execution used (recorded by the orchestrator).
+                system_ids = list(self.execution_service.note.system_ids or [])
+                if system_ids:
+                    self.github_integration.system_ids = system_ids
                 push_results = self.github_integration.push_files(self.github_push_config)
                 if push_results:
                     self.execution_service.note.github_push_results = push_results

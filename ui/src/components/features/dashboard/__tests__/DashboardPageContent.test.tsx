@@ -17,6 +17,7 @@ const mockListForumPosts = vi.hoisted(() => vi.fn());
 const mockGetChipNotesSummary = vi.hoisted(() => vi.fn());
 
 vi.mock("@/client/chip/chip", () => ({
+  useListChipSystems: () => ({ data: undefined, isLoading: false }),
   useListChips: () => ({
     data: {
       data: {
@@ -140,6 +141,9 @@ vi.mock("@/hooks/useMetricsQueryParams", () => ({
   }),
 }));
 
+vi.mock("@/hooks/url-state/useSystemUrlState", () => ({
+  useSystemUrlState: () => ({ selectedSystemId: null, setSelectedSystemId: vi.fn() }),
+}));
 vi.mock("@/hooks/useUrlState", () => ({
   useMetricsUrlState: () => ({
     selectedChip: "chip-1",

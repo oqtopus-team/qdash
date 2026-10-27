@@ -321,6 +321,8 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
               onPush={handlePush}
               isPulling={git.isPulling}
               isPushing={git.isPushing}
+              onSync={git.canSync ? () => git.sync() : undefined}
+              isSyncing={git.isSyncing}
               hideOnMobile
               pushTitle={`Create a pull request with ${workspace.key} changes`}
               menuItems={
@@ -688,6 +690,24 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
         onConfirm={() => git.pull()}
         onOpenChange={setPullConfirmationOpen}
         pending={git.isPulling}
+        destructive
+      />
+      <ConfirmDialog
+        open={git.conflict !== null}
+        title="Discard unpublished edits to shared files?"
+        description={
+          <>
+            <p>{git.conflict?.message}</p>
+            <p className="mt-2">
+              Edits to the shared hardware files (config/*.yaml) are not published automatically.
+              Create a pull request with them first, or discard them and continue.
+            </p>
+          </>
+        }
+        confirmLabel={git.conflict?.action === "sync" ? "Discard and sync" : "Discard and pull"}
+        onConfirm={() => git.forceRetry()}
+        onOpenChange={(open) => !open && git.dismissConflict()}
+        pending={git.isPulling || git.isSyncing}
         destructive
       />
     </>

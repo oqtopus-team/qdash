@@ -3,11 +3,13 @@
 import { useCallback, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Axios from "axios";
 
 import { useToast } from "@/components/ui/Toast";
 import {
   type FileWorkspace,
   type GitPushResult,
+  type GitSyncResult,
   type GitWorkspaceStatus,
   workspaceQueryKeys,
 } from "@/lib/fileWorkspace";
@@ -19,14 +21,30 @@ export interface PullRequestCreated {
   branch: string;
 }
 
+/** The server refused to overwrite unpublished edits to shared files. */
+export interface PullConflict {
+  message: string;
+  /** Which action to retry with force. */
+  action: "pull" | "sync";
+}
+
+function conflictOf(error: unknown, action: "pull" | "sync"): PullConflict | null {
+  if (Axios.isAxiosError(error) && error.response?.status === 409) {
+    return { message: getApiErrorMessage(error, "Shared files have unpublished changes"), action };
+  }
+  return null;
+}
+
 /**
- * Git state and actions of one workspace: status polling, pull, and push as a
- * pull request, with the toasts both pages show.
+ * Git state and actions of one workspace: status polling, pull, sync, and
+ * push as a pull request, with the toasts both pages show. A 409 on pull or
+ * sync is kept as `conflict` for the page to confirm a forced retry.
  */
 export function useGitWorkspace(workspace: FileWorkspace, options?: { onPulled?: () => void }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [prResult, setPrResult] = useState<PullRequestCreated | null>(null);
+  const [conflict, setConflict] = useState<PullConflict | null>(null);
   const onPulled = options?.onPulled;
 
   const statusQuery = useQuery<GitWorkspaceStatus>({
@@ -42,14 +60,56 @@ export function useGitWorkspace(workspace: FileWorkspace, options?: { onPulled?:
   }, [queryClient, workspace]);
 
   const pullMutation = useMutation({
-    mutationFn: workspace.pull,
+    mutationFn: (force?: boolean) => workspace.pull(force),
     onSuccess: (result) => {
-      toast.success(`Pulled ${workspace.key}: now at ${result.commit ?? "unknown"}`);
+      const published = result.published?.length ?? 0;
+      toast.success(
+        `Pulled ${workspace.key}: now at ${result.commit ?? "unknown"}` +
+          (published > 0 ? ` (published ${published} ${published === 1 ? "file" : "files"})` : ""),
+      );
+      setConflict(null);
       invalidateWorkspace();
       onPulled?.();
     },
     onError: (error: Error) => {
+      const refused = conflictOf(error, "pull");
+      if (refused) {
+        setConflict(refused);
+        return;
+      }
       toast.error(`Git pull failed: ${getApiErrorMessage(error, "Unknown error")}`);
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: (force?: boolean) => {
+      if (!workspace.sync) throw new Error("This workspace has no repository to sync");
+      return workspace.sync(force);
+    },
+    onSuccess: (result: GitSyncResult) => {
+      const published = result.published?.length ?? 0;
+      if (result.mode === "plain") {
+        toast.info(result.message || "No repository configured; files are written in place");
+      } else {
+        toast.success(
+          `Synced ${workspace.key}: ` +
+            (published > 0
+              ? `published ${published} ${published === 1 ? "file" : "files"}, `
+              : "") +
+            `now at ${result.commit ?? "unknown"}`,
+        );
+      }
+      setConflict(null);
+      invalidateWorkspace();
+      onPulled?.();
+    },
+    onError: (error: Error) => {
+      const refused = conflictOf(error, "sync");
+      if (refused) {
+        setConflict(refused);
+        return;
+      }
+      toast.error(`Sync failed: ${getApiErrorMessage(error, "Unknown error")}`);
     },
   });
 
@@ -79,8 +139,19 @@ export function useGitWorkspace(workspace: FileWorkspace, options?: { onPulled?:
     status: statusQuery.data,
     refetchStatus: statusQuery.refetch,
     invalidateWorkspace,
-    pull: () => pullMutation.mutate(),
+    pull: (force?: boolean) => pullMutation.mutate(force),
     isPulling: pullMutation.isPending,
+    canSync: Boolean(workspace.sync),
+    sync: (force?: boolean) => syncMutation.mutate(force),
+    isSyncing: syncMutation.isPending,
+    /** Set when a pull or sync was refused with 409; retry with `force` after confirming. */
+    conflict,
+    dismissConflict: () => setConflict(null),
+    forceRetry: () => {
+      if (!conflict) return;
+      if (conflict.action === "sync") syncMutation.mutate(true);
+      else pullMutation.mutate(true);
+    },
     push: (message?: string) =>
       pushMutation.mutate(message?.trim() || workspace.defaultCommitMessage),
     isPushing: pushMutation.isPending,

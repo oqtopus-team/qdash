@@ -1,0 +1,6 @@
+meta:
+  description: T2 echo coherence time of the qubit
+  unit: µs
+  default: null
+  scope: qubit
+data: {}

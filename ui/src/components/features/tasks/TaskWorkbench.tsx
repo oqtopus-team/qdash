@@ -20,6 +20,7 @@ import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
 import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 import { isExecutionInProgress, isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
+import { getRunErrorMessage } from "@/lib/utils/systemSplit";
 import { sortChipsByDefaultPriority } from "@/lib/utils/chips";
 import {
   convertSweep,
@@ -247,7 +248,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
       setSubmittedTargetQuery(requestedTarget);
       toast.success(`${task.name} started`);
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Failed to start task"));
+      toast.error(getRunErrorMessage(error, "Failed to start task"));
     } finally {
       await Promise.all([
         queryClient.invalidateQueries({

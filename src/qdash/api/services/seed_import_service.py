@@ -23,6 +23,8 @@ from qdash.api.schemas.calibration import (
 )
 from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.paths import QUBEX_CONFIG_BASE
+from qdash.common.config.qubex_layout import QubexLayout
+from qdash.common.config.system_catalog import default_system_id
 from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.provenance import ProvenanceRelationType
@@ -121,7 +123,8 @@ class SeedImportService:
         # Validate chip_id to prevent path traversal attacks
         if not re.match(r"^[a-zA-Z0-9_-]+$", chip_id):
             raise ValueError(f"Invalid chip_id: {chip_id}")
-        return pathlib.Path(self._config_base) / chip_id / "params"
+        layout = QubexLayout.detect(pathlib.Path(self._config_base))
+        return layout.params_dir(default_system_id(layout, chip_id))
 
     def _user_id_for_username(self, username: str) -> str | None:
         user = self._user_repository.find_by_username(username)

@@ -364,6 +364,14 @@ When persistence is enabled:
 
 The API field `update_params` is passed to `single-task-executor` as `force_update_params` and also controls GitHub integration for that run. It does not replace `persist_output_parameters`; persistence must be enabled before output values can be written.
 
+## Qubex configuration paths
+
+`QubexLayout` resolves every Qubex file path for the shared and the legacy tree, and
+`SystemCatalog` maps a session's targets to the System whose `params_dir` and
+`calib_note.json` the backend reads and writes. The resolution rules, the `system_id`
+recorded on task results, and the migration path are described in
+[Chips and Systems](../architecture/qubex-systems.md).
+
 ## Implementation files
 
 - `src/qdash/workflow/calibtasks/base.py`

@@ -53,6 +53,8 @@ interface CouplingMetricsGridProps {
   /** Optional ISO timestamp bounds to restrict the history modal. */
   startAt?: string | null;
   endAt?: string | null;
+  /** Restrict the history modal to results measured on this System. */
+  systemId?: string | null;
 }
 
 interface SelectedCouplingInfo {
@@ -74,6 +76,7 @@ export function CouplingMetricsGrid({
   topologyId,
   startAt,
   endAt,
+  systemId = null,
 }: CouplingMetricsGridProps) {
   // Get topology configuration
   const {
@@ -741,6 +744,7 @@ export function CouplingMetricsGrid({
                   metricUnit={unit}
                   startAt={startAt}
                   endAt={endAt}
+                  systemId={systemId}
                 />
               </div>
 

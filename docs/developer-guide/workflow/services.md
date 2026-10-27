@@ -111,9 +111,10 @@ Calibration figures, raw data, notes, and exported parameters live beneath `CALI
 Docker, the API and workers mount the same host directory at `/app/calib_data`. Stored execution
 paths use the container layout, while API reads map them back to the configured local mount.
 
-GitHub configuration synchronization is separate from flow registration. `GitHubIntegration`
-pulls configuration before a session when enabled and can push selected calibration files during
-successful finalization.
+Configuration repository synchronization is separate from flow registration. `GitHubIntegration`
+pulls the configuration root before a session when enabled and publishes the session's parameter
+and calibration-note files during successful finalization; see
+[Configuration Repository](./config-repository.md).
 
 ## Handle Terminal States
 

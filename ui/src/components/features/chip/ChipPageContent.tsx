@@ -12,7 +12,9 @@ import { CouplingGrid } from "./CouplingGrid";
 import { QubitGrid } from "./QubitGrid";
 import { ChipManageModal } from "./ChipManageModal";
 import { ChipCreationTour } from "./ChipCreationTour";
+import { ChipSystemsCard } from "./ChipSystemsCard";
 import { CreateChipModal } from "./modals/CreateChipModal";
+import { SystemSelector, useChipSystems } from "./SystemSelector";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
 
@@ -39,6 +41,8 @@ import { useProject } from "@/contexts/ProjectContext";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { useChipUrlState } from "@/hooks/useUrlState";
+import { useSystemUrlState } from "@/hooks/url-state/useSystemUrlState";
+import { systemQids } from "@/lib/utils/systemQids";
 
 interface SelectedTaskInfo {
   qid: string;
@@ -82,6 +86,7 @@ export function ChipPageContent() {
     setViewMode,
     isInitialized,
   } = useChipUrlState();
+  const { selectedSystemId, setSelectedSystemId } = useSystemUrlState();
 
   const [gridSize, setGridSize] = useState<number>(8);
   const [isEvaluateOpen, setIsEvaluateOpen] = useState(false);
@@ -121,7 +126,14 @@ export function ChipPageContent() {
   // Get topology config to check if MUX is enabled
   const topologyId =
     chipData?.data?.topology_id ?? `square-lattice-mux-${chipData?.data?.size ?? 64}`;
-  const { hasMux = true } = useTopologyConfig(topologyId) ?? {};
+  const { hasMux = true, muxSize: muxWidth = 2 } = useTopologyConfig(topologyId) ?? {};
+  // Qubits of the selected System; the task-result endpoints have no System
+  // filter, so the grids hide the other qubits themselves.
+  const { selectedSystem } = useChipSystems(selectedChip, selectedSystemId);
+  const selectedSystemQids = useMemo(
+    () => (selectedSystem ? systemQids(selectedSystem, muxWidth) : null),
+    [selectedSystem, muxWidth],
+  );
 
   // Set default chip only when URL is initialized and no chip is selected from URL
   useEffect(() => {
@@ -254,12 +266,16 @@ export function ChipPageContent() {
     data: muxData,
     isLoading: isLoadingMux,
     isError: isMuxError,
-  } = useListChipMuxes(selectedChip || "", {
-    query: {
-      placeholderData: keepPreviousData,
-      staleTime: 30000, // 30 seconds
+  } = useListChipMuxes(
+    selectedChip || "",
+    { system_id: selectedSystemId ?? undefined },
+    {
+      query: {
+        placeholderData: keepPreviousData,
+        staleTime: 30000, // 30 seconds
+      },
     },
-  });
+  );
 
   // Reset modal only when date changes externally (not from modal navigation)
   React.useEffect(() => {
@@ -406,6 +422,7 @@ export function ChipPageContent() {
   const handleChipSelect = (chipId: string) => {
     setSelectedChip(chipId);
     setSelectedCooldownId(null);
+    setSelectedSystemId(null);
   };
 
   function handleDateNavigation(date: string) {
@@ -475,28 +492,35 @@ export function ChipPageContent() {
             className="mb-0"
           />
 
-          {/* View Mode Tabs */}
-          <div className="tabs tabs-boxed bg-base-200 w-fit">
-            <button
-              className={`tab ${viewMode === "1q" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("1q")}
-            >
-              Qubit
-            </button>
-            <button
-              className={`tab ${viewMode === "2q" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("2q")}
-            >
-              Coupling
-            </button>
-            {hasMux && (
+          {/* View Mode Tabs and System */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="tabs tabs-boxed bg-base-200 w-fit">
               <button
-                className={`tab ${viewMode === "mux" ? "tab-active" : ""}`}
-                onClick={() => setViewMode("mux")}
+                className={`tab ${viewMode === "1q" ? "tab-active" : ""}`}
+                onClick={() => setViewMode("1q")}
               >
-                MUX View
+                Qubit
               </button>
-            )}
+              <button
+                className={`tab ${viewMode === "2q" ? "tab-active" : ""}`}
+                onClick={() => setViewMode("2q")}
+              >
+                Coupling
+              </button>
+              {hasMux && (
+                <button
+                  className={`tab ${viewMode === "mux" ? "tab-active" : ""}`}
+                  onClick={() => setViewMode("mux")}
+                >
+                  MUX View
+                </button>
+              )}
+            </div>
+            <SystemSelector
+              chipId={selectedChip}
+              selectedSystemId={selectedSystemId}
+              onSelect={setSelectedSystemId}
+            />
           </div>
 
           {/* Selection Controls */}
@@ -552,6 +576,8 @@ export function ChipPageContent() {
             onEndDateChange={handleEndDateChange}
             onQuickRange={handleQuickRange}
           />
+
+          {selectedChip && <ChipSystemsCard chipId={selectedChip} canEdit={canEdit} />}
         </div>
 
         {/* Content Section */}
@@ -606,6 +632,7 @@ export function ChipPageContent() {
               endAt={taskResultEndAt}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
+              systemQids={selectedSystemQids}
             />
           ) : viewMode === "2q" ? (
             <CouplingGrid
@@ -619,6 +646,7 @@ export function ChipPageContent() {
               endAt={taskResultEndAt}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
+              systemQids={selectedSystemQids}
             />
           ) : (
             <div className="space-y-4">
@@ -801,6 +829,7 @@ export function ChipPageContent() {
       <CreateChipModal
         isOpen={isCreateChipModalOpen}
         onClose={closeCreateChipModal}
+        defaultCooldownId={selectedCooldownId}
         onSuccess={(chipId) => {
           // Automatically select the newly created chip
           setSelectedChip(chipId);

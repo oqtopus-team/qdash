@@ -23,6 +23,7 @@ import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
+import { filterQubitEntries } from "@/lib/utils/systemQids";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
@@ -36,6 +37,8 @@ interface QubitGridProps {
   endAt?: string | null;
   gridSize: number;
   onDateChange?: (date: string) => void;
+  /** Qubits of the selected System; results of other qubits are hidden. */
+  systemQids?: Set<string> | null;
 }
 
 interface SelectedTaskInfo {
@@ -231,6 +234,7 @@ export function QubitGrid({
   startAt,
   endAt,
   gridSize: defaultGridSize,
+  systemQids = null,
 }: QubitGridProps) {
   // Get topology configuration
   const {
@@ -296,6 +300,10 @@ export function QubitGrid({
     startAt,
     endAt,
   });
+  const taskResults = useMemo(
+    () => filterQubitEntries(taskResponse?.data?.result, systemQids),
+    [taskResponse?.data?.result, systemQids],
+  );
   const downloadCounts = useMemo(() => {
     const counts: DownloadItemCounts = {
       figureImages: 0,
@@ -303,13 +311,13 @@ export function QubitGrid({
       rawData: 0,
     };
     selectedForDownload.forEach((qid) => {
-      const task = taskResponse?.data?.result?.[qid];
+      const task = taskResults?.[qid];
       counts.figureImages += toPathList(task?.figure_path).length;
       counts.jsonFigures += toPathList(task?.json_figure_path).length;
       counts.rawData += toNetcdfPathList(task?.raw_data_path).length;
     });
     return counts;
-  }, [selectedForDownload, taskResponse?.data?.result]);
+  }, [selectedForDownload, taskResults]);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
   const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
@@ -396,8 +404,8 @@ export function QubitGrid({
     );
 
   const gridPositions: { [key: string]: { row: number; col: number } } = {};
-  if (taskResponse?.data?.result) {
-    Object.keys(taskResponse.data.result).forEach((qid) => {
+  if (taskResults) {
+    Object.keys(taskResults).forEach((qid) => {
       const numericId = parseInt(qid.replace(/\D/g, ""), 10);
       if (topologyQubits && topologyQubits[numericId]) {
         gridPositions[qid] = topologyQubits[numericId];
@@ -408,7 +416,7 @@ export function QubitGrid({
     });
   }
 
-  const getTaskResult = (qid: string): Task | null => taskResponse?.data?.result?.[qid] || null;
+  const getTaskResult = (qid: string): Task | null => taskResults?.[qid] || null;
 
   // Download selection helpers
   const toggleDownloadSelection = (qid: string) => {
@@ -424,7 +432,7 @@ export function QubitGrid({
   };
 
   const selectAllForDownload = () => {
-    const allQids = Object.entries(taskResponse?.data?.result || {})
+    const allQids = Object.entries(taskResults || {})
       .filter(([, task]) => hasDownloadableArtifacts(task))
       .map(([qid]) => qid);
     setSelectedForDownload(new Set(allQids));
@@ -439,7 +447,7 @@ export function QubitGrid({
 
     const paths: string[] = [];
     selectedForDownload.forEach((qid) => {
-      const task = taskResponse?.data?.result?.[qid];
+      const task = taskResults?.[qid];
       if (!task) return;
       if (downloadOptions.figureImages) {
         paths.push(...toPathList(task.figure_path));
@@ -488,12 +496,12 @@ export function QubitGrid({
     );
 
   const hasJsonFigures = (qid: string): boolean => {
-    const task = taskResponse?.data?.result?.[qid];
+    const task = taskResults?.[qid];
     return hasDownloadableArtifacts(task);
   };
 
-  const availableForDownloadCount = Object.entries(taskResponse?.data?.result || {}).filter(
-    ([, task]) => hasDownloadableArtifacts(task),
+  const availableForDownloadCount = Object.entries(taskResults || {}).filter(([, task]) =>
+    hasDownloadableArtifacts(task),
   ).length;
 
   // Calculate displayed grid size based on zoom mode

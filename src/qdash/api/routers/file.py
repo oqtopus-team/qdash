@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 
 from qdash.api.dependencies import get_file_service
@@ -147,7 +147,7 @@ def _workspace_router(
     def validate_file_content(
         request: ValidateFileRequest, service: FileService = service_dep
     ) -> dict[str, Any]:
-        return service.validate_file_content(request.content, request.file_type)
+        return service.validate_file_content(request.content, request.file_type, request.path)
 
     @workspace.get(
         f"{prefix}/git/status",
@@ -163,9 +163,15 @@ def _workspace_router(
         operation_id=f"gitPull{title}",
     )
     def git_pull(
-        _current_user: User = user_dep, service: FileService = service_dep
+        _current_user: User = user_dep,
+        service: FileService = service_dep,
+        force: bool = Query(
+            default=False, description="Discard local edits to shared files instead of refusing"
+        ),
     ) -> dict[str, Any]:
-        return service.git_pull_config()
+        """Publishes unpublished params and calibration notes first; 409 while shared
+        files hold local edits unless ``force``."""
+        return service.git_pull_config(force=force)
 
     @workspace.post(
         f"{prefix}/git/push",

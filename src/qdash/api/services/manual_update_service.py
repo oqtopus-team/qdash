@@ -32,6 +32,8 @@ from qdash.common.config.backend import get_default_backend
 from qdash.common.config.params_updater import YamlParamsUpdater, resolve_param_yaml_file_names
 from qdash.common.config.path_resolver import resolve_calib_data_path
 from qdash.common.config.paths import QUBEX_CONFIG_BASE
+from qdash.common.config.qubex_layout import QubexLayout
+from qdash.common.config.system_catalog import default_system_id
 from qdash.common.domain.qubit import qid_to_label
 from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
@@ -324,7 +326,8 @@ class ManualUpdateService:
         if chip is None:
             raise HTTPException(status_code=404, detail="Chip not found in this project")
         label = "-".join(qid_to_label(qid, chip.size) for qid in request.qid.split("-"))
-        params_dir = QUBEX_CONFIG_BASE / request.chip_id / "params"
+        layout = QubexLayout.detect(QUBEX_CONFIG_BASE)
+        params_dir = layout.params_dir(default_system_id(layout, request.chip_id))
         updater = YamlParamsUpdater(params_dir=params_dir, label=label)
         return updater.applied(request.qid, parameters)
 

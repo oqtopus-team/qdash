@@ -22,6 +22,5 @@ def test_qubit_targets_pass_project_id_to_cr_scheduler() -> None:
     scheduler_cls.assert_called_once_with(
         username="",
         chip_id="chip-1",
-        wiring_config_path="/app/config/qubex-config/chip-1/config/wiring.yaml",
         project_id="proj-1",
     )

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oqtopus-team.github.io/qdash/schemas/qubex-config/box.schema.json",
+  "title": "box.yaml",
+  "description": "Control box catalog keyed by box id; wiring rows reference these ids.",
+  "type": "object",
+  "propertyNames": {
+    "type": "string",
+    "minLength": 1,
+    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+  },
+  "additionalProperties": {
+    "type": "object",
+    "required": [
+      "type"
+    ],
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "type": {
+        "type": "string",
+        "minLength": 1,
+        "description": "A qubex BoxType value, e.g. quel1se-riken8, quel1-a, quel3."
+      },
+      "address": {
+        "type": "string"
+      },
+      "adapter": {
+        "type": "string"
+      },
+      "options": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "additionalProperties": true
+  }
+}

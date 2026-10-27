@@ -12,6 +12,20 @@ needs investigation or context.
 The selected time range and value mode apply to the summary and every metric section. Include
 them when sharing an observation because another scope can show a different record.
 
+## Filter by System
+
+A chip driven by more than one control System (for example quel1 and quel3 boxes) shows a
+**System** control next to the chip and cool-down selectors on **Dashboard**, **Metrics**, and
+**Chip Experiments**; a chip with one System shows no control.
+
+1. Select a System, or **All Systems** for the whole chip.
+2. Share the page link: the choice is kept in the `system` query parameter.
+
+With a System selected, **Metrics** shows only the results measured on that System and the
+history of a qubit or coupling lists only those measurements. **Chip Experiments** hides the
+qubits and couplings of the other Systems and lists only the MUXes the System wires. A
+selection that the chip no longer has is cleared.
+
 <!-- MEDIA PLACEHOLDER
 File: /images/guides/dashboard-scope-and-metrics.gif
 Start: Dashboard for a populated chip with the default scope visible.

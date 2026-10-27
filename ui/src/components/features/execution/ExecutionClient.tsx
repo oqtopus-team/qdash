@@ -11,6 +11,7 @@ import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
 import { ExecutionDAG } from "./ExecutionDAG";
+import { ExecutionSystemsSummary } from "./ExecutionSystemsSummary";
 
 import type { ExecutionResponseDetail } from "@/schemas";
 
@@ -275,6 +276,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           <h2 className="text-xl font-bold mb-4">Execution Flow</h2>
           <ExecutionDAG tasks={validTasks} />
         </div>
+
+        <ExecutionSystemsSummary note={execution.note as Record<string, unknown> | null} />
 
         {/* Execution Note (if available) */}
         {execution.note &&

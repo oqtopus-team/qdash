@@ -50,6 +50,8 @@ class OrderingContext:
     grid_size: int
     mux_grid_size: int
     qid_to_mux: dict[str, int] = field(default_factory=dict)
+    mux_size: int = 4
+    """Qubits per MUX (``chip.yaml`` ``topology.mux_size``)."""
 
 
 class MuxOrderingStrategy(ABC):
@@ -161,12 +163,13 @@ class DefaultOrderingStrategy(MuxOrderingStrategy):
             List of 4 steps with natural ordering
         """
         qid_set = set(qids)
-        steps: list[list[str]] = [[] for _ in range(4)]
+        mux_size = context.mux_size
+        steps: list[list[str]] = [[] for _ in range(mux_size)]
 
         for mux_id in sorted(mux_ids):
-            base_qid = mux_id * 4
+            base_qid = mux_id * mux_size
 
-            for offset in range(4):
+            for offset in range(mux_size):
                 target_qid = str(base_qid + offset)
                 if target_qid in qid_set:
                     steps[offset].append(target_qid)
@@ -217,6 +220,17 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
     # Offset order for odd MUXes: [2, 3, 0, 1]
     ODD_MUX_ORDER = [2, 3, 0, 1]
 
+    @classmethod
+    def _offset_order(cls, mux_id: int, mux_size: int) -> list[int]:
+        """Offsets of one MUX in execution order; odd MUXes start half-way round."""
+        if mux_size == len(cls.EVEN_MUX_ORDER):
+            return cls.EVEN_MUX_ORDER if mux_id % 2 == 0 else cls.ODD_MUX_ORDER
+        offsets = list(range(mux_size))
+        if mux_id % 2 == 0:
+            return offsets
+        half = mux_size // 2
+        return offsets[half:] + offsets[:half]
+
     def order_qids_in_mux(
         self,
         mux_id: int,
@@ -225,10 +239,10 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
     ) -> list[str]:
         """Order qubits for checkerboard pattern."""
         # Determine which offset order to use
-        offset_order = self.EVEN_MUX_ORDER if mux_id % 2 == 0 else self.ODD_MUX_ORDER
+        offset_order = self._offset_order(mux_id, context.mux_size)
 
         # Base qubit ID for this MUX
-        base_qid = mux_id * 4
+        base_qid = mux_id * context.mux_size
 
         # Build mapping from offset to qid
         qid_set = set(qids)
@@ -283,13 +297,14 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
             - Step 3: [3, 5, 11, 13]
         """
         qid_set = set(qids)
-        steps: list[list[str]] = [[] for _ in range(4)]
+        mux_size = context.mux_size
+        steps: list[list[str]] = [[] for _ in range(mux_size)]
 
         for mux_id in sorted(mux_ids):
-            base_qid = mux_id * 4
+            base_qid = mux_id * mux_size
 
             # Determine offset order for this MUX
-            offset_order = self.EVEN_MUX_ORDER if mux_id % 2 == 0 else self.ODD_MUX_ORDER
+            offset_order = self._offset_order(mux_id, mux_size)
 
             # Add qubits to corresponding steps
             for step_idx, offset in enumerate(offset_order):

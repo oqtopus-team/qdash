@@ -127,6 +127,15 @@ configuration, and test preprocessing, effective parameter resolution, result va
 failure behavior. Keep backend calls inside the task's run phase and persistence policy inside the
 engine.
 
+A task whose output must reach the Qubex parameter files needs two more entries. Map the output
+parameter to its file in `config/app/workflow.yaml` under `params_updater.parameter_file_map`, and
+add a template for that file under `config/domain/qubex-params/common/` (a physics value written
+to every System of the chip) or `config/domain/qubex-params/<backend>/` (a hardware value written
+to that backend's System only). The template holds `meta` (`description`, `unit`, `default`,
+`scope`: `qubit`, `mux` or `coupling`) and `data: {}`; chip provisioning renders it for new chips
+and Systems, and `test_every_mapped_params_file_has_a_template` fails until the template exists.
+See [Chip Provisioning](../api/chip-provisioning.md) for the template rules.
+
 ### Add a backend
 
 Implement `BaseBackend`, add construction logic to `engine/backend/factory.py`, and provide tests

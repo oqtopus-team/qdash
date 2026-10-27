@@ -1,96 +1,27 @@
-import os
-import shutil
-import tempfile
-from pathlib import Path
-from urllib.parse import urlparse, urlunparse
+"""Prefect task wrapper over :meth:`ConfigRepository.pull`."""
 
-from git import Repo
-from git.exc import GitCommandError
+from __future__ import annotations
+
+from pathlib import Path
+
 from prefect import get_run_logger, task
 
 from qdash.common.config.paths import QUBEX_CONFIG_BASE
+from qdash.common.config.qubex_layout import QubexLayout
+from qdash.common.infrastructure.config_repository import get_config_repository
 
 
 @task(task_run_name="Pull GitHub")
 def pull_github(target_dir: str | Path = QUBEX_CONFIG_BASE) -> str:
-    """Update configuration files from the remote repository.
+    """Bring the configuration root up to date with its repository.
 
-    Args:
-    ----
-        target_dir: The directory where configuration files will be updated.
-                   Defaults to "config" in the current working directory.
-
-    Raises:
-    ------
-        RuntimeError: If required environment variables are missing or if there are
-                     issues with cloning/updating the repository.
-
+    Returns the short commit SHA of the new head, or an empty string when the root is
+    not synchronized with a remote (``local-git`` and ``plain`` modes).
     """
-    target_dir = Path(target_dir)
-    temp_dir = None
     logger = get_run_logger()
-
-    try:
-        # Get authentication details from environment
-        github_user = os.getenv("GITHUB_USER", "")
-        github_token = os.getenv("GITHUB_TOKEN", "")
-        repo_url = os.getenv("CONFIG_REPO_URL", "")
-
-        if not all([github_user, github_token]):
-            raise RuntimeError("Missing required environment variables: GITHUB_USER, GITHUB_TOKEN")
-
-        # Parse and reconstruct URL with authentication
-        parsed = urlparse(repo_url)
-        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-        auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
-
-        # Create temporary directory and clone repository (shallow clone for efficiency)
-        temp_dir = tempfile.mkdtemp()
-        logger.info("Cloning repository to temporary directory")
-        repo = Repo.clone_from(auth_url, temp_dir, depth=1)
-
-        # Get latest changes
-        logger.info("Fetching latest changes")
-        repo.remotes.origin.fetch()
-        repo.git.reset("--hard", "origin/main")
-
-        # Create target directory if it doesn't exist
-        target_dir.mkdir(parents=True, exist_ok=True)
-
-        # Copy files
-        config_source = Path(temp_dir)
-        for item in config_source.glob("*"):
-            if item.name == ".git":
-                continue
-
-            destination = target_dir / item.name
-            if item.is_file():
-                shutil.copy2(item, destination)
-            else:
-                shutil.copytree(item, destination, dirs_exist_ok=True)
-
-        # Log success with commit information
-        current = repo.head.commit
-        message = (
-            current.message if isinstance(current.message, str) else current.message.decode("utf-8")
-        )
-        logger.info(f"Updated to commit: {current.hexsha[:8]} - {message.strip()}")
-        logger.info(f"Config files updated successfully in: {target_dir}")
-
-    except GitCommandError as e:
-        # Mask credentials in error message
-        error_msg = str(e.stderr)
-        parsed_err = urlparse(repo_url)
-        masked_url = urlunparse(
-            (parsed_err.scheme, str(parsed_err.netloc).split("@")[-1], parsed_err.path, "", "", "")
-        )
-        raise RuntimeError(f"Git operation failed for {masked_url}: {error_msg}")
-
-    except Exception as e:
-        raise RuntimeError(f"Failed to update config: {e!s}")
-
-    finally:
-        if temp_dir and Path(temp_dir).exists():
-            shutil.rmtree(temp_dir)
-
-        return str(current.hexsha[:8]) if current else ""
+    repository = get_config_repository(QubexLayout.detect(Path(target_dir)))
+    commit = repository.pull()
+    logger.info(
+        "Configuration root %s (%s mode) at commit %s", target_dir, repository.mode.value, commit
+    )
+    return commit or ""

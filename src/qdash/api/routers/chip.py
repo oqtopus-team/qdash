@@ -13,7 +13,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from qdash.api.dependencies import (
+    get_chip_provisioning_service,
     get_chip_service,
+    get_chip_systems_service,
     get_reanalysis_service,
 )
 from qdash.api.lib.project import (
@@ -22,9 +24,12 @@ from qdash.api.lib.project import (
     get_project_context_editor,
 )
 from qdash.api.schemas.chip import (
+    AddChipSystemRequest,
+    AddChipSystemResponse,
     ChipDatesResponse,
     ChipDeletionImpactResponse,
     ChipResponse,
+    ChipSystemsResponse,
     CouplingResponse,
     CreateChipRequest,
     ListChipsResponse,
@@ -44,8 +49,11 @@ from qdash.api.schemas.reanalysis import (
     ReanalyzeResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.api.services.chip import ChipInitializer, ChipService
+from qdash.api.services.chip import ChipService
+from qdash.api.services.chip.provisioner import ChipProvisioningError, ChipProvisioningService
+from qdash.api.services.chip.systems import ChipSystemsError, ChipSystemsService
 from qdash.api.services.reanalysis_service import ReanalysisService
+from qdash.api.services.system_scope import resolve_system_scope
 from qdash.datamodel.note import NoteModel
 
 router = APIRouter()
@@ -84,57 +92,86 @@ def list_chips(
 def create_chip(
     request: CreateChipRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    provisioning: Annotated[ChipProvisioningService, Depends(get_chip_provisioning_service)],
 ) -> ChipResponse:
     """Create a new chip in the current project.
 
-    Parameters
-    ----------
-    request : CreateChipRequest
-        Chip creation request containing chip_id and size
-    ctx : ProjectContext
-        Project context with editor permission
-
-    Returns
-    -------
-    ChipResponse
-        Created chip information
+    In the shared Qubex configuration layout the chip's configuration files are
+    generated as well (``provision_config`` defaults to that); the response's
+    ``provisioning`` field says what was written and whether it was published.
 
     Raises
     ------
     HTTPException
-        If chip_id already exists or size is invalid
+        400 when the chip exists, the size or topology is invalid, or configuration
+        generation was requested in the legacy layout or fails validation.
 
     """
     logger.debug(f"Creating chip {request.chip_id} for project: {ctx.project_id}")
 
     try:
-        # Use ChipInitializer service to create chip with full initialization
-        chip = ChipInitializer.create_chip(
-            username=ctx.user.username,
-            chip_id=request.chip_id,
-            size=request.size,
-            project_id=ctx.project_id,
-            topology_id=request.topology_id,
+        return provisioning.create_chip(
+            project_id=ctx.project_id, username=ctx.user.username, request=request
         )
-
-        # qubit_count and coupling_count are derived from topology
-        # For a new chip, this equals the topology's defined qubits/couplings
-        return ChipResponse(
-            chip_id=chip.chip_id,
-            size=chip.size,
-            topology_id=chip.topology_id,
-            qubit_count=chip.size,  # Qubits are created based on size
-            coupling_count=0,  # Will be populated by ChipInitializer
-            installed_at=chip.installed_at,
-            activity_status=chip.activity_status,
-        )
-    except ValueError as e:
-        # Handle validation errors (duplicate chip, invalid size, etc.)
+    except (ChipProvisioningError, ValueError) as e:
         logger.warning(f"Validation error creating chip {request.chip_id}: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Error creating chip {request.chip_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create chip: {e!s}") from e
+
+
+@router.get(
+    "/chips/{chip_id}/systems",
+    response_model=ChipSystemsResponse,
+    summary="List the Qubex Systems driving a chip",
+    operation_id="listChipSystems",
+)
+def list_chip_systems(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+    systems: Annotated[ChipSystemsService, Depends(get_chip_systems_service)],
+) -> ChipSystemsResponse:
+    """Systems, their backends, MUXes and boxes, from the configuration tree."""
+    if chip_service.get_chip_summary(ctx.project_id, chip_id) is None:
+        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
+    return systems.list_systems(chip_id=chip_id)
+
+
+@router.post(
+    "/chips/{chip_id}/systems",
+    response_model=AddChipSystemResponse,
+    summary="Add a System on another backend to a chip",
+    operation_id="addChipSystem",
+)
+def add_chip_system(
+    chip_id: str,
+    request: AddChipSystemRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    chip_service: Annotated[ChipService, Depends(get_chip_service)],
+    systems: Annotated[ChipSystemsService, Depends(get_chip_systems_service)],
+) -> AddChipSystemResponse:
+    """Move MUXes to a new ``<chip_id>-<backend>`` System and generate its files.
+
+    Raises
+    ------
+    HTTPException
+        400 when the System exists, a MUX is not wired, a box is not registered,
+        or the generated configuration does not load.
+
+    """
+    if chip_service.get_chip_summary(ctx.project_id, chip_id) is None:
+        raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
+    try:
+        return systems.add_system(
+            project_id=ctx.project_id,
+            username=ctx.user.username,
+            chip_id=chip_id,
+            request=request,
+        )
+    except (ChipSystemsError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.patch(
@@ -280,6 +317,7 @@ def list_chip_muxes(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     chip_service: Annotated[ChipService, Depends(get_chip_service)],
+    system_id: Annotated[str | None, Query(description="Only MUXes of this Qubex System")] = None,
 ) -> ListMuxResponse:
     """List all multiplexers for a chip.
 
@@ -291,6 +329,8 @@ def list_chip_muxes(
         Project context with user and project information
     chip_service : ChipService
         Service for chip operations
+    system_id : str | None
+        Optional Qubex System; only its MUXes are returned (404 when unknown)
 
     Returns
     -------
@@ -298,6 +338,7 @@ def list_chip_muxes(
         List of multiplexer details
 
     """
+    scope = resolve_system_scope(chip_id, system_id)
     # Get chip size
     chip_size = chip_service.get_chip_size(ctx.project_id, chip_id)
     if chip_size is None:
@@ -311,6 +352,8 @@ def list_chip_muxes(
         chip_id=chip_id,
         chip_size=chip_size,
     )
+    if scope is not None:
+        muxes = {mux_id: mux for mux_id, mux in muxes.items() if mux_id in scope.mux_ids}
 
     return ListMuxResponse(muxes=muxes)
 
@@ -443,6 +486,7 @@ def list_chip_qubits(
     limit: Annotated[int, Query(le=256, ge=1)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
     qids: Annotated[list[str] | None, Query()] = None,
+    system_id: Annotated[str | None, Query(description="Only qubits of this Qubex System")] = None,
 ) -> ListQubitsResponse:
     """List qubits for a chip with pagination.
 
@@ -463,6 +507,8 @@ def list_chip_qubits(
         Number of qubits to skip for pagination
     qids : list[str] | None
         Optional list of specific qubit IDs to fetch
+    system_id : str | None
+        Optional Qubex System; only its qubits are returned (404 when unknown)
 
     Returns
     -------
@@ -471,6 +517,9 @@ def list_chip_qubits(
 
     """
     logger.debug(f"Listing qubits for chip {chip_id}, project: {ctx.project_id}")
+    scope = resolve_system_scope(chip_id, system_id)
+    if scope is not None:
+        qids = scope.filter_targets(qids)
     qubits, total = chip_service.list_qubits(
         project_id=ctx.project_id,
         chip_id=chip_id,
@@ -588,6 +637,9 @@ def list_chip_couplings(
     chip_service: Annotated[ChipService, Depends(get_chip_service)],
     limit: Annotated[int, Query(le=512, ge=1)] = 100,
     offset: Annotated[int, Query(ge=0)] = 0,
+    system_id: Annotated[
+        str | None, Query(description="Only couplings inside this Qubex System")
+    ] = None,
 ) -> ListCouplingsResponse:
     """List couplings for a chip with pagination.
 
@@ -605,6 +657,8 @@ def list_chip_couplings(
         Maximum number of couplings to return (default 100, max 512)
     offset : int
         Number of couplings to skip for pagination
+    system_id : str | None
+        Optional Qubex System; couplings crossing its boundary are left out
 
     Returns
     -------
@@ -613,11 +667,18 @@ def list_chip_couplings(
 
     """
     logger.debug(f"Listing couplings for chip {chip_id}, project: {ctx.project_id}")
+    scope = resolve_system_scope(chip_id, system_id)
+    coupling_ids = (
+        chip_service.coupling_ids_within(ctx.project_id, chip_id, scope.includes)
+        if scope is not None
+        else None
+    )
     couplings, total = chip_service.list_couplings(
         project_id=ctx.project_id,
         chip_id=chip_id,
         limit=limit,
         offset=offset,
+        coupling_ids=coupling_ids,
     )
     return ListCouplingsResponse(couplings=couplings, total=total, limit=limit, offset=offset)
 
@@ -672,6 +733,7 @@ def get_chip_metrics_summary(
     chip_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     chip_service: Annotated[ChipService, Depends(get_chip_service)],
+    system_id: Annotated[str | None, Query(description="Only qubits of this Qubex System")] = None,
 ) -> MetricsSummaryResponse:
     """Get aggregated metrics summary for a chip.
 
@@ -694,7 +756,10 @@ def get_chip_metrics_summary(
 
     """
     logger.debug(f"Fetching metrics summary for chip {chip_id}, project: {ctx.project_id}")
-    summary = chip_service.get_metrics_summary(ctx.project_id, chip_id)
+    scope = resolve_system_scope(chip_id, system_id)
+    summary = chip_service.get_metrics_summary(
+        ctx.project_id, chip_id, qids=scope.filter_targets(None) if scope is not None else None
+    )
     if summary is None:
         raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
     return summary
@@ -711,6 +776,9 @@ def get_chip_metric_heatmap(
     metric: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     chip_service: Annotated[ChipService, Depends(get_chip_service)],
+    system_id: Annotated[
+        str | None, Query(description="Only qubits or couplings of this Qubex System")
+    ] = None,
 ) -> MetricHeatmapResponse:
     """Get heatmap data for a single metric.
 
@@ -740,7 +808,10 @@ def get_chip_metric_heatmap(
 
     """
     logger.debug(f"Fetching heatmap for {metric} on chip {chip_id}, project: {ctx.project_id}")
-    heatmap = chip_service.get_metric_heatmap(ctx.project_id, chip_id, metric)
+    scope = resolve_system_scope(chip_id, system_id)
+    heatmap = chip_service.get_metric_heatmap(
+        ctx.project_id, chip_id, metric, include=scope.includes if scope is not None else None
+    )
     if heatmap is None:
         raise HTTPException(status_code=404, detail=f"Chip {chip_id} not found")
     return heatmap

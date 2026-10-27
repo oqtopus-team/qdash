@@ -2,6 +2,7 @@ name: Linear Chain
 description: Linear qubit chain topology
 grid_size: 16
 num_qubits: 16
+mux_size: 4
 mux:
   enabled: false
 qubits:

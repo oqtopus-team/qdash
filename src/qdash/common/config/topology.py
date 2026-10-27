@@ -50,6 +50,14 @@ class TopologyDefinition(BaseModel):
         description="Coupling direction convention: 'checkerboard_cr' means [control, target] order based on (row+col)%2 parity",
     )
     mux: MuxConfig = Field(default_factory=MuxConfig)
+    mux_size: int = Field(
+        default=4,
+        ge=1,
+        description=(
+            "Qubits per readout multiplexer (MUX n holds qubits n*mux_size .. n*mux_size+mux_size-1). "
+            "Written to chip.yaml topology.mux_size when a chip is provisioned."
+        ),
+    )
     qubits: dict[int, QubitPosition]
     couplings: list[list[int]]
     visualization: VisualizationConfig = Field(default_factory=VisualizationConfig)

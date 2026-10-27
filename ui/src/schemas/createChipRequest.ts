@@ -5,6 +5,11 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { CreateChipRequestBackend } from './createChipRequestBackend';
+import type { CreateChipRequestCooldownId } from './createChipRequestCooldownId';
+import type { CreateChipRequestDisplayName } from './createChipRequestDisplayName';
+import type { CreateChipRequestInheritWiringFrom } from './createChipRequestInheritWiringFrom';
+import type { CreateChipRequestProvisionConfig } from './createChipRequestProvisionConfig';
 import type { CreateChipRequestTopologyId } from './createChipRequestTopologyId';
 
 /**
@@ -15,9 +20,26 @@ import type { CreateChipRequestTopologyId } from './createChipRequestTopologyId'
  *     chip_id (str): The ID of the chip to create.
  *     size (int): The size of the chip (64, 144, 256, or 1024).
  *     topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'.
+ *     display_name (str | None): Name written to chip.yaml; defaults to the chip ID.
+ *     provision_config (bool | None): Also generate the Qubex configuration files.
+ *         None (default) generates them when the configuration tree uses the shared layout.
+ *     backend (str | None): Backend of the generated System (quel1 or quel3).
+ *         Defaults to the inherited chip's backend, else quel1.
+ *     inherit_wiring_from (str | None): Chip whose wiring and Systems are copied.
+ *         Defaults to the previous chip on the cool-down's cryostat.
+ *     cooldown_id (str | None): Cool-down to load the chip into.
  */
 export interface CreateChipRequest {
+  /**
+     * @maxLength 64
+     * @pattern ^[A-Za-z0-9][A-Za-z0-9_-]*$
+     */
   chip_id: string;
   size?: number;
   topology_id?: CreateChipRequestTopologyId;
+  display_name?: CreateChipRequestDisplayName;
+  provision_config?: CreateChipRequestProvisionConfig;
+  backend?: CreateChipRequestBackend;
+  inherit_wiring_from?: CreateChipRequestInheritWiringFrom;
+  cooldown_id?: CreateChipRequestCooldownId;
 }

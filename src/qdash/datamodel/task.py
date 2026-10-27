@@ -615,6 +615,8 @@ class BaseTaskResultModel(BaseModel):
     elapsed_time: timedelta | None = None
     task_type: str = "global"
     system_info: SystemInfoModel = SystemInfoModel()
+    system_id: str | None = None
+    """Qubex System that measured the result (``None`` before the session connected)."""
 
     @field_validator("elapsed_time", mode="before")
     @classmethod

@@ -74,6 +74,7 @@ import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel"
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
+import { getRunErrorMessage } from "@/lib/utils/systemSplit";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 // Monaco Editor is only available on client side
@@ -272,7 +273,7 @@ export function WorkflowEditorPageContent() {
     !!lockStatus?.data.lock &&
     latestExecution?.status !== "cancelling" &&
     !isExecutionTerminal(latestExecution?.status);
-  const executeErrorMessage = getApiErrorMessage(executeMutation.error, "Unknown error");
+  const executeErrorMessage = getRunErrorMessage(executeMutation.error, "Unknown error");
   useEffect(() => {
     if (data?.data) {
       const flow = data.data;
@@ -894,7 +895,9 @@ export function WorkflowEditorPageContent() {
 
         {executeMutation.isError && (
           <div className="alert alert-error mx-4 mt-2">
-            <span>Failed to execute flow: {executeErrorMessage}</span>
+            <span className="whitespace-pre-line">
+              Failed to execute flow: {executeErrorMessage}
+            </span>
           </div>
         )}
 

@@ -24,6 +24,8 @@ from qdash.api.schemas.calibration_pipeline import (
 )
 from qdash.api.services.calibration_pipeline_preflight import (
     PreflightTask,
+    configuration_problems,
+    default_system_catalog,
     prerequisite_problems,
     run_parameter_problems,
 )
@@ -48,6 +50,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
     from qdash.api.schemas.task_file import TaskInfo
+    from qdash.common.config.system_catalog import SystemCatalog
     from qdash.repository.task_definition import MongoTaskDefinitionRepository
 
 logger = logging.getLogger(__name__)
@@ -90,6 +93,7 @@ class CalibrationPipelineService:
         task_catalog: Callable[[str], Mapping[str, TaskInfo]] | None = None,
         qubit_data: Callable[[str, str, str], Mapping[str, Any]] | None = None,
         source_run_parameters: Callable[[str, str], Mapping[str, Any] | None] | None = None,
+        system_catalog: Callable[[str], SystemCatalog | None] | None = default_system_catalog,
     ) -> None:
         """Create the service.
 
@@ -105,6 +109,9 @@ class CalibrationPipelineService:
             qubit_data: (project_id, chip_id, qid) -> the qubit's calibration data.
             source_run_parameters: (project_id, task_id) -> run parameters recorded
                 on that task result, or None when the task is unknown.
+            system_catalog: chip_id -> the chip's Qubex System catalog, or None when
+                the configuration tree has nothing for the chip. None skips the
+                configuration checks.
         """
         self._task_definitions = task_definition_repository
         self._default_backend = default_backend
@@ -113,6 +120,7 @@ class CalibrationPipelineService:
         self._task_catalog = task_catalog
         self._qubit_data = qubit_data
         self._source_run_parameters = source_run_parameters
+        self._system_catalog = system_catalog
 
     # ------------------------------------------------------------------ catalog
 
@@ -186,6 +194,8 @@ class CalibrationPipelineService:
             return ValidatePipelineResponse(valid=False, problems=problems, backend_name=backend)
 
         targets, target_qids = self._validate_targets(project_id, chip_id, parsed, problems)
+        if targets is not None:
+            self._validate_configuration(chip_id, target_qids, problems)
         if not backend_problem:
             self._validate_tasks(project_id, backend, parsed, problems)
         self._validate_run_parameters(parsed, problems)
@@ -292,6 +302,23 @@ class CalibrationPipelineService:
             ),
             [qid for qid in mux_qids if qid in known and qid not in excluded],
         )
+
+    def _validate_configuration(
+        self, chip_id: str, target_qids: list[str], problems: list[PipelineProblem]
+    ) -> None:
+        """Report what the Qubex configuration tree would refuse for these targets."""
+        if self._system_catalog is None:
+            return
+        try:
+            catalog = self._system_catalog(chip_id)
+        except Exception as exc:
+            problems.append(
+                _problem("chip_id", f"configuration for chip {chip_id!r} could not be read: {exc}")
+            )
+            return
+        if catalog is None:
+            return
+        problems.extend(configuration_problems(catalog, chip_id, target_qids))
 
     def _preflight(
         self,

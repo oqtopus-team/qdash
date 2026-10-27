@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oqtopus-team.github.io/qdash/schemas/qubex-config/manifest.schema.json",
+  "title": "qubex-config manifest",
+  "description": "Declares which layout version a qubex-config tree follows. Lives at <root>/qubex-config.json. 1.0 is the per-chip layout used before qubex 1.5; 2.0 is the shared layout keyed by system_id.",
+  "type": "object",
+  "required": [
+    "layout_version"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "layout_version": {
+      "type": "string",
+      "enum": [
+        "1.0",
+        "2.0"
+      ],
+      "description": "1.0: <chip_id>/{config,params,calibration}. 2.0: config/*.yaml shared, params/<system_id>/, calibration/<system_id>/."
+    },
+    "description": {
+      "type": "string"
+    },
+    "converted_from": {
+      "type": "string",
+      "enum": [
+        "1.0"
+      ],
+      "description": "Layout the tree was converted from, when it was converted by a script."
+    },
+    "converted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "generated_by": {
+      "type": "string",
+      "description": "Tool and version that wrote this file."
+    }
+  },
+  "additionalProperties": false
+}

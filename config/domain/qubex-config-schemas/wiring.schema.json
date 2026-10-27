@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oqtopus-team.github.io/qdash/schemas/qubex-config/wiring.schema.json",
+  "title": "wiring.yaml",
+  "description": "MUX rows keyed by system_id (2.0) or chip_id (1.0). Every MUX of a chip appears under exactly one key.",
+  "type": "object",
+  "propertyNames": {
+    "type": "string",
+    "minLength": 1,
+    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+  },
+  "additionalProperties": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "required": [
+        "mux",
+        "ctrl",
+        "read_out"
+      ],
+      "properties": {
+        "mux": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ctrl": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "description": "<box>-<port> for quel1 boxes or <box>:<port> for quel3 boxes."
+          }
+        },
+        "read_out": {
+          "type": "string",
+          "minLength": 1,
+          "description": "<box>-<port> for quel1 boxes or <box>:<port> for quel3 boxes."
+        },
+        "read_in": {
+          "type": "string",
+          "minLength": 1,
+          "description": "<box>-<port> for quel1 boxes or <box>:<port> for quel3 boxes."
+        },
+        "pump": {
+          "type": "string",
+          "minLength": 1,
+          "description": "<box>-<port> for quel1 boxes or <box>:<port> for quel3 boxes."
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -13,6 +13,7 @@ import { QubitMetricsGrid } from "./QubitMetricsGrid";
 import { LinearGauge } from "@/components/ui/LinearGauge";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
+import { SystemSelector } from "@/components/features/chip/SystemSelector";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
@@ -24,6 +25,7 @@ import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useMetricsUrlState } from "@/hooks/useUrlState";
+import { useSystemUrlState } from "@/hooks/url-state/useSystemUrlState";
 import { getDaisySelectStyles } from "@/lib/react-select-theme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -76,6 +78,7 @@ export function MetricsPageContent() {
     setEndDate,
     setQuickRange,
   } = useMetricsUrlState();
+  const { selectedSystemId, setSelectedSystemId } = useSystemUrlState();
   const [gridSize, setGridSize] = useState<number>(8);
 
   // Load metrics configuration from backend
@@ -118,12 +121,16 @@ export function MetricsPageContent() {
     }
   }, [chipData?.data?.size]);
 
-  const { queryParams: metricsQueryParams, canFetch } = useMetricsQueryParams({
+  const { queryParams: baseQueryParams, canFetch } = useMetricsQueryParams({
     selectionMode,
     startDate,
     endDate,
     selectedChip,
   });
+  const metricsQueryParams = useMemo(
+    () => ({ ...baseQueryParams, system_id: selectedSystemId ?? undefined }),
+    [baseQueryParams, selectedSystemId],
+  );
 
   const { data, isLoading, isError } = useGetChipMetrics(selectedChip, metricsQueryParams, {
     query: {
@@ -392,7 +399,13 @@ export function MetricsPageContent() {
               <PageFiltersBar className="gap-3">
                 <PageFiltersBar.Group className="gap-3">
                   <PageFiltersBar.Item label="Chip" className="sm:w-64">
-                    <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
+                    <ChipSelector
+                      selectedChip={selectedChip}
+                      onChipSelect={(chipId) => {
+                        setSelectedSystemId(null);
+                        setSelectedChip(chipId);
+                      }}
+                    />
                   </PageFiltersBar.Item>
 
                   <PageFiltersBar.Item
@@ -407,6 +420,17 @@ export function MetricsPageContent() {
                           dateToDateTimeLocal(cd.ended_at ? new Date(cd.ended_at) : new Date()),
                         );
                       }}
+                    />
+                  </PageFiltersBar.Item>
+
+                  <PageFiltersBar.Item
+                    label="System"
+                    className="[&:not(:has([role=group]))]:hidden"
+                  >
+                    <SystemSelector
+                      chipId={selectedChip}
+                      selectedSystemId={selectedSystemId}
+                      onSelect={setSelectedSystemId}
                     />
                   </PageFiltersBar.Item>
 
@@ -554,6 +578,7 @@ export function MetricsPageContent() {
                 selectedDate="latest"
                 startAt={metricsQueryParams.start_at}
                 endAt={metricsQueryParams.end_at}
+                systemId={selectedSystemId}
               />
             ) : (
               <CouplingMetricsGrid
@@ -568,6 +593,7 @@ export function MetricsPageContent() {
                 selectedDate="latest"
                 startAt={metricsQueryParams.start_at}
                 endAt={metricsQueryParams.end_at}
+                systemId={selectedSystemId}
               />
             )}
           </>

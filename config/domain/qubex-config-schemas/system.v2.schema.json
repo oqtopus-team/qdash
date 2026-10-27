@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oqtopus-team.github.io/qdash/schemas/qubex-config/system.v2.schema.json",
+  "title": "system.yaml (layout 2.0)",
+  "description": "System catalog keyed by system_id. A chip driven by one System uses system_id == chip_id; a second backend on the same chip is another entry with the same chip_id.",
+  "type": "object",
+  "minProperties": 1,
+  "propertyNames": {
+    "type": "string",
+    "minLength": 1,
+    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+  },
+  "additionalProperties": {
+    "type": "object",
+    "required": [
+      "chip_id",
+      "backend"
+    ],
+    "properties": {
+      "chip_id": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+      },
+      "backend": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Backend kind, e.g. quel1 or quel3. The same-named key below holds its runtime settings."
+      },
+      "quel1": {
+        "type": "object",
+        "properties": {
+          "clock_master": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "quel3": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": true
+  }
+}

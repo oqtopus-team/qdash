@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.0.1
  */
 import type {
+  AddChipSystemRequest,
+  AddChipSystemResponse,
   AddMemberRequest,
   AdminDeleteProject200,
   AgentActionResponse,
@@ -33,12 +35,17 @@ import type {
   ChipMetricsResponse,
   ChipNotesSummaryResponse,
   ChipResponse,
+  ChipSystemsResponse,
   CommitAgentCandidateRequest,
   CommitAgentCandidateSetRequest,
   CompareExecutionsParams,
   CompareSeedValues200,
   CompareSeedValuesParams,
+  ConfigBox,
   ConfigReloadResponse,
+  ConfigRepositoryStatus,
+  ConfigRepositorySyncRequest,
+  ConfigRepositorySyncResult,
   CooldownCreateRequest,
   CooldownResponse,
   CooldownUpdateRequest,
@@ -109,7 +116,9 @@ import type {
   ForumPostResponse,
   ForumPostUpdate,
   GetCalibrationPipelineCatalogParams,
+  GetChipMetricHeatmapParams,
   GetChipMetricsParams,
+  GetChipMetricsSummaryParams,
   GetChipNoteParams,
   GetChipNotesSummaryParams,
   GetCopilotConfig200,
@@ -141,6 +150,7 @@ import type {
   GetTimeseriesTaskResultsParams,
   GetTopologyById200,
   GitPullConfig200,
+  GitPullConfigParams,
   GitPushConfig200,
   GitPushRequest,
   ImpactResponse,
@@ -154,9 +164,12 @@ import type {
   ListAllUsersParams,
   ListBackendsResponse,
   ListChipCouplingsParams,
+  ListChipMuxesParams,
   ListChipNoteEventsParams,
   ListChipQubitsParams,
   ListChipsResponse,
+  ListConfigBoxesParams,
+  ListConfigBoxesResponse,
   ListCooldownWiringEventsParams,
   ListCooldownWiringEventsResponse,
   ListCooldownsParams,
@@ -270,6 +283,7 @@ import type {
   UpdateScheduleResponse,
   UpdateUserRequest,
   UpsertChipNoteParams,
+  UpsertConfigBoxResponse,
   UpsertCouplingMetricNoteParams,
   UpsertCouplingNoteParams,
   UpsertQubitMetricNoteParams,
@@ -1127,13 +1141,16 @@ const getGitStatus = (
     }
 
 /**
+ * Publishes unpublished params and calibration notes first; 409 while shared
+ * files hold local edits unless ``force``.
  * @summary Pull the latest config from its Git repository
  */
 const gitPullConfig = (
-
+    params?: GitPullConfigParams,
  options?: SecondParameter<typeof qdashRequest<GitPullConfig200>>,) => {
       return qdashRequest<GitPullConfig200>(
-      {url: `/config/files/git/pull`, method: 'POST'
+      {url: `/config/files/git/pull`, method: 'POST',
+        params
     },
       options);
     }
@@ -1790,22 +1807,15 @@ const listChips = (
 /**
  * Create a new chip in the current project.
  *
- * Parameters
- * ----------
- * request : CreateChipRequest
- *     Chip creation request containing chip_id and size
- * ctx : ProjectContext
- *     Project context with editor permission
- *
- * Returns
- * -------
- * ChipResponse
- *     Created chip information
+ * In the shared Qubex configuration layout the chip's configuration files are
+ * generated as well (``provision_config`` defaults to that); the response's
+ * ``provisioning`` field says what was written and whether it was published.
  *
  * Raises
  * ------
  * HTTPException
- *     If chip_id already exists or size is invalid
+ *     400 when the chip exists, the size or topology is invalid, or configuration
+ *     generation was requested in the legacy layout or fails validation.
  * @summary Create a new chip
  */
 const createChip = (
@@ -1815,6 +1825,41 @@ const createChip = (
       {url: `/chips`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: createChipRequest
+    },
+      options);
+    }
+
+/**
+ * Systems, their backends, MUXes and boxes, from the configuration tree.
+ * @summary List the Qubex Systems driving a chip
+ */
+const listChipSystems = (
+    chipId: string,
+ options?: SecondParameter<typeof qdashRequest<ChipSystemsResponse>>,) => {
+      return qdashRequest<ChipSystemsResponse>(
+      {url: `/chips/${chipId}/systems`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Move MUXes to a new ``<chip_id>-<backend>`` System and generate its files.
+ *
+ * Raises
+ * ------
+ * HTTPException
+ *     400 when the System exists, a MUX is not wired, a box is not registered,
+ *     or the generated configuration does not load.
+ * @summary Add a System on another backend to a chip
+ */
+const addChipSystem = (
+    chipId: string,
+    addChipSystemRequest: AddChipSystemRequest,
+ options?: SecondParameter<typeof qdashRequest<AddChipSystemResponse>>,) => {
+      return qdashRequest<AddChipSystemResponse>(
+      {url: `/chips/${chipId}/systems`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: addChipSystemRequest
     },
       options);
     }
@@ -1958,6 +2003,8 @@ const getChipMux = (
  *     Project context with user and project information
  * chip_service : ChipService
  *     Service for chip operations
+ * system_id : str | None
+ *     Optional Qubex System; only its MUXes are returned (404 when unknown)
  *
  * Returns
  * -------
@@ -1967,9 +2014,11 @@ const getChipMux = (
  */
 const listChipMuxes = (
     chipId: string,
+    params?: ListChipMuxesParams,
  options?: SecondParameter<typeof qdashRequest<ListMuxResponse>>,) => {
       return qdashRequest<ListMuxResponse>(
-      {url: `/chips/${chipId}/muxes`, method: 'GET'
+      {url: `/chips/${chipId}/muxes`, method: 'GET',
+        params
     },
       options);
     }
@@ -2039,6 +2088,8 @@ const deleteChipNote = (
  *     Number of qubits to skip for pagination
  * qids : list[str] | None
  *     Optional list of specific qubit IDs to fetch
+ * system_id : str | None
+ *     Optional Qubex System; only its qubits are returned (404 when unknown)
  *
  * Returns
  * -------
@@ -2147,6 +2198,8 @@ const reanalyzeQubitSpectroscopy = (
  *     Maximum number of couplings to return (default 100, max 512)
  * offset : int
  *     Number of couplings to skip for pagination
+ * system_id : str | None
+ *     Optional Qubex System; couplings crossing its boundary are left out
  *
  * Returns
  * -------
@@ -2218,9 +2271,11 @@ const getChipCoupling = (
  */
 const getChipMetricsSummary = (
     chipId: string,
+    params?: GetChipMetricsSummaryParams,
  options?: SecondParameter<typeof qdashRequest<MetricsSummaryResponse>>,) => {
       return qdashRequest<MetricsSummaryResponse>(
-      {url: `/chips/${chipId}/metrics/summary`, method: 'GET'
+      {url: `/chips/${chipId}/metrics/summary`, method: 'GET',
+        params
     },
       options);
     }
@@ -2256,9 +2311,11 @@ const getChipMetricsSummary = (
 const getChipMetricHeatmap = (
     chipId: string,
     metric: string,
+    params?: GetChipMetricHeatmapParams,
  options?: SecondParameter<typeof qdashRequest<MetricHeatmapResponse>>,) => {
       return qdashRequest<MetricHeatmapResponse>(
-      {url: `/chips/${chipId}/metrics/heatmap/${metric}`, method: 'GET'
+      {url: `/chips/${chipId}/metrics/heatmap/${metric}`, method: 'GET',
+        params
     },
       options);
     }
@@ -4393,6 +4450,67 @@ const getConfigAll = (
     }
 
 /**
+ * The catalog shared by every chip, plus the box types qubex accepts.
+ * @summary List the control boxes in box.yaml
+ */
+const listConfigBoxes = (
+    params?: ListConfigBoxesParams,
+ options?: SecondParameter<typeof qdashRequest<ListConfigBoxesResponse>>,) => {
+      return qdashRequest<ListConfigBoxesResponse>(
+      {url: `/config/boxes`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Write the entry and publish it; other entries and comments are kept.
+ *
+ * Raises
+ * ------
+ * HTTPException
+ *     400 for an unknown type, a missing address or adapter, or the legacy layout.
+ * @summary Register or update a control box in box.yaml
+ */
+const upsertConfigBox = (
+    configBox: ConfigBox,
+ options?: SecondParameter<typeof qdashRequest<UpsertConfigBoxResponse>>,) => {
+      return qdashRequest<UpsertConfigBoxResponse>(
+      {url: `/config/boxes`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: configBox
+    },
+      options);
+    }
+
+/**
+ * @summary Mode, layout and git state of the Qubex configuration root
+ */
+const getConfigRepositoryStatus = (
+
+ options?: SecondParameter<typeof qdashRequest<ConfigRepositoryStatus>>,) => {
+      return qdashRequest<ConfigRepositoryStatus>(
+      {url: `/config/repository/status`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Refuses with 409 while shared files hold local edits, unless ``force``.
+ * @summary Publish unpublished calibration files, then pull the repository
+ */
+const syncConfigRepository = (
+    configRepositorySyncRequest: ConfigRepositorySyncRequest,
+ options?: SecondParameter<typeof qdashRequest<ConfigRepositorySyncResult>>,) => {
+      return qdashRequest<ConfigRepositorySyncResult>(
+      {url: `/config/repository/sync`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: configRepositorySyncRequest
+    },
+      options);
+    }
+
+/**
  * Get a specific parameter version by entity ID.
  *
  * Parameters
@@ -4735,7 +4853,7 @@ const getRecalibrationRecommendations = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,listChipSystems,addChipSystem,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,listConfigBoxes,upsertConfigBox,getConfigRepositoryStatus,syncConfigRepository,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -4820,6 +4938,8 @@ export type GetCopilotSystemPromptResult = NonNullable<Awaited<ReturnType<Return
 export type GetSettingsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getSettings']>>>
 export type ListChipsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listChips']>>>
 export type CreateChipResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createChip']>>>
+export type ListChipSystemsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listChipSystems']>>>
+export type AddChipSystemResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['addChipSystem']>>>
 export type UpdateChipResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateChip']>>>
 export type DeleteChipResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteChip']>>>
 export type GetChipResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getChip']>>>
@@ -4956,6 +5076,10 @@ export type ListCooldownWiringEventsResult = NonNullable<Awaited<ReturnType<Retu
 export type ListTopologiesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listTopologies']>>>
 export type GetTopologyByIdResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getTopologyById']>>>
 export type GetConfigAllResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getConfigAll']>>>
+export type ListConfigBoxesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listConfigBoxes']>>>
+export type UpsertConfigBoxResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['upsertConfigBox']>>>
+export type GetConfigRepositoryStatusResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getConfigRepositoryStatus']>>>
+export type SyncConfigRepositoryResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['syncConfigRepository']>>>
 export type GetProvenanceEntityResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getProvenanceEntity']>>>
 export type GetProvenanceLineageResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getProvenanceLineage']>>>
 export type GetProvenanceImpactResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getProvenanceImpact']>>>

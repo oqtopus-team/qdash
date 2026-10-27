@@ -14,9 +14,13 @@ from qdash.common.config.params_updater import (
     _load_param_file_map,
     resolve_param_yaml_file_names,
 )
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.common.config.qubex_layout import QubexLayout
+from qdash.common.config.qubex_params_templates import is_common_file
+from qdash.common.config.system_catalog import SystemCatalog
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from qdash.workflow.engine.backend.base import BaseBackend
 
 logger = logging.getLogger(__name__)
@@ -71,12 +75,101 @@ def _resolve_fake_updater(backend: BaseBackend, chip_id: str | None) -> ParamsUp
 
 
 class _QubexParamsUpdater(YamlParamsUpdater):
-    """Resolve worker-side configuration and labels without reconnecting hardware."""
+    """Resolve worker-side configuration and labels without reconnecting hardware.
+
+    Physics values (the common template files) describe the chip, so they are
+    projected into the ``params`` directory of every System of the chip; backend
+    files (``capture_delay.yaml`` and the like) are written only to the session's
+    own System directory. Projection targets are snapshotted and restored with
+    the primary files so a failed update leaves every System unchanged.
+    """
 
     def __init__(self, backend: BaseBackend, chip_id: str | None) -> None:
         super().__init__()
         self._backend = backend
         self._chip_id = chip_id
+        self._projection_targets: list[Path] | None = None
+
+    # ----------------------------------------------------------- projection
+
+    def _resolve_chip_id(self) -> str | None:
+        backend_config = getattr(self._backend, "config", {})
+        return backend_config.get("chip_id") or self._chip_id
+
+    def _other_system_dirs(self) -> list[Path]:
+        """``params`` directories of the chip's other Systems (shared layout only)."""
+        if self._projection_targets is not None:
+            return self._projection_targets
+        targets: list[Path] = []
+        chip_id = self._resolve_chip_id()
+        primary = self._resolve_params_dir()
+        if chip_id and primary is not None:
+            try:
+                layout = QubexLayout.detect()
+                systems = SystemCatalog(layout, chip_id).systems() if layout.is_shared else []
+            except Exception:
+                systems = []
+            for entry in systems:
+                candidate = layout.params_dir(entry.system_id)
+                if candidate.is_dir() and candidate.resolve() != primary.resolve():
+                    targets.append(candidate)
+        self._projection_targets = targets
+        return targets
+
+    def _projection_paths(self, file_name: str) -> list[Path]:
+        if not is_common_file(file_name):
+            return []
+        return [directory / file_name for directory in self._other_system_dirs()]
+
+    def snapshot(self, qid: str, output_parameters: dict[str, Any]) -> dict[str, bytes | None]:
+        snapshots = super().snapshot(qid, output_parameters)
+        for file_name in sorted(self._resolve_file_names(output_parameters)):
+            for path in self._projection_paths(file_name):
+                lock_path = path.with_suffix(path.suffix + ".lock")
+                lock_path.touch(exist_ok=True)
+                with self._file_lock(lock_path):
+                    try:
+                        snapshots[str(path)] = path.read_bytes()
+                    except FileNotFoundError:
+                        snapshots[str(path)] = None
+        return snapshots
+
+    def update(self, qid: str, output_parameters: dict[str, Any]) -> set[str]:
+        updated = super().update(qid, output_parameters)
+        label = self._resolve_qubit_label(qid)
+        if label is None:
+            return updated
+        for key, param in output_parameters.items():
+            value = self._extract_value(param)
+            if value is None:
+                continue
+            for file_name in sorted(self._resolve_file_names({key: param})):
+                for path in self._projection_paths(file_name):
+                    self._project(path, label, value)
+        return updated
+
+    def _project(self, path: Path, label: str, value: float | int | str) -> None:
+        try:
+            self._update_yaml(path, label, value)
+        except Exception as exc:
+            logger.warning("Could not project %s to %s: %s", path.name, path.parent, exc)
+
+    def restore(self, snapshot: dict[str, bytes | None]) -> None:
+        primary = {
+            name: content for name, content in snapshot.items() if not Path(name).is_absolute()
+        }
+        super().restore(primary)
+        for name, content in snapshot.items():
+            path = Path(name)
+            if not path.is_absolute():
+                continue
+            lock_path = path.with_suffix(path.suffix + ".lock")
+            lock_path.touch(exist_ok=True)
+            with self._file_lock(lock_path):
+                if content is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_bytes(content)
 
     def _resolve_params_dir(self) -> Path | None:
         config_dir = getattr(self._backend, "config", {}).get("params_dir")
@@ -100,12 +193,14 @@ class _QubexParamsUpdater(YamlParamsUpdater):
                 if path.exists():
                     return path
 
-        chip_id = getattr(self._backend, "config", {}).get("chip_id") or self._chip_id
+        backend_config = getattr(self._backend, "config", {})
+        chip_id = backend_config.get("chip_id") or self._chip_id
         if not chip_id:
             return None
 
+        system_id = backend_config.get("system_id") or chip_id
         for candidate in (
-            get_qubex_paths().params_dir(chip_id),
+            QubexLayout.detect().params_dir(system_id),
             Path("config") / "qubex" / chip_id / "params",
         ):
             if candidate.exists():

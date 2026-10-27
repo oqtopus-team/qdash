@@ -18,6 +18,7 @@ from qdash.api.schemas.metrics import (
     QubitMetricHistoryResponse,
 )
 from qdash.api.services.metrics_service import MetricsService
+from qdash.api.services.system_scope import resolve_system_scope
 from qdash.common.config.metrics import load_metrics_config
 
 router = APIRouter()
@@ -76,6 +77,10 @@ async def get_chip_metrics(
         str | None,
         Query(description="Inclusive absolute upper bound on task start time (ISO8601 or date)."),
     ] = None,
+    system_id: Annotated[
+        str | None,
+        Query(description="Only results measured on this Qubex System (404 when unknown)."),
+    ] = None,
 ) -> ChipMetricsResponse:
     """Get chip calibration metrics for visualization.
 
@@ -99,6 +104,7 @@ async def get_chip_metrics(
         ChipMetricsResponse with all metrics data
 
     """
+    resolve_system_scope(chip_id, system_id)
     return metrics_service.get_chip_metrics(
         chip_id=chip_id,
         project_id=ctx.project_id,
@@ -107,6 +113,7 @@ async def get_chip_metrics(
         selection_mode=selection_mode,
         start_at=start_at,
         end_at=end_at,
+        system_id=system_id or None,
     )
 
 
@@ -125,6 +132,9 @@ async def get_qubit_metric_history(
         int | None, Query(description="Max number of history items (None for unlimited)", ge=1)
     ] = None,
     within_days: Annotated[int | None, Query(description="Filter to last N days", ge=1)] = 30,
+    system_id: Annotated[
+        str | None, Query(description="Only results measured on this Qubex System.")
+    ] = None,
 ) -> QubitMetricHistoryResponse:
     """Get historical metric data for a specific qubit with task_id for figure display.
 
@@ -147,6 +157,7 @@ async def get_qubit_metric_history(
         QubitMetricHistoryResponse with historical metric data and task_ids
 
     """
+    resolve_system_scope(chip_id, system_id)
     return metrics_service.get_metric_history(
         chip_id=chip_id,
         qid=qid,
@@ -156,6 +167,7 @@ async def get_qubit_metric_history(
         entity_type="qubit",
         limit=limit,
         within_days=within_days,
+        system_id=system_id or None,
     )
 
 
@@ -176,6 +188,9 @@ async def get_coupling_metric_history(
         int | None, Query(description="Max number of history items (None for unlimited)", ge=1)
     ] = None,
     within_days: Annotated[int | None, Query(description="Filter to last N days", ge=1)] = 30,
+    system_id: Annotated[
+        str | None, Query(description="Only results measured on this Qubex System.")
+    ] = None,
 ) -> QubitMetricHistoryResponse:
     """Get historical metric data for a specific coupling with task_id for figure display.
 
@@ -199,6 +214,7 @@ async def get_coupling_metric_history(
         (Note: qid field contains coupling_id for coupling metrics)
 
     """
+    resolve_system_scope(chip_id, system_id)
     return metrics_service.get_metric_history(
         chip_id=chip_id,
         qid=coupling_id,
@@ -208,6 +224,7 @@ async def get_coupling_metric_history(
         entity_type="coupling",
         limit=limit,
         within_days=within_days,
+        system_id=system_id or None,
     )
 
 

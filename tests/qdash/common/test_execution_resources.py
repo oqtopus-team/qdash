@@ -172,3 +172,77 @@ def test_unresolved_wiring_claims_whole_chip(wiring_file: Path, contents: str | 
     scope = resolve_execution_resource_scope("chip-1", {"mux_ids": [0, 4]})
     assert scope.exclusive is True
     assert scopes_conflict(scope, ExecutionResourceScope("chip-1", ("mux:9",)))
+
+
+def test_shared_wiring_with_other_chips_keeps_mux_granular_locks(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A shared wiring.yaml holding other chips must not degrade to an exclusive lock."""
+    config = tmp_path / "config"
+    config.mkdir()
+    (config / "chip.yaml").write_text(yaml.safe_dump({"chip-1": {"n_qubits": 16}, "chip-2": {}}))
+    (config / "system.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "chip-1": {"chip_id": "chip-1", "backend": "quel1"},
+                "chip-1-quel3": {"chip_id": "chip-1", "backend": "quel3"},
+                "chip-2": {"chip_id": "chip-2", "backend": "quel1"},
+            }
+        )
+    )
+    rows = lambda *ids, box: [  # noqa: E731
+        {"mux": m, "ctrl": [f"{box}{m}-0"], "read_out": f"{box}{m}-1"} for m in ids
+    ]
+    (config / "wiring.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "chip-1": rows(0, 1, box="A"),
+                "chip-1-quel3": rows(2, 3, box="B"),
+                "chip-2": rows(0, 1, 2, 3, box="Z"),  # same MUX numbers, another chip
+            }
+        )
+    )
+    monkeypatch.setattr(execution_resources, "resolve_config_base_path", lambda: tmp_path)
+
+    quel1 = resolve_execution_resource_scope("chip-1", {"qids": ["1", "4"]})
+    quel3 = resolve_execution_resource_scope("chip-1", {"qids": ["9"]})
+
+    assert quel1.exclusive is False and quel3.exclusive is False
+    assert {r for r in quel1.resources if r.startswith("mux:")} == {"mux:0", "mux:1"}
+    assert "channel:Z0-0" not in quel1.resources
+    assert not scopes_conflict(quel1, quel3)
+
+
+def test_workflow_scope_of_a_declared_system_is_not_exclusive(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from qdash.common.execution_resources import resolve_workflow_resource_scope
+
+    config = tmp_path / "config"
+    config.mkdir(parents=True)
+    (config / "chip.yaml").write_text(yaml.safe_dump({"chip-1": {"n_qubits": 16}}))
+    (config / "system.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "chip-1": {"chip_id": "chip-1", "backend": "quel1"},
+                "chip-1-quel3": {"chip_id": "chip-1", "backend": "quel3"},
+            }
+        )
+    )
+    rows = lambda *ids: [{"mux": m, "ctrl": [f"C{m}-0"], "read_out": f"R{m}-0"} for m in ids]  # noqa: E731
+    (config / "wiring.yaml").write_text(
+        yaml.safe_dump({"chip-1": rows(0, 1), "chip-1-quel3": rows(2, 3)})
+    )
+    monkeypatch.setattr(execution_resources, "resolve_config_base_path", lambda: tmp_path)
+
+    whole = resolve_workflow_resource_scope("chip-1")
+    quel3 = resolve_workflow_resource_scope("chip-1", "chip-1-quel3")
+    quel1 = resolve_workflow_resource_scope("chip-1", "chip-1")
+    unknown = resolve_workflow_resource_scope("chip-1", "nope")
+
+    assert whole.exclusive is True
+    assert quel3.exclusive is False
+    assert {r for r in quel3.resources if r.startswith("mux:")} == {"mux:2", "mux:3"}
+    assert not scopes_conflict(quel1, quel3)
+    assert scopes_conflict(whole, quel3)
+    assert unknown.exclusive is True

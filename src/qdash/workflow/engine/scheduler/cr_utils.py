@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import itertools
 import logging
+import math
 from collections import defaultdict
 from typing import Any
 
 import networkx as nx
 
+from qdash.common.config.system_catalog import DEFAULT_MUX_SIZE
 from qdash.common.wiring_resources import mux_module_resources
 
 logger = logging.getLogger(__name__)
@@ -32,12 +34,14 @@ def extract_qubit_frequency(qubits: dict[str, Any]) -> dict[str, float]:
     }
 
 
-def qid_to_coords(qid: int, grid_size: int) -> tuple[int, int]:
+def qid_to_coords(qid: int, grid_size: int, mux_size: int = DEFAULT_MUX_SIZE) -> tuple[int, int]:
     """Convert qubit ID to (row, col) coordinates in the square lattice.
 
     Args:
         qid: Qubit ID (0-indexed)
         grid_size: Grid dimension (8 for 64-qubit, 12 for 144-qubit)
+        mux_size: Qubits per MUX; a MUX is laid out as a square when the size is
+            a perfect square (4 -> 2x2) and as one row otherwise
 
     Returns:
         (row, col) tuple representing position in the grid
@@ -49,31 +53,36 @@ def qid_to_coords(qid: int, grid_size: int) -> tuple[int, int]:
         - qid=2 -> (1, 0) [MUX 0, position BL]
         - qid=16 -> (2, 0) [MUX 4, position TL]
     """
-    # Which MUX does this qubit belong to?
-    mux_id = qid // 4
+    # Which MUX does this qubit belong to, and where inside it?
+    mux_id = qid // mux_size
+    pos_in_mux = qid % mux_size
 
-    # Position within the MUX (0=TL, 1=TR, 2=BL, 3=BR)
-    pos_in_mux = qid % 4
+    # A MUX is a square sub-grid (2x2 for 4 qubits); other sizes are one row.
+    side = math.isqrt(mux_size)
+    local_cols = side if side * side == mux_size else mux_size
+    local_rows = mux_size // local_cols
 
-    # MUX grid dimension (N/2 x N/2)
-    mux_grid_size = grid_size // 2
+    # MUX grid dimension
+    mux_grid_size = max(grid_size // local_cols, 1)
 
     # MUX position in MUX grid
     mux_row = mux_id // mux_grid_size
     mux_col = mux_id % mux_grid_size
 
-    # Position within MUX (2x2 sub-grid)
-    local_row = pos_in_mux // 2  # 0 (top) or 1 (bottom)
-    local_col = pos_in_mux % 2  # 0 (left) or 1 (right)
+    # Position within MUX
+    local_row = pos_in_mux // local_cols
+    local_col = pos_in_mux % local_cols
 
     # Combine to get global position
-    row = mux_row * 2 + local_row
-    col = mux_col * 2 + local_col
+    row = mux_row * local_rows + local_row
+    col = mux_col * local_cols + local_col
 
     return (row, col)
 
 
-def infer_direction_from_design(qid1: str, qid2: str, grid_size: int = 8) -> bool:
+def infer_direction_from_design(
+    qid1: str, qid2: str, grid_size: int = 8, mux_size: int = DEFAULT_MUX_SIZE
+) -> bool:
     """Infer CR gate direction from design-based frequency pattern.
 
     The chip follows a checkerboard frequency pattern where frequency is determined by
@@ -89,6 +98,7 @@ def infer_direction_from_design(qid1: str, qid2: str, grid_size: int = 8) -> boo
         qid1: First qubit ID
         qid2: Second qubit ID
         grid_size: Grid dimension (8 for 64-qubit, 12 for 144-qubit, default: 8)
+        mux_size: Qubits per MUX (``chip.yaml`` ``topology.mux_size``, default 4)
 
     Returns:
         True if qid1 should be control (qid1 has lower frequency by design),
@@ -100,8 +110,8 @@ def infer_direction_from_design(qid1: str, qid2: str, grid_size: int = 8) -> boo
         - qid2=1 -> (0,1) -> sum=1 (odd) -> high freq
         - Result: True (0 is control, 1 is target)
     """
-    r1, c1 = qid_to_coords(int(qid1), grid_size)
-    r2, c2 = qid_to_coords(int(qid2), grid_size)
+    r1, c1 = qid_to_coords(int(qid1), grid_size, mux_size)
+    r2, c2 = qid_to_coords(int(qid2), grid_size, mux_size)
 
     # Checkerboard pattern: (row + col) % 2 determines frequency group
     # Even sum -> low frequency, Odd sum -> high frequency
@@ -131,16 +141,19 @@ def build_mux_conflict_map(yaml_mux_list: list[dict[str, Any]]) -> dict[int, set
     return dict(conflict_map)
 
 
-def build_qubit_to_mux_map(yaml_mux_list: list[dict[str, Any]]) -> dict[str, int]:
+def build_qubit_to_mux_map(
+    yaml_mux_list: list[dict[str, Any]], mux_size: int = DEFAULT_MUX_SIZE
+) -> dict[str, int]:
     """Build mapping from qubit ID to MUX ID.
 
-    Each MUX controls 4 qubits: MUX_N controls qubits [4N, 4N+1, 4N+2, 4N+3].
+    MUX_N controls qubits [N*mux_size, ..., N*mux_size + mux_size - 1]; the default
+    size is 4.
     """
     qid_to_mux = {}
     for entry in yaml_mux_list:
         mux_id = entry["mux"]
-        for offset in range(4):
-            qid_to_mux[str(mux_id * 4 + offset)] = mux_id
+        for offset in range(mux_size):
+            qid_to_mux[str(mux_id * mux_size + offset)] = mux_id
     return qid_to_mux
 
 

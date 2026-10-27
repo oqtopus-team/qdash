@@ -46,6 +46,8 @@ interface QubitMetricsGridProps {
   /** Optional ISO timestamp bounds to restrict the history modal. */
   startAt?: string | null;
   endAt?: string | null;
+  /** Restrict the history modal to results measured on this System. */
+  systemId?: string | null;
 }
 
 interface SelectedQubitInfo {
@@ -229,6 +231,7 @@ export function QubitMetricsGrid({
   topologyId,
   startAt,
   endAt,
+  systemId = null,
 }: QubitMetricsGridProps) {
   // Get topology configuration
   const {
@@ -799,6 +802,7 @@ export function QubitMetricsGrid({
                   metricUnit={unit}
                   startAt={startAt}
                   endAt={endAt}
+                  systemId={systemId}
                 />
               </div>
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">

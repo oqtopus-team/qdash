@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any
 from prefect import get_run_logger
 
 from qdash.workflow.engine import OneQubitScheduler
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.service._internal.scheduling_tasks import (
     calibrate_mux_qubits as _calibrate_mux_qubits,
 )
@@ -20,6 +19,7 @@ from qdash.workflow.service._internal.scheduling_tasks import (
     run_mux_calibrations_parallel,
     run_qubit_calibrations_parallel,
 )
+from qdash.workflow.service.system_groups import plan_system_waves
 
 if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
@@ -68,10 +68,6 @@ class OneQubitStrategy(ABC):
         """
         ...
 
-    def _get_wiring_config_path(self, chip_id: str) -> str:
-        """Get the wiring config path for a chip."""
-        return str(get_qubex_paths().wiring_yaml(chip_id))
-
     def _filter_qids(self, qids: list[str], allowed_qids: list[str] | None) -> list[str]:
         """Filter qids to only include those in allowed_qids.
 
@@ -104,6 +100,10 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
             [MUX0 qubits] parallel with [MUX4 qubits] parallel with ...
         Box_MIXED:
             [MUX1 qubits] parallel with [MUX2 qubits] parallel with ...
+
+    MUX groups never span Qubex Systems. Within one parallel batch, Systems
+    with different backends run at the same time; Systems with the same backend
+    run one after another (``workflow.yaml`` ``systems.parallel_same_backend``).
     """
 
     def execute(
@@ -112,10 +112,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute Box-based scheduled calibration."""
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
-        scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
-        )
+        scheduler = OneQubitScheduler(chip_id=cal_service.chip_id)
         schedule = scheduler.generate_from_mux(
             mux_ids=config.mux_ids, exclude_qids=config.exclude_qids
         )
@@ -179,13 +176,15 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
             stage_name = f"Box_{box_type}"
             stage_results = {}
 
-            for seq_idx, parallel_groups in enumerate(sequential_groups):
-                mux_results = run_mux_calibrations_parallel(
-                    mux_groups=parallel_groups,
-                    tasks=config.tasks,
-                    session_config=session_config,
-                )
-                stage_results.update(mux_results)
+            for parallel_groups in sequential_groups:
+                for wave in plan_system_waves(parallel_groups, scheduler.catalog):
+                    mux_results = run_mux_calibrations_parallel(
+                        mux_groups=wave.groups,
+                        tasks=config.tasks,
+                        session_config=session_config,
+                        **wave.worker_kwargs("group_system_ids"),
+                    )
+                    stage_results.update(mux_results)
 
             all_results[stage_name] = stage_results
 
@@ -215,10 +214,7 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
         """Execute synchronized step-based calibration."""
         logger = get_run_logger()
 
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
-        scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
-        )
+        scheduler = OneQubitScheduler(chip_id=cal_service.chip_id)
         schedule = scheduler.generate_synchronized_from_mux(
             mux_ids=config.mux_ids,
             exclude_qids=config.exclude_qids,
@@ -261,11 +257,16 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             if not filtered_qids:
                 continue
 
-            step_results = run_qubit_calibrations_parallel(
-                qids=filtered_qids,
-                tasks=config.tasks,
-                session_config=session_config,
-            )
+            step_results: dict[str, Any] = {}
+            for wave in plan_system_waves([[qid] for qid in filtered_qids], scheduler.catalog):
+                step_results.update(
+                    run_qubit_calibrations_parallel(
+                        qids=wave.qids,
+                        tasks=config.tasks,
+                        session_config=session_config,
+                        **wave.worker_kwargs("qid_system_ids"),
+                    )
+                )
             # Group results by box type for organized output
             box_key = f"Box_{step.box_type}"
             if box_key not in all_results:
@@ -289,10 +290,7 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
         """Execute local-index spectroscopy steps as hardware-aware batches."""
         from qdash.workflow.service.one_qubit_stage_runner import OneQubitStageRunner
 
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
-        scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
-        )
+        scheduler = OneQubitScheduler(chip_id=cal_service.chip_id)
         schedule = scheduler.generate_simultaneous_spectroscopy_batches_from_mux(
             mux_ids=config.mux_ids,
             exclude_qids=config.exclude_qids,
@@ -304,10 +302,19 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
         if not all_qids:
             return {}
 
+        # When the targets span Systems the owner session is not connected, so
+        # every step runs on isolated workers that each drive one System.
+        session_config = None
+        if len(cal_service.session_system_ids) > 1:
+            session_config = runner.build_session_config(
+                execution_id=cal_service.execution_id or "", flow_name=cal_service.flow_name
+            )
+
         all_results = runner.execute_simultaneous_spectroscopy_schedule(
             schedule,
             tasks=config.tasks,
             allowed_qids=config.qids,
+            session_config=session_config,
         )
 
         # Match the per-qubit status supplied by the other strategies so a
@@ -340,10 +347,7 @@ class OneQubitSerialStrategy(OneQubitStrategy):
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute fully serial calibration."""
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
-        scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
-        )
+        scheduler = OneQubitScheduler(chip_id=cal_service.chip_id)
         schedule = scheduler.generate_from_mux(
             mux_ids=config.mux_ids, exclude_qids=config.exclude_qids
         )

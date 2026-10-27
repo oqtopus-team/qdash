@@ -16,4 +16,8 @@ limit?: number;
  * @minimum 0
  */
 offset?: number;
+/**
+ * Only couplings inside this Qubex System
+ */
+system_id?: string | null;
 };

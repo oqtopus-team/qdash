@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oqtopus-team.github.io/qdash/schemas/qubex-config/system.v1.schema.json",
+  "title": "system.yaml (layout 1.0)",
+  "description": "Per-chip system file: either a single entry (chip_id/backend at the top level, optional schema_version) or the 2.0 catalog form with one entry.",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "chip_id",
+        "backend"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": [
+            "string",
+            "integer",
+            "number"
+          ]
+        },
+        "chip_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+        },
+        "backend": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quel1": {
+          "type": "object"
+        },
+        "quel3": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "$ref": "https://oqtopus-team.github.io/qdash/schemas/qubex-config/system.v2.schema.json"
+    }
+  ]
+}

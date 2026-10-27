@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ValidateFileRequestPath } from './validateFileRequestPath';
 
 /**
  * Request model for validating file content.
@@ -12,4 +13,5 @@
 export interface ValidateFileRequest {
   content: string;
   file_type: string;
+  path?: ValidateFileRequestPath;
 }
