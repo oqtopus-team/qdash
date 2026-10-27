@@ -29,6 +29,7 @@ const createUserSchema = z.object({
 type CreateUserFormInput = z.input<typeof createUserSchema>;
 type CreateUserFormData = z.output<typeof createUserSchema>;
 
+/** Modal for creating a user and showing the generated temporary password. */
 export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUserModalProps) {
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const [createdUsername, setCreatedUsername] = useState("");
