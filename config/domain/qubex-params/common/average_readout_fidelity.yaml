@@ -1,0 +1,6 @@
+meta:
+  description: Average readout fidelity of the qubit
+  unit: '%'
+  default: null
+  scope: qubit
+data: {}

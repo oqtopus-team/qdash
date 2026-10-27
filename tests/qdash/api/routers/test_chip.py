@@ -1,8 +1,10 @@
 """Tests for chip router endpoints."""
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
+import yaml
 
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
@@ -52,6 +54,25 @@ def test_project(init_db):
     membership.insert()
 
     return project
+
+
+@pytest.fixture(autouse=True)
+def config_tree(tmp_path):
+    """Point chip creation at a temporary Qubex configuration tree."""
+    from qdash.api.dependencies import get_chip_config_scaffolder
+    from qdash.api.main import app
+    from qdash.api.services.chip import ChipConfigScaffolder
+
+    root = tmp_path / "qubex-config"
+    wiring = root / "64Qv3" / "config" / "wiring.yaml"
+    wiring.parent.mkdir(parents=True)
+    wiring.write_text(yaml.safe_dump({"64Qv3": [{"mux": 0, "ctrl": ["S1R-7"]}]}))
+    templates = Path(__file__).resolve().parents[4] / "config" / "domain" / "qubex-params"
+    app.dependency_overrides[get_chip_config_scaffolder] = lambda: ChipConfigScaffolder(
+        config_base=root, templates_dir=templates
+    )
+    yield root
+    app.dependency_overrides.pop(get_chip_config_scaffolder, None)
 
 
 @pytest.fixture
@@ -338,6 +359,61 @@ class TestChipRouter:
         assert data["chip_id"] == "new_chip"
         assert data["size"] == 64
         assert data["activity_status"] == "active"
+        assert data["config"]["status"] == "created"
+
+    def test_create_chip_creates_config_with_chip_id_as_system_id(
+        self, test_client, test_project, auth_headers, config_tree
+    ):
+        """The new chip's directory copies wiring from the named system."""
+        response = test_client.post(
+            "/chips",
+            headers=auth_headers,
+            json={"chip_id": "64Qv4", "size": 64, "config": {"source_system_id": "64Qv3"}},
+        )
+
+        assert response.status_code == 200
+        config = response.json()["config"]
+        assert config["status"] == "created"
+        assert config["source_system_id"] == "64Qv3"
+        wiring = yaml.safe_load((config_tree / "64Qv4/config/wiring.yaml").read_text())
+        assert wiring == {"64Qv4": [{"mux": 0, "ctrl": ["S1R-7"]}]}
+        system = yaml.safe_load((config_tree / "64Qv4/config/system.yaml").read_text())
+        assert system["64Qv4"]["chip_id"] == "64Qv4"
+
+    def test_create_chip_without_config(self, test_client, test_project, auth_headers, config_tree):
+        """config.create=false registers the chip only."""
+        response = test_client.post(
+            "/chips",
+            headers=auth_headers,
+            json={"chip_id": "db_only", "size": 64, "config": {"create": False}},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["config"] is None
+        assert not (config_tree / "db_only").exists()
+
+    def test_create_chip_unknown_config_source(
+        self, test_client, test_project, auth_headers, config_tree
+    ):
+        """An unknown source system is a 400 and creates nothing."""
+        response = test_client.post(
+            "/chips",
+            headers=auth_headers,
+            json={"chip_id": "64Qv4", "size": 64, "config": {"source_system_id": "nope"}},
+        )
+
+        assert response.status_code == 400
+        assert not (config_tree / "64Qv4").exists()
+        assert ChipDocument.find_one({"chip_id": "64Qv4"}).run() is None
+
+    def test_list_chip_config_sources(self, test_client, test_project, auth_headers):
+        """Systems with a wiring file are offered as sources."""
+        response = test_client.get("/chips/config-sources", headers=auth_headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["available"] is True
+        assert [source["system_id"] for source in data["sources"]] == ["64Qv3"]
 
     def test_create_chip_invalid_size(self, test_client, test_project, auth_headers):
         """Test creating a chip with invalid size returns 400."""
@@ -349,7 +425,7 @@ class TestChipRouter:
 
         assert response.status_code == 400
 
-    def test_create_chip_duplicate(self, test_client, test_project, auth_headers):
+    def test_create_chip_duplicate(self, test_client, test_project, auth_headers, config_tree):
         """Test creating a duplicate chip returns 400."""
         # Arrange: Create initial chip
         chip = ChipDocument(
@@ -368,8 +444,9 @@ class TestChipRouter:
             json={"chip_id": "existing_chip", "size": 64},
         )
 
-        # Assert
+        # Assert: the configuration directory written before the failure is rolled back
         assert response.status_code == 400
+        assert not (config_tree / "existing_chip").exists()
 
     def test_list_chips_requires_authentication(self, test_client, test_project):
         """Test that listing chips without auth returns 401."""

@@ -4647,7 +4647,7 @@
           "chip"
         ],
         "summary": "Create a new chip",
-        "description": "Create a new chip in the current project.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\nctx : ProjectContext\n    Project context with editor permission\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
+        "description": "Create a new chip in the current project.\n\nBesides the database records, this creates ``<chip_id>/`` in the Qubex\nconfiguration tree (``system_id == chip_id``) unless ``config.create`` is\nfalse or the directory already exists. Wiring and hardware files are copied\nfrom ``config.source_system_id`` when given; parameter files always start\nfrom QDash's templates.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id, size and configuration options\nctx : ProjectContext\n    Project context with editor permission\nscaffolder : ChipConfigScaffolder\n    Writer of the chip's configuration directory\n\nReturns\n-------\nCreateChipResponse\n    Created chip information and the configuration outcome\n\nRaises\n------\nHTTPException\n    If chip_id already exists, size is invalid, or the configuration\n    source cannot be used",
         "operationId": "createChip",
         "security": [
           {
@@ -4688,7 +4688,62 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ChipResponse"
+                  "$ref": "#/components/schemas/CreateChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/config-sources": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "List systems a new chip can copy wiring from",
+        "description": "List the systems in the Qubex configuration tree that have a wiring file.\n\nQDash runs every chip with ``system_id == chip_id``, so each entry is also a\nchip directory of the tree.",
+        "operationId": "listChipConfigSources",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListConfigSourcesResponse"
                 }
               }
             }
@@ -17987,6 +18042,105 @@
         "title": "CandidateGateResponse",
         "description": "Side-effect-free deterministic decision for one candidate value."
       },
+      "ChipConfigOptions": {
+        "properties": {
+          "create": {
+            "type": "boolean",
+            "title": "Create",
+            "description": "Create the directory when it does not exist yet",
+            "default": true
+          },
+          "source_system_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source System Id",
+            "description": "Existing system whose wiring and hardware files are copied; empty wiring when omitted"
+          },
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "quel1",
+                  "quel3"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend",
+            "description": "Backend of the new system; taken from the source system when one is given"
+          }
+        },
+        "type": "object",
+        "title": "ChipConfigOptions",
+        "description": "How to create ``<chip_id>/`` in the Qubex configuration tree (system_id == chip_id)."
+      },
+      "ChipConfigResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "existing",
+              "skipped"
+            ],
+            "title": "Status"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "source_system_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source System Id"
+          },
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "path"
+        ],
+        "title": "ChipConfigResult",
+        "description": "Outcome of creating the chip's configuration directory."
+      },
       "ChipDatesResponse": {
         "properties": {
           "data": {
@@ -18373,6 +18527,38 @@
         "type": "object",
         "title": "ConfigReloadResponse",
         "description": "Response model for config cache reload."
+      },
+      "ConfigSourceResponse": {
+        "properties": {
+          "system_id": {
+            "type": "string",
+            "title": "System Id"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend"
+          },
+          "mux_count": {
+            "type": "integer",
+            "title": "Mux Count"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "system_id",
+          "backend",
+          "mux_count",
+          "files"
+        ],
+        "title": "ConfigSourceResponse",
+        "description": "An existing system whose wiring a new chip can copy."
       },
       "CooldownCreateRequest": {
         "properties": {
@@ -19011,6 +19197,17 @@
               }
             ],
             "title": "Topology Id"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChipConfigOptions"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Qubex configuration directory to create; defaults to creating one"
           }
         },
         "type": "object",
@@ -19019,6 +19216,91 @@
         ],
         "title": "CreateChipRequest",
         "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024).\n    topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'."
+      },
+      "CreateChipResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "default": 64
+          },
+          "topology_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topology Id"
+          },
+          "qubit_count": {
+            "type": "integer",
+            "title": "Qubit Count",
+            "default": 0
+          },
+          "coupling_count": {
+            "type": "integer",
+            "title": "Coupling Count",
+            "default": 0
+          },
+          "installed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed At"
+          },
+          "activity_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "title": "Activity Status",
+            "default": "active"
+          },
+          "current_cooldown_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Cooldown Id"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChipConfigResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id"
+        ],
+        "title": "CreateChipResponse",
+        "description": "A created chip plus what happened to its configuration directory."
       },
       "CreateCopilotChatSessionRequest": {
         "properties": {
@@ -23359,6 +23641,29 @@
         ],
         "title": "ListChipsResponse",
         "description": "Response model for listing chips."
+      },
+      "ListConfigSourcesResponse": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "Whether a Qubex configuration tree is mounted"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigSourceResponse"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "sources"
+        ],
+        "title": "ListConfigSourcesResponse",
+        "description": "Systems available as wiring sources for a new chip."
       },
       "ListCooldownWiringEventsResponse": {
         "properties": {

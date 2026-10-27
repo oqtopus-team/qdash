@@ -38,6 +38,22 @@ class ChipResponse(BaseModel):
     note: NoteModel = Field(default_factory=NoteModel)
 
 
+class ChipConfigOptions(BaseModel):
+    """How to create ``<chip_id>/`` in the Qubex configuration tree (system_id == chip_id)."""
+
+    create: bool = Field(
+        default=True, description="Create the directory when it does not exist yet"
+    )
+    source_system_id: str | None = Field(
+        default=None,
+        description="Existing system whose wiring and hardware files are copied; empty wiring when omitted",
+    )
+    backend: Literal["quel1", "quel3"] | None = Field(
+        default=None,
+        description="Backend of the new system; taken from the source system when one is given",
+    )
+
+
 class CreateChipRequest(BaseModel):
     """Request model for creating a new chip.
 
@@ -52,6 +68,43 @@ class CreateChipRequest(BaseModel):
     chip_id: str
     size: int = 64
     topology_id: str | None = None
+    config: ChipConfigOptions | None = Field(
+        default=None,
+        description="Qubex configuration directory to create; defaults to creating one",
+    )
+
+
+class ChipConfigResult(BaseModel):
+    """Outcome of creating the chip's configuration directory."""
+
+    status: Literal["created", "existing", "skipped"]
+    path: str
+    source_system_id: str | None = None
+    backend: str | None = None
+    files: list[str] = Field(default_factory=list)
+    message: str = ""
+
+
+class CreateChipResponse(ChipResponse):
+    """A created chip plus what happened to its configuration directory."""
+
+    config: ChipConfigResult | None = None
+
+
+class ConfigSourceResponse(BaseModel):
+    """An existing system whose wiring a new chip can copy."""
+
+    system_id: str
+    backend: str
+    mux_count: int
+    files: list[str]
+
+
+class ListConfigSourcesResponse(BaseModel):
+    """Systems available as wiring sources for a new chip."""
+
+    available: bool = Field(description="Whether a Qubex configuration tree is mounted")
+    sources: list[ConfigSourceResponse]
 
 
 class UpdateChipRequest(BaseModel):

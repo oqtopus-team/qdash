@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { CreateChipRequestConfig } from './createChipRequestConfig';
 import type { CreateChipRequestTopologyId } from './createChipRequestTopologyId';
 
 /**
@@ -20,4 +21,6 @@ export interface CreateChipRequest {
   chip_id: string;
   size?: number;
   topology_id?: CreateChipRequestTopologyId;
+  /** Qubex configuration directory to create; defaults to creating one */
+  config?: CreateChipRequestConfig;
 }

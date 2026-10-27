@@ -1,0 +1,6 @@
+meta:
+  description: Capture delay in words
+  unit: word
+  default: 0
+  scope: mux
+data: {}

@@ -1,0 +1,6 @@
+meta:
+  description: ZX90 gate fidelity of the qubit pair
+  unit: '%'
+  default: null
+  scope: coupling
+data: {}
