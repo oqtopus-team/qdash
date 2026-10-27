@@ -1,5 +1,5 @@
 meta:
-  description: Readout VATT
+  description: Readout FSC
   default: 39990
   scope: mux
 data: {}

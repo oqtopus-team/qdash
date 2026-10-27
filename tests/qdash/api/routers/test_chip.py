@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from pymongo.errors import DuplicateKeyError
 
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
@@ -425,17 +426,28 @@ class TestChipRouter:
 
         assert response.status_code == 400
 
-    def test_create_chip_duplicate(self, test_client, test_project, auth_headers, config_tree):
+    @pytest.mark.parametrize("username", ["test_user", "another_user"])
+    def test_create_chip_duplicate(
+        self, test_client, test_project, auth_headers, config_tree, username, monkeypatch
+    ):
         """Test creating a duplicate chip returns 400."""
         # Arrange: Create initial chip
         chip = ChipDocument(
             chip_id="existing_chip",
-            username="test_user",
+            username=username,
             project_id="test_project",
             size=64,
             system_info=SystemInfoModel(),
         )
         chip.insert()
+
+        def unexpected_scaffold(*args, **kwargs):
+            pytest.fail("Duplicate chips must be rejected before filesystem work")
+
+        monkeypatch.setattr(
+            "qdash.api.services.chip.config_scaffold.ChipConfigScaffolder.scaffold",
+            unexpected_scaffold,
+        )
 
         # Act: Try to create duplicate
         response = test_client.post(
@@ -444,9 +456,37 @@ class TestChipRouter:
             json={"chip_id": "existing_chip", "size": 64},
         )
 
-        # Assert: the configuration directory written before the failure is rolled back
+        # Reject duplicates regardless of the creator, before touching the tree.
         assert response.status_code == 400
         assert not (config_tree / "existing_chip").exists()
+
+    def test_create_chip_duplicate_save_returns_validation_error(
+        self, test_client, test_project, auth_headers, config_tree, monkeypatch
+    ):
+        def duplicate_save(self, *args, **kwargs):
+            raise DuplicateKeyError("concurrent insert")
+
+        monkeypatch.setattr(ChipDocument, "save", duplicate_save)
+        response = test_client.post(
+            "/chips", headers=auth_headers, json={"chip_id": "racing_chip", "size": 64}
+        )
+        assert response.status_code == 400
+        assert "already exists" in response.json()["detail"]
+        # The winning creator may already use the shared configuration.
+        assert (config_tree / "racing_chip/config/wiring.yaml").exists()
+
+    def test_create_chip_failure_rolls_back_config(
+        self, test_client, test_project, auth_headers, config_tree, monkeypatch
+    ):
+        def failed_save(self, *args, **kwargs):
+            raise RuntimeError("database unavailable")
+
+        monkeypatch.setattr(ChipDocument, "save", failed_save)
+        response = test_client.post(
+            "/chips", headers=auth_headers, json={"chip_id": "failed_chip", "size": 64}
+        )
+        assert response.status_code == 500
+        assert not (config_tree / "failed_chip").exists()
 
     def test_list_chips_requires_authentication(self, test_client, test_project):
         """Test that listing chips without auth returns 401."""

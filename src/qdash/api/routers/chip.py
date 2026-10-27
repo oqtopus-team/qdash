@@ -55,6 +55,7 @@ from qdash.api.services.chip import (
     ChipInitializer,
     ChipService,
 )
+from qdash.api.services.chip.initializer import ChipAlreadyExistsError
 from qdash.api.services.reanalysis_service import ReanalysisService
 from qdash.datamodel.note import NoteModel
 
@@ -162,6 +163,7 @@ def create_chip(
     create_config = options is None or options.create
 
     try:
+        ChipInitializer.check_chip_available(request.chip_id, ctx.project_id)
         _, topology = ChipInitializer._load_topology(request.topology_id, request.size)
         config_result = None
         if create_config:
@@ -188,6 +190,9 @@ def create_chip(
                 project_id=ctx.project_id,
                 topology_id=request.topology_id,
             )
+        except ChipAlreadyExistsError:
+            # A concurrent creator may already be using this configuration tree.
+            raise
         except Exception:
             if config_result is not None and config_result.status == "created":
                 scaffolder.remove(request.chip_id)

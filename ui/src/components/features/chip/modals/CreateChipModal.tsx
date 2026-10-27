@@ -145,6 +145,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
   });
 
   const submit = (data: CreateChipFormData) => {
+    if (isLoadingSources) return;
     setServerError(null);
     if (!selectedTopology) {
       setError("topologyId", { message: "Please select a topology template" });
@@ -356,7 +357,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={createChipMutation.isPending}
+              disabled={createChipMutation.isPending || isLoadingSources}
               data-tour="submit-chip"
             >
               {createChipMutation.isPending ? (

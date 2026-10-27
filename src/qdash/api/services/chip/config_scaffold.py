@@ -22,6 +22,7 @@ An existing chip directory is never modified.
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import re
@@ -86,14 +87,12 @@ def _load_yaml(path: Path) -> Any:
 
 
 def _entry_for(payload: Any, system_id: str) -> Any:
-    """The entry of ``payload`` for ``system_id``, or its only entry."""
+    """The entry of ``payload`` for ``system_id``; never infer another system."""
     if not isinstance(payload, dict) or not payload:
         return None
     if system_id in payload:
         return payload[system_id]
-    if len(payload) == 1:
-        return next(iter(payload.values()))
-    return None
+    raise ChipConfigError(f"Cannot find system '{system_id}' in configuration entries")
 
 
 def _dump(path: Path, payload: Any, header: str) -> None:
@@ -178,18 +177,20 @@ class ChipConfigScaffolder:
         backend: str | None = None,
     ) -> ScaffoldResult:
         """Write the chip directory; an existing one is left untouched."""
-        if not _DIR_NAME.match(chip_id):
-            raise ChipConfigError(
-                "A chip ID used as a configuration directory may contain letters, digits, "
-                "'.', '-' and '_' only"
-            )
-        target = self.chip_dir(chip_id)
         if not self.available:
             return ScaffoldResult(
                 status="skipped",
                 path=chip_id,
                 message="No Qubex configuration tree is mounted; no files were created.",
             )
+        if not _DIR_NAME.match(chip_id):
+            raise ChipConfigError(
+                "A chip ID used as a configuration directory may contain letters, digits, "
+                "'.', '-' and '_' only"
+            )
+        if chip_id in _SKIP_DIRS:
+            raise ChipConfigError(f"Chip ID '{chip_id}' is a reserved configuration directory")
+        target = self.chip_dir(chip_id)
         if target.exists():
             return ScaffoldResult(
                 status="existing",
@@ -217,7 +218,17 @@ class ChipConfigScaffolder:
                 source_system_id=source_system_id,
             )
             staging.chmod(0o755)
-            staging.rename(target)
+            try:
+                staging.rename(target)
+            except OSError as exc:
+                if exc.errno not in {errno.EEXIST, errno.ENOTEMPTY} or not target.is_dir():
+                    raise
+                shutil.rmtree(staging, ignore_errors=True)
+                return ScaffoldResult(
+                    status="existing",
+                    path=chip_id,
+                    message=f"{chip_id}/ already exists in the configuration tree and was kept as is.",
+                )
         except Exception:
             shutil.rmtree(staging, ignore_errors=True)
             raise

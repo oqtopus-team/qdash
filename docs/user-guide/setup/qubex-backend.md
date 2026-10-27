@@ -69,9 +69,15 @@ dialog sets what goes into it:
 | **Wiring**: **Start with empty wiring** | `wiring.yaml` has no rows, `box.yaml` is empty, and `system.yaml` names the selected **Backend** (`quel1` or `quel3`). |
 | Checkbox cleared | Only the chip record is created. |
 
-The **Copy from** list shows every directory under `CONFIG_PATH` that has
-`config/wiring.yaml`. Use it when the new chip goes onto wiring that an existing chip already
-uses, for example a chip replaced in the same cryostat.
+The **Copy from** list shows directories under `CONFIG_PATH` that have `config/wiring.yaml`.
+It skips hidden directories, the reserved `template`, `archive`, `schemas`, and `scripts`
+directories, and sources whose wiring or system configuration cannot be read or names a
+different system. Missing `system.yaml` or `chip.yaml` files do not exclude a source;
+without a backend setting, QDash uses `quel1`. Use **Copy from** when the new chip goes onto
+wiring that an existing chip already uses, for example a chip replaced in the same cryostat.
+
+For configuration creation, the chip ID must start with a letter or digit and contain only
+letters, digits, periods, hyphens, and underscores. Reserved directory names are not allowed.
 
 Parameter files in `params/` always start from QDash's templates for the backend, with empty
 `data`, so calibration fills them; values are never copied from the source system.

@@ -4,6 +4,8 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
+from pymongo.errors import DuplicateKeyError
+
 from qdash.common.config.topology import TopologyDefinition, load_topology
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling import CouplingDocument
@@ -13,8 +15,18 @@ from qdash.dbmodel.user import UserDocument
 logger = logging.getLogger(__name__)
 
 
+class ChipAlreadyExistsError(ValueError):
+    """A chip with this ID already exists in the project."""
+
+
 class ChipInitializer:
     """Service class for initializing chips with proper data structures."""
+
+    @staticmethod
+    def check_chip_available(chip_id: str, project_id: str | None) -> None:
+        """Check the same identity as the database's unique chip index."""
+        if ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run():
+            raise ChipAlreadyExistsError(f"Chip {chip_id} already exists in this project")
 
     @staticmethod
     def _user_id_for_username(username: str) -> str | None:
@@ -167,13 +179,7 @@ class ChipInitializer:
             raise ValueError(msg)
 
         # Check if chip already exists (scoped by project)
-        query = {"chip_id": chip_id, "username": username}
-        if project_id:
-            query["project_id"] = project_id
-        existing_chip = ChipDocument.find_one(query).run()
-        if existing_chip:
-            msg = f"Chip {chip_id} already exists for user {username}"
-            raise ValueError(msg)
+        cls.check_chip_available(chip_id, project_id)
 
         try:
             # Get qubit positions and couplings from topology
@@ -190,7 +196,12 @@ class ChipInitializer:
                 topology_id=topology_id,
                 system_info={},
             )
-            chip.save()
+            try:
+                chip.save()
+            except DuplicateKeyError as exc:
+                raise ChipAlreadyExistsError(
+                    f"Chip {chip_id} already exists in this project"
+                ) from exc
 
             # Generate and insert individual qubit documents
             qubit_documents = cls._generate_qubit_documents(

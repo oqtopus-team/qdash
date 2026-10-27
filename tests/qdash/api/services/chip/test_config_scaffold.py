@@ -1,5 +1,6 @@
 """Tests for ChipConfigScaffolder."""
 
+import errno
 from pathlib import Path
 
 import pytest
@@ -117,11 +118,61 @@ def test_scaffold_keeps_existing_directory(scaffolder, tree):
     assert (tree / "64Qv3/config/wiring.yaml").read_text() == before
 
 
-def test_scaffold_skips_without_tree(tmp_path):
+@pytest.mark.parametrize("chip_id", ["64Qv4", "my chip", "../escape", "template"])
+def test_scaffold_skips_without_tree(tmp_path, chip_id):
     scaffolder = ChipConfigScaffolder(config_base=tmp_path / "missing", templates_dir=TEMPLATES)
 
-    assert scaffolder.scaffold(chip_id="64Qv4", n_qubits=64).status == "skipped"
+    assert scaffolder.scaffold(chip_id=chip_id, n_qubits=64).status == "skipped"
     assert scaffolder.list_sources() == []
+    assert not (tmp_path / "missing").exists()
+
+
+@pytest.mark.parametrize("chip_id", ["template", "archive", "schemas", "scripts"])
+def test_scaffold_rejects_reserved_chip_id(scaffolder, chip_id):
+    with pytest.raises(ChipConfigError, match="reserved"):
+        scaffolder.scaffold(chip_id=chip_id, n_qubits=64)
+
+
+@pytest.mark.parametrize("filename", ["wiring.yaml", "system.yaml", "chip.yaml"])
+def test_scaffold_rejects_unrelated_single_entry(scaffolder, tree, filename):
+    _write(tree / "64Qv3/config" / filename, {"unrelated": {"backend": "quel3"}})
+    with pytest.raises(ChipConfigError, match="Cannot find system"):
+        scaffolder.scaffold(chip_id="64Qv4", n_qubits=64, source_system_id="64Qv3")
+    assert not (tree / "64Qv4").exists()
+    assert "64Qv3" not in [source.system_id for source in scaffolder.list_sources()]
+
+
+def test_source_without_system_or_chip_uses_default_backend(scaffolder, tree):
+    _write(tree / "minimal/config/wiring.yaml", {"minimal": []})
+    result = scaffolder.scaffold(chip_id="64Qv4", n_qubits=64, source_system_id="minimal")
+    assert result.backend == "quel1"
+    assert "minimal" in [source.system_id for source in scaffolder.list_sources()]
+
+
+def test_scaffold_keeps_concurrently_created_directory(scaffolder, tree, monkeypatch):
+    rename = Path.rename
+
+    def concurrent_rename(staging, target):
+        target.mkdir()
+        (target / "sentinel").write_text("keep")
+        return rename(staging, target)
+
+    monkeypatch.setattr(Path, "rename", concurrent_rename)
+    result = scaffolder.scaffold(chip_id="64Qv4", n_qubits=64)
+    assert result.status == "existing"
+    assert (tree / "64Qv4/sentinel").read_text() == "keep"
+    assert not list(tree.glob(".64Qv4.*"))
+
+
+def test_scaffold_does_not_hide_other_rename_errors(scaffolder, tree, monkeypatch):
+    def fail_rename(staging, target):
+        target.mkdir()
+        raise PermissionError(errno.EACCES, "permission denied")
+
+    monkeypatch.setattr(Path, "rename", fail_rename)
+    with pytest.raises(PermissionError):
+        scaffolder.scaffold(chip_id="64Qv4", n_qubits=64)
+    assert not list(tree.glob(".64Qv4.*"))
 
 
 @pytest.mark.parametrize("source", ["missing", "template", "../64Qv3", "64Qv3/config"])
