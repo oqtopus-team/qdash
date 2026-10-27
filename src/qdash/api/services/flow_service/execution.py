@@ -91,7 +91,7 @@ class ExecutionCoordinator:
                 run_qids, run_mux_ids = targets_from_parameters(parameters)
                 ensure_single_system(chip_id, run_qids, mux_ids=run_mux_ids)
             except HTTPException as exc:
-                detail = exc.detail if isinstance(exc.detail, dict) else {}
+                detail: dict[str, Any] = exc.detail if isinstance(exc.detail, dict) else {}
                 return False, str(detail.get("message") or exc.detail)
         scope = (
             resolve_workflow_resource_scope(chip_id, parameters.get("system_id"))

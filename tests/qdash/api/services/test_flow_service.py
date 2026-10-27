@@ -952,6 +952,7 @@ async def test_execute_flow_checks_system_boundaries_before_dispatch(
                 "my_flow", ExecuteFlowRequest(parameters=parameters), "operator", "project-1"
             )
         assert info.value.status_code == 400
-        assert info.value.detail["code"] == "system_split_required"
-        assert info.value.detail["systems"] == {"chip-1": ["1"], "chip-1-quel3": ["9"]}
+        detail = cast("dict[str, Any]", info.value.detail)
+        assert detail["code"] == "system_split_required"
+        assert detail["systems"] == {"chip-1": ["1"], "chip-1-quel3": ["9"]}
         assert coordinator.run_calls == []
