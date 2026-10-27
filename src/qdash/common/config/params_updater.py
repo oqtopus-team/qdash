@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+QUBITS_PER_MUX = 4
+
 
 def represent_none(representer: Any, _: Any) -> Any:
     """Preserve explicit YAML nulls when updating a parameter file."""
@@ -82,6 +84,16 @@ def _load_extra_file_map() -> dict[str, list[str]]:
     return result
 
 
+def _load_mux_file_names() -> frozenset[str]:
+    settings = _load_params_updater_settings()
+    value = settings.get("mux_file_names")
+    if value is None:
+        return frozenset()
+    if not isinstance(value, list) or not all(isinstance(name, str) for name in value):
+        raise ValueError("workflow.params_updater.mux_file_names must be a string list")
+    return frozenset(_validate_yaml_file_name(name) for name in value)
+
+
 class ParamsUpdater(Protocol):
     """Protocol for backend-specific parameter updaters."""
 
@@ -123,6 +135,7 @@ class YamlParamsUpdater:
         self._locks: dict[Path, FileLock] = {}
         self._param_file_map = _load_param_file_map()
         self._extra_file_map = _load_extra_file_map()
+        self._mux_file_names = _load_mux_file_names()
         self._yaml = YAML(typ="rt")
         self._yaml.preserve_quotes = True
         self._yaml.width = None
@@ -213,7 +226,12 @@ class YamlParamsUpdater:
             if value is None:
                 continue
             for file_name in sorted(self._resolve_file_names({key: param})):
-                if self._update_yaml(params_dir / file_name, label, value):
+                if self._update_yaml(
+                    params_dir / file_name,
+                    self._yaml_key(file_name, label),
+                    self._yaml_value(file_name, value),
+                    unit=self._yaml_unit(file_name, param),
+                ):
                     updated_files.add(file_name)
 
         return updated_files
@@ -249,10 +267,11 @@ class YamlParamsUpdater:
                 with self._file_lock(lock_path), file_path.open("r") as fp:
                     data = self._yaml.load(fp) or {}
                 section = data.get("data") if isinstance(data, dict) else None
-                actual = section.get(label) if isinstance(section, dict) else None
+                yaml_key = self._yaml_key(file_name, label)
+                actual = section.get(yaml_key) if isinstance(section, dict) else None
                 if not self._values_equal(actual, expected):
                     raise ValueError(
-                        f"Backend verification failed for {file_name}:{label}: "
+                        f"Backend verification failed for {file_name}:{yaml_key}: "
                         f"expected {expected!r}, got {actual!r}"
                     )
                 verified.add(file_name)
@@ -306,6 +325,18 @@ class YamlParamsUpdater:
         value = getattr(param, "value", param)
         return YamlParamsUpdater._coerce_value(value)
 
+    def _yaml_unit(self, file_name: str, param: Any) -> str | None:
+        """Return the unit to declare in a MUX file that lacks ``meta.unit``.
+
+        Qubex rejects capture delay files without ``meta.unit``, and the task
+        units (ndelay, word, ns) are the ones it accepts. Other files are left
+        alone: Qubex converts their values by ``meta.unit``.
+        """
+        if file_name not in self._mux_file_names:
+            return None
+        unit = param.get("unit") if isinstance(param, dict) else getattr(param, "unit", None)
+        return unit if isinstance(unit, str) and unit.strip() else None
+
     @staticmethod
     def _coerce_value(value: Any) -> float | int | str | None:
         if value is None:
@@ -325,8 +356,33 @@ class YamlParamsUpdater:
             return value
         return None
 
-    def _update_yaml(self, file_path: Path, qubit_label: str, value: float | int | str) -> bool:
-        """Create or update a mapped YAML file under a lock with an atomic write."""
+    def _yaml_key(self, file_name: str, label: str) -> str | int:
+        """Return the data key: the qubit label, or the MUX index for MUX files."""
+        if file_name not in self._mux_file_names:
+            return label
+        index = self._label_index(label)
+        if index is None:
+            raise ValueError(f"Cannot resolve the MUX of {label!r} for {file_name}")
+        return index // QUBITS_PER_MUX
+
+    def _yaml_value(self, file_name: str, value: float | int | str) -> float | int | str:
+        """Keep integral MUX settings as integers, as Qubex validates them."""
+        if file_name in self._mux_file_names and isinstance(value, float) and value.is_integer():
+            return int(value)
+        return value
+
+    def _update_yaml(
+        self,
+        file_path: Path,
+        qubit_label: str | int,
+        value: float | int | str,
+        *,
+        unit: str | None = None,
+    ) -> bool:
+        """Create or update a mapped YAML file under a lock with an atomic write.
+
+        A file without ``meta.unit`` gets ``unit`` when one is given.
+        """
         lock_path = file_path.with_suffix(file_path.suffix + ".lock")
         lock_path.touch(exist_ok=True)
 
@@ -349,9 +405,17 @@ class YamlParamsUpdater:
                 section = CommentedMap(section)
                 data["data"] = section
 
+            meta = data.get("meta")
+            missing_unit = bool(unit) and not (isinstance(meta, dict) and meta.get("unit"))
             current_value = section.get(qubit_label)
-            if self._values_equal(current_value, value):
+            if self._values_equal(current_value, value) and not missing_unit:
                 return False
+
+            if missing_unit:
+                if not isinstance(meta, dict):
+                    meta = CommentedMap()
+                    data.insert(0, "meta", meta)
+                meta["unit"] = unit
 
             if isinstance(section, CommentedMap):
                 self._set_ordered(section, qubit_label, value)
@@ -392,19 +456,23 @@ class YamlParamsUpdater:
         except ValueError:
             return None
 
-    def _set_ordered(self, section: CommentedMap, label: str, value: float | int | str) -> None:
+    def _set_ordered(
+        self, section: CommentedMap, label: str | int, value: float | int | str
+    ) -> None:
         if label in section:
             section[label] = value
             return
 
-        label_index = self._label_index(label)
+        label_index = label if isinstance(label, int) else self._label_index(label)
         if label_index is None:
             section[label] = value
             return
 
         insert_pos = None
         for idx, existing in enumerate(section):
-            existing_index = self._label_index(existing)
+            existing_index = (
+                existing if isinstance(existing, int) else self._label_index(str(existing))
+            )
             if existing_index is None:
                 continue
             if label_index < existing_index:

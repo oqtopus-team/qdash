@@ -77,7 +77,7 @@ def test_scaffold_without_source_uses_chip_id_as_system_id(scaffolder, tree):
     assert _load(config / "wiring.yaml") == {"64Qv4": []}
     assert _load(config / "box.yaml") == {}
     assert (tree / "64Qv4/params/capture_delay_word.yaml").is_file()
-    assert _load(tree / "64Qv4/params/qubit_frequency.yaml")["data"] == {}
+    assert _load(tree / "64Qv4/params/t1.yaml")["data"] == {}
     assert (tree / "64Qv4/calibration/calib_note.json").read_text().strip() == "{}"
     assert not list(tree.glob(".64Qv4.*"))
 
@@ -219,4 +219,51 @@ def test_remove_rolls_back(scaffolder, tree):
     scaffolder.scaffold(chip_id="64Qv4", n_qubits=64)
     scaffolder.remove("64Qv4")
 
+    assert not (tree / "64Qv4").exists()
+
+
+def _seeded(path: Path) -> tuple[float, dict[str, None]]:
+    payload = _load(path)
+    return payload["meta"]["default"], payload["data"]
+
+
+def test_scaffold_lists_qubits_as_null_with_high_band_defaults(scaffolder, tree):
+    scaffolder.scaffold(chip_id="64Qv4", n_qubits=64)
+
+    params = tree / "64Qv4" / "params"
+    for name, default in (("readout_frequency.yaml", 10.25), ("control_frequency.yaml", 8.0)):
+        meta_default, data = _seeded(params / name)
+        assert meta_default == default
+        assert list(data) == [f"Q{index:02d}" for index in range(64)]
+        assert set(data.values()) == {None}
+    assert "description" in _load(params / "control_frequency.yaml")["meta"]
+    # Measured physical frequencies are left for calibration to fill.
+    for name in ("qubit_frequency.yaml", "resonator_frequency.yaml"):
+        assert _load(params / name)["data"] == {}
+
+
+def test_scaffold_uses_low_band_defaults_for_low_band_readout_boxes(scaffolder, tree):
+    scaffolder.scaffold(chip_id="64Qv4", n_qubits=64, source_system_id="64Qv3")
+    scaffolder.scaffold(chip_id="144Qv4", n_qubits=144, source_system_id="144Q-quel3")
+
+    assert _seeded(tree / "64Qv4/params/readout_frequency.yaml")[0] == 6.25
+    assert _seeded(tree / "64Qv4/params/control_frequency.yaml")[0] == 4.0
+    default, data = _seeded(tree / "144Qv4/params/readout_frequency.yaml")
+    assert default == 6.25
+    assert list(data)[:2] == ["Q000", "Q001"]
+
+
+def test_scaffold_rejects_readout_boxes_in_both_bands(scaffolder, tree):
+    rows = [
+        {"mux": 0, "read_out": "S1R-1", "read_in": "S1R-0"},
+        {"mux": 1, "read_out": "Q2A-1", "read_in": "Q2A-0"},
+    ]
+    _write(tree / "64Qv3/config/wiring.yaml", {"64Qv3": rows})
+    _write(
+        tree / "64Qv3/config/box.yaml",
+        {"S1R": {"type": "quel1se-riken8"}, "Q2A": {"type": "quel1-a"}},
+    )
+
+    with pytest.raises(ChipConfigError, match="mix"):
+        scaffolder.scaffold(chip_id="64Qv4", n_qubits=64, source_system_id="64Qv3")
     assert not (tree / "64Qv4").exists()

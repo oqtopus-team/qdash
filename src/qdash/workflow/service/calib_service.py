@@ -1143,14 +1143,20 @@ class CalibService:
         except Exception as e:
             logger.warning(f"Failed to finalize tasks on cancel: {e}")
 
-    def _sync_backend_params_before_push(self, logger: Any) -> None:
-        """Sync recent calibration results into backend YAML params prior to GitHub push."""
+    def _sync_backend_params_before_push(self, logger: Any) -> GitHubPushConfig:
+        """Sync recent calibration results into backend YAML params prior to GitHub push.
+
+        Returns the push configuration for this execution. ``params_file_names`` is
+        narrowed to the files this execution touched on a copy, because pipeline
+        steps share ``self.github_push_config``: narrowing it in place would leave
+        later steps with only the files an earlier step touched.
+        """
         assert self.execution_service is not None, "ExecutionService not initialized"
         assert self.github_push_config is not None, "GitHubPushConfig not initialized"
         self._merge_task_result_calib_data_before_push(logger)
         updater_instance = get_params_updater(self.backend, self.chip_id)
         if updater_instance is None:
-            return
+            return self.github_push_config
 
         from qdash.workflow.engine.params_updater import resolve_param_yaml_file_names
 
@@ -1165,18 +1171,23 @@ class CalibService:
                 logger.warning(f"Failed to sync params for qid={qid}: {exc}")
 
         configured_param_files = self.github_push_config.params_file_names
-        if configured_param_files is not None:
-            self.github_push_config.params_file_names = [
-                file_name
-                for file_name in configured_param_files
-                if file_name in push_candidate_files
-            ]
-            skipped_files = sorted(set(configured_param_files) - push_candidate_files)
-            if skipped_files:
-                logger.info(
-                    "Skipping params files not touched by this calibration: %s",
-                    ", ".join(skipped_files),
-                )
+        if configured_param_files is None:
+            return self.github_push_config
+        skipped_files = sorted(set(configured_param_files) - push_candidate_files)
+        if skipped_files:
+            logger.info(
+                "Skipping params files not touched by this calibration: %s",
+                ", ".join(skipped_files),
+            )
+        return self.github_push_config.model_copy(
+            update={
+                "params_file_names": [
+                    file_name
+                    for file_name in configured_param_files
+                    if file_name in push_candidate_files
+                ]
+            }
+        )
 
     def _merge_task_result_calib_data_before_push(self, logger: Any) -> None:
         """Reload completed task outputs into parent calib_data before GitHub push.
@@ -1398,10 +1409,10 @@ class CalibService:
         if not should_push:
             return None
 
-        self._sync_backend_params_before_push(logger)
+        push_config = self._sync_backend_params_before_push(logger)
         if GitHubIntegration.check_credentials() and self.github_integration is not None:
             try:
-                push_results = self.github_integration.push_files(self.github_push_config)
+                push_results = self.github_integration.push_files(push_config)
                 if push_results:
                     self.execution_service.note.github_push_results = push_results
                     self.execution_service.save()

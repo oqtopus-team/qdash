@@ -41,9 +41,17 @@ params_updater:
     purcell_filter_linewidth: purcell_filter_linewidth.yaml
     dispersive_shift: dispersive_shift.yaml
     critical_photon_number: critical_photon_number.yaml
+    capture_delay: capture_delay.yaml
+    capture_delay_word: capture_delay_word.yaml
 
   # Additional params/*.yaml files to update from the same output parameter.
   extra_file_map: {}
+
+  # params/*.yaml files keyed by MUX index instead of qubit label.
+  # A qubit's value is written to the MUX that contains it (qubit index // 4).
+  mux_file_names:
+    - capture_delay.yaml
+    - capture_delay_word.yaml
 
 github:
   # Publish manual edits and saved Tasks runs when GitHub credentials are configured.
@@ -76,3 +84,5 @@ github:
     - purcell_filter_linewidth.yaml
     - dispersive_shift.yaml
     - critical_photon_number.yaml
+    - capture_delay.yaml
+    - capture_delay_word.yaml

@@ -197,4 +197,4 @@ members = [
 
 [tool.uv.sources]
 qdash-api = { workspace = true }
-qubex = { git = "https://github.com/amachino/qubex.git", branch = "develop" }
+qubex = { git = "https://github.com/orangekame3/qubex.git", rev = "aed7308abd7843d35095c1b87697daa0a2380b48" }
