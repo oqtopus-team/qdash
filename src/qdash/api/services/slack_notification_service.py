@@ -215,7 +215,7 @@ class SlackNotificationService:
 
     def _forum_post_url(self, post: ForumPostDocument) -> str:
         """Return the QDash UI URL for the post, or an empty string if unavailable."""
-        base = self._settings.client_url.rstrip("/")
+        base = self._settings.client_url
         if not base or post.id is None:
             return ""
         return f"{base}/forum/{post.id}"

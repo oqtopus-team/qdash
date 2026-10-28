@@ -1,7 +1,7 @@
 name: ${ENV:-default}
 services:
   caddy:
-    image: caddy:2.10-alpine
+    image: caddy:2.10.2-alpine
     restart: always
     environment:
       CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-:80}

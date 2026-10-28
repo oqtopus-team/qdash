@@ -17,20 +17,9 @@ type TestResult = {
 
 const TEST_PATH = "/auth/me";
 
-/** Returns the browser API path used in generated curl commands. */
-function getConfiguredApiUrl() {
-  return API_BASE_URL;
-}
-
-/** Resolves the same-origin API path for display in the token settings panel. */
+/** Resolves the same-origin API URL shown in curl examples, falling back to the base path before hydration. */
 function resolveApiUrl() {
-  const normalizedApiUrl = getConfiguredApiUrl().replace(/\/$/, "");
-
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}${normalizedApiUrl.startsWith("/") ? "" : "/"}${normalizedApiUrl}`;
-  }
-
-  return normalizedApiUrl;
+  return typeof window !== "undefined" ? `${window.location.origin}${API_BASE_URL}` : API_BASE_URL;
 }
 
 function maskSecret(value: string) {
@@ -66,7 +55,7 @@ export function ApiAccessTokenPanel() {
   const [curlMode, setCurlMode] = useState<CurlMode>("standard");
   const [showToken, setShowToken] = useState(false);
   const [showCfSecret, setShowCfSecret] = useState(false);
-  const [apiUrl, setApiUrl] = useState(() => getConfiguredApiUrl().replace(/\/$/, ""));
+  const [apiUrl, setApiUrl] = useState(API_BASE_URL);
   const [cfAccessClientId, setCfAccessClientId] = useState("");
   const [cfAccessClientSecret, setCfAccessClientSecret] = useState("");
   const [requestProjectId, setRequestProjectId] = useState("");

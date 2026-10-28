@@ -1,22 +1,22 @@
 {
 	admin off
 	servers {
-		trusted_proxies static {$CADDY_TRUSTED_PROXIES:127.0.0.1/32 ::1/128}
+		trusted_proxies static {$CADDY_TRUSTED_PROXIES}
 	}
 }
 
-{$CADDY_SITE_ADDRESS::80} {
-	bind {$CADDY_BIND_ADDRESS:0.0.0.0}
+{$CADDY_SITE_ADDRESS} {
+	bind {$CADDY_BIND_ADDRESS}
 
 	@api path /api /api/*
 	handle @api {
 		uri strip_prefix /api
-		reverse_proxy {$CADDY_API_UPSTREAM:api:5715}
+		reverse_proxy {$CADDY_API_UPSTREAM}
 	}
 
 	@prefect path /prefect /prefect/*
 	handle @prefect {
-		reverse_proxy {$CADDY_API_UPSTREAM:api:5715} {
+		reverse_proxy {$CADDY_API_UPSTREAM} {
 			method GET
 			rewrite /auth/me
 			header_up Authorization "Bearer {http.request.cookie.access_token}"
@@ -38,10 +38,10 @@
 				respond 401
 			}
 		}
-		reverse_proxy {$CADDY_PREFECT_UPSTREAM:prefect-server:4200}
+		reverse_proxy {$CADDY_PREFECT_UPSTREAM}
 	}
 
 	handle {
-		reverse_proxy {$CADDY_UI_UPSTREAM:ui:5714}
+		reverse_proxy {$CADDY_UI_UPSTREAM}
 	}
 }

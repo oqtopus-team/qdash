@@ -161,7 +161,7 @@ tasks:
             echo "Stopping ${name}: ${pid}"
             pgid="$(ps -p "$pid" -o pgid= 2>/dev/null | tr -d ' ')"
             if [ "$pgid" = "$pid" ]; then
-              python3 -c 'import os,signal,sys; os.killpg(int(sys.argv[1]), signal.SIGTERM)' "$pid" 2>/dev/null || true
+              /bin/kill -TERM -- "-$pid" 2>/dev/null || true
             else
               /bin/kill "$pid" 2>/dev/null || true
             fi
@@ -207,23 +207,7 @@ tasks:
           deployment_service_url="${DEPLOYMENT_SERVICE_URL:-http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}}"
           forwarded_allow_ips="${FORWARDED_ALLOW_IPS:-127.0.0.1}"
         fi
-        MONGO_HOST="$mongo_host" PREFECT_API_URL="$prefect_api_url" DEPLOYMENT_SERVICE_URL="$deployment_service_url" FORWARDED_ALLOW_IPS="$forwarded_allow_ips" python3 -c '
-        import os, signal, subprocess, sys
-        pid_file, *command = sys.argv[1:]
-        child = subprocess.Popen(command, start_new_session=True)
-        with open(pid_file, "w") as output:
-            output.write(str(child.pid) + chr(10))
-        forward = lambda signum, _frame: os.killpg(child.pid, signum)
-        signal.signal(signal.SIGINT, forward)
-        signal.signal(signal.SIGTERM, forward)
-        status = child.wait()
-        try:
-            if open(pid_file).read().strip() == str(child.pid):
-                os.unlink(pid_file)
-        except FileNotFoundError:
-            pass
-        sys.exit(status)
-        ' .tmp/dev-api-local.pid uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
+        MONGO_HOST="$mongo_host" PREFECT_API_URL="$prefect_api_url" DEPLOYMENT_SERVICE_URL="$deployment_service_url" FORWARDED_ALLOW_IPS="$forwarded_allow_ips" python3 scripts/run-with-pidfile.py .tmp/dev-api-local.pid uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
 
   dev-ui-local:
     desc: Start the UI on the host against the local API
@@ -233,23 +217,7 @@ tasks:
     cmds:
       - |
         mkdir -p ../.tmp
-        PORT="${UI_INTERNAL_PORT:-5716}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" python3 -c '
-        import os, signal, subprocess, sys
-        pid_file, *command = sys.argv[1:]
-        child = subprocess.Popen(command, start_new_session=True)
-        with open(pid_file, "w") as output:
-            output.write(str(child.pid) + chr(10))
-        forward = lambda signum, _frame: os.killpg(child.pid, signum)
-        signal.signal(signal.SIGINT, forward)
-        signal.signal(signal.SIGTERM, forward)
-        status = child.wait()
-        try:
-            if open(pid_file).read().strip() == str(child.pid):
-                os.unlink(pid_file)
-        except FileNotFoundError:
-            pass
-        sys.exit(status)
-        ' ../.tmp/dev-ui-local.pid bun run dev --hostname 127.0.0.1
+        PORT="${UI_INTERNAL_PORT:-5716}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" python3 ../scripts/run-with-pidfile.py ../.tmp/dev-ui-local.pid bun run dev --hostname 127.0.0.1
 
   dev-proxy-local:
     desc: Start Caddy as the shared local browser entry point
@@ -273,23 +241,7 @@ tasks:
         CADDY_API_UPSTREAM="${CADDY_API_UPSTREAM:-127.0.0.1:${API_PORT:-5715}}" \
         CADDY_PREFECT_UPSTREAM="${CADDY_PREFECT_UPSTREAM:-$prefect_upstream_default}" \
         CADDY_TRUSTED_PROXIES="${CADDY_TRUSTED_PROXIES:-127.0.0.1/32 ::1/128}" \
-        python3 -c '
-        import os, signal, subprocess, sys
-        pid_file, *command = sys.argv[1:]
-        child = subprocess.Popen(command, start_new_session=True)
-        with open(pid_file, "w") as output:
-            output.write(str(child.pid) + chr(10))
-        forward = lambda signum, _frame: os.killpg(child.pid, signum)
-        signal.signal(signal.SIGINT, forward)
-        signal.signal(signal.SIGTERM, forward)
-        status = child.wait()
-        try:
-            if open(pid_file).read().strip() == str(child.pid):
-                os.unlink(pid_file)
-        except FileNotFoundError:
-            pass
-        sys.exit(status)
-        ' .tmp/dev-proxy-local.pid caddy run --config config/caddy/Caddyfile --adapter caddyfile
+        python3 scripts/run-with-pidfile.py .tmp/dev-proxy-local.pid caddy run --config config/caddy/Caddyfile --adapter caddyfile
 
   dev-local:
     desc: Start lightweight local development services, API, UI, and Caddy

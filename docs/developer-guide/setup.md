@@ -175,8 +175,7 @@ The component tasks are:
 
 The host task defaults are `UI_PORT=5714`, `API_PORT=5715`, `UI_INTERNAL_PORT=5716`, and
 `PREFECT_PORT=4200`. Browser traffic enters at `5714`; the other listeners serve the host
-development processes and are not browser entry points. `task dev-proxy-local` accepts these
-gateway settings from `.env`:
+development processes and are not browser entry points.
 
 The example `.env` leaves `PREFECT_API_URL` blank so `task dev-api-local` can choose its context:
 host tasks use `http://127.0.0.1:<PREFECT_PORT>/prefect/api`, while DevContainer tasks use
@@ -184,20 +183,39 @@ host tasks use `http://127.0.0.1:<PREFECT_PORT>/prefect/api`, while DevContainer
 address. Set an explicit `PREFECT_API_URL` only when overriding that context default, and keep the
 `/prefect/api` path.
 
-| Variable | Purpose | Default |
+### Caddy Settings
+
+Compose and `task dev-proxy-local` pass every Caddy setting to `config/caddy/Caddyfile`, which has
+no defaults of its own. The example `.env` files set no `CADDY_*` variable; add one to `.env` only
+to override its default. Both modes read `.env`, so an upstream or trusted-proxy override applies
+to Compose and to the host task alike.
+
+Compose (`compose.yaml`) reads these variables:
+
+| Variable | Purpose | Compose default |
 | --- | --- | --- |
-| `CADDY_LOCAL_SITE_ADDRESS` | Host Caddy site address | `http://localhost:<UI_PORT>` |
-| `CADDY_LOCAL_BIND_ADDRESS` | Host Caddy bind address | `127.0.0.1` |
-| `CADDY_SITE_ADDRESS` | Caddy site address | Host task derives this from `CADDY_LOCAL_SITE_ADDRESS`; `:80` in Compose or `CLIENT_URL` for HTTPS |
-| `CADDY_BIND_ADDRESS` | Network address Caddy listens on | `127.0.0.1` in the host task; `0.0.0.0` in Compose |
-| `CADDY_UI_UPSTREAM` | UI server address | `127.0.0.1:<UI_INTERNAL_PORT>` for host development |
-| `CADDY_API_UPSTREAM` | API server address | `127.0.0.1:<API_PORT>` for host development |
-| `CADDY_PREFECT_UPSTREAM` | Prefect server address | `127.0.0.1:<PREFECT_PORT>` for host development |
+| `CADDY_SITE_ADDRESS` | Caddy site address | `:80`; `compose.https.yaml` sets it from `CLIENT_URL` |
+| `CADDY_BIND_ADDRESS` | Network address Caddy listens on | `0.0.0.0` |
+| `CADDY_UI_UPSTREAM` | UI server address | `ui:5714` |
+| `CADDY_API_UPSTREAM` | API server address | `api:<API_PORT>` |
+| `CADDY_PREFECT_UPSTREAM` | Prefect server address | `prefect-server:4200` |
 | `CADDY_TRUSTED_PROXIES` | Proxies trusted to supply forwarded client headers | `127.0.0.1/32 ::1/128` |
 
-Compose uses the service-name upstreams `ui:5714`, `api:<API_PORT>`, and
-`prefect-server:4200`. Only trust the addresses of an actual TLS-terminating proxy in
-`CADDY_TRUSTED_PROXIES`.
+`task dev-proxy-local` ignores `CADDY_SITE_ADDRESS` and `CADDY_BIND_ADDRESS` and reads
+`CADDY_LOCAL_SITE_ADDRESS` and `CADDY_LOCAL_BIND_ADDRESS` instead, so a Compose site address in
+`.env` does not change host development. It reads the other four Compose variables with its own
+defaults:
+
+| Variable | Host default | DevContainer default |
+| --- | --- | --- |
+| `CADDY_LOCAL_SITE_ADDRESS` | `http://localhost:<UI_PORT>` | `http://:<UI_PORT>` |
+| `CADDY_LOCAL_BIND_ADDRESS` | `127.0.0.1` | `0.0.0.0` |
+| `CADDY_UI_UPSTREAM` | `127.0.0.1:<UI_INTERNAL_PORT>` | `127.0.0.1:<UI_INTERNAL_PORT>` |
+| `CADDY_API_UPSTREAM` | `127.0.0.1:<API_PORT>` | `127.0.0.1:<API_PORT>` |
+| `CADDY_PREFECT_UPSTREAM` | `127.0.0.1:<PREFECT_PORT>` | `prefect-server:4200` |
+| `CADDY_TRUSTED_PROXIES` | `127.0.0.1/32 ::1/128` | `127.0.0.1/32 ::1/128` |
+
+Only trust the addresses of an actual TLS-terminating proxy in `CADDY_TRUSTED_PROXIES`.
 
 ### Access Points
 

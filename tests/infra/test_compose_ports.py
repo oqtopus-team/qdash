@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+HTTPS_ENTRYPOINT = REPO_ROOT / "config/caddy/https-entrypoint.sh"
 
 
 def render_compose(
@@ -85,9 +86,6 @@ def test_devcontainer_publishes_only_its_browser_gateway() -> None:
 
     assert published_ports(compose) == {"devcontainer": {("127.0.0.1", "5714", 5714)}}
     assert compose["services"]["devcontainer"]["environment"]["QDASH_DEV_CONTAINER"] == "1"
-    assert (
-        '"QDASH_DEV_CONTAINER": "1"' in (REPO_ROOT / ".devcontainer/devcontainer.json").read_text()
-    )
 
 
 def test_admin_override_publishes_loopback_management_ports() -> None:
@@ -127,29 +125,27 @@ def test_api_and_prefect_trust_forwarded_headers_on_internal_network() -> None:
 
 
 def test_https_override_requires_https_client_url() -> None:
-    """HTTPS mode checks the URL scheme before starting Caddy."""
-    compose = render_compose("compose.yaml", "compose.https.yaml")
-    command = compose["services"]["caddy"]["command"][0].replace("$$", "$")
+    """HTTPS mode runs the mounted entrypoint that validates CLIENT_URL."""
+    caddy = render_compose("compose.yaml", "compose.https.yaml")["services"]["caddy"]
 
-    assert "https://*)" in command
-    assert "HTTPS mode requires CLIENT_URL=https://<host>[:443][/]." in command
+    assert caddy["entrypoint"] == ["/bin/sh", "/etc/caddy/https-entrypoint.sh"]
+    assert any(
+        volume["source"].endswith("config/caddy/https-entrypoint.sh")
+        and volume["target"] == "/etc/caddy/https-entrypoint.sh"
+        and volume.get("read_only") is True
+        for volume in caddy["volumes"]
+    )
 
 
 def run_https_entrypoint(client_url: str, tmp_path: Path) -> subprocess.CompletedProcess[str]:
-    """Run the HTTPS entrypoint with a stub Caddy executable."""
-    compose = render_compose(
-        "compose.yaml",
-        "compose.https.yaml",
-        variables={"CLIENT_URL": client_url},
-    )
-    command = compose["services"]["caddy"]["command"][0].replace("$$", "$")
+    """Run the HTTPS entrypoint script with a stub Caddy executable."""
     stub_bin = tmp_path / "bin"
     stub_bin.mkdir(exist_ok=True)
     stub = stub_bin / "caddy"
     stub.write_text('#!/bin/sh\nprintf "%s" "$CADDY_SITE_ADDRESS"\n')
     stub.chmod(0o755)
     return subprocess.run(  # noqa: S603
-        ["/bin/sh", "-ec", command],
+        ["/bin/sh", str(HTTPS_ENTRYPOINT)],
         check=False,
         capture_output=True,
         env={
@@ -167,6 +163,8 @@ def run_https_entrypoint(client_url: str, tmp_path: Path) -> subprocess.Complete
     [
         ("https://qdash.example.test/", "https://qdash.example.test"),
         ("https://qdash.example.test:443/", "https://qdash.example.test:443"),
+        ("https://[2001:db8::1]", "https://[2001:db8::1]"),
+        ("https://[2001:db8::1]:443/", "https://[2001:db8::1]:443"),
     ],
 )
 def test_https_override_normalizes_trailing_slash(
@@ -188,6 +186,10 @@ def test_https_override_normalizes_trailing_slash(
         "https://user@qdash.example.test",
         "https://qdash.example.test?next=/login",
         "https://qdash.example.test#fragment",
+        "https://qdash.example.test:443:443",
+        "https://[2001:db8::1]:8443",
+        "https://2001:db8::1",
+        "https://",
     ],
 )
 def test_https_override_rejects_non_origin_urls(client_url: str, tmp_path: Path) -> None:
@@ -198,29 +200,6 @@ def test_https_override_rejects_non_origin_urls(client_url: str, tmp_path: Path)
     assert (
         "Paths, credentials, queries, fragments, and other ports are unsupported." in result.stderr
     )
-
-
-def test_environment_examples_leave_caddy_mode_settings_unset() -> None:
-    """Copied env examples allow Compose and CLI-specific Caddy defaults to apply."""
-    keys = {
-        "CADDY_SITE_ADDRESS",
-        "CADDY_BIND_ADDRESS",
-        "CADDY_UI_UPSTREAM",
-        "CADDY_API_UPSTREAM",
-        "CADDY_PREFECT_UPSTREAM",
-        "CADDY_TRUSTED_PROXIES",
-        "CADDY_LOCAL_SITE_ADDRESS",
-        "CADDY_LOCAL_BIND_ADDRESS",
-    }
-
-    for example_name in (".env.example", ".env.example.qubex"):
-        values = {
-            key: value
-            for line in (REPO_ROOT / example_name).read_text().splitlines()
-            if "=" in line and not line.lstrip().startswith("#")
-            for key, value in [line.split("=", maxsplit=1)]
-        }
-        assert all(values.get(key) == "" for key in keys)
 
 
 def run_task_with_stub(

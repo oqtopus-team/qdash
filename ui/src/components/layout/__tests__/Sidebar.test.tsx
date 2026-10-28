@@ -70,7 +70,6 @@ describe("Sidebar", () => {
     sidebarState.isOpen = true;
     sidebarState.isMobileOpen = false;
     projectState.canEdit = false;
-    vi.unstubAllEnvs();
   });
 
   it("narrows the mobile drawer to w-56 and drops w-72", () => {
@@ -162,9 +161,8 @@ describe("Sidebar", () => {
     expect(setMobileSidebarOpen).toHaveBeenCalledWith(false);
   });
 
-  it("keeps Prefect navigation under the same origin despite the legacy URL setting", () => {
+  it("links Prefect to the same-origin /prefect/dashboard path", () => {
     projectState.canEdit = true;
-    vi.stubEnv("NEXT_PUBLIC_PREFECT_URL", "https://legacy-prefect.example.com");
     const { container } = render(<Sidebar />);
 
     const prefectLink = container.querySelector('a[title="Prefect"]');

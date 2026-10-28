@@ -3,48 +3,9 @@ services:
     environment:
       CADDY_SITE_ADDRESS: ${CLIENT_URL:?Set CLIENT_URL to https://your-domain}
       CLIENT_URL: ${CLIENT_URL:?Set CLIENT_URL to https://your-domain}
-    entrypoint: ["/bin/sh", "-ec"]
-    command:
-      - |
-        invalid_origin() {
-          echo "HTTPS mode requires CLIENT_URL=https://<host>[:443][/]. Paths, credentials, queries, fragments, and other ports are unsupported." >&2
-          exit 1
-        }
-        case "$$CLIENT_URL" in
-          https://*) ;;
-          *) invalid_origin ;;
-        esac
-        site_address="$${CLIENT_URL%/}"
-        authority="$${site_address#https://}"
-        case "$$authority" in
-          ""|*/*|*\?*|*\#*|*@*|*" "*|*"\\"*) invalid_origin ;;
-        esac
-        case "$$authority" in
-          \[*\]:*)
-            host="$${authority%%]*}]"
-            port="$${authority#*]:}"
-            case "$$port" in ""|*:*) invalid_origin ;; esac
-            [ "$$port" = 443 ] || invalid_origin
-            ;;
-          \[*\])
-            host="$$authority"
-            ;;
-          \[*|\[*\]:*|\[*\]:)
-            invalid_origin
-            ;;
-          *:*)
-            host="$${authority%%:*}"
-            port="$${authority#*:}"
-            case "$$port" in ""|*:*) invalid_origin ;; esac
-            [ "$$port" = 443 ] || invalid_origin
-            ;;
-          *)
-            host="$$authority"
-            ;;
-        esac
-        [ -n "$$host" ] || invalid_origin
-        export CADDY_SITE_ADDRESS="$$site_address"
-        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    volumes:
+      - ./config/caddy/https-entrypoint.sh:/etc/caddy/https-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/etc/caddy/https-entrypoint.sh"]
     ports: !override
       - "80:80"
       - "443:443"
