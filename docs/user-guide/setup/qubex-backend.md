@@ -66,8 +66,17 @@ dialog sets what goes into it:
 | Setting | Result |
 | --- | --- |
 | **Wiring**: **Copy from** an existing system | `wiring.yaml` gets that system's rows under the new chip ID. `box.yaml`, `skew.yaml`, and the other hardware files are copied unchanged, and `system.yaml` takes the source's backend and settings. |
-| **Wiring**: **Start with empty wiring** | `wiring.yaml` has no rows, `box.yaml` is empty, and `system.yaml` names the selected **Backend** (`quel1` or `quel3`). |
+| **Wiring**: **Start from template** | `system.yaml`, `wiring.yaml`, and `box.yaml` include commented examples for the selected **Backend** (`quel1` or `quel3`). |
 | Checkbox cleared | Only the chip record is created. |
+
+Use **Start from template** when there is no source configuration or the hardware setup changes.
+Open **Config** after creation, fill in the backend connection settings in `system.yaml`,
+and replace the empty wiring list and box map with entries based on the commented examples.
+Uncomment and adapt the examples to your hardware before running calibration.
+The chip ID and qubit count are filled in automatically.
+For `quel1`, QDash also creates `skew.yaml` with commented examples for inter-box timing
+adjustment. Fill in the box timing values and measurement ports when your setup requires
+synchronization. The `quel3` template does not create this file.
 
 The **Copy from** list shows directories under `CONFIG_PATH` that have `config/wiring.yaml`.
 It skips directories with invalid chip IDs (including hidden directories), the reserved

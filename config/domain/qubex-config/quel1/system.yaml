@@ -1,0 +1,6 @@
+# TODO: Uncomment the backend settings and enter your hardware connection details.
+$chip_id:
+  chip_id: $chip_id
+  backend: quel1
+  # quel1:
+  #   clock_master: "<clock-master-IP>"
