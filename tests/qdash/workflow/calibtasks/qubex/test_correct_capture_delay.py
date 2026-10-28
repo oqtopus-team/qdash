@@ -23,6 +23,7 @@ class _FakeQuel1:
         self.restore = restore
         self.applied_ns: float | None = None
         self.frequencies: list[dict[str, float]] = []
+        self.active_frequencies = {"RQ00": 8.1}
         self.captured: list[list[str]] = []
         self.delays: dict[int, float] = {0: 7, 1: 8}
         self.words = {0: 0, 1: 0}
@@ -54,7 +55,12 @@ class _FakeQuel1:
     @contextmanager
     def modified_frequencies(self, frequencies):
         self.frequencies.append(dict(frequencies))
-        yield
+        original = dict(self.active_frequencies)
+        self.active_frequencies.update(frequencies)
+        try:
+            yield
+        finally:
+            self.active_frequencies = original
 
     @contextmanager
     def _modified_capture_delay(self, delays):
@@ -66,9 +72,18 @@ class _FakeQuel1:
         finally:
             self.applied_ns = None
 
-    def measure(self, sequence, *, readout_duration, n_shots, **_):
+    def check_waveform(
+        self, *, targets, readout_amplitude, readout_duration, n_shots, add_pump_pulses, plot
+    ):
+        # These conditions must hold for sweeps, verification, and the final check
+        # on both backends, even with other active qubits in the same MUX.
+        assert len(targets) == 1
+        assert readout_amplitude == 1.0
+        assert n_shots == 1024
+        assert not add_pump_pulses
+        assert not plot
         assert self.applied_ns is not None
-        self.captured.append(list(sequence))
+        self.captured.append(list(targets))
         rng = np.random.default_rng(round(self.applied_ns * 10))
         time = np.arange(self.samples) * self.sampling_ns
         start = self.arrival_ns - self.applied_ns
@@ -76,7 +91,7 @@ class _FakeQuel1:
             np.tanh((time - start) / 6) - np.tanh((time - start - readout_duration) / 6)
         )
         data = {}
-        for target in sequence:
+        for target in targets:
             shape = (4, self.samples)
             noise = rng.normal(size=shape) + 1j * rng.normal(size=shape)
             raw = envelope * (0.3 + 0.4j) + 0.005 * noise
@@ -179,12 +194,15 @@ def test_quel3_publishes_capture_delay_in_ns_without_word():
     capture_delay = result.output_parameters["capture_delay"]
     assert capture_delay.unit == "ns"
     assert isinstance(capture_delay.value, float)
-    steps = capture_delay.value / 0.8
+    steps = capture_delay.value / 32.0
     assert steps == pytest.approx(round(steps), abs=1e-6)
-    # The pulse midpoint lands on the window center within one 0.8 ns step.
+    # Calibration uses the same 32 ns grid and ±16 ns tolerance as QuEL-1.
     midpoint = 1430.0 - capture_delay.value + DURATION_NS / 2
-    assert midpoint == pytest.approx(1920 * 0.8 / 2, abs=0.8)
+    assert midpoint == pytest.approx(1920 * 0.8 / 2, abs=16.0)
     # One ns sweep without a word sweep: delay sweep and final capture figures.
+    assert all(captured == ["Q00"] for captured in experiment.captured)
+    assert experiment.applied_ns is None
+    assert experiment.delays == {0: 700.0, 1: 700.0}
     assert run_result.raw_result.fine == []
     assert len(result.figures) == 2
     assert task.run_parameters["readout_frequency"].value == pytest.approx(7.0)
@@ -232,3 +250,22 @@ def test_run_explains_inactive_qubits_without_frequencies():
 
     with pytest.raises(ValueError, match="readout_frequency"):
         _run(task, _backend(experiment), qid="4")
+
+
+@pytest.mark.parametrize("experiment_class", [_FakeQuel1, _FakeQuel3])
+def test_capture_failure_restores_frequency_and_delay(experiment_class, monkeypatch):
+    experiment = experiment_class(1430.0)
+    task = CorrectCaptureDelay()
+
+    def fail_capture(**kwargs):
+        assert kwargs["targets"] == ["Q00"]
+        assert kwargs["readout_amplitude"] == 1.0
+        assert experiment.applied_ns is not None
+        raise RuntimeError("capture failed")
+
+    monkeypatch.setattr(experiment, "check_waveform", fail_capture)
+    with pytest.raises(RuntimeError, match="capture failed"):
+        _run(task, _backend(experiment))
+
+    assert experiment.applied_ns is None
+    assert experiment.active_frequencies == {"RQ00": 8.1}

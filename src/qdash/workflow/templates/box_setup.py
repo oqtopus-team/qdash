@@ -49,7 +49,7 @@ def box_setup(
     flow_name: str | None = None,
     project_id: str | None = None,
 ) -> Any:
-    """Configure the selected MUXes and correct their QuEL-1 capture delays.
+    """Configure the selected MUXes and correct their QuEL-1 or QuEL-3 capture delays.
 
     Args:
         username: User name (from UI)

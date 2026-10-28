@@ -7,7 +7,10 @@ verifies the candidate, and then remeasures the final value.
 
 - QuEL-1 sweeps ``capture_delay`` (128 ns) with ``capture_delay_word`` fixed at 0,
   then sweeps the word (8 ns, 32 ns steps) at the chosen coarse delay.
-- QuEL-3 sweeps ``capture_delay`` in ns once and selects on its 0.8 ns grid.
+- QuEL-3 sweeps ``capture_delay`` in ns once (0.8 ns sampling grid).
+  Both backends select calibrated delays on a 32 ns grid.
+
+All captures use one representative qubit with readout amplitude 1.0.
 """
 
 from __future__ import annotations
@@ -46,7 +49,9 @@ if TYPE_CHECKING:
 # Place the default tone just above the resonator spectroscopy range so that
 # resonators do not distort the captured pulse: 11.0 GHz (high band), 7.0 GHz (low band).
 READOUT_FREQUENCY_OFFSET_GHZ = 0.25
-RESOLUTION_NS = {"quel1": QUEL1_RESOLUTION_NS, "quel3": QUEL3_RESOLUTION_NS}
+# Match capture-delay-tools: calibrate both backends in 32 ns steps, even
+# though QuEL-3 accepts sweep values on its finer 0.8 ns sampling grid.
+RESOLUTION_NS = {"quel1": QUEL1_RESOLUTION_NS, "quel3": QUEL1_RESOLUTION_NS}
 
 # A delay setting to capture with: total delay in ns and its label in figures.
 Setting = tuple[float, str]
@@ -302,8 +307,6 @@ class CorrectCaptureDelay(QubexTask):
         settings: list[Setting],
     ) -> list[Waveform]:
         """Capture ``target`` once per delay setting."""
-        from qubex import Blank
-
         system = exp.system_manager.experiment_system
         params = system.control_params
 
@@ -320,10 +323,10 @@ class CorrectCaptureDelay(QubexTask):
         with exp.modified_frequencies({read_label: frequency}):
             for total_ns, label in settings:
                 with exp.system_manager.modified_capture_delay({mux: total_ns}):
-                    measured_result = exp.measure(
-                        {target: Blank(0)},
+                    measured_result = exp.check_waveform(
+                        targets=[target],
+                        readout_amplitude=1.0,
                         readout_duration=duration,
-                        time_integration=False,
                         add_pump_pulses=False,
                         n_shots=int(self.run_parameters["shots"].get_value()),
                         plot=False,
