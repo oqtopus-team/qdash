@@ -1,5 +1,5 @@
 /**
- * Positive allowlist for the pinned pi-qdash package.
+ * Positive allowlist for the bundled pi-qdash package.
  *
  * The runtime authenticates as the user who submitted the turn. Newly added
  * extension tools still require review before they are exposed to the model.
@@ -64,7 +64,7 @@ export const ALLOWED_TOOL_NAMES = [
 ] as const;
 
 /**
- * Reviewed write-capable tools from the pinned pi-qdash package.
+ * Reviewed write-capable tools from the bundled pi-qdash package.
  *
  * These stay separate from read tools so every call requires user approval.
  * Raw path access remains excluded.
@@ -94,14 +94,13 @@ export function isReviewedWriteTool(name: string): boolean {
 /**
  * Installed pi packages trusted as a whole, like a local checkout: every tool
  * they define is offered without a per-name entry above (reviewed write names
- * still require user approval). Reviewed per package, pinned by version in
- * `agent-runtime/Dockerfile`.
+ * still require user approval). Reviewed per package; the bundled source is reviewed with QDash.
  */
-export const TRUSTED_EXTENSION_PACKAGES = ["@orangekame3/pi-qcaleval"] as const;
+export const TRUSTED_EXTENSION_PACKAGES = ["@oqtopus-team/pi-qcaleval"] as const;
 
 /**
  * Packages whose tools go through the per-name allowlist above even when a
  * local checkout of them is mounted for development: the checkout replaces
- * the pinned copy, but does not widen what the model may call.
+ * the bundled copy, but does not widen what the model may call.
  */
 export const ALLOWLISTED_PACKAGES = ["@oqtopus-team/pi-qdash"] as const;

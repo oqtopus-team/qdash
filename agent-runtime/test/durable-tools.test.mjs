@@ -326,7 +326,7 @@ test("a trusted installed package gets the checkout treatment", () => {
   const { extension } = buildQDashExtension(
     [
       {
-        path: "/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval/extensions/qcaleval.ts",
+        path: "/app/.pi-agent/npm/node_modules/@oqtopus-team/pi-qcaleval/extensions/qcaleval.ts",
         tools: new Map([["qcal_evaluate", readOnly]]),
       },
       {
@@ -338,7 +338,7 @@ test("a trusted installed package gets the checkout treatment", () => {
     "/tmp/work",
     connection,
     [],
-    ["@orangekame3/pi-qcaleval"],
+    ["@oqtopus-team/pi-qcaleval"],
   );
   // The listed package is offered; an unlisted installed package still needs the allowlist.
   assert.deepEqual(
