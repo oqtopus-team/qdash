@@ -55,6 +55,7 @@ backends:
         - EFReadoutClassification
         - CheckThermalExcitation
         - CheckSpinLockSpectroscopy
+        - CheckReadoutMIST
         - ReadoutClassification
         - RandomizedBenchmarking
         - X90InterleavedRandomizedBenchmarking
