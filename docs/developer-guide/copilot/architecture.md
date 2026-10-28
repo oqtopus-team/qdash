@@ -201,50 +201,37 @@ the corresponding YAML model. Variable renaming does not transform the URL: for 
 
 ### Developing a pi extension against the runtime
 
-The Agent Runtime image installs `@oqtopus-team/pi-qdash` at a pinned version
-(`agent-runtime/Dockerfile`), so a published release is the only way an
-extension normally reaches it. While developing another extension (for example
-`pi-qcaleval`), clone it under `agent-runtime/extensions/` (gitignored) and start
-the runtime with the override:
+The Agent Runtime image includes `packages/pi-qdash/` and `packages/pi-qcaleval/`
+from the same QDash checkout. Edit those packages, run `task ci-pi-packages` and
+`task ci-agent-runtime`, then rebuild the runtime:
 
 ```bash
-git clone https://github.com/orangekame3/pi-qcaleval.git agent-runtime/extensions/pi-qcaleval
-docker compose up -d agent-runtime
+bun install --frozen-lockfile
+docker compose up -d --build agent-runtime
 ```
 
-`compose.yaml` always mounts `agent-runtime/extensions/` at `/app/extensions`
-(read-only); the directory is tracked through a `.gitkeep`, so the mount exists in
-every clone and is empty in production. At startup the runtime takes every
-subdirectory whose `package.json` carries a `pi` manifest as a checkout and
-passes it to pi's resource loader as an additional extension path. No override
-file or environment variable is involved, so `task deploy` and a plain
-`docker compose up -d` behave the same. A checkout of a package the image also
-installs (pi-qcaleval once pinned, or pi-qdash) replaces the installed copy; pi
-rejects the installed one as a tool-name conflict, which the runtime logs as
-"local checkout ... replaces installed ...". A pi-qdash checkout keeps the
-per-name allowlist (`ALLOWLISTED_PACKAGES`), so developing it in place never
-exposes a tool that production would filter; run `bun install` inside the
-checkout first, since pi-qdash has dependencies of its own. The checkout must use the pi package layout
-(`package.json` with a `pi.extensions` manifest, like pi-qdash) and may depend only
-on the packages the runtime already ships (`@earendil-works/pi-coding-agent`,
-`typebox`), because its imports resolve from the runtime's `node_modules`.
+The root Bun workspace locks the runtime and the two pi packages together.
+The runtime loads their tools and skills directly; npm publication is not needed
+for QDash development or deployment. [Pi packages](./packages.md) describes
+independent distribution and release validation.
 
-A checkout is trusted by its path, not by tool name: every tool it defines is
-offered to the model without the pi-qdash allowlist review
-(`agent-runtime/src/allowed-tools.ts`), with three limits. The same trust applies
-in production to the packages listed in `TRUSTED_EXTENSION_PACKAGES` (for example
-`@orangekame3/pi-qcaleval`), which the image installs at a pinned version next to
-pi-qdash in `agent-runtime/Dockerfile`; a package is added to that list only after
-review, and the version pin is the release gate.
+`compose.yaml` also mounts `agent-runtime/extensions/` at `/app/extensions`
+(read-only) for additional development extensions. At startup, each subdirectory
+with a `pi` manifest is loaded. A checkout whose package name matches a bundled
+package replaces that package's tools and skills. Install any extra dependencies
+inside the checkout before starting the container, and restart the runtime after
+editing it. The image does not copy this gitignored directory.
 
-- Reviewed write names (`REVIEWED_WRITE_TOOL_NAMES`) are available by default and go through
-  the same approval card as the pinned tool. Each operation runs only after the user approves
-  its arguments, using that user's credentials and project permissions.
-- A checkout tool is rerun after an interrupted turn only when its pi
-  `annotations.readOnlyHint` is `true`; other local tools are reported to the
-  model as interrupted instead, so a side-effecting tool never runs twice.
-- A checkout tool that reuses a pinned tool's name replaces the pinned
-  implementation; the runtime logs the replacement at startup.
+The bundled pi-qdash package and overrides of it retain the per-name allowlist
+in `agent-runtime/src/allowed-tools.ts`. The bundled pi-qcaleval package is trusted
+as a whole. Additional checkouts are trusted by path, with these limits:
+
+- Reviewed write names (`REVIEWED_WRITE_TOOL_NAMES`) still require approval of
+  their arguments and execute with the requesting user's credentials.
+- A checkout tool is replayed after interruption only when its
+  `annotations.readOnlyHint` is `true`.
+- A trusted checkout that reuses a bundled tool's name replaces it, with a
+  replacement message in the startup log.
 
 Checkout tools receive the same extension context as pi-qdash tools, including
 `modelRegistry` for calling a model other than the conversation's. Their pi

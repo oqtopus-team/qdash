@@ -1,0 +1,9 @@
+{
+  "name": "qdash-workspace",
+  "private": true,
+  "packageManager": "bun@1.4.0",
+  "workspaces": [
+    "agent-runtime",
+    "packages/*"
+  ]
+}

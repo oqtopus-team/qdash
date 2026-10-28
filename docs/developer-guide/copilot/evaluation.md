@@ -14,8 +14,8 @@ unit of comparison.
 | Part | Owns | Where |
 | --- | --- | --- |
 | Task knowledge | The reference and the labeled example plots of each task | [qdash-task-knowledge](https://github.com/qiqb-osaka/qdash-task-knowledge), checked out at `config/task-knowledge` |
-| pi-qdash | `qdash_build_qcal_evidence`: one task result as evidence | Pinned in `agent-runtime/Dockerfile` |
-| pi-qcaleval | `qcal_evaluate`: question templates, model calls, answer parsing, `dry_run` | Pinned in `agent-runtime/Dockerfile`; a checkout under `agent-runtime/extensions/` replaces it |
+| pi-qdash | `qdash_build_qcal_evidence`: one task result as evidence | `packages/pi-qdash/`, bundled in the runtime image |
+| pi-qcaleval | `qcal_evaluate`: question templates, model calls, answer parsing, `dry_run` | `packages/pi-qcaleval/`, bundled in the runtime image |
 | Agent Runtime | One evaluation: the two tools, the reference and examples filled in as the user, the record, the prompt preview | `agent-runtime/src/evaluate.ts`, `knowledge-context.ts` |
 | API and UI | Runs: selection, background execution, storage, verdicts, chat recording, comparison | `src/qdash/api/services/evaluation_service.py`, `ui/src/components/features/evaluations/` |
 
@@ -277,10 +277,12 @@ labels (`status` from the task's criteria, `suggested_range`, `parameters`), the
 `task-knowledge.json` with the repository's `generate.py`. Label the success case too: the status
 question shows one example per status.
 
-**A question template or its parsing.** Change pi-qcaleval. A checkout under
-`agent-runtime/extensions/` is loaded in place of the pinned package (restart the runtime; the
-startup log names it), and every record says which one judged. Release it and bump the pin in
-`agent-runtime/Dockerfile`.
+**A question template or its parsing.** Change `packages/pi-qcaleval/`, run
+`task ci-pi-packages` and `task ci-agent-runtime`, and rebuild the runtime image.
+Bundled evaluations record a package version with a source hash covering the
+manifest, extension code, skills, and root lockfile. This distinguishes unreleased
+changes even in an image without Git metadata. See [Pi packages](./packages.md)
+for independent releases.
 
 **The context or the evidence.** `evidenceContext` and `sweepRangeFormat` in `evaluate.ts` decide
 what the context says; the evidence itself is pi-qdash's tool.

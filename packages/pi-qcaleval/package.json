@@ -1,0 +1,54 @@
+{
+  "name": "@orangekame3/pi-qcaleval",
+  "version": "0.0.1",
+  "description": "pi extension that sends calibration plots to a calibration-evaluation VLM such as NVIDIA Ising-Calibration and returns a structured diagnosis",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oqtopus-team/qdash.git",
+    "directory": "packages/pi-qcaleval"
+  },
+  "homepage": "https://github.com/oqtopus-team/qdash/tree/develop/packages/pi-qcaleval#readme",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "calibration",
+    "qdash"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "type": "module",
+  "files": [
+    "extensions",
+    "skills"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/qcaleval.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "rm -rf .test-dist && tsc --noEmit false --outDir .test-dist && node --test tests/*.test.mjs; status=$?; rm -rf .test-dist; exit $status"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "1.4.0",
+    "@earendil-works/pi-coding-agent": "1.4.0",
+    "@types/node": "^22.0.0",
+    "typebox": "^1.0.55",
+    "typescript": "^5.8.0"
+  },
+  "bugs": "https://github.com/oqtopus-team/qdash/issues"
+}
