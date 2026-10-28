@@ -1,4 +1,4 @@
-name: Publish pi packages
+name: Publish TypeScript packages
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ on:
       - ".github/scripts/pi-package-*"
       - ".github/scripts/client-release*"
       - ".github/workflows/publish-qdash-typescript-client.yml"
-      - ".github/workflows/publish-pi-packages.yml"
+      - ".github/workflows/publish-typescript-packages.yml"
   push:
     branches: [develop]
     paths:
@@ -29,7 +29,7 @@ on:
       - ".github/scripts/pi-package-*"
       - ".github/scripts/client-release*"
       - ".github/workflows/publish-qdash-typescript-client.yml"
-      - ".github/workflows/publish-pi-packages.yml"
+      - ".github/workflows/publish-typescript-packages.yml"
     tags:
       - "pi-qdash/v*"
       - "pi-qcaleval/v*"
