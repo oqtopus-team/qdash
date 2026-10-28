@@ -9,6 +9,7 @@ import yaml
 from qdash.api.services.chip.config_scaffold import ChipConfigError, ChipConfigScaffolder
 
 TEMPLATES = Path(__file__).resolve().parents[5] / "config" / "domain" / "qubex-params"
+CONFIG_TEMPLATES = TEMPLATES.parent / "qubex-config"
 
 
 def _load(path: Path):
@@ -53,7 +54,9 @@ def tree(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def scaffolder(tree: Path) -> ChipConfigScaffolder:
-    return ChipConfigScaffolder(config_base=tree, templates_dir=TEMPLATES)
+    return ChipConfigScaffolder(
+        config_base=tree, templates_dir=TEMPLATES, config_templates_dir=CONFIG_TEMPLATES
+    )
 
 
 def test_list_sources_reports_backend_and_mux_count(scaffolder):
@@ -94,7 +97,7 @@ def test_scaffold_copies_wiring_and_hardware_from_legacy_source(scaffolder, tree
         "64Qv4": {"chip_id": "64Qv4", "backend": "quel1", "quel1": {"clock_master": "10.0.0.1"}}
     }
     assert (config / "box.yaml").read_text().startswith("# boxes")
-    assert (config / "skew.yaml").is_file()
+    assert (config / "skew.yaml").read_bytes() == (tree / "64Qv3/config/skew.yaml").read_bytes()
     assert "old" not in (config / "chip.yaml").read_text()
 
 
@@ -220,3 +223,78 @@ def test_remove_rolls_back(scaffolder, tree):
     scaffolder.remove("64Qv4")
 
     assert not (tree / "64Qv4").exists()
+
+
+@pytest.mark.parametrize("backend", ["quel1", "quel3"])
+@pytest.mark.parametrize("chip_id", ["64Qv4", "123", "true"])
+def test_config_templates_preserve_examples_and_string_ids(scaffolder, tree, backend, chip_id):
+    result = scaffolder.scaffold(chip_id=chip_id, n_qubits=64, backend=backend)
+    config = tree / chip_id / "config"
+    assert result.backend == backend
+    assert _load(config / "system.yaml") == {chip_id: {"chip_id": chip_id, "backend": backend}}
+    assert _load(config / "wiring.yaml") == {chip_id: []}
+    assert _load(config / "box.yaml") == {}
+    for name in ("system.yaml", "wiring.yaml", "box.yaml"):
+        text = (config / name).read_text()
+        assert "TODO:" in text
+        assert "$chip_id" not in text
+        assert f"{chip_id}/config/{name}" in result.files
+    connection_key = "clock_master" if backend == "quel1" else "endpoint"
+    assert connection_key in (config / "system.yaml").read_text()
+    assert "read_out:" in (config / "wiring.yaml").read_text()
+    assert (tree / chip_id / "params/qubit_frequency.yaml").is_file()
+
+
+def test_missing_config_template_rolls_back(tree, tmp_path):
+    scaffolder = ChipConfigScaffolder(
+        config_base=tree, templates_dir=TEMPLATES, config_templates_dir=tmp_path / "missing"
+    )
+    with pytest.raises(ChipConfigError, match="Missing configuration template"):
+        scaffolder.scaffold(chip_id="64Qv4", n_qubits=64)
+    assert not (tree / "64Qv4").exists()
+    assert not list(tree.glob(".64Qv4.*"))
+
+
+def test_copy_does_not_require_config_templates(tree, tmp_path):
+    scaffolder = ChipConfigScaffolder(
+        config_base=tree, templates_dir=TEMPLATES, config_templates_dir=tmp_path / "missing"
+    )
+    result = scaffolder.scaffold(chip_id="64Qv4", n_qubits=64, source_system_id="64Qv3")
+    assert result.status == "created"
+    assert (tree / "64Qv4/config/box.yaml").read_bytes() == (
+        tree / "64Qv3/config/box.yaml"
+    ).read_bytes()
+
+
+@pytest.mark.parametrize("backend", ["quel1", "quel3"])
+def test_skew_template_is_only_created_for_quel1(scaffolder, tree, backend):
+    result = scaffolder.scaffold(chip_id="new-chip", n_qubits=64, backend=backend)
+    skew = tree / "new-chip/config/skew.yaml"
+    if backend == "quel3":
+        assert not skew.exists()
+        assert "new-chip/config/skew.yaml" not in result.files
+        return
+    assert "new-chip/config/skew.yaml" in result.files
+    assert _load(skew) == {"box_setting": {}}
+    # Follow the template instructions to verify the commented example is usable YAML.
+    example = skew.read_text().replace("box_setting: {}", "box_setting:")
+    example = "\n".join(
+        line[2:] if line.startswith("# ") else line
+        for line in example.splitlines()
+        if not line.startswith("# ")
+        or line.startswith(
+            (
+                "#   ",
+                "# monitor_port:",
+                "# reference_port:",
+                "# scale:",
+                "# target_port:",
+                "# time_to_start:",
+                "# trigger_nport:",
+            )
+        )
+    )
+    settings = yaml.safe_load(example)
+    assert settings["box_setting"]["BOX_A"]["port_wait"] == {1: 0}
+    assert settings["target_port"] == {"BOX_A-1", "BOX_B-8"}
+    assert settings["reference_port"] == "BOX_A-1"

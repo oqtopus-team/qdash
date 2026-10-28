@@ -294,7 +294,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
                         disabled={createChipMutation.isPending}
                         {...register("wiringSource")}
                       >
-                        <option value={EMPTY_WIRING}>Start with empty wiring</option>
+                        <option value={EMPTY_WIRING}>Start from template</option>
                         {configSources.map((source) => (
                           <option key={source.system_id} value={source.system_id}>
                             Copy from {source.system_id} ({source.backend}, {source.mux_count} MUX)
@@ -320,7 +320,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
                     )}
                     <p className="text-xs text-base-content/60">
                       {wiringSource === EMPTY_WIRING
-                        ? "Wiring and boxes start empty."
+                        ? "Config templates include commented examples. Edit hardware settings on the Config page before running."
                         : `Wiring, boxes and other hardware files are copied from ${wiringSource}.`}{" "}
                       Parameter files start from templates. An existing directory is kept as is.
                       Push the new files from the Config page.
