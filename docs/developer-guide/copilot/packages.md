@@ -44,7 +44,7 @@ metadata; npm releases use the versions described below.
 
 ## Distribution
 
-`.github/workflows/publish-pi-packages.yml` follows the client workflows: validate
+`.github/workflows/publish-typescript-packages.yml` follows the client workflows: validate
 PRs, publish beta builds from `develop`, and publish stable versions from tags.
 It calls `publish-qdash-typescript-client.yml` to build the matching client; when
 publishing pi-qdash, that call must publish the client successfully first.
@@ -108,10 +108,10 @@ dependencies.
 
 Configure [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) for
 both `@oqtopus-team` packages with organization `oqtopus-team`, repository `qdash`, and
-workflow filename `publish-pi-packages.yml`. The workflow uses a GitHub-hosted
+workflow filename `publish-typescript-packages.yml`. The workflow uses a GitHub-hosted
 runner and OIDC for the pi packages. The client workflow retains its existing
 `NPM_TOKEN` fallback. When enabling OIDC for the client, authorize both
-`publish-pi-packages.yml` (the caller for dependent releases) and
+`publish-typescript-packages.yml` (the caller for dependent releases) and
 `publish-qdash-typescript-client.yml` (direct stable releases). This package-owner setting is external
 to the repository; merging the workflow alone does not authorize publishing.
 
