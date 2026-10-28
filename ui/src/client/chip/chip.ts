@@ -30,6 +30,7 @@ import type {
   ChipResponse,
   CouplingResponse,
   CreateChipRequest,
+  CreateChipResponse,
   DeleteChipNoteParams,
   DeleteChipParams,
   GetChipNoteParams,
@@ -37,6 +38,7 @@ import type {
   ListChipCouplingsParams,
   ListChipQubitsParams,
   ListChipsResponse,
+  ListConfigSourcesResponse,
   ListCouplingsResponse,
   ListMuxResponse,
   ListQubitsResponse,
@@ -175,22 +177,31 @@ export function useListChips<TData = Awaited<ReturnType<typeof listChips>>, TErr
 /**
  * Create a new chip in the current project.
  *
+ * Besides the database records, this creates ``<chip_id>/`` in the Qubex
+ * configuration tree (``system_id == chip_id``) unless ``config.create`` is
+ * false or the directory already exists. Wiring and hardware files are copied
+ * from ``config.source_system_id`` when given; parameter files always start
+ * from QDash's templates.
+ *
  * Parameters
  * ----------
  * request : CreateChipRequest
- *     Chip creation request containing chip_id and size
+ *     Chip creation request containing chip_id, size and configuration options
  * ctx : ProjectContext
  *     Project context with editor permission
+ * scaffolder : ChipConfigScaffolder
+ *     Writer of the chip's configuration directory
  *
  * Returns
  * -------
- * ChipResponse
- *     Created chip information
+ * CreateChipResponse
+ *     Created chip information and the configuration outcome
  *
  * Raises
  * ------
  * HTTPException
- *     If chip_id already exists or size is invalid
+ *     If chip_id already exists, size is invalid, or the configuration
+ *     source cannot be used
  * @summary Create a new chip
  */
 export const createChip = (
@@ -199,7 +210,7 @@ export const createChip = (
 ) => {
 
 
-      return customInstance<ChipResponse>(
+      return customInstance<CreateChipResponse>(
       {url: `/chips`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: createChipRequest, signal
@@ -255,6 +266,102 @@ export const useCreateChip = <TError = HTTPValidationError,
       return useMutation(getCreateChipMutationOptions(options), queryClient);
     }
     /**
+ * List the systems in the Qubex configuration tree that have a wiring file.
+ *
+ * QDash runs every chip with ``system_id == chip_id``, so each entry is also a
+ * chip directory of the tree.
+ * @summary List systems a new chip can copy wiring from
+ */
+export const listChipConfigSources = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ListConfigSourcesResponse>(
+      {url: `/chips/config-sources`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListChipConfigSourcesQueryKey = () => {
+    return [
+    `/chips/config-sources`
+    ] as const;
+    }
+
+
+export const getListChipConfigSourcesQueryOptions = <TData = Awaited<ReturnType<typeof listChipConfigSources>>, TError = HTTPValidationError>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipConfigSources>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListChipConfigSourcesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChipConfigSources>>> = ({ signal }) => listChipConfigSources(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChipConfigSources>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListChipConfigSourcesQueryResult = NonNullable<Awaited<ReturnType<typeof listChipConfigSources>>>
+export type ListChipConfigSourcesQueryError = HTTPValidationError
+
+
+export function useListChipConfigSources<TData = Awaited<ReturnType<typeof listChipConfigSources>>, TError = HTTPValidationError>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipConfigSources>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listChipConfigSources>>,
+          TError,
+          Awaited<ReturnType<typeof listChipConfigSources>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListChipConfigSources<TData = Awaited<ReturnType<typeof listChipConfigSources>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipConfigSources>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listChipConfigSources>>,
+          TError,
+          Awaited<ReturnType<typeof listChipConfigSources>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListChipConfigSources<TData = Awaited<ReturnType<typeof listChipConfigSources>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipConfigSources>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List systems a new chip can copy wiring from
+ */
+
+export function useListChipConfigSources<TData = Awaited<ReturnType<typeof listChipConfigSources>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipConfigSources>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListChipConfigSourcesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * @summary Update chip metadata (topology_id, note)
  */
 export const updateChip = (

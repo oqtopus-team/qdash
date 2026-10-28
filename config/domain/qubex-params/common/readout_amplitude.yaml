@@ -1,0 +1,6 @@
+meta:
+  description: Readout amplitude for the qubit
+  unit: a.u.
+  default: 0.02
+  scope: qubit
+data: {}

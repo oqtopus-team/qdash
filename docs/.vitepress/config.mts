@@ -189,6 +189,7 @@ export default withMermaid(
               collapsed: true,
               items: [
                 { text: "Architecture", link: "/developer-guide/copilot/architecture" },
+                { text: "Pi Packages", link: "/developer-guide/copilot/packages" },
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },
                 { text: "Agentic Calibration", link: "/developer-guide/copilot/agentic-calibration" },
                 { text: "Knowledge Layout", link: "/developer-guide/copilot/knowledge-layout" },

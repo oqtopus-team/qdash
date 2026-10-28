@@ -19,6 +19,25 @@ layer described in [Workflow Services](./services.md).
 `CalibOrchestrator` is useful in engine tests and low-level integrations, but callers then own
 initialization and terminal handling themselves.
 
+## Execution Identity
+
+Execution IDs use a daily sequence shared by every chip and user in a project.
+For example, allocations for two chips can produce `20261027-000` and
+`20261027-001`. Different projects and dates have independent sequences. This matches
+the `(project_id, execution_id)` identity used by execution history and task queries.
+
+`ProjectExecutionCounterDocument` in `src/qdash/dbmodel/project_execution_counter.py`
+allocates numbers atomically in `project_execution_counter`. On the first allocation
+for a project and date, it starts above the largest retained legacy counter or numeric
+execution ID in execution and task history. The legacy `execution_counter` collection
+remains available for chip date lookups; new counters track participating chips.
+
+Deploy all API services and workflow workers that allocate IDs together, with ID
+creation paused during the switch. Older processes still allocate chip-local IDs and
+cannot safely run alongside the shared allocator. The switch preserves existing
+records; it does not repair IDs that previously collided or reconstruct overwritten
+execution history.
+
 ## Execution Path
 
 ```mermaid

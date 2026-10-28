@@ -237,6 +237,33 @@ def test_capture_qubex_progress_patches_spin_lock_spectroscopy() -> None:
     assert {event.description for event in events} == {"Spin-lock spectroscopy: Q00"}
 
 
+def test_readout_mist_progress_labels_both_acquisition_phases() -> None:
+    """MIST should expose its calibration and population sweeps as two phases."""
+    from qubex.experiment.services import measurement_service
+
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(
+        events.append,
+        task_name="CheckReadoutMIST",
+        plan=ProgressPlan(2, 2),
+    ):
+        list(
+            _service_tqdm(measurement_service)(
+                range(2), desc="Sweeping parameters", disable=True, file=StringIO()
+            )
+        )
+        list(
+            _service_tqdm(measurement_service)(
+                range(3), desc="Sweeping parameters", disable=True, file=StringIO()
+            )
+        )
+
+    assert events[0].phase == 1
+    assert events[-1].phase == 2
+    assert all(event.has_multiple_phases for event in events)
+    assert {event.description for event in events} == {"Readout MIST acquisition"}
+
+
 def test_capture_qubex_progress_selects_cpmg_frequency_sweep() -> None:
     """CPMG progress should follow frequencies instead of the outer repeat loop."""
     cpmg = importlib.import_module("qubex.contrib.experiment.cpmg_noise_spectroscopy")

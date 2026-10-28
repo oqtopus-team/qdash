@@ -274,8 +274,8 @@ services:
     env_file:
       - .env
     volumes:
-      - ./agent-runtime/src:/app/src
-      - ./agent-runtime/exec:/app/exec # Hello protocol shared with agent-exec
+      - ./agent-runtime/src:/app/agent-runtime/src
+      - ./agent-runtime/exec:/app/agent-runtime/exec # Hello protocol shared with agent-exec
       - ./config:/app/config # Read for copilot language and model settings only
       # Local pi extension checkouts for development (gitignored, empty in
       # production); the runtime trusts whatever package directories it finds.

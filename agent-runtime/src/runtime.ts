@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Api, Model } from "@earendil-works/pi-ai";
@@ -39,6 +40,8 @@ import { ExecWorkspace, execConfigFromEnv, removeWorkspace, WORKSPACE_TOOL_NAMES
 import { askUserTool } from "./ask-tool.ts";
 import {
   buildLocalToolGuide,
+  bundledExtensionCheckouts,
+  withExtensionOverrides,
   localToolNames,
   describeExtensionError,
   extensionPackage,
@@ -97,10 +100,12 @@ const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 18
 const EXEC_CONFIG = execConfigFromEnv();
 // Local extension checkouts: compose mounts agent-runtime/extensions/ here. It
 // is empty in production and in a clone without checkouts. Every checkout is
-// loaded (replacing an installed copy of the same package); only those outside
+// loaded (replacing the bundled or installed copy of the same package); only those outside
 // the allowlisted packages are trusted as a whole.
 const EXTENSIONS_DIR = "/app/extensions";
-const CHECKOUTS = discoverExtensionCheckouts(EXTENSIONS_DIR);
+const BUNDLED = bundledExtensionCheckouts(fileURLToPath(new URL("../../packages/", import.meta.url)));
+const BUNDLED_PATHS = BUNDLED.map(({ path }) => path);
+const CHECKOUTS = withExtensionOverrides(BUNDLED, discoverExtensionCheckouts(EXTENSIONS_DIR));
 const CHECKOUT_PATHS = CHECKOUTS.map((checkout) => checkout.path);
 const EXTENSION_PATHS = trustedCheckoutRoots(CHECKOUTS, ALLOWLISTED_PACKAGES);
 
@@ -450,7 +455,7 @@ export class SharedRuntime {
           )) as ToolRun;
         },
         ...knowledgeSource(connection, request.knowledgeDraftId, signal),
-        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS, BUNDLED_PATHS) : undefined,
       });
     } finally {
       await connection.close();
@@ -597,7 +602,7 @@ export class SharedRuntime {
       return recordFromDetails(request.taskId, outcome.details, {
         mode: "planner",
         usage: outcome.usage,
-        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS, BUNDLED_PATHS) : undefined,
         planner: {
           model: `${providerId}/${request.modelName}`,
           answer,

@@ -1,0 +1,6 @@
+meta:
+  description: Capture Delay
+  unit: ns
+  default: 700
+  scope: mux
+data: {}

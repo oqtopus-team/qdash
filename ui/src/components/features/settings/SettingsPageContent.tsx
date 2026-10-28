@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ApiAccessTokenPanel } from "@/components/features/settings/ApiAccessTokenPanel";
 import { AppearanceSettingsPanel } from "@/components/features/settings/AppearanceSettingsPanel";
 import { PasswordChangeCard } from "@/components/features/settings/PasswordChangeCard";
+import { ProfileSettingsPanel } from "@/components/features/settings/ProfileSettingsPanel";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectedLabel } from "@/components/ui/SelectedLabel";
@@ -27,8 +28,6 @@ import {
   setStoredChatModelKey,
 } from "@/lib/copilotModels";
 import type { MemberResponse, ProjectRole } from "@/schemas";
-import { getGetCurrentUserQueryKey, useUpdateCurrentUserProfile } from "@/client/auth/auth";
-import { AVATAR_PRESETS, UserAvatar } from "@/components/ui/UserAvatar";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 import { CopilotInstructionsSettings } from "./CopilotInstructionsSettings";
@@ -39,12 +38,14 @@ type Tab = (typeof TABS)[number];
 
 const editableProjectRoles: ProjectRole[] = ["viewer", "editor"];
 
+/** Returns the DaisyUI badge class for a project role. */
 function roleBadgeClass(role: ProjectRole) {
   if (role === "owner") return "badge-secondary";
   if (role === "editor") return "badge-primary";
   return "badge-ghost";
 }
 
+/** Copilot settings for the chat model, custom instructions and system prompt. */
 function CopilotSettingsPanel() {
   const [selectedModelKey, setSelectedModelKey] = useState(getStoredChatModelKey);
   const { data: copilotConfigResponse, isLoading } = useGetCopilotConfig();
@@ -113,124 +114,7 @@ function CopilotSettingsPanel() {
   );
 }
 
-function ProfileSettingsPanel() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const [displayName, setDisplayName] = useState(user?.display_name ?? "");
-  const [avatarKey, setAvatarKey] = useState(user?.avatar_key ?? "");
-  const [saved, setSaved] = useState(false);
-  const updateProfileMutation = useUpdateCurrentUserProfile({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: getGetCurrentUserQueryKey(),
-        });
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-      },
-    },
-  });
-
-  useEffect(() => {
-    setDisplayName(user?.display_name ?? "");
-    setAvatarKey(user?.avatar_key ?? "");
-  }, [user?.display_name, user?.avatar_key]);
-
-  const handleSave = () => {
-    updateProfileMutation.mutate({
-      data: {
-        display_name: displayName.trim() || null,
-        avatar_key: avatarKey || null,
-      },
-    });
-  };
-
-  const isDirty =
-    displayName.trim() !== (user?.display_name ?? "") || avatarKey !== (user?.avatar_key ?? "");
-
-  return (
-    <div className="card bg-base-200 shadow-lg">
-      <div className="card-body">
-        <h2 className="card-title text-xl mb-4">Profile</h2>
-        <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-          <div className="flex flex-col items-center gap-3 rounded-lg bg-base-100 p-4">
-            <UserAvatar username={user?.username ?? ""} avatarKey={avatarKey} size={72} />
-            <div className="text-center">
-              <div className="font-medium">{displayName || user?.username}</div>
-              <div className="text-xs text-base-content/50">@{user?.username}</div>
-            </div>
-          </div>
-          <div className="space-y-5">
-            <label className="form-control w-full">
-              <div className="label">
-                <span className="label-text">Display name</span>
-              </div>
-              <input
-                className="input input-bordered w-full"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                placeholder={user?.username ?? "Display name"}
-                maxLength={100}
-              />
-            </label>
-
-            <div>
-              <div className="mb-2 text-sm font-medium">Avatar</div>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-7 md:grid-cols-9">
-                <button
-                  type="button"
-                  className={`btn h-12 min-h-0 rounded-lg p-1 ${
-                    avatarKey === "" ? "btn-primary" : "btn-ghost bg-base-100"
-                  }`}
-                  onClick={() => setAvatarKey("")}
-                  title="Automatic"
-                >
-                  <UserAvatar username={user?.username ?? ""} size={28} />
-                </button>
-                {AVATAR_PRESETS.map((preset) => (
-                  <button
-                    key={preset.key}
-                    type="button"
-                    className={`btn h-12 min-h-0 rounded-lg p-1 ${
-                      avatarKey === preset.key ? "btn-primary" : "btn-ghost bg-base-100"
-                    }`}
-                    onClick={() => setAvatarKey(preset.key)}
-                    title={preset.label}
-                  >
-                    <UserAvatar username={user?.username ?? ""} avatarKey={preset.key} size={28} />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {updateProfileMutation.isError && (
-              <div className="alert alert-error">
-                <span>Failed to update profile.</span>
-              </div>
-            )}
-            {saved && (
-              <div className="alert alert-success">
-                <span>Profile updated.</span>
-              </div>
-            )}
-            <button
-              className="btn btn-primary"
-              onClick={handleSave}
-              disabled={!isDirty || updateProfileMutation.isPending}
-            >
-              {updateProfileMutation.isPending ? (
-                <span className="loading loading-spinner loading-xs" />
-              ) : (
-                "Save Profile"
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+/** Project member list with owner controls to invite, change roles and remove members. */
 function ProjectMembersPanel() {
   const queryClient = useQueryClient();
   const { user } = useAuth();

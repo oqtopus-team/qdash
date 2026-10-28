@@ -205,6 +205,7 @@ def _progress_description(task_name: str, description: str) -> str:
         "CheckT2EchoAverage": "T2 echo measurement sweep",
         "CheckPIPulse": "Pi-pulse sweep",
         "CheckHPIPulse": "Half-pi-pulse sweep",
+        "CheckReadoutMIST": "Readout MIST acquisition",
         "CreatePIPulse": "Pi-pulse calibration sweep",
         "CreateHPIPulse": "Half-pi-pulse calibration sweep",
     }

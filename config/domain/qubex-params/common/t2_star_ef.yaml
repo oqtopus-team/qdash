@@ -1,0 +1,6 @@
+meta:
+  description: T2* coherence time of the e-f transition
+  unit: µs
+  default: null
+  scope: qubit
+data: {}

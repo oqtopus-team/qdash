@@ -1,0 +1,25 @@
+# QuEL-1 / QuBE inter-box timing adjustment.
+# TODO: Replace {} below with entries for the boxes requiring synchronization.
+# Match box IDs to box.yaml. Slot and wait values must be set for your hardware.
+box_setting: {}
+#   BOX_A:
+#     slot: 0
+#     wait: 0
+#     port_wait:
+#       1: 0
+#   BOX_B:
+#     slot: 1
+#     wait: 0
+#     port_wait:
+#       8: 0
+# TODO: Uncomment and adapt the measurement settings before running skew adjustment.
+# These port references use BOX_ID-port syntax.
+# monitor_port: BOX_A-12
+# reference_port: BOX_A-1
+# scale:
+#   BOX_A-1: 0.125
+# target_port: !!set
+#   BOX_A-1: null
+#   BOX_B-8: null
+# time_to_start: 0
+# trigger_nport: 10

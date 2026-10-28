@@ -54,70 +54,13 @@ class ExecutionCounterDocument(Document):
         project_id: str,
         user_id: str | None = None,
     ) -> int:
-        """Get the next index for a project chip and date.
+        """Allocate from the project-wide counter; retain legacy rows for lookup."""
+        from qdash.dbmodel.project_execution_counter import ProjectExecutionCounterDocument
 
-        Uses atomic findAndModify to prevent race conditions in concurrent executions.
-        Index starts from 0 on the first call for a project/date/chip combination.
-
-        Args:
-        ----
-            date: The date to get the next index for
-            username: The actor username recorded on the counter document
-            chip_id: The chip_id to get the next index for
-            project_id: The project_id to get the next index for
-
-        Returns:
-        -------
-            The next index (0 on first call, then 1, 2, 3...)
-
-        """
-        import time
-
-        from pymongo import ReturnDocument
-        from pymongo.errors import DuplicateKeyError
-
-        max_retries = 5
-        resolved_user_id = user_id or cls._user_id_for_username(username)
-        for attempt in range(max_retries):
-            # First, try to find existing document
-            counter_key = {"project_id": project_id, "date": date, "chip_id": chip_id}
-            doc = cls.find_one(counter_key).run()
-
-            if doc is None:
-                # Try to create initial document with index 0
-                try:
-                    doc = cls(
-                        project_id=project_id,
-                        date=date,
-                        user_id=resolved_user_id,
-                        username=username,
-                        chip_id=chip_id,
-                        index=0,
-                    )
-                    doc.insert()
-                    return 0
-                except DuplicateKeyError:
-                    # Another process created it concurrently
-                    # Wait a bit and retry the whole operation
-                    time.sleep(0.01 * (attempt + 1))
-                    continue
-
-            # Document exists - use atomic increment
-            result = cls.get_motor_collection().find_one_and_update(
-                counter_key,
-                {
-                    "$inc": {"index": 1},
-                    "$set": {"username": username, "user_id": resolved_user_id},
-                },
-                return_document=ReturnDocument.AFTER,
-            )
-
-            if result is not None:
-                return int(result["index"])
-
-            # Result was None, retry
-            time.sleep(0.01 * (attempt + 1))
-
-        # All retries failed
-        msg = f"Failed to get next index after {max_retries} attempts"
-        raise RuntimeError(msg)
+        return ProjectExecutionCounterDocument.get_next_index(
+            date=date,
+            username=username,
+            chip_id=chip_id,
+            project_id=project_id,
+            user_id=user_id or cls._user_id_for_username(username),
+        )

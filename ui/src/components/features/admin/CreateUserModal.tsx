@@ -29,6 +29,7 @@ const createUserSchema = z.object({
 type CreateUserFormInput = z.input<typeof createUserSchema>;
 type CreateUserFormData = z.output<typeof createUserSchema>;
 
+/** Modal for creating a user and showing the generated temporary password. */
 export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUserModalProps) {
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const [createdUsername, setCreatedUsername] = useState("");
@@ -167,7 +168,7 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
                 {...register("organization")}
               />
             </div>
-            <label className="form-control cursor-pointer rounded-lg border border-base-300 bg-base-100 p-3">
+            <label className="block cursor-pointer rounded-lg border border-base-300 bg-base-100 p-3">
               <div className="flex items-start gap-3">
                 <input
                   type="checkbox"
