@@ -4,6 +4,14 @@
   "packageManager": "bun@1.4.0",
   "workspaces": [
     "agent-runtime",
-    "packages/*"
-  ]
+    "packages/*",
+    "clients/typescript"
+  ],
+  "overrides": {
+    "esbuild": "^0.28.1",
+    "js-yaml": "^4.3.2"
+  },
+  "scripts": {
+    "build:client": "bun run --filter @oqtopus-team/qdash-client build"
+  }
 }

@@ -14,7 +14,7 @@ QDash is a web platform for managing and monitoring qubit calibration workflows.
 
 - Frontend: `ui/` uses Next.js, React, TypeScript, DaisyUI, TanStack Query, and Bun.
 - Backend API: `src/qdash/api/` uses FastAPI with MongoDB/PostgreSQL-related services.
-- Pi extensions: `packages/pi-qdash/` and `packages/pi-qcaleval/` share a root Bun workspace with `agent-runtime/`; install dependencies from the repository root. They remain independently published npm packages.
+- Pi extensions: `packages/pi-qdash/` and `packages/pi-qcaleval/` share a root Bun workspace with `agent-runtime/` and `clients/typescript/`; install dependencies from the repository root. They remain independently published npm packages.
 - Workflow engine: `src/qdash/workflow/` uses Prefect 3 and qubex.
 - Shared data/model code lives under `src/qdash/common`, `src/qdash/datamodel`, `src/qdash/dbmodel`, and repository/service modules.
 
@@ -63,6 +63,7 @@ Run commands from the repository root unless a directory is specified.
 - API tests: `task test-api`
 - Workflow tests: `task test-workflow`
 - UI tests: `task test-ui`
+- Build the local TypeScript client: `task build-client-ts` (also runs before pi/runtime checks)
 - TypeScript client checks: `task test-client-ts`
 - Pi package tests and typecheck: `task ci-pi-packages`
 - Agent runtime tests and typecheck: `task ci-agent-runtime`

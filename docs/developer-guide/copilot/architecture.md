@@ -210,7 +210,8 @@ bun install --frozen-lockfile
 docker compose up -d --build agent-runtime
 ```
 
-The root Bun workspace locks the runtime and the two pi packages together.
+The root Bun workspace locks the runtime, TypeScript client, and two pi packages
+together. The image builds the local client before loading the extensions.
 The runtime loads their tools and skills directly; npm publication is not needed
 for QDash development or deployment. [Pi packages](./packages.md) describes
 independent distribution and release validation.

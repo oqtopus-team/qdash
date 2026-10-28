@@ -1,7 +1,7 @@
 # Pi Packages
 
 QDash maintains two independently published pi extensions in its root Bun workspace,
-alongside `agent-runtime/`. The runtime uses the source in the checkout; npm packages
+alongside `agent-runtime/` and `clients/typescript/`. The runtime uses the source in the checkout; npm packages
 serve standalone pi CLI users.
 
 | Directory | npm package | Stable tag |
@@ -9,10 +9,11 @@ serve standalone pi CLI users.
 | `packages/pi-qdash/` | `@oqtopus-team/pi-qdash` | `pi-qdash/vX.Y.Z` |
 | `packages/pi-qcaleval/` | `@oqtopus-team/pi-qcaleval` | `pi-qcaleval/vX.Y.Z` |
 
-The Python and TypeScript clients, UI, and documentation retain their own dependency
-configuration. pi-qdash keeps its explicit dependency on the published TypeScript
-client, so its npm artifact works outside the monorepo. pi-qcaleval has no QDash
-client or runtime dependency.
+pi-qdash depends on `@oqtopus-team/qdash-client` through `workspace:*`, so API,
+client, and tool changes can be tested in one PR. The root lockfile also owns the
+client's dependency overrides. The UI and documentation retain separate Bun
+installs; the Python client retains its Python workspace configuration.
+pi-qcaleval has no QDash client or runtime dependency.
 
 ## Development
 
@@ -20,12 +21,14 @@ Install from the repository root with Bun 1.4.0. Package tests also require Node
 
 ```bash
 bun install --frozen-lockfile
+task test-client-ts
 task ci-pi-packages
 task ci-agent-runtime
 ```
 
-The root `bun.lock` covers the runtime and both extensions. Do not create package-local
-lockfiles. Test standalone pi behavior with `pi -e ./packages/pi-qdash` or
+The root `bun.lock` covers the runtime, client, and both extensions. Do not create
+package-local lockfiles. `task ci-pi-packages` and `task ci-agent-runtime` build
+the client first; run `task build-client-ts` before using pi CLI directly. Test standalone pi behavior with `pi -e ./packages/pi-qdash` or
 `pi -e ./packages/pi-qcaleval` from the repository root.
 
 Rebuild the runtime with `docker compose up -d --build agent-runtime` after changing
@@ -43,17 +46,33 @@ metadata; npm releases use the versions described below.
 
 `.github/workflows/publish-pi-packages.yml` follows the client workflows: validate
 PRs, publish beta builds from `develop`, and publish stable versions from tags.
+It calls `publish-qdash-typescript-client.yml` to build the matching client; when
+publishing pi-qdash, that call must publish the client successfully first.
 Both packages publish under `@oqtopus-team` with independent version lines.
 pi-qcaleval moves from `@orangekame3/pi-qcaleval` to `@oqtopus-team/pi-qcaleval`;
 pi-qdash keeps its existing name.
 
 | Trigger | Result |
 | --- | --- |
-| PR to `develop` affecting packages, runtime, root dependencies, or release workflow | Typecheck and test both packages and runtime; upload npm tarballs without publishing |
-| Push to `develop` affecting packages, root dependencies, or release workflow | Publish both tarballs with the `beta` dist-tag |
+| PR to `develop` affecting packages, client, API schema, runtime, root dependencies, or release workflow | Typecheck and test both packages and runtime; upload npm tarballs without publishing |
+| Push to `develop` affecting packages, client, API schema, root dependencies, or release workflow | Publish the matching client first, then both pi tarballs, with the `beta` dist-tag |
 | `pi-qdash/vX.Y.Z` or `pi-qcaleval/vX.Y.Z` tag | Validate both packages, then publish only the named package as `latest` |
 | Manual run on a branch | Build and validate without publishing |
 | Manual run on a package tag | Retry that stable release |
+
+Before packing pi-qdash, the release script replaces `workspace:*` with the exact
+client version returned by the client workflow. It rejects missing versions and
+`0.0.0`. The source manifests retain their development versions. Artifact checks
+install the client and pi-qdash tarballs together in a separate npm consumer;
+PR checks therefore do not need the client to exist on npm yet.
+
+Client snapshots on `develop` use `<next QDash patch>-beta.<run ID>.<attempt>`.
+A `pi-qdash/vX.Y.Z` tag publishes a client snapshot from that same commit as
+`<next QDash patch>-pi.<run ID>.<attempt>` under the `pi` dist-tag, so an independent
+extension release does not move the client's `latest` or `beta` tags. pi-qdash pins
+that exact snapshot even for a stable extension release. QDash's `vX.Y.Z` tags
+continue publishing the stable client as `X.Y.Z` under `latest`. A pi-qcaleval-only
+tag builds the client for integration checks without publishing it.
 
 Beta versions use the next patch after the highest stable tag for that package, or
 its manifest version if no newer tag exists, followed by
@@ -90,7 +109,10 @@ dependencies.
 Configure [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) for
 both `@oqtopus-team` packages with organization `oqtopus-team`, repository `qdash`, and
 workflow filename `publish-pi-packages.yml`. The workflow uses a GitHub-hosted
-runner and OIDC rather than an npm token. This package-owner setting is external
+runner and OIDC for the pi packages. The client workflow retains its existing
+`NPM_TOKEN` fallback. When enabling OIDC for the client, authorize both
+`publish-pi-packages.yml` (the caller for dependent releases) and
+`publish-qdash-typescript-client.yml` (direct stable releases). This package-owner setting is external
 to the repository; merging the workflow alone does not authorize publishing.
 
 `@oqtopus-team/pi-qcaleval` is a new npm package. Its first publication needs an

@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { pinClientDependency } from "./client-release.mjs";
 
 export const PACKAGES = ["pi-qdash", "pi-qcaleval"];
 const stable = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -37,7 +38,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const name = process.argv[2];
   if (!PACKAGES.includes(name)) throw new Error("Unknown package");
   const path = `packages/${name}/package.json`;
-  const manifest = JSON.parse(readFileSync(path, "utf8"));
+  const manifest = pinClientDependency(
+    JSON.parse(readFileSync(path, "utf8")), process.env.QDASH_CLIENT_VERSION,
+  );
   const result = releaseVersion({
     name, base: manifest.version,
     tags: execFileSync("git", ["tag", "--list", `${name}/v*`], { encoding: "utf8" }).trim().split("\n"),

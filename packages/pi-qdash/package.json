@@ -28,7 +28,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@oqtopus-team/qdash-client": "1.9.21-beta.276"
+    "@oqtopus-team/qdash-client": "workspace:*"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

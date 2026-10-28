@@ -10,11 +10,16 @@ Install the package from npm. Node.js 20 or later is required.
 npm install @oqtopus-team/qdash-client
 ```
 
-Every push to `develop` that touches the client or the OpenAPI spec also publishes a prerelease under the `beta` dist-tag, versioned as the next patch release with a `-beta.<build>` suffix (for example `1.9.10-beta.412`). Use it to build against endpoints that are merged but not yet released, and switch back to `latest` once the release is tagged.
+Changes to the client, API schema, or pi packages on `develop` publish a prerelease under the `beta` dist-tag, versioned as the next patch release with a `-beta.<run ID>.<attempt>` suffix (for example `1.9.21-beta.12345678.1`). Use it to build against endpoints that are merged but not yet released, and switch back to `latest` once the release is tagged.
 
 ```bash
 npm install @oqtopus-team/qdash-client@beta
 ```
+
+Independent pi-qdash releases pin a client snapshot from the same commit; the
+`pi` dist-tag identifies those snapshots without changing `latest` or `beta`.
+See [Pi packages](../../developer-guide/copilot/packages.md) for local development
+and release ordering.
 
 ## Configuration
 

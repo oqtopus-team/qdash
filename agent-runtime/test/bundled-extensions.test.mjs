@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,17 @@ import {
 } from "../src/local-extensions.ts";
 
 const packagesDir = fileURLToPath(new URL("../../packages/", import.meta.url));
+
+test("pi-qdash resolves the client built from this checkout", () => {
+  const client = import.meta.resolve(
+    "@oqtopus-team/qdash-client",
+    fileURLToPath(new URL("../../packages/pi-qdash/package.json", import.meta.url)),
+  );
+  assert.equal(
+    realpathSync(fileURLToPath(client)),
+    realpathSync(fileURLToPath(new URL("../../clients/typescript/dist/index.js", import.meta.url))),
+  );
+});
 
 test("bundled packages load tools and skills offline, retaining the pi-qdash allowlist", async () => {
   const dir = mkdtempSync(join(tmpdir(), "qdash-bundled-"));

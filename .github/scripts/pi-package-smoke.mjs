@@ -18,6 +18,11 @@ assert.equal(manifest.name, packageName);
 for (const version of Object.values(manifest.dependencies ?? {})) {
   assert.ok(!/^(workspace:|file:|link:)/.test(version), "Published dependencies must resolve outside the workspace");
 }
+if (name === "pi-qdash") {
+  const client = JSON.parse(readFileSync(join(consumer, "node_modules/@oqtopus-team/qdash-client/package.json"), "utf8"));
+  assert.equal(manifest.dependencies["@oqtopus-team/qdash-client"], client.version);
+  assert.notEqual(client.version, "0.0.0");
+}
 assert.ok(existsSync(join(root, "LICENSE")));
 assert.ok(existsSync(join(root, "skills", skill, "SKILL.md")));
 const tools = new Map();
