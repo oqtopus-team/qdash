@@ -44,6 +44,7 @@ test("bundled packages load tools and skills offline, retaining the pi-qdash all
     const evaluator = extensions.find(({ tools }) => tools.has("qcal_evaluate"));
     const info = extensionPackage(evaluator.path, paths, paths);
     assert.equal(info.source, "package");
+    assert.equal(info.name, "@oqtopus-team/pi-qcaleval");
     assert.match(info.version, /^\d+\.\d+\.\d+\+source\.[0-9a-f]{16}$/);
   } finally {
     rmSync(dir, { recursive: true, force: true });

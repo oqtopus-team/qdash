@@ -111,12 +111,16 @@ once.
 ## Installation
 
 ```bash
-pi install npm:@orangekame3/pi-qcaleval
+pi install npm:@oqtopus-team/pi-qcaleval
 ```
+
+The package is now published as `@oqtopus-team/pi-qcaleval`. Existing pi CLI users
+should remove `@orangekame3/pi-qcaleval` before installing the new package to avoid
+loading both extensions. Historical releases remain available under the old name.
 
 Releases use QDash tags `pi-qcaleval/vX.Y.Z` and publish to npm as `latest`.
 Changes to the pi packages on QDash's `develop` branch publish `beta` prereleases
-(`npm:@orangekame3/pi-qcaleval@beta`).
+(`npm:@oqtopus-team/pi-qcaleval@beta`).
 
 ## Development
 

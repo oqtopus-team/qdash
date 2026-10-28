@@ -7,7 +7,7 @@ serve standalone pi CLI users.
 | Directory | npm package | Stable tag |
 | --- | --- | --- |
 | `packages/pi-qdash/` | `@oqtopus-team/pi-qdash` | `pi-qdash/vX.Y.Z` |
-| `packages/pi-qcaleval/` | `@orangekame3/pi-qcaleval` | `pi-qcaleval/vX.Y.Z` |
+| `packages/pi-qcaleval/` | `@oqtopus-team/pi-qcaleval` | `pi-qcaleval/vX.Y.Z` |
 
 The Python and TypeScript clients, UI, and documentation retain their own dependency
 configuration. pi-qdash keeps its explicit dependency on the published TypeScript
@@ -43,7 +43,9 @@ metadata; npm releases use the versions described below.
 
 `.github/workflows/publish-pi-packages.yml` follows the client workflows: validate
 PRs, publish beta builds from `develop`, and publish stable versions from tags.
-Both packages keep their existing npm names and independent version lines.
+Both packages publish under `@oqtopus-team` with independent version lines.
+pi-qcaleval moves from `@orangekame3/pi-qcaleval` to `@oqtopus-team/pi-qcaleval`;
+pi-qdash keeps its existing name.
 
 | Trigger | Result |
 | --- | --- |
@@ -56,23 +58,28 @@ Both packages keep their existing npm names and independent version lines.
 Beta versions use the next patch after the highest stable tag for that package, or
 its manifest version if no newer tag exists, followed by
 `-beta.<GitHub run ID>.<attempt>`. QDash's `vX.Y.Z` tags do not affect package versions.
-Run IDs avoid colliding with the old repositories' beta build numbers; attempts
+Run IDs avoid colliding with pi-qdash's previous beta build numbers; attempts
 allow a retry if one package published before the other failed.
 
 The workflow sets the artifact version at build time, like the TypeScript client.
 A routine change does not need a manifest version bump. For a stable release,
-choose a version newer than the package's current npm `latest`, tag the reviewed
+choose a version newer than the package's current npm `latest` (or at least its
+manifest version for the first publication), tag the reviewed
 QDash commit with the package prefix, and push that tag. Follow the repository's
 [pre-push procedure](../development-flow.md#before-pushing), including `task check`.
 Do not reuse a version that npm already contains. The versioning script rejects
 malformed tags and tags older than a known stable release.
 
-Consumers continue to install packages with:
+Consumers install packages with:
 
 ```bash
 pi install npm:@oqtopus-team/pi-qdash
-pi install npm:@orangekame3/pi-qcaleval
+pi install npm:@oqtopus-team/pi-qcaleval
 ```
+
+For existing standalone pi installations, remove the old `@orangekame3/pi-qcaleval`
+extension before installing the new name to avoid duplicate tools. Existing QDash
+evaluation records retain the original evaluator name and remain readable.
 
 Append `@beta` to select the prerelease channel. The packed artifacts contain the
 extension source, bundled skills, README, and license; they have no workspace-only
@@ -81,15 +88,21 @@ dependencies.
 ## Publishing configuration and repository retirement
 
 Configure [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) for
-both existing packages with organization `oqtopus-team`, repository `qdash`, and
+both `@oqtopus-team` packages with organization `oqtopus-team`, repository `qdash`, and
 workflow filename `publish-pi-packages.yml`. The workflow uses a GitHub-hosted
 runner and OIDC rather than an npm token. This package-owner setting is external
 to the repository; merging the workflow alone does not authorize publishing.
 
+`@oqtopus-team/pi-qcaleval` is a new npm package. Its first publication needs an
+account with permission to create packages in the `@oqtopus-team` scope. Publish
+the validated tarball from the workflow artifact with that maintainer account,
+then configure Trusted Publishing on the new package before enabling automated
+releases. The old npm package is not renamed or removed by this migration.
+
 Keep the original repositories available until a QDash beta and stable release
 of each package have published successfully and install correctly in standalone
-pi. During the handover, avoid publishing from both repositories concurrently,
-so the old workflow cannot overwrite the npm dist-tags. After verifying the new
+pi. During the pi-qdash handover, avoid publishing from both repositories
+concurrently, so its old workflow cannot overwrite the npm dist-tags. After verifying the new
 release path, disable the old publish workflows, update their README links to
 QDash, and archive them. Preserve the existing npm packages and versions.
 

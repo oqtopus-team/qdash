@@ -1,5 +1,5 @@
 {
-  "name": "@orangekame3/pi-qcaleval",
+  "name": "@oqtopus-team/pi-qcaleval",
   "version": "0.0.1",
   "description": "pi extension that sends calibration plots to a calibration-evaluation VLM such as NVIDIA Ising-Calibration and returns a structured diagnosis",
   "license": "Apache-2.0",

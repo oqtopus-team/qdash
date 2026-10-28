@@ -494,8 +494,8 @@ tasks:
     cmds:
       - bun run --filter '@oqtopus-team/pi-qdash' check
       - bun run --filter '@oqtopus-team/pi-qdash' test
-      - bun run --filter '@orangekame3/pi-qcaleval' check
-      - bun run --filter '@orangekame3/pi-qcaleval' test
+      - bun run --filter '@oqtopus-team/pi-qcaleval' check
+      - bun run --filter '@oqtopus-team/pi-qcaleval' test
       - node --test .github/scripts/pi-package-release.test.mjs
 
   ci-agent-runtime:

@@ -48,7 +48,7 @@ export function discoverExtensionCheckouts(dir: string): ExtensionCheckout[] {
 export function bundledExtensionCheckouts(packagesDir: string): ExtensionCheckout[] {
   const expected = new Map([
     ["pi-qdash", "@oqtopus-team/pi-qdash"],
-    ["pi-qcaleval", "@orangekame3/pi-qcaleval"],
+    ["pi-qcaleval", "@oqtopus-team/pi-qcaleval"],
   ]);
   return [...expected].map(([directory, name]) => {
     const path = resolve(packagesDir, directory);

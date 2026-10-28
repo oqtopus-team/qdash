@@ -17,14 +17,14 @@
         "yaml": "^2.8.0",
       },
       "devDependencies": {
+        "@oqtopus-team/pi-qcaleval": "workspace:*",
         "@oqtopus-team/pi-qdash": "workspace:*",
-        "@orangekame3/pi-qcaleval": "workspace:*",
         "@types/node": "^22.0.0",
         "typescript": "^5.8.0",
       },
     },
     "packages/pi-qcaleval": {
-      "name": "@orangekame3/pi-qcaleval",
+      "name": "@oqtopus-team/pi-qcaleval",
       "version": "0.0.1",
       "devDependencies": {
         "@earendil-works/pi-ai": "1.4.0",
@@ -123,11 +123,11 @@
 
     "@google/genai": ["@google/genai@2.21.0", "", { "dependencies": { "google-auth-library": "^10.3.0", "p-retry": "^4.6.2", "protobufjs": "^7.5.4", "ws": "^8.18.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.2" }, "optionalPeers": ["@modelcontextprotocol/sdk"] }, "sha512-+PDtco2/Z0ONdzCGekCoCT+O1VJS9xJQNN4XzQpXG/t3El/SWWMkCWlFRO1KmivOHPa4Q0VjUYu1HBKCZ/v33Q=="],
 
+    "@oqtopus-team/pi-qcaleval": ["@oqtopus-team/pi-qcaleval@workspace:packages/pi-qcaleval"],
+
     "@oqtopus-team/pi-qdash": ["@oqtopus-team/pi-qdash@workspace:packages/pi-qdash"],
 
     "@oqtopus-team/qdash-client": ["@oqtopus-team/qdash-client@1.9.21-beta.276", "", { "dependencies": { "axios": "^1.11.0", "ini": "^6.0.0" } }, "sha512-OecnrWd7fQ2JinNSvD7E7KsJo/Fwz2uXcDOr+TpnxGkQqITO3BgHsJjHowrlwfiHA+R2h7dPncNT8K629pSRYg=="],
-
-    "@orangekame3/pi-qcaleval": ["@orangekame3/pi-qcaleval@workspace:packages/pi-qcaleval"],
 
     "@protobufjs/aspromise": ["@protobufjs/aspromise@1.1.2", "", {}, "sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ=="],
 

@@ -96,7 +96,7 @@ export function isReviewedWriteTool(name: string): boolean {
  * they define is offered without a per-name entry above (reviewed write names
  * still require user approval). Reviewed per package; the bundled source is reviewed with QDash.
  */
-export const TRUSTED_EXTENSION_PACKAGES = ["@orangekame3/pi-qcaleval"] as const;
+export const TRUSTED_EXTENSION_PACKAGES = ["@oqtopus-team/pi-qcaleval"] as const;
 
 /**
  * Packages whose tools go through the per-name allowlist above even when a

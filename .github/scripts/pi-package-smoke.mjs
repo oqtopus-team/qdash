@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 const [consumer, name] = process.argv.slice(2);
 const packages = {
   "pi-qdash": ["@oqtopus-team/pi-qdash", "qdash_build_qcal_evidence", "qdash"],
-  "pi-qcaleval": ["@orangekame3/pi-qcaleval", "qcal_evaluate", "qcaleval"],
+  "pi-qcaleval": ["@oqtopus-team/pi-qcaleval", "qcal_evaluate", "qcaleval"],
 };
 assert.ok(Object.hasOwn(packages, name), "Unknown package");
 const [packageName, tool, skill] = packages[name];
