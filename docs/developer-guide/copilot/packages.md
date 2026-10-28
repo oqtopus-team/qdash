@@ -15,6 +15,10 @@ client's dependency overrides. The UI and documentation retain separate Bun
 installs; the Python client retains its Python workspace configuration.
 pi-qcaleval has no QDash client or runtime dependency.
 
+The [pi-qdash](../../reference/pi-qdash.md) and
+[pi-qcaleval](../../reference/pi-qcaleval.md) references describe their public tools.
+See [Pi Extension Design](./extensions.md) for the extension and skill boundaries.
+
 ## Development
 
 Install from the repository root with Bun 1.4.0. Package tests also require Node.js 24.
@@ -104,7 +108,7 @@ Append `@beta` to select the prerelease channel. The packed artifacts contain th
 extension source, bundled skills, README, and license; they have no workspace-only
 dependencies.
 
-## Publishing configuration and repository retirement
+## Publishing configuration
 
 Configure [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) for
 both `@oqtopus-team` packages with organization `oqtopus-team`, repository `qdash`, and
@@ -115,11 +119,7 @@ runner and OIDC for the pi packages. The client workflow retains its existing
 `publish-qdash-typescript-client.yml` (direct stable releases). This package-owner setting is external
 to the repository; merging the workflow alone does not authorize publishing.
 
-`@oqtopus-team/pi-qcaleval` is a new npm package. Its first publication needs an
-account with permission to create packages in the `@oqtopus-team` scope. Publish
-the validated tarball from the workflow artifact with that maintainer account,
-then configure Trusted Publishing on the new package before enabling automated
-releases. The old npm package is not renamed or removed by this migration.
+## Retiring the original repositories
 
 Keep the original repositories available until a QDash beta and stable release
 of each package have published successfully and install correctly in standalone

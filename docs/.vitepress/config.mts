@@ -190,6 +190,7 @@ export default withMermaid(
               items: [
                 { text: "Architecture", link: "/developer-guide/copilot/architecture" },
                 { text: "Pi Packages", link: "/developer-guide/copilot/packages" },
+                { text: "Pi Extension Design", link: "/developer-guide/copilot/extensions" },
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },
                 { text: "Agentic Calibration", link: "/developer-guide/copilot/agentic-calibration" },
                 { text: "Knowledge Layout", link: "/developer-guide/copilot/knowledge-layout" },
@@ -219,6 +220,8 @@ export default withMermaid(
                 { text: "OpenAPI", link: "/reference/openapi" },
                 { text: "Python Client", link: "/reference/clients/python" },
                 { text: "TypeScript Client", link: "/reference/clients/typescript" },
+                { text: "pi-qdash", link: "/reference/pi-qdash" },
+                { text: "pi-qcaleval", link: "/reference/pi-qcaleval" },
               ],
             },
             {

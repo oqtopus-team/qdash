@@ -1,9 +1,9 @@
 <!-- markdownlint-disable MD041 -->
-![OQTOPUS logo](./docs/asset/oqtopus-logo.png)
+![OQTOPUS logo](https://raw.githubusercontent.com/oqtopus-team/qdash/develop/packages/pi-qdash/docs/asset/oqtopus-logo.png)
 
 # pi-qdash
 
-[![CI](https://github.com/oqtopus-team/pi-qdash/actions/workflows/ci.yaml/badge.svg)](https://github.com/oqtopus-team/pi-qdash/actions/workflows/ci.yaml)
+[![CI](https://github.com/oqtopus-team/qdash/actions/workflows/publish-typescript-packages.yml/badge.svg)](https://github.com/oqtopus-team/qdash/actions/workflows/publish-typescript-packages.yml)
 [![npm version](https://img.shields.io/npm/v/%40oqtopus-team%2Fpi-qdash.svg)](https://www.npmjs.com/package/@oqtopus-team/pi-qdash)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![slack](https://img.shields.io/badge/slack-OQTOPUS-pink.svg?logo=slack&style=plastic)](https://join.slack.com/t/oqtopus/shared_invite/zt-3bpjb7yc3-Vg8IYSMY1m5wV3DR~TMSnw)
@@ -44,13 +44,9 @@ Or try it without installing:
 pi -e npm:@oqtopus-team/pi-qdash
 ```
 
-Requires Node.js 20 or later and pi v0.74.0 or later. The extension tracks
-`@oqtopus-team/qdash-client` 1.9.x and uses its authenticated high-level and
-generated API clients.
-
-Changes to the pi packages on QDash’s `develop` branch publish a prerelease under the `beta` dist-tag
-(the next patch version with a `-beta.<build>` suffix, for example
-`0.1.10-beta.42`). Use it to try tools that are merged but not yet released:
+The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.4.0.
+Published releases pin the matching `@oqtopus-team/qdash-client` version.
+Use the `beta` dist-tag to try changes merged into QDash's `develop` branch:
 
 ```bash
 pi install npm:@oqtopus-team/pi-qdash@beta
@@ -67,31 +63,22 @@ In interactive pi, set up the session context first:
 
 See the documentation below for the full tool and command reference.
 
-## Developing from a Fork
+## Documentation and development
 
-For local development, clone your QDash fork and use the root Bun workspace:
+The [tool, command, and skill reference](https://oqtopus-team.github.io/qdash/reference/pi-qdash)
+describes the extension's capabilities. The
+[extension design guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/extensions)
+explains where to add tools, safety gates, and domain reasoning.
 
-```bash
-git clone https://github.com/<your-user>/qdash.git
-cd qdash
-bun install --frozen-lockfile
-task ci-pi-packages
-pi -e ./packages/pi-qdash
-```
-
-See [Development Guide](./docs/DEVELOPMENT.md) for the fork workflow, local testing, PR expectations, and the extension-vs-skill design policy.
-
-## Documentation
-
-- [Architecture](./docs/ARCHITECTURE.md)
-- [Tool Reference](./docs/tools.md)
-- [Commands & Skills](./docs/commands.md)
-- [Development Guide](./docs/DEVELOPMENT.md)
-- [Contributing](./docs/CONTRIBUTING.md)
+Development takes place in the [QDash monorepo](https://github.com/oqtopus-team/qdash/tree/develop/packages/pi-qdash).
+Follow the [package development and release guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/packages)
+for workspace setup, checks, local pi CLI testing, and independent npm releases.
+Open pull requests against QDash's `develop` branch and report bugs in
+[QDash issues](https://github.com/oqtopus-team/qdash/issues).
 
 ## Citation
 
-Citation information is available in the [CITATION](./CITATION.cff) file.
+Citation information is available in the [CITATION](https://github.com/oqtopus-team/qdash/blob/develop/packages/pi-qdash/CITATION.cff) file.
 
 ## Contact
 
