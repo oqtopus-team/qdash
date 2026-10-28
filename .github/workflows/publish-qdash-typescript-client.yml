@@ -1,6 +1,6 @@
 name: Publish @oqtopus-team/qdash-client
 
-# The pi workflow owns PR/develop builds so dependent packages share one client
+# The TypeScript packages workflow owns PR/develop builds so packages share one client
 # version and cannot race a separate client publication for the same commit.
 on:
   push:
