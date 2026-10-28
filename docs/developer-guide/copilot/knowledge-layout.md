@@ -1,11 +1,11 @@
 # Copilot Knowledge Layout
 
-Copilot's behaviour comes from three kinds of knowledge that live in three places. QDash consumes the first two at pinned versions and owns only the third.
+Copilot's behaviour comes from three kinds of knowledge that live in three places. QDash owns the tools and product behaviour; task knowledge comes from a separate repository.
 
 | Kind | Examples | Home | How QDash gets it |
 | --- | --- | --- | --- |
 | Facts about calibration tasks | Background per task (`task.md` with a fixed template: intro, Expected plot, Common failures, Parameters to extract; laid out by calibtasks package) and expert-labeled example plots | [qdash-task-knowledge](https://github.com/qiqb-osaka/qdash-task-knowledge), cloned into `config/task-knowledge` | The repository's `generate.py` builds a versioned `task-knowledge.json` whose contract is `task-knowledge.schema.json` (figures by path, not embedded); the API serves it to the chat prompt, the evaluation reference, and the `qdash_get_task_knowledge` tool. The Knowledge page shows it read-only. |
-| Tools and procedures | Tool definitions, "which tool for which question", diagnosis workflows, agent-session workflows | [pi-qdash](https://github.com/oqtopus-team/pi-qdash) (`extensions/`, `skills/`) | Installed into the Agent Runtime image at a pinned version (`agent-runtime/Dockerfile`) |
+| Tools and procedures | Tool definitions, "which tool for which question", diagnosis workflows, agent-session workflows | `packages/pi-qdash/` (`extensions/`, `skills/`) | Included from the same QDash checkout in the Agent Runtime image |
 | Product behaviour | Persona, approval cards, `ask_user`, output language, turn budgets, model catalog | This repository | `agent-runtime/src/prompt.ts`, `config/copilot/*.yaml` |
 
 The evaluation reference is derived from `task.md`, not written separately: the API's `GET /tasks/{name}/knowledge` serves `reference` with the background (`This is a <task> experiment: <intro>. <Expected plot prose>`), the parameters to extract (one `float` per bullet under **Parameters to extract**), and the status criteria (`SUCCESS` from the "A good result" sentence, then one `UPPER_SNAKE` code per bullet under **Common failures**, with the text up to the first `;` as its criterion). The evaluation model is asked the six QCalEval questions against exactly that, so write those sections as criteria a reader could apply to a plot; the derivation rules and the question each part fills are in [Calibration Evaluation](./evaluation.md). An example under `examples/` may carry `status`, `suggested_range` and `parameters` next to its `outcome`; those are what the in-context demonstrations show for the status, significance and extraction questions.
@@ -35,7 +35,7 @@ The split follows what changes together. A skill that names `qdash_list_cooldown
 - Do not put pi-qdash tool names into `prompt.ts`. The tool routing guide is the "Preferred tools" section of the pi-qdash `qdash` skill; the runtime reads it at startup, keeps only the tools it exposes, and inlines it into the system prompt (`agent-runtime/src/tool-guide.ts`). The rest of that skill and the other skills stay behind `read_skill`.
 - Do not add QDash-only instructions to a pi-qdash skill. pi CLI users get the same skills without the QDash UI.
 - The distribution source for agent skills is pi-qdash. Skills under this repository's `.agents/skills/` are for agents editing QDash's own code, not for sessions, and are never recorded.
-- Updating knowledge means bumping a version: the pi-qdash version in `agent-runtime/Dockerfile`, or the task-knowledge checkout under `config/task-knowledge`. Agent sessions record the skill name, version, and hash they ran with.
+- Update tool skills in `packages/pi-qdash/skills/` and rebuild the runtime; update task knowledge through the checkout under `config/task-knowledge`. Agent sessions record the skill name, version, and hash they ran with.
 
 ## Chat prompts
 

@@ -140,6 +140,26 @@ describe("CreateChipModal", () => {
     );
   });
 
+  it("creates configuration from the selected backend template", async () => {
+    render(<CreateChipModal isOpen onClose={vi.fn()} />);
+    expect(screen.getByRole("option", { name: "Start from template" })).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText("e.g., 64Q, Chip001"), {
+      target: { value: "new-chip" },
+    });
+    fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "quel3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create Chip" }));
+    await waitFor(() =>
+      expect(mocks.mutate).toHaveBeenCalledWith({
+        data: {
+          chip_id: "new-chip",
+          size: 64,
+          topology_id: "grid-64",
+          config: { backend: "quel3" },
+        },
+      }),
+    );
+  });
+
   it("copies wiring from the selected system", async () => {
     render(<CreateChipModal isOpen onClose={vi.fn()} />);
     fireEvent.change(screen.getByPlaceholderText("e.g., 64Q, Chip001"), {

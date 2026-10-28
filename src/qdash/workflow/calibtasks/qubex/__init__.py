@@ -37,6 +37,7 @@ from qdash.workflow.calibtasks.qubex.measurement.check_cpmg_noise_spectroscopy i
 from qdash.workflow.calibtasks.qubex.measurement.check_quantum_efficiency import (
     CheckQuantumEfficiency,
 )
+from qdash.workflow.calibtasks.qubex.measurement.check_readout_mist import CheckReadoutMIST
 from qdash.workflow.calibtasks.qubex.measurement.check_spin_lock_spectroscopy import (
     CheckSpinLockSpectroscopy,
 )
@@ -121,6 +122,7 @@ __all__ = [
     "CheckQubitSpectroscopy",
     "CheckRabi",
     "CheckRamsey",
+    "CheckReadoutMIST",
     "CheckResonatorSpectroscopy",
     "CheckSpinLockSpectroscopy",
     "CheckStatus",

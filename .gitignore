@@ -249,3 +249,7 @@ scripts/estimate-resonator-frequency
 .direnv
 tmp
 /notes
+
+# Compiled pi package tests and release tarballs.
+packages/*/.test-dist/
+*.tgz

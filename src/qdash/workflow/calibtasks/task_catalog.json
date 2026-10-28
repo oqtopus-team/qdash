@@ -4282,6 +4282,125 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CheckReadoutMIST",
+        "description": "Characterize effective GEF transitions caused by a readout cycle.",
+        "file_path": "measurement/check_readout_mist.py",
+        "input_parameters": {
+          "control_frequency": {
+            "default_value": null,
+            "description": "Calibrated GE control frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_frequency_ef": {
+            "default_value": null,
+            "description": "Calibrated EF control frequency",
+            "fallback_parameter_names": [
+              "ef_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "ef_pi_amplitude": {
+            "default_value": null,
+            "description": "Calibrated EF pi-pulse amplitude",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_pi_duration": {
+            "default_value": null,
+            "description": "Calibrated EF pi-pulse duration",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "pi_amplitude": {
+            "default_value": null,
+            "description": "Calibrated GE pi-pulse amplitude",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "pi_duration": {
+            "default_value": null,
+            "description": "Calibrated GE pi-pulse duration",
+            "greater_than": 0,
+            "parameter_aliases": [
+              "pi_length"
+            ],
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "description": "Calibrated readout amplitude",
+            "greater_than": 0,
+            "less_than_or_equal": 1,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "description": "Calibrated readout frequency",
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckReadoutMIST",
+        "output_parameters": [],
+        "run_parameters": {
+          "calibration_shots": {
+            "description": "Shots for each shared GEF calibration configuration",
+            "unit": "a.u.",
+            "value": 8192,
+            "value_type": "int"
+          },
+          "cycle_gap": {
+            "description": "Trailing gap appended to each configured readout cycle",
+            "unit": "ns",
+            "value": 0.0,
+            "value_type": "float"
+          },
+          "interval": {
+            "description": "Interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "measure_reference": {
+            "description": "Measure and fit a duration-matched blank reference cycle",
+            "unit": "a.u.",
+            "value": true,
+            "value_type": "bool"
+          },
+          "shots": {
+            "description": "Shots for each GEF population measurement",
+            "unit": "a.u.",
+            "value": 4096,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckResonatorSpectroscopy",
         "description": "Task to check the resonator spectroscopy.\n\nThis is a MUX-level task that performs spectroscopy on all resonators\nwith the dedicated 8192 ns Qubex spectroscopy pulse. The scheduler executes it once\nper MUX, and the result will be used by all qubits in that MUX.\n\nNote: task_type remains \"qubit\" for frontend compatibility, but\nis_mux_level=True indicates this task runs once per MUX.",
         "file_path": "cw/check_resonator_spectroscopy.py",
