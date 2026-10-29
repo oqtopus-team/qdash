@@ -156,7 +156,7 @@ services:
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - ./config:/app/config # QDash app/domain/copilot config files
-      - ${QUELWARE_CLIENT_PATH:-./config/quelware-client}:/root/.config/quelware-client # Qubex backend CLI for workflow tasks
+      - ${QUELWARE_CLIENT_PATH:-${HOME}/.config/quelware-client}:/root/.config/quelware-client # Qubex backend CLI for workflow tasks
       - worker-logs:/app/logs
     working_dir: /app/qdash/workflow
     command: python start_worker.py
