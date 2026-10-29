@@ -12,7 +12,7 @@ from qdash.workflow.calibtasks.qubex.base import (
     readout_duration_run_parameter,
     required_rabi_normalization_inputs,
 )
-from qdash.workflow.calibtasks.qubex.validation import finite_value_error
+from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -104,6 +104,11 @@ class CheckCouplingStrength(QubexTask):
     }
 
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "static_zz_interaction": OutputParameterSpec(
+            qid_role="coupling",
+            unit="KHz",
+            description="Signed static ZZ interaction (Qubex zeta = 2 * xi)",
+        ),
         "qubit_qubit_coupling_strength": OutputParameterSpec(
             qid_role="coupling",
             unit="GHz",
@@ -115,13 +120,18 @@ class CheckCouplingStrength(QubexTask):
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
         data = run_result.raw_result.data
+        zeta = data.get("zeta")
+        self.output_parameters["static_zz_interaction"].value = (
+            zeta * 1e6 if zeta is not None else None
+        )  # GHz to KHz
         self.output_parameters["qubit_qubit_coupling_strength"].value = data.get("g")
         figure = data.get("fig")
         return PostProcessResult(
             output_parameters=self.attach_execution_id(execution_id),
             figures=[figure] if figure is not None else [],
-            validation_error=finite_value_error(
-                data.get("g"), "qubit_qubit_coupling_strength", minimum=0.0
+            validation_error=first_validation_error(
+                finite_value_error(data.get("g"), "qubit_qubit_coupling_strength", minimum=0.0),
+                finite_value_error(zeta, "static_zz_interaction"),
             ),
         )
 

@@ -2396,6 +2396,7 @@
         },
         "name": "CheckCouplingStrength",
         "output_parameters": [
+          "static_zz_interaction",
           "qubit_qubit_coupling_strength"
         ],
         "run_parameters": {

@@ -60,7 +60,9 @@ def test_postprocess_preserves_coupling_strength_in_ghz(strength: float) -> None
     result = task.postprocess(
         cast("Any", object()),
         "exec-1",
-        RunResult(raw_result=SimpleNamespace(data={"g": strength, "fig": figure})),
+        RunResult(
+            raw_result=SimpleNamespace(data={"g": strength, "zeta": -0.00002, "fig": figure})
+        ),
         "0-1",
     )
 
@@ -78,21 +80,21 @@ def test_postprocess_rejects_invalid_strength(strength: float | None) -> None:
     result = CheckCouplingStrength().postprocess(
         cast("Any", object()),
         "exec-1",
-        RunResult(raw_result=SimpleNamespace(data={"g": strength})),
+        RunResult(raw_result=SimpleNamespace(data={"g": strength, "zeta": -0.00002})),
         "0-1",
     )
     assert result.validation_error is not None
     assert "qubit_qubit_coupling_strength" in result.validation_error
 
 
-def test_registered_task_saves_strength_to_coupling_metric() -> None:
+def test_registered_task_saves_both_coupling_metrics() -> None:
     task = generate_task_instances(
         ["CheckCouplingStrength"], {"CheckCouplingStrength": {}}, "qubex"
     )["CheckCouplingStrength"]
     output = task.postprocess(
         cast("Any", object()),
         "exec-1",
-        RunResult(raw_result=SimpleNamespace(data={"g": 0.005})),
+        RunResult(raw_result=SimpleNamespace(data={"g": 0.005, "zeta": -0.00002})),
         "0-1",
     ).output_parameters
     state_manager = MagicMock()
@@ -111,3 +113,34 @@ def test_registered_task_saves_strength_to_coupling_metric() -> None:
     assert saved["project_id"] == "proj-1"
     assert saved["output_parameters"]["qubit_qubit_coupling_strength"].value == pytest.approx(0.005)
     assert saved["output_parameters"]["qubit_qubit_coupling_strength"].unit == "GHz"
+
+    assert saved["output_parameters"]["static_zz_interaction"].value == pytest.approx(-20.0)
+    assert saved["output_parameters"]["static_zz_interaction"].unit == "KHz"
+
+
+@pytest.mark.parametrize("zeta", [0.00002, -0.00002, 0.0])
+def test_postprocess_converts_signed_static_zz_to_khz(zeta) -> None:
+    result = CheckCouplingStrength().postprocess(
+        cast("Any", object()),
+        "exec-1",
+        RunResult(raw_result=SimpleNamespace(data={"g": 0.005, "zeta": zeta})),
+        "0-1",
+    )
+    metric = result.output_parameters["static_zz_interaction"]
+    assert metric.value == pytest.approx(zeta * 1e6)
+    assert metric.unit == "KHz"
+    assert metric.qid_role == "coupling"
+    assert metric.execution_id == "exec-1"
+    assert result.validation_error is None
+
+
+@pytest.mark.parametrize("zeta", [None, np.nan, np.inf, -np.inf])
+def test_postprocess_rejects_missing_or_non_finite_static_zz(zeta) -> None:
+    result = CheckCouplingStrength().postprocess(
+        cast("Any", object()),
+        "exec-1",
+        RunResult(raw_result=SimpleNamespace(data={"g": 0.005, "zeta": zeta})),
+        "0-1",
+    )
+    assert result.validation_error is not None
+    assert "static_zz_interaction" in result.validation_error
