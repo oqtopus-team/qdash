@@ -240,6 +240,28 @@ class TestParameterManagement:
         assert tsm.get_task("CheckAdaptiveFHChevron", "qubit", "0").output_parameters == {}
         assert set(tsm.calib_data.qubit["0"]) == {"t1"}
 
+    def test_duplicate_publish_targets_leave_task_and_calibration_state_unchanged(self):
+        """Reject an ambiguous target before recording either output."""
+        tsm = TaskStateManager(qids=["0"])
+        tsm.calib_data.qubit["0"]["t1"] = ParameterModel(value=30.0)
+        task = tsm.ensure_task_exists("CheckFrequency", "qubit", "0")
+
+        with pytest.raises(ValueError, match="Multiple outputs publish to 'control_frequency'"):
+            tsm.put_output_parameters(
+                "CheckFrequency",
+                {"first": ParameterModel(value=4.2), "second": ParameterModel(value=4.3)},
+                "qubit",
+                "0",
+                publish_targets={
+                    "first": ("control_frequency",),
+                    "second": ("control_frequency",),
+                },
+            )
+
+        assert task.output_parameters == {}
+        assert set(tsm.calib_data.qubit["0"]) == {"t1"}
+        assert tsm.get_published_parameter_names("CheckFrequency", "qubit", "0") == set()
+
     def test_put_output_parameters_for_coupling(self):
         """Test put_output_parameters for coupling task."""
         tsm = TaskStateManager()

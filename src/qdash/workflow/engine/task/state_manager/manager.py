@@ -213,10 +213,10 @@ class TaskStateManager(BaseModel):
         publishes under its own name.
         """
         task = self._ensure_task_exists(task_name, task_type, qid)
+        published = data_ops.expand_published_parameters(output_parameters, publish_targets)
         task.put_output_parameter(dict(output_parameters))
 
         # Update calibration data under the published names
-        published = data_ops.expand_published_parameters(output_parameters, publish_targets)
         self._published_parameter_names[(task_name, task_type, qid)] = list(published)
         if task_type == TaskTypes.QUBIT:
             for key, value in published.items():
@@ -224,6 +224,10 @@ class TaskStateManager(BaseModel):
         elif task_type == TaskTypes.COUPLING:
             for key, value in published.items():
                 self.calib_data.put_coupling_data(qid, key, value)
+
+    def get_published_parameter_names(self, task_name: str, task_type: str, qid: str) -> set[str]:
+        """Return calibration parameter names published by this task run."""
+        return set(self._published_parameter_names.get((task_name, task_type, qid), ()))
 
     def clear_output_parameters(self, task_name: str, task_type: str, qid: str) -> None:
         """Clear output parameters for a task and rollback calib_data."""

@@ -31,6 +31,8 @@ def expand_published_parameters(
     for output_name, parameter in output_parameters.items():
         targets = tuple(publish_targets.get(output_name, ())) if publish_targets else ()
         for target in targets or (output_name,):
+            if target in published:
+                raise ValueError(f"Multiple outputs publish to '{target}'")
             if target == output_name:
                 published[target] = parameter
             else:

@@ -928,6 +928,84 @@ class TestCalibServiceParameterManagement:
         assert "not_written_only" not in qubit_data
         assert "measurement_only" not in qubit_data
 
+    def test_merge_task_result_calib_data_drops_replaced_publish_targets(self, monkeypatch):
+        """History reconstruction keeps the latest owner of each published name."""
+        from qdash.datamodel.task import ParameterModel, TaskTypes
+
+        def result(task_name: str, target: str, value: float):
+            return SimpleNamespace(
+                name=task_name,
+                qid="0",
+                task_type=TaskTypes.QUBIT,
+                task_id=f"{task_name}-{target}",
+                output_parameters={
+                    "measured": {
+                        "value": value,
+                        "database_updated": True,
+                        "database_updates": [
+                            {"parameter_name": target, "updated_value": value, "updated": True}
+                        ],
+                    }
+                },
+            )
+
+        class FakeFinder:
+            def sort(self, sort):
+                return self
+
+            def run(self):
+                return [
+                    SimpleNamespace(
+                        name="TaskA",
+                        qid="0",
+                        task_type=TaskTypes.QUBIT,
+                        task_id="TaskA-first",
+                        output_parameters={
+                            "measured": {
+                                "value": 4.2,
+                                "database_updated": True,
+                                "database_updates": [
+                                    {
+                                        "parameter_name": "old_alias",
+                                        "updated_value": 4.2,
+                                        "updated": True,
+                                    },
+                                    {
+                                        "parameter_name": "shared_alias",
+                                        "updated_value": 4.2,
+                                        "updated": True,
+                                    },
+                                ],
+                            }
+                        },
+                    ),
+                    result("TaskB", "shared_alias", 5.0),
+                    result("TaskA", "new_alias", 4.3),
+                ]
+
+        monkeypatch.setattr(
+            "qdash.dbmodel.task_result_history.TaskResultHistoryDocument.find",
+            lambda query: FakeFinder(),
+        )
+        execution_service = MockExecutionService()
+        execution_service.calib_data.qubit["0"] = {
+            "old_alias": ParameterModel(value=4.2),
+            "shared_alias": ParameterModel(value=5.0),
+        }
+        session = CalibService.__new__(CalibService)
+        session.project_id = "test_project"
+        session.execution_id = "exec-1"
+        orchestrator = MagicMock()
+        orchestrator._execution_service = execution_service
+        session._orchestrator = orchestrator
+
+        session._merge_task_result_calib_data_before_push(MagicMock())
+
+        calib = execution_service.calib_data.qubit["0"]
+        assert set(calib) == {"shared_alias", "new_alias"}
+        assert calib["shared_alias"].value == 5.0
+        assert calib["new_alias"].value == 4.3
+
 
 class TestGlobalSessionHelpers:
     """Test global session helper functions."""
