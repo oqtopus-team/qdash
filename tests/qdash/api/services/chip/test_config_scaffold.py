@@ -256,6 +256,26 @@ def test_scaffold_uses_low_band_defaults_for_low_band_readout_boxes(scaffolder, 
     assert list(data)[:2] == ["Q000", "Q001"]
 
 
+@pytest.mark.parametrize("read_out", ["S1R:1", "S1R:", "S1R-1"])
+def test_scaffold_reads_box_id_from_readout_port(scaffolder, tree, read_out):
+    _write(
+        tree / "64Qv3/config/wiring.yaml",
+        {"64Qv3": [{"mux": 0, "read_out": read_out}]},
+    )
+
+    scaffolder.scaffold(chip_id="64Qv4", n_qubits=64, source_system_id="64Qv3")
+
+    assert _seeded(tree / "64Qv4/params/readout_frequency.yaml")[0] == 6.25
+
+
+def test_scaffold_uses_only_configured_box_when_wiring_has_no_readout(scaffolder, tree):
+    _write(tree / "64Qv3/config/wiring.yaml", {"64Qv3": []})
+
+    scaffolder.scaffold(chip_id="64Qv4", n_qubits=64, source_system_id="64Qv3")
+
+    assert _seeded(tree / "64Qv4/params/readout_frequency.yaml")[0] == 6.25
+
+
 def test_scaffold_rejects_readout_boxes_in_both_bands(scaffolder, tree):
     rows = [
         {"mux": 0, "read_out": "S1R-1", "read_in": "S1R-0"},

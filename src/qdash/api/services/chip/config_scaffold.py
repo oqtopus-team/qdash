@@ -127,9 +127,15 @@ def _readout_band(backend: str, rows: list[Any], boxes: Any) -> str:
     types: set[str] = set()
     for row in rows:
         port = row.get("read_out") if isinstance(row, dict) else None
-        box = boxes.get(str(port).split("-")[0]) if isinstance(boxes, dict) and port else None
+        port_text = str(port) if port else ""
+        box_id = port_text.split(":", 1)[0] if ":" in port_text else port_text.rsplit("-", 1)[0]
+        box = boxes.get(box_id) if isinstance(boxes, dict) and port else None
         if isinstance(box, dict) and box.get("type"):
             types.add(str(box["type"]))
+    if not types and isinstance(boxes, dict) and len(boxes) == 1:
+        only_box = next(iter(boxes.values()))
+        if isinstance(only_box, dict) and only_box.get("type"):
+            types.add(str(only_box["type"]))
     if not types:
         return "low" if backend == "quel3" else "high"
     bands = {"low" if box_type in _LOW_BAND_BOX_TYPES else "high" for box_type in types}

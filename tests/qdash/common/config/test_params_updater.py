@@ -244,3 +244,52 @@ def test_missing_unit_is_added_even_when_the_value_is_unchanged(tmp_path, monkey
     word = YAML().load((tmp_path / "capture_delay_word.yaml").read_text())
     assert word["meta"]["unit"] == "word"
     assert dict(word["data"]) == {1: 4}
+
+
+def test_mux_unit_mismatch_rejects_update_without_changing_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "qdash.common.config.params_updater.ConfigLoader.load_workflow",
+        lambda: {
+            "params_updater": {
+                "parameter_file_map": {"capture_delay_word": "capture_delay_word.yaml"},
+                "mux_file_names": ["capture_delay_word.yaml"],
+            }
+        },
+    )
+    path = tmp_path / "capture_delay_word.yaml"
+    before = "meta:\n  unit: ndelay\ndata:\n  1: 4\n"
+    path.write_text(before)
+    updater = YamlParamsUpdater(tmp_path, "Q05")
+
+    with pytest.raises(ValueError, match=r"declares meta\.unit='ndelay'"):
+        updater.update("5", {"capture_delay_word": {"value": 4, "unit": "word"}})
+
+    assert path.read_text() == before
+
+
+def test_equal_mux_value_is_rewritten_as_integer(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "qdash.common.config.params_updater.ConfigLoader.load_workflow",
+        lambda: {
+            "params_updater": {
+                "parameter_file_map": {"capture_delay_word": "capture_delay_word.yaml"},
+                "mux_file_names": ["capture_delay_word.yaml"],
+            }
+        },
+    )
+    path = tmp_path / "capture_delay_word.yaml"
+    path.write_text("meta:\n  unit: word\ndata:\n  1: 4.0\n")
+    updater = YamlParamsUpdater(tmp_path, "Q05")
+
+    assert updater.update("5", {"capture_delay_word": {"value": 4, "unit": "word"}}) == {
+        "capture_delay_word.yaml"
+    }
+    assert type(YAML().load(path.read_text())["data"][1]) is int
+
+
+def test_equal_non_mux_value_keeps_existing_yaml(updater, tmp_path):
+    before = (tmp_path / "frequency.yaml").read_text()
+
+    assert updater.update("4", {"frequency": {"value": 4}}) == set()
+
+    assert (tmp_path / "frequency.yaml").read_text() == before

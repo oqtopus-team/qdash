@@ -406,9 +406,22 @@ class YamlParamsUpdater:
                 data["data"] = section
 
             meta = data.get("meta")
-            missing_unit = bool(unit) and not (isinstance(meta, dict) and meta.get("unit"))
+            existing_unit = meta.get("unit") if isinstance(meta, dict) else None
+            if unit and existing_unit and str(existing_unit) != unit:
+                raise ValueError(
+                    f"{file_path.name} declares meta.unit={existing_unit!r}, "
+                    f"but the parameter uses {unit!r}"
+                )
+            missing_unit = bool(unit) and not existing_unit
             current_value = section.get(qubit_label)
-            if self._values_equal(current_value, value) and not missing_unit:
+            needs_scalar_rewrite = file_path.name in self._mux_file_names and type(
+                current_value
+            ) is not type(value)
+            if (
+                self._values_equal(current_value, value)
+                and not missing_unit
+                and not needs_scalar_rewrite
+            ):
                 return False
 
             if missing_unit:
