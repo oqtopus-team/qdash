@@ -72,6 +72,14 @@
     "function_name": "ef_calibration"
   },
   {
+    "id": "characterization",
+    "name": "Characterization",
+    "description": "End-to-end GE, optional EF, and JAZZ characterization with selectable stages. Calibration failures filter dependent work, while characterization measurement failures are recorded without stopping later measurements. JAZZ runs after any selected EF work using the coupling schedule captured from GE-successful qubits.",
+    "category": "production",
+    "filename": "characterization.py",
+    "function_name": "characterization"
+  },
+  {
     "id": "full_calibration",
     "name": "Full Calibration",
     "description": "Complete calibration for explicitly selected mux_ids using step-based pipeline: ConfigureAll -> 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule (forward/reverse) -> 2Q.",

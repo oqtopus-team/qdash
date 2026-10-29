@@ -36,6 +36,7 @@ backends:
         - CheckCoarseReadoutParams
         - CheckCKP
         - CheckQuantumEfficiency
+        - CheckCPMGNoiseSpectroscopy
         - CreateHPIPulse
         - CheckHPIPulse
         - CreatePIPulse
