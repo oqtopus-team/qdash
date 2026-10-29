@@ -10,6 +10,9 @@ from qdash.workflow.calibtasks.base import (
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.box_setup.configuration_lock import (
+    configuration_push_lock,
+)
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
@@ -64,7 +67,9 @@ class ConfigureAll(QubexTask):
             config_dir=exp.config_path,
             params_dir=exp.params_path,
         )
-        print(f"[ConfigureAll] Pushing system_manager (box_ids={exp.box_ids})")
-        exp.system_manager.push(box_ids=exp.box_ids, confirm=False, parallel=False)
+        box_ids = exp.box_ids
+        print(f"[ConfigureAll] Pushing system_manager (box_ids={box_ids})")
+        with configuration_push_lock(box_ids):
+            exp.system_manager.push(box_ids=box_ids, confirm=False, parallel=False)
         print("[ConfigureAll] Done")
-        return RunResult(raw_result={"mux_ids": mux_ids, "box_ids": exp.box_ids})
+        return RunResult(raw_result={"mux_ids": mux_ids, "box_ids": box_ids})

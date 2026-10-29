@@ -12,6 +12,9 @@ from qdash.workflow.calibtasks.base import (
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.box_setup.configuration_lock import (
+    configuration_push_lock,
+)
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -66,8 +69,10 @@ class Configure(QubexTask):
             "configuration_mode": mode,
         }
         exp.system_manager.load(**load_kwargs)
-        print(f"[{self.name}] Pushing system_manager for {label} (box_ids={exp.box_ids})")
-        exp.system_manager.push(box_ids=exp.box_ids, confirm=False, parallel=False)
+        box_ids = exp.box_ids
+        print(f"[{self.name}] Pushing system_manager for {label} (box_ids={box_ids})")
+        with configuration_push_lock(box_ids):
+            exp.system_manager.push(box_ids=box_ids, confirm=False, parallel=False)
         print(f"[{self.name}] Done for {label}")
         self.save_calibration(backend)
         return RunResult(raw_result=None)

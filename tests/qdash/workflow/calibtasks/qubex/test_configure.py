@@ -1,5 +1,6 @@
 """Configuration tasks preserve readout isolation and select usable EF channels."""
 
+from contextlib import contextmanager
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock
@@ -8,6 +9,8 @@ import pytest
 
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
 from qdash.workflow.calibtasks.qubex.box_setup.configure import Configure, ConfigureEF
+from qdash.workflow.calibtasks.qubex.box_setup.configure_all import ConfigureAll
+from qdash.workflow.calibtasks.qubex.box_setup.readout_configure import ReadoutConfigure
 from qdash.workflow.calibtasks.qubex.validation import require_ef_configuration
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
@@ -166,3 +169,121 @@ def test_push_failure_does_not_save_calibration() -> None:
     assert exp.configuration_mode == "ge-cr-cr"
     assert "configuration_mode" not in backend.config
     exp.calib_note.save.assert_not_called()
+
+
+def test_configure_holds_box_lock_while_pushing(monkeypatch: pytest.MonkeyPatch) -> None:
+    exp = ConfigurationExperiment()
+    lock_events: list[tuple[str, object]] = []
+
+    @contextmanager
+    def fake_lock(box_ids):
+        lock_events.append(("acquire", list(box_ids)))
+        yield
+        lock_events.append(("release", list(box_ids)))
+
+    def push(**kwargs: Any) -> None:
+        lock_events.append(("push", kwargs))
+
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.box_setup.configure.configuration_push_lock",
+        fake_lock,
+    )
+    exp.system_manager.push.side_effect = push
+
+    ConfigureEF().run(_backend(exp), "0")
+
+    assert lock_events == [
+        ("acquire", ["box-1"]),
+        (
+            "push",
+            {"box_ids": ["box-1"], "confirm": False, "parallel": False},
+        ),
+        ("release", ["box-1"]),
+    ]
+
+
+def test_configure_all_uses_the_shared_box_lock(monkeypatch: pytest.MonkeyPatch) -> None:
+    lock_events: list[tuple[str, object]] = []
+    system_manager = MagicMock()
+    exp = SimpleNamespace(
+        chip_id="chip",
+        config_path="/config",
+        params_path="/params",
+        box_ids=["box-1", "box-2"],
+        system_manager=system_manager,
+    )
+
+    @contextmanager
+    def fake_lock(box_ids):
+        lock_events.append(("acquire", list(box_ids)))
+        yield
+        lock_events.append(("release", list(box_ids)))
+
+    system_manager.push.side_effect = lambda **kwargs: lock_events.append(("push", kwargs))
+    monkeypatch.setattr("qubex.Experiment", lambda **kwargs: exp)
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.box_setup.configure_all.get_qubex_paths",
+        MagicMock(),
+    )
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.box_setup.configure_all.configuration_push_lock",
+        fake_lock,
+    )
+    backend = QubexBackend({"chip_id": "chip", "config_dir": "/config", "params_dir": "/params"})
+
+    ConfigureAll().run(backend, "")
+
+    assert lock_events == [
+        ("acquire", ["box-1", "box-2"]),
+        (
+            "push",
+            {
+                "box_ids": ["box-1", "box-2"],
+                "confirm": False,
+                "parallel": False,
+            },
+        ),
+        ("release", ["box-1", "box-2"]),
+    ]
+
+
+def test_readout_configure_uses_the_shared_box_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lock_events: list[tuple[str, object]] = []
+    system_manager = MagicMock()
+    experiment_system = SimpleNamespace(resonators=[SimpleNamespace(qubit="Q00", frequency=6.0)])
+    exp = SimpleNamespace(
+        chip_id="chip",
+        box_ids=["box-1"],
+        config_loader=SimpleNamespace(
+            get_experiment_system=MagicMock(return_value=experiment_system)
+        ),
+        get_qubit_label=lambda qid: f"Q{qid:02d}",
+        system_manager=system_manager,
+    )
+    backend = MagicMock()
+    backend.get_instance.return_value = exp
+
+    @contextmanager
+    def fake_lock(box_ids):
+        lock_events.append(("acquire", list(box_ids)))
+        yield
+        lock_events.append(("release", list(box_ids)))
+
+    system_manager.push.side_effect = lambda *args, **kwargs: lock_events.append(
+        ("push", (args, kwargs))
+    )
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.box_setup.readout_configure.configuration_push_lock",
+        fake_lock,
+    )
+    task = ReadoutConfigure({"run_parameters": {"qubits": {"value": [0]}}})
+
+    task.run(backend, "")
+
+    assert lock_events == [
+        ("acquire", ["box-1"]),
+        ("push", ((["box-1"],), {"confirm": False})),
+        ("release", ["box-1"]),
+    ]
