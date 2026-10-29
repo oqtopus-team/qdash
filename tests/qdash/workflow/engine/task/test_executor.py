@@ -599,6 +599,9 @@ class TestTaskExecutorExecuteTask:
 
         mock_result_processor.process_output_parameters.assert_called_once()
         mock_state_manager.put_output_parameters.assert_called_once()
+        # calib_data is keyed by publish targets; an undeclared output publishes as itself.
+        put_kwargs = mock_state_manager.put_output_parameters.call_args.kwargs
+        assert put_kwargs["publish_targets"] == {"qubit_frequency": ("qubit_frequency",)}
         assert "output_parameters" in result
 
     def test_execute_task_returns_r2_in_result(

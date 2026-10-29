@@ -72,7 +72,9 @@ QDash keeps execution state and task state separate.
   data. `ExecutionService` persists state changes through `ExecutionRepository` and uses
   optimistic locking for concurrent note updates.
 - `TaskStateManager` is the source of truth for per-target task status, parameters, messages,
-  figures, and raw-data paths.
+  figures, and raw-data paths. Task results keep the raw output names; its in-memory `calib_data`
+  is keyed by the published parameter names declared through `publish_targets`, so it mirrors the
+  calibration database and the finish-time params YAML selection sees the same names.
 - `TaskHistoryRecorder` writes task-result history and optional provenance records.
 - `BackendSaver` decides which validated outputs update the backend and accepted calibration
   state. `persist_output_parameters=False` records the task without promoting its outputs.

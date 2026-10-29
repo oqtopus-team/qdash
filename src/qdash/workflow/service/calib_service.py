@@ -1226,10 +1226,14 @@ class CalibService:
             )
 
             calib_data = CalibDataModel()
+            names_by_task: dict[tuple[str, str, str], set[str]] = {}
+            name_owner: dict[tuple[str, str, str], tuple[str, str, str]] = {}
+            stale_names: set[tuple[str, str, str]] = set()
             for doc in docs:
                 if not doc.qid or not doc.output_parameters:
                     continue
 
+                published_by_doc: dict[str, ParameterModel] = {}
                 for name, value in doc.output_parameters.items():
                     try:
                         output_parameter = (
@@ -1251,10 +1255,47 @@ class CalibService:
                         )
                         continue
 
-                    if doc.task_type == TaskTypes.COUPLING or "-" in doc.qid:
-                        calib_data.put_coupling_data(doc.qid, name, parameter)
+                    # Key by the published calibration parameter names recorded at
+                    # save time, matching the in-memory calib_data of the task run.
+                    # Results persisted before per-destination metadata existed only
+                    # carry the output name.
+                    if output_parameter.database_updates:
+                        published_targets = [
+                            (
+                                str(update["parameter_name"]),
+                                update.get("updated_value", parameter.value),
+                            )
+                            for update in output_parameter.database_updates
+                            if update.get("updated") is True
+                        ]
                     else:
-                        calib_data.put_qubit_data(doc.qid, name, parameter)
+                        published_targets = [(name, parameter.value)]
+                    for published_name, published_value in published_targets:
+                        published_by_doc[published_name] = parameter.model_copy(
+                            update={"parameter_name": published_name, "value": published_value}
+                        )
+
+                if not published_by_doc:
+                    continue
+                task_key = (doc.name, doc.task_type, doc.qid)
+                previous_names = names_by_task.get(task_key, set())
+                is_coupling = doc.task_type == TaskTypes.COUPLING or "-" in doc.qid
+                target_data = calib_data.coupling if is_coupling else calib_data.qubit
+                for old_name in previous_names - published_by_doc.keys():
+                    owner_key = (doc.task_type, doc.qid, old_name)
+                    if name_owner.get(owner_key) == task_key:
+                        target_data.get(doc.qid, {}).pop(old_name, None)
+                        stale_names.add(owner_key)
+                        del name_owner[owner_key]
+                for published_name, published in published_by_doc.items():
+                    owner_key = (doc.task_type, doc.qid, published_name)
+                    if is_coupling:
+                        calib_data.put_coupling_data(doc.qid, published_name, published)
+                    else:
+                        calib_data.put_qubit_data(doc.qid, published_name, published)
+                    name_owner[owner_key] = task_key
+                    stale_names.discard(owner_key)
+                names_by_task[task_key] = set(published_by_doc)
 
             if calib_data.qubit or calib_data.coupling:
                 self.execution_service.merge_calib_data(calib_data)
@@ -1263,6 +1304,14 @@ class CalibService:
                     len(calib_data.qubit),
                     len(calib_data.coupling),
                 )
+            current_data = self.execution_service.calib_data
+            for task_type, qid, stale_name in stale_names:
+                target_data = (
+                    current_data.coupling
+                    if task_type == TaskTypes.COUPLING or "-" in qid
+                    else current_data.qubit
+                )
+                target_data.get(qid, {}).pop(stale_name, None)
         except Exception as exc:
             logger.warning(f"Failed to merge task result calib_data before push: {exc}")
 
