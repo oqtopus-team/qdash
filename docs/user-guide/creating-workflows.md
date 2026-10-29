@@ -107,6 +107,34 @@ The `mode` value controls how one-qubit work is arranged:
 Keep the template's mode unless the procedure requires a specific ordering. The selected tasks
 must support the chosen mode and backend.
 
+## Schedule Two-Qubit Calibration
+
+Use **2Q Calibration** after the candidate qubits have the one-qubit calibration values
+required by the selected tasks. CR (cross-resonance) scheduling chooses directed coupling pairs
+and groups pairs that can run together without sharing qubits or conflicting hardware.
+
+1. Open **New Flow** and choose **2Q Calibration** under **TEMPLATE**.
+2. Set a default `qids` list in the source for runs started from the application, as described in
+   [Choose the Targets](#choose-the-targets). Include at least two connected qubits.
+3. Set the direction and parallelism defaults in the source using the settings below.
+4. Keep the template's task list or select the coupling tasks required by your procedure.
+5. Save and test the workflow on a small target before expanding it.
+
+| Source setting | Meaning | Default |
+| --- | --- | --- |
+| `inverse` | Reverse the selected CR direction; check that your procedure supports this direction | `False` |
+| `max_parallel_ops` | Maximum coupling pairs in one parallel group; hardware conflicts can reduce this number | `10` |
+
+Groups run one after another. Within a group, coupling pairs can run in parallel, and each pair
+runs its task list from top to bottom. A pair can advance to its next task while another pair is
+still measuring. Pairs within one MUX are scheduled before pairs across MUXes. If no eligible pair
+remains after direction and hardware checks, scheduling fails.
+
+In a combined one-qubit and two-qubit workflow, filter the one-qubit results before generating
+the CR schedule so the two-qubit work uses only the remaining candidates.
+
+How this works: [CR Gate Scheduler](../developer-guide/architecture/cr-scheduler.md).
+
 ## Set Parameters for One Task
 
 Add `task_parameters` to the workflow's calibration service when one named task needs different
@@ -141,6 +169,21 @@ current calibration values.
 QDash rejects a parameter placed in the wrong section, a parameter the task does not declare, or
 an input the task does not allow users to override. See [Task Parameters](./task-parameters.md)
 before overriding calibration inputs or allowing outputs to update shared state.
+
+## Use Earlier Calibration Results in Later Steps
+
+Later tasks use earlier outputs once those outputs pass validation and become current
+calibration values. This also applies across workflow steps: finishing a step does not reset
+the accepted values. Experiment settings such as shots and sweep ranges come from the workflow's
+settings and task defaults, rather than from previous measurement outputs.
+
+For example, if a frequency measurement changes the accepted frequency from 5.000 GHz to
+5.010 GHz, a later task that uses that calibration value resolves 5.010 GHz. If the measurement
+is configured to keep outputs only in history, the later task continues to use 5.000 GHz.
+An explicit input override takes priority over either value.
+
+Review the effective inputs in **Execution** to confirm what the later task actually used.
+How this works: [State Between Steps](../developer-guide/workflow/quickstart.md#state-between-steps).
 
 ## Save and Test the Workflow
 

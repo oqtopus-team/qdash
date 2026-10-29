@@ -118,6 +118,59 @@ step's default list. The visible order is part of the flow contract: repeated me
 configuration checkpoints must remain reviewable in the saved source. If two templates must stay
 aligned, compare their lists in template tests.
 
+## State Between Steps
+
+`CalibService._run_pipeline()` passes the returned `StepContext` to each step in order. Target
+selection and scheduling travel through this context; Qubex calibration inputs resolve from
+the current calibration database when each task preprocesses.
+
+| State | Owner | Consumer |
+| --- | --- | --- |
+| Remaining qubits | `StepContext.candidate_qids` | Filters, scheduling, and calibration steps |
+| Candidate coupling IDs | `StepContext.candidate_couplings` | Steps that consume coupling candidates |
+| CR parallel groups | `StepContext.metadata["cr_schedule"]` | `CustomTwoQubit` and `TwoQubitCalibration` |
+| Typed step results | `StepContext.one_qubit_check`, `one_qubit_fine_tune`, `two_qubit` | Filters and pipeline results |
+| Accepted calibration values | MongoDB qubit and coupling calibration records | Declared task inputs |
+| Experiment settings and overrides | `CalibService.default_run_parameters` and `task_parameters` | Task construction and isolated worker sessions |
+
+```mermaid
+flowchart TD
+    one[One-qubit calibration] -->|Typed results| ctx[StepContext]
+    one -->|Validated and applied outputs| db[(Current calibration DB)]
+    ctx --> filter[FilterByStatus or FilterByMetric]
+    filter -->|Remaining candidate_qids| schedule[GenerateCRSchedule]
+    schedule -->|metadata.cr_schedule| two[Two-qubit calibration]
+    two --> task[Coupling task preprocessing]
+    db -->|Declared calibration inputs| task
+```
+
+Each hardware step gets its own Execution. After a hardware step finishes, the pipeline creates
+a new orchestrator and session for the next hardware step; transform steps retain the context
+without opening an Execution. Calibration values survive this boundary because applied outputs
+are persisted, rather than copied from the preceding step's return value into the next task.
+
+For normal Qubex tasks, `QubexTask._load_parameters_from_db()` reads declared inputs from the
+selected qubit or, for coupling tasks, the control qubit, target qubit, and coupling records
+according to `qid_role`. Explicit input overrides take precedence. Measurement-only outputs do
+not replace accepted inputs for later tasks. Run parameters such as shots and sweep ranges
+come from task and workflow settings. See [Parameter Resolution](./parameter-resolution.md) for
+precedence and snapshot re-execution, and [Calibration Data Lifecycle](./calibration-data-lifecycle.md)
+for output promotion.
+
+Parallel coupling workers receive the shared settings and parent Execution ID in
+`session_config`, then create isolated sessions. Within each coupling, tasks run sequentially;
+workers do not share Python objects. See [CR Gate Scheduler](../architecture/cr-scheduler.md#workflow-integration)
+for schedule reuse and group ordering.
+
+The context and session lifecycle are implemented in `service/steps/pipeline.py` and
+`service/calib_service.py`; worker session construction is in
+`service/_internal/scheduling_tasks.py`, all under `src/qdash/workflow/`.
+When changing these boundaries, run the pipeline and worker tests under
+`tests/qdash/workflow/service/` using the [Workflow Testing](./testing.md) guidance.
+
+For the user-facing procedure, see
+[Use Earlier Calibration Results in Later Steps](../../user-guide/creating-workflows.md#use-earlier-calibration-results-in-later-steps).
+
 ## Set Task Parameters
 
 Pass shared run-parameter fallbacks through `default_run_parameters` and settings for one task
