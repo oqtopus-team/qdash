@@ -105,6 +105,21 @@ export function colorRangeStep(range: ColorRange): number {
   return 10 ** Math.floor(Math.log10(raw));
 }
 
+/**
+ * Increment for the number fields' spinner: about 40 clicks across the span,
+ * snapped to the nearest 1-2-5 value so the numbers stay round. Coarser than
+ * `colorRangeStep`, which positions the thumbs.
+ */
+export function colorRangeSpinnerStep(range: ColorRange): number {
+  const span = range.max - range.min;
+  if (!(span > 0)) return 1;
+  const raw = span / 40;
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  const mantissa = raw / magnitude;
+  const nice = mantissa < 1.5 ? 1 : mantissa < 3.5 ? 2 : mantissa < 7.5 ? 5 : 10;
+  return Number((nice * magnitude).toPrecision(12));
+}
+
 /** Format a bound with just enough digits to distinguish it at `step` resolution. */
 export function formatRangeValue(value: number, step: number): string {
   if (!Number.isFinite(value)) return "";

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  colorRangeSpinnerStep,
   colorRangeStep,
   formatRangeValue,
   getValueExtent,
@@ -110,6 +111,30 @@ describe("colorRangeStep", () => {
 
   it("falls back to 1 for a degenerate span", () => {
     expect(colorRangeStep({ min: 1, max: 1 })).toBe(1);
+  });
+});
+
+describe("colorRangeSpinnerStep", () => {
+  it("gives about 40 round increments across the span", () => {
+    expect(colorRangeSpinnerStep({ min: 0, max: 200 })).toBe(5);
+    expect(colorRangeSpinnerStep({ min: 0, max: 150 })).toBe(5);
+    expect(colorRangeSpinnerStep({ min: 0, max: 100 })).toBe(2);
+    expect(colorRangeSpinnerStep({ min: 4, max: 5 })).toBe(0.02);
+    expect(colorRangeSpinnerStep({ min: 99, max: 99.9 })).toBe(0.02);
+  });
+
+  it("is coarser than the thumb step", () => {
+    for (const range of [
+      { min: 0, max: 200 },
+      { min: 0, max: 100 },
+      { min: 4, max: 5 },
+    ]) {
+      expect(colorRangeSpinnerStep(range)).toBeGreaterThan(colorRangeStep(range));
+    }
+  });
+
+  it("falls back to 1 for a degenerate span", () => {
+    expect(colorRangeSpinnerStep({ min: 1, max: 1 })).toBe(1);
   });
 });
 

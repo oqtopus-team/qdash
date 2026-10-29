@@ -1,10 +1,15 @@
 "use client";
 
-import { type KeyboardEvent, useId } from "react";
+import { type KeyboardEvent, useId, useState } from "react";
 
 import { RotateCcw } from "lucide-react";
 
-import { type ColorRange, colorRangeStep, formatRangeValue } from "@/lib/utils/color-scale";
+import {
+  type ColorRange,
+  colorRangeSpinnerStep,
+  colorRangeStep,
+  formatRangeValue,
+} from "@/lib/utils/color-scale";
 
 interface ColorRangeSliderProps {
   /** Whole interval the thumbs can travel. */
@@ -28,6 +33,47 @@ const THUMB_INPUT_CLASS = [
   "[&::-webkit-slider-thumb]:pointer-events-auto [&::-moz-range-thumb]:pointer-events-auto",
 ].join(" ");
 
+interface BoundInputProps {
+  value: number;
+  /** Resolution used to format the value; matches the thumbs. */
+  step: number;
+  /** Increment for the spinner arrows and arrow keys. */
+  spinnerStep: number;
+  ariaLabel: string;
+  onCommit: (raw: string) => void;
+}
+
+/**
+ * Number field for one end of the range. Every edit (typing, spinner arrows,
+ * arrow keys) commits at once so the slider and heatmap follow immediately.
+ * While focused the field shows what the user typed, even when the committed
+ * value was clamped; on blur it snaps to the committed value.
+ */
+function BoundInput({ value, step, spinnerStep, ariaLabel, onCommit }: BoundInputProps) {
+  const formatted = formatRangeValue(value, step);
+  const [draft, setDraft] = useState<string | null>(null);
+  const blurOnEnter = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") e.currentTarget.blur();
+  };
+  return (
+    <input
+      type="number"
+      className="input input-xs w-24 shrink-0 font-mono tabular-nums"
+      aria-label={ariaLabel}
+      step={spinnerStep}
+      value={draft ?? formatted}
+      onFocus={() => setDraft(formatted)}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setDraft(raw);
+        if (raw.trim() !== "" && Number.isFinite(Number(raw))) onCommit(raw);
+      }}
+      onBlur={() => setDraft(null)}
+      onKeyDown={blurOnEnter}
+    />
+  );
+}
+
 /**
  * Two-thumb slider that sets the interval a metric heatmap maps onto the
  * palette. The track previews the palette between the thumbs; values beyond a
@@ -45,6 +91,7 @@ export function ColorRangeSlider({
   const id = useId();
   const span = bounds.max - bounds.min;
   const step = colorRangeStep(bounds);
+  const spinnerStep = colorRangeSpinnerStep(bounds);
   const toPct = (v: number) => (span > 0 ? ((v - bounds.min) / span) * 100 : 0);
   const minPct = Math.max(0, Math.min(100, toPct(value.min)));
   const maxPct = Math.max(0, Math.min(100, toPct(value.max)));
@@ -67,10 +114,6 @@ export function ColorRangeSlider({
   };
 
   const unitSuffix = unit ? ` ${unit}` : "";
-  const blurOnEnter = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") e.currentTarget.blur();
-  };
-
   return (
     <div
       className="flex w-full max-w-xl flex-wrap items-center gap-x-3 gap-y-2 text-xs"
@@ -79,15 +122,12 @@ export function ColorRangeSlider({
       <span id={`${id}-label`} className="shrink-0 font-medium text-base-content/70">
         Color range
       </span>
-      <input
-        key={`min-${formatRangeValue(value.min, step)}`}
-        type="number"
-        className="input input-xs w-24 shrink-0 font-mono tabular-nums"
-        aria-label={`Color range minimum value${unitSuffix}`}
+      <BoundInput
+        value={value.min}
         step={step}
-        defaultValue={formatRangeValue(value.min, step)}
-        onBlur={(e) => handleMin(e.target.value)}
-        onKeyDown={blurOnEnter}
+        spinnerStep={spinnerStep}
+        ariaLabel={`Color range minimum value${unitSuffix}`}
+        onCommit={handleMin}
       />
       <div className="relative h-4 min-w-32 flex-1" role="group" aria-labelledby={`${id}-label`}>
         <div
@@ -131,15 +171,12 @@ export function ColorRangeSlider({
           onChange={(e) => handleMax(e.target.value)}
         />
       </div>
-      <input
-        key={`max-${formatRangeValue(value.max, step)}`}
-        type="number"
-        className="input input-xs w-24 shrink-0 font-mono tabular-nums"
-        aria-label={`Color range maximum value${unitSuffix}`}
+      <BoundInput
+        value={value.max}
         step={step}
-        defaultValue={formatRangeValue(value.max, step)}
-        onBlur={(e) => handleMax(e.target.value)}
-        onKeyDown={blurOnEnter}
+        spinnerStep={spinnerStep}
+        ariaLabel={`Color range maximum value${unitSuffix}`}
+        onCommit={handleMax}
       />
       {unit && <span className="shrink-0 text-base-content/50">{unit}</span>}
       <button
