@@ -181,6 +181,19 @@ def test_ef_chevron_is_enabled_with_calibration_and_sweep_metadata() -> None:
     assert task.run_parameters["shots"]["value"] == 256
 
 
+def test_cpmg_noise_spectroscopy_is_enabled_in_one_qubit_group() -> None:
+    clear_backend_config_cache()
+    task = next(
+        task
+        for task in TaskFileService().list_task_info("qubex", enabled_only=True).tasks
+        if task.name == "CheckCPMGNoiseSpectroscopy"
+    )
+
+    assert task.enabled
+    assert task.category == "One Qubit"
+    assert task.task_type == "qubit"
+
+
 def test_fh_chevron_is_enabled_with_transition_and_pulse_dependencies() -> None:
     clear_backend_config_cache()
     all_task_names = {task.name for task in TaskFileService().list_task_info("qubex").tasks}
