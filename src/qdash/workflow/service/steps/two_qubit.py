@@ -43,11 +43,16 @@ class CustomTwoQubit(CalibrationStep):
             step_name="zx90_tune",
             tasks=["CreateZX90", "CheckZX90"],
         )
+
+    ``continue_on_failure`` keeps independent later tasks running. Use
+    ``stop_on_failure_tasks`` for prerequisite tasks that must remain fail-fast.
     """
 
     step_name: str = "custom_two_qubit"
     tasks: list[str] = field(default_factory=list)
     max_parallel_ops: int = 10
+    continue_on_failure: bool = False
+    stop_on_failure_tasks: tuple[str, ...] = ()
 
     @property
     def name(self) -> str:
@@ -74,12 +79,6 @@ class CustomTwoQubit(CalibrationStep):
             logger.warning(f"[{self.name}] No tasks specified, skipping")
             return ctx
 
-        candidate_qubits = ctx.candidate_qids
-        if len(candidate_qubits) < 2:
-            logger.warning(f"[{self.name}] Not enough candidates ({len(candidate_qubits)}) for 2Q")
-            ctx.metadata[self.step_name] = TwoQubitResult()
-            return ctx
-
         logger.info(f"[{self.name}] Starting with {len(self.tasks)} tasks: {self.tasks}")
 
         # Use pre-generated schedule if available, otherwise generate
@@ -87,6 +86,14 @@ class CustomTwoQubit(CalibrationStep):
             parallel_groups = ctx.metadata["cr_schedule"]
             logger.info(f"[{self.name}] Using pre-generated CR schedule")
         else:
+            candidate_qubits = ctx.candidate_qids
+            if len(candidate_qubits) < 2:
+                logger.warning(
+                    f"[{self.name}] Not enough candidates ({len(candidate_qubits)}) for 2Q"
+                )
+                ctx.metadata[self.step_name] = TwoQubitResult()
+                return ctx
+
             from qdash.workflow.engine import CRScheduler
 
             wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
@@ -134,11 +141,17 @@ class CustomTwoQubit(CalibrationStep):
         # Execute groups sequentially (groups are scheduled to avoid resource conflicts)
         # but within each group, coupling pairs run in parallel using separate processes
         all_raw_results: dict[str, Any] = {}
+        failure_options: dict[str, Any] = {}
+        if self.continue_on_failure:
+            failure_options["continue_on_failure"] = True
+        if self.stop_on_failure_tasks:
+            failure_options["stop_on_failure_tasks"] = self.stop_on_failure_tasks
         for group in coupling_groups:
             group_results = run_coupling_calibrations_parallel(
                 coupling_qids=group,
                 tasks=self.tasks,
                 session_config=session_config,
+                **failure_options,
             )
             all_raw_results.update(group_results)
 

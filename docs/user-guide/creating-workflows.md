@@ -59,6 +59,25 @@ Replace `0` with the MUX that the saved workflow should use. To target individua
 set `qids = ["0", "1"]`. If every caller supplies targets through an API, leave the template's
 missing-target check unchanged instead of adding a fallback.
 
+## Run Box Setup Before Spectroscopy
+
+Use **Box Setup** on QuEL-1 or QuEL-3 hardware to align each selected MUX's readout capture
+before running resonator spectroscopy. The template requires `mux_ids` and runs
+**CorrectCaptureDelay** once per MUX.
+
+1. Select **Box Setup** under **TEMPLATE** and set a flow name.
+2. Set a default MUX target in the source when you plan to run it from the application. Replace
+   the template's missing-target check with:
+
+   ```python
+   if mux_ids is None:
+       mux_ids = [0]
+   ```
+
+   Replace `0` with the MUX you want to align.
+3. Save the flow, then select **Execute**. Review the capture delay result before running a
+   spectroscopy workflow.
+
 ## Choose Tasks and Execution Order
 
 The task list runs from top to bottom. Open **Tasks** in another tab to find the task names enabled
@@ -87,6 +106,34 @@ The `mode` value controls how one-qubit work is arranged:
 
 Keep the template's mode unless the procedure requires a specific ordering. The selected tasks
 must support the chosen mode and backend.
+
+## Schedule Two-Qubit Calibration
+
+Use **2Q Calibration** after the candidate qubits have the one-qubit calibration values
+required by the selected tasks. CR (cross-resonance) scheduling chooses directed coupling pairs
+and groups pairs that can run together without sharing qubits or conflicting hardware.
+
+1. Open **New Flow** and choose **2Q Calibration** under **TEMPLATE**.
+2. Set a default `qids` list in the source for runs started from the application, as described in
+   [Choose the Targets](#choose-the-targets). Include at least two connected qubits.
+3. Set the direction and parallelism defaults in the source using the settings below.
+4. Keep the template's task list or select the coupling tasks required by your procedure.
+5. Save and test the workflow on a small target before expanding it.
+
+| Source setting | Meaning | Default |
+| --- | --- | --- |
+| `inverse` | Reverse the selected CR direction; check that your procedure supports this direction | `False` |
+| `max_parallel_ops` | Maximum coupling pairs in one parallel group; hardware conflicts can reduce this number | `10` |
+
+Groups run one after another. Within a group, coupling pairs can run in parallel, and each pair
+runs its task list from top to bottom. A pair can advance to its next task while another pair is
+still measuring. Pairs within one MUX are scheduled before pairs across MUXes. If no eligible pair
+remains after direction and hardware checks, scheduling fails.
+
+In a combined one-qubit and two-qubit workflow, filter the one-qubit results before generating
+the CR schedule so the two-qubit work uses only the remaining candidates.
+
+How this works: [CR Gate Scheduler](../developer-guide/architecture/cr-scheduler.md).
 
 ## Set Parameters for One Task
 
@@ -122,6 +169,21 @@ current calibration values.
 QDash rejects a parameter placed in the wrong section, a parameter the task does not declare, or
 an input the task does not allow users to override. See [Task Parameters](./task-parameters.md)
 before overriding calibration inputs or allowing outputs to update shared state.
+
+## Use Earlier Calibration Results in Later Steps
+
+Later tasks use earlier outputs once those outputs pass validation and become current
+calibration values. This also applies across workflow steps: finishing a step does not reset
+the accepted values. Experiment settings such as shots and sweep ranges come from the workflow's
+settings and task defaults, rather than from previous measurement outputs.
+
+For example, if a frequency measurement changes the accepted frequency from 5.000 GHz to
+5.010 GHz, a later task that uses that calibration value resolves 5.010 GHz. If the measurement
+is configured to keep outputs only in history, the later task continues to use 5.000 GHz.
+An explicit input override takes priority over either value.
+
+Review the effective inputs in **Execution** to confirm what the later task actually used.
+How this works: [State Between Steps](../developer-guide/workflow/quickstart.md#state-between-steps).
 
 ## Save and Test the Workflow
 

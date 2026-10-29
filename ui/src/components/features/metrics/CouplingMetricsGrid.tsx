@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import { pickColor } from "@/lib/utils/color-scale";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridDimension, cellFontSize } from "@/lib/utils/grid-layout";
 
@@ -183,57 +184,16 @@ export function CouplingMetricsGrid({
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
 
-  // Helper function to interpolate between two hex colors
-  const interpolateColor = (color1: string, color2: string, factor: number): string => {
-    const c1 = parseInt(color1.slice(1), 16);
-    const c2 = parseInt(color2.slice(1), 16);
-
-    const r1 = (c1 >> 16) & 0xff;
-    const g1 = (c1 >> 8) & 0xff;
-    const b1 = c1 & 0xff;
-
-    const r2 = (c2 >> 16) & 0xff;
-    const g2 = (c2 >> 8) & 0xff;
-    const b2 = c2 & 0xff;
-
-    const r = Math.round(r1 + (r2 - r1) * factor);
-    const g = Math.round(g1 + (g2 - g1) * factor);
-    const b = Math.round(b1 + (b2 - b1) * factor);
-
-    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-  };
-
-  // Calculate color for a value
+  // Calculate color for a value. A zero min and max means "fit the data".
   const getColor = (value: number | null, autoMin: number, autoMax: number): string | null => {
-    if (value === null || value === undefined) {
-      return null;
-    }
-
-    const { colors } = colorScale;
-    if (colors.length === 0) return null;
-
-    const effectiveMin = colorScale.min === 0 && colorScale.max === 0 ? autoMin : colorScale.min;
-    const effectiveMax = colorScale.min === 0 && colorScale.max === 0 ? autoMax : colorScale.max;
-
-    if (effectiveMin === effectiveMax) {
-      return colors[colors.length - 1];
-    }
-
-    const normalized = Math.max(
-      0,
-      Math.min(1, (value - effectiveMin) / (effectiveMax - effectiveMin)),
+    if (value === null || value === undefined) return null;
+    const useAuto = colorScale.min === 0 && colorScale.max === 0;
+    return pickColor(
+      value,
+      useAuto ? autoMin : colorScale.min,
+      useAuto ? autoMax : colorScale.max,
+      colorScale.colors,
     );
-
-    const position = normalized * (colors.length - 1);
-    const lowerIndex = Math.floor(position);
-    const upperIndex = Math.min(lowerIndex + 1, colors.length - 1);
-    const factor = position - lowerIndex;
-
-    if (factor === 0 || lowerIndex === upperIndex) {
-      return colors[lowerIndex];
-    }
-
-    return interpolateColor(colors[lowerIndex], colors[upperIndex], factor);
   };
 
   // Calculate statistics

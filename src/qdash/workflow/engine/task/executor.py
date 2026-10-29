@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, cast
 from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.progress import ProgressPlan
-from qdash.workflow.engine.task.backend_saver import BackendSaver
+from qdash.workflow.engine.task.backend_saver import BackendSaver, resolve_publish_targets
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.mux_distributor import MuxDistributor
 from qdash.workflow.engine.task.result_processor import (
@@ -461,7 +461,11 @@ class TaskExecutor:
                         task_model.task_id,
                     )
                     self.state_manager.put_output_parameters(
-                        task_name, processed_params, task_type, qid
+                        task_name,
+                        processed_params,
+                        task_type,
+                        qid,
+                        publish_targets=resolve_publish_targets(task, processed_params),
                     )
 
                 # 5c. Save figures and raw data
@@ -694,7 +698,11 @@ class TaskExecutor:
                             task_model.task_id,
                         )
                         self.state_manager.put_output_parameters(
-                            task_name, processed_params, task_type, qid
+                            task_name,
+                            processed_params,
+                            task_type,
+                            qid,
+                            publish_targets=resolve_publish_targets(task, processed_params),
                         )
 
                     self._save_artifacts(postprocess_result, task_name, task_type, qid)

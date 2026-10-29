@@ -6,7 +6,7 @@ from qdash.datamodel.task import (
     OutputParameterSpec,
     ParameterModel,
 )
-from qdash.workflow.engine.task.backend_saver import BackendSaver
+from qdash.workflow.engine.task.backend_saver import BackendSaver, resolve_publish_targets
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.execution.service import ExecutionService
@@ -233,6 +233,26 @@ def test_save_qubex_records_previous_database_value_for_coupling() -> None:
     coupling_repo_cls.return_value.get_calibration_data_for_update.assert_called_once_with(
         username="alice", project_id="proj-1", chip_id="chip-1", qid="0-1"
     )
+
+
+def test_resolve_publish_targets_defaults_to_output_name() -> None:
+    class FrequencyTask:
+        output_spec = {
+            "fh_frequency": OutputParameterSpec(
+                unit="GHz", publish_targets=("fh_frequency", "control_frequency_fh")
+            ),
+            "r2": OutputParameterSpec(),
+        }
+
+    targets = resolve_publish_targets(
+        cast("TaskProtocol", FrequencyTask()),
+        {"fh_frequency": ParameterModel(value=4.2), "r2": ParameterModel(value=0.9)},
+    )
+
+    assert targets == {
+        "fh_frequency": ("fh_frequency", "control_frequency_fh"),
+        "r2": ("r2",),
+    }
 
 
 def test_save_qubex_publishes_measurement_and_operational_frequency() -> None:

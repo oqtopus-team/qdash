@@ -36,6 +36,7 @@ backends:
         - CheckCoarseReadoutParams
         - CheckCKP
         - CheckQuantumEfficiency
+        - CheckCPMGNoiseSpectroscopy
         - CreateHPIPulse
         - CheckHPIPulse
         - CreatePIPulse
@@ -62,6 +63,7 @@ backends:
         - X180InterleavedRandomizedBenchmarking
 
       Two Qubit:
+        - CheckCouplingStrength
         - CheckJAZZ
         - CheckCrossResonance
         - CreateZX90

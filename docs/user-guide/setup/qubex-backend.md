@@ -93,8 +93,12 @@ even when configuration creation is disabled or no configuration tree is mounted
 If checking the configuration tree fails, the dialog shows an error and blocks creation.
 Close and reopen the dialog to retry.
 
-Parameter files in `params/` always start from QDash's templates for the backend, with empty
-`data`, so calibration fills them; values are never copied from the source system.
+Parameter files in `params/` start from QDash's templates for the backend; values are never
+copied from the source system. Most files have empty `data`. `readout_frequency.yaml` and
+`control_frequency.yaml` list every qubit with a null value so Qubex can activate it for initial
+setup. Their defaults use the connected readout box's frequency band, or the backend's band when
+the box is not yet configured. If you change the box or wiring after creating the chip, update
+these frequency defaults to match the configured band before running Box Setup.
 `calibration/calib_note.json` starts as `{}`. When `<chip_id>/` already exists, QDash keeps it
 unchanged and creates only the chip record. Without a mounted configuration tree, the dialog
 creates only the chip record.

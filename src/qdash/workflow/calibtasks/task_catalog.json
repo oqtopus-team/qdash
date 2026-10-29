@@ -2097,6 +2097,341 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CheckCouplingStrength",
+        "description": "Estimate coupling strength; the first qid is measured, the second is the spectator.",
+        "file_path": "two_qubit/check_coupling_strength.py",
+        "input_parameters": {
+          "control_control_amplitude": {
+            "default_value": null,
+            "parameter_name": "control_amplitude",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_hpi_amplitude": {
+            "default_value": null,
+            "parameter_name": "hpi_amplitude",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_hpi_duration": {
+            "default_value": null,
+            "parameter_name": "hpi_duration",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "control_maximum_rabi_frequency": {
+            "default_value": null,
+            "parameter_name": "maximum_rabi_frequency",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "MHz/a.u.",
+            "user_override": "allowed"
+          },
+          "control_qubit_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_rabi_amplitude": {
+            "default_value": null,
+            "parameter_name": "rabi_amplitude",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_rabi_angle": {
+            "default_value": null,
+            "parameter_name": "rabi_angle",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "rad",
+            "user_override": "allowed"
+          },
+          "control_rabi_distance": {
+            "default_value": null,
+            "parameter_name": "rabi_distance",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_rabi_noise": {
+            "default_value": null,
+            "parameter_name": "rabi_noise",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_rabi_offset": {
+            "default_value": null,
+            "parameter_name": "rabi_offset",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_rabi_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_phase",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_rabi_r2": {
+            "default_value": null,
+            "parameter_name": "rabi_r2",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "",
+            "user_override": "allowed"
+          },
+          "control_rabi_reference_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_reference_phase",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_readout_amplitude": {
+            "default_value": null,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "control_readout_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "parameter_name": "readout_frequency",
+            "qid_role": "control",
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_control_amplitude": {
+            "default_value": null,
+            "parameter_name": "control_amplitude",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_hpi_amplitude": {
+            "default_value": null,
+            "parameter_name": "hpi_amplitude",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_hpi_duration": {
+            "default_value": null,
+            "parameter_name": "hpi_duration",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "target_maximum_rabi_frequency": {
+            "default_value": null,
+            "parameter_name": "maximum_rabi_frequency",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "MHz/a.u.",
+            "user_override": "allowed"
+          },
+          "target_qubit_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "parameter_name": "control_frequency",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "target_rabi_amplitude": {
+            "default_value": null,
+            "parameter_name": "rabi_amplitude",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_rabi_angle": {
+            "default_value": null,
+            "parameter_name": "rabi_angle",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "rad",
+            "user_override": "allowed"
+          },
+          "target_rabi_distance": {
+            "default_value": null,
+            "parameter_name": "rabi_distance",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_rabi_noise": {
+            "default_value": null,
+            "parameter_name": "rabi_noise",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_rabi_offset": {
+            "default_value": null,
+            "parameter_name": "rabi_offset",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_rabi_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_phase",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_rabi_r2": {
+            "default_value": null,
+            "parameter_name": "rabi_r2",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "",
+            "user_override": "allowed"
+          },
+          "target_rabi_reference_phase": {
+            "default_value": null,
+            "parameter_name": "rabi_reference_phase",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "ui_group": "Rabi normalization",
+            "ui_group_collapsed": true,
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_readout_amplitude": {
+            "default_value": null,
+            "parameter_name": "readout_amplitude",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "target_readout_frequency": {
+            "default_value": null,
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "parameter_name": "readout_frequency",
+            "qid_role": "target",
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckCouplingStrength",
+        "output_parameters": [
+          "static_zz_interaction",
+          "qubit_qubit_coupling_strength"
+        ],
+        "run_parameters": {
+          "interval": {
+            "description": "Time interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "int"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Number of shots",
+            "unit": "a.u.",
+            "value": 2048,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Wait time in each half of the JAZZ echo sequence",
+            "unit": "ns",
+            "value": [
+              0,
+              20001,
+              400
+            ],
+            "value_type": "np.arange"
+          }
+        },
+        "task_type": "coupling"
+      },
+      {
         "class_name": "CheckCrossResonance",
         "description": "Task to check the cross resonance pulse (obtain_cr_params).",
         "file_path": "two_qubit/check_cross_resonance.py",
@@ -6024,6 +6359,80 @@
             "description": "EF control layout: ge-ef-cr or ge-ef-fh.",
             "value": "ge-ef-cr",
             "value_type": "str"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
+        "class_name": "CorrectCaptureDelay",
+        "description": "Center the readout pulse in the capture window of each MUX.\n\nThis is a MUX-level task: it runs once for the representative qubit and\nwrites the same capture delay to every qubit in the MUX: ``capture_delay``\nand ``capture_delay_word`` on QuEL-1, ``capture_delay`` in ns on QuEL-3.\nThe delay is a setting of the MUX, so the task captures only the\nrepresentative qubit's readout at a fixed tone frequency. The capture units\nof a MUX read the same ADC samples, so capturing more qubits adds no information.",
+        "file_path": "box_setup/correct_capture_delay.py",
+        "input_parameters": {},
+        "name": "CorrectCaptureDelay",
+        "output_parameters": [
+          "capture_delay",
+          "capture_delay_word"
+        ],
+        "run_parameters": {
+          "capture_delay_ns_range": {
+            "description": "QuEL-3: capture_delay sweep as [start, stop, step] in ns. Every value must be a multiple of 0.8 ns. The stop value is exclusive.",
+            "unit": "ns",
+            "value": [
+              0,
+              2432,
+              128
+            ],
+            "value_type": "np.arange"
+          },
+          "capture_delay_word_range": {
+            "description": "QuEL-1: capture_delay_word sweep at the chosen coarse delay as [start, stop, step] in 8 ns words. Every value must be a multiple of 4 words (32 ns).",
+            "unit": "8 ns",
+            "value": [
+              0,
+              16,
+              4
+            ],
+            "value_type": "range"
+          },
+          "delay_range": {
+            "description": "QuEL-1: coarse capture_delay sweep as [start, stop, step] in 128 ns units. The stop value is exclusive.",
+            "unit": "128 ns",
+            "value": [
+              0,
+              19,
+              1
+            ],
+            "value_type": "range"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "readout_frequency": {
+            "description": "Fixed readout tone frequency used for every capture. Choose a frequency inside the readout band but away from the resonators; resonator calibration is not required. Leave blank to use 0.25 GHz above the connected readout box's default resonator spectroscopy range: 11.0 GHz for the high band and 7.0 GHz for the low band.",
+            "unit": "GHz",
+            "value": null,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Number of averaged shots per capture",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "smoothing": {
+            "description": "Moving-average window used to locate the pulse plateau",
+            "unit": "samples",
+            "value": 5,
+            "value_type": "int"
+          },
+          "snr_threshold": {
+            "description": "Minimum signal-to-noise ratio of a detected pulse edge",
+            "unit": "a.u.",
+            "value": 5.0,
+            "value_type": "float"
           }
         },
         "task_type": "qubit"

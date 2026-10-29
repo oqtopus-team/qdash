@@ -7,6 +7,7 @@ import { MessageSquare, StickyNote } from "lucide-react";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import type { ForumLabelDefinition } from "../forum/categories";
 import { getForumMarkerStyle } from "../forum/ForumLabelBadge";
+import { type ColorRange, getValueExtent, pickColor } from "@/lib/utils/color-scale";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 
 import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
@@ -22,6 +23,11 @@ interface DashboardQubitGridProps {
   unit: string;
   topologyId: string;
   colors: string[];
+  /**
+   * Interval mapped onto `colors`. Defaults to the extent of `metricData`;
+   * values outside it take the end colors.
+   */
+  colorRange?: ColorRange | null;
   /** Maximum cell side length in px. Cells shrink to fit narrower containers. */
   maxCellSize?: number;
   /** Set of qubit IDs that have a note for the metric this grid represents. */
@@ -52,33 +58,6 @@ interface DashboardQubitGridProps {
   onQubitClick?: (qid: string) => void;
 }
 
-function interpolateColor(c1: string, c2: string, factor: number): string {
-  const a = parseInt(c1.slice(1), 16);
-  const b = parseInt(c2.slice(1), 16);
-  const ar = (a >> 16) & 0xff;
-  const ag = (a >> 8) & 0xff;
-  const ab = a & 0xff;
-  const br = (b >> 16) & 0xff;
-  const bg = (b >> 8) & 0xff;
-  const bb = b & 0xff;
-  const r = Math.round(ar + (br - ar) * factor);
-  const g = Math.round(ag + (bg - ag) * factor);
-  const bl = Math.round(ab + (bb - ab) * factor);
-  return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
-}
-
-function pickColor(value: number, min: number, max: number, colors: string[]): string | null {
-  if (colors.length === 0) return null;
-  if (min === max) return colors[colors.length - 1];
-  const t = Math.max(0, Math.min(1, (value - min) / (max - min)));
-  const pos = t * (colors.length - 1);
-  const lo = Math.floor(pos);
-  const hi = Math.min(lo + 1, colors.length - 1);
-  const f = pos - lo;
-  if (f === 0 || lo === hi) return colors[lo];
-  return interpolateColor(colors[lo], colors[hi], f);
-}
-
 /**
  * Read-only, fixed-size qubit heatmap for the dashboard. Skips zoom/pan/region
  * controls so multiple instances can be stacked on a single page. Cells are
@@ -89,6 +68,7 @@ export function DashboardQubitGrid({
   unit,
   topologyId,
   colors,
+  colorRange,
   maxCellSize = 60,
   notedQids,
   targetNotedQids,
@@ -140,17 +120,16 @@ export function DashboardQubitGrid({
     [hasMux, muxSize, gridRows, gridCols, layoutType],
   );
 
-  const { autoMin, autoMax } = useMemo(() => {
-    if (!metricData) return { autoMin: 0, autoMax: 0 };
-    const vals = Object.values(metricData)
-      .map((m) => m.value)
-      .filter((v): v is number => v !== null && v !== undefined);
-    if (vals.length === 0) return { autoMin: 0, autoMax: 0 };
-    return {
-      autoMin: Math.min(...vals),
-      autoMax: Math.max(...vals),
-    };
-  }, [metricData]);
+  const { min: rangeMin, max: rangeMax } = useMemo<ColorRange>(() => {
+    if (colorRange) return colorRange;
+    if (!metricData) return { min: 0, max: 0 };
+    return (
+      getValueExtent(Object.values(metricData).map((m) => m.value)) ?? {
+        min: 0,
+        max: 0,
+      }
+    );
+  }, [metricData, colorRange]);
 
   // Map (row,col) -> qid using topology when available, else getQubitGridPosition
   const cellMap = useMemo(() => {
@@ -198,7 +177,7 @@ export function DashboardQubitGrid({
         }
         const metric = metricData?.[qid];
         const value = metric?.value ?? null;
-        const bg = value !== null ? pickColor(value, autoMin, autoMax, colors) : null;
+        const bg = value !== null ? pickColor(value, rangeMin, rangeMax, colors) : null;
         const hasNote = notedQids?.has(qid) ?? false;
         const hasTargetNote = targetNotedQids?.has(qid) ?? false;
         const forumLabel = forumLinkedQids?.[qid];
@@ -244,7 +223,9 @@ export function DashboardQubitGrid({
             className={`aspect-square rounded-md flex flex-col items-center justify-center relative shadow-sm text-left transition-all ${
               isSummaryPresentation ? `border ${summaryTileClass}` : ""
             } ${onQubitClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""}`}
-            style={{ backgroundColor: isSummaryPresentation ? undefined : (bg ?? undefined) }}
+            style={{
+              backgroundColor: isSummaryPresentation ? undefined : (bg ?? undefined),
+            }}
             aria-label={titleText}
           >
             <span

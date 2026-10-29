@@ -41,6 +41,8 @@ class OneQubitConfig:
     project_id: str | None
     qids: list[str] | None = None  # Explicit qubit IDs (overrides mux_ids if set)
     simultaneous_spectroscopy_schedule_mode: str = "local_index"
+    continue_on_failure: bool = False
+    stop_on_failure_tasks: tuple[str, ...] = ()
 
 
 # =============================================================================
@@ -180,10 +182,16 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
             stage_results = {}
 
             for seq_idx, parallel_groups in enumerate(sequential_groups):
+                failure_options: dict[str, Any] = {}
+                if config.continue_on_failure:
+                    failure_options["continue_on_failure"] = True
+                if config.stop_on_failure_tasks:
+                    failure_options["stop_on_failure_tasks"] = config.stop_on_failure_tasks
                 mux_results = run_mux_calibrations_parallel(
                     mux_groups=parallel_groups,
                     tasks=config.tasks,
                     session_config=session_config,
+                    **failure_options,
                 )
                 stage_results.update(mux_results)
 
@@ -261,10 +269,16 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             if not filtered_qids:
                 continue
 
+            failure_options: dict[str, Any] = {}
+            if config.continue_on_failure:
+                failure_options["continue_on_failure"] = True
+            if config.stop_on_failure_tasks:
+                failure_options["stop_on_failure_tasks"] = config.stop_on_failure_tasks
             step_results = run_qubit_calibrations_parallel(
                 qids=filtered_qids,
                 tasks=config.tasks,
                 session_config=session_config,
+                **failure_options,
             )
             # Group results by box type for organized output
             box_key = f"Box_{step.box_type}"
@@ -366,7 +380,15 @@ class OneQubitSerialStrategy(OneQubitStrategy):
         all_results = {}
         for mux_group in all_mux_groups:
             # Execute single MUX group (no parallelism)
-            result = _calibrate_mux_qubits(qids=mux_group, tasks=config.tasks)
+            if config.continue_on_failure:
+                result = _calibrate_mux_qubits(
+                    qids=mux_group,
+                    tasks=config.tasks,
+                    continue_on_failure=True,
+                    stop_on_failure_tasks=config.stop_on_failure_tasks,
+                )
+            else:
+                result = _calibrate_mux_qubits(qids=mux_group, tasks=config.tasks)
             all_results.update(result)
 
         cal_service.record_stage_result("1q_serial", all_results)

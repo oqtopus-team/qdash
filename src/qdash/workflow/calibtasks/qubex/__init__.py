@@ -20,6 +20,7 @@ from qdash.workflow.calibtasks.qubex.box_setup.check_noise import CheckNoise
 from qdash.workflow.calibtasks.qubex.box_setup.check_status import CheckStatus
 from qdash.workflow.calibtasks.qubex.box_setup.configure import Configure, ConfigureEF
 from qdash.workflow.calibtasks.qubex.box_setup.configure_all import ConfigureAll
+from qdash.workflow.calibtasks.qubex.box_setup.correct_capture_delay import CorrectCaptureDelay
 from qdash.workflow.calibtasks.qubex.box_setup.dump_box import DumpBox
 from qdash.workflow.calibtasks.qubex.box_setup.link_up import LinkUp
 from qdash.workflow.calibtasks.qubex.box_setup.readout_configure import ReadoutConfigure
@@ -89,6 +90,7 @@ from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state import CheckBell
 from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state_tomography import (
     CheckBellStateTomography,
 )
+from qdash.workflow.calibtasks.qubex.two_qubit.check_coupling_strength import CheckCouplingStrength
 from qdash.workflow.calibtasks.qubex.two_qubit.check_cross_resonance import CheckCrossResonance
 from qdash.workflow.calibtasks.qubex.two_qubit.check_jazz import CheckJAZZ
 from qdash.workflow.calibtasks.qubex.two_qubit.check_zx90 import CheckZX90
@@ -107,6 +109,7 @@ __all__ = [
     "CheckChevron",
     "CheckCoarseReadoutParams",
     "CheckControlAmplitude",
+    "CheckCouplingStrength",
     "CheckCrossResonance",
     "CheckDRAGHPIPulse",
     "CheckDRAGPIPulse",
@@ -135,6 +138,7 @@ __all__ = [
     "Configure",
     "ConfigureAll",
     "ConfigureEF",
+    "CorrectCaptureDelay",
     "CreateDRAGHPIPulse",
     "CreateDRAGPIPulse",
     "CreateEFHPIPulse",
