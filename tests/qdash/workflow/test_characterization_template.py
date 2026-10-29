@@ -61,7 +61,7 @@ def test_characterization_builds_full_pipeline_in_dependency_order() -> None:
     assert steps[6].tasks == ["ConfigureEF", *characterization_module.EF_CHARACTERIZATION_TASKS]
     assert steps[6].continue_on_failure is True
     assert steps[6].stop_on_failure_tasks == ("ConfigureEF",)
-    assert steps[7].tasks == characterization_module.TWO_QUBIT_CHARACTERIZATION_TASKS
+    assert steps[7].tasks == ["CheckCouplingStrength"]
     assert steps[7].continue_on_failure is True
 
 
@@ -102,7 +102,7 @@ def test_jazz_does_not_imply_ef_calibration() -> None:
     ]
     assert steps[0].tasks[0] == "Configure"
     assert steps[2].inverse is True
-    assert steps[3].tasks == characterization_module.TWO_QUBIT_CHARACTERIZATION_TASKS
+    assert steps[3].tasks == ["CheckCouplingStrength"]
 
 
 def test_characterization_prefers_mux_targets_and_preserves_exclusions() -> None:
