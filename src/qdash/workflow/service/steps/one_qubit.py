@@ -29,6 +29,8 @@ def _execute_direct_one_qubit(
     qids: list[str],
     tasks: list[str],
     stage_name: str,
+    continue_on_failure: bool = False,
+    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Run explicit qubit targets under a visible parent Execution."""
     from qdash.workflow.service._internal.scheduling_tasks import (
@@ -51,10 +53,16 @@ def _execute_direct_one_qubit(
         "note": service.note,
     }
 
+    failure_options: dict[str, Any] = {}
+    if continue_on_failure:
+        failure_options["continue_on_failure"] = True
+    if stop_on_failure_tasks:
+        failure_options["stop_on_failure_tasks"] = stop_on_failure_tasks
     results = run_qubit_calibrations_parallel(
         qids=qids,
         tasks=tasks,
         session_config=session_config,
+        **failure_options,
     )
     wrapped_results = {"direct": results}
     service.record_stage_result(stage_name, wrapped_results)
@@ -68,6 +76,8 @@ def _execute_scheduled_one_qubit(
     tasks: list[str],
     stage_name: str,
     mode: str,
+    continue_on_failure: bool = False,
+    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Run explicit qubit targets through the same scheduler used by MUX targets."""
     from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
@@ -83,6 +93,8 @@ def _execute_scheduled_one_qubit(
         tasks=tasks,
         flow_name=f"{service.flow_name}_{stage_name}" if service.flow_name else stage_name,
         project_id=service.project_id,
+        continue_on_failure=continue_on_failure,
+        stop_on_failure_tasks=stop_on_failure_tasks,
     )
     strategy = get_one_qubit_strategy(mode)
     result: dict[str, Any] = strategy.execute(service, config)
@@ -107,12 +119,18 @@ class CustomOneQubit(CalibrationStep):
         CustomOneQubit(
             step_name="coherence_check",
             tasks=["CheckT1", "CheckT2Echo", "CheckRamsey"],
+            continue_on_failure=True,
         )
+
+    Set ``stop_on_failure_tasks`` for prerequisites such as ``Configure`` that must remain
+    fail-fast even when later independent measurements use best-effort execution.
     """
 
     step_name: str = "custom_one_qubit"
     tasks: list[str] = field(default_factory=list)
     mode: str = "synchronized"
+    continue_on_failure: bool = False
+    stop_on_failure_tasks: tuple[str, ...] = ()
 
     @property
     def name(self) -> str:
@@ -142,22 +160,30 @@ class CustomOneQubit(CalibrationStep):
 
         logger.info(f"[{self.name}] Starting with {len(self.tasks)} tasks: {self.tasks}")
 
-        from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
-        from qdash.workflow.service.targets import MuxTargets
-
-        if isinstance(targets, MuxTargets):
-            config = OneQubitConfig(
-                mux_ids=targets.mux_ids,
-                exclude_qids=targets.exclude_qids,
-                tasks=self.tasks,
-                flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
-                project_id=service.project_id,
-            )
-            strategy = get_one_qubit_strategy(self.mode)
-            raw_results = strategy.execute(service, config)
+        has_previous_selection = bool(ctx.filters) or ctx.get_latest_one_qubit_result() is not None
+        if has_previous_selection:
+            raw_results = self._execute_scheduled(service, ctx.candidate_qids)
         else:
-            qids = targets.to_qids(service.chip_id)
-            raw_results = self._execute_scheduled(service, qids)
+            from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
+            from qdash.workflow.service.targets import MuxTargets
+
+            if isinstance(targets, MuxTargets):
+                config = OneQubitConfig(
+                    mux_ids=targets.mux_ids,
+                    exclude_qids=targets.exclude_qids,
+                    tasks=self.tasks,
+                    flow_name=(
+                        f"{service.flow_name}_{self.name}" if service.flow_name else self.name
+                    ),
+                    project_id=service.project_id,
+                    continue_on_failure=self.continue_on_failure,
+                    stop_on_failure_tasks=self.stop_on_failure_tasks,
+                )
+                strategy = get_one_qubit_strategy(self.mode)
+                raw_results = strategy.execute(service, config)
+            else:
+                qids = targets.to_qids(service.chip_id)
+                raw_results = self._execute_scheduled(service, qids)
 
         # Build typed result
         result = self._build_result(raw_results)
@@ -183,6 +209,8 @@ class CustomOneQubit(CalibrationStep):
             tasks=self.tasks,
             stage_name=self.step_name,
             mode=self.mode,
+            continue_on_failure=self.continue_on_failure,
+            stop_on_failure_tasks=self.stop_on_failure_tasks,
         )
 
     def _execute_direct(
@@ -196,6 +224,8 @@ class CustomOneQubit(CalibrationStep):
             qids=qids,
             tasks=self.tasks,
             stage_name=self.step_name,
+            continue_on_failure=self.continue_on_failure,
+            stop_on_failure_tasks=self.stop_on_failure_tasks,
         )
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:

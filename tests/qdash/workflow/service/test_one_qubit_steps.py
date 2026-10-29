@@ -74,15 +74,23 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
         flow_name="simple_calibration",
         note={},
     )
-    step = CustomOneQubit(step_name="simple_tasks", tasks=["CheckRabi"], mode="scheduled")
+    step = CustomOneQubit(
+        step_name="simple_tasks",
+        tasks=["Configure", "CheckRabi"],
+        mode="scheduled",
+        continue_on_failure=True,
+        stop_on_failure_tasks=("Configure",),
+    )
 
     step.execute(cast("CalibService", service), QubitTargets(["1", "4"]), StepContext())
 
     assert len(calls) == 1
     assert calls[0].mux_ids == [0, 1]
     assert calls[0].qids == ["1", "4"]
-    assert calls[0].tasks == ["CheckRabi"]
+    assert calls[0].tasks == ["Configure", "CheckRabi"]
     assert calls[0].flow_name == "simple_calibration_simple_tasks"
+    assert calls[0].continue_on_failure is True
+    assert calls[0].stop_on_failure_tasks == ("Configure",)
 
 
 def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> None:
