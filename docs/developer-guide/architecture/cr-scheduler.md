@@ -100,10 +100,22 @@ diagnostics.
 
 ## Workflow Integration
 
-`GenerateCRSchedule` stores `parallel_groups` in `StepContext.metadata["cr_schedule"]` and publishes
-the flattened coupling IDs as candidates. `TwoQubitCalibration` then executes groups sequentially
-and coupling pairs within a group in parallel. `MuxTargets` and `QubitTargets` also use
-`CRScheduler` to resolve eligible coupling IDs.
+`GenerateCRSchedule` reads `StepContext.candidate_qids`, stores `parallel_groups` in
+`StepContext.metadata["cr_schedule"]`, and publishes the flattened coupling IDs in
+`candidate_couplings`. `SetCRSchedule` supplies an explicit schedule through the same metadata key.
+`MuxTargets` and `QubitTargets` also use `CRScheduler` to resolve eligible coupling IDs.
+
+`CustomTwoQubit` and `TwoQubitCalibration` reuse the stored schedule when present; otherwise they
+generate one internally. When reusing a schedule, their own `max_parallel_ops` does not regroup
+it. Set direction and parallelism on `GenerateCRSchedule` before execution. Changing candidate
+qubits or calibration values after generation does not refresh the stored groups: place filters
+before schedule generation, or regenerate the schedule after a change.
+
+The execution steps run groups sequentially and submit coupling pairs within a group to isolated
+worker processes. Each worker runs its pair's tasks sequentially; there is no barrier between
+the same task on different pairs. See [State Between Steps](../workflow/quickstart.md#state-between-steps)
+for context, calibration inputs, and worker settings. For the application procedure, see
+[Schedule Two-Qubit Calibration](../../user-guide/creating-workflows.md#schedule-two-qubit-calibration).
 
 Scheduling therefore stays separate from execution: do not add Prefect tasks or backend calls to
 the scheduler.
