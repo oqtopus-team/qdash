@@ -67,7 +67,7 @@ See the documentation below for the full tool and command reference.
 
 The [tool, command, and skill reference](https://oqtopus-team.github.io/qdash/reference/pi-qdash)
 describes the extension's capabilities. The
-[extension design guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/extensions)
+[pi extension design guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/extensions)
 explains where to add tools, safety gates, and domain reasoning.
 
 Development takes place in the [QDash monorepo](https://github.com/oqtopus-team/qdash/tree/develop/packages/pi-qdash).

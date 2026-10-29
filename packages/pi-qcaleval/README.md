@@ -24,14 +24,14 @@ Use `npm:@oqtopus-team/pi-qcaleval@beta` for prereleases. Existing pi CLI users
 should remove `@orangekame3/pi-qcaleval` before installing the new package to avoid
 loading both extensions. Historical releases remain available under the old name.
 
-## Configuration and tool reference
+## Documentation and development
 
 The [pi-qcaleval reference](https://oqtopus-team.github.io/qdash/reference/pi-qcaleval)
-describes model configuration, the six questions, inputs, outputs, and labeled examples.
-The [QDash evaluation guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/evaluation)
+lists tool inputs, outputs, model selection, and the six questions. The
+[pi extension design guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/extensions)
+shows standalone model configuration. The
+[QDash evaluation guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/evaluation)
 explains how the runtime supplies figures and task knowledge.
-
-## Development
 
 This package lives in the [QDash monorepo](https://github.com/oqtopus-team/qdash/tree/develop/packages/pi-qcaleval).
 Follow the [package development and release guide](https://oqtopus-team.github.io/qdash/developer-guide/copilot/packages)

@@ -1,6 +1,6 @@
 # Reference
 
-Use these pages to look up QDash database collections and generated or public client and extension contracts.
+Use these pages to look up QDash database collections, client APIs, and pi extension contracts.
 Explanations and change procedures remain in the Developer Guide.
 
 ## Database
