@@ -440,6 +440,29 @@ describe("TaskWorkbench run availability", () => {
     expect(mocks.post).not.toHaveBeenCalled();
   });
 
+  it("allows a missing optional database input when reloading a source task", async () => {
+    mocks.qubit.mockResolvedValue({ data: { data: {} } });
+    renderWorkbench(
+      {
+        input_parameters: {
+          anharmonicity: {
+            resolution: "database_optional",
+            user_override: "forbidden",
+            value_type: "float",
+          },
+        },
+      },
+      undefined,
+      { ...source, input_parameters: {} },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+
+    await waitFor(() => expect(mocks.refetchAvailability).toHaveBeenCalledTimes(1));
+    expect(mocks.toast.error).not.toHaveBeenCalledWith("No current value found for anharmonicity");
+    expect(screen.getByRole("textbox", { name: "anharmonicity" })).toHaveValue("");
+  });
+
   it("skips incompatible historical fields and executes current defaults without old values", async () => {
     renderWorkbench(
       {

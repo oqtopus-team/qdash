@@ -249,6 +249,22 @@ def test_jazz_task_is_enabled_in_two_qubit_group() -> None:
     assert is_task_available("CheckJAZZ", "qubex")
 
 
+def test_coupling_strength_exposes_optional_database_anharmonicities() -> None:
+    clear_backend_config_cache()
+    task = next(
+        task
+        for task in TaskFileService().list_task_info("qubex", enabled_only=True).tasks
+        if task.name == "CheckCouplingStrength"
+    )
+
+    assert task.category == "Two Qubit"
+    for name in ("control_anharmonicity", "target_anharmonicity"):
+        parameter = task.input_parameters[name]
+        assert parameter["resolution"] == "database_optional"
+        assert parameter["user_override"] == "forbidden"
+        assert parameter["default_value"] is None
+
+
 def test_list_task_info_extracts_input_parameter_metadata() -> None:
     clear_backend_config_cache()
     service = TaskFileService()
@@ -418,6 +434,11 @@ def test_extract_parameter_metadata_understands_named_spec_constructors() -> Non
                 greater_than_or_equal=0.0001,
                 less_than_or_equal=1.0,
             ),
+            "anharmonicity": InputParameterSpec.database_optional(
+                unit="GHz",
+                user_override="forbidden",
+                less_than=0,
+            ),
         }""",
         mode="eval",
     ).body
@@ -441,6 +462,13 @@ def test_extract_parameter_metadata_understands_named_spec_constructors() -> Non
             "default_value": 0.0625,
             "greater_than_or_equal": 0.0001,
             "less_than_or_equal": 1.0,
+        },
+        "anharmonicity": {
+            "resolution": "database_optional",
+            "user_override": "forbidden",
+            "default_value": None,
+            "unit": "GHz",
+            "less_than": 0,
         },
     }
 

@@ -2098,9 +2098,19 @@
       },
       {
         "class_name": "CheckCouplingStrength",
-        "description": "Estimate coupling strength; the first qid is measured, the second is the spectator.",
+        "description": "Measure JAZZ and estimate coupling strength when both anharmonicities are known.\n\nThe first qid is the measured/control qubit and the second is the spectator/target qubit.\nFrequencies and anharmonicities used by the estimate are resolved from QDash calibration\ninputs rather than from Qubex's implicit anharmonicity fallback.",
         "file_path": "two_qubit/check_coupling_strength.py",
         "input_parameters": {
+          "control_anharmonicity": {
+            "default_value": null,
+            "description": "Optional calibrated anharmonicity of the measured/control qubit",
+            "less_than": 0,
+            "parameter_name": "anharmonicity",
+            "qid_role": "control",
+            "resolution": "database_optional",
+            "unit": "GHz",
+            "user_override": "forbidden"
+          },
           "control_control_amplitude": {
             "default_value": null,
             "parameter_name": "control_amplitude",
@@ -2113,6 +2123,7 @@
           },
           "control_hpi_amplitude": {
             "default_value": null,
+            "greater_than": 0,
             "parameter_name": "hpi_amplitude",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2121,6 +2132,7 @@
           },
           "control_hpi_duration": {
             "default_value": null,
+            "greater_than": 0,
             "parameter_name": "hpi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2139,9 +2151,11 @@
           },
           "control_qubit_frequency": {
             "default_value": null,
+            "description": "Calibrated GE frequency of the measured/control qubit",
             "fallback_parameter_names": [
               "qubit_frequency"
             ],
+            "greater_than": 0,
             "parameter_name": "control_frequency",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2230,6 +2244,8 @@
           },
           "control_readout_amplitude": {
             "default_value": null,
+            "greater_than": 0,
+            "less_than_or_equal": 1,
             "parameter_name": "readout_amplitude",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2241,11 +2257,22 @@
             "fallback_parameter_names": [
               "resonator_frequency"
             ],
+            "greater_than": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_required",
             "unit": "GHz",
             "user_override": "allowed"
+          },
+          "target_anharmonicity": {
+            "default_value": null,
+            "description": "Optional calibrated anharmonicity of the spectator/target qubit",
+            "less_than": 0,
+            "parameter_name": "anharmonicity",
+            "qid_role": "target",
+            "resolution": "database_optional",
+            "unit": "GHz",
+            "user_override": "forbidden"
           },
           "target_control_amplitude": {
             "default_value": null,
@@ -2259,6 +2286,7 @@
           },
           "target_hpi_amplitude": {
             "default_value": null,
+            "greater_than": 0,
             "parameter_name": "hpi_amplitude",
             "qid_role": "target",
             "resolution": "database_required",
@@ -2267,6 +2295,7 @@
           },
           "target_hpi_duration": {
             "default_value": null,
+            "greater_than": 0,
             "parameter_name": "hpi_duration",
             "qid_role": "target",
             "resolution": "database_required",
@@ -2285,9 +2314,11 @@
           },
           "target_qubit_frequency": {
             "default_value": null,
+            "description": "Calibrated GE frequency of the spectator/target qubit",
             "fallback_parameter_names": [
               "qubit_frequency"
             ],
+            "greater_than": 0,
             "parameter_name": "control_frequency",
             "qid_role": "target",
             "resolution": "database_required",
@@ -2376,6 +2407,8 @@
           },
           "target_readout_amplitude": {
             "default_value": null,
+            "greater_than": 0,
+            "less_than_or_equal": 1,
             "parameter_name": "readout_amplitude",
             "qid_role": "target",
             "resolution": "database_required",
@@ -2387,6 +2420,7 @@
             "fallback_parameter_names": [
               "resonator_frequency"
             ],
+            "greater_than": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_required",

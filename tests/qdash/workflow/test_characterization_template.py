@@ -62,6 +62,7 @@ def test_characterization_builds_full_pipeline_in_dependency_order() -> None:
     assert steps[6].continue_on_failure is True
     assert steps[6].stop_on_failure_tasks == ("ConfigureEF",)
     assert steps[7].tasks == ["CheckCouplingStrength"]
+    assert steps[7].step_name == "coupling_characterization"
     assert steps[7].continue_on_failure is True
 
 
@@ -71,7 +72,7 @@ def test_ge_only_characterization_uses_ge_configuration() -> None:
         chip_id="64Q",
         qids=["0"],
         run_ef_characterization=False,
-        run_jazz=False,
+        run_coupling_characterization=False,
     )
 
     assert isinstance(result["targets"], QubitTargets)
@@ -82,15 +83,16 @@ def test_ge_only_characterization_uses_ge_configuration() -> None:
     assert steps[2].stop_on_failure_tasks == ("Configure",)
 
 
-def test_jazz_does_not_imply_ef_calibration() -> None:
+def test_coupling_characterization_does_not_imply_ef_calibration() -> None:
     result = characterization_module.characterization(
         username="alice",
         chip_id="64Q",
         mux_ids=[0],
         run_ge_characterization=False,
         run_ef_characterization=False,
-        run_jazz=True,
-        inverse=True,
+        run_coupling_characterization=True,
+        max_parallel_couplings=3,
+        reverse_coupling_direction=True,
     )
 
     steps = result["steps"]
@@ -102,7 +104,10 @@ def test_jazz_does_not_imply_ef_calibration() -> None:
     ]
     assert steps[0].tasks[0] == "Configure"
     assert steps[2].inverse is True
+    assert steps[2].max_parallel_ops == 3
     assert steps[3].tasks == ["CheckCouplingStrength"]
+    assert steps[3].step_name == "coupling_characterization"
+    assert steps[3].max_parallel_ops == 3
 
 
 def test_characterization_prefers_mux_targets_and_preserves_exclusions() -> None:
@@ -127,7 +132,7 @@ def test_characterization_requires_targets_and_an_enabled_stage() -> None:
             qids=["0"],
             run_ge_characterization=False,
             run_ef_characterization=False,
-            run_jazz=False,
+            run_coupling_characterization=False,
         )
 
     with pytest.raises(ValueError, match="mux_ids or qids is required"):
@@ -149,7 +154,7 @@ def test_characterization_exposes_primary_task_parameters() -> None:
         *characterization_module.GE_CHARACTERIZATION_TASKS,
         *characterization_module.EF_CALIBRATION_TASKS,
         *characterization_module.EF_CHARACTERIZATION_TASKS,
-        *characterization_module.TWO_QUBIT_CHARACTERIZATION_TASKS,
+        *characterization_module.COUPLING_CHARACTERIZATION_TASKS,
     }
     assert parameters.keys() == expected_tasks
     assert parameters["ConfigureEF"]["run"]["configuration_mode"] == "ge-ef-fh"

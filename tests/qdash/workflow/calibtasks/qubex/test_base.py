@@ -398,6 +398,41 @@ class TestLoadParametersFromDbQubitTask:
 
         assert task.input_parameters["amplitude"].value == 0.25
 
+    def test_database_optional_remains_none_without_database_value(self):
+        class OptionalInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "anharmonicity": InputParameterSpec.database_optional(unit="GHz")
+            }
+
+        task = OptionalInputTask()
+        with patch(
+            "qdash.workflow.calibtasks.qubex.base.MongoQubitCalibrationRepository"
+        ) as mock_repo:
+            mock_repo.return_value.get_calibration_data.return_value = {}
+            task._load_parameters_from_db(_make_backend(), "0")
+
+        parameter = task.input_parameters["anharmonicity"]
+        assert parameter.value is None
+
+    def test_database_optional_loads_database_value(self):
+        class OptionalInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "anharmonicity": InputParameterSpec.database_optional(unit="GHz")
+            }
+
+        task = OptionalInputTask()
+        with patch(
+            "qdash.workflow.calibtasks.qubex.base.MongoQubitCalibrationRepository"
+        ) as mock_repo:
+            mock_repo.return_value.get_calibration_data.return_value = {
+                "anharmonicity": {"value": -0.3, "unit": "GHz"}
+            }
+            task._load_parameters_from_db(_make_backend(), "0")
+
+        parameter = task.input_parameters["anharmonicity"]
+        assert parameter.value == -0.3
+        assert parameter.unit == "GHz"
+
     def test_database_resolution_preserves_input_ui_group_metadata(self):
         class GroupedInputTask(ConcreteQubexTask):
             input_spec: ClassVar[dict[str, InputParameterSpec]] = {
