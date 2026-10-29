@@ -10,6 +10,9 @@ from qdash.workflow.calibtasks.base import (
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.box_setup.configuration_lock import (
+    configuration_push_lock,
+)
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
@@ -50,9 +53,10 @@ class ReadoutConfigure(QubexTask):
                     r.frequency = np.nan  # Update readout only
             exp.system_manager.set_experiment_system(sys)
             exp.system_manager.experiment_system.configure()
-            exp.system_manager.push(
-                exp.box_ids, confirm=False
-            )  # Use config values for control, update box linked to specified qubit's readout
+            # Preserve control settings while updating readout on the selected boxes.
+            box_ids = exp.box_ids
+            with configuration_push_lock(box_ids):
+                exp.system_manager.push(box_ids, confirm=False)
             return None
 
         readout_configure()
