@@ -39,7 +39,8 @@ def render_compose(
         env=environment,
         text=True,
     )
-    return json.loads(result.stdout)
+    compose: dict[str, Any] = json.loads(result.stdout)
+    return compose
 
 
 def published_ports(compose: dict[str, Any]) -> dict[str, set[tuple[str, str, int]]]:

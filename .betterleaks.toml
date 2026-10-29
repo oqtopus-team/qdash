@@ -28,6 +28,8 @@ matchesAny(attributes[?"path"].orValue(""), [
 # betterleaks exposes the clean value in finding["secret"]; we match the mongodb
 # URI here (Gitleaks used regexTarget="match") because betterleaks' finding["match"]
 # includes a trailing quote that would break the `$` anchor.
+# dGhlIHNhbXBsZSBub25jZQ== is the RFC 6455 sample Sec-WebSocket-Key used by the
+# Caddy proxy tests.
 # ---------------------------------------------------------------------------
 filter = '''
 matchesAny(finding["secret"], [
@@ -37,6 +39,7 @@ matchesAny(finding["secret"], [
   r"""^x90_gate_fidelity$""",
   r"""^x180_gate_fidelity$""",
   r"""^zx90_gate_fidelity$""",
+  r"""^dGhlIHNhbXBsZSBub25jZQ==$""",
 ])
 '''
 

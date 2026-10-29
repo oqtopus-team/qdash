@@ -52,7 +52,8 @@ class MockHandler(BaseHTTPRequestHandler):
     @property
     def state(self) -> BackendState:
         """Return the state attached to this handler's server."""
-        return self.server.state  # type: ignore[attr-defined]
+        state: BackendState = self.server.state  # type: ignore[attr-defined]
+        return state
 
     def log_message(self, _format: str, *_args: Any) -> None:
         """Keep test server output out of pytest logs."""
