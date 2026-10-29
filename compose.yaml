@@ -17,7 +17,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "mongosh --quiet --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 })'",
+          'mongosh --quiet --username "$$MONGO_INITDB_ROOT_USERNAME" --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval ''db.adminCommand({ ping: 1 })''',
         ]
       interval: 5s
       timeout: 5s
@@ -156,6 +156,7 @@ services:
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - ./config:/app/config # QDash app/domain/copilot config files
+      - ${QUELWARE_CLIENT_PATH:-${HOME}/.config/quelware-client}:/root/.config/quelware-client # quelware-client PAT path
       - worker-logs:/app/logs
     working_dir: /app/qdash/workflow
     command: python start_worker.py
@@ -313,8 +314,8 @@ services:
     # The server starts one pi-env daemon per conversation as that user's own
     # uid; see docs/developer-guide/copilot/workspace.md.
     build:
-      context: ./agent-runtime
-      dockerfile: ./exec/Dockerfile
+      context: .
+      dockerfile: ./agent-runtime/exec/Dockerfile
     restart: always
     read_only: true
     tmpfs:
