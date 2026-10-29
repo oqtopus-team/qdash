@@ -22,7 +22,7 @@ class FakeCalibService:
         return {"targets": targets, "steps": steps}
 
 
-def test_bringup_starts_with_configure_all(monkeypatch) -> None:
+def test_bringup_starts_with_measurements(monkeypatch) -> None:
     monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
 
     result = bringup_module.bringup(
@@ -31,7 +31,7 @@ def test_bringup_starts_with_configure_all(monkeypatch) -> None:
         mux_ids=[0],
     )
 
-    assert [step.name for step in result["steps"]] == ["configure_all", "bringup"]
+    assert [step.name for step in result["steps"]] == ["bringup"]
 
 
 def test_bringup_step_accepts_resonator_assignment_order() -> None:
@@ -65,7 +65,7 @@ def test_bringup_template_passes_template_task_list(monkeypatch) -> None:
 
     result = bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
 
-    assert result["steps"][1].tasks == bringup_module.BRINGUP_TASKS
+    assert result["steps"][0].tasks == bringup_module.BRINGUP_TASKS
 
 
 def test_bringup_template_preserves_task_specific_acquisition_settings(monkeypatch) -> None:

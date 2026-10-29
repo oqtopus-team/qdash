@@ -1,7 +1,7 @@
 """Bring-up calibration for MUX-level characterization.
 
-This template configures selected MUXes, then runs MUX-level bring-up tasks like
-resonator spectroscopy. Bring-up tasks are executed once per MUX, not per qubit.
+This template runs MUX-level bring-up tasks like resonator spectroscopy.
+Bring-up tasks are executed once per MUX, not per qubit.
 
 Example:
     bringup(
@@ -22,7 +22,7 @@ from qdash.workflow.service.calib_service import (
     on_flow_crashed,
     on_flow_failure,
 )
-from qdash.workflow.service.steps import BringUp, ConfigureAll
+from qdash.workflow.service.steps import BringUp
 from qdash.workflow.service.targets import MuxTargets
 
 BRINGUP_TASKS: list[str] = [
@@ -51,9 +51,8 @@ def bringup(
 ) -> Any:
     """Bring-up calibration for MUX-level characterization.
 
-    This flow first pushes the current configuration to the selected MUXes, then
-    runs MUX-level tasks (e.g., CheckResonatorSpectroscopy) that characterize the
-    entire MUX unit. Tasks are executed only for the representative qubit
+    This flow runs MUX-level tasks (e.g., CheckResonatorSpectroscopy) that
+    characterize the entire MUX unit. Tasks are executed only for the representative qubit
     (qid % 4 == 0) of each MUX.
 
     Args:
@@ -137,10 +136,7 @@ def bringup(
         #     "frequency_range": sweep.arange(3.0, 5.75, 0.005),
         #     "power_range": sweep.arange(-60, 0, 10),
     }
-    steps = [
-        ConfigureAll(),
-        BringUp(mode=mode, tasks=BRINGUP_TASKS),
-    ]
+    steps = [BringUp(mode=mode, tasks=BRINGUP_TASKS)]
 
     cal = CalibService(
         username,

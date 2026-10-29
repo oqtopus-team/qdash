@@ -2,10 +2,18 @@
   {
     "id": "bringup",
     "name": "Bring-up",
-    "description": "MUX-level bring-up calibration: ConfigureAll -> resonator spectroscopy. Requires explicit mux_ids and runs once per selected MUX.",
+    "description": "MUX-level bring-up calibration starting with resonator spectroscopy. Requires explicit mux_ids and runs once per selected MUX.",
     "category": "production",
     "filename": "bringup.py",
     "function_name": "bringup"
+  },
+  {
+    "id": "box_setup",
+    "name": "Box Setup",
+    "description": "Box setup with capture delay correction for QuEL-1 and QuEL-3: CorrectCaptureDelay once per MUX. Sweeps the capture delay with a fixed readout tone, then writes capture_delay.yaml (and capture_delay_word.yaml on QuEL-1). Requires explicit mux_ids; run first, before resonator spectroscopy.",
+    "category": "production",
+    "filename": "box_setup.py",
+    "function_name": "box_setup"
   },
   {
     "id": "check_waveform",

@@ -59,6 +59,25 @@ Replace `0` with the MUX that the saved workflow should use. To target individua
 set `qids = ["0", "1"]`. If every caller supplies targets through an API, leave the template's
 missing-target check unchanged instead of adding a fallback.
 
+## Run Box Setup Before Spectroscopy
+
+Use **Box Setup** on QuEL-1 or QuEL-3 hardware to align each selected MUX's readout capture
+before running resonator spectroscopy. The template requires `mux_ids` and runs
+**CorrectCaptureDelay** once per MUX.
+
+1. Select **Box Setup** under **TEMPLATE** and set a flow name.
+2. Set a default MUX target in the source when you plan to run it from the application. Replace
+   the template's missing-target check with:
+
+   ```python
+   if mux_ids is None:
+       mux_ids = [0]
+   ```
+
+   Replace `0` with the MUX you want to align.
+3. Save the flow, then select **Execute**. Review the capture delay result before running a
+   spectroscopy workflow.
+
 ## Choose Tasks and Execution Order
 
 The task list runs from top to bottom. Open **Tasks** in another tab to find the task names enabled

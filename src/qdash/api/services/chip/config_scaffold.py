@@ -16,7 +16,10 @@ it with ``system_id == chip_id``::
 * without a source, backend-specific config templates provide commented hardware
   examples to complete before running;
 * ``params/`` is always new: QDash's templates for the system's backend, with
-  empty ``data`` so calibration fills them;
+  empty ``data`` so calibration fills them. The readout and control frequency
+  files list every qubit as ``null`` instead, so Qubex uses their
+  ``meta.default``, set inside the box's band, and activates the qubits for the
+  first box setup and spectroscopy;
 * ``calibration/calib_note.json`` holds ``{}``.
 
 An existing chip directory is never modified.
@@ -56,6 +59,19 @@ CONFIG_TEMPLATES_DIR = "domain/qubex-config"
 _KEYED_FILES = frozenset({"chip.yaml", "system.yaml", "wiring.yaml"})
 _HARDWARE_FILES = ("box.yaml", "skew.yaml", "cable_delay.yaml", "external_devices.yaml")
 _SKIP_DIRS = RESERVED_CHIP_IDS
+
+# Qubex activates a qubit only when its readout and control frequencies resolve.
+# A null entry resolves to the file's meta.default without recording a value.
+# These are operating settings; measured qubit and resonator frequencies stay empty.
+_SEED_FREQUENCY_FILES = ("readout_frequency.yaml", "control_frequency.yaml")
+# Box types whose readout band is 5.75-6.75 GHz in Qubex; every other type uses
+# 9.75-10.75 GHz. The defaults are the centers of Qubex's default readout and
+# control spectroscopy ranges for each band.
+_LOW_BAND_BOX_TYPES = frozenset({"quel3", "quel1se-riken8"})
+_BAND_FREQUENCY_DEFAULTS: dict[str, dict[str, float]] = {
+    "high": {"readout_frequency.yaml": 10.25, "control_frequency.yaml": 8.0},
+    "low": {"readout_frequency.yaml": 6.25, "control_frequency.yaml": 4.0},
+}
 _DIR_NAME = re.compile(CHIP_ID_PATTERN)
 
 
@@ -104,6 +120,43 @@ def _entry_for(payload: Any, system_id: str) -> Any:
 def _dump(path: Path, payload: Any, header: str) -> None:
     body = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
     path.write_text(f"{header}\n{body}", encoding="utf-8")
+
+
+def _readout_band(backend: str, rows: list[Any], boxes: Any) -> str:
+    """The band of the readout boxes in ``rows``; the backend's when none is known."""
+    types: set[str] = set()
+    for row in rows:
+        port = row.get("read_out") if isinstance(row, dict) else None
+        port_text = str(port) if port else ""
+        box_id = port_text.split(":", 1)[0] if ":" in port_text else port_text.rsplit("-", 1)[0]
+        box = boxes.get(box_id) if isinstance(boxes, dict) and port else None
+        if isinstance(box, dict) and box.get("type"):
+            types.add(str(box["type"]))
+    if not types and isinstance(boxes, dict) and len(boxes) == 1:
+        only_box = next(iter(boxes.values()))
+        if isinstance(only_box, dict) and only_box.get("type"):
+            types.add(str(only_box["type"]))
+    if not types:
+        return "low" if backend == "quel3" else "high"
+    bands = {"low" if box_type in _LOW_BAND_BOX_TYPES else "high" for box_type in types}
+    if len(bands) > 1:
+        raise ChipConfigError("Readout boxes of the wiring mix the high and low frequency bands")
+    return bands.pop()
+
+
+def _seed_frequencies(params_dir: Path, n_qubits: int, band: str) -> None:
+    """List every qubit as null with an in-band default in the frequency files."""
+    digits = len(str(n_qubits - 1))
+    for name in _SEED_FREQUENCY_FILES:
+        path = params_dir / name
+        payload = _load_yaml(path)
+        if not isinstance(payload, dict):
+            continue
+        meta = payload.get("meta") or {}
+        meta["default"] = _BAND_FREQUENCY_DEFAULTS[band][name]
+        payload["meta"] = meta
+        payload["data"] = {f"Q{index:0{digits}d}": None for index in range(n_qubits)}
+        path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
 class ChipConfigScaffolder:
@@ -333,6 +386,8 @@ class ChipConfigScaffolder:
 
         for template in self._param_templates(str(system["backend"])):
             shutil.copy2(template, params_dir / template.name)
+        band = _readout_band(str(system["backend"]), rows, _load_yaml(config_dir / "box.yaml"))
+        _seed_frequencies(params_dir, n_qubits, band)
         (calibration_dir / "calib_note.json").write_text("{}\n", encoding="utf-8")
 
         written = [

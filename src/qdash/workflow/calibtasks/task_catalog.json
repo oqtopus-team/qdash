@@ -6029,6 +6029,80 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CorrectCaptureDelay",
+        "description": "Center the readout pulse in the capture window of each MUX.\n\nThis is a MUX-level task: it runs once for the representative qubit and\nwrites the same capture delay to every qubit in the MUX: ``capture_delay``\nand ``capture_delay_word`` on QuEL-1, ``capture_delay`` in ns on QuEL-3.\nThe delay is a setting of the MUX, so the task captures only the\nrepresentative qubit's readout at a fixed tone frequency. The capture units\nof a MUX read the same ADC samples, so capturing more qubits adds no information.",
+        "file_path": "box_setup/correct_capture_delay.py",
+        "input_parameters": {},
+        "name": "CorrectCaptureDelay",
+        "output_parameters": [
+          "capture_delay",
+          "capture_delay_word"
+        ],
+        "run_parameters": {
+          "capture_delay_ns_range": {
+            "description": "QuEL-3: capture_delay sweep as [start, stop, step] in ns. Every value must be a multiple of 0.8 ns. The stop value is exclusive.",
+            "unit": "ns",
+            "value": [
+              0,
+              2432,
+              128
+            ],
+            "value_type": "np.arange"
+          },
+          "capture_delay_word_range": {
+            "description": "QuEL-1: capture_delay_word sweep at the chosen coarse delay as [start, stop, step] in 8 ns words. Every value must be a multiple of 4 words (32 ns).",
+            "unit": "8 ns",
+            "value": [
+              0,
+              16,
+              4
+            ],
+            "value_type": "range"
+          },
+          "delay_range": {
+            "description": "QuEL-1: coarse capture_delay sweep as [start, stop, step] in 128 ns units. The stop value is exclusive.",
+            "unit": "128 ns",
+            "value": [
+              0,
+              19,
+              1
+            ],
+            "value_type": "range"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "readout_frequency": {
+            "description": "Fixed readout tone frequency used for every capture. Choose a frequency inside the readout band but away from the resonators; resonator calibration is not required. Leave blank to use 0.25 GHz above the connected readout box's default resonator spectroscopy range: 11.0 GHz for the high band and 7.0 GHz for the low band.",
+            "unit": "GHz",
+            "value": null,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Number of averaged shots per capture",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "smoothing": {
+            "description": "Moving-average window used to locate the pulse plateau",
+            "unit": "samples",
+            "value": 5,
+            "value_type": "int"
+          },
+          "snr_threshold": {
+            "description": "Minimum signal-to-noise ratio of a detected pulse edge",
+            "unit": "a.u.",
+            "value": 5.0,
+            "value_type": "float"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CreateDRAGHPIPulse",
         "description": "Task to create the DRAG HPI pulse.",
         "file_path": "one_qubit_fine/create_drag_hpi_pulse.py",

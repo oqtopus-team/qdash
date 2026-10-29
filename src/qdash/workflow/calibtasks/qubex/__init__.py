@@ -20,6 +20,7 @@ from qdash.workflow.calibtasks.qubex.box_setup.check_noise import CheckNoise
 from qdash.workflow.calibtasks.qubex.box_setup.check_status import CheckStatus
 from qdash.workflow.calibtasks.qubex.box_setup.configure import Configure, ConfigureEF
 from qdash.workflow.calibtasks.qubex.box_setup.configure_all import ConfigureAll
+from qdash.workflow.calibtasks.qubex.box_setup.correct_capture_delay import CorrectCaptureDelay
 from qdash.workflow.calibtasks.qubex.box_setup.dump_box import DumpBox
 from qdash.workflow.calibtasks.qubex.box_setup.link_up import LinkUp
 from qdash.workflow.calibtasks.qubex.box_setup.readout_configure import ReadoutConfigure
@@ -135,6 +136,7 @@ __all__ = [
     "Configure",
     "ConfigureAll",
     "ConfigureEF",
+    "CorrectCaptureDelay",
     "CreateDRAGHPIPulse",
     "CreateDRAGPIPulse",
     "CreateEFHPIPulse",

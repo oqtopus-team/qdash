@@ -694,10 +694,45 @@ class TestCalibServiceParameterManagement:
         )
         logger = MagicMock()
 
-        session._sync_backend_params_before_push(logger)
+        push_config = session._sync_backend_params_before_push(logger)
 
-        assert session.github_push_config.params_file_names == ["t1.yaml"]
+        assert push_config.params_file_names == ["t1.yaml"]
+        # Pipeline steps share the session config, so it must keep the full allowlist.
+        assert session.github_push_config.params_file_names == ["t1.yaml", "t2_echo.yaml"]
         logger.info.assert_called_once()
+
+    def test_sync_backend_params_does_not_narrow_later_pipeline_steps(self, monkeypatch):
+        """A step that touches no params must not empty the allowlist for later steps."""
+        from qdash.workflow.service.github import GitHubPushConfig
+
+        class FakeUpdater:
+            def update(self, qid, params):
+                return {"capture_delay.yaml"} if params else set()
+
+        orchestrator = MagicMock()
+        orchestrator._execution_service = MockExecutionService()
+        orchestrator._backend = MagicMock()
+
+        session = CalibService.__new__(CalibService)
+        session.chip_id = "chip_1"
+        session._orchestrator = orchestrator
+        session.github_push_config = GitHubPushConfig(
+            params_file_names=["capture_delay.yaml", "t1.yaml"],
+        )
+        monkeypatch.setattr(
+            "qdash.workflow.service.calib_service.get_params_updater",
+            lambda backend, chip_id: FakeUpdater(),
+        )
+
+        # Step 1 (ConfigureAll) updates no params.
+        orchestrator._execution_service.calib_data.qubit = {}
+        first = session._sync_backend_params_before_push(MagicMock())
+        # Step 2 (CorrectCaptureDelay) updates the capture delay.
+        orchestrator._execution_service.calib_data.qubit = {"0": {"capture_delay": {"value": 8}}}
+        second = session._sync_backend_params_before_push(MagicMock())
+
+        assert first.params_file_names == []
+        assert second.params_file_names == ["capture_delay.yaml"]
 
     def test_sync_backend_params_keeps_touched_files_when_already_updated(
         self,
@@ -743,9 +778,11 @@ class TestCalibServiceParameterManagement:
         )
         logger = MagicMock()
 
-        session._sync_backend_params_before_push(logger)
+        push_config = session._sync_backend_params_before_push(logger)
 
-        assert session.github_push_config.params_file_names == ["t1.yaml"]
+        assert push_config.params_file_names == ["t1.yaml"]
+        # Pipeline steps share the session config, so it must keep the full allowlist.
+        assert session.github_push_config.params_file_names == ["t1.yaml", "t2_echo.yaml"]
         logger.info.assert_called_once()
 
     def test_merge_task_result_calib_data_before_push_loads_completed_outputs(
