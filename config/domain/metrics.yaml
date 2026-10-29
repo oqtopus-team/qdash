@@ -363,7 +363,7 @@ coupling_metrics:
   qubit_qubit_coupling_strength:
     title: Coupling Strength
     unit: MHz
-    scale: 1000 # Convert GHz to MHz
+    scale: 1
     description: Qubit coupling strength estimated from JAZZ and qubit anharmonicities
     evaluation:
       mode: none

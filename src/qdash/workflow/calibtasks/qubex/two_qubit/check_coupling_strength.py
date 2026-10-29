@@ -111,7 +111,7 @@ class CheckCouplingStrength(QubexTask):
         ),
         "qubit_qubit_coupling_strength": OutputParameterSpec(
             qid_role="coupling",
-            unit="GHz",
+            unit="MHz",
             description="Coupling strength estimated from JAZZ and configured qubit frequencies and anharmonicities",
         ),
     }
@@ -124,7 +124,10 @@ class CheckCouplingStrength(QubexTask):
         self.output_parameters["static_zz_interaction"].value = (
             zeta * 1e6 if zeta is not None else None
         )  # GHz to KHz
-        self.output_parameters["qubit_qubit_coupling_strength"].value = data.get("g")
+        strength = data.get("g")
+        self.output_parameters["qubit_qubit_coupling_strength"].value = (
+            strength * 1e3 if strength is not None else None
+        )  # GHz to MHz
         figure = data.get("fig")
         return PostProcessResult(
             output_parameters=self.attach_execution_id(execution_id),

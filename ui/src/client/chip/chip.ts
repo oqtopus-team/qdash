@@ -1995,8 +1995,7 @@ export function useGetChipMetricsSummary<TData = Awaited<ReturnType<typeof getCh
  * - Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction,
  *             qubit_qubit_coupling_strength
  *
- * Coupling strength is stored and returned in GHz. The metrics configuration
- * displays it in MHz with a scale factor of 1000.
+ * Coupling strength is stored, returned, and displayed in MHz.
  *
  * Parameters
  * ----------

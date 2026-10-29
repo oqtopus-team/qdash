@@ -54,7 +54,7 @@ def test_run_passes_pulses_sweep_and_returns_r2(task_and_experiment) -> None:
 
 
 @pytest.mark.parametrize("strength", [0.005, 0.0])
-def test_postprocess_preserves_coupling_strength_in_ghz(strength: float) -> None:
+def test_postprocess_converts_coupling_strength_to_mhz(strength: float) -> None:
     task = CheckCouplingStrength()
     figure = go.Figure()
     result = task.postprocess(
@@ -67,8 +67,8 @@ def test_postprocess_preserves_coupling_strength_in_ghz(strength: float) -> None
     )
 
     metric = result.output_parameters["qubit_qubit_coupling_strength"]
-    assert metric.value == pytest.approx(strength)
-    assert metric.unit == "GHz"
+    assert metric.value == pytest.approx(strength * 1e3)
+    assert metric.unit == "MHz"
     assert metric.qid_role == "coupling"
     assert metric.execution_id == "exec-1"
     assert result.figures == [figure]
@@ -111,8 +111,8 @@ def test_registered_task_saves_both_coupling_metrics() -> None:
     saved = repository.return_value.update_calib_data.call_args.kwargs
     assert saved["qid"] == "0-1"
     assert saved["project_id"] == "proj-1"
-    assert saved["output_parameters"]["qubit_qubit_coupling_strength"].value == pytest.approx(0.005)
-    assert saved["output_parameters"]["qubit_qubit_coupling_strength"].unit == "GHz"
+    assert saved["output_parameters"]["qubit_qubit_coupling_strength"].value == pytest.approx(5.0)
+    assert saved["output_parameters"]["qubit_qubit_coupling_strength"].unit == "MHz"
 
     assert saved["output_parameters"]["static_zz_interaction"].value == pytest.approx(-20.0)
     assert saved["output_parameters"]["static_zz_interaction"].unit == "KHz"
