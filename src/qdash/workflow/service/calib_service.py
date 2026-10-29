@@ -1251,10 +1251,25 @@ class CalibService:
                         )
                         continue
 
-                    if doc.task_type == TaskTypes.COUPLING or "-" in doc.qid:
-                        calib_data.put_coupling_data(doc.qid, name, parameter)
-                    else:
-                        calib_data.put_qubit_data(doc.qid, name, parameter)
+                    # Key by the published calibration parameter names recorded at
+                    # save time, matching the in-memory calib_data of the task run.
+                    # Results persisted before per-destination metadata existed only
+                    # carry the output name.
+                    published_names = [
+                        str(update["parameter_name"])
+                        for update in output_parameter.database_updates
+                        if update.get("updated") is True
+                    ] or [name]
+                    for published_name in published_names:
+                        published = (
+                            parameter
+                            if published_name == name
+                            else parameter.model_copy(update={"parameter_name": published_name})
+                        )
+                        if doc.task_type == TaskTypes.COUPLING or "-" in doc.qid:
+                            calib_data.put_coupling_data(doc.qid, published_name, published)
+                        else:
+                            calib_data.put_qubit_data(doc.qid, published_name, published)
 
             if calib_data.qubit or calib_data.coupling:
                 self.execution_service.merge_calib_data(calib_data)

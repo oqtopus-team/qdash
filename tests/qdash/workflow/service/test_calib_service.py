@@ -807,6 +807,27 @@ class TestCalibServiceParameterManagement:
                                 "value": 0.25,
                                 "database_updated": True,
                             },
+                            "fh_frequency": {
+                                "value": 4.25,
+                                "database_updated": True,
+                                "database_updates": [
+                                    {
+                                        "parameter_name": "fh_frequency",
+                                        "updated_value": 4.25,
+                                        "updated": True,
+                                    },
+                                    {
+                                        "parameter_name": "control_frequency_fh",
+                                        "updated_value": 4.25,
+                                        "updated": True,
+                                    },
+                                    {
+                                        "parameter_name": "not_written",
+                                        "updated_value": 4.25,
+                                        "updated": False,
+                                    },
+                                ],
+                            },
                             "measurement_only": {
                                 "value": 0.75,
                                 "database_updated": False,
@@ -835,7 +856,14 @@ class TestCalibServiceParameterManagement:
         merged = execution_service.calib_data.qubit["0"]["control_amplitude"]
         assert isinstance(merged, ParameterModel)
         assert merged.value == 0.25
-        assert "measurement_only" not in execution_service.calib_data.qubit["0"]
+        # Published destinations are keyed by their database names so the YAML
+        # push sees control_frequency_fh.yaml even though the output is fh_frequency.
+        qubit_data = execution_service.calib_data.qubit["0"]
+        assert qubit_data["fh_frequency"].value == 4.25
+        assert qubit_data["control_frequency_fh"].value == 4.25
+        assert qubit_data["control_frequency_fh"].parameter_name == "control_frequency_fh"
+        assert "not_written" not in qubit_data
+        assert "measurement_only" not in qubit_data
 
 
 class TestGlobalSessionHelpers:

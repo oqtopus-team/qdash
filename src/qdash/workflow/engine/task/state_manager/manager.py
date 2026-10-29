@@ -1,9 +1,9 @@
 """TaskStateManager class for managing task state and lifecycle."""
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, PrivateAttr
 
 from qdash.common.utils.datetime import now
 from qdash.datamodel.task import (
@@ -41,6 +41,11 @@ class TaskStateManager(BaseModel):
     task_result: TaskResultModel = TaskResultModel()
     calib_data: CalibDataModel = CalibDataModel(qubit={}, coupling={})
     _upstream_task_id: str = ""
+    # Published calib_data keys per (task_name, task_type, qid), so a rollback
+    # removes publish targets as well as the raw output names.
+    _published_parameter_names: dict[tuple[str, str, str], list[str]] = PrivateAttr(
+        default_factory=dict
+    )
 
     def __init__(self, qids: list[str] | None = None, **data: Any) -> None:
         super().__init__(**data)
@@ -198,25 +203,36 @@ class TaskStateManager(BaseModel):
         output_parameters: Mapping[str, ParameterModel],
         task_type: str,
         qid: str,
+        publish_targets: Mapping[str, Sequence[str]] | None = None,
     ) -> None:
-        """Store output parameters for a task and update calibration data."""
+        """Store output parameters for a task and update calibration data.
+
+        The task result keeps the raw output names. ``calib_data`` is keyed by
+        the published calibration parameter names from ``publish_targets`` so
+        it mirrors the calibration database; an output without targets
+        publishes under its own name.
+        """
         task = self._ensure_task_exists(task_name, task_type, qid)
         task.put_output_parameter(dict(output_parameters))
 
-        # Update calibration data
+        # Update calibration data under the published names
+        published = data_ops.expand_published_parameters(output_parameters, publish_targets)
+        self._published_parameter_names[(task_name, task_type, qid)] = list(published)
         if task_type == TaskTypes.QUBIT:
-            for key, value in output_parameters.items():
+            for key, value in published.items():
                 self.calib_data.put_qubit_data(qid, key, value)
         elif task_type == TaskTypes.COUPLING:
-            for key, value in output_parameters.items():
+            for key, value in published.items():
                 self.calib_data.put_coupling_data(qid, key, value)
 
     def clear_output_parameters(self, task_name: str, task_type: str, qid: str) -> None:
         """Clear output parameters for a task and rollback calib_data."""
         task = self._ensure_task_exists(task_name, task_type, qid)
 
-        # Get parameter names before clearing
-        parameter_names = list(task.output_parameters.keys())
+        # Remove the published names, falling back to the raw output names
+        parameter_names = self._published_parameter_names.pop(
+            (task_name, task_type, qid), None
+        ) or list(task.output_parameters.keys())
 
         # Clear task output parameters
         task.output_parameters = {}
