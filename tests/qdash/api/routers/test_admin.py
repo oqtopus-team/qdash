@@ -412,6 +412,30 @@ class TestAdminProjectsEndpoints:
         assert "total" in data
         assert data["total"] >= 1
 
+    def test_list_projects_counts_only_active_members(
+        self, test_client, admin_user, project_owner, test_project, admin_headers
+    ):
+        """Project member counts exclude revoked memberships."""
+        for username, status in [("activemember", "active"), ("revokedmember", "revoked")]:
+            ProjectMembershipDocument(
+                project_id=test_project.project_id,
+                user_id=f"user-{username}",
+                username=username,
+                role=ProjectRole.VIEWER,
+                status=status,
+                invited_by_user_id=project_owner.user_id,
+                invited_by="projectowner",
+                system_info=SystemInfoModel(),
+            ).insert()
+
+        response = test_client.get("/admin/projects", headers=admin_headers)
+
+        assert response.status_code == 200
+        project = next(
+            p for p in response.json()["projects"] if p["project_id"] == test_project.project_id
+        )
+        assert project["member_count"] == 1
+
     def test_list_projects_requires_admin(
         self, test_client, admin_user, project_owner, test_project, user_headers
     ):

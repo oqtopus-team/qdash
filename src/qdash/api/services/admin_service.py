@@ -386,13 +386,15 @@ class AdminService:
     # --- Project Management ---
 
     def list_projects(self, skip: int = 0, limit: int = 100) -> ProjectListResponse:
-        """List all projects with member counts."""
+        """List all projects with active member counts."""
         total = ProjectDocument.find_all().count()
         projects = list(ProjectDocument.find_all().skip(skip).limit(limit).run())
 
         project_list = []
         for p in projects:
-            member_count = ProjectMembershipDocument.find({"project_id": p.project_id}).count()
+            member_count = ProjectMembershipDocument.find(
+                {"project_id": p.project_id, "status": "active"}
+            ).count()
             project_list.append(
                 ProjectListItem(
                     project_id=p.project_id,
