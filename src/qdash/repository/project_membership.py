@@ -55,16 +55,22 @@ class MongoProjectMembershipRepository:
         query: dict[str, Any] = {"user_id": user_id, "status": status}
         return list(ProjectMembershipDocument.find(query).run())
 
-    def find_by_project(self, project_id: str) -> list[ProjectMembershipDocument]:
-        """Find all memberships for a project.
+    def find_by_project(
+        self, project_id: str, status: str | None = None
+    ) -> list[ProjectMembershipDocument]:
+        """Find memberships for a project, optionally filtered by status.
 
         Args:
             project_id: Project identifier
+            status: Membership status to match, or None to return all statuses
 
         Returns:
             List of ProjectMembershipDocument objects
         """
-        return list(ProjectMembershipDocument.find({"project_id": project_id}).run())
+        query: dict[str, Any] = {"project_id": project_id}
+        if status is not None:
+            query["status"] = status
+        return list(ProjectMembershipDocument.find(query).run())
 
     def delete_by_project(self, project_id: str) -> None:
         """Delete all memberships for a project.
