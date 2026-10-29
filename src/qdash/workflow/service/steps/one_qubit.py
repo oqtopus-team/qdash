@@ -48,6 +48,7 @@ def _execute_direct_one_qubit(
         "project_id": service.project_id,
         "default_run_parameters": service.default_run_parameters,
         "task_parameters": service.task_parameters,
+        "configuration_mode": getattr(service, "configuration_mode", None),
         "tags": service.tags,
         "flow_name": service.flow_name,
         "note": service.note,

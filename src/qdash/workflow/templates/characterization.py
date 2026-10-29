@@ -3,15 +3,16 @@
 GE and EF refer to the ground-to-first-excited and first-to-second-excited transitions.
 The pipeline runs in this order:
 
-1. GE calibration and filtering (always).
-2. Capture the coupling schedule from GE-successful qubits (if enabled).
-3. GE characterization (optional).
-4. EF calibration, filtering, and characterization (optional).
-5. Coupling characterization with JAZZ using the captured schedule (optional).
+1. Configure all selected MUXes once (always).
+2. GE calibration and filtering (always).
+3. Capture the coupling schedule from GE-successful qubits (if enabled).
+4. GE characterization (optional).
+5. EF calibration, filtering, and characterization (optional).
+6. Coupling characterization with JAZZ using the captured schedule (optional).
 
-Calibration stages stop the affected qubit after the first failed task. Characterization stages
-record each measurement failure and continue with the remaining measurements, while still
-stopping if their configuration task fails.
+The selected MUXes are configured once before calibration. Calibration stages stop the affected
+qubit after the first failed task, while characterization stages record each measurement failure
+and continue with the remaining measurements.
 
 Edit the task lists below to change measurement order, and _build_task_parameters() to tune
 sweeps, shots, pulse durations, and intervals.
@@ -37,6 +38,7 @@ from qdash.workflow.service.calib_service import (
     on_flow_failure,
 )
 from qdash.workflow.service.steps import (
+    ConfigureAll,
     CustomOneQubit,
     CustomTwoQubit,
     FilterByStatus,
@@ -136,20 +138,30 @@ def characterization(
     else:
         raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
-    # EF characterization includes FH Chevron, so its sessions need GE/EF/FH targets.
-    configure_task = "ConfigureEF" if run_ef_characterization else "Configure"
+    enabled_tasks = [*GE_CALIBRATION_TASKS]
+    if run_ge_characterization:
+        enabled_tasks.extend(GE_CHARACTERIZATION_TASKS)
+    if run_ef_characterization:
+        enabled_tasks.extend((*EF_CALIBRATION_TASKS, *EF_CHARACTERIZATION_TASKS))
+    if run_coupling_characterization:
+        enabled_tasks.extend(COUPLING_CHARACTERIZATION_TASKS)
 
-    # 1. GE calibration: retain only qubits whose calibration succeeded.
-    # Each step has an isolated Qubex session, so configure every task group explicitly.
+    # FH Chevron requires the GE/EF/FH layout. GE and JAZZ remain available in it,
+    # so the full workflow can keep one configuration from start to finish.
+    configuration_mode = "ge-ef-fh" if "CheckAdaptiveFHChevron" in enabled_tasks else "ge-cr-cr"
+
+    # Configure the selected MUXes once; isolated workers inherit the same logical layout.
     steps: list[Step] = [
+        ConfigureAll(),
+        # 2. GE calibration: retain only qubits whose calibration succeeded.
         OneQubitCheck(
             mode="synchronized",
-            tasks=[configure_task, *GE_CALIBRATION_TASKS],
+            tasks=GE_CALIBRATION_TASKS,
         ),
         FilterByStatus(),
     ]
 
-    # 2. Capture coupling pairs before any EF filtering changes candidate_qids.
+    # 3. Capture coupling pairs before any EF filtering changes candidate_qids.
     if run_coupling_characterization:
         steps.append(
             GenerateCRSchedule(
@@ -158,38 +170,36 @@ def characterization(
             )
         )
 
-    # 3. GE characterization: continue measurements unless configuration fails.
+    # 4. GE characterization: record failures and continue independent measurements.
     if run_ge_characterization:
         steps.append(
             CustomOneQubit(
                 step_name="ge_characterization",
-                tasks=[configure_task, *GE_CHARACTERIZATION_TASKS],
+                tasks=GE_CHARACTERIZATION_TASKS,
                 mode="synchronized",
                 continue_on_failure=True,
-                stop_on_failure_tasks=(configure_task,),
             )
         )
 
-    # 4. EF calibration, filtering, and characterization.
+    # 5. EF calibration, filtering, and characterization.
     if run_ef_characterization:
         steps.extend(
             [
                 OneQubitFineTune(
                     mode="synchronized",
-                    tasks=["ConfigureEF", *EF_CALIBRATION_TASKS],
+                    tasks=EF_CALIBRATION_TASKS,
                 ),
                 FilterByStatus(),
                 CustomOneQubit(
                     step_name="ef_characterization",
-                    tasks=["ConfigureEF", *EF_CHARACTERIZATION_TASKS],
+                    tasks=EF_CHARACTERIZATION_TASKS,
                     mode="synchronized",
                     continue_on_failure=True,
-                    stop_on_failure_tasks=("ConfigureEF",),
                 ),
             ]
         )
 
-    # 5. Coupling characterization using the saved GE schedule.
+    # 6. Coupling characterization using the saved GE schedule.
     if run_coupling_characterization:
         steps.append(
             CustomTwoQubit(
@@ -206,7 +216,8 @@ def characterization(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters=_build_task_parameters(),
+        task_parameters=_build_task_parameters(configuration_mode),
+        configuration_mode=configuration_mode,
         default_run_parameters={
             "readout_duration": 1024,
             "interval": STANDARD_INTERVAL,
@@ -215,20 +226,16 @@ def characterization(
     return cal.run(targets, steps=steps)
 
 
-def _build_task_parameters() -> dict[str, dict[str, Any]]:
+def _build_task_parameters(configuration_mode: str) -> dict[str, dict[str, Any]]:
     """Create editable task defaults grouped in pipeline order for each flow run.
 
     Tune sweeps, shots, durations, and intervals for the device under test.
     Time values are in ns and frequency values are in GHz.
     """
     return {
-        # Session configuration
-        "Configure": {
-            "run": {"configuration_mode": "ge-cr-cr"},
-        },
-        "ConfigureEF": {
-            # FH Chevron is part of EF characterization, so the FH layout is required.
-            "run": {"configuration_mode": "ge-ef-fh"},
+        # Push the full selected-MUX layout once before any calibration stage.
+        "ConfigureAll": {
+            "run": {"configuration_mode": configuration_mode},
         },
         # GE calibration
         "CheckRabi": {

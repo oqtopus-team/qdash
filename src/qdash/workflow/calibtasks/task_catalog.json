@@ -6372,6 +6372,11 @@
         "name": "ConfigureAll",
         "output_parameters": [],
         "run_parameters": {
+          "configuration_mode": {
+            "description": "Control layout: ge-cr-cr, ge-ef-cr, or ge-ef-fh.",
+            "value": "ge-cr-cr",
+            "value_type": "str"
+          },
           "mux_ids": {
             "description": "List of MUX IDs to configure",
             "unit": "a.u.",

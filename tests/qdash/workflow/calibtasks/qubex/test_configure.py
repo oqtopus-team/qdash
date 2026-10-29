@@ -2,12 +2,13 @@
 
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
 from qdash.workflow.calibtasks.qubex.box_setup.configure import Configure, ConfigureEF
+from qdash.workflow.calibtasks.qubex.box_setup.configure_all import ConfigureAll
 from qdash.workflow.calibtasks.qubex.validation import require_ef_configuration
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
@@ -166,3 +167,63 @@ def test_push_failure_does_not_save_calibration() -> None:
     assert exp.configuration_mode == "ge-cr-cr"
     assert "configuration_mode" not in backend.config
     exp.calib_note.save.assert_not_called()
+
+
+@pytest.mark.parametrize("old_snapshot", [False, True])
+def test_configure_all_applies_requested_or_default_configuration_mode(
+    old_snapshot: bool,
+) -> None:
+    task = ConfigureAll()
+    task.run_parameters["mux_ids"].value = [7]
+    expected_mode = "ge-cr-cr" if old_snapshot else "ge-ef-fh"
+    if old_snapshot:
+        task.run_parameters.pop("configuration_mode")
+    else:
+        task.run_parameters["configuration_mode"].value = expected_mode
+    backend = MagicMock()
+    backend.config = {
+        "chip_id": "chip",
+        "config_dir": "/config",
+        "params_dir": "/params",
+    }
+    exp = MagicMock()
+    exp.chip_id = "chip"
+    exp.config_path = "/config"
+    exp.params_path = "/params"
+    exp.box_ids = ["box-7"]
+
+    with patch("qubex.Experiment", return_value=exp) as experiment:
+        result = task.run(cast("Any", backend), "")
+
+    experiment.assert_called_once_with(
+        chip_id="chip",
+        muxes=[7],
+        config_dir="/config",
+        params_dir="/params",
+        configuration_mode=expected_mode,
+    )
+    exp.system_manager.load.assert_called_once_with(
+        chip_id="chip",
+        config_dir="/config",
+        params_dir="/params",
+        configuration_mode=expected_mode,
+    )
+    exp.system_manager.push.assert_called_once_with(
+        box_ids=["box-7"], confirm=False, parallel=False
+    )
+    assert result.raw_result == {"mux_ids": [7], "box_ids": ["box-7"]}
+
+
+def test_configure_all_rejects_invalid_configuration_mode_before_connecting() -> None:
+    task = ConfigureAll()
+    task.run_parameters["configuration_mode"].value = "invalid"
+    backend = MagicMock()
+    backend.config = {"chip_id": "chip"}
+
+    with (
+        patch("qubex.Experiment") as experiment,
+        pytest.raises(ValueError, match="Unsupported configuration_mode"),
+    ):
+        task.run(cast("Any", backend), "")
+
+    experiment.assert_not_called()

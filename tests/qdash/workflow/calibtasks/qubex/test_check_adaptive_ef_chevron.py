@@ -143,7 +143,7 @@ def test_run_rejects_missing_ef_target_before_measurement() -> None:
             "qdash.workflow.calibtasks.qubex.one_qubit_fine.check_adaptive_ef_chevron."
             "estimate_ef_frequency_from_chevron_adaptive"
         ) as estimate,
-        pytest.raises(ValueError, match="Run ConfigureEF"),
+        pytest.raises(ValueError, match="EF-capable configuration_mode"),
     ):
         _task().run(cast("Any", backend), "0")
     estimate.assert_not_called()

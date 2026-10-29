@@ -346,6 +346,44 @@ class TestCalibServiceInitialization:
         assert session.execution_service is not None
         assert session.backend is not None
 
+    def test_configuration_mode_is_applied_to_the_session_config(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+    ):
+        session = CalibService(
+            username="test_user",
+            execution_id="20240101-001",
+            chip_id="chip_1",
+            qids=["0"],
+            backend_name="fake",
+            project_id="test_project",
+            configuration_mode="ge-ef-fh",
+            lock_repo=mock_lock_repo,
+            user_repo=mock_user_repo,
+        )
+
+        assert session.configuration_mode == "ge-ef-fh"
+        assert session._orchestrator is not None
+        assert session._orchestrator.config.configuration_mode == "ge-ef-fh"
+
+    def test_isolated_worker_inherits_configuration_mode(self, mock_flow_session_deps):
+        from qdash.workflow.service._internal.scheduling_tasks import _create_isolated_session
+
+        session = _create_isolated_session(
+            {
+                "username": "test_user",
+                "chip_id": "chip_1",
+                "execution_id": "20240101-001",
+                "backend_name": "fake",
+                "project_id": "test_project",
+                "configuration_mode": "ge-ef-fh",
+            },
+            ["0"],
+        )
+
+        assert session.configuration_mode == "ge-ef-fh"
+        assert session._orchestrator is not None
+        assert session._orchestrator.config.configuration_mode == "ge-ef-fh"
+
     def test_flow_session_default_tags(
         self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
     ):

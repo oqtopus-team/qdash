@@ -141,6 +141,7 @@ def test_custom_two_qubit_uses_saved_schedule_after_candidate_filtering(monkeypa
         project_id="project-1",
         default_run_parameters={},
         task_parameters={},
+        configuration_mode="ge-ef-fh",
         tags=[],
         flow_name="characterization_jazz",
         note={},
@@ -157,4 +158,5 @@ def test_custom_two_qubit_uses_saved_schedule_after_candidate_filtering(monkeypa
 
     assert calls[0]["coupling_qids"] == ["0-1"]
     assert calls[0]["continue_on_failure"] is True
+    assert calls[0]["session_config"]["configuration_mode"] == "ge-ef-fh"
     assert result.metadata["jazz_characterization"].successful_couplings() == ["0-1"]

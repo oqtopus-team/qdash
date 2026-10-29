@@ -130,7 +130,7 @@ def test_fake_zx90_accepts_explicit_cr_parameters_and_x180(monkeypatch) -> None:
     assert exp._resolve_zx90_x180("Q00", {"Q00": x180}) is x180
 
 
-def test_fake_backend_passes_readout_duration_to_experiment(monkeypatch) -> None:
+def test_fake_backend_passes_session_configuration_to_experiment(monkeypatch) -> None:
     experiment = MagicMock()
     factory = MagicMock(return_value=experiment)
     monkeypatch.setattr(
@@ -143,10 +143,12 @@ def test_fake_backend_passes_readout_duration_to_experiment(monkeypatch) -> None
             "qids": ["0"],
             "chip_id": "chip-1",
             "readout_duration": 2048.0,
+            "configuration_mode": "ge-ef-fh",
         }
     )
 
     backend.connect()
 
     assert factory.call_args.kwargs["readout_duration"] == 2048.0
+    assert factory.call_args.kwargs["configuration_mode"] == "ge-ef-fh"
     experiment.connect.assert_called_once_with()

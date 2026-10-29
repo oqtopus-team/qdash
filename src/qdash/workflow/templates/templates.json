@@ -74,7 +74,7 @@
   {
     "id": "characterization",
     "name": "Characterization",
-    "description": "End-to-end GE, optional EF, and coupling characterization with selectable stages. Calibration failures filter dependent work, while characterization measurement failures are recorded without stopping later measurements. JAZZ measures static ZZ after optional EF work and calculates coupling strength when both qubits have calibrated anharmonicities in QDash.",
+    "description": "End-to-end GE, optional EF, and coupling characterization with selectable stages. The selected MUXes are configured once using the layout required by the enabled tasks. Calibration failures filter dependent work, while characterization measurement failures are recorded without stopping later measurements. JAZZ measures static ZZ after optional EF work and calculates coupling strength when both qubits have calibrated anharmonicities in QDash.",
     "category": "production",
     "filename": "characterization.py",
     "function_name": "characterization"

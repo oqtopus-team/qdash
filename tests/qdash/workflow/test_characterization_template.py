@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from qdash.workflow.service.steps import (
+    ConfigureAll,
     CustomOneQubit,
     CustomTwoQubit,
     FilterByStatus,
@@ -43,6 +44,7 @@ def test_characterization_builds_full_pipeline_in_dependency_order() -> None:
 
     steps = result["steps"]
     assert [type(step) for step in steps] == [
+        ConfigureAll,
         OneQubitCheck,
         FilterByStatus,
         GenerateCRSchedule,
@@ -52,18 +54,23 @@ def test_characterization_builds_full_pipeline_in_dependency_order() -> None:
         CustomOneQubit,
         CustomTwoQubit,
     ]
-    assert steps[0].tasks == ["ConfigureEF", *characterization_module.GE_CALIBRATION_TASKS]
-    assert steps[2].inverse is False
-    assert steps[3].tasks == ["ConfigureEF", *characterization_module.GE_CHARACTERIZATION_TASKS]
-    assert steps[3].continue_on_failure is True
-    assert steps[3].stop_on_failure_tasks == ("ConfigureEF",)
-    assert steps[4].tasks == ["ConfigureEF", *characterization_module.EF_CALIBRATION_TASKS]
-    assert steps[6].tasks == ["ConfigureEF", *characterization_module.EF_CHARACTERIZATION_TASKS]
-    assert steps[6].continue_on_failure is True
-    assert steps[6].stop_on_failure_tasks == ("ConfigureEF",)
-    assert steps[7].tasks == ["CheckCouplingStrength"]
-    assert steps[7].step_name == "coupling_characterization"
+    assert steps[1].tasks == characterization_module.GE_CALIBRATION_TASKS
+    assert steps[3].inverse is False
+    assert steps[4].tasks == characterization_module.GE_CHARACTERIZATION_TASKS
+    assert steps[4].continue_on_failure is True
+    assert steps[4].stop_on_failure_tasks == ()
+    assert steps[5].tasks == characterization_module.EF_CALIBRATION_TASKS
+    assert steps[7].tasks == characterization_module.EF_CHARACTERIZATION_TASKS
     assert steps[7].continue_on_failure is True
+    assert steps[7].stop_on_failure_tasks == ()
+    assert steps[8].tasks == ["CheckCouplingStrength"]
+    assert steps[8].step_name == "coupling_characterization"
+    assert steps[8].continue_on_failure is True
+    assert result["kwargs"]["configuration_mode"] == "ge-ef-fh"
+    assert (
+        result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
+        == result["kwargs"]["configuration_mode"]
+    )
 
 
 def test_ge_only_characterization_uses_ge_configuration() -> None:
@@ -77,10 +84,20 @@ def test_ge_only_characterization_uses_ge_configuration() -> None:
 
     assert isinstance(result["targets"], QubitTargets)
     steps = result["steps"]
-    assert [type(step) for step in steps] == [OneQubitCheck, FilterByStatus, CustomOneQubit]
-    assert steps[0].tasks[0] == "Configure"
-    assert steps[2].tasks[0] == "Configure"
-    assert steps[2].stop_on_failure_tasks == ("Configure",)
+    assert [type(step) for step in steps] == [
+        ConfigureAll,
+        OneQubitCheck,
+        FilterByStatus,
+        CustomOneQubit,
+    ]
+    assert steps[1].tasks == characterization_module.GE_CALIBRATION_TASKS
+    assert steps[3].tasks == characterization_module.GE_CHARACTERIZATION_TASKS
+    assert steps[3].stop_on_failure_tasks == ()
+    assert result["kwargs"]["configuration_mode"] == "ge-cr-cr"
+    assert (
+        result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
+        == result["kwargs"]["configuration_mode"]
+    )
 
 
 def test_coupling_characterization_does_not_imply_ef_calibration() -> None:
@@ -97,17 +114,19 @@ def test_coupling_characterization_does_not_imply_ef_calibration() -> None:
 
     steps = result["steps"]
     assert [type(step) for step in steps] == [
+        ConfigureAll,
         OneQubitCheck,
         FilterByStatus,
         GenerateCRSchedule,
         CustomTwoQubit,
     ]
-    assert steps[0].tasks[0] == "Configure"
-    assert steps[2].inverse is True
-    assert steps[2].max_parallel_ops == 3
-    assert steps[3].tasks == ["CheckCouplingStrength"]
-    assert steps[3].step_name == "coupling_characterization"
+    assert steps[1].tasks == characterization_module.GE_CALIBRATION_TASKS
+    assert steps[3].inverse is True
     assert steps[3].max_parallel_ops == 3
+    assert steps[4].tasks == ["CheckCouplingStrength"]
+    assert steps[4].step_name == "coupling_characterization"
+    assert steps[4].max_parallel_ops == 3
+    assert result["kwargs"]["configuration_mode"] == "ge-cr-cr"
 
 
 def test_characterization_prefers_mux_targets_and_preserves_exclusions() -> None:
@@ -148,8 +167,7 @@ def test_characterization_exposes_primary_task_parameters() -> None:
 
     parameters = result["kwargs"]["task_parameters"]
     expected_tasks = {
-        "Configure",
-        "ConfigureEF",
+        "ConfigureAll",
         *characterization_module.GE_CALIBRATION_TASKS,
         *characterization_module.GE_CHARACTERIZATION_TASKS,
         *characterization_module.EF_CALIBRATION_TASKS,
@@ -157,7 +175,7 @@ def test_characterization_exposes_primary_task_parameters() -> None:
         *characterization_module.COUPLING_CHARACTERIZATION_TASKS,
     }
     assert parameters.keys() == expected_tasks
-    assert parameters["ConfigureEF"]["run"]["configuration_mode"] == "ge-ef-fh"
+    assert parameters["ConfigureAll"]["run"]["configuration_mode"] == "ge-ef-fh"
     assert (
         characterization_module.SHORT_INTERVAL
         < characterization_module.STANDARD_INTERVAL
