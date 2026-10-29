@@ -360,6 +360,14 @@ coupling_metrics:
     evaluation:
       mode: minimize
 
+  qubit_qubit_coupling_strength:
+    title: Coupling Strength
+    unit: MHz
+    scale: 1000 # Convert GHz to MHz
+    description: Qubit coupling strength estimated from JAZZ and qubit anharmonicities
+    evaluation:
+      mode: none
+
 # CDF chart grouping configuration
 # Metrics in the same group will be displayed together in a single CDF chart
 cdf_groups:

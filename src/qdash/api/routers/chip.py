@@ -802,7 +802,11 @@ def get_chip_metric_heatmap(
     Supported metrics:
     - Qubit: t1, t2_echo, t2_star, qubit_frequency, anharmonicity,
              average_readout_fidelity, x90_gate_fidelity, x180_gate_fidelity
-    - Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction
+    - Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction,
+                qubit_qubit_coupling_strength
+
+    Coupling strength is stored and returned in GHz. The metrics configuration
+    displays it in MHz with a scale factor of 1000.
 
     Parameters
     ----------

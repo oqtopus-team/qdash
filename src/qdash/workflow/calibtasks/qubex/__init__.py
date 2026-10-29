@@ -90,6 +90,7 @@ from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state import CheckBell
 from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state_tomography import (
     CheckBellStateTomography,
 )
+from qdash.workflow.calibtasks.qubex.two_qubit.check_coupling_strength import CheckCouplingStrength
 from qdash.workflow.calibtasks.qubex.two_qubit.check_cross_resonance import CheckCrossResonance
 from qdash.workflow.calibtasks.qubex.two_qubit.check_jazz import CheckJAZZ
 from qdash.workflow.calibtasks.qubex.two_qubit.check_zx90 import CheckZX90
@@ -108,6 +109,7 @@ __all__ = [
     "CheckChevron",
     "CheckCoarseReadoutParams",
     "CheckControlAmplitude",
+    "CheckCouplingStrength",
     "CheckCrossResonance",
     "CheckDRAGHPIPulse",
     "CheckDRAGPIPulse",

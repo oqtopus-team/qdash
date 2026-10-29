@@ -835,7 +835,12 @@ class ChipService:
 
         """
         # Determine if this is a qubit or coupling metric
-        coupling_metrics = {"zx90_gate_fidelity", "bell_state_fidelity", "static_zz_interaction"}
+        coupling_metrics = {
+            "zx90_gate_fidelity",
+            "bell_state_fidelity",
+            "static_zz_interaction",
+            "qubit_qubit_coupling_strength",
+        }
         is_coupling = metric in coupling_metrics
 
         result = self._chip_repo.aggregate_metric_heatmap(
