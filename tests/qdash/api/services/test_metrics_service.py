@@ -10,7 +10,7 @@ from qdash.api.services.metrics_service import MetricsService, _parse_date_range
 from qdash.common.config.metrics import load_metrics_config
 
 
-def test_coupling_strength_is_extracted_and_displayed_in_mhz():
+def test_coupling_strength_is_extracted_with_mhz_display_config():
     repository = MagicMock()
     repository.aggregate_latest_metrics.return_value = {
         "qubit_qubit_coupling_strength": {

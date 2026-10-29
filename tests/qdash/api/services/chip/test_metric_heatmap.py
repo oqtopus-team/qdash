@@ -5,13 +5,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from qdash.api.services.chip import ChipService
+from qdash.common.config.metrics import load_metrics_config
 
 
 @pytest.mark.parametrize(
     ("metric", "is_coupling"),
     [
-        ("qubit_qubit_coupling_strength", True),
-        ("static_zz_interaction", True),
+        *((metric, True) for metric in load_metrics_config().coupling_metrics),
         ("qubit_frequency", False),
     ],
 )
