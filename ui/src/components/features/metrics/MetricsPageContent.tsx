@@ -10,6 +10,7 @@ import { MetricsPdfDownloadButton } from "./MetricsPdfDownloadButton";
 import { MetricsYamlDownloadButton } from "./MetricsYamlDownloadButton";
 import { MetricsStatsCards, useMetricStats } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
+import { ColorRangeSlider } from "@/components/ui/ColorRangeSlider";
 import { LinearGauge } from "@/components/ui/LinearGauge";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
@@ -27,6 +28,13 @@ import { useMetricsUrlState } from "@/hooks/useUrlState";
 import { getDaisySelectStyles } from "@/lib/react-select-theme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import {
+  getStoredColorRanges,
+  resolveMetricColorRange,
+  setStoredColorRanges,
+  type StoredColorRanges,
+} from "@/lib/metricColorRanges";
+import type { ColorRange } from "@/lib/utils/color-scale";
 import { dateToDateTimeLocal } from "@/lib/utils/datetime";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 
@@ -151,6 +159,19 @@ export function MetricsPageContent() {
     [metricsConfig, selectedMetric],
   );
 
+  // Per-metric color range overrides, shared with the dashboard and remembered per chip.
+  const [colorRangeOverrides, setColorRangeOverrides] = useState<StoredColorRanges>({});
+  useEffect(() => {
+    setColorRangeOverrides(getStoredColorRanges(selectedChip));
+  }, [selectedChip]);
+  const updateColorRange = (metricKey: string, range: ColorRange | null) => {
+    const next = { ...colorRangeOverrides };
+    if (range) next[metricKey] = range;
+    else delete next[metricKey];
+    setStoredColorRanges(selectedChip, next);
+    setColorRangeOverrides(next);
+  };
+
   // Check if current metric supports best mode
   const isBestModeSupported = useMemo(
     () => currentMetricConfig?.evaluationMode !== "none",
@@ -272,6 +293,27 @@ export function MetricsPageContent() {
 
     return scaledData;
   }, [data, currentMetricConfig, metricType]);
+
+  const colorRange = useMemo(
+    () =>
+      currentMetricConfig
+        ? resolveMetricColorRange(
+            Object.values(metricData ?? {}).map((v) => v.value),
+            currentMetricConfig.colorRange,
+            currentMetricConfig.scale,
+            colorRangeOverrides[currentMetricConfig.key],
+          )
+        : null,
+    [metricData, currentMetricConfig, colorRangeOverrides],
+  );
+  const gridColorScale = useMemo(
+    () => ({
+      min: colorRange?.effective.min ?? 0,
+      max: colorRange?.effective.max ?? 0,
+      colors: hexColors,
+    }),
+    [colorRange, hexColors],
+  );
 
   // Process all metrics data for CDF groups
   const allMetricsData = useMemo(() => {
@@ -540,6 +582,19 @@ export function MetricsPageContent() {
               />
             )}
 
+            {/* Color range */}
+            {colorRange && (
+              <ColorRangeSlider
+                bounds={colorRange.bounds}
+                value={colorRange.effective}
+                isOverridden={colorRange.isOverridden}
+                unit={currentMetricConfig.unit}
+                colors={hexColors}
+                onChange={(range) => updateColorRange(currentMetricConfig.key, range)}
+                onReset={() => updateColorRange(currentMetricConfig.key, null)}
+              />
+            )}
+
             {/* Metric Grid */}
             {metricType === "qubit" ? (
               <QubitMetricsGrid
@@ -547,7 +602,7 @@ export function MetricsPageContent() {
                 title={currentMetricConfig.title}
                 metricKey={currentMetricConfig.key}
                 unit={currentMetricConfig.unit}
-                colorScale={{ min: 0, max: 0, colors: hexColors }}
+                colorScale={gridColorScale}
                 gridSize={gridSize}
                 chipId={selectedChip}
                 topologyId={topologyId}
@@ -561,7 +616,7 @@ export function MetricsPageContent() {
                 title={currentMetricConfig.title}
                 metricKey={currentMetricConfig.key}
                 unit={currentMetricConfig.unit}
-                colorScale={{ min: 0, max: 0, colors: hexColors }}
+                colorScale={gridColorScale}
                 gridSize={gridSize}
                 chipId={selectedChip}
                 topologyId={topologyId}
