@@ -17,6 +17,12 @@ export default withMermaid(
       build: {
         target: "es2022",
       },
+      optimizeDeps: {
+        esbuildOptions: {
+          // Keep dev pre-bundling aligned with the production target.
+          target: "es2022",
+        },
+      },
     },
     base: "/qdash/",
     title: "QDash",
