@@ -1255,16 +1255,20 @@ class CalibService:
                     # save time, matching the in-memory calib_data of the task run.
                     # Results persisted before per-destination metadata existed only
                     # carry the output name.
-                    published_names = [
-                        str(update["parameter_name"])
-                        for update in output_parameter.database_updates
-                        if update.get("updated") is True
-                    ] or [name]
-                    for published_name in published_names:
-                        published = (
-                            parameter
-                            if published_name == name
-                            else parameter.model_copy(update={"parameter_name": published_name})
+                    if output_parameter.database_updates:
+                        published_targets = [
+                            (
+                                str(update["parameter_name"]),
+                                update.get("updated_value", parameter.value),
+                            )
+                            for update in output_parameter.database_updates
+                            if update.get("updated") is True
+                        ]
+                    else:
+                        published_targets = [(name, parameter.value)]
+                    for published_name, published_value in published_targets:
+                        published = parameter.model_copy(
+                            update={"parameter_name": published_name, "value": published_value}
                         )
                         if doc.task_type == TaskTypes.COUPLING or "-" in doc.qid:
                             calib_data.put_coupling_data(doc.qid, published_name, published)

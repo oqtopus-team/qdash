@@ -785,6 +785,57 @@ class TestCalibServiceParameterManagement:
         assert session.github_push_config.params_file_names == ["t1.yaml", "t2_echo.yaml"]
         logger.info.assert_called_once()
 
+    def test_sync_backend_params_pushes_publish_target_files(self, monkeypatch):
+        """A publish-only YAML file (control_frequency_fh.yaml) stays in the push."""
+        from qdash.datamodel.task import ParameterModel
+        from qdash.workflow.engine.task.state_manager import TaskStateManager
+        from qdash.workflow.service.github import GitHubPushConfig
+
+        state_manager = TaskStateManager(qids=["0"])
+        state_manager.put_output_parameters(
+            "CheckAdaptiveFHChevron",
+            {"fh_frequency": ParameterModel(value=4.2, unit="GHz")},
+            "qubit",
+            "0",
+            publish_targets={"fh_frequency": ("fh_frequency", "control_frequency_fh")},
+        )
+
+        class FakeUpdater:
+            def update(self, qid, params):
+                assert set(params) == {"fh_frequency", "control_frequency_fh"}
+                return set()
+
+        orchestrator = MagicMock()
+        orchestrator._execution_service = MockExecutionService()
+        orchestrator._execution_service.calib_data = state_manager.calib_data
+        orchestrator._backend = MagicMock()
+
+        session = CalibService.__new__(CalibService)
+        session.chip_id = "chip_1"
+        session._orchestrator = orchestrator
+        session.github_push_config = GitHubPushConfig(
+            params_file_names=["control_frequency_fh.yaml", "t1.yaml"],
+        )
+        monkeypatch.setattr(
+            "qdash.workflow.service.calib_service.get_params_updater",
+            lambda backend, chip_id: FakeUpdater(),
+        )
+        monkeypatch.setattr(
+            "qdash.workflow.engine.params_updater.ConfigLoader.load_workflow",
+            lambda: {
+                "params_updater": {
+                    "parameter_file_map": {
+                        "control_frequency_fh": "control_frequency_fh.yaml",
+                        "t1": "t1.yaml",
+                    },
+                },
+            },
+        )
+
+        push_config = session._sync_backend_params_before_push(MagicMock())
+
+        assert push_config.params_file_names == ["control_frequency_fh.yaml"]
+
     def test_merge_task_result_calib_data_before_push_loads_completed_outputs(
         self,
         monkeypatch,
@@ -818,7 +869,7 @@ class TestCalibServiceParameterManagement:
                                     },
                                     {
                                         "parameter_name": "control_frequency_fh",
-                                        "updated_value": 4.25,
+                                        "updated_value": 4.2,
                                         "updated": True,
                                     },
                                     {
@@ -826,6 +877,17 @@ class TestCalibServiceParameterManagement:
                                         "updated_value": 4.25,
                                         "updated": False,
                                     },
+                                ],
+                            },
+                            "not_written_only": {
+                                "value": 1.0,
+                                "database_updated": True,
+                                "database_updates": [
+                                    {
+                                        "parameter_name": "not_written_only",
+                                        "updated_value": 1.0,
+                                        "updated": False,
+                                    }
                                 ],
                             },
                             "measurement_only": {
@@ -860,9 +922,10 @@ class TestCalibServiceParameterManagement:
         # push sees control_frequency_fh.yaml even though the output is fh_frequency.
         qubit_data = execution_service.calib_data.qubit["0"]
         assert qubit_data["fh_frequency"].value == 4.25
-        assert qubit_data["control_frequency_fh"].value == 4.25
+        assert qubit_data["control_frequency_fh"].value == 4.2
         assert qubit_data["control_frequency_fh"].parameter_name == "control_frequency_fh"
         assert "not_written" not in qubit_data
+        assert "not_written_only" not in qubit_data
         assert "measurement_only" not in qubit_data
 
 
