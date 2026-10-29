@@ -7,7 +7,7 @@ The pipeline runs in this order:
 2. Capture the JAZZ coupling schedule from GE-successful qubits (if JAZZ is enabled).
 3. GE characterization (optional).
 4. EF calibration, filtering, and characterization (optional).
-5. JAZZ characterization using the captured schedule (optional).
+5. Measure static ZZ and coupling strength using the captured schedule (optional).
 
 Calibration stages stop the affected qubit after the first failed task. Characterization stages
 record each measurement failure and continue with the remaining measurements, while still
@@ -79,7 +79,7 @@ EF_CHARACTERIZATION_TASKS: list[str] = [
     "CheckAdaptiveFHChevron",
 ]
 
-TWO_QUBIT_CHARACTERIZATION_TASKS: list[str] = ["CheckJAZZ"]
+TWO_QUBIT_CHARACTERIZATION_TASKS: list[str] = ["CheckCouplingStrength"]
 
 SHORT_INTERVAL = 256 * 1024
 STANDARD_INTERVAL = 384 * 1024
@@ -116,8 +116,8 @@ def characterization(
         qids: Individual targets when mux_ids is not supplied.
         run_ge_characterization: Measure GE properties after the required GE calibration.
         run_ef_characterization: Calibrate EF, then characterize EF-successful qubits.
-        run_jazz: Measure GE-successful pairs after the optional EF work. EF failures do not
-            remove pairs; anharmonicity-dependent outputs may be omitted without EF data.
+        run_jazz: Measure static ZZ and coupling strength for GE-successful pairs after the
+            optional EF work. EF failures do not remove pairs.
         max_parallel_ops: Maximum coupling pairs in each JAZZ schedule group.
         inverse: Reverse the CR direction used to select JAZZ coupling pairs.
         tags: Tags applied to execution history.
@@ -372,7 +372,7 @@ def _build_task_parameters() -> dict[str, dict[str, Any]]:
             },
         },
         # JAZZ characterization
-        "CheckJAZZ": {
+        "CheckCouplingStrength": {
             "run": {
                 "time_range": sweep.arange(0, 20_001, 400),
                 "shots": 1024,
