@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD041 -->
-![OQTOPUS logo](https://raw.githubusercontent.com/oqtopus-team/qdash/develop/packages/pi-qdash/docs/asset/oqtopus-logo.png)
+![OQTOPUS logo](https://raw.githubusercontent.com/oqtopus-team/qdash/develop/docs/public/images/oqtopus-logo.png)
 
 # pi-qdash
 
@@ -8,13 +8,11 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![slack](https://img.shields.io/badge/slack-OQTOPUS-pink.svg?logo=slack&style=plastic)](https://join.slack.com/t/oqtopus/shared_invite/zt-3bpjb7yc3-Vg8IYSMY1m5wV3DR~TMSnw)
 
-## Overview
-
-**pi-qdash** is a [pi](https://github.com/badlogic/pi-mono) extension for querying [QDash](https://github.com/oqtopus-team/qdash), the large-scale QPU calibration platform in the OQTOPUS ecosystem, directly from the pi coding agent.
+`@oqtopus-team/pi-qdash` is a [pi](https://github.com/badlogic/pi-mono) extension for querying [QDash](https://github.com/oqtopus-team/qdash), the large-scale QPU calibration platform in the OQTOPUS ecosystem.
 
 It uses [`@oqtopus-team/qdash-client`](https://www.npmjs.com/package/@oqtopus-team/qdash-client) and reuses existing `QDASH_*` environment variables or profiles from `~/.config/qdash/config.ini` / `$XDG_CONFIG_HOME/qdash/config.ini`.
 
-## Key Features
+## Features
 
 - **Read-only investigation**: dedicated tools to inspect chips, qubits, couplings, calibration task results, task knowledge (`qdash_get_task_knowledge`), executions, and Forum posts. Secrets are redacted from tool output.
 - **Dashboards and insights**: compact dashboards, triage overviews, target-level incident reports, degradation reports, and wiring insights.
@@ -32,7 +30,7 @@ Install pi first if needed:
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 ```
 
-Install the published extension:
+Install the extension:
 
 ```bash
 pi install npm:@oqtopus-team/pi-qdash
@@ -52,7 +50,7 @@ Use the `beta` dist-tag to try changes merged into QDash's `develop` branch:
 pi install npm:@oqtopus-team/pi-qdash@beta
 ```
 
-## Quick Start
+## Quick start
 
 In interactive pi, set up the session context first:
 
@@ -61,7 +59,8 @@ In interactive pi, set up the session context first:
 /qdash-dashboard
 ```
 
-See the documentation below for the full tool and command reference.
+See the [pi-qdash reference](https://oqtopus-team.github.io/qdash/reference/pi-qdash)
+for the full tool and command list.
 
 ## Documentation and development
 
@@ -82,7 +81,7 @@ Citation information is available in the [CITATION](https://github.com/oqtopus-t
 
 ## Contact
 
-You can contact us by creating an issue in this repository or by email:
+Open a [QDash issue](https://github.com/oqtopus-team/qdash/issues) or email us:
 
 - [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team[at]googlegroups.com)
 
