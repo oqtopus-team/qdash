@@ -9,7 +9,7 @@ import pytest
 
 from qdash.workflow.calibtasks.qubex import CorrectCaptureDelay
 from qdash.workflow.engine.task_parameters import normalize_task_parameters
-from qdash.workflow.service.steps import BringUp, ConfigureAll
+from qdash.workflow.service.steps import BringUp
 from qdash.workflow.service.targets import MuxTargets
 
 box_setup_module = importlib.import_module("qdash.workflow.templates.box_setup")
@@ -29,14 +29,13 @@ def fake_calibration_service(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(box_setup_module, "CalibService", FakeCalibService)
 
 
-def test_box_setup_configures_then_corrects_each_mux() -> None:
+def test_box_setup_corrects_each_mux() -> None:
     result = box_setup_module.box_setup(
         username="alice", chip_id="64Q", mux_ids=[0, 1], mode="serial"
     )
 
     assert result["targets"] == MuxTargets(mux_ids=[0, 1], exclude_qids=[])
-    configure, correct = result["steps"]
-    assert isinstance(configure, ConfigureAll)
+    (correct,) = result["steps"]
     assert isinstance(correct, BringUp)
     assert correct.tasks == ["CorrectCaptureDelay"]
     assert correct.mode == "serial"

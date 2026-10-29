@@ -1,7 +1,6 @@
 """Box setup for selected MUXes with capture delay correction.
 
-This template pushes the current configuration to the selected MUXes, then runs
-CorrectCaptureDelay once per MUX. The task centers the readout pulse in the
+This template runs CorrectCaptureDelay once per MUX. The task centers the readout pulse in the
 capture window and writes capture_delay.yaml, plus capture_delay_word.yaml on
 QuEL-1. Its figures show the delay sweep before correction and the capture
 after it. QuEL-1 and QuEL-3 chips are supported.
@@ -29,7 +28,7 @@ from qdash.workflow.service.calib_service import (
     on_flow_crashed,
     on_flow_failure,
 )
-from qdash.workflow.service.steps import BringUp, ConfigureAll
+from qdash.workflow.service.steps import BringUp
 from qdash.workflow.service.targets import MuxTargets
 
 
@@ -93,10 +92,7 @@ def box_setup(
             },
         },
     }
-    steps = [
-        ConfigureAll(),
-        BringUp(mode=mode, tasks=["CorrectCaptureDelay"]),
-    ]
+    steps = [BringUp(mode=mode, tasks=["CorrectCaptureDelay"])]
 
     cal = CalibService(
         username,
