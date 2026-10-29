@@ -232,6 +232,7 @@ config/qubex/*
 !config/qubex/qubex.example/
 config/qubex-config/*
 config/task-knowledge/
+config/quelware-client/*
 src/tools/schedule/*
 .serena/
 .mcp.json

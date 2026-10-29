@@ -111,8 +111,8 @@ configuration) and `exec-server.test.mjs`, which starts the real server and daem
 Unix socket and runs commands, file operations, and a second conversation through the
 relay, and checks that a malformed hello closes the connection. A root-only test verifies
 that colliding owners cannot read each other's files or connect to the socket; it skips
-when the test runner cannot change uid. Run `task ci-agent-runtime`. Building the image needs the
-`agent-runtime/` build context (`docker compose build agent-exec`).
+when the test runner cannot change uid. Run `task ci-agent-runtime`. The image uses the
+repository root as its build context (`docker compose build agent-exec`).
 
 To add a Python package, extend `requirements.txt` and rebuild `agent-exec`. To offer the
 model no workspace, leave `AGENT_EXEC_SOCKET` unset on `agent-runtime`.
