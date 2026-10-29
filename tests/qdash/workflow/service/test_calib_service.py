@@ -785,6 +785,41 @@ class TestCalibServiceParameterManagement:
         assert session.github_push_config.params_file_names == ["t1.yaml", "t2_echo.yaml"]
         logger.info.assert_called_once()
 
+    def test_sync_backend_params_excludes_files_when_any_qubit_sync_fails(self, monkeypatch):
+        """Never push a shared YAML file when one qubit could not be synchronized."""
+        from qdash.workflow.service.github import GitHubPushConfig
+
+        class FakeUpdater:
+            def update(self, qid, params):
+                if qid == "1":
+                    raise RuntimeError("write failed")
+                return set()
+
+        orchestrator = MagicMock()
+        orchestrator._execution_service = MockExecutionService()
+        orchestrator._execution_service.calib_data.qubit = {
+            "0": {"control_frequency_fh": {"value": 4.25}},
+            "1": {"control_frequency_fh": {"value": 4.15}},
+        }
+        orchestrator._backend = MagicMock()
+
+        session = CalibService.__new__(CalibService)
+        session.chip_id = "chip_1"
+        session._orchestrator = orchestrator
+        session.github_push_config = GitHubPushConfig(
+            params_file_names=["control_frequency_fh.yaml"],
+        )
+        monkeypatch.setattr(
+            "qdash.workflow.service.calib_service.get_params_updater",
+            lambda backend, chip_id: FakeUpdater(),
+        )
+        logger = MagicMock()
+
+        push_config = session._sync_backend_params_before_push(logger)
+
+        assert push_config.params_file_names == []
+        logger.warning.assert_called_once_with("Failed to sync params for qid=1: write failed")
+
     def test_merge_task_result_calib_data_before_push_loads_completed_outputs(
         self,
         monkeypatch,
@@ -806,6 +841,27 @@ class TestCalibServiceParameterManagement:
                             "control_amplitude": {
                                 "value": 0.25,
                                 "database_updated": True,
+                            },
+                            "fh_frequency": {
+                                "value": 4.25,
+                                "database_updated": True,
+                                "database_updates": [
+                                    {
+                                        "parameter_name": "fh_frequency",
+                                        "updated_value": 4.25,
+                                        "updated": True,
+                                    },
+                                    {
+                                        "parameter_name": "control_frequency_fh",
+                                        "updated_value": 4.2,
+                                        "updated": True,
+                                    },
+                                    {
+                                        "parameter_name": "ignored_frequency",
+                                        "updated_value": 4.25,
+                                        "updated": False,
+                                    },
+                                ],
                             },
                             "measurement_only": {
                                 "value": 0.75,
@@ -835,7 +891,22 @@ class TestCalibServiceParameterManagement:
         merged = execution_service.calib_data.qubit["0"]["control_amplitude"]
         assert isinstance(merged, ParameterModel)
         assert merged.value == 0.25
+        fh_frequency = execution_service.calib_data.qubit["0"]["fh_frequency"]
+        control_frequency_fh = execution_service.calib_data.qubit["0"]["control_frequency_fh"]
+        assert isinstance(fh_frequency, ParameterModel)
+        assert fh_frequency.value == 4.25
+        assert fh_frequency.parameter_name == "fh_frequency"
+        assert isinstance(control_frequency_fh, ParameterModel)
+        assert control_frequency_fh.value == 4.2
+        assert control_frequency_fh.parameter_name == "control_frequency_fh"
+        assert "ignored_frequency" not in execution_service.calib_data.qubit["0"]
         assert "measurement_only" not in execution_service.calib_data.qubit["0"]
+
+        from qdash.workflow.engine.params_updater import resolve_param_yaml_file_names
+
+        assert "control_frequency_fh.yaml" in resolve_param_yaml_file_names(
+            execution_service.calib_data.qubit["0"]
+        )
 
 
 class TestGlobalSessionHelpers:

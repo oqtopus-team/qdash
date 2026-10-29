@@ -1161,14 +1161,23 @@ class CalibService:
         from qdash.workflow.engine.params_updater import resolve_param_yaml_file_names
 
         push_candidate_files: set[str] = set()
+        failed_sync_files: set[str] = set()
         for qid, params in self.execution_service.calib_data.qubit.items():
             if "-" in qid or not params:
                 continue
-            push_candidate_files.update(resolve_param_yaml_file_names(params))
+            mapped_files = resolve_param_yaml_file_names(params)
             try:
-                push_candidate_files.update(updater_instance.update(qid, params))
+                updated_files = updater_instance.update(qid, params)
             except Exception as exc:
+                # A mapped YAML file can contain many qubits. If any one update fails,
+                # exclude the whole file rather than publishing a partially stale copy.
+                failed_sync_files.update(mapped_files)
                 logger.warning(f"Failed to sync params for qid={qid}: {exc}")
+                continue
+            push_candidate_files.update(mapped_files)
+            push_candidate_files.update(updated_files)
+
+        push_candidate_files.difference_update(failed_sync_files)
 
         configured_param_files = self.github_push_config.params_file_names
         if configured_param_files is None:
@@ -1251,10 +1260,32 @@ class CalibService:
                         )
                         continue
 
-                    if doc.task_type == TaskTypes.COUPLING or "-" in doc.qid:
-                        calib_data.put_coupling_data(doc.qid, name, parameter)
+                    database_updates = output_parameter.database_updates
+                    if database_updates:
+                        targets = [
+                            (
+                                str(update["parameter_name"]),
+                                update.get("updated_value", parameter.value),
+                            )
+                            for update in database_updates
+                            if update.get("updated") is True
+                        ]
                     else:
-                        calib_data.put_qubit_data(doc.qid, name, parameter)
+                        # Task results created before per-destination update metadata was
+                        # introduced only carry the declared output name.
+                        targets = [(name, parameter.value)]
+
+                    for target_name, target_value in targets:
+                        target_parameter = parameter.model_copy(
+                            update={
+                                "parameter_name": target_name,
+                                "value": target_value,
+                            }
+                        )
+                        if doc.task_type == TaskTypes.COUPLING or "-" in doc.qid:
+                            calib_data.put_coupling_data(doc.qid, target_name, target_parameter)
+                        else:
+                            calib_data.put_qubit_data(doc.qid, target_name, target_parameter)
 
             if calib_data.qubit or calib_data.coupling:
                 self.execution_service.merge_calib_data(calib_data)
