@@ -121,6 +121,48 @@ def test_execute_simultaneous_spectroscopy_schedule_batches_current_session(
     }
 
 
+def test_execute_simultaneous_spectroscopy_schedule_passes_step_task_parameters(
+    monkeypatch: Any,
+) -> None:
+    runner = OneQubitStageRunner(_service())
+    calls: list[dict[str, Any]] = []
+
+    class FakeSession:
+        def execute_task_batch(
+            self,
+            task_name: str,
+            qids: list[str],
+            *,
+            parameters: dict[str, Any] | None = None,
+        ) -> dict[str, dict[str, Any]]:
+            calls.append({"task_name": task_name, "qids": qids, "parameters": parameters})
+            return {qid: {"task_id": f"task-{qid}"} for qid in qids}
+
+    def get_session() -> FakeSession:
+        return FakeSession()
+
+    monkeypatch.setattr(
+        "qdash.workflow.service.one_qubit_stage_runner.get_session",
+        get_session,
+    )
+    schedule = SimpleNamespace(steps=[SimpleNamespace(step_index=0, parallel_qids=["0"])])
+    settings = {"CheckRamsey": {"run": {"detuning": {"value": 0.0002}}, "input": {}}}
+
+    runner.execute_simultaneous_spectroscopy_schedule(
+        schedule,
+        tasks=["CheckRamsey"],
+        task_parameters=settings,
+    )
+
+    assert calls == [
+        {
+            "task_name": "CheckRamsey",
+            "qids": ["0"],
+            "parameters": settings["CheckRamsey"],
+        }
+    ]
+
+
 def test_execute_simultaneous_spectroscopy_schedule_uses_isolated_batch(
     monkeypatch: Any,
 ) -> None:
@@ -168,3 +210,33 @@ def test_execute_simultaneous_spectroscopy_schedule_uses_isolated_batch(
         "step_0": {"0": {"CheckSimultaneousQubitSpectroscopy": {"task_id": "task-0"}}},
         "step_1": {"5": {"CheckSimultaneousQubitSpectroscopy": {"task_id": "task-5"}}},
     }
+
+
+def test_execute_simultaneous_spectroscopy_schedule_overrides_isolated_task_parameters(
+    monkeypatch: Any,
+) -> None:
+    runner = OneQubitStageRunner(_service())
+    calls: list[dict[str, Any]] = []
+
+    def run_qubit_batch_calibration_isolated(
+        *, qids: list[str], tasks: list[str], session_config: dict[str, Any]
+    ) -> dict[str, Any]:
+        calls.append(session_config)
+        return {qid: {tasks[0]: {"task_id": f"task-{qid}"}} for qid in qids}
+
+    monkeypatch.setattr(
+        "qdash.workflow.service.one_qubit_stage_runner.run_qubit_batch_calibration_isolated",
+        run_qubit_batch_calibration_isolated,
+    )
+    schedule = SimpleNamespace(steps=[SimpleNamespace(step_index=0, parallel_qids=["0"])])
+    session_config = runner.build_session_config(execution_id="exec-1", flow_name="flow-1")
+    settings = {"CheckRamsey": {"run": {"detuning": {"value": 0.0002}}, "input": {}}}
+
+    runner.execute_simultaneous_spectroscopy_schedule(
+        schedule,
+        tasks=["CheckRamsey"],
+        session_config=session_config,
+        task_parameters=settings,
+    )
+
+    assert calls == [{**session_config, "task_parameters": settings}]

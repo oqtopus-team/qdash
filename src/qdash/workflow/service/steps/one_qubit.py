@@ -13,6 +13,11 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
+from qdash.workflow.engine.task_parameters import (
+    merge_task_parameters,
+    normalize_task_parameters,
+    validate_task_names,
+)
 from qdash.workflow.service.results import OneQubitResult, normalize_metric_value
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_1Q_TASKS_AFTER_CHECK
@@ -31,6 +36,7 @@ def _execute_direct_one_qubit(
     stage_name: str,
     continue_on_failure: bool = False,
     stop_on_failure_tasks: tuple[str, ...] = (),
+    task_parameters: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Run explicit qubit targets under a visible parent Execution."""
     from qdash.workflow.service._internal.scheduling_tasks import (
@@ -47,7 +53,9 @@ def _execute_direct_one_qubit(
         "execution_id": service.execution_id,
         "project_id": service.project_id,
         "default_run_parameters": service.default_run_parameters,
-        "task_parameters": service.task_parameters,
+        "task_parameters": (
+            task_parameters if task_parameters is not None else service.task_parameters
+        ),
         "configuration_mode": getattr(service, "configuration_mode", None),
         "tags": service.tags,
         "flow_name": service.flow_name,
@@ -79,6 +87,7 @@ def _execute_scheduled_one_qubit(
     mode: str,
     continue_on_failure: bool = False,
     stop_on_failure_tasks: tuple[str, ...] = (),
+    task_parameters: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Run explicit qubit targets through the same scheduler used by MUX targets."""
     from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
@@ -96,6 +105,7 @@ def _execute_scheduled_one_qubit(
         project_id=service.project_id,
         continue_on_failure=continue_on_failure,
         stop_on_failure_tasks=stop_on_failure_tasks,
+        task_parameters=task_parameters,
     )
     strategy = get_one_qubit_strategy(mode)
     result: dict[str, Any] = strategy.execute(service, config)
@@ -121,10 +131,14 @@ class CustomOneQubit(CalibrationStep):
             step_name="coherence_check",
             tasks=["CheckT1", "CheckT2Echo", "CheckRamsey"],
             continue_on_failure=True,
+            task_parameters={
+                "CheckRamsey": {"run": {"detuning": 0.0002}},
+            },
         )
 
     Set ``stop_on_failure_tasks`` for prerequisites such as ``Configure`` that must remain
     fail-fast even when later independent measurements use best-effort execution.
+    Step-local ``task_parameters`` are merged over service-wide settings.
     """
 
     step_name: str = "custom_one_qubit"
@@ -132,6 +146,7 @@ class CustomOneQubit(CalibrationStep):
     mode: str = "synchronized"
     continue_on_failure: bool = False
     stop_on_failure_tasks: tuple[str, ...] = ()
+    task_parameters: dict[str, Any] = field(default_factory=dict)
 
     @property
     def name(self) -> str:
@@ -179,6 +194,7 @@ class CustomOneQubit(CalibrationStep):
                     project_id=service.project_id,
                     continue_on_failure=self.continue_on_failure,
                     stop_on_failure_tasks=self.stop_on_failure_tasks,
+                    task_parameters=self._merged_task_parameters(service),
                 )
                 strategy = get_one_qubit_strategy(self.mode)
                 raw_results = strategy.execute(service, config)
@@ -212,6 +228,7 @@ class CustomOneQubit(CalibrationStep):
             mode=self.mode,
             continue_on_failure=self.continue_on_failure,
             stop_on_failure_tasks=self.stop_on_failure_tasks,
+            task_parameters=self._merged_task_parameters(service),
         )
 
     def _execute_direct(
@@ -227,6 +244,27 @@ class CustomOneQubit(CalibrationStep):
             stage_name=self.step_name,
             continue_on_failure=self.continue_on_failure,
             stop_on_failure_tasks=self.stop_on_failure_tasks,
+            task_parameters=self._merged_task_parameters(service),
+        )
+
+    def _merged_task_parameters(
+        self,
+        service: CalibService,
+    ) -> dict[str, dict[str, Any]] | None:
+        """Merge step-local task settings over service-wide settings."""
+        if not self.task_parameters:
+            return None
+        local_task_parameters = normalize_task_parameters(self.task_parameters)
+        unused = sorted(set(local_task_parameters) - set(self.tasks))
+        if unused:
+            raise ValueError(
+                f"task_parameters for step {self.step_name!r} names tasks not run by the step: "
+                + ", ".join(repr(name) for name in unused)
+            )
+        validate_task_names(local_task_parameters, service.backend_name)
+        return merge_task_parameters(
+            service.task_parameters,
+            local_task_parameters,
         )
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:

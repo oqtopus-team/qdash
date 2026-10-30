@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -39,12 +40,12 @@ def test_coherence_check_runs_expected_tasks_in_order() -> None:
         qids=["0"],
     )
 
-    assert len(result["steps"]) == 1
-    step = result["steps"][0]
-    assert isinstance(step, CustomOneQubit)
-    assert step.name == "coherence_check"
-    assert step.mode == "synchronized"
-    assert step.tasks == [
+    assert len(result["steps"]) == 2
+    first_step, second_step = result["steps"]
+    assert isinstance(first_step, CustomOneQubit)
+    assert first_step.name == "coherence_check"
+    assert first_step.mode == "synchronized"
+    assert first_step.tasks == [
         "Configure",
         "CheckChevron",
         "CheckRabi",
@@ -52,9 +53,28 @@ def test_coherence_check_runs_expected_tasks_in_order() -> None:
         "CheckT2Echo",
         "CheckRamsey",
     ]
+    assert isinstance(second_step, CustomOneQubit)
+    assert second_step.name == "long_ramsey_check"
+    assert second_step.mode == "synchronized"
+    assert second_step.tasks == ["Configure", "CheckRabi", "CheckRamsey"]
 
 
-def test_coherence_check_uses_explicit_chevron_settings_without_updating_calibration() -> None:
+def test_coherence_check_scales_second_ramsey_range_and_detuning() -> None:
+    result = coherence_check_module.coherence_check(
+        username="alice",
+        chip_id="64Q",
+        qids=["0"],
+    )
+
+    settings = normalize_task_parameters(result["steps"][1].task_parameters)["CheckRamsey"]
+    assert settings["run"]["time_range"] == {
+        "value": (0, 50_001, 500),
+        "value_type": "np.arange",
+    }
+    assert settings["run"]["detuning"] == {"value": 0.0002}
+
+
+def test_coherence_check_uses_explicit_task_settings() -> None:
     result = coherence_check_module.coherence_check(
         username="alice",
         chip_id="64Q",
@@ -70,6 +90,30 @@ def test_coherence_check_uses_explicit_chevron_settings_without_updating_calibra
             },
             "update_calibration_parameters": False,
         },
+        "CheckT1": {
+            "run": {
+                "time_range": sweep.logspace(
+                    math.log10(300),
+                    math.log10(500_000),
+                    51,
+                ),
+            },
+        },
+        "CheckT2Echo": {
+            "run": {
+                "time_range": sweep.logspace(
+                    math.log10(300),
+                    math.log10(500_000),
+                    51,
+                ),
+            },
+        },
+        "CheckRamsey": {
+            "run": {
+                "time_range": sweep.arange(0, 10_001, 100),
+                "detuning": 0.001,
+            },
+        },
     }
     chevron_settings = normalize_task_parameters(result["kwargs"]["task_parameters"])[
         "CheckChevron"
@@ -79,6 +123,19 @@ def test_coherence_check_uses_explicit_chevron_settings_without_updating_calibra
             chevron_settings["run"][parameter_name]["value"]
             == CheckChevron.run_spec[parameter_name].default
         )
+
+
+def test_coherence_check_uses_explicit_shared_run_defaults() -> None:
+    result = coherence_check_module.coherence_check(
+        username="alice",
+        chip_id="64Q",
+        qids=["0"],
+    )
+
+    assert result["kwargs"]["default_run_parameters"] == {
+        "readout_duration": 1024,
+        "interval": 256 * 1024,
+    }
 
 
 def test_coherence_check_uses_explicit_qubits() -> None:

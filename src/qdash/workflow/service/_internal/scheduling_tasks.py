@@ -293,6 +293,7 @@ def _execute_mux_qubits_with_session(
     logger: Any,
     continue_on_failure: bool = False,
     stop_on_failure_tasks: tuple[str, ...] = (),
+    task_parameters: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Execute tasks for qubits using the provided session.
 
@@ -313,7 +314,14 @@ def _execute_mux_qubits_with_session(
                     )
                     result[task_name] = {"skipped": True, "reason": "not_mux_representative"}
                     continue
-                task_result = session.execute_task(task_name, qid)
+                if task_parameters is None:
+                    task_result = session.execute_task(task_name, qid)
+                else:
+                    task_result = session.execute_task(
+                        task_name,
+                        qid,
+                        parameters=task_parameters.get(task_name),
+                    )
                 result[task_name] = task_result
             except Exception as e:
                 error_details = _format_exception_details(e)
@@ -352,6 +360,7 @@ def calibrate_mux_qubits(
     session_config: dict[str, Any] | None = None,
     continue_on_failure: bool = False,
     stop_on_failure_tasks: tuple[str, ...] = (),
+    task_parameters: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Execute tasks for qubits in a single MUX sequentially (Prefect task).
 
@@ -370,6 +379,7 @@ def calibrate_mux_qubits(
             global session context.
         continue_on_failure: Continue with later tasks after recording a task failure.
         stop_on_failure_tasks: Tasks that remain fail-fast when continuation is enabled.
+        task_parameters: Optional call-level task settings for a pipeline step.
 
     Returns:
         Dictionary mapping qid to results
@@ -393,6 +403,7 @@ def calibrate_mux_qubits(
                 logger,
                 continue_on_failure,
                 stop_on_failure_tasks,
+                task_parameters,
             )
         finally:
             session.finish_calibration(update_chip_history=False, push_to_github=False)
@@ -405,6 +416,7 @@ def calibrate_mux_qubits(
             logger,
             continue_on_failure,
             stop_on_failure_tasks,
+            task_parameters,
         )
 
     # Flush logs before returning (critical for Dask worker processes)

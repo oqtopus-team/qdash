@@ -99,8 +99,13 @@ class OneQubitStageRunner:
         tasks: list[str],
         allowed_qids: list[str] | None = None,
         session_config: dict[str, Any] | None = None,
+        task_parameters: dict[str, dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        """Run simultaneous spectroscopy batches under the current execution."""
+        """Run simultaneous spectroscopy batches under the current execution.
+
+        Step-local ``task_parameters`` take precedence in both the current-session
+        and isolated-session paths.
+        """
         logger = get_run_logger()
         all_results: dict[str, Any] = {}
         for step in schedule.steps:
@@ -113,17 +118,30 @@ class OneQubitStageRunner:
                 len(step_qids),
             )
             if session_config is not None:
+                worker_config = session_config
+                if task_parameters is not None:
+                    worker_config = {
+                        **session_config,
+                        "task_parameters": task_parameters,
+                    }
                 all_results[f"step_{step.step_index}"] = run_qubit_batch_calibration_isolated(
                     qids=step_qids,
                     tasks=tasks,
-                    session_config=session_config,
+                    session_config=worker_config,
                 )
                 continue
 
             session = get_session()
             step_results: dict[str, dict[str, Any]] = {qid: {} for qid in step_qids}
             for task_name in tasks:
-                task_results = session.execute_task_batch(task_name, step_qids)
+                if task_parameters is None:
+                    task_results = session.execute_task_batch(task_name, step_qids)
+                else:
+                    task_results = session.execute_task_batch(
+                        task_name,
+                        step_qids,
+                        parameters=task_parameters.get(task_name),
+                    )
                 for qid, task_result in task_results.items():
                     step_results.setdefault(qid, {})[task_name] = task_result
             all_results[f"step_{step.step_index}"] = step_results
