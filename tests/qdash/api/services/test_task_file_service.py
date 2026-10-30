@@ -258,11 +258,13 @@ def test_coupling_strength_exposes_optional_database_anharmonicities() -> None:
     )
 
     assert task.category == "Two Qubit"
-    for name in ("control_anharmonicity", "target_anharmonicity"):
+    for name in ("control_qubit_anharmonicity", "target_qubit_anharmonicity"):
         parameter = task.input_parameters[name]
         assert parameter["resolution"] == "database_optional"
         assert parameter["user_override"] == "forbidden"
         assert parameter["default_value"] is None
+        assert parameter["parameter_name"] == "qubit_anharmonicity"
+        assert parameter["parameter_aliases"] == ["anharmonicity"]
 
 
 def test_list_task_info_extracts_input_parameter_metadata() -> None:

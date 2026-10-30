@@ -91,6 +91,22 @@ def test_validate_source_accepts_declared_parameter_from_failed_qubit_spectrosco
         assert service._validate_source_task(request, "project") is source
 
 
+def test_validate_source_accepts_canonical_name_for_legacy_anharmonicity_output() -> None:
+    service = ManualUpdateService()
+    source = _source(
+        name="CheckQubitSpectroscopy",
+        status="completed",
+        output_parameter_names=["anharmonicity"],
+    )
+    request = _request(parameters={"qubit_anharmonicity": {"value": -0.3, "unit": "GHz"}})
+
+    with patch(
+        "qdash.api.services.manual_update_service.TaskResultHistoryDocument.find_one"
+    ) as find_one:
+        find_one.return_value.run.return_value = source
+        assert service._validate_source_task(request, "project") is source
+
+
 def test_validate_source_does_not_invent_parameters_for_completed_qubit_spectroscopy() -> None:
     service = ManualUpdateService()
     source = _source(

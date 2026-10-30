@@ -61,8 +61,9 @@ class CheckCouplingStrength(QubexTask):
             greater_than=0,
             description="Calibrated GE frequency of the measured/control qubit",
         ),
-        "control_anharmonicity": InputParameterSpec.database_optional(
-            parameter_name="anharmonicity",
+        "control_qubit_anharmonicity": InputParameterSpec.database_optional(
+            parameter_name="qubit_anharmonicity",
+            parameter_aliases=("anharmonicity",),
             qid_role="control",
             unit="GHz",
             less_than=0,
@@ -104,8 +105,9 @@ class CheckCouplingStrength(QubexTask):
             greater_than=0,
             description="Calibrated GE frequency of the spectator/target qubit",
         ),
-        "target_anharmonicity": InputParameterSpec.database_optional(
-            parameter_name="anharmonicity",
+        "target_qubit_anharmonicity": InputParameterSpec.database_optional(
+            parameter_name="qubit_anharmonicity",
+            parameter_aliases=("anharmonicity",),
             qid_role="target",
             unit="GHz",
             less_than=0,
@@ -159,27 +161,27 @@ class CheckCouplingStrength(QubexTask):
         xi: float,
         control_frequency: float,
         target_frequency: float,
-        control_anharmonicity: float,
-        target_anharmonicity: float,
+        control_qubit_anharmonicity: float,
+        target_qubit_anharmonicity: float,
     ) -> float:
         """Return the dispersive coupling estimate in GHz using the Qubex formula."""
         detuning = control_frequency - target_frequency
-        denominator = control_anharmonicity + target_anharmonicity
+        denominator = control_qubit_anharmonicity + target_qubit_anharmonicity
         if math.isclose(denominator, 0.0, abs_tol=1e-15):
             raise ValueError("The sum of the two anharmonicities must be non-zero")
         return math.sqrt(
             abs(
                 xi
-                * (detuning + control_anharmonicity)
-                * (detuning - target_anharmonicity)
+                * (detuning + control_qubit_anharmonicity)
+                * (detuning - target_qubit_anharmonicity)
                 / denominator
             )
         )
 
     def _optional_anharmonicities(self) -> tuple[float, float] | None:
         """Return both resolved DB anharmonicities, or ``None`` when either is absent."""
-        control = self.input_parameters["control_anharmonicity"].value
-        target = self.input_parameters["target_anharmonicity"].value
+        control = self.input_parameters["control_qubit_anharmonicity"].value
+        target = self.input_parameters["target_qubit_anharmonicity"].value
         if control is None or target is None:
             return None
         return float(control), float(target)
@@ -220,13 +222,13 @@ class CheckCouplingStrength(QubexTask):
         strength = None
         anharmonicities = self._optional_anharmonicities()
         if zeta_error is None and anharmonicities is not None:
-            control_anharmonicity, target_anharmonicity = anharmonicities
+            control_qubit_anharmonicity, target_qubit_anharmonicity = anharmonicities
             strength = self._calculate_coupling_strength(
                 xi=float(zeta) / 2,
                 control_frequency=self._get_calibration_value("control_qubit_frequency"),
                 target_frequency=self._get_calibration_value("target_qubit_frequency"),
-                control_anharmonicity=control_anharmonicity,
-                target_anharmonicity=target_anharmonicity,
+                control_qubit_anharmonicity=control_qubit_anharmonicity,
+                target_qubit_anharmonicity=target_qubit_anharmonicity,
             )
         self.output_parameters["qubit_qubit_coupling_strength"].value = (
             strength * 1e3 if strength is not None else None

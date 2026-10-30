@@ -689,7 +689,7 @@
         "name": "CheckAdaptiveEFChevron",
         "output_parameters": [
           "ef_frequency",
-          "anharmonicity"
+          "qubit_anharmonicity"
         ],
         "run_parameters": {
           "detuning_range": {
@@ -2101,16 +2101,6 @@
         "description": "Measure JAZZ and estimate coupling strength when both anharmonicities are known.\n\nThe first qid is the measured/control qubit and the second is the spectator/target qubit.\nFrequencies and anharmonicities used by the estimate are resolved from QDash calibration\ninputs rather than from Qubex's implicit anharmonicity fallback.",
         "file_path": "two_qubit/check_coupling_strength.py",
         "input_parameters": {
-          "control_anharmonicity": {
-            "default_value": null,
-            "description": "Optional calibrated anharmonicity of the measured/control qubit",
-            "less_than": 0,
-            "parameter_name": "anharmonicity",
-            "qid_role": "control",
-            "resolution": "database_optional",
-            "unit": "GHz",
-            "user_override": "forbidden"
-          },
           "control_control_amplitude": {
             "default_value": null,
             "parameter_name": "control_amplitude",
@@ -2148,6 +2138,19 @@
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
             "user_override": "allowed"
+          },
+          "control_qubit_anharmonicity": {
+            "default_value": null,
+            "description": "Optional calibrated anharmonicity of the measured/control qubit",
+            "less_than": 0,
+            "parameter_aliases": [
+              "anharmonicity"
+            ],
+            "parameter_name": "qubit_anharmonicity",
+            "qid_role": "control",
+            "resolution": "database_optional",
+            "unit": "GHz",
+            "user_override": "forbidden"
           },
           "control_qubit_frequency": {
             "default_value": null,
@@ -2264,16 +2267,6 @@
             "unit": "GHz",
             "user_override": "allowed"
           },
-          "target_anharmonicity": {
-            "default_value": null,
-            "description": "Optional calibrated anharmonicity of the spectator/target qubit",
-            "less_than": 0,
-            "parameter_name": "anharmonicity",
-            "qid_role": "target",
-            "resolution": "database_optional",
-            "unit": "GHz",
-            "user_override": "forbidden"
-          },
           "target_control_amplitude": {
             "default_value": null,
             "parameter_name": "control_amplitude",
@@ -2311,6 +2304,19 @@
             "ui_group_collapsed": true,
             "unit": "MHz/a.u.",
             "user_override": "allowed"
+          },
+          "target_qubit_anharmonicity": {
+            "default_value": null,
+            "description": "Optional calibrated anharmonicity of the spectator/target qubit",
+            "less_than": 0,
+            "parameter_aliases": [
+              "anharmonicity"
+            ],
+            "parameter_name": "qubit_anharmonicity",
+            "qid_role": "target",
+            "resolution": "database_optional",
+            "unit": "GHz",
+            "user_override": "forbidden"
           },
           "target_qubit_frequency": {
             "default_value": null,

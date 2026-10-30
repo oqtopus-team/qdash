@@ -17,16 +17,16 @@ from qdash.workflow.engine.task.backend_saver import BackendSaver
 def _set_measurement_inputs(
     task: CheckCouplingStrength,
     *,
-    control_anharmonicity: float | None = -0.3,
-    target_anharmonicity: float | None = -0.31,
+    control_qubit_anharmonicity: float | None = -0.3,
+    target_qubit_anharmonicity: float | None = -0.31,
 ) -> None:
     values = {
         "control_qubit_frequency": 5.0,
-        "control_anharmonicity": control_anharmonicity,
+        "control_qubit_anharmonicity": control_qubit_anharmonicity,
         "control_readout_frequency": 7.0,
         "control_readout_amplitude": 0.1,
         "target_qubit_frequency": 5.2,
-        "target_anharmonicity": target_anharmonicity,
+        "target_qubit_anharmonicity": target_qubit_anharmonicity,
         "target_readout_frequency": 7.2,
         "target_readout_amplitude": 0.2,
     }
@@ -76,19 +76,19 @@ def test_run_passes_pulses_sweep_and_returns_r2(task_and_experiment) -> None:
 
 
 @pytest.mark.parametrize(
-    ("control_anharmonicity", "target_anharmonicity"),
+    ("control_qubit_anharmonicity", "target_qubit_anharmonicity"),
     [(None, -0.31), (-0.3, None), (None, None)],
 )
 def test_postprocess_omits_strength_when_either_anharmonicity_is_missing(
     task_and_experiment,
-    control_anharmonicity: float | None,
-    target_anharmonicity: float | None,
+    control_qubit_anharmonicity: float | None,
+    target_qubit_anharmonicity: float | None,
 ) -> None:
     task, _ = task_and_experiment
     _set_measurement_inputs(
         task,
-        control_anharmonicity=control_anharmonicity,
-        target_anharmonicity=target_anharmonicity,
+        control_qubit_anharmonicity=control_qubit_anharmonicity,
+        target_qubit_anharmonicity=target_qubit_anharmonicity,
     )
     result = task.postprocess(
         cast("Any", object()),
@@ -128,8 +128,8 @@ def test_postprocess_calculates_coupling_strength_in_mhz(zeta: float) -> None:
         xi=zeta / 2,
         control_frequency=5.0,
         target_frequency=5.2,
-        control_anharmonicity=-0.3,
-        target_anharmonicity=-0.31,
+        control_qubit_anharmonicity=-0.3,
+        target_qubit_anharmonicity=-0.31,
     )
     metric = result.output_parameters["qubit_qubit_coupling_strength"]
     assert metric.value == pytest.approx(expected * 1e3)
@@ -172,8 +172,8 @@ def test_registered_task_saves_both_coupling_metrics() -> None:
         xi=-0.00001,
         control_frequency=5.0,
         target_frequency=5.2,
-        control_anharmonicity=-0.3,
-        target_anharmonicity=-0.31,
+        control_qubit_anharmonicity=-0.3,
+        target_qubit_anharmonicity=-0.31,
     )
     assert saved["output_parameters"]["qubit_qubit_coupling_strength"].value == pytest.approx(
         expected * 1e3
@@ -248,7 +248,7 @@ def test_postprocess_clears_previous_strength_when_task_instance_is_reused() -> 
         RunResult(raw_result=SimpleNamespace(data={"zeta": -0.00002})),
         "0-1",
     )
-    task.input_parameters["target_anharmonicity"].value = None
+    task.input_parameters["target_qubit_anharmonicity"].value = None
     second = task.postprocess(
         cast("Any", object()),
         "exec-2",

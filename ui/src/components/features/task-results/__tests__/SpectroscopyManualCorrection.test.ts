@@ -8,7 +8,7 @@ describe("spectroscopyCorrectionParameterNames", () => {
       spectroscopyCorrectionParameterNames("CheckQubitSpectroscopy", "failed", [], {}),
     ).toEqual([
       "coarse_qubit_frequency",
-      "anharmonicity",
+      "qubit_anharmonicity",
       "f01_repr_db",
       "f01_quality_level",
       "coarse_control_amplitude",
@@ -26,7 +26,7 @@ describe("spectroscopyCorrectionParameterNames", () => {
     ).toEqual([
       "coarse_qubit_frequency",
       "f01_repr_db",
-      "anharmonicity",
+      "qubit_anharmonicity",
       "f01_quality_level",
       "coarse_control_amplitude",
     ]);
@@ -41,5 +41,19 @@ describe("spectroscopyCorrectionParameterNames", () => {
         {},
       ),
     ).toEqual(["coarse_qubit_frequency"]);
+  });
+
+  it("normalizes the legacy anharmonicity output name", () => {
+    expect(
+      spectroscopyCorrectionParameterNames("CheckQubitSpectroscopy", "failed", ["anharmonicity"], {
+        anharmonicity: { value: -0.3, unit: "GHz" },
+      }),
+    ).toEqual([
+      "qubit_anharmonicity",
+      "coarse_qubit_frequency",
+      "f01_repr_db",
+      "f01_quality_level",
+      "coarse_control_amplitude",
+    ]);
   });
 });

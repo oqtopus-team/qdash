@@ -66,7 +66,7 @@ qubit_metrics:
     evaluation:
       mode: none
 
-  anharmonicity:
+  qubit_anharmonicity:
     title: Qubit Anharmonicity
     unit: MHz
     scale: 1000 # Convert GHz to MHz

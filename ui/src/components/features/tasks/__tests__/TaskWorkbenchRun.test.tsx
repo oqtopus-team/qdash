@@ -445,7 +445,7 @@ describe("TaskWorkbench run availability", () => {
     renderWorkbench(
       {
         input_parameters: {
-          anharmonicity: {
+          qubit_anharmonicity: {
             resolution: "database_optional",
             user_override: "forbidden",
             value_type: "float",
@@ -459,8 +459,10 @@ describe("TaskWorkbench run availability", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reload" }));
 
     await waitFor(() => expect(mocks.refetchAvailability).toHaveBeenCalledTimes(1));
-    expect(mocks.toast.error).not.toHaveBeenCalledWith("No current value found for anharmonicity");
-    expect(screen.getByRole("textbox", { name: "anharmonicity" })).toHaveValue("");
+    expect(mocks.toast.error).not.toHaveBeenCalledWith(
+      "No current value found for qubit_anharmonicity",
+    );
+    expect(screen.getByRole("textbox", { name: "qubit_anharmonicity" })).toHaveValue("");
   });
 
   it("skips incompatible historical fields and executes current defaults without old values", async () => {

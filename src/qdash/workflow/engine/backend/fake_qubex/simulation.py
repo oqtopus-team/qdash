@@ -5708,7 +5708,9 @@ def build_qxsimulator_system(
                 label=label,
                 dimension=qubit_dimension,
                 frequency=frequency,
-                anharmonicity=_optional_float(qubit.get("anharmonicity")),
+                anharmonicity=_optional_float(
+                    qubit.get("qubit_anharmonicity", qubit.get("anharmonicity"))
+                ),
                 relaxation_rate=relaxation_rate,
                 dephasing_rate=dephasing_rate,
             )

@@ -21,7 +21,7 @@ const PARAMETER_UNITS: Record<string, string> = {
   optimal_power: "dB",
   readout_amplitude: "a.u.",
   coarse_qubit_frequency: "GHz",
-  anharmonicity: "GHz",
+  qubit_anharmonicity: "GHz",
   f01_repr_db: "dB",
   f01_quality_level: "a.u.",
   coarse_control_amplitude: "a.u.",
@@ -30,7 +30,7 @@ const PARAMETER_UNITS: Record<string, string> = {
 const FAILED_TASK_PARAMETER_NAMES: Record<string, readonly string[]> = {
   CheckQubitSpectroscopy: [
     "coarse_qubit_frequency",
-    "anharmonicity",
+    "qubit_anharmonicity",
     "f01_repr_db",
     "f01_quality_level",
     "coarse_control_amplitude",
@@ -93,7 +93,8 @@ export function SpectroscopyManualCorrection({
     const nextBaselines = Object.fromEntries(
       names.map((name) => [
         name,
-        parameterValue(currentData[name]) ?? parameterValue(outputParameters[name]),
+        parameterValue(parameterRaw(currentData, name)) ??
+          parameterValue(parameterRaw(outputParameters, name)),
       ]),
     );
     setBaselines(nextBaselines);
@@ -121,7 +122,7 @@ export function SpectroscopyManualCorrection({
               name,
               {
                 value: parseFinite(values[name]),
-                unit: parameterUnit(outputParameters[name], name),
+                unit: parameterUnit(parameterRaw(outputParameters, name), name),
               },
             ]),
           ),
@@ -272,8 +273,9 @@ export function SpectroscopyManualCorrection({
             </thead>
             <tbody>
               {names.map((name) => {
-                const measured = parameterValue(outputParameters[name]);
-                const current = parameterValue(currentData[name]);
+                const measuredRaw = parameterRaw(outputParameters, name);
+                const measured = parameterValue(measuredRaw);
+                const current = parameterValue(parameterRaw(currentData, name));
                 const baseline = baselines[name];
                 const changed = parseFinite(values[name]) !== baseline;
                 return (
@@ -306,7 +308,7 @@ export function SpectroscopyManualCorrection({
                         )}
                       </div>
                     </td>
-                    <td>{parameterUnit(outputParameters[name], name)}</td>
+                    <td>{parameterUnit(measuredRaw, name)}</td>
                   </tr>
                 );
               })}
@@ -355,7 +357,7 @@ export function SpectroscopyManualCorrection({
                   <li key={name} className="flex items-center justify-between gap-4 px-3 py-2.5">
                     <span className="min-w-0 truncate font-mono text-xs">{name}</span>
                     <span className="shrink-0 font-mono text-xs font-semibold">
-                      {values[name]} {parameterUnit(outputParameters[name], name)}
+                      {values[name]} {parameterUnit(parameterRaw(outputParameters, name), name)}
                     </span>
                   </li>
                 ))}
@@ -463,8 +465,22 @@ export function spectroscopyCorrectionParameterNames(
   const failedTaskNames =
     taskStatus === "failed" ? (FAILED_TASK_PARAMETER_NAMES[taskName] ?? []) : [];
   return [
-    ...new Set([...outputParameterNames, ...Object.keys(outputParameters), ...failedTaskNames]),
+    ...new Set(
+      [...outputParameterNames, ...Object.keys(outputParameters), ...failedTaskNames].map(
+        canonicalParameterName,
+      ),
+    ),
   ];
+}
+
+function canonicalParameterName(name: string): string {
+  return name === "anharmonicity" ? "qubit_anharmonicity" : name;
+}
+
+function parameterRaw(parameters: Record<string, unknown>, name: string): unknown {
+  if (name in parameters) return parameters[name];
+  if (name === "qubit_anharmonicity") return parameters.anharmonicity;
+  return undefined;
 }
 
 function parameterValue(raw: unknown): number | null {

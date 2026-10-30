@@ -68,7 +68,7 @@ def test_bringup_normalizes_serialized_metrics() -> None:
             },
             "CheckQubitSpectroscopy": {
                 "coarse_qubit_frequency": {"value": 5.2},
-                "anharmonicity": -0.3,
+                "qubit_anharmonicity": -0.3,
             },
             "CheckAdaptiveChevron": {"qubit_frequency": {"value": 5.15}},
         }
