@@ -689,7 +689,7 @@
         "name": "CheckAdaptiveEFChevron",
         "output_parameters": [
           "ef_frequency",
-          "anharmonicity"
+          "qubit_anharmonicity"
         ],
         "run_parameters": {
           "detuning_range": {
@@ -2098,7 +2098,7 @@
       },
       {
         "class_name": "CheckCouplingStrength",
-        "description": "Estimate coupling strength; the first qid is measured, the second is the spectator.",
+        "description": "Measure JAZZ and estimate coupling strength when both anharmonicities are known.\n\nThe first qid is the measured/control qubit and the second is the spectator/target qubit.\nFrequencies and anharmonicities used by the estimate are resolved from QDash calibration\ninputs rather than from Qubex's implicit anharmonicity fallback.",
         "file_path": "two_qubit/check_coupling_strength.py",
         "input_parameters": {
           "control_control_amplitude": {
@@ -2113,6 +2113,7 @@
           },
           "control_hpi_amplitude": {
             "default_value": null,
+            "greater_than": 0,
             "parameter_name": "hpi_amplitude",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2121,6 +2122,7 @@
           },
           "control_hpi_duration": {
             "default_value": null,
+            "greater_than": 0,
             "parameter_name": "hpi_duration",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2137,11 +2139,26 @@
             "unit": "MHz/a.u.",
             "user_override": "allowed"
           },
+          "control_qubit_anharmonicity": {
+            "default_value": null,
+            "description": "Optional calibrated anharmonicity of the measured/control qubit",
+            "less_than": 0,
+            "parameter_aliases": [
+              "anharmonicity"
+            ],
+            "parameter_name": "qubit_anharmonicity",
+            "qid_role": "control",
+            "resolution": "database_optional",
+            "unit": "GHz",
+            "user_override": "forbidden"
+          },
           "control_qubit_frequency": {
             "default_value": null,
+            "description": "Calibrated GE frequency of the measured/control qubit",
             "fallback_parameter_names": [
               "qubit_frequency"
             ],
+            "greater_than": 0,
             "parameter_name": "control_frequency",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2230,6 +2247,8 @@
           },
           "control_readout_amplitude": {
             "default_value": null,
+            "greater_than": 0,
+            "less_than_or_equal": 1,
             "parameter_name": "readout_amplitude",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2241,6 +2260,7 @@
             "fallback_parameter_names": [
               "resonator_frequency"
             ],
+            "greater_than": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "control",
             "resolution": "database_required",
@@ -2259,6 +2279,7 @@
           },
           "target_hpi_amplitude": {
             "default_value": null,
+            "greater_than": 0,
             "parameter_name": "hpi_amplitude",
             "qid_role": "target",
             "resolution": "database_required",
@@ -2267,6 +2288,7 @@
           },
           "target_hpi_duration": {
             "default_value": null,
+            "greater_than": 0,
             "parameter_name": "hpi_duration",
             "qid_role": "target",
             "resolution": "database_required",
@@ -2283,11 +2305,26 @@
             "unit": "MHz/a.u.",
             "user_override": "allowed"
           },
+          "target_qubit_anharmonicity": {
+            "default_value": null,
+            "description": "Optional calibrated anharmonicity of the spectator/target qubit",
+            "less_than": 0,
+            "parameter_aliases": [
+              "anharmonicity"
+            ],
+            "parameter_name": "qubit_anharmonicity",
+            "qid_role": "target",
+            "resolution": "database_optional",
+            "unit": "GHz",
+            "user_override": "forbidden"
+          },
           "target_qubit_frequency": {
             "default_value": null,
+            "description": "Calibrated GE frequency of the spectator/target qubit",
             "fallback_parameter_names": [
               "qubit_frequency"
             ],
+            "greater_than": 0,
             "parameter_name": "control_frequency",
             "qid_role": "target",
             "resolution": "database_required",
@@ -2376,6 +2413,8 @@
           },
           "target_readout_amplitude": {
             "default_value": null,
+            "greater_than": 0,
+            "less_than_or_equal": 1,
             "parameter_name": "readout_amplitude",
             "qid_role": "target",
             "resolution": "database_required",
@@ -2387,6 +2426,7 @@
             "fallback_parameter_names": [
               "resonator_frequency"
             ],
+            "greater_than": 0,
             "parameter_name": "readout_frequency",
             "qid_role": "target",
             "resolution": "database_required",
@@ -6338,6 +6378,11 @@
         "name": "ConfigureAll",
         "output_parameters": [],
         "run_parameters": {
+          "configuration_mode": {
+            "description": "Control layout: ge-cr-cr, ge-ef-cr, or ge-ef-fh.",
+            "value": "ge-cr-cr",
+            "value_type": "str"
+          },
           "mux_ids": {
             "description": "List of MUX IDs to configure",
             "unit": "a.u.",

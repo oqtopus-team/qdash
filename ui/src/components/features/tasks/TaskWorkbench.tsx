@@ -348,7 +348,9 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
               : stored;
           if (value === null || value === undefined) value = parameter.default_value;
           if (value === null || value === undefined) {
-            if (sourceTask) throw new Error(`No current value found for ${name}`);
+            if (sourceTask && resolution !== "database_optional") {
+              throw new Error(`No current value found for ${name}`);
+            }
             return [name, ""];
           }
           loadedCount += 1;

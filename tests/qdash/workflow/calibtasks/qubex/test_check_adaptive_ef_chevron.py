@@ -126,9 +126,9 @@ def test_run_uses_qubex_missing_anharmonicity_default_when_ef_frequency_is_unset
     assert estimate.call_args.kwargs["frequencies"]["Q00"] == pytest.approx(5.001 * 18 / 19)
 
 
-def test_ef_chevron_does_not_declare_anharmonicity_as_an_input() -> None:
-    """Keep persisted anharmonicity out of EF chevron seed selection."""
-    assert "anharmonicity" not in CheckAdaptiveEFChevron.input_spec
+def test_ef_chevron_does_not_declare_qubit_anharmonicity_as_an_input() -> None:
+    """Keep persisted qubit anharmonicity out of EF chevron seed selection."""
+    assert {"qubit_anharmonicity", "anharmonicity"}.isdisjoint(CheckAdaptiveEFChevron.input_spec)
 
 
 def test_run_rejects_missing_ef_target_before_measurement() -> None:
@@ -143,7 +143,7 @@ def test_run_rejects_missing_ef_target_before_measurement() -> None:
             "qdash.workflow.calibtasks.qubex.one_qubit_fine.check_adaptive_ef_chevron."
             "estimate_ef_frequency_from_chevron_adaptive"
         ) as estimate,
-        pytest.raises(ValueError, match="Run ConfigureEF"),
+        pytest.raises(ValueError, match="EF-capable configuration_mode"),
     ):
         _task().run(cast("Any", backend), "0")
     estimate.assert_not_called()
@@ -160,7 +160,7 @@ def test_postprocess_uses_final_frequency_and_prioritizes_final_chevron_figure()
     result = _task().postprocess(_backend(), "exec-1", _result(figures=figures), "0")
     assert result.validation_error is None
     assert result.output_parameters["ef_frequency"].value == 4.72
-    assert result.output_parameters["anharmonicity"].value == pytest.approx(-0.281)
+    assert result.output_parameters["qubit_anharmonicity"].value == pytest.approx(-0.281)
     assert all(
         p.unit == "GHz" and p.execution_id == "exec-1" for p in result.output_parameters.values()
     )
@@ -204,10 +204,11 @@ def test_registered_task_saves_both_qubit_metrics() -> None:
     assert saved["qid"] == "0" and saved["project_id"] == "proj-1"
     assert saved["output_parameters"]["ef_frequency"]["value"] == 4.72
     assert saved["output_parameters"]["control_frequency_ef"]["value"] == 4.72
-    assert saved["output_parameters"]["anharmonicity"].value == pytest.approx(-0.281)
+    assert saved["output_parameters"]["qubit_anharmonicity"].value == pytest.approx(-0.281)
     metrics = load_metrics_config().qubit_metrics
     assert metrics["ef_frequency"].unit == "GHz" and metrics["ef_frequency"].scale == 1
-    assert metrics["anharmonicity"].unit == "MHz" and metrics["anharmonicity"].scale == 1000
+    assert metrics["qubit_anharmonicity"].unit == "MHz"
+    assert metrics["qubit_anharmonicity"].scale == 1000
 
 
 def test_legacy_task_name_is_not_registered() -> None:

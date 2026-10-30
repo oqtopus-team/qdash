@@ -52,7 +52,7 @@ same way as GE calibration.
 
 | Task or task family | Frequency input | Frequency result | Published database parameters |
 | --- | --- | --- | --- |
-| `CheckAdaptiveEFChevron` | Configured `control_frequency_ef`; otherwise the Qubex missing-anharmonicity default derived from `control_frequency` | Measured EF transition and anharmonicity | `ef_frequency`, `control_frequency_ef`, `anharmonicity` |
+| `CheckAdaptiveEFChevron` | Configured `control_frequency_ef`; otherwise the Qubex missing-anharmonicity default derived from `control_frequency` | Measured EF transition and qubit anharmonicity | `ef_frequency`, `control_frequency_ef`, `qubit_anharmonicity` |
 | `CheckEFRabi`, EF pulse creation, and EF readout classification | `control_frequency_ef`; fallback: `ef_frequency` | No transition-frequency result | None |
 | `CheckAdaptiveFHChevron` | Configured `control_frequency_fh`; otherwise `2 * control_frequency_ef - control_frequency` | Measured FH transition | `fh_frequency`, `control_frequency_fh` |
 
@@ -62,12 +62,12 @@ a session whose GE and EF targets are not available, and `CheckAdaptiveFHChevron
 FH target. Ordinary `Configure` defaults to `ge-cr-cr`, even after an EF configuration task, so a
 flow returning to CR calibration must run `Configure` to restore the CR layout.
 
-`CheckAdaptiveEFChevron` deliberately ignores persisted anharmonicity when selecting its initial search
+`CheckAdaptiveEFChevron` deliberately ignores persisted qubit anharmonicity when selecting its initial search
 frequency. If Qubex has an explicit `control_frequency_ef`, the task uses it. Otherwise it uses
 `18 / 19 * control_frequency`, matching Qubex's `E_J / E_C = 50` fallback when anharmonicity is
 unset. Its initial EF drive amplitude is `control_amplitude / sqrt(2)`, matching Qubex's default
 scaling from the calibrated GE control amplitude. Qubit spectroscopy may still display an f12
-estimate for diagnosis, but it does not publish that estimate as calibrated anharmonicity.
+estimate for diagnosis, but it does not publish that estimate as calibrated qubit anharmonicity.
 
 `CheckAdaptiveFHChevron` requires the `ge-ef-fh` layout, a calibrated GE HPI pulse, and a calibrated EF pi
 pulse. It uses the configured `control_frequency_fh` as its initial search frequency when present.

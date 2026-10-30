@@ -5846,7 +5846,7 @@
           "chip"
         ],
         "summary": "Re-run qubit spectroscopy analysis on a stored task result (preview)",
-        "description": "Re-run the qubit-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `qubit_frequency`,\n`f01_repr_db`, `f01_quality_level`, and `anharmonicity` for the requested\nqubit. The DB is **not** mutated; this is a preview only.",
+        "description": "Re-run the qubit-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `qubit_frequency`,\n`f01_repr_db`, `f01_quality_level`, and `qubit_anharmonicity` for the requested\nqubit. The DB is **not** mutated; this is a preview only.",
         "operationId": "reanalyzeQubitSpectroscopy",
         "security": [
           {
@@ -6153,7 +6153,7 @@
           "chip"
         ],
         "summary": "Get heatmap data for a single metric",
-        "description": "Get heatmap data for a single metric.\n\nReturns only the values needed for heatmap visualization (~5KB).\nMuch more efficient than fetching full chip data (~300KB+).\n\nSupported metrics:\n- Qubit: t1, t2_echo, t2_star, qubit_frequency, anharmonicity,\n         average_readout_fidelity, x90_gate_fidelity, x180_gate_fidelity\n- Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction,\n            qubit_qubit_coupling_strength\n\nCoupling strength is stored, returned, and displayed in MHz.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmetric : str\n    Name of the metric to retrieve\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nMetricHeatmapResponse\n    Metric values keyed by qubit/coupling ID",
+        "description": "Get heatmap data for a single metric.\n\nReturns only the values needed for heatmap visualization (~5KB).\nMuch more efficient than fetching full chip data (~300KB+).\n\nSupported metrics:\n- Qubit: t1, t2_echo, t2_star, qubit_frequency, qubit_anharmonicity,\n         average_readout_fidelity, x90_gate_fidelity, x180_gate_fidelity\n- Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction,\n            qubit_qubit_coupling_strength\n\nCoupling strength is stored, returned, and displayed in MHz.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmetric : str\n    Name of the metric to retrieve\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nMetricHeatmapResponse\n    Metric values keyed by qubit/coupling ID",
         "operationId": "getChipMetricHeatmap",
         "security": [
           {
@@ -11397,7 +11397,7 @@
           "metrics"
         ],
         "summary": "Get Chip Metrics",
-        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    ctx: Project context with user and project information\n    metrics_service: Injected metrics service\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n    start_at: Optional absolute lower bound (ISO8601 or date)\n    end_at: Optional absolute upper bound (ISO8601 or date)\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
+        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, qubit anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    ctx: Project context with user and project information\n    metrics_service: Injected metrics service\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n    start_at: Optional absolute lower bound (ISO8601 or date)\n    end_at: Optional absolute upper bound (ISO8601 or date)\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
         "operationId": "getChipMetrics",
         "security": [
           {

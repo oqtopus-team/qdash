@@ -1,4 +1,6 @@
-from typing import ClassVar
+from typing import ClassVar, cast, get_args
+
+from qubex.typing import ConfigurationMode
 
 from qdash.datamodel.task import (
     InputParameterSpec,
@@ -27,6 +29,11 @@ class ConfigureAll(QubexTask):
             default=[],
             description="List of MUX IDs to configure",
         ),
+        "configuration_mode": RunParameterSpec(
+            value_type="str",
+            default="ge-cr-cr",
+            description="Control layout: ge-cr-cr, ge-ef-cr, or ge-ef-fh.",
+        ),
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {}
 
@@ -47,22 +54,37 @@ class ConfigureAll(QubexTask):
         if mux_ids is None:
             mux_ids = []
         mux_ids = list(mux_ids)
+        # Older execution snapshots may not contain the newly added parameter.
+        parameter = self.run_parameters.get("configuration_mode")
+        mode = (
+            parameter.get_value()
+            if parameter is not None
+            else self.run_spec["configuration_mode"].default
+        )
+        if not isinstance(mode, str) or mode not in get_args(ConfigurationMode):
+            raise ValueError(f"Unsupported configuration_mode: {mode!r}")
+        configuration_mode = cast("ConfigurationMode", mode)
 
         qubex_paths = get_qubex_paths()
         config_dir = backend.config.get("config_dir", str(qubex_paths.config_dir(chip_id)))
         params_dir = backend.config.get("params_dir", str(qubex_paths.params_dir(chip_id)))
 
-        print(f"[ConfigureAll] Loading system_manager for mux_ids={mux_ids}")
+        print(
+            f"[ConfigureAll] Loading system_manager for mux_ids={mux_ids} "
+            f"(mode={configuration_mode})"
+        )
         exp = Experiment(
             chip_id=chip_id,
             muxes=mux_ids,
             config_dir=config_dir,
             params_dir=params_dir,
+            configuration_mode=configuration_mode,
         )
         exp.system_manager.load(
             chip_id=exp.chip_id,
             config_dir=exp.config_path,
             params_dir=exp.params_path,
+            configuration_mode=configuration_mode,
         )
         print(f"[ConfigureAll] Pushing system_manager (box_ids={exp.box_ids})")
         exp.system_manager.push(box_ids=exp.box_ids, confirm=False, parallel=False)

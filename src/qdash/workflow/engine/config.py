@@ -28,6 +28,7 @@ class CalibConfig:
         enable_github_pull: Whether to pull config from GitHub
         enable_provenance_tracking: Whether to track data provenance for lineage
         connect_backend: Whether to connect hardware during session initialization
+        configuration_mode: Qubex control layout for the session
         task_parameters: Task-scoped run parameters, input overrides, and
             ``update_calibration_parameters`` in the canonical form of
             :mod:`qdash.workflow.engine.task_parameters`

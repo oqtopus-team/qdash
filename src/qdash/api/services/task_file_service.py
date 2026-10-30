@@ -390,6 +390,11 @@ class TaskFileService:
                         "user_override": "allowed",
                         "default_value": None,
                     },
+                    "database_optional": {
+                        "resolution": "database_optional",
+                        "user_override": "allowed",
+                        "default_value": None,
+                    },
                     "database_or_default": {
                         "resolution": "database_or_default",
                         "user_override": "allowed",

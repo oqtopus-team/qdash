@@ -646,7 +646,7 @@ def reanalyze_qubit_spectroscopy(
     """Re-run the qubit-spectroscopy analysis on a previously stored figure.
 
     Returns the marked figure and the re-estimated `qubit_frequency`,
-    `f01_repr_db`, `f01_quality_level`, and `anharmonicity` for the requested
+    `f01_repr_db`, `f01_quality_level`, and `qubit_anharmonicity` for the requested
     qubit. The DB is **not** mutated; this is a preview only.
     """
     return reanalysis_service.reanalyze_qubit_spectroscopy(
@@ -800,7 +800,7 @@ def get_chip_metric_heatmap(
     Much more efficient than fetching full chip data (~300KB+).
 
     Supported metrics:
-    - Qubit: t1, t2_echo, t2_star, qubit_frequency, anharmonicity,
+    - Qubit: t1, t2_echo, t2_star, qubit_frequency, qubit_anharmonicity,
              average_readout_fidelity, x90_gate_fidelity, x180_gate_fidelity
     - Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction,
                 qubit_qubit_coupling_strength

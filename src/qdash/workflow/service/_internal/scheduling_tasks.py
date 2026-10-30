@@ -169,6 +169,7 @@ def _create_isolated_session(
             - project_id: Project ID (optional)
             - muxes: List of MUX IDs (optional)
             - execution_id: Parent's execution_id (to share Execution document)
+            - configuration_mode: Qubex control layout inherited from the parent
         qids: List of qubit IDs for this session
 
     Returns:
@@ -199,6 +200,7 @@ def _create_isolated_session(
         enable_github=False,  # No GitHub operations for isolated sessions
         default_run_parameters=session_config.get("default_run_parameters"),
         task_parameters=session_config.get("task_parameters"),
+        configuration_mode=session_config.get("configuration_mode"),
         tags=session_config.get("tags"),
         flow_name=session_config.get("flow_name"),
         note=session_config.get("note"),

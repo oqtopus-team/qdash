@@ -3,15 +3,16 @@
 GE and EF refer to the ground-to-first-excited and first-to-second-excited transitions.
 The pipeline runs in this order:
 
-1. GE calibration and filtering (always).
-2. Capture the JAZZ coupling schedule from GE-successful qubits (if JAZZ is enabled).
-3. GE characterization (optional).
-4. EF calibration, filtering, and characterization (optional).
-5. Measure static ZZ and coupling strength using the captured schedule (optional).
+1. Configure all selected MUXes once (always).
+2. GE calibration and filtering (always).
+3. Capture the coupling schedule from GE-successful qubits (if enabled).
+4. GE characterization (optional).
+5. EF calibration, filtering, and characterization (optional).
+6. Coupling characterization with JAZZ using the captured schedule (optional).
 
-Calibration stages stop the affected qubit after the first failed task. Characterization stages
-record each measurement failure and continue with the remaining measurements, while still
-stopping if their configuration task fails.
+The selected MUXes are configured once before calibration. Calibration stages stop the affected
+qubit after the first failed task, while characterization stages record each measurement failure
+and continue with the remaining measurements.
 
 Edit the task lists below to change measurement order, and _build_task_parameters() to tune
 sweeps, shots, pulse durations, and intervals.
@@ -37,6 +38,7 @@ from qdash.workflow.service.calib_service import (
     on_flow_failure,
 )
 from qdash.workflow.service.steps import (
+    ConfigureAll,
     CustomOneQubit,
     CustomTwoQubit,
     FilterByStatus,
@@ -79,7 +81,7 @@ EF_CHARACTERIZATION_TASKS: list[str] = [
     "CheckAdaptiveFHChevron",
 ]
 
-TWO_QUBIT_CHARACTERIZATION_TASKS: list[str] = ["CheckCouplingStrength"]
+COUPLING_CHARACTERIZATION_TASKS: list[str] = ["CheckCouplingStrength"]
 
 SHORT_INTERVAL = 256 * 1024
 STANDARD_INTERVAL = 384 * 1024
@@ -99,9 +101,9 @@ def characterization(
     qids: list[str] | None = None,
     run_ge_characterization: bool = True,
     run_ef_characterization: bool = True,
-    run_jazz: bool = True,
-    max_parallel_ops: int = 10,
-    inverse: bool = False,
+    run_coupling_characterization: bool = True,
+    max_parallel_couplings: int = 10,
+    reverse_coupling_direction: bool = False,
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
@@ -116,16 +118,16 @@ def characterization(
         qids: Individual targets when mux_ids is not supplied.
         run_ge_characterization: Measure GE properties after the required GE calibration.
         run_ef_characterization: Calibrate EF, then characterize EF-successful qubits.
-        run_jazz: Measure static ZZ and coupling strength for GE-successful pairs after the
-            optional EF work. EF failures do not remove pairs.
-        max_parallel_ops: Maximum coupling pairs in each JAZZ schedule group.
-        inverse: Reverse the CR direction used to select JAZZ coupling pairs.
+        run_coupling_characterization: Run JAZZ for GE-successful pairs after optional EF work.
+            Static ZZ is always measured. Coupling strength is calculated when QDash contains
+            calibrated anharmonicities for both qubits. EF failures do not remove scheduled pairs.
+        max_parallel_couplings: Maximum coupling pairs in each schedule group.
+        reverse_coupling_direction: Reverse the CR direction used to select coupling pairs.
         tags: Tags applied to execution history.
         flow_name: Flow name supplied by QDash.
         project_id: Project ID supplied by QDash.
     """
-    # Validate the requested stages and resolve targets.
-    if not any((run_ge_characterization, run_ef_characterization, run_jazz)):
+    if not any((run_ge_characterization, run_ef_characterization, run_coupling_characterization)):
         raise ValueError("at least one characterization stage must be enabled")
 
     targets: Target
@@ -136,62 +138,74 @@ def characterization(
     else:
         raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
-    # EF characterization includes FH Chevron, so its sessions need GE/EF/FH targets.
-    configure_task = "ConfigureEF" if run_ef_characterization else "Configure"
+    enabled_tasks = [*GE_CALIBRATION_TASKS]
+    if run_ge_characterization:
+        enabled_tasks.extend(GE_CHARACTERIZATION_TASKS)
+    if run_ef_characterization:
+        enabled_tasks.extend((*EF_CALIBRATION_TASKS, *EF_CHARACTERIZATION_TASKS))
+    if run_coupling_characterization:
+        enabled_tasks.extend(COUPLING_CHARACTERIZATION_TASKS)
 
-    # 1. GE calibration: retain only qubits whose calibration succeeded.
-    # Every CalibrationStep owns an isolated Qubex session. Keep configuration in each task list
-    # that needs GE/EF/FH targets instead of relying on a previous step's in-memory Experiment.
+    # FH Chevron requires the GE/EF/FH layout. GE and JAZZ remain available in it,
+    # so the full workflow can keep one configuration from start to finish.
+    configuration_mode = "ge-ef-fh" if "CheckAdaptiveFHChevron" in enabled_tasks else "ge-cr-cr"
+
+    # Configure the selected MUXes once; isolated workers inherit the same logical layout.
     steps: list[Step] = [
+        ConfigureAll(),
+        # 2. GE calibration: retain only qubits whose calibration succeeded.
         OneQubitCheck(
             mode="synchronized",
-            tasks=[configure_task, *GE_CALIBRATION_TASKS],
+            tasks=GE_CALIBRATION_TASKS,
         ),
         FilterByStatus(),
     ]
 
-    # 2. Capture JAZZ pairs before any EF filtering changes candidate_qids.
-    if run_jazz:
-        steps.append(GenerateCRSchedule(max_parallel_ops=max_parallel_ops, inverse=inverse))
+    # 3. Capture coupling pairs before any EF filtering changes candidate_qids.
+    if run_coupling_characterization:
+        steps.append(
+            GenerateCRSchedule(
+                max_parallel_ops=max_parallel_couplings,
+                inverse=reverse_coupling_direction,
+            )
+        )
 
-    # 3. GE characterization: continue measurements unless configuration fails.
+    # 4. GE characterization: record failures and continue independent measurements.
     if run_ge_characterization:
         steps.append(
             CustomOneQubit(
                 step_name="ge_characterization",
-                tasks=[configure_task, *GE_CHARACTERIZATION_TASKS],
+                tasks=GE_CHARACTERIZATION_TASKS,
                 mode="synchronized",
                 continue_on_failure=True,
-                stop_on_failure_tasks=(configure_task,),
             )
         )
 
-    # 4. EF calibration gates EF characterization, but leaves the saved JAZZ pairs intact.
+    # 5. EF calibration, filtering, and characterization.
     if run_ef_characterization:
         steps.extend(
             [
                 OneQubitFineTune(
                     mode="synchronized",
-                    tasks=["ConfigureEF", *EF_CALIBRATION_TASKS],
+                    tasks=EF_CALIBRATION_TASKS,
                 ),
                 FilterByStatus(),
                 CustomOneQubit(
                     step_name="ef_characterization",
-                    tasks=["ConfigureEF", *EF_CHARACTERIZATION_TASKS],
+                    tasks=EF_CHARACTERIZATION_TASKS,
                     mode="synchronized",
                     continue_on_failure=True,
-                    stop_on_failure_tasks=("ConfigureEF",),
                 ),
             ]
         )
 
-    # 5. JAZZ consumes the GE schedule, even if no qubits survived EF calibration.
-    if run_jazz:
+    # 6. Coupling characterization using the saved GE schedule.
+    if run_coupling_characterization:
         steps.append(
             CustomTwoQubit(
-                step_name="jazz_characterization",
-                tasks=TWO_QUBIT_CHARACTERIZATION_TASKS,
-                max_parallel_ops=max_parallel_ops,
+                step_name="coupling_characterization",
+                tasks=COUPLING_CHARACTERIZATION_TASKS,
+                max_parallel_ops=max_parallel_couplings,
                 continue_on_failure=True,
             )
         )
@@ -202,7 +216,8 @@ def characterization(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters=_build_task_parameters(),
+        task_parameters=_build_task_parameters(configuration_mode),
+        configuration_mode=configuration_mode,
         default_run_parameters={
             "readout_duration": 1024,
             "interval": STANDARD_INTERVAL,
@@ -211,20 +226,16 @@ def characterization(
     return cal.run(targets, steps=steps)
 
 
-def _build_task_parameters() -> dict[str, dict[str, Any]]:
+def _build_task_parameters(configuration_mode: str) -> dict[str, dict[str, Any]]:
     """Create editable task defaults grouped in pipeline order for each flow run.
 
     Tune sweeps, shots, durations, and intervals for the device under test.
     Time values are in ns and frequency values are in GHz.
     """
     return {
-        # Session configuration
-        "Configure": {
-            "run": {"configuration_mode": "ge-cr-cr"},
-        },
-        "ConfigureEF": {
-            # FH Chevron is part of EF characterization, so the FH layout is required.
-            "run": {"configuration_mode": "ge-ef-fh"},
+        # Push the full selected-MUX layout once before any calibration stage.
+        "ConfigureAll": {
+            "run": {"configuration_mode": configuration_mode},
         },
         # GE calibration
         "CheckRabi": {
@@ -371,7 +382,7 @@ def _build_task_parameters() -> dict[str, dict[str, Any]]:
                 "minimum_peak_background_rms_ratio": 5.0,
             },
         },
-        # JAZZ characterization
+        # Coupling characterization
         "CheckCouplingStrength": {
             "run": {
                 "time_range": sweep.arange(0, 20_001, 400),
