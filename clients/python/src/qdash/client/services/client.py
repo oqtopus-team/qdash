@@ -611,8 +611,10 @@ class QDashClient:
         response = self._request("GET", f"/flows/{name}")
         return self._validate_model_payload(GetFlowResponse, response.data)
 
-    def list_flow_templates(self) -> list[FlowTemplate]:
-        response = self._request("GET", "/flows/templates")
+    def list_flow_templates(self, backend: str | None = None) -> list[FlowTemplate]:
+        """List flow templates, optionally only those written for ``backend``."""
+        params = {"backend": backend} if backend else None
+        response = self._request("GET", "/flows/templates", params=params)
         return self._validate_model_list_payload(FlowTemplate, response.data)
 
     def get_flow_template(self, template_id: str) -> FlowTemplateWithCode:

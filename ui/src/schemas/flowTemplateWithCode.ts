@@ -18,6 +18,8 @@ export interface FlowTemplateWithCode {
   description: string;
   /** Template category */
   category: string;
+  /** Backend the template's tasks run on, e.g. qubex or fake */
+  backend: string;
   /** Python filename */
   filename: string;
   /** Flow function name */

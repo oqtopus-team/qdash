@@ -174,6 +174,7 @@ import type {
   ListExecutionsResponse,
   ListFlowSchedulesParams,
   ListFlowSchedulesResponse,
+  ListFlowTemplatesParams,
   ListFlowsResponse,
   ListForumCategoriesParams,
   ListForumCategoriesResponse,
@@ -3451,14 +3452,15 @@ const listFlows = (
     }
 
 /**
- * List all available flow templates.
+ * List the flow templates, optionally filtered to one backend.
  * @summary List all flow templates
  */
 const listFlowTemplates = (
-
+    params?: ListFlowTemplatesParams,
  options?: SecondParameter<typeof qdashRequest<FlowTemplate[]>>,) => {
       return qdashRequest<FlowTemplate[]>(
-      {url: `/flows/templates`, method: 'GET'
+      {url: `/flows/templates`, method: 'GET',
+        params
     },
       options);
     }

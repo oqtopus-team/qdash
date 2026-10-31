@@ -532,9 +532,9 @@ class FlowService:
             message=f"Agent candidate commit '{commit_id}' queued for backend application",
         )
 
-    async def list_templates(self) -> list[FlowTemplate]:
-        """List the available flow templates."""
-        return self._templates.list_templates()
+    async def list_templates(self, backend: str | None = None) -> list[FlowTemplate]:
+        """List the available flow templates, optionally only those for one backend."""
+        return self._templates.list_templates(backend)
 
     async def get_template(self, template_id: str) -> FlowTemplateWithCode:
         """Return one flow template together with its source."""

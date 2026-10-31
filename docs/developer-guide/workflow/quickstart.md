@@ -10,7 +10,10 @@ To create, save, and run a workflow in the application, see
 
 Copy the closest file under `src/qdash/workflow/templates/` before writing a flow from scratch.
 Templates contain the terminal hooks, target validation, task order, and defaults required by the
-current runtime. Their matching tests under `tests/qdash/workflow/` protect those decisions.
+current runtime. Their matching tests under `tests/qdash/workflow/` protect those decisions. A
+template the editor should offer is registered in `templates/templates.json` with the `backend`
+its tasks run on (`qubex` or `fake`); the API and the **New Flow** page list templates per backend,
+so a hardware template never appears on a fake deployment.
 
 The smallest useful flow has four parts:
 

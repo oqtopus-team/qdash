@@ -336,8 +336,9 @@ export class QDashClient {
     return this.get(`/flows/${pathPart(name)}`);
   }
 
-  async listFlowTemplates(): Promise<FlowTemplate[]> {
-    return this.get("/flows/templates");
+  /** List flow templates, optionally only those written for one backend (e.g. "fake"). */
+  async listFlowTemplates(backend?: string): Promise<FlowTemplate[]> {
+    return this.get("/flows/templates", query({ backend }));
   }
 
   async getFlowTemplate(templateId: string): Promise<FlowTemplateWithCode> {

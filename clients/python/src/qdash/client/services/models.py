@@ -918,6 +918,10 @@ class FlowTemplate(BaseModel):
     """
     Template category
     """
+    backend: Annotated[str, Field(title="Backend")]
+    """
+    Backend the template's tasks run on, e.g. qubex or fake
+    """
     filename: Annotated[str, Field(title="Filename")]
     """
     Python filename
@@ -948,6 +952,10 @@ class FlowTemplateWithCode(BaseModel):
     category: Annotated[str, Field(title="Category")]
     """
     Template category
+    """
+    backend: Annotated[str, Field(title="Backend")]
+    """
+    Backend the template's tasks run on, e.g. qubex or fake
     """
     filename: Annotated[str, Field(title="Filename")]
     """

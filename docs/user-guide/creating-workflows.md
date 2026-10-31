@@ -12,8 +12,10 @@ when you are learning the editor or checking a new task sequence without laborat
    per creator, with the subfolders set by each workflow's **Folder** property inside. Your own
    folder comes first and starts open; select another creator's folder header to open it.
 2. Select **New Flow**.
-3. Under **TEMPLATE**, select the workflow closest to the procedure you need. **Simple
-   Calibration** is the smallest general-purpose starting point.
+3. Under **TEMPLATE**, confirm the backend; the configured default backend is preselected, and
+   the list holds only the templates written for it, so a Fake backend never offers hardware
+   templates. Then select the workflow closest to the procedure you need. **Simple Calibration**
+   is the smallest general-purpose starting point on the qubex backend.
 4. Under **PROPERTIES**, enter a unique **Flow Name** using letters, numbers, and underscores.
 5. Confirm **Entrypoint Function**, **Username**, and **Chip ID**. The entrypoint must match the
    function marked as the flow in the source.
