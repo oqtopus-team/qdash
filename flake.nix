@@ -3,6 +3,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    # Pinned so the Nix shell runs the same betterleaks release as
+    # .devcontainer/Dockerfile (BETTERLEAKS_VERSION); newer releases add rules
+    # that flag the repository's fixed sample credentials.
+    nixpkgs-betterleaks.url = "github:NixOS/nixpkgs/f3a6890d30cfd033e21cc4714461c5fd327eb9ea";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -10,6 +14,7 @@
     {
       self,
       nixpkgs,
+      nixpkgs-betterleaks,
       flake-utils,
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -18,6 +23,7 @@
         pkgs = import nixpkgs {
           inherit system;
         };
+        betterleaks = nixpkgs-betterleaks.legacyPackages.${system}.betterleaks;
 
         runtimeLibs = with pkgs; [
           cairo
@@ -33,7 +39,6 @@
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             bashInteractive
-            betterleaks
             bun
             curl
             docker-client
@@ -52,7 +57,8 @@
             python311
             trufflehog
             uv
-          ];
+          ]
+          ++ [ betterleaks ];
 
           env = {
             UV_LINK_MODE = "copy";
