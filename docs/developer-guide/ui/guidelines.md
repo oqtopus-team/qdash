@@ -156,7 +156,9 @@ Every Plotly chart renders through `Plot` in `ui/src/components/charts/Plot.tsx`
 `themedLayout` from `ui/src/lib/chartTheme.ts` under the caller's layout: transparent backgrounds,
 a hairline grid, muted ticks and legend, the interface font and a shared `colorway`. A chart file
 therefore sets only what is specific to it (titles, ranges, margins, axis types) and never
-`plot_bgcolor`, `paper_bgcolor`, `gridcolor` or legend backgrounds.
+`plot_bgcolor`, `paper_bgcolor`, `gridcolor` or legend backgrounds. A fetched figure that paints
+its own `paper_bgcolor` keeps its own text, grid and series colors, because the theme cannot know
+which text reads on that background; it receives only the font family.
 
 Series colors come from `chartTheme(useIsDarkTheme())`: `accent` for the one series that matters,
 `secondary` for a right-hand axis, `seriesColor(theme, i)` for the i-th of several, and `pass` /

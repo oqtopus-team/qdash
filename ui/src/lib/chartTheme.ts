@@ -76,26 +76,43 @@ export function seriesColor(theme: ChartTheme, index: number): string {
 
 type AxisLayout = Partial<Layout["xaxis"]>;
 
+/** True for an unset, `transparent` or zero-alpha `rgba()` color. */
+function isTransparent(color: unknown): boolean {
+  if (color === undefined || color === null) return true;
+  const value = String(color).trim().toLowerCase();
+  return value === "transparent" || /^rgba\(.*,\s*0(?:\.0+)?\s*\)$/.test(value);
+}
+
 function themedAxis(axis: AxisLayout | undefined, t: ChartTheme): AxisLayout {
+  const title = axis?.title;
   return {
     gridcolor: t.grid,
     zerolinecolor: t.grid,
     linecolor: t.grid,
     tickfont: { color: t.muted, ...(axis?.tickfont ?? {}) },
     ...axis,
+    // A fetched figure may carry `title: null`, and `typeof null === "object"`.
     title:
-      typeof axis?.title === "object"
-        ? { ...axis.title, font: { color: t.muted, ...(axis.title.font ?? {}) } }
-        : axis?.title,
+      title !== null && typeof title === "object"
+        ? { ...title, font: { color: t.muted, ...(title.font ?? {}) } }
+        : title,
   };
 }
 
 /**
  * Fill in the chart chrome a caller did not set: transparent backgrounds, hairline grid, muted
  * ticks and legend, the interface font and the shared colorway. Caller values always win.
+ *
+ * A figure that paints its own `paper_bgcolor` keeps its own text, grid and series colors: the
+ * theme cannot tell which text color reads on that background, so it only supplies the font
+ * family.
  */
 export function themedLayout(layout: Partial<Layout> | undefined, t: ChartTheme): Partial<Layout> {
   const l = layout ?? {};
+  const hoverlabel = { font: { family: sansFontFamily }, ...(l.hoverlabel ?? {}) };
+  if (!isTransparent(l.paper_bgcolor)) {
+    return { ...l, font: { family: sansFontFamily, ...(l.font ?? {}) }, hoverlabel };
+  }
   const axes: Partial<Layout> = {};
   for (const key of Object.keys(l) as (keyof Layout)[]) {
     if (/^[xy]axis\d*$/.test(key)) {
@@ -117,6 +134,6 @@ export function themedLayout(layout: Partial<Layout> | undefined, t: ChartTheme)
       font: { color: t.muted },
       ...(l.legend ?? {}),
     },
-    hoverlabel: { font: { family: sansFontFamily }, ...(l.hoverlabel ?? {}) },
+    hoverlabel,
   };
 }

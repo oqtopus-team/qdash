@@ -23,7 +23,7 @@ import { useTimeRange } from "@/hooks/useTimeRange";
 import { useAnalysisUrlState } from "@/hooks/useUrlState";
 import { formatDateTime } from "@/lib/utils/datetime";
 import { useIsDarkTheme } from "@/contexts/ThemeContext";
-import { chartTheme } from "@/lib/chartTheme";
+import { chartTheme, seriesColor } from "@/lib/chartTheme";
 
 interface TimeSeriesDataPoint {
   calibrated_at: string;
@@ -237,6 +237,17 @@ export function TimeSeriesView() {
   );
 
   // Process primary data
+  // One color per QID across both axes, so a qubit keeps its color when a second metric is
+  // plotted; the dashed line and diamond markers tell the axes apart.
+  const qidColors = useMemo<Record<string, string>>(() => {
+    const qids = new Set<string>();
+    for (const response of [timeseriesResponse, secondaryTimeseriesResponse]) {
+      for (const qid of Object.keys(response?.data?.data ?? {})) qids.add(qid);
+    }
+    const sortedQids = [...qids].sort((a, b) => parseInt(a) - parseInt(b));
+    return Object.fromEntries(sortedQids.map((qid, index) => [qid, seriesColor(palette, index)]));
+  }, [palette, timeseriesResponse, secondaryTimeseriesResponse]);
+
   const { tableData, primaryTraces, metadata } = useMemo(() => {
     if (!timeseriesResponse?.data?.data) {
       return {
@@ -300,13 +311,14 @@ export function TimeSeriesView() {
         type: "data" as const,
         array: qidData[qid].error as Plotly.Datum[],
         visible: true,
+        color: qidColors[qid],
       },
       type: "scatter" as const,
       mode: "lines+markers" as const,
       name: `${currentMetricConfig?.title || selectedParameter} Q${qid}`,
       yaxis: "y",
-      line: { shape: "linear" as const, width: 2 },
-      marker: { size: 8, symbol: "circle" },
+      line: { shape: "linear" as const, width: 2, color: qidColors[qid] },
+      marker: { size: 8, symbol: "circle", color: qidColors[qid] },
       hovertemplate:
         `<b>${currentMetricConfig?.title || selectedParameter}</b><br>` +
         "Time: %{x}<br>Value: %{y:.6g}" +
@@ -332,7 +344,7 @@ export function TimeSeriesView() {
       primaryTraces: traces,
       metadata: metaInfo,
     };
-  }, [timeseriesResponse, selectedParameter, currentMetricConfig]);
+  }, [timeseriesResponse, selectedParameter, currentMetricConfig, qidColors]);
 
   // Process secondary data
   const { secondaryTableData, secondaryTraces, secondaryMetadata } = useMemo(() => {
@@ -391,14 +403,14 @@ export function TimeSeriesView() {
 
     // Sort QIDs numerically and create traces for secondary axis
     const sortedQids = Object.keys(qidData).sort((a, b) => parseInt(a) - parseInt(b));
-    const traces = sortedQids.map((qid, index) => ({
+    const traces = sortedQids.map((qid) => ({
       x: qidData[qid].x,
       y: qidData[qid].y,
       error_y: {
         type: "data" as const,
         array: qidData[qid].error as Plotly.Datum[],
         visible: true,
-        color: palette.series[1 + (index % (palette.series.length - 1))],
+        color: qidColors[qid],
       },
       type: "scatter" as const,
       mode: "lines+markers" as const,
@@ -408,12 +420,12 @@ export function TimeSeriesView() {
         shape: "linear" as const,
         width: 2,
         dash: "dash" as const,
-        color: palette.series[1 + (index % (palette.series.length - 1))],
+        color: qidColors[qid],
       },
       marker: {
         size: 8,
         symbol: "diamond",
-        color: palette.series[1 + (index % (palette.series.length - 1))],
+        color: qidColors[qid],
       },
       hovertemplate:
         `<b>${secondaryMetricConfig?.title || secondaryParameter}</b><br>` +
@@ -440,7 +452,7 @@ export function TimeSeriesView() {
       secondaryTraces: traces,
       secondaryMetadata: metaInfo,
     };
-  }, [palette, secondaryTimeseriesResponse, secondaryParameter, secondaryMetricConfig]);
+  }, [qidColors, secondaryTimeseriesResponse, secondaryParameter, secondaryMetricConfig]);
 
   // Combined plot data
   const plotData = useMemo(() => {
