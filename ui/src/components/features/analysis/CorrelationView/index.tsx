@@ -374,21 +374,17 @@ export function CorrelationView() {
       },
       xaxis: {
         title: { text: `${xMetricConfig?.title || xParameter} (${xUnit})` },
-        gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
       },
       yaxis: {
         title: { text: `${yMetricConfig?.title || yParameter} (${yUnit})` },
-        gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
       },
       hovermode: "closest" as const,
       showlegend: false,
       margin: { t: 60, r: 50, b: 100, l: 80 },
-      plot_bgcolor: "#ffffff",
-      paper_bgcolor: "#ffffff",
       annotations: [
         {
           text: statistics
@@ -404,10 +400,7 @@ export function CorrelationView() {
           y: 0.98,
           xanchor: "left" as const,
           yanchor: "top" as const,
-          font: { size: 11, color: "#666" },
-          bgcolor: "rgba(255, 255, 255, 0.8)",
-          bordercolor: "#e5e7eb",
-          borderwidth: 1,
+          font: { size: 11 },
         },
       ],
     };

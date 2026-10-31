@@ -22,14 +22,8 @@ import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTimeRange } from "@/hooks/useTimeRange";
 import { useAnalysisUrlState } from "@/hooks/useUrlState";
 import { formatDateTime } from "@/lib/utils/datetime";
-
-// Color palette for secondary axis traces
-const SECONDARY_AXIS_COLORS = [
-  "#e377c2", // pink
-  "#7f7f7f", // gray
-  "#bcbd22", // olive
-  "#17becf", // cyan
-];
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
+import { chartTheme } from "@/lib/chartTheme";
 
 interface TimeSeriesDataPoint {
   calibrated_at: string;
@@ -49,6 +43,8 @@ interface TimeSeriesTableRow {
 }
 
 export function TimeSeriesView() {
+  const isDark = useIsDarkTheme();
+  const palette = chartTheme(isDark);
   // URL state management
   const {
     selectedChip,
@@ -402,7 +398,7 @@ export function TimeSeriesView() {
         type: "data" as const,
         array: qidData[qid].error as Plotly.Datum[],
         visible: true,
-        color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
+        color: palette.series[1 + (index % (palette.series.length - 1))],
       },
       type: "scatter" as const,
       mode: "lines+markers" as const,
@@ -412,12 +408,12 @@ export function TimeSeriesView() {
         shape: "linear" as const,
         width: 2,
         dash: "dash" as const,
-        color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
+        color: palette.series[1 + (index % (palette.series.length - 1))],
       },
       marker: {
         size: 8,
         symbol: "diamond",
-        color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
+        color: palette.series[1 + (index % (palette.series.length - 1))],
       },
       hovertemplate:
         `<b>${secondaryMetricConfig?.title || secondaryParameter}</b><br>` +
@@ -444,7 +440,7 @@ export function TimeSeriesView() {
       secondaryTraces: traces,
       secondaryMetadata: metaInfo,
     };
-  }, [secondaryTimeseriesResponse, secondaryParameter, secondaryMetricConfig]);
+  }, [palette, secondaryTimeseriesResponse, secondaryParameter, secondaryMetricConfig]);
 
   // Combined plot data
   const plotData = useMemo(() => {
@@ -476,20 +472,18 @@ export function TimeSeriesView() {
         title: { text: "Time (JST)" },
         type: "date",
         tickformat: "%Y-%m-%d %H:%M",
-        gridcolor: "#eee",
         zeroline: false,
         domain: showSecondaryAxis ? [0, 0.92] : [0, 1],
       },
       yaxis: {
         type: "linear",
-        gridcolor: "#eee",
         zeroline: false,
         exponentformat: "e" as const,
         title: {
           text: `${currentMetricConfig?.title || metadata.description} [${currentMetricConfig?.unit || metadata.unit}]`,
-          font: { color: "#1f77b4" },
+          font: { color: palette.accent },
         },
-        tickfont: { color: "#1f77b4" },
+        tickfont: { color: palette.accent },
       },
       showlegend: true,
       legend: {
@@ -497,12 +491,9 @@ export function TimeSeriesView() {
         y: 1,
         xanchor: "left",
         yanchor: "top",
-        bgcolor: "rgba(255, 255, 255, 0.8)",
       },
       autosize: true,
       margin: { l: 80, r: showSecondaryAxis ? 180 : 150, t: 100, b: 80 },
-      plot_bgcolor: "white",
-      paper_bgcolor: "white",
       hovermode: "closest",
     };
 
@@ -512,19 +503,19 @@ export function TimeSeriesView() {
         type: "linear",
         overlaying: "y",
         side: "right",
-        gridcolor: "rgba(227, 119, 194, 0.2)",
         zeroline: false,
         exponentformat: "e" as const,
         title: {
           text: `${secondaryMetricConfig?.title || secondaryMetadata.description} [${secondaryMetricConfig?.unit || secondaryMetadata.unit}]`,
-          font: { color: "#e377c2" },
+          font: { color: palette.secondary },
         },
-        tickfont: { color: "#e377c2" },
+        tickfont: { color: palette.secondary },
       };
     }
 
     return baseLayout;
   }, [
+    palette,
     selectedParameter,
     secondaryParameter,
     metadata,
@@ -730,7 +721,7 @@ export function TimeSeriesView() {
                     minHeight: "38px",
                     height: "auto",
                     borderRadius: "0.5rem",
-                    borderColor: "#1f77b4",
+                    borderColor: palette.accent,
                     borderWidth: "2px",
                   }),
                   valueContainer: (base) => ({
@@ -764,7 +755,7 @@ export function TimeSeriesView() {
             <div className="space-y-1">
               <label className="text-sm font-medium text-base-content/70">
                 Secondary Parameter
-                <span className="ml-1 text-xs" style={{ color: "#e377c2" }}>
+                <span className="ml-1 text-xs" style={{ color: palette.secondary }}>
                   (Right Y)
                 </span>
               </label>
@@ -787,7 +778,7 @@ export function TimeSeriesView() {
                       height: "auto",
                       borderRadius: "0.5rem",
                       borderStyle: "dashed",
-                      borderColor: "#e377c2",
+                      borderColor: palette.secondary,
                     }),
                     valueContainer: (base) => ({
                       ...base,
@@ -799,7 +790,7 @@ export function TimeSeriesView() {
                     }),
                     placeholder: (base) => ({
                       ...base,
-                      color: "#e377c2",
+                      color: palette.secondary,
                     }),
                   }}
                 />
@@ -828,7 +819,7 @@ export function TimeSeriesView() {
                         minHeight: "38px",
                         height: "auto",
                         borderRadius: "0.5rem",
-                        borderColor: "#e377c2",
+                        borderColor: palette.secondary,
                         borderWidth: "2px",
                       }),
                       valueContainer: (base) => ({
@@ -871,7 +862,7 @@ export function TimeSeriesView() {
                 <div className="text-xs text-base-content/60 flex items-center gap-2">
                   <span
                     className="inline-block w-6 border-t-2 border-dashed"
-                    style={{ borderColor: "#e377c2" }}
+                    style={{ borderColor: palette.secondary }}
                   ></span>
                   <span>Dashed lines & diamond markers</span>
                 </div>
