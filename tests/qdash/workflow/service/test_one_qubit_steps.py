@@ -93,6 +93,139 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
     assert calls[0].stop_on_failure_tasks == ("Configure",)
 
 
+def test_custom_one_qubit_merges_step_task_parameters_over_service_settings(monkeypatch) -> None:
+    from qdash.workflow import sweep
+    from qdash.workflow.engine.task_parameters import normalize_task_parameters
+    from qdash.workflow.service.steps.pipeline import StepContext
+    from qdash.workflow.service.targets import QubitTargets
+
+    calls = []
+
+    class FakeStrategy:
+        def execute(self, service, config):
+            calls.append(config)
+            return {"scheduled": {"1": {"status": "success"}}}
+
+    monkeypatch.setattr(
+        "qdash.workflow.service.strategy.get_one_qubit_strategy",
+        lambda mode: FakeStrategy(),
+    )
+
+    service = SimpleNamespace(
+        username="alice",
+        chip_id="64Qv3",
+        backend_name="qubex",
+        project_id="project-1",
+        default_run_parameters={},
+        task_parameters=normalize_task_parameters(
+            {
+                "CheckRamsey": {"run": {"detuning": 0.001, "shots": 256}},
+                "CheckT1": {"run": {"shots": 512}},
+            }
+        ),
+        tags=[],
+        flow_name="coherence_check",
+        note={},
+    )
+    step = CustomOneQubit(
+        step_name="long_ramsey_check",
+        tasks=["CheckRamsey"],
+        task_parameters={
+            "CheckRamsey": {
+                "run": {
+                    "time_range": sweep.arange(0, 50_001, 500),
+                    "detuning": 0.0002,
+                }
+            }
+        },
+    )
+
+    step.execute(cast("CalibService", service), QubitTargets(["1"]), StepContext())
+
+    assert len(calls) == 1
+    assert calls[0].task_parameters == normalize_task_parameters(
+        {
+            "CheckRamsey": {
+                "run": {
+                    "time_range": sweep.arange(0, 50_001, 500),
+                    "detuning": 0.0002,
+                    "shots": 256,
+                }
+            },
+            "CheckT1": {"run": {"shots": 512}},
+        }
+    )
+
+
+def test_custom_one_qubit_rejects_step_settings_for_tasks_it_does_not_run() -> None:
+    service = cast(
+        "CalibService",
+        SimpleNamespace(backend_name="qubex", task_parameters={}),
+    )
+    step = CustomOneQubit(
+        tasks=["CheckRamsey"],
+        task_parameters={"CheckT1": {"run": {"shots": 256}}},
+    )
+
+    with pytest.raises(ValueError, match="names tasks not run by the step: 'CheckT1'"):
+        step._merged_task_parameters(service)
+
+
+def test_serial_strategy_passes_step_task_parameters_as_call_overrides(monkeypatch) -> None:
+    from unittest.mock import MagicMock
+
+    from qdash.workflow.engine.task_parameters import normalize_task_parameters
+    from qdash.workflow.service.strategy import OneQubitConfig, OneQubitSerialStrategy
+
+    class FakeScheduler:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def generate_from_mux(self, **kwargs):
+            return SimpleNamespace(
+                stages=[SimpleNamespace(parallel_groups=[["0"]])],
+            )
+
+    calls = []
+
+    def calibrate_mux_qubits(**kwargs):
+        calls.append(kwargs)
+        return {"0": {"status": "success"}}
+
+    monkeypatch.setattr(
+        "qdash.workflow.service.strategy.OneQubitScheduler",
+        FakeScheduler,
+    )
+    monkeypatch.setattr(
+        "qdash.workflow.service.strategy._calibrate_mux_qubits",
+        calibrate_mux_qubits,
+    )
+    settings = normalize_task_parameters({"CheckRamsey": {"run": {"detuning": 0.0002}}})
+    service = cast(
+        "CalibService",
+        SimpleNamespace(chip_id="64Q", record_stage_result=MagicMock()),
+    )
+    config = OneQubitConfig(
+        mux_ids=[0],
+        exclude_qids=[],
+        tasks=["CheckRamsey"],
+        flow_name="long_ramsey_check",
+        project_id="project-1",
+        task_parameters=settings,
+    )
+
+    result = OneQubitSerialStrategy().execute(service, config)
+
+    assert result == {"serial": {"0": {"status": "success"}}}
+    assert calls == [
+        {
+            "qids": ["0"],
+            "tasks": ["CheckRamsey"],
+            "task_parameters": settings,
+        }
+    ]
+
+
 def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> None:
     from qdash.workflow.service.steps.one_qubit import OneQubitCheck
     from qdash.workflow.service.steps.pipeline import StepContext
