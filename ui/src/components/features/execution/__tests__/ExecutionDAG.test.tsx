@@ -202,19 +202,38 @@ describe("ExecutionDAG node interaction", () => {
   it("gives the canvas up to the preview and re-fits the graph afterwards", async () => {
     render(<ExecutionDAG tasks={tasks} />);
     const canvas = screen.getByTestId("execution-flow-canvas");
-    expect(canvas).not.toHaveClass("lg:mr-[calc(40vw-2rem)]");
+    expect(canvas).not.toHaveClass("lg:mr-[calc(40vw-2.5rem)]");
     const fitCallsBefore = mocks.fitView.mock.calls.length;
 
     fireEvent.click(screen.getByTestId("node-task-1"));
 
-    expect(canvas).toHaveClass("lg:mr-[calc(40vw-2rem)]");
+    expect(canvas).toHaveClass("lg:mr-[calc(40vw-2.5rem)]");
     await waitFor(() =>
       expect(mocks.fitView).toHaveBeenCalledWith(expect.objectContaining({ duration: 300 })),
     );
     expect(mocks.fitView.mock.calls.length).toBeGreaterThan(fitCallsBefore);
 
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(canvas).not.toHaveClass("lg:mr-[calc(40vw-2rem)]");
+    expect(canvas).not.toHaveClass("lg:mr-[calc(40vw-2.5rem)]");
+  });
+
+  it("lets Escape close the preview before it exits fullscreen", () => {
+    const { container } = render(<ExecutionDAG tasks={tasks} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Fullscreen" }));
+    fireEvent.click(screen.getByTestId("node-task-1"));
+    const canvas = screen.getByTestId("execution-flow-canvas");
+    expect(container.firstChild).toHaveClass("fixed");
+    expect(canvas).toHaveClass("lg:mr-[calc(40vw-1rem)]");
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByText("CheckT1")).toBeNull();
+    expect(container.firstChild).toHaveClass("fixed");
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(container.firstChild).not.toHaveClass("fixed");
   });
 
   it("marks the selected node and closes the preview on Escape", () => {

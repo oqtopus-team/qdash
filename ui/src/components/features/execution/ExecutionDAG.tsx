@@ -331,7 +331,13 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
           <div
             data-testid="execution-flow-canvas"
             className={`relative h-full transition-[margin] duration-300 ${
-              selectedTaskId ? "lg:mr-[calc(40vw-2rem)]" : ""
+              // The sidebar is 40vw wide; subtract what already separates the canvas from the
+              // viewport edge (card and page padding, or the fullscreen panel padding).
+              selectedTaskId
+                ? isFullscreen
+                  ? "lg:mr-[calc(40vw-1rem)]"
+                  : "lg:mr-[calc(40vw-2.5rem)]"
+                : ""
             }`}
           >
             <FlowContent

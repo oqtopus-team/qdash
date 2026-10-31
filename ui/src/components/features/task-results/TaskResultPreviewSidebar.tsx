@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
-
 import { ExternalLink, X, XCircle } from "lucide-react";
 
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
@@ -11,6 +9,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { QubitTile } from "@/components/ui/QubitTile";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
+import { useEscapeLayer } from "@/hooks/useFullscreenPanel";
 import { formatDateTime } from "@/lib/utils/datetime";
 import { getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
 
@@ -171,14 +170,8 @@ export function TaskResultPreviewSidebar({
   const jsonFigures =
     taskResult && Array.isArray(taskResult.json_figure_path) ? taskResult.json_figure_path : [];
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [isOpen, onClose]);
+  // Escape closes the preview first, then any fullscreen panel it was opened over.
+  useEscapeLayer(isOpen, onClose);
 
   return (
     <div
