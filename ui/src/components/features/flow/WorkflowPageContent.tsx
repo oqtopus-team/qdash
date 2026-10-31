@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Tags, Users, Workflow } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { listFlows } from "@/client/flow/flow";
 import { FlowFolderSection } from "@/components/features/flow/FlowFolderTree";
@@ -43,8 +43,8 @@ export function WorkflowPageContent() {
   return (
     <PageContainer maxWidth>
       <PageHeader
-        title="Project Workflows"
-        description="Create, run, and schedule workflow definitions shared by this project."
+        title="Workflow"
+        description="Flow definitions shared by this project"
         actions={
           <Link href="/workflow/new" className="btn btn-primary">
             <Plus size={20} />
@@ -56,25 +56,16 @@ export function WorkflowPageContent() {
       {flows.length > 0 && (
         <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
           <div className="stat bg-base-200 rounded-box p-4">
-            <div className="stat-figure text-primary">
-              <Workflow className="h-6 w-6 sm:h-8 sm:w-8" />
-            </div>
             <div className="stat-title text-sm">Workflows</div>
             <div className="stat-value">{flows.length}</div>
             <div className="stat-desc text-xs">Defined for this project</div>
           </div>
           <div className="stat bg-base-200 rounded-box p-4">
-            <div className="stat-figure text-secondary">
-              <Users className="h-6 w-6 sm:h-8 sm:w-8" />
-            </div>
             <div className="stat-title text-sm">Creators</div>
             <div className="stat-value">{folders.length}</div>
             <div className="stat-desc text-xs">Distinct authors</div>
           </div>
           <div className="stat bg-base-200 rounded-box p-4">
-            <div className="stat-figure text-accent">
-              <Tags className="h-6 w-6 sm:h-8 sm:w-8" />
-            </div>
             <div className="stat-title text-sm">Tags</div>
             <div className="stat-value">{tagCount}</div>
             <div className="stat-desc text-xs">Unique labels in use</div>

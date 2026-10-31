@@ -75,9 +75,7 @@ function SidebarLogo({ size, onClick }: { size: "sm" | "lg"; onClick: () => void
 function SectionHeader({ label, visible }: { label: string; visible: boolean }) {
   if (!visible) return null;
   return (
-    <li className="menu-title px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-base-content/50">
-      {label}
-    </li>
+    <li className="menu-title px-3 pb-2 pt-5 text-xs font-medium text-base-content/50">{label}</li>
   );
 }
 
@@ -358,7 +356,7 @@ export function Sidebar() {
 
   // Mobile sidebar style
   const linkClass = (active: boolean) =>
-    `relative min-h-10 px-3 mx-1 my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
+    `relative min-h-9 px-3 mx-1 my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
       active ? "text-primary" : "text-base-content/75 hover:bg-base-300 hover:text-base-content"
     }`;
 
@@ -568,7 +566,7 @@ export function Sidebar() {
       {/* Desktop Sidebar */}
       <aside
         aria-label="Primary navigation"
-        className={`hidden h-full border-r border-base-300 bg-base-200 transition-all duration-300 lg:flex lg:flex-col ${
+        className={`hidden h-full border-r border-base-300 bg-base-200 transition-colors duration-300 lg:flex lg:flex-col ${
           isOpen ? "w-48" : "w-16"
         }`}
       >

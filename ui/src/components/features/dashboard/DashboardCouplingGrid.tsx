@@ -268,11 +268,11 @@ export function DashboardCouplingGrid({
                 });
               }}
               onMouseLeave={() => setHover(null)}
-              className={`absolute flex items-center justify-center transition-all ${
+              className={`absolute flex items-center justify-center transition-colors ${
                 isSummaryPresentation
                   ? "rounded-full"
                   : "rounded-md shadow-sm flex-col -translate-x-1/2 -translate-y-1/2"
-              } ${onCouplingClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60 hover:scale-105" : ""} ${
+              } ${onCouplingClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""} ${
                 isSummaryPresentation ? `border ${summaryChipClass}` : !bg ? "bg-base-300/60" : ""
               }`}
               style={{

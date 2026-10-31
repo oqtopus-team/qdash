@@ -4,7 +4,6 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { useGetCopilotPreferences } from "@/client/copilot/copilot";
 import { ArrowDown, FlaskConical } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
-import { useAuth } from "@/contexts/AuthContext";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
 import { useCopilotChat } from "@/hooks/useCopilotChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
@@ -56,13 +55,6 @@ function ScrollToBottomButton() {
   );
 }
 
-function greetingFor(hour: number): string {
-  if (hour < 5) return "Working late";
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
-
 function EmptyState({
   variant,
   context,
@@ -74,13 +66,11 @@ function EmptyState({
   suggestions: ChatSuggestion[];
   onPick: (text: string) => void;
 }) {
-  const { user, username } = useAuth();
   const large = variant === "page";
-  const name = user?.display_name || username;
   const title = context
     ? "Ask about this result"
     : large
-      ? `${greetingFor(new Date().getHours())}${name ? `, ${name}` : ""}`
+      ? "Ask about calibration data"
       : "Ask anything about calibration";
 
   if (large) {
@@ -243,7 +233,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       onStop={stop}
       isStreaming={isStreaming}
       disabled={isLoadingMessages}
-      placeholder={context ? "Ask about this result..." : "Ask about calibration data..."}
+      placeholder={context ? "Ask about this result" : "Ask a question"}
       attachments={attachments}
       onAttach={attach}
       onRemoveAttachment={remove}

@@ -64,7 +64,7 @@ export function FigureStrip({
             type="button"
             onClick={() => setPreview(figureUrl(path))}
             title={figureLabel(path)}
-            className="shrink-0 overflow-hidden rounded-lg border border-base-300 bg-base-200 transition-all hover:border-primary/50 hover:shadow-md"
+            className="shrink-0 overflow-hidden rounded-lg border border-base-300 bg-base-200 transition-colors hover:border-primary/50 hover:shadow-md"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- API-served calibration figure */}
             <img

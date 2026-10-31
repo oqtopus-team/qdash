@@ -120,7 +120,7 @@ const TopologyCell = memo(function TopologyCell({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(event) => handleActivationKey(event, onClick)}
-      className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${muxBgClass}`}
+      className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 relative w-full ${muxBgClass}`}
     >
       {figurePath && (
         <div className="absolute inset-1">
@@ -200,7 +200,7 @@ const CouplingMarker = memo(function CouplingMarker({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(event) => handleActivationKey(event, onClick)}
-      className="absolute z-20 rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2"
+      className="absolute z-20 rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-transform duration-200 hover:shadow-xl hover:border-primary/40 -translate-x-1/2 -translate-y-1/2"
       style={{
         left,
         top,

@@ -76,7 +76,7 @@ export function CodeBlock({
     >
       {/* Header bar */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-base-300/30 text-xs border-b border-base-300/50">
-        <span className="font-mono text-base-content/50 text-xs tracking-wide">
+        <span className="font-mono text-base-content/50 text-xs">
           {title ? (
             <>
               <span className="text-base-content/70">{title}</span>

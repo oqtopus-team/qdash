@@ -37,7 +37,7 @@ import {
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <div className="text-xs uppercase text-base-content/50">{label}</div>
+      <div className="text-xs text-base-content/50">{label}</div>
       <div className="mt-1 text-sm">{value}</div>
     </div>
   );
@@ -286,7 +286,7 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
         </div>
         {run.knowledge_draft_id && (
           <div className="mt-3 text-sm" data-testid="run-knowledge">
-            <span className="text-xs uppercase text-base-content/50">Knowledge</span>
+            <span className="text-xs text-base-content/50">Knowledge</span>
             <p className="mt-1 flex flex-wrap items-center gap-2 text-base-content/80">
               {knowledgeLabel(run)}
               <span className="font-mono text-xs text-base-content/50">
@@ -304,7 +304,7 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
         )}
         {run.question && (
           <div className="mt-3 text-sm">
-            <span className="text-xs uppercase text-base-content/50">Question</span>
+            <span className="text-xs text-base-content/50">Question</span>
             <p className="mt-1 text-base-content/80">{run.question}</p>
           </div>
         )}

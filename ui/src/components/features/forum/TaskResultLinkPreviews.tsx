@@ -91,9 +91,7 @@ export function TaskResultLinkPreviews({
 
   return (
     <div className={className}>
-      <div className="text-xs font-medium uppercase tracking-wide text-base-content/45">
-        {heading}
-      </div>
+      <div className="text-xs font-medium text-base-content/45">{heading}</div>
       {taskIds.map((taskId) => (
         <TaskResultLinkPreview key={taskId} taskId={taskId} />
       ))}

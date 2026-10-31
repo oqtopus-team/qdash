@@ -385,7 +385,7 @@ export function EvaluationCard({
                 if (!text) return null;
                 return (
                   <div key={key}>
-                    <div className="text-xs uppercase text-base-content/50">{label}</div>
+                    <div className="text-xs text-base-content/50">{label}</div>
                     <p className="mt-1 whitespace-pre-wrap text-base-content/80">{text}</p>
                   </div>
                 );
@@ -395,7 +395,7 @@ export function EvaluationCard({
 
           {item.status === "completed" && output?.raw && (!diagnosis || !output.complete) && (
             <div>
-              <div className="text-xs uppercase text-base-content/50">
+              <div className="text-xs text-base-content/50">
                 {diagnosis ? "Answer as returned" : "Answer (not JSON)"}
               </div>
               <p className="mt-1 whitespace-pre-wrap text-sm text-base-content/80">{output.raw}</p>
@@ -413,7 +413,7 @@ export function EvaluationCard({
               <div className="mt-2 space-y-3 rounded-lg border border-base-300 bg-base-200/40 p-3">
                 {answers.map(([key, text]) => (
                   <div key={key}>
-                    <div className="text-xs uppercase text-base-content/50">
+                    <div className="text-xs text-base-content/50">
                       {questionLabel(key)}
                       <span className="ml-2 font-mono normal-case text-base-content/40">{key}</span>
                     </div>

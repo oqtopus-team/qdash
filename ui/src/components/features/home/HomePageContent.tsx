@@ -107,7 +107,7 @@ function QuickActions({ canEdit }: QuickActionsProps) {
             className="card card-interactive border border-base-300 bg-base-100 shadow-sm"
           >
             <div className="card-body flex-row items-center gap-3 p-4">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-200 text-base-content/70">
                 <Icon className="h-5 w-5" />
               </span>
               <span className="min-w-0">
@@ -230,7 +230,7 @@ export function HomePageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Home"
-        description="Start work and review what needs your attention"
+        description="What is running and what needs attention"
         actions={
           showHeaderTour && (
             <Link href="/chip?tutorial=create-chip" className="btn btn-ghost btn-sm gap-2">
@@ -245,7 +245,7 @@ export function HomePageContent() {
         {showGettingStarted && (
           <section className="flex flex-col gap-4 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-200 text-base-content/70">
                 <Cpu size={20} />
               </span>
               <div>
@@ -345,7 +345,7 @@ export function HomePageContent() {
                         href={`/task-results/${encodeURIComponent(result.task_id)}`}
                         className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:text-error"
                       >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-error/10 text-error">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-base-200 text-error">
                           <AlertCircle className="h-5 w-5" />
                         </span>
                         <span className="min-w-0 flex-1">

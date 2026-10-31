@@ -112,9 +112,7 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
           </>
         ) : mode === "view" ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-base-content/60">
-              Add cooldown context, handoff details, or observations for your team.
-            </p>
+            <p className="text-sm text-base-content/60">Add a note for your team</p>
             <button
               className="btn btn-sm btn-outline shrink-0 gap-1.5"
               onClick={() => setMode("edit")}

@@ -74,9 +74,7 @@ export function CooldownWiringSection({
   return (
     <div className="text-xs">
       <div className="flex items-center justify-between mb-1 min-h-[1.25rem]">
-        <span className="text-base-content/60 font-medium uppercase tracking-wide">
-          Wiring info
-        </span>
+        <span className="text-base-content/60 font-medium">Wiring info</span>
         <SaveStatus state={auto.state} savedAt={auto.savedAt} />
       </div>
 

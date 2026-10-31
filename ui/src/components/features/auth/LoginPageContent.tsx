@@ -63,7 +63,8 @@ export function LoginPageContent() {
           </div>
 
           <p className="mx-auto mt-5 max-w-lg text-sm leading-relaxed text-base-content/70 lg:mx-0">
-            Manage and monitor qubit calibration workflows from one focused dashboard.
+            Run calibration tasks, watch executions and read chip metrics for your superconducting
+            qubit chips
           </p>
 
           <nav
@@ -106,13 +107,12 @@ export function LoginPageContent() {
 
         <section
           aria-labelledby="sign-in-heading"
-          className="card mx-auto w-full max-w-sm border border-base-300 bg-base-100/95 shadow-sm backdrop-blur-sm"
+          className="card mx-auto w-full max-w-sm border border-base-300 bg-base-100 shadow-sm"
         >
           <div className="card-body gap-0 p-6 sm:p-8">
             <h2 id="sign-in-heading" className="text-xl font-medium tracking-tight">
-              Welcome back
+              Sign in
             </h2>
-            <p className="mt-1 text-sm text-base-content/60">Sign in to continue to QDash.</p>
 
             <form onSubmit={handleSubmit} className="mt-6" aria-busy={loading}>
               <fieldset disabled={loading} className="contents">
@@ -130,7 +130,6 @@ export function LoginPageContent() {
                     spellCheck="false"
                     autoFocus
                     className="input input-bordered w-full focus:input-primary"
-                    placeholder="Enter your user ID"
                     value={userName}
                     onChange={(event) => setUserName(event.target.value)}
                   />
@@ -148,7 +147,6 @@ export function LoginPageContent() {
                       required
                       autoComplete="current-password"
                       className="input input-bordered w-full pr-12 focus:input-primary"
-                      placeholder="Enter your password"
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       aria-describedby={error ? "login-error" : undefined}
@@ -185,7 +183,7 @@ export function LoginPageContent() {
             </form>
 
             <p className="mt-5 text-center text-xs text-base-content/50">
-              Need access? Contact your QDash administrator.
+              Accounts are created by a QDash administrator
             </p>
           </div>
         </section>

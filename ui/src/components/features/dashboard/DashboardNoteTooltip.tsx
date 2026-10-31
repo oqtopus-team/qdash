@@ -89,7 +89,7 @@ export function DashboardNoteTooltip({
       <div className="font-medium tabular-nums">{header}</div>
       {hasTargetNote && targetNote && (
         <div className="space-y-1.5 border-l-2 border-warning pl-2">
-          <div className="text-xs uppercase tracking-wide text-warning">
+          <div className="text-xs text-warning">
             pinned summary
             {targetComments.length > 0 ? ` (${targetComments.length})` : ""}
           </div>
@@ -124,9 +124,7 @@ export function DashboardNoteTooltip({
       )}
       {current && (
         <div className="border-l-2 border-base-300 pl-2">
-          <div className="text-xs uppercase tracking-wide text-base-content/60">
-            legacy metric note
-          </div>
+          <div className="text-xs text-base-content/60">legacy metric note</div>
           <p className="whitespace-pre-wrap break-words">{current.content}</p>
           <div className="text-xs text-base-content/50 mt-0.5">
             {current.username} · {formatDateTime(current.updatedAt)}
@@ -135,9 +133,7 @@ export function DashboardNoteTooltip({
       )}
       {hasForumLinks && (
         <div className="space-y-1.5 border-l-2 border-info pl-2">
-          <div className="text-xs uppercase tracking-wide text-info">
-            linked forum discussions ({forumLinks.length})
-          </div>
+          <div className="text-xs text-info">linked forum discussions ({forumLinks.length})</div>
           <ul className="space-y-1.5">
             {forumLinks.slice(0, 6).map((post) => (
               <li key={post.id}>
@@ -161,7 +157,7 @@ export function DashboardNoteTooltip({
       )}
       {others && others.length > 0 && (
         <div className="space-y-1.5">
-          <div className="text-xs uppercase tracking-wide text-base-content/60">
+          <div className="text-xs text-base-content/60">
             legacy notes on other metrics ({others.length})
           </div>
           <ul className="space-y-1.5">

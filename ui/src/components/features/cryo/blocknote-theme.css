@@ -76,7 +76,7 @@
 /* Neutralize a globals.css leak onto the editor's FIRST block.
    globals.css (~L1529) styles react-select group headings with:
      [class$="-group"] > div:first-child {
-       text-transform: uppercase !important; font-size: .75rem !important;
+       font-size: .75rem !important;
        font-weight: 500 !important; opacity: .7 !important; color: ... !important; }
    `[class$="-group"]` (any class ending in "-group") also matches BlockNote's
    `.bn-block-group`, so `> div:first-child` hits the editor's first block

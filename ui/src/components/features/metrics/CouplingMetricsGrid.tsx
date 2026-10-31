@@ -436,7 +436,7 @@ export function CouplingMetricsGrid({
                   height: displayCellSize * 0.5,
                   backgroundColor: bgColor || undefined,
                 }}
-                className={`rounded-md shadow-md flex flex-col items-center justify-center transition-all hover:shadow-xl hover:scale-110 -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
+                className={`rounded-md shadow-md flex flex-col items-center justify-center transition-transform hover:shadow-xl -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
                   !bgColor ? "bg-base-300/50" : ""
                 }`}
               >

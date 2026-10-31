@@ -163,9 +163,7 @@ function TasksCatalog({ sourceTask }: { sourceTask?: TaskResultResponse }) {
       <header className="flex items-center justify-between gap-3 border-b border-base-300 bg-base-200 px-4 py-2">
         <div className="min-w-0">
           <h1 className="text-xl font-medium">Tasks</h1>
-          <p className="truncate text-xs text-base-content/50">
-            Configure, run, and inspect calibration tasks
-          </p>
+          <p className="truncate text-xs text-base-content/50">Run and inspect calibration tasks</p>
         </div>
         <select
           value={selectedBackend ?? ""}
@@ -195,7 +193,7 @@ function TasksCatalog({ sourceTask }: { sourceTask?: TaskResultResponse }) {
           >
             <div className="border-b border-base-300 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="text-xs font-medium tracking-wide text-base-content/60">TASKS</h2>
+                <h2 className="text-xs font-medium text-base-content/60">Tasks</h2>
                 <span className="text-xs text-base-content/45">
                   {filteredTasks.length}/{taskListData?.tasks.length ?? 0}
                 </span>
@@ -235,7 +233,7 @@ function TasksCatalog({ sourceTask }: { sourceTask?: TaskResultResponse }) {
                 <div className="space-y-2">
                   {Object.entries(groupedTasks).map(([category, tasks]) => (
                     <details key={category} className="group" open>
-                      <summary className="flex cursor-pointer select-none items-center px-3 py-1 text-xs font-medium uppercase tracking-wide text-base-content/60 hover:bg-base-200">
+                      <summary className="flex cursor-pointer select-none items-center px-3 py-1 text-xs font-medium text-base-content/60 hover:bg-base-200">
                         <span className="mr-1 transition-transform group-open:rotate-90">▸</span>
                         {category}
                         <span className="ml-2 text-base-content/40">({tasks.length})</span>
