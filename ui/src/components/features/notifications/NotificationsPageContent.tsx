@@ -110,7 +110,7 @@ export function NotificationsPageContent() {
         </button>
       </div>
 
-      <div className="card bg-base-200 shadow-lg overflow-hidden">
+      <div className="card bg-base-200 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center py-16">
             <span className="loading loading-spinner loading-lg" />

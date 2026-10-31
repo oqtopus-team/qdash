@@ -106,7 +106,7 @@ export function PlotCard({
 
   return (
     <div
-      className={`card bg-base-100 shadow-xl rounded-xl p-4 sm:p-8 border border-base-300 ${className}`}
+      className={`card bg-base-100 shadow-sm rounded-xl p-4 sm:p-8 border border-base-300 ${className}`}
     >
       <div className="flex items-center justify-between mb-4 sm:mb-6">
         <h2 className="text-sm font-medium flex items-center gap-2">

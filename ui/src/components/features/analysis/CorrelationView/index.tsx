@@ -719,7 +719,7 @@ export function CorrelationView() {
               <div className="stats stats-horizontal shadow w-full hidden sm:inline-grid">
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Sample Size</div>
-                  <div className="stat-value text-primary">{statistics.sampleSize}</div>
+                  <div className="stat-value">{statistics.sampleSize}</div>
                 </div>
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Correlation (r)</div>
@@ -750,7 +750,7 @@ export function CorrelationView() {
                   <div className="stat-title text-xs">
                     {xMetricConfig?.title || xParameter} (Mean)
                   </div>
-                  <div className="stat-value text-secondary">{statistics.xMean.toFixed(2)}</div>
+                  <div className="stat-value">{statistics.xMean.toFixed(2)}</div>
                   <div className="stat-desc text-xs">
                     Range: {statistics.xMin.toFixed(2)} - {statistics.xMax.toFixed(2)}
                   </div>
@@ -759,7 +759,7 @@ export function CorrelationView() {
                   <div className="stat-title text-xs">
                     {yMetricConfig?.title || yParameter} (Mean)
                   </div>
-                  <div className="stat-value text-accent">{statistics.yMean.toFixed(2)}</div>
+                  <div className="stat-value">{statistics.yMean.toFixed(2)}</div>
                   <div className="stat-desc text-xs">
                     Range: {statistics.yMin.toFixed(2)} - {statistics.yMax.toFixed(2)}
                   </div>

@@ -134,7 +134,7 @@ function RecentNotifications() {
   };
 
   return (
-    <section className="card bg-base-200 shadow-lg">
+    <section className="card bg-base-200 shadow-sm">
       <div className="card-body gap-4 p-5">
         <SectionHeading
           title="Recent notifications"
@@ -269,7 +269,7 @@ export function HomePageContent() {
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
           <div className="space-y-6">
-            <section className="card bg-base-200 shadow-lg">
+            <section className="card bg-base-200 shadow-sm">
               <div className="card-body gap-4 p-5">
                 <SectionHeading
                   title="Current execution"
@@ -312,7 +312,7 @@ export function HomePageContent() {
               </div>
             </section>
 
-            <section className="card bg-base-200 shadow-lg">
+            <section className="card bg-base-200 shadow-sm">
               <div className="card-body gap-4 p-5">
                 <SectionHeading
                   title="Needs attention"

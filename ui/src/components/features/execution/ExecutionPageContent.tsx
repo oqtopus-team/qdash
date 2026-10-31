@@ -395,7 +395,7 @@ export function ExecutionPageContent() {
           </div>
           <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
             <div className="stat-title text-xs">Running</div>
-            <div className="stat-value text-info">{statusSummary.running}</div>
+            <div className="stat-value">{statusSummary.running}</div>
           </div>
           <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
             <div className="stat-title text-xs">Failed</div>

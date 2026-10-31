@@ -169,7 +169,7 @@ export function ApiAccessTokenPanel() {
   };
 
   return (
-    <div className="card bg-base-200 shadow-lg" key="api">
+    <div className="card bg-base-200 shadow-sm" key="api">
       <div className="card-body">
         <h2 className="card-title mb-4">API Access Token</h2>
         <div className="flex flex-col gap-6">

@@ -874,28 +874,28 @@ export function CDFView() {
                       </div>
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">Median</div>
-                        <div className="stat-value text-primary">
+                        <div className="stat-value">
                           {formatValue(data.median)}
                           {unit}
                         </div>
                       </div>
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">Mean</div>
-                        <div className="stat-value text-secondary">
+                        <div className="stat-value">
                           {formatValue(data.mean)}
                           {unit}
                         </div>
                       </div>
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">10th %ile</div>
-                        <div className="stat-value text-accent">
+                        <div className="stat-value">
                           {formatValue(data.percentile10!)}
                           {unit}
                         </div>
                       </div>
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">90th %ile</div>
-                        <div className="stat-value text-accent">
+                        <div className="stat-value">
                           {formatValue(data.percentile90!)}
                           {unit}
                         </div>

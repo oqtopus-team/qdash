@@ -66,7 +66,7 @@ export function ProvenancePageContent() {
                 <History className="h-6 w-6 sm:h-8 sm:w-8" />
               </div>
               <div className="stat-title text-sm">Parameter Versions</div>
-              <div className="stat-value text-primary">{stats.total_entities.toLocaleString()}</div>
+              <div className="stat-value">{stats.total_entities.toLocaleString()}</div>
               <div className="stat-desc text-xs">Tracked parameter values</div>
             </div>
             <div className="stat bg-base-200 rounded-box p-4">
@@ -74,9 +74,7 @@ export function ProvenancePageContent() {
                 <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8" />
               </div>
               <div className="stat-title text-sm">Activities</div>
-              <div className="stat-value text-secondary">
-                {stats.total_activities.toLocaleString()}
-              </div>
+              <div className="stat-value">{stats.total_activities.toLocaleString()}</div>
               <div className="stat-desc text-xs">Task executions</div>
             </div>
             <div className="stat bg-base-200 rounded-box p-4">
@@ -84,7 +82,7 @@ export function ProvenancePageContent() {
                 <GitBranch className="h-6 w-6 sm:h-8 sm:w-8" />
               </div>
               <div className="stat-title text-sm">Relations</div>
-              <div className="stat-value text-accent">{stats.total_relations.toLocaleString()}</div>
+              <div className="stat-value">{stats.total_relations.toLocaleString()}</div>
               <div className="stat-desc text-xs">Provenance links</div>
             </div>
           </div>

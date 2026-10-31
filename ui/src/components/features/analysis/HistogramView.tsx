@@ -873,15 +873,15 @@ export function HistogramView() {
               <div className="stats stats-horizontal shadow w-full hidden sm:inline-grid [grid-auto-columns:1fr]">
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Count</div>
-                  <div className="stat-value text-primary">{statistics.count}</div>
+                  <div className="stat-value">{statistics.count}</div>
                 </div>
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Mean</div>
-                  <div className="stat-value text-secondary">{statistics.mean.toFixed(4)}</div>
+                  <div className="stat-value">{statistics.mean.toFixed(4)}</div>
                 </div>
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Median</div>
-                  <div className="stat-value text-accent">{statistics.median.toFixed(4)}</div>
+                  <div className="stat-value">{statistics.median.toFixed(4)}</div>
                 </div>
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Min / Max</div>

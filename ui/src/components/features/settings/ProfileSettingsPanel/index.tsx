@@ -99,7 +99,7 @@ export function ProfileSettingsPanel() {
   };
 
   return (
-    <div className="card bg-base-200 shadow-lg">
+    <div className="card bg-base-200 shadow-sm">
       <div className="card-body">
         <h2 className="card-title mb-4">Profile</h2>
         <form onSubmit={handleSubmit(submit)} noValidate>

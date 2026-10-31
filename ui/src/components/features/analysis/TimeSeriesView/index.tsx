@@ -648,7 +648,7 @@ export function TimeSeriesView() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
       {/* Parameter Selection Card */}
-      <div className="col-span-1 lg:col-span-3 card bg-base-100 shadow-xl rounded-xl p-4 sm:p-8 border border-base-300">
+      <div className="col-span-1 lg:col-span-3 card bg-base-100 shadow-sm rounded-xl p-4 sm:p-8 border border-base-300">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-4 sm:mb-6">
           <h2 className="text-sm font-medium flex items-center gap-2">
             <svg
