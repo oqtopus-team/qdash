@@ -1,46 +1,27 @@
 """Fake backend calibration flow template.
 
-Template for testing calibration workflows without real quantum hardware.
-Demonstrates how to switch between backends using CalibService.
+Runs a short calibration on the fake backend, a QUBEX-compatible simulator, so workflows,
+persistence and result handling can be exercised without hardware. Apart from the first task
+the chain is the production qubex task code: the fake backend routes the task names below to
+the qubex implementations.
 
-Backend Switching:
-    - backend_name="fake": Use simulated measurements (no hardware required)
-    - backend_name="qubex": Use real quantum hardware via qubex library
-    - backend_name=None: Use default from config/app/backend.yaml
-
-Available Fake Tasks (same names as qubex for seamless switching):
-    - CheckFineChevron: Entry point, outputs qubit_frequency, readout_frequency
-    - CreateHPIPulse: Depends on qubit_frequency, outputs hpi_amplitude, hpi_duration
-    - CheckRabi: Depends on qubit_frequency
-    - CheckRamsey: Depends on qubit_frequency, hpi_amplitude
-    - CheckT1: Depends on qubit_frequency, hpi_amplitude
-    - CheckT2Echo: Depends on qubit_frequency, hpi_amplitude
-    - RandomizedBenchmarking: Depends on qubit_frequency, rabi_amplitude, t1, t2_echo
+Default task order:
+    - FakeBringUp: seeds the simulator's qubit and readout parameters (fake only)
+    - CheckChevron: measures the chevron pattern around the seeded qubit frequency
+    - CheckRabi: Rabi oscillation, outputs the rabi parameters and control amplitude
+    - CreateHPIPulse / CreatePIPulse: pulse calibration
+    - CheckT1 / CheckT2Echo / CheckRamsey: coherence checks
 
 Example:
-    # Test with fake backend (default tasks)
-    fake_calibration(
-        username="alice",
-        chip_id="64Qv3",
-        qids=["0", "1"],
-        backend_name="fake",
-    )
+    fake_calibration(username="alice", chip_id="64Q", qids=["0", "1"], backend_name="fake")
 
-    # Test provenance chain with all tasks
+    # Run only the pulse checks after an earlier bring-up
     fake_calibration(
         username="alice",
-        chip_id="64Qv3",
-        qids=["0", "1"],
+        chip_id="64Q",
+        qids=["0"],
         backend_name="fake",
-        tasks=["CheckFineChevron", "CheckRabi", "CheckT1", "CheckT2Echo", "RandomizedBenchmarking"],
-    )
-
-    # Switch to production (qubex)
-    fake_calibration(
-        username="alice",
-        chip_id="64Qv3",
-        qids=["0", "1"],
-        backend_name="qubex",
+        tasks=["CheckHPIPulse", "CheckPIPulse"],
     )
 """
 
@@ -56,6 +37,19 @@ from qdash.workflow.service.calib_service import (
 )
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import QubitTargets
+
+# Tasks the template runs when none are given; every name is listed for the fake backend in
+# config/app/backend.yaml and resolves its inputs from the tasks before it.
+FAKE_CALIBRATION_TASKS: list[str] = [
+    "FakeBringUp",
+    "CheckChevron",
+    "CheckRabi",
+    "CreateHPIPulse",
+    "CreatePIPulse",
+    "CheckT1",
+    "CheckT2Echo",
+    "CheckRamsey",
+]
 
 
 @flow(
@@ -79,8 +73,7 @@ def fake_calibration(
         username: User name (from UI)
         chip_id: Chip ID (default: "64Q")
         qids: Qubit IDs to calibrate (default: ["0", "1", "2", "3"])
-        tasks: Task names to run. Default: ["CheckFineChevron", "CheckRabi", "CheckT1", "CheckT2Echo"]
-               For full provenance test, add "RandomizedBenchmarking".
+        tasks: Task names to run. Default: FAKE_CALIBRATION_TASKS.
         backend_name: Backend to use ("fake" for testing, "qubex" for production,
                       None for default from config/app/backend.yaml)
         flow_name: Flow name (auto-injected)
@@ -93,13 +86,7 @@ def fake_calibration(
         qids = ["0", "1", "2", "3"]
 
     if tasks is None:
-        tasks = [
-            "CheckFineChevron",
-            "CreateHPIPulse",
-            "CheckRabi",
-            "CheckT1",
-            "CheckT2Echo",
-        ]
+        tasks = list(FAKE_CALIBRATION_TASKS)
 
     targets = QubitTargets(qids=qids)
     steps = [

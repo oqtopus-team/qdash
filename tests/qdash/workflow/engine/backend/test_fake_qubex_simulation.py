@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 
 from qdash.workflow.engine.backend.fake import FakeBackend
 from qdash.workflow.engine.backend.fake_qubex.simulation import FakeExperiment
@@ -152,3 +153,121 @@ def test_fake_backend_passes_session_configuration_to_experiment(monkeypatch) ->
     assert factory.call_args.kwargs["readout_duration"] == 2048.0
     assert factory.call_args.kwargs["configuration_mode"] == "ge-ef-fh"
     experiment.connect.assert_called_once_with()
+
+
+def test_fake_default_control_amplitude_drives_a_pi_rotation_in_pi_duration() -> None:
+    exp = FakeExperiment()
+
+    rate = exp.calc_rabi_rate("Q00")
+
+    assert rate == pytest.approx(1.0 / (2.0 * exp.pi_duration))
+    assert exp.control_params.get_control_amplitude("Q00") == exp.CONTROL_AMPLITUDE_SCALE
+
+
+def test_fake_rabi_oscillation_carries_shot_noise_and_decay() -> None:
+    exp = FakeExperiment()
+
+    result = exp.obtain_rabi_params(["Q00"], time_range=np.arange(0.0, 401.0, 8.0), plot=False)
+    param = result.rabi_params["Q00"]
+    normalized = np.asarray(result.data["Q00"].normalized, dtype=float)
+
+    assert param.frequency == pytest.approx(1.0 / (2.0 * exp.pi_duration))
+    assert 0.0 < param.noise < 0.1
+    assert 0.95 < param.r2 < 1.0
+    # Several periods fit in the sweep, so the signal changes sign many times.
+    assert np.count_nonzero(np.diff(np.sign(normalized))) >= 8
+
+
+def test_fake_pulse_calibration_returns_the_amplitude_for_the_requested_angle() -> None:
+    exp = FakeExperiment()
+
+    hpi = exp.calibrate_hpi_pulse(["Q00"]).data["Q00"]
+    pi = exp.calibrate_pi_pulse(["Q00"]).data["Q00"]
+
+    assert hpi.calib_value == pytest.approx(exp.CONTROL_AMPLITUDE_SCALE / 2.0)
+    assert pi.calib_value == pytest.approx(exp.CONTROL_AMPLITUDE_SCALE)
+    assert 0.95 < hpi.r2 < 1.0
+    assert hpi.fit()["fig"] is not None
+
+
+def test_fake_drive_sweep_follows_the_rabi_formula() -> None:
+    """A sweep of plain drive pulses, as qubex's chevron measurement issues, oscillates on
+    resonance and loses contrast off resonance."""
+    from qxpulse import Rect
+
+    exp = FakeExperiment()
+    amplitude = exp.CONTROL_AMPLITUDE_SCALE
+    durations = np.arange(0.0, 97.0, 4.0)
+
+    def resonant(duration: float) -> dict[str, Rect]:
+        return {"Q00": Rect(duration=float(duration), amplitude=amplitude)}
+
+    def detuned(duration: float) -> dict[str, Rect]:
+        return {"Q00": Rect(duration=float(duration), amplitude=amplitude).detuned(0.05)}
+
+    on = exp.sweep_parameter(resonant, sweep_range=durations, n_shots=4096, plot=False)
+    off = exp.sweep_parameter(detuned, sweep_range=durations, n_shots=4096, plot=False)
+
+    on_signal = np.real(np.asarray(on.data["Q00"].data))
+    off_signal = np.real(np.asarray(off.data["Q00"].data))
+    # One pi rotation takes pi_duration, so the signal crosses zero around 12 ns and again
+    # around 36 ns; off resonance by 50 MHz the excitation stays small.
+    assert on_signal[0] < -0.9
+    assert on_signal.max() > 0.9
+    assert np.ptp(off_signal) < 0.3
+
+
+def test_fake_ramsey_x_and_y_axes_rotate_counter_clockwise() -> None:
+    """The second pi/2 pulse about Y reads cos, about X reads -sin, so the (X, Y) pair
+    advances counter-clockwise for a positive detuning and clockwise for a negative one."""
+    exp = FakeExperiment()
+    time_range = np.arange(0.0, 1001.0, 50.0)
+
+    def xy(detuning: float) -> tuple[np.ndarray, np.ndarray]:
+        y = exp.ramsey_experiment(
+            targets=["Q00"],
+            time_range=time_range,
+            detuning=detuning,
+            second_rotation_axis="Y",
+            plot=False,
+        )
+        x = exp.ramsey_experiment(
+            targets=["Q00"],
+            time_range=time_range,
+            detuning=detuning,
+            second_rotation_axis="X",
+            plot=False,
+        )
+        return (
+            np.asarray(x.data["Q00"].normalized, dtype=float),
+            np.asarray(y.data["Q00"].normalized, dtype=float),
+        )
+
+    x_pos, y_pos = xy(0.001)
+    cross = x_pos[:-1] * y_pos[1:] - x_pos[1:] * y_pos[:-1]
+    assert np.all(cross > 0), "positive detuning must rotate counter-clockwise"
+    assert y_pos[0] == pytest.approx(1.0, abs=0.1)
+    assert abs(x_pos[0]) < 0.1
+
+    x_neg, y_neg = xy(-0.001)
+    cross_neg = x_neg[:-1] * y_neg[1:] - x_neg[1:] * y_neg[:-1]
+    assert np.all(cross_neg < 0), "negative detuning must rotate clockwise"
+
+
+def test_fake_repeated_pulse_check_drifts_and_carries_noise() -> None:
+    """Repeating a calibrated pi/2 pulse alternates 1, 0, -1, 0 with a small, deterministic
+    rotation error and shot noise instead of an exact pattern."""
+    exp = FakeExperiment()
+    exp.calibrate_hpi_pulse(["Q00"])
+
+    result = exp.repeat_sequence({"Q00": exp.hpi_pulse["Q00"]}, repetitions=20, plot=False)
+    again = exp.repeat_sequence({"Q00": exp.hpi_pulse["Q00"]}, repetitions=20, plot=False)
+    signal = 2.0 * np.imag(np.asarray(result.data["Q00"].data, dtype=complex))
+
+    assert signal[0] == pytest.approx(1.0, abs=0.1)
+    assert signal[2] == pytest.approx(-1.0, abs=0.15)
+    assert abs(signal[1]) < 0.2
+    assert not np.allclose(np.abs(signal[::2]), 1.0, atol=1e-6)
+    # The noise is seeded per target; only the simulator's lifetime jitter differs between runs.
+    repeated = 2.0 * np.imag(np.asarray(again.data["Q00"].data, dtype=complex))
+    assert np.allclose(signal, repeated, atol=0.05)
