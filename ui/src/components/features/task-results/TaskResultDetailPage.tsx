@@ -19,6 +19,7 @@ import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
+import { QubitTile } from "@/components/ui/QubitTile";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
 
@@ -113,7 +114,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         </button>
         <div className="flex items-center gap-3 flex-wrap flex-1 min-w-0">
           <span className="font-mono text-sm font-medium truncate">{taskId}</span>
-          <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
+          <QubitTile qid={taskResult.qid} />
           <StatusBadge status={taskResult.status} />
           <div className="ml-auto flex items-center gap-2">
             <TaskResultHistoryNavigation
