@@ -36,6 +36,7 @@ import type {
   ListAllFlowSchedulesParams,
   ListFlowSchedulesParams,
   ListFlowSchedulesResponse,
+  ListFlowTemplatesParams,
   ListFlowsResponse,
   MoveFlowRequest,
   MoveFlowResponse,
@@ -228,17 +229,18 @@ export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TErr
 
 
 /**
- * List all available flow templates.
+ * List the flow templates, optionally filtered to one backend.
  * @summary List all flow templates
  */
 export const listFlowTemplates = (
-
+    params?: ListFlowTemplatesParams,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
 
 
       return customInstance<FlowTemplate[]>(
-      {url: `/flows/templates`, method: 'GET', signal
+      {url: `/flows/templates`, method: 'GET',
+        params, signal
     },
       options);
     }
@@ -246,23 +248,23 @@ export const listFlowTemplates = (
 
 
 
-export const getListFlowTemplatesQueryKey = () => {
+export const getListFlowTemplatesQueryKey = (params?: ListFlowTemplatesParams,) => {
     return [
-    `/flows/templates`
+    `/flows/templates`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListFlowTemplatesQueryOptions = <TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getListFlowTemplatesQueryOptions = <TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = HTTPValidationError>(params?: ListFlowTemplatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListFlowTemplatesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListFlowTemplatesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFlowTemplates>>> = ({ signal }) => listFlowTemplates(requestOptions, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFlowTemplates>>> = ({ signal }) => listFlowTemplates(params, requestOptions, signal);
 
 
 
@@ -272,11 +274,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListFlowTemplatesQueryResult = NonNullable<Awaited<ReturnType<typeof listFlowTemplates>>>
-export type ListFlowTemplatesQueryError = unknown
+export type ListFlowTemplatesQueryError = HTTPValidationError
 
 
-export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>> & Pick<
+export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = HTTPValidationError>(
+ params: undefined |  ListFlowTemplatesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listFlowTemplates>>,
           TError,
@@ -285,8 +287,8 @@ export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowT
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>> & Pick<
+export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = HTTPValidationError>(
+ params?: ListFlowTemplatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listFlowTemplates>>,
           TError,
@@ -295,20 +297,20 @@ export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowT
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = HTTPValidationError>(
+ params?: ListFlowTemplatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List all flow templates
  */
 
-export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = HTTPValidationError>(
+ params?: ListFlowTemplatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getListFlowTemplatesQueryOptions(options)
+  const queryOptions = getListFlowTemplatesQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

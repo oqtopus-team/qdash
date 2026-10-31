@@ -247,6 +247,7 @@ class FlowTemplate(BaseModel):
     name: str = Field(..., description="Template name")
     description: str = Field(..., description="Template description")
     category: str = Field(..., description="Template category")
+    backend: str = Field(..., description="Backend the template's tasks run on, e.g. qubex or fake")
     filename: str = Field(..., description="Python filename")
     function_name: str = Field(..., description="Flow function name")
 

@@ -4,6 +4,7 @@
     "name": "Bring-up",
     "description": "MUX-level bring-up calibration starting with resonator spectroscopy. Requires explicit mux_ids and runs once per selected MUX.",
     "category": "production",
+    "backend": "qubex",
     "filename": "bringup.py",
     "function_name": "bringup"
   },
@@ -12,6 +13,7 @@
     "name": "Box Setup",
     "description": "Box setup with capture delay correction for QuEL-1 and QuEL-3: CorrectCaptureDelay once per MUX. Sweeps the capture delay with a fixed readout tone, then writes capture_delay.yaml (and capture_delay_word.yaml on QuEL-1). Requires explicit mux_ids; run first, before resonator spectroscopy.",
     "category": "production",
+    "backend": "qubex",
     "filename": "box_setup.py",
     "function_name": "box_setup"
   },
@@ -20,6 +22,7 @@
     "name": "Check Waveform",
     "description": "Readout waveform inspection using qubex CheckWaveform for explicitly selected MUXes or qubits.",
     "category": "basic",
+    "backend": "qubex",
     "filename": "check_waveform.py",
     "function_name": "check_waveform"
   },
@@ -28,6 +31,7 @@
     "name": "Coherence Check",
     "description": "Apply the current configuration, record a coarse Chevron without updating calibration parameters, then run Rabi, T1, T2Echo, and Ramsey checks for explicitly selected MUXes or qubits.",
     "category": "production",
+    "backend": "qubex",
     "filename": "coherence_check.py",
     "function_name": "coherence_check"
   },
@@ -36,6 +40,7 @@
     "name": "Simple Calibration",
     "description": "Basic calibration for learning and simple tasks. Requires explicit mux_ids or qids, with customizable tasks and execution modes.",
     "category": "basic",
+    "backend": "qubex",
     "filename": "simple.py",
     "function_name": "simple_calibration"
   },
@@ -44,6 +49,7 @@
     "name": "1Q Calibration",
     "description": "Combined coarse_one and fine_one calibration, proceeding to fine-tuning only for successful qubits. Requires explicit mux_ids or qids; check_only runs the coarse stage alone. Each calibration stage has its own Execution.",
     "category": "production",
+    "backend": "qubex",
     "filename": "one_qubit.py",
     "function_name": "one_qubit"
   },
@@ -52,6 +58,7 @@
     "name": "Coarse 1Q Calibration",
     "description": "Coarse 1-qubit calibration after bring-up: Configure -> readout parameter search -> Configure -> Rabi -> calibration and checks for HPI, PI, DRAG HPI, and DRAG PI -> T1/T2Echo -> Ramsey. Requires explicit mux_ids or qids and ends after the check stage.",
     "category": "production",
+    "backend": "qubex",
     "filename": "coarse_one.py",
     "function_name": "coarse_one"
   },
@@ -60,6 +67,7 @@
     "name": "Fine 1Q Calibration",
     "description": "Fine 1-qubit calibration after coarse_one or equivalent calibration: Configure -> two amplitude/frequency optimization pairs, running Rabi and calibrating/checking HPI -> PI -> DRAG HPI -> DRAG PI before each pair and applying Configure after each frequency update -> final full pulse calibration -> readout classification -> randomized benchmarking. Requires explicit mux_ids or qids.",
     "category": "production",
+    "backend": "qubex",
     "filename": "fine_one.py",
     "function_name": "fine_one"
   },
@@ -68,6 +76,7 @@
     "name": "EF Calibration",
     "description": "Minimal GE pulse setup and EF-transition calibration: ConfigureEF -> GE Rabi -> GE HPI -> EF Chevron -> EF Rabi -> EF HPI -> EF PI -> three-state readout classification. Pre-calibrated GE Rabi, HPI, and DRAG pulses are not required; an existing GE control frequency and readout frequency/amplitude are required. Requires explicit mux_ids or qids and supports ge-ef-cr or ge-ef-fh control layouts.",
     "category": "production",
+    "backend": "qubex",
     "filename": "ef_calibration.py",
     "function_name": "ef_calibration"
   },
@@ -76,6 +85,7 @@
     "name": "Characterization",
     "description": "End-to-end GE, optional EF, and coupling characterization with selectable stages. The selected MUXes are configured once using the layout required by the enabled tasks. Calibration failures filter dependent work, while characterization measurement failures are recorded without stopping later measurements. JAZZ measures static ZZ after optional EF work and calculates coupling strength when both qubits have calibrated anharmonicities in QDash.",
     "category": "production",
+    "backend": "qubex",
     "filename": "characterization.py",
     "function_name": "characterization"
   },
@@ -84,6 +94,7 @@
     "name": "Full Calibration",
     "description": "Complete calibration for explicitly selected mux_ids using step-based pipeline: ConfigureAll -> 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule (forward/reverse) -> 2Q.",
     "category": "production",
+    "backend": "qubex",
     "filename": "full_calibration.py",
     "function_name": "full_calibration"
   },
@@ -92,6 +103,7 @@
     "name": "Fast Full Calibration",
     "description": "Shortened full calibration for explicitly selected mux_ids: ConfigureAll -> fast 1Q check -> 1Q fine-tune without T1/T2 averages -> Filter -> CR Schedule -> 2Q.",
     "category": "production",
+    "backend": "qubex",
     "filename": "fast_full_calibration.py",
     "function_name": "fast_full_calibration"
   },
@@ -100,6 +112,7 @@
     "name": "2Q Calibration",
     "description": "Two-qubit calibration from candidate qubits. Auto-generates optimal CR schedule with explicit checkerboard direction (forward/reverse). Default: forward.",
     "category": "production",
+    "backend": "qubex",
     "filename": "two_qubit.py",
     "function_name": "two_qubit"
   },
@@ -108,6 +121,7 @@
     "name": "2Q Scheduled Calibration",
     "description": "Two-qubit calibration with user-defined schedule. Specify qubit pairs and parallel groups directly.",
     "category": "production",
+    "backend": "qubex",
     "filename": "two_qubit_scheduled.py",
     "function_name": "two_qubit_scheduled"
   },
@@ -116,6 +130,7 @@
     "name": "Fake Backend Calibration",
     "description": "Calibration with backend switching. Use backend_name='fake' for testing, 'qubex' for production. Customize tasks list for provenance testing.",
     "category": "testing",
+    "backend": "fake",
     "filename": "fake_backend.py",
     "function_name": "fake_calibration"
   },
@@ -124,6 +139,7 @@
     "name": "Gate Coherence Limit",
     "description": "Calculate theoretical fidelity limit of 1Q and 2Q gates for explicitly selected mux_ids or qids from T1, T2 coherence times and gate duration.",
     "category": "production",
+    "backend": "qubex",
     "filename": "coherence_limit.py",
     "function_name": "coherence_limit"
   }

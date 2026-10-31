@@ -10562,29 +10562,59 @@
           "flow"
         ],
         "summary": "List all flow templates",
-        "description": "List all available flow templates.",
+        "description": "List the flow templates, optionally filtered to one backend.",
         "operationId": "listFlowTemplates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only templates written for this backend, e.g. qubex or fake",
+              "title": "Backend"
+            },
+            "description": "Only templates written for this backend, e.g. qubex or fake"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/FlowTemplate"
                   },
-                  "type": "array",
                   "title": "Response Listflowtemplates"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/flows/templates/{template_id}": {
@@ -22004,6 +22034,11 @@
             "title": "Category",
             "description": "Template category"
           },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "description": "Backend the template's tasks run on, e.g. qubex or fake"
+          },
           "filename": {
             "type": "string",
             "title": "Filename",
@@ -22021,6 +22056,7 @@
           "name",
           "description",
           "category",
+          "backend",
           "filename",
           "function_name"
         ],
@@ -22049,6 +22085,11 @@
             "title": "Category",
             "description": "Template category"
           },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "description": "Backend the template's tasks run on, e.g. qubex or fake"
+          },
           "filename": {
             "type": "string",
             "title": "Filename",
@@ -22071,6 +22112,7 @@
           "name",
           "description",
           "category",
+          "backend",
           "filename",
           "function_name",
           "code"

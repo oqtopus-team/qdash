@@ -5,17 +5,27 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { parseAsString, useQueryState } from "nuqs";
 
 import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { useToast } from "@/components/ui/Toast";
 
-import type { SaveFlowRequest, FlowTemplate, SaveFlowResponse } from "@/schemas";
+import type {
+  FlowTemplate,
+  ListTaskFileBackendsResponse,
+  SaveFlowRequest,
+  SaveFlowResponse,
+  TaskFileBackend,
+  TaskFileSettings,
+} from "@/schemas";
 import type { AxiosResponse } from "axios";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useChatDock } from "@/contexts/ChatDockContext";
 import { useListChips } from "@/client/chip/chip";
 import { getFlowTemplate, listFlowTemplates, saveFlow } from "@/client/flow/flow";
+import { getTaskFileSettings, listTaskFileBackends } from "@/client/task-file/task-file";
+import { pickDefaultTemplate } from "@/lib/flowTemplates";
 import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
 
 // Monaco Editor is only available on client side
@@ -41,6 +51,8 @@ export default function NewFlowPage() {
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  // Templates are listed per backend, like the task catalog on the Tasks page.
+  const [selectedBackend, setSelectedBackend] = useQueryState("backend", parseAsString);
 
   // The chat sidebar sees the flow being written here and can propose its code.
   const { registerPage } = useChatDock();
@@ -71,10 +83,39 @@ export default function NewFlowPage() {
   // Fetch chips
   const { data: chipsData } = useListChips();
 
-  // Fetch templates
+  const { data: settingsData, isPending: isSettingsPending } = useQuery({
+    queryKey: ["taskFileSettings"],
+    queryFn: () =>
+      getTaskFileSettings().then((response: AxiosResponse<TaskFileSettings>) => response.data),
+  });
+
+  const { data: backendsData } = useQuery({
+    queryKey: ["taskFileBackends"],
+    queryFn: () =>
+      listTaskFileBackends().then(
+        (response: AxiosResponse<ListTaskFileBackendsResponse>) => response.data,
+      ),
+  });
+
+  // Start on the configured default backend unless the URL already names one.
+  useEffect(() => {
+    if (isSettingsPending || !backendsData?.backends.length || selectedBackend) return;
+    const configuredBackend = settingsData?.default_backend;
+    const backend = backendsData.backends.find((item) => item.name === configuredBackend);
+    setSelectedBackend(backend?.name ?? backendsData.backends[0].name);
+  }, [
+    backendsData?.backends,
+    isSettingsPending,
+    selectedBackend,
+    setSelectedBackend,
+    settingsData?.default_backend,
+  ]);
+
+  // Fetch the templates written for the selected backend
   const { data: templatesData, isLoading: isTemplatesLoading } = useQuery({
-    queryKey: ["flowTemplates"],
-    queryFn: () => listFlowTemplates(),
+    queryKey: ["flowTemplates", selectedBackend],
+    queryFn: () => listFlowTemplates({ backend: selectedBackend }),
+    enabled: Boolean(selectedBackend),
   });
 
   const templateOptions: TemplateOption[] = useMemo(
@@ -108,47 +149,53 @@ export default function NewFlowPage() {
     }
   }, [chipsData, chipId]);
 
-  // Load default template (simple) on mount
-  useEffect(() => {
-    const loadDefaultTemplate = async () => {
-      try {
-        const response = await getFlowTemplate("simple");
-        const template = response.data;
+  // Only the newest template request may touch the editor: a backend switch or a newer pick
+  // retires older requests, and a source edit made while a request is in flight wins over it.
+  const latestTemplateRequest = useRef(0);
+  const sourceVersion = useRef(0);
 
-        setCode(template.code);
-        setFlowFunctionName(template.function_name);
-        setDescription(template.description);
-        setSelectedTemplateId("simple");
-      } catch (error) {
-        console.error("Failed to load default template:", error);
-        toast.error("Failed to load default template");
-        // Set a minimal fallback template if loading fails
-        setCode("# Failed to load template. Please select one from the dropdown.");
-      }
-    };
-
-    loadDefaultTemplate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- toast is a singleton from sonner, doesn't need to be a dependency
-  }, []);
-
-  // Load template when selected
-  const handleTemplateSelect = async (templateId: string) => {
-    if (!templateId) return;
-
+  const loadTemplate = async (templateId: string, { notify }: { notify: boolean }) => {
+    const requestId = ++latestTemplateRequest.current;
+    const sourceAtRequest = sourceVersion.current;
     setSelectedTemplateId(templateId);
-
+    const isCurrent = () =>
+      requestId === latestTemplateRequest.current && sourceAtRequest === sourceVersion.current;
     try {
       const response = await getFlowTemplate(templateId);
+      if (!isCurrent()) return;
       const template = response.data;
 
       setCode(template.code);
       setFlowFunctionName(template.function_name);
       setDescription(template.description);
-      toast.success("Template loaded successfully");
+      if (notify) toast.success("Template loaded successfully");
     } catch (error) {
       console.error("Failed to load template:", error);
+      if (!isCurrent()) return;
       toast.error("Failed to load template");
+      if (!notify) setCode("# Failed to load template. Please select one from the dropdown.");
     }
+  };
+
+  // Open the editor on the backend's default template once; switching the backend later only
+  // changes the list, so the user's edits are never replaced without a pick.
+  const hasLoadedInitialTemplate = useRef(false);
+  useEffect(() => {
+    if (hasLoadedInitialTemplate.current || !templatesData) return;
+    hasLoadedInitialTemplate.current = true;
+    const template = pickDefaultTemplate(templatesData.data);
+    if (template) {
+      void loadTemplate(template.id, { notify: false });
+    } else {
+      setCode("# No template for this backend. Select another backend or start from scratch.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when the first template list arrives
+  }, [templatesData]);
+
+  // Load template when selected
+  const handleTemplateSelect = (templateId: string) => {
+    if (!templateId) return;
+    void loadTemplate(templateId, { notify: true });
   };
 
   const saveMutation = useMutation({
@@ -263,7 +310,10 @@ export default function NewFlowPage() {
               language="python"
               theme="vs-dark"
               value={code}
-              onChange={(value) => setCode(value || "")}
+              onChange={(value) => {
+                sourceVersion.current += 1;
+                setCode(value || "");
+              }}
               onMount={(editor, monaco) => {
                 remeasureMonacoFontsWhenLoaded(monaco);
                 editor.onDidChangeCursorPosition((e) => {
@@ -315,8 +365,30 @@ export default function NewFlowPage() {
               {/* Template Selector */}
               <div className="mb-6">
                 <h2 className="text-sm font-medium mb-3">Template</h2>
+                <label className="label py-1" htmlFor="template-backend">
+                  <span className="label-text text-xs">Backend</span>
+                </label>
+                <select
+                  id="template-backend"
+                  className="select select-bordered select-sm w-full mb-3"
+                  value={selectedBackend ?? ""}
+                  onChange={(e) => {
+                    latestTemplateRequest.current += 1;
+                    setSelectedBackend(e.target.value);
+                    setSelectedTemplateId("");
+                  }}
+                  disabled={!backendsData?.backends.length}
+                >
+                  <SelectedLabel />
+                  {backendsData?.backends.map((backend: TaskFileBackend) => (
+                    <option key={backend.name} value={backend.name}>
+                      {backend.name}
+                    </option>
+                  ))}
+                </select>
                 <select
                   className="select select-bordered select-sm w-full"
+                  aria-label="Template"
                   value={selectedTemplateId}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -326,7 +398,7 @@ export default function NewFlowPage() {
                     }
                     handleTemplateSelect(value);
                   }}
-                  disabled={isTemplatesLoading}
+                  disabled={isTemplatesLoading || !selectedBackend}
                 >
                   <SelectedLabel />
                   <option value="">Select a template...</option>
@@ -336,11 +408,15 @@ export default function NewFlowPage() {
                     </option>
                   ))}
                 </select>
-                {selectedTemplateId && (
+                {selectedTemplateId ? (
                   <p className="text-xs text-base-content/60 mt-2">
                     Template loaded. You can modify the code as needed.
                   </p>
-                )}
+                ) : selectedBackend && !isTemplatesLoading && templateOptions.length === 0 ? (
+                  <p className="text-xs text-base-content/60 mt-2">
+                    No templates are written for the {selectedBackend} backend
+                  </p>
+                ) : null}
               </div>
 
               <h2 className="text-sm font-medium mb-4">Properties</h2>
