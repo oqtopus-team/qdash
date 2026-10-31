@@ -9,11 +9,20 @@ import {
   useMarkNotificationRead,
 } from "@/client/notification/notification";
 
-export function useNotifications(unreadOnly = false) {
+interface UseNotificationsOptions {
+  /** Set to false to skip fetching until the list is actually shown. */
+  enabled?: boolean;
+}
+
+export function useNotifications(
+  unreadOnly = false,
+  { enabled = true }: UseNotificationsOptions = {},
+) {
   return useListNotifications(
     { unread_only: unreadOnly, limit: 100 },
     {
       query: {
+        enabled,
         staleTime: 15_000,
         refetchInterval: 60_000,
       },
