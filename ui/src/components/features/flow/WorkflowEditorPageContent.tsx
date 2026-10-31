@@ -75,7 +75,7 @@ import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeleto
 import { isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
-import { monoFontFamily } from "@/lib/fonts";
+import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -638,6 +638,7 @@ export function WorkflowEditorPageContent() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleEditorMount = useCallback((editor: any, monaco: any) => {
     editorRef.current = editor;
+    remeasureMonacoFontsWhenLoaded(monaco);
     editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
       setCursorPosition({
         line: e.position.lineNumber,
