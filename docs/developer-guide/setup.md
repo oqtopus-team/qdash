@@ -36,13 +36,18 @@ The DevContainer bind-mounts the checkout at `/workspace/qdash` and, by default,
 directory at `/workspace/repos`. Git changes and commits in QDash are visible from either
 environment. With the default mount, clones made under `/workspace/repos` in the container appear
 beside QDash on the host; clones made beside QDash on the host appear under `/workspace/repos` in
-the container. For example,
-`git clone <repository-url> /workspace/repos/<repository-name>` works from the container.
+the container. For example, this creates a second checkout from the container:
+
+```shell
+git clone https://github.com/oqtopus-team/qdash.git /workspace/repos/qdash-copy
+```
+
 Use `/workspace/qdash` for QDash development so its dependencies stay in the separate
 DevContainer volumes. The initial QDash clone must be made on the host because its Compose file
-is needed to start the DevContainer. If you want a different shared directory, set
-`QDASH_SHARED_REPOS_DIR` to its absolute host path before starting the container. No repository
-manager is required.
+is needed to start the DevContainer. If you want a different shared directory, create it on the
+host and export `QDASH_SHARED_REPOS_DIR` with its absolute path before starting the container.
+The directory must already exist and be writable by your host user. No repository manager is
+required. Setting the override only in `.env` does not pass it to the host-side preflight check.
 
 A DevContainer can start without `.env`. Before running Qubex-backed calibration tasks, follow
 [Operator Setup](../user-guide/setup.md) for `.env` and `CONFIG_PATH` configuration.
@@ -52,8 +57,12 @@ A DevContainer can start without `.env`. Before running Qubex-backed calibration
 The recommended way to develop is using the DevContainer:
 
 ```shell
-docker compose -f compose.devcontainer.yaml up -d
+.devcontainer/check-shared-repos.sh "$PWD" && docker compose -f compose.devcontainer.yaml up -d
 ```
+
+The check also runs automatically when opening the DevContainer through VS Code. It prevents a
+missing shared directory from being created by Compose versions that ignore
+`create_host_path: false`.
 
 The DevContainer can start without a local `.env`; Docker Compose uses `.env` when present. The
 checked-in VS Code configuration runs its remote session as the `vscode` user so files created in
@@ -66,7 +75,8 @@ and shared repository directory remain writable from both the host and the conta
 starting Compose directly, pass the IDs explicitly:
 
 ```shell
-LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose -f compose.devcontainer.yaml up -d --build
+.devcontainer/check-shared-repos.sh "$PWD" && \
+  LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose -f compose.devcontainer.yaml up -d --build
 ```
 
 The container mounts `/var/run/docker.sock` so devcontainer users can run the local Docker
