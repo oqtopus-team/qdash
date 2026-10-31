@@ -113,11 +113,10 @@ class BackendSaver:
         success : bool
             Whether backend updates should be applied
         """
-        if task.backend == "qubex":
-            self._save_qubex(task, execution_service, qid, backend, success)
-        elif task.backend == "fake":
-            # Simulation metadata save (implement as needed)
-            pass
+        if task.backend in ("qubex", "fake"):
+            # Fake tasks run on a QUBEX-compatible simulator and persist their outputs the
+            # same way, so the qubex tasks routed to the fake backend find their inputs.
+            self._save_calibration(task, execution_service, qid, backend, success)
 
     def save_mux_qid(
         self,
@@ -173,7 +172,7 @@ class BackendSaver:
             task_model, output_parameters, publish_targets, previous_data
         )
 
-    def _save_qubex(
+    def _save_calibration(
         self,
         task: TaskProtocol,
         execution_service: ExecutionService,
@@ -181,7 +180,7 @@ class BackendSaver:
         backend: BaseBackend,
         success: bool,
     ) -> None:
-        """Qubex-specific save processing.
+        """Persist outputs to the calibration database and the backend parameter store.
 
         Parameters
         ----------

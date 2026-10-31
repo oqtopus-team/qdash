@@ -128,7 +128,7 @@
   {
     "id": "fake_calibration",
     "name": "Fake Backend Calibration",
-    "description": "Calibration with backend switching. Use backend_name='fake' for testing, 'qubex' for production. Customize tasks list for provenance testing.",
+    "description": "Short calibration on the fake backend: FakeBringUp seeds the simulator's device parameters, then the qubex CheckChevron, CheckRabi, pulse and coherence tasks run on the simulator. Customize the tasks list to rerun a subset.",
     "category": "testing",
     "backend": "fake",
     "filename": "fake_backend.py",

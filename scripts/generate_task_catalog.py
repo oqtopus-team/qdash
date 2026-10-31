@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from qdash.api.services.task_file_service import TaskFileService
+from qdash.common.config.backend import get_tasks
 
 if TYPE_CHECKING:
     from qdash.api.schemas.task_file import TaskInfo
@@ -27,35 +28,35 @@ def build_catalog(base_path: Path) -> dict[str, object]:
         for task in discovered:
             current = tasks_by_name.get(task.name)
             task_score = (
-                task.file_path == "qubex_compat.py",
                 task.task_type is not None,
                 len(task.input_parameters) + len(task.run_parameters),
             )
             current_score = (
                 (
-                    current.file_path == "qubex_compat.py",
                     current.task_type is not None,
                     len(current.input_parameters) + len(current.run_parameters),
                 )
                 if current is not None
-                else (False, False, -1)
+                else (False, -1)
             )
             if current is None or task_score > current_score:
                 tasks_by_name[task.name] = task
         discovered_backends[backend_path.name] = tasks_by_name
 
-    # Fake adapters inherit their parameter declarations from the production
-    # task. Resolve that inheritance from the already parsed qubex metadata.
+    # The fake backend runs the qubex implementation of every configured task that the fake
+    # package does not define itself, so publish those qubex declarations under "fake" too.
     qubex_tasks = discovered_backends.get("qubex", {})
-    for task in discovered_backends.get("fake", {}).values():
-        if task.file_path != "qubex_compat.py":
+    fake_tasks = discovered_backends.setdefault("fake", {})
+    for task_name in get_tasks("fake"):
+        if task_name in fake_tasks:
             continue
-        inherited = qubex_tasks.get(task.name)
+        inherited = qubex_tasks.get(task_name)
         if inherited is None:
-            continue
-        task.task_type = task.task_type or inherited.task_type
-        task.input_parameters = task.input_parameters or inherited.input_parameters
-        task.run_parameters = task.run_parameters or inherited.run_parameters
+            raise RuntimeError(
+                f"backend.yaml lists '{task_name}' for the fake backend, "
+                "but no qubex task defines it"
+            )
+        fake_tasks[task_name] = inherited.model_copy(deep=True)
 
     unresolved_defaults = [
         f"{backend}.{task.name}.{name}"
