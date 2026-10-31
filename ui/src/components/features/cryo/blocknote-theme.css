@@ -29,9 +29,7 @@
   --bn-colors-side-menu: color-mix(in oklch, var(--color-base-content) 35%, transparent);
 
   --bn-border-radius: 0.625rem;
-  --bn-font-family:
-    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
-    sans-serif;
+  --bn-font-family: var(--font-sans);
 }
 
 /* Outer chrome — border + bg on the *container*, not on .bn-editor */
@@ -158,7 +156,7 @@
 }
 
 .wiring-blocknote .bn-block-content[data-content-type="codeBlock"] pre {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.875rem;
   line-height: 1.6;
   padding: 1rem 2.5rem 1rem 1.25rem;

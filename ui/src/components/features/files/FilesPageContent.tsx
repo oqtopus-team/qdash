@@ -45,6 +45,7 @@ import {
   gitStatusEntries,
 } from "./WorkspaceChangesView";
 import { useGitWorkspace } from "./useGitWorkspace";
+import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -519,9 +520,11 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                           theme="vs-dark"
                           value={fileContent}
                           onChange={handleContentChange}
+                          onMount={(_editor, monaco) => remeasureMonacoFontsWhenLoaded(monaco)}
                           options={{
                             minimap: { enabled: false },
                             fontSize: 14,
+                            fontFamily: monoFontFamily,
                             lineNumbers: "on",
                             automaticLayout: true,
                             scrollBeyondLastLine: false,
@@ -545,6 +548,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                     value={fileContent}
                     onChange={handleContentChange}
                     onMount={(editor, monaco) => {
+                      remeasureMonacoFontsWhenLoaded(monaco);
                       editor.onDidChangeCursorPosition((e) => {
                         setCursorPosition({
                           line: e.position.lineNumber,
@@ -561,6 +565,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                     options={{
                       minimap: { enabled: true },
                       fontSize: 14,
+                      fontFamily: monoFontFamily,
                       lineNumbers: "on",
                       automaticLayout: true,
                       scrollBeyondLastLine: false,

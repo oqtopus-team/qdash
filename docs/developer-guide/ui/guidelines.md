@@ -88,6 +88,13 @@ How these boundaries connect: [UI Architecture](./architecture.md).
 Text uses three sizes and two weights. Hierarchy comes from spacing and color, not from a larger
 or bolder font. `body` in `ui/src/app/globals.css` sets 14px, so unsized text is body text.
 
+The typeface is Geist Sans, with Geist Mono for identifiers and numbers (`font-mono`). Both are
+self-hosted from the `geist` package: `ui/src/app/layout.tsx` loads them through `next/font` and
+exposes `--font-geist-sans` and `--font-geist-mono`; the `@theme` block in `globals.css` maps them
+to Tailwind's `--font-sans` and `--font-mono`, so no page needs a `font-sans` class. Libraries that
+bypass the cascade (Monaco, Plotly) take `sansFontFamily` and `monoFontFamily` from
+`ui/src/lib/fonts.ts`; do not write a font stack anywhere else.
+
 | Role | Classes |
 | --- | --- |
 | Page title (`h1`, `PageHeader`) | `text-xl font-medium` |
