@@ -20,6 +20,7 @@ scope, and status visible; surfaces stay flat as described in
 | Interface action or status | Lucide React icon |
 | Empty state | `EmptyState`, which renders a Lucide icon from its `emoji` name |
 | User identity | `UserAvatar` |
+| Qubit or coupling id | `QubitTile`, optionally with a status dot |
 | Status or count | DaisyUI badge or status color |
 | Main page framing | `PageContainer` and `PageHeader` |
 | Destructive confirmation | `ConfirmDialog` or shared `Dialog` |

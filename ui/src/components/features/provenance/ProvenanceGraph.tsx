@@ -22,6 +22,7 @@ import dagre from "dagre";
 import type { LineageNodeResponse, LineageEdgeResponse } from "@/schemas";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 import { Network } from "lucide-react";
+import { QubitTile } from "@/components/ui/QubitTile";
 
 interface ProvenanceGraphProps {
   nodes: LineageNodeResponse[];
@@ -215,9 +216,7 @@ function ActivityNode({ data, selected }: NodeProps) {
           <div className="w-2 h-2 rounded-sm bg-secondary/60 flex-shrink-0" />
           <div className="font-medium truncate text-sm">{typedData.label}</div>
         </div>
-        {typedData.isTaskFlow && typedData.qid && (
-          <span className="badge badge-secondary badge-sm flex-shrink-0">{typedData.qid}</span>
-        )}
+        {typedData.isTaskFlow && typedData.qid && <QubitTile qid={typedData.qid} />}
       </div>
       {typedData.status && (
         <div className={`text-xs ${statusClass} mt-1 capitalize`}>{typedData.status}</div>

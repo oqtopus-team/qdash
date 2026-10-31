@@ -16,6 +16,7 @@ import {
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import type { LineageResponse } from "@/schemas/lineageResponse";
+import { QubitTile } from "@/components/ui/QubitTile";
 
 type StepStatus = "changed" | "unchanged" | "added" | "removed";
 
@@ -326,7 +327,7 @@ export function LineagePathComparison({
                   <div className="flex items-center gap-2">
                     <StatusIcon className="h-3.5 w-3.5" />
                     <h4 className="font-medium text-sm">{step.taskName}</h4>
-                    <span className="badge badge-outline badge-xs font-mono">{step.qid}</span>
+                    <QubitTile qid={step.qid} />
                     {step.depthBefore !== null && (
                       <span className="text-xs text-base-content/40">depth {step.depthBefore}</span>
                     )}
