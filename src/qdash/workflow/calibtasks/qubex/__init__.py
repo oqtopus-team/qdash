@@ -18,8 +18,9 @@ from qdash.workflow.calibtasks.qubex.benchmark.zx90_interleaved_randoized_benchm
 )
 from qdash.workflow.calibtasks.qubex.box_setup.check_noise import CheckNoise
 from qdash.workflow.calibtasks.qubex.box_setup.check_status import CheckStatus
-from qdash.workflow.calibtasks.qubex.box_setup.configure import Configure
+from qdash.workflow.calibtasks.qubex.box_setup.configure import Configure, ConfigureEF
 from qdash.workflow.calibtasks.qubex.box_setup.configure_all import ConfigureAll
+from qdash.workflow.calibtasks.qubex.box_setup.correct_capture_delay import CorrectCaptureDelay
 from qdash.workflow.calibtasks.qubex.box_setup.dump_box import DumpBox
 from qdash.workflow.calibtasks.qubex.box_setup.link_up import LinkUp
 from qdash.workflow.calibtasks.qubex.box_setup.readout_configure import ReadoutConfigure
@@ -29,6 +30,23 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
     CheckResonatorSpectroscopy,
 )
 from qdash.workflow.calibtasks.qubex.cw.check_waveform import CheckWaveform
+from qdash.workflow.calibtasks.qubex.measurement.check_ckp import CheckCKP
+from qdash.workflow.calibtasks.qubex.measurement.check_cpmg_noise_spectroscopy import (
+    CheckCPMGNoiseSpectroscopy,
+)
+from qdash.workflow.calibtasks.qubex.measurement.check_quantum_efficiency import (
+    CheckQuantumEfficiency,
+)
+from qdash.workflow.calibtasks.qubex.measurement.check_readout_mist import CheckReadoutMIST
+from qdash.workflow.calibtasks.qubex.measurement.check_spin_lock_spectroscopy import (
+    CheckSpinLockSpectroscopy,
+)
+from qdash.workflow.calibtasks.qubex.measurement.check_thermal_excitation import (
+    CheckThermalExcitation,
+)
+from qdash.workflow.calibtasks.qubex.measurement.ef_readout_classification import (
+    EFReadoutClassification,
+)
 from qdash.workflow.calibtasks.qubex.measurement.readout_classification import ReadoutClassification
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_adaptive_chevron import (
     CheckAdaptiveChevron,
@@ -55,15 +73,26 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t2_echo_average impo
 )
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_hpi_pulse import CreateHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_pi_pulse import CreatePIPulse
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_adaptive_ef_chevron import (
+    CheckAdaptiveEFChevron,
+)
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_adaptive_fh_chevron import (
+    CheckAdaptiveFHChevron,
+)
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_hpi_pulse import CheckDRAGHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_pi_pulse import CheckDRAGPIPulse
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_ef_rabi import CheckEFRabi
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_hpi_pulse import CreateDRAGHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_pi_pulse import CreateDRAGPIPulse
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_ef_hpi_pulse import CreateEFHPIPulse
+from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_ef_pi_pulse import CreateEFPIPulse
 from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state import CheckBellState
 from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state_tomography import (
     CheckBellStateTomography,
 )
+from qdash.workflow.calibtasks.qubex.two_qubit.check_coupling_strength import CheckCouplingStrength
 from qdash.workflow.calibtasks.qubex.two_qubit.check_cross_resonance import CheckCrossResonance
+from qdash.workflow.calibtasks.qubex.two_qubit.check_jazz import CheckJAZZ
 from qdash.workflow.calibtasks.qubex.two_qubit.check_zx90 import CheckZX90
 from qdash.workflow.calibtasks.qubex.two_qubit.create_zx90 import CreateZX90
 
@@ -71,38 +100,54 @@ __all__ = [
     "Check1QGateCoherenceLimit",
     "Check2QGateCoherenceLimit",
     "CheckAdaptiveChevron",
+    "CheckAdaptiveEFChevron",
+    "CheckAdaptiveFHChevron",
     "CheckBellState",
     "CheckBellStateTomography",
+    "CheckCKP",
+    "CheckCPMGNoiseSpectroscopy",
     "CheckChevron",
     "CheckCoarseReadoutParams",
     "CheckControlAmplitude",
+    "CheckCouplingStrength",
     "CheckCrossResonance",
     "CheckDRAGHPIPulse",
     "CheckDRAGPIPulse",
+    "CheckEFRabi",
     "CheckHPIPulse",
+    "CheckJAZZ",
     "CheckNoise",
     "CheckOptimalReadoutAmplitude",
     "CheckOptimalReadoutFrequency",
     "CheckPIPulse",
+    "CheckQuantumEfficiency",
     "CheckQubitSpectroscopy",
     "CheckRabi",
     "CheckRamsey",
+    "CheckReadoutMIST",
     "CheckResonatorSpectroscopy",
+    "CheckSpinLockSpectroscopy",
     "CheckStatus",
     "CheckT1",
     "CheckT1Average",
     "CheckT2Echo",
     "CheckT2EchoAverage",
+    "CheckThermalExcitation",
     "CheckWaveform",
     "CheckZX90",
     "Configure",
     "ConfigureAll",
+    "ConfigureEF",
+    "CorrectCaptureDelay",
     "CreateDRAGHPIPulse",
     "CreateDRAGPIPulse",
+    "CreateEFHPIPulse",
+    "CreateEFPIPulse",
     "CreateHPIPulse",
     "CreatePIPulse",
     "CreateZX90",
     "DumpBox",
+    "EFReadoutClassification",
     "LinkUp",
     "QubexTask",
     "RandomizedBenchmarking",

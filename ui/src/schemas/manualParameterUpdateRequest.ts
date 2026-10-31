@@ -7,12 +7,13 @@
  */
 import type { ManualParameterUpdateRequestCorrectionPoint } from './manualParameterUpdateRequestCorrectionPoint';
 import type { ManualParameterUpdateRequestParameters } from './manualParameterUpdateRequestParameters';
-import type { ManualParameterUpdateRequestSourceTaskId } from './manualParameterUpdateRequestSourceTaskId';
 
 /**
- * Request to manually update calibration parameters.
+ * Request to manually correct calibration parameters from a task result.
  *
- * Parameters are written to the DB and provenance is recorded.
+ * Corrections must reference a supported source task result, and only that
+ * result's output parameters can be written. Parameters are written to the DB
+ * and provenance is recorded.
  * The qid format determines target type: "0" for qubit, "0-1" for coupling.
  */
 export interface ManualParameterUpdateRequest {
@@ -23,7 +24,7 @@ export interface ManualParameterUpdateRequest {
   /** Parameters to update. Format: {"param_name": {"value": 4.85, "unit": "GHz"}} */
   parameters: ManualParameterUpdateRequestParameters;
   /** Task result whose output values are being manually corrected */
-  source_task_id?: ManualParameterUpdateRequestSourceTaskId;
+  source_task_id: string;
   /** Plotly point selected as the visual basis for this correction */
   correction_point?: ManualParameterUpdateRequestCorrectionPoint;
 }

@@ -21,6 +21,7 @@ from fastapi import HTTPException
 
 from qdash.api.schemas.calibration import (
     CalibrationGitHubSync,
+    CalibrationParameterDeleteResponse,
     ManualEditItem,
     ManualEditsResponse,
     ManualParameterUpdateRequest,
@@ -58,7 +59,7 @@ _MANUALLY_CORRECTABLE_TASKS = {
 _FAILED_TASK_CORRECTABLE_PARAMETERS = {
     "CheckQubitSpectroscopy": {
         "coarse_qubit_frequency",
-        "anharmonicity",
+        "qubit_anharmonicity",
         "f01_repr_db",
         "f01_quality_level",
         "coarse_control_amplitude",
@@ -163,19 +164,18 @@ class ManualUpdateService:
                     execution_id=execution_id,
                 )
 
-            if source_doc is not None:
-                for source_version in self._param_version_repo.get_by_task(
-                    project_id=project_id, task_id=source_doc.task_id
-                ):
-                    self._relation_repo.create_relation(
-                        relation_type=ProvenanceRelationType.USED,
-                        source_type="activity",
-                        source_id=activity.activity_id,
-                        target_type="entity",
-                        target_id=source_version.entity_id,
-                        project_id=project_id,
-                        execution_id=execution_id,
-                    )
+            for source_version in self._param_version_repo.get_by_task(
+                project_id=project_id, task_id=source_doc.task_id
+            ):
+                self._relation_repo.create_relation(
+                    relation_type=ProvenanceRelationType.USED,
+                    source_type="activity",
+                    source_id=activity.activity_id,
+                    target_type="entity",
+                    target_id=source_version.entity_id,
+                    project_id=project_id,
+                    execution_id=execution_id,
+                )
 
             # Record in TaskResultHistory so metrics page picks up the new values.
             task_type = "coupling" if is_coupling else "qubit"
@@ -208,7 +208,7 @@ class ManualUpdateService:
                 execution_id=execution_id,
                 tags=["manual-edit"],
                 chip_id=request.chip_id,
-                source_task_id=source_doc.task_id if source_doc is not None else None,
+                source_task_id=source_doc.task_id,
             )
             task_result.insert()
 
@@ -251,6 +251,48 @@ class ManualUpdateService:
             execution_id=execution_id,
             provenance_activity_id=activity.activity_id,
             github_sync=CalibrationGitHubService().sync(task_result),
+        )
+
+    def delete_parameter(
+        self,
+        *,
+        chip_id: str,
+        qid: str,
+        parameter_name: str,
+        project_id: str,
+        username: str,
+    ) -> CalibrationParameterDeleteResponse:
+        """Delete one current calibration value while retaining historical snapshots."""
+        repository = self._coupling_repo if "-" in qid else self._qubit_repo
+        try:
+            repository.delete_calib_parameter(
+                username=username,
+                qid=qid,
+                chip_id=chip_id,
+                parameter_name=parameter_name,
+                project_id=project_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        ParameterVersionDocument.invalidate_current(
+            project_id=project_id,
+            parameter_name=parameter_name,
+            qid=qid,
+        )
+
+        logger.info(
+            "Deleted calibration parameter: project=%s, chip=%s, qid=%s, parameter=%s, user=%s",
+            project_id,
+            chip_id,
+            qid,
+            parameter_name,
+            username,
+        )
+        return CalibrationParameterDeleteResponse(
+            chip_id=chip_id,
+            qid=qid,
+            parameter_name=parameter_name,
         )
 
     def retry_github_sync(self, task_id: str, project_id: str) -> CalibrationGitHubSync:
@@ -340,11 +382,8 @@ class ManualUpdateService:
         self,
         request: ManualParameterUpdateRequest,
         project_id: str,
-    ) -> TaskResultHistoryDocument | None:
+    ) -> TaskResultHistoryDocument:
         """Validate a correction against the source spectroscopy result."""
-        if request.source_task_id is None:
-            return None
-
         source_doc = TaskResultHistoryDocument.find_one(
             {"project_id": project_id, "task_id": request.source_task_id}
         ).run()
@@ -362,6 +401,8 @@ class ManualUpdateService:
             )
 
         allowed_names = set(source_doc.output_parameter_names)
+        if "anharmonicity" in allowed_names:
+            allowed_names.add("qubit_anharmonicity")
         if source_doc.status == "failed":
             allowed_names.update(_FAILED_TASK_CORRECTABLE_PARAMETERS.get(source_doc.name, set()))
         unknown_names = sorted(set(request.parameters) - allowed_names)
@@ -374,11 +415,11 @@ class ManualUpdateService:
 
     @staticmethod
     def _save_correction_figure(
-        source_doc: TaskResultHistoryDocument | None,
+        source_doc: TaskResultHistoryDocument,
         request: ManualParameterUpdateRequest,
     ) -> tuple[list[str], list[str]]:
         """Persist a marker-overlay figure for later review of a manual correction."""
-        if source_doc is None or request.correction_point is None:
+        if request.correction_point is None:
             return [], []
         if not source_doc.json_figure_path:
             raise HTTPException(

@@ -1,0 +1,7 @@
+schema_version: 1
+
+execution:
+  shot_interval_ns: 500000
+
+readout:
+  duration_ns: 1024.0

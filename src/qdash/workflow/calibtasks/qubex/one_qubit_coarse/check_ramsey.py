@@ -31,11 +31,15 @@ class CheckRamsey(QubexTask):
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
         # RabiParam normalizes measured IQ values; its readout duration is validated.
         **required_rabi_normalization_inputs(),
-        "qubit_frequency": InputParameterSpec.required_database(),
+        "control_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("qubit_frequency",)
+        ),
         "hpi_amplitude": InputParameterSpec.required_database(),
         "hpi_duration": InputParameterSpec.required_database(),
         "readout_amplitude": InputParameterSpec.required_database(),
-        "readout_frequency": InputParameterSpec.required_database(),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
     }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "readout_duration": readout_duration_run_parameter(),
@@ -68,7 +72,14 @@ class CheckRamsey(QubexTask):
         "ramsey_frequency": OutputParameterSpec(
             unit="MHz", description="Ramsey oscillation frequency"
         ),
-        "qubit_frequency": OutputParameterSpec(unit="GHz", description="Qubit bare frequency"),
+        "qubit_frequency": OutputParameterSpec(
+            unit="GHz",
+            description="Qubit bare frequency",
+            publish_targets=(
+                "qubit_frequency",
+                "control_frequency",
+            ),
+        ),
         "t2_star": OutputParameterSpec(unit="μs", description="T2* time"),
     }
 

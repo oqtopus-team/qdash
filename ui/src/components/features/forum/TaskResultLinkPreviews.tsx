@@ -42,7 +42,7 @@ function TaskResultLinkPreview({ taskId }: { taskId: string }) {
       <div className="min-w-0 p-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-          <span className="truncate text-sm font-semibold">{taskResult.task_name}</span>
+          <span className="truncate text-sm font-medium">{taskResult.task_name}</span>
           <span className={`badge badge-sm ${statusClass(taskResult.status)}`}>
             {taskResult.status}
           </span>
@@ -61,7 +61,7 @@ function TaskResultLinkPreview({ taskId }: { taskId: string }) {
             </span>
           )}
         </div>
-        <div className="mt-2 truncate font-mono text-[11px] text-base-content/40">{taskId}</div>
+        <div className="mt-2 truncate font-mono text-xs text-base-content/40">{taskId}</div>
       </div>
       {(figurePath || jsonFigurePath) && (
         <div className="hidden h-28 items-center justify-center overflow-hidden border-l border-base-300 bg-base-200/40 p-2 sm:flex">
@@ -69,7 +69,7 @@ function TaskResultLinkPreview({ taskId }: { taskId: string }) {
             path={figurePath ?? jsonFigurePath}
             jsonFigurePath={jsonFigurePath}
             qid={taskResult.qid}
-            className="max-h-full max-w-full object-contain"
+            fit
             hideExpandButton
           />
         </div>
@@ -78,14 +78,20 @@ function TaskResultLinkPreview({ taskId }: { taskId: string }) {
   );
 }
 
-export function TaskResultLinkPreviews({ taskIds }: { taskIds: string[] }) {
+export function TaskResultLinkPreviews({
+  taskIds,
+  heading = "Linked task results",
+  className = "mt-4 space-y-2",
+}: {
+  taskIds: string[];
+  heading?: string;
+  className?: string;
+}) {
   if (taskIds.length === 0) return null;
 
   return (
-    <div className="mt-4 space-y-2">
-      <div className="text-xs font-semibold uppercase tracking-wide text-base-content/45">
-        Linked task results
-      </div>
+    <div className={className}>
+      <div className="text-xs font-medium text-base-content/45">{heading}</div>
       {taskIds.map((taskId) => (
         <TaskResultLinkPreview key={taskId} taskId={taskId} />
       ))}

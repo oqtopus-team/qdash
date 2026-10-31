@@ -202,6 +202,66 @@ class TestParameterManagement:
         assert "qubit_frequency" in task.output_parameters
         assert "qubit_frequency" in tsm.calib_data.qubit["0"]
 
+    def test_put_output_parameters_keys_calib_data_by_publish_targets(self):
+        """calib_data mirrors the published database names, not the raw output name."""
+        tsm = TaskStateManager(qids=["0"])
+        output_param = ParameterModel(value=4.2, unit="GHz")
+
+        tsm.put_output_parameters(
+            "CheckAdaptiveFHChevron",
+            {"fh_frequency": output_param},
+            "qubit",
+            "0",
+            publish_targets={"fh_frequency": ("fh_frequency", "control_frequency_fh")},
+        )
+
+        task = tsm.get_task("CheckAdaptiveFHChevron", "qubit", "0")
+        assert list(task.output_parameters) == ["fh_frequency"]
+        calib = tsm.calib_data.qubit["0"]
+        assert set(calib) == {"fh_frequency", "control_frequency_fh"}
+        assert calib["fh_frequency"] is output_param
+        assert calib["control_frequency_fh"].value == 4.2
+        assert calib["control_frequency_fh"].parameter_name == "control_frequency_fh"
+
+    def test_clear_output_parameters_removes_publish_targets(self):
+        """Rolling back a task removes every published name it added."""
+        tsm = TaskStateManager(qids=["0"])
+        tsm.calib_data.qubit["0"]["t1"] = ParameterModel(value=30.0)
+        tsm.put_output_parameters(
+            "CheckAdaptiveFHChevron",
+            {"fh_frequency": ParameterModel(value=4.2)},
+            "qubit",
+            "0",
+            publish_targets={"fh_frequency": ("fh_frequency", "control_frequency_fh")},
+        )
+
+        tsm.clear_output_parameters("CheckAdaptiveFHChevron", "qubit", "0")
+
+        assert tsm.get_task("CheckAdaptiveFHChevron", "qubit", "0").output_parameters == {}
+        assert set(tsm.calib_data.qubit["0"]) == {"t1"}
+
+    def test_duplicate_publish_targets_leave_task_and_calibration_state_unchanged(self):
+        """Reject an ambiguous target before recording either output."""
+        tsm = TaskStateManager(qids=["0"])
+        tsm.calib_data.qubit["0"]["t1"] = ParameterModel(value=30.0)
+        task = tsm.ensure_task_exists("CheckFrequency", "qubit", "0")
+
+        with pytest.raises(ValueError, match="Multiple outputs publish to 'control_frequency'"):
+            tsm.put_output_parameters(
+                "CheckFrequency",
+                {"first": ParameterModel(value=4.2), "second": ParameterModel(value=4.3)},
+                "qubit",
+                "0",
+                publish_targets={
+                    "first": ("control_frequency",),
+                    "second": ("control_frequency",),
+                },
+            )
+
+        assert task.output_parameters == {}
+        assert set(tsm.calib_data.qubit["0"]) == {"t1"}
+        assert tsm.get_published_parameter_names("CheckFrequency", "qubit", "0") == set()
+
     def test_put_output_parameters_for_coupling(self):
         """Test put_output_parameters for coupling task."""
         tsm = TaskStateManager()

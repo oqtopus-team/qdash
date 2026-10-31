@@ -36,6 +36,10 @@ Backend Interface
             # Initialize hardware connection
             pass
 
+        def disconnect(self) -> None:
+            # Release hardware connection
+            pass
+
         def get_instance(self) -> Any:
             # Return experiment session
             return self._session

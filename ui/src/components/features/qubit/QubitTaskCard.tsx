@@ -181,7 +181,7 @@ export function QubitTaskCard({
         <div className="min-w-0 space-y-1.5">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <StatusIcon className={`h-4 w-4 shrink-0 ${meta.iconClass}`} />
-            <h3 className="min-w-0 truncate text-sm font-semibold text-base-content">
+            <h3 className="min-w-0 truncate text-sm font-medium text-base-content">
               {formatTaskName(task.name)}
             </h3>
             <span className={`badge badge-xs ${meta.badgeClass}`}>{meta.label}</span>

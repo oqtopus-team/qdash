@@ -1,8 +1,7 @@
 """Tests for flow router endpoints."""
 
 from datetime import datetime
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -104,6 +103,7 @@ def sample_flow(test_project):
         created_at=datetime.now(),
         updated_at=datetime.now(),
         tags=["test"],
+        folder="daily/t1",
     )
     flow.insert()
     return flow
@@ -128,6 +128,7 @@ class TestFlowRouter:
         assert len(data["flows"]) == 1
         assert data["flows"][0]["name"] == "test_flow"
         assert data["flows"][0]["created_by"] == "test_user"
+        assert data["flows"][0]["folder"] == "daily/t1"
         assert data["flows"][0]["file_exists"] is False
 
     def test_list_flows_marks_existing_files(
@@ -215,6 +216,49 @@ class TestFlowRouter:
         assert response.status_code == 401
 
 
+class TestFlowMove:
+    """Tests for PATCH /flows/{name}/folder."""
+
+    def test_move_flow_updates_only_the_folder(
+        self, test_client, test_project, auth_headers, sample_flow
+    ):
+        response = test_client.patch(
+            "/flows/test_flow/folder", headers=auth_headers, json={"folder": "/weekly/"}
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["folder"] == "weekly"
+        stored = FlowDocument.find_one({"project_id": "test_project", "name": "test_flow"}).run()
+        assert stored is not None
+        assert stored.folder == "weekly"
+        assert stored.file_path == sample_flow.file_path
+        assert stored.deployment_id == sample_flow.deployment_id
+
+    def test_move_flow_to_the_root(self, test_client, test_project, auth_headers, sample_flow):
+        response = test_client.patch(
+            "/flows/test_flow/folder", headers=auth_headers, json={"folder": ""}
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["folder"] == ""
+
+    def test_move_flow_rejects_a_bad_folder(
+        self, test_client, test_project, auth_headers, sample_flow
+    ):
+        response = test_client.patch(
+            "/flows/test_flow/folder", headers=auth_headers, json={"folder": "../x"}
+        )
+
+        assert response.status_code == 400
+
+    def test_move_flow_not_found(self, test_client, test_project, auth_headers):
+        response = test_client.patch(
+            "/flows/missing/folder", headers=auth_headers, json={"folder": "a"}
+        )
+
+        assert response.status_code == 404
+
+
 class TestFlowExecution:
     """Tests for flow execution endpoint."""
 
@@ -226,19 +270,12 @@ class TestFlowExecution:
         project_id is passed for multi-tenancy support, allowing workflows to
         operate within the correct project context.
         """
-        # Arrange: Mock Prefect client
-        mock_flow_run = MagicMock()
-        mock_flow_run.id = "test-flow-run-id"
+        create_flow_run = AsyncMock(return_value="test-flow-run-id")
 
-        mock_client = MagicMock()
-        mock_client.create_flow_run_from_deployment = AsyncMock(return_value=mock_flow_run)
-
-        # Create async context manager mock
-        async_cm = MagicMock()
-        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
-        async_cm.__aexit__ = AsyncMock(return_value=None)
-
-        with patch("qdash.api.services.flow_service.get_client", return_value=async_cm):
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
             # Act
             response = test_client.post(
                 "/flows/test_flow/execute",
@@ -250,8 +287,7 @@ class TestFlowExecution:
         assert response.status_code == 200
 
         # Verify parameters passed to Prefect
-        call_args = mock_client.create_flow_run_from_deployment.call_args
-        parameters = call_args.kwargs.get("parameters", {})
+        parameters = create_flow_run.call_args.kwargs["parameters"]
 
         # project_id should be passed for multi-tenancy
         assert "project_id" in parameters
@@ -265,18 +301,12 @@ class TestFlowExecution:
         self, test_client, test_project, auth_headers, sample_flow
     ):
         """Test that execute_flow merges request parameters with default_parameters."""
-        # Arrange
-        mock_flow_run = MagicMock()
-        mock_flow_run.id = "test-flow-run-id"
+        create_flow_run = AsyncMock(return_value="test-flow-run-id")
 
-        mock_client = MagicMock()
-        mock_client.create_flow_run_from_deployment = AsyncMock(return_value=mock_flow_run)
-
-        async_cm = MagicMock()
-        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
-        async_cm.__aexit__ = AsyncMock(return_value=None)
-
-        with patch("qdash.api.services.flow_service.get_client", return_value=async_cm):
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
             # Act: Execute with custom parameters
             response = test_client.post(
                 "/flows/test_flow/execute",
@@ -287,8 +317,7 @@ class TestFlowExecution:
         # Assert
         assert response.status_code == 200
 
-        call_args = mock_client.create_flow_run_from_deployment.call_args
-        parameters = call_args.kwargs.get("parameters", {})
+        parameters = create_flow_run.call_args.kwargs["parameters"]
 
         # Default parameters should be present
         assert parameters.get("username") == "test_user"
@@ -346,17 +375,12 @@ class TestFlowExecution:
         self, test_client, test_project, editor_auth_headers, sample_flow
     ):
         """Test that project members can execute shared flows as themselves."""
-        mock_flow_run = MagicMock()
-        mock_flow_run.id = "test-flow-run-id"
+        create_flow_run = AsyncMock(return_value="test-flow-run-id")
 
-        mock_client = MagicMock()
-        mock_client.create_flow_run_from_deployment = AsyncMock(return_value=mock_flow_run)
-
-        async_cm = MagicMock()
-        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
-        async_cm.__aexit__ = AsyncMock(return_value=None)
-
-        with patch("qdash.api.services.flow_service.get_client", return_value=async_cm):
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
             response = test_client.post(
                 "/flows/test_flow/execute",
                 headers=editor_auth_headers,
@@ -365,8 +389,7 @@ class TestFlowExecution:
 
         assert response.status_code == 200
 
-        call_args = mock_client.create_flow_run_from_deployment.call_args
-        parameters = call_args.kwargs.get("parameters", {})
+        parameters = create_flow_run.call_args.kwargs["parameters"]
         assert parameters["username"] == "editor_user"
         assert parameters["project_id"] == "test_project"
 
@@ -378,17 +401,7 @@ class TestFlowTemplates:
         self, test_client, test_project, auth_headers
     ):
         """Test that the full calibration template starts with ConfigureAll."""
-        repo_root = Path(__file__).resolve().parents[4]
-        templates_dir = repo_root / "src/qdash/workflow/templates"
-
-        with (
-            patch("qdash.api.services.flow_service.TEMPLATES_DIR", templates_dir),
-            patch(
-                "qdash.api.services.flow_service.TEMPLATES_METADATA_FILE",
-                templates_dir / "templates.json",
-            ),
-        ):
-            response = test_client.get("/flows/templates/full_calibration", headers=auth_headers)
+        response = test_client.get("/flows/templates/full_calibration", headers=auth_headers)
 
         assert response.status_code == 200
         data = response.json()
@@ -400,19 +413,7 @@ class TestFlowTemplates:
         self, test_client, test_project, auth_headers
     ):
         """Test that the fast full calibration template is registered and loadable."""
-        repo_root = Path(__file__).resolve().parents[4]
-        templates_dir = repo_root / "src/qdash/workflow/templates"
-
-        with (
-            patch("qdash.api.services.flow_service.TEMPLATES_DIR", templates_dir),
-            patch(
-                "qdash.api.services.flow_service.TEMPLATES_METADATA_FILE",
-                templates_dir / "templates.json",
-            ),
-        ):
-            response = test_client.get(
-                "/flows/templates/fast_full_calibration", headers=auth_headers
-            )
+        response = test_client.get("/flows/templates/fast_full_calibration", headers=auth_headers)
 
         assert response.status_code == 200
         data = response.json()

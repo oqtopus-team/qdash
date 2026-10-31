@@ -145,7 +145,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
                   onChange={(e) => setTopologyId(e.target.value)}
                   placeholder={`square-lattice-mux-${chip.size}`}
                 />
-                <p className="text-[11px] text-base-content/50 mt-1">
+                <p className="text-xs text-base-content/50 mt-1">
                   Topology template applied to qubit/coupling layout.
                 </p>
               </Field>
@@ -160,7 +160,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
-                <p className="text-[11px] text-base-content/50 mt-1">
+                <p className="text-xs text-base-content/50 mt-1">
                   Inactive chips remain available but are de-emphasized in chip selection.
                 </p>
               </Field>
@@ -173,7 +173,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
                   placeholder="Serial number, fabrication batch, design doc link…"
                 />
                 {chip.note?.updated_by && (
-                  <p className="text-[11px] text-base-content/50 mt-1">
+                  <p className="text-xs text-base-content/50 mt-1">
                     Last edited by {chip.note.updated_by}
                     {chip.note.updated_at && (
                       <>
@@ -199,7 +199,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
 
             {/* Danger zone */}
             <div className="rounded-lg border border-error/40 bg-error/5 p-3 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-error">
+              <div className="flex items-center gap-2 text-sm font-medium text-error">
                 <AlertTriangle className="h-4 w-4" />
                 Danger zone
               </div>
@@ -207,12 +207,12 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
               {impact && (
                 <div className="text-xs space-y-1">
                   <div>
-                    <span className="font-semibold">Hard-deleted:</span> {impact.qubits} qubit
+                    <span className="font-medium">Hard-deleted:</span> {impact.qubits} qubit
                     {impact.qubits !== 1 ? "s" : ""}, {impact.couplings} coupling
                     {impact.couplings !== 1 ? "s" : ""}
                   </div>
                   <div className="text-base-content/60">
-                    <span className="font-semibold">Retained for audit:</span> {impact.task_results}{" "}
+                    <span className="font-medium">Retained for audit:</span> {impact.task_results}{" "}
                     task result
                     {impact.task_results !== 1 ? "s" : ""}, {impact.qubit_history_snapshots} qubit
                     snapshot
@@ -222,7 +222,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
                   </div>
                   {impact.cooldowns_referencing > 0 && (
                     <div>
-                      <span className="font-semibold">Detached from:</span>{" "}
+                      <span className="font-medium">Detached from:</span>{" "}
                       {impact.cooldowns_referencing} cool-down
                       {impact.cooldowns_referencing !== 1 ? "s" : ""}
                     </div>

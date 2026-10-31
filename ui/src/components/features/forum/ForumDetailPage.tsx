@@ -14,6 +14,7 @@ import {
   Tag,
   Trash2,
   UserRound,
+  ClipboardList,
 } from "lucide-react";
 
 import { useListChips } from "@/client/chip/chip";
@@ -39,6 +40,7 @@ import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useForumAiReply } from "@/hooks/useForumAiReply";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { formatDateTimeCompact, formatRelativeTime } from "@/lib/utils/datetime";
 import type { ForumPostResponse } from "@/schemas";
@@ -52,6 +54,7 @@ import {
   isForumTerminalStatus,
   toForumCategoryDefinition,
 } from "./categories";
+import { ForumLabelBadge } from "./ForumLabelBadge";
 import { ForumLabelPicker } from "./ForumLabelSelector";
 import { type ForumBlockSnapshotGetter, type ForumMentionCandidate } from "./ForumBlockEditor";
 import { ForumPostContent } from "./ForumPostContent";
@@ -255,12 +258,14 @@ function PostBody({
           content={post.content}
           contentBlocks={post.content_blocks}
           markdownClassName="text-sm text-base-content/80"
+          aboutTaskId={post.parent_id ? null : post.task_id}
         />
       )}
     </div>
   );
 }
 
+/** Page showing a forum thread with its replies and metadata controls. */
 export function ForumDetailPage({ postId }: { postId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -388,6 +393,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const createMutation = useCreateForumPost();
   const updateMutation = useUpdateForumPost();
   const deleteMutation = useDeleteForumPost();
+  const { labels } = useForumLabels();
   const {
     isGenerating,
     statusMessage: aiStatus,
@@ -584,10 +590,13 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     invalidateThread();
   };
 
+  /** Toggles a label on the thread. */
   const togglePostLabel = (label: string) => {
     if (!post) return;
     const currentLabels = post.labels ?? [];
-    const nextLabels = currentLabels.includes(label) ? [] : [label];
+    const nextLabels = currentLabels.includes(label)
+      ? currentLabels.filter((item) => item !== label)
+      : [...currentLabels, label];
     updateRootMetadata({ labels: nextLabels });
   };
 
@@ -711,8 +720,8 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 </button>
               </div>
             ) : (
-              <h1 className="min-w-0 flex-1 truncate text-xl font-bold">
-                {post.title || "Untitled topic"}
+              <h1 className="min-w-0 flex-1 truncate text-xl font-medium">
+                {post.title || "Untitled thread"}
               </h1>
             )}
             {canManageMetadata && !editingTitle && (
@@ -872,7 +881,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
 
         <aside className="space-y-5 border-t border-base-300 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium text-base-content/50">
               <CategoryIcon className="h-3.5 w-3.5" />
               Category
             </div>
@@ -896,10 +905,24 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium text-base-content/50">
               <Crosshair className="h-3.5 w-3.5" />
               Target
             </div>
+            {post.task_id && (
+              <Link
+                href={`/task-results/${encodeURIComponent(post.task_id)}`}
+                className="btn btn-outline btn-sm w-full justify-start gap-2 rounded-md normal-case"
+                title={post.task_id}
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                <span className="min-w-0 truncate">
+                  {post.task_result
+                    ? `${post.task_result.task_name} · Q${post.task_result.qid} · ${post.task_result.status}`
+                    : `Task result ${post.task_id.slice(0, 8)}`}
+                </span>
+              </Link>
+            )}
             {targetContext && (
               <Link
                 href={dashboardTargetHref(targetContext)}
@@ -977,7 +1000,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
 
           {targetContext && (
             <section className="space-y-3 rounded-lg border border-base-300 bg-base-100 p-3">
-              <div className="text-xs font-semibold uppercase text-base-content/50">Related</div>
+              <div className="text-xs font-medium text-base-content/50">Related</div>
               <div className="space-y-2">
                 <div className="text-xs font-medium text-base-content/60">Recent task results</div>
                 {relatedTaskResults.length > 0 ? (
@@ -1013,7 +1036,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                         className="block rounded-md border border-base-300 px-2 py-1.5 text-xs hover:border-primary/50"
                       >
                         <div className="truncate font-medium">
-                          {formatForumPostNumber(thread.number)} {thread.title || "Untitled topic"}
+                          {formatForumPostNumber(thread.number)} {thread.title || "Untitled thread"}
                         </div>
                         <div className="mt-0.5 text-base-content/55">
                           {getForumStatus(thread.status).label}
@@ -1037,7 +1060,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           )}
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium text-base-content/50">
               <CalendarDays className="h-3.5 w-3.5" />
               Cooldown
             </div>
@@ -1079,7 +1102,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium text-base-content/50">
               <UserRound className="h-3.5 w-3.5" />
               Assignee
             </div>
@@ -1111,12 +1134,13 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium text-base-content/50">
               <Tag className="h-3.5 w-3.5" />
               Labels
             </div>
             {canManageMetadata ? (
               <ForumLabelPicker
+                labels={labels}
                 selectedLabels={post.labels ?? []}
                 onToggle={togglePostLabel}
                 disabled={updateMutation.isPending}
@@ -1124,14 +1148,9 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {(post.labels ?? []).length > 0 ? (
-                  (post.labels ?? []).map((label) => {
-                    const labelDef = getForumLabel(label);
-                    return (
-                      <span key={label} className={`badge badge-sm ${labelDef.badgeClass}`}>
-                        {labelDef.label}
-                      </span>
-                    );
-                  })
+                  (post.labels ?? []).map((label) => (
+                    <ForumLabelBadge key={label} label={getForumLabel(label, labels)} />
+                  ))
                 ) : (
                   <span className="text-xs text-base-content/45">No labels</span>
                 )}
@@ -1140,7 +1159,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium text-base-content/50">
               <StatusIcon className="h-3.5 w-3.5" />
               Status
             </div>
@@ -1168,7 +1187,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium text-base-content/50">
               <UserRound className="h-3.5 w-3.5" />
               Author
             </div>

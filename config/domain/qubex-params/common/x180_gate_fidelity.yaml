@@ -1,0 +1,6 @@
+meta:
+  description: X180 gate fidelity of the qubit
+  unit: '%'
+  default: null
+  scope: qubit
+data: {}

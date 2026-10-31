@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 
 class CalibrationNoteResponse(BaseModel):
@@ -96,9 +96,11 @@ class ManualCorrectionPoint(BaseModel):
 
 
 class ManualParameterUpdateRequest(BaseModel):
-    """Request to manually update calibration parameters.
+    """Request to manually correct calibration parameters from a task result.
 
-    Parameters are written to the DB and provenance is recorded.
+    Corrections must reference a supported source task result, and only that
+    result's output parameters can be written. Parameters are written to the DB
+    and provenance is recorded.
     The qid format determines target type: "0" for qubit, "0-1" for coupling.
     """
 
@@ -108,21 +110,14 @@ class ManualParameterUpdateRequest(BaseModel):
         ...,
         description='Parameters to update. Format: {"param_name": {"value": 4.85, "unit": "GHz"}}',
     )
-    source_task_id: str | None = Field(
-        default=None,
+    source_task_id: str = Field(
+        ...,
         description="Task result whose output values are being manually corrected",
     )
     correction_point: ManualCorrectionPoint | None = Field(
         default=None,
         description="Plotly point selected as the visual basis for this correction",
     )
-
-    @model_validator(mode="after")
-    def validate_correction_source(self) -> "ManualParameterUpdateRequest":
-        """Require a source result whenever a plotted correction point is recorded."""
-        if self.correction_point is not None and self.source_task_id is None:
-            raise ValueError("source_task_id is required when correction_point is provided")
-        return self
 
 
 class CalibrationGitHubSync(BaseModel):
@@ -141,6 +136,15 @@ class ManualParameterUpdateResponse(BaseModel):
     execution_id: str = Field(..., description="Created manual edit execution ID")
     provenance_activity_id: str | None = None
     github_sync: CalibrationGitHubSync = Field(default_factory=CalibrationGitHubSync)
+
+
+class CalibrationParameterDeleteResponse(BaseModel):
+    """Response from deleting one current calibration parameter value."""
+
+    chip_id: str
+    qid: str
+    parameter_name: str
+    deleted: bool = True
 
 
 class ManualEditItem(BaseModel):

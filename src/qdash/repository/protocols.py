@@ -888,6 +888,18 @@ class QubitCalibrationRepository(Protocol):
         """
         ...
 
+    def delete_calib_parameter(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+        parameter_name: str,
+        project_id: str | None,
+    ) -> QubitModel:
+        """Delete one current calibration parameter."""
+        ...
+
     def find_one(
         self,
         *,
@@ -961,6 +973,18 @@ class CouplingCalibrationRepository(Protocol):
         """
         ...
 
+    def delete_calib_parameter(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+        parameter_name: str,
+        project_id: str | None,
+    ) -> CouplingModel:
+        """Delete one current calibration parameter."""
+        ...
+
     def find_one(
         self,
         *,
@@ -993,7 +1017,7 @@ class ExecutionCounterRepository(Protocol):
     """Protocol for execution counter operations.
 
     This repository provides atomic counter generation for execution IDs.
-    The counter is scoped by date, chip_id, and project_id.
+    The counter is scoped by date and project_id across all chips.
 
     Example
     -------

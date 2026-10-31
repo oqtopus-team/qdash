@@ -1,5 +1,6 @@
 """Tests for QubexTask._load_parameters_from_db."""
 
+from types import SimpleNamespace
 from typing import Any, ClassVar, cast
 from unittest.mock import MagicMock, call, patch
 
@@ -10,6 +11,7 @@ from qdash.datamodel.task import InputParameterSpec
 from qdash.datamodel.task import ParameterModel as BaseParameterModel
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.base import (
+    EF_RABI_CONTEXT_PARAMETER_UNITS,
     RABI_CONTEXT_PARAMETER_UNITS,
     QubexTask,
     readout_duration_run_parameter,
@@ -107,6 +109,89 @@ def test_readout_duration_rejects_value_that_differs_from_session() -> None:
         task.resolve_run_parameters(backend, "0")
 
 
+def test_restore_ef_context_uses_transition_label(monkeypatch: pytest.MonkeyPatch) -> None:
+    task = ConcreteQubexTask()
+    task.input_parameters = {
+        name: ParameterModel(value=value, task_id="ef-rabi-task")
+        for name, value in {
+            "ef_rabi_amplitude": 0.4,
+            "ef_rabi_frequency": 12.5,
+            "ef_rabi_phase": 0.1,
+            "ef_rabi_offset": 0.2,
+            "ef_rabi_angle": 0.3,
+            "ef_rabi_noise": 0.01,
+            "ef_rabi_distance": -0.2,
+            "ef_rabi_reference_phase": 0.4,
+            "ef_rabi_r2": 0.98,
+            "ef_hpi_amplitude": 0.16,
+            "ef_hpi_duration": 32.0,
+            "ef_pi_amplitude": 0.31,
+            "ef_pi_duration": 32.0,
+        }.items()
+    }
+    source_task = SimpleNamespace(
+        run_parameters={"readout_duration": {"value": 1024.0}}, input_parameters={}
+    )
+    repository = MagicMock()
+    repository.find.return_value = [source_task]
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.base.MongoTaskResultHistoryRepository",
+        MagicMock(return_value=repository),
+    )
+    exp = MagicMock()
+    exp.readout_duration = 1024.0
+    exp.get_qubit_label.return_value = "Q00"
+    exp.ctx.resolve_ef_label.return_value = "Q00-ef"
+    backend = MagicMock()
+    backend.config = {"project_id": "project"}
+    backend.get_instance.return_value = exp
+
+    task.prepare_run(backend, "0")
+
+    stored = exp.store_rabi_params.call_args.args[0]
+    assert set(stored) == {"Q00-ef"}
+    assert stored["Q00-ef"].frequency == pytest.approx(0.0125)
+    exp.calib_note.update_hpi_param.assert_called_once()
+    assert exp.calib_note.update_hpi_param.call_args.args[0] == "Q00-ef"
+    exp.calib_note.update_pi_param.assert_called_once()
+    assert exp.calib_note.update_pi_param.call_args.args[0] == "Q00-ef"
+
+
+def test_ef_rabi_context_units_are_transition_specific() -> None:
+    assert EF_RABI_CONTEXT_PARAMETER_UNITS == {
+        "ef_rabi_amplitude": "a.u.",
+        "ef_rabi_frequency": "MHz",
+        "ef_rabi_phase": "a.u.",
+        "ef_rabi_offset": "a.u.",
+        "ef_rabi_angle": "rad",
+        "ef_rabi_noise": "a.u.",
+        "ef_rabi_distance": "a.u.",
+        "ef_rabi_reference_phase": "a.u.",
+        "ef_rabi_r2": "",
+    }
+
+
+def test_restore_ef_rabi_context_points_to_ef_source_task_when_provenance_is_missing() -> None:
+    task = ConcreteQubexTask()
+    task.input_parameters = {
+        name: ParameterModel(value=value)
+        for name, value in {
+            "ef_rabi_amplitude": 0.4,
+            "ef_rabi_frequency": 12.5,
+            "ef_rabi_phase": 0.1,
+            "ef_rabi_offset": 0.2,
+            "ef_rabi_angle": 0.3,
+            "ef_rabi_noise": 0.01,
+            "ef_rabi_distance": -0.2,
+            "ef_rabi_reference_phase": 0.4,
+            "ef_rabi_r2": 0.98,
+        }.items()
+    }
+
+    with pytest.raises(ValueError, match="Run CheckEFRabi"):
+        task._restore_ef_rabi_context(MagicMock(), "0")
+
+
 def test_readout_duration_is_restored_for_legacy_snapshot() -> None:
     task = ReadoutDurationTask()
     task.run_parameters = {}
@@ -196,6 +281,63 @@ class TestLoadParametersFromDbQubitTask:
 
         assert canonical_task.input_parameters["pi_duration"].value == 48
 
+    def test_input_parameter_fallback_uses_measurement_when_operational_value_is_missing(
+        self,
+    ) -> None:
+        class FrequencyInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "control_frequency": InputParameterSpec.required_database(
+                    fallback_parameter_names=("qubit_frequency",),
+                )
+            }
+
+        fallback_task = FrequencyInputTask()
+        fallback_task._populate_parameters(
+            {"": [{"qubit_frequency": {"value": 5.2, "unit": "GHz"}}]}
+        )
+
+        fallback_parameter = fallback_task.input_parameters["control_frequency"]
+        assert fallback_parameter.value == 5.2
+        assert fallback_parameter.parameter_name == "qubit_frequency"
+
+        canonical_task = FrequencyInputTask()
+        canonical_task._populate_parameters(
+            {
+                "": [
+                    {
+                        "control_frequency": {"value": 5.1, "unit": "GHz"},
+                        "qubit_frequency": {"value": 5.2, "unit": "GHz"},
+                    }
+                ]
+            }
+        )
+
+        canonical_parameter = canonical_task.input_parameters["control_frequency"]
+        assert canonical_parameter.value == 5.1
+        assert canonical_parameter.parameter_name == "control_frequency"
+
+    def test_input_parameter_prefers_operational_value_across_sources(self) -> None:
+        class FrequencyInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "control_frequency": InputParameterSpec.required_database(
+                    fallback_parameter_names=("qubit_frequency",),
+                )
+            }
+
+        task = FrequencyInputTask()
+        task._populate_parameters(
+            {
+                "": [
+                    {"qubit_frequency": {"value": 5.2, "unit": "GHz"}},
+                    {"control_frequency": {"value": 5.1, "unit": "GHz"}},
+                ]
+            }
+        )
+
+        parameter = task.input_parameters["control_frequency"]
+        assert parameter.value == 5.1
+        assert parameter.parameter_name == "control_frequency"
+
     def test_qubit_task_falls_back_to_dict_key_when_no_parameter_name(self):
         """When parameter_name is empty, dict key is used as lookup."""
         task = ConcreteQubexTask()
@@ -255,6 +397,41 @@ class TestLoadParametersFromDbQubitTask:
             task._load_parameters_from_db(_make_backend(), "0")
 
         assert task.input_parameters["amplitude"].value == 0.25
+
+    def test_database_optional_remains_none_without_database_value(self):
+        class OptionalInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "anharmonicity": InputParameterSpec.database_optional(unit="GHz")
+            }
+
+        task = OptionalInputTask()
+        with patch(
+            "qdash.workflow.calibtasks.qubex.base.MongoQubitCalibrationRepository"
+        ) as mock_repo:
+            mock_repo.return_value.get_calibration_data.return_value = {}
+            task._load_parameters_from_db(_make_backend(), "0")
+
+        parameter = task.input_parameters["anharmonicity"]
+        assert parameter.value is None
+
+    def test_database_optional_loads_database_value(self):
+        class OptionalInputTask(ConcreteQubexTask):
+            input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+                "anharmonicity": InputParameterSpec.database_optional(unit="GHz")
+            }
+
+        task = OptionalInputTask()
+        with patch(
+            "qdash.workflow.calibtasks.qubex.base.MongoQubitCalibrationRepository"
+        ) as mock_repo:
+            mock_repo.return_value.get_calibration_data.return_value = {
+                "anharmonicity": {"value": -0.3, "unit": "GHz"}
+            }
+            task._load_parameters_from_db(_make_backend(), "0")
+
+        parameter = task.input_parameters["anharmonicity"]
+        assert parameter.value == -0.3
+        assert parameter.unit == "GHz"
 
     def test_database_resolution_preserves_input_ui_group_metadata(self):
         class GroupedInputTask(ConcreteQubexTask):
@@ -631,6 +808,62 @@ class TestRestoreCalibrationContext:
         assert pulse["duration"] == duration
         if pulse_type.startswith("drag_"):
             assert pulse["beta"] == 0.25
+
+    @pytest.mark.parametrize(
+        ("amplitude", "duration", "beta"),
+        [
+            (0.0, 0.0, 0.0),
+            (0.1, 0.0, -0.4),
+            (0.0, 40.0, -0.4),
+            (0.1, 40.0, float("inf")),
+        ],
+    )
+    def test_skips_unusable_optional_drag_fallback_values(
+        self,
+        amplitude: float,
+        duration: float,
+        beta: float,
+    ) -> None:
+        """An absent optional DRAG calibration should not replace the Qubex context."""
+        optional_drag_spec = {
+            name: InputParameterSpec.database_or_default(default=0)
+            for name in ("drag_pi_amplitude", "drag_pi_duration", "drag_pi_beta")
+        }
+        with patch.object(ConcreteQubexTask, "input_spec", optional_drag_spec):
+            task = ConcreteQubexTask()
+            task.input_parameters = {
+                "drag_pi_amplitude": ParameterModel(value=amplitude),
+                "drag_pi_duration": ParameterModel(value=duration),
+                "drag_pi_beta": ParameterModel(value=beta),
+            }
+            exp = MagicMock()
+            backend = MagicMock()
+            backend.get_instance.return_value = exp
+
+            task._restore_qubit_pulse_context(backend, "0")
+
+        exp.calib_note.update_drag_pi_param.assert_not_called()
+
+    def test_does_not_treat_required_drag_values_as_optional_fallbacks(self) -> None:
+        """The optional sentinel policy should not alter existing required DRAG groups."""
+        required_drag_spec = {
+            name: InputParameterSpec.required_database()
+            for name in ("drag_pi_amplitude", "drag_pi_duration", "drag_pi_beta")
+        }
+        with patch.object(ConcreteQubexTask, "input_spec", required_drag_spec):
+            task = ConcreteQubexTask()
+            task.input_parameters = {
+                "drag_pi_amplitude": ParameterModel(value=0.0),
+                "drag_pi_duration": ParameterModel(value=0.0),
+                "drag_pi_beta": ParameterModel(value=0.0),
+            }
+            exp = MagicMock()
+            backend = MagicMock()
+            backend.get_instance.return_value = exp
+
+            task._restore_qubit_pulse_context(backend, "0")
+
+        exp.calib_note.update_drag_pi_param.assert_called_once()
 
     def test_restores_two_qubit_pulses_using_each_qubit_id(self) -> None:
         task = ConcreteQubexTask()

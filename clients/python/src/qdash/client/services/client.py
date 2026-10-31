@@ -31,20 +31,20 @@ from qdash.client.services.exporter_models import NormalizedMetricRecord
 from qdash.client.services.models import (
     AgentActionListResponse,
     AgentActionResponse,
-    AgentCampaignCommitResponse,
     AgentCandidateCommitResponse,
     AgentCandidateListResponse,
     AgentCandidateResponse,
+    AgentCandidateSetCommitResponse,
     AgentSessionResponse,
-    AiReviewListResponse,
-    AiReviewRunDetailResponse,
-    AiReviewRunListResponse,
     BodyReExecuteTaskResult,
     CancelExecutionResponse,
     CandidateGateResponse,
     ChipMetricsResponse,
     ChipResponse,
     CouplingResponse,
+    CreateEvaluationRunResponse,
+    EvaluationItem,
+    EvaluationRunDetailResponse,
     ExecuteFlowResponse,
     ExecutionResponseDetail,
     FileTreeNode,
@@ -78,6 +78,7 @@ from qdash.client.services.models import (
     SuccessResponse,
     TaskHistoryResponse,
     TaskKnowledgeResponse,
+    TaskNextAction,
     TaskResultExcludeResponse,
     TaskResultListResponse,
     TaskResultResponse,
@@ -817,19 +818,22 @@ class QDashClient:
         session_id: str,
         action_id: str,
         *,
-        source_execution_id: str,
+        source_execution_id: str | None = None,
         update_params: bool = False,
         reconfigure: bool = False,
     ) -> AgentActionResponse:
-        """Dispatch one authorized agent action to the system workflow."""
+        """Dispatch one authorized agent action to the system workflow.
+
+        The task runs like a Task Workbench run, on the current calibration
+        state. ``source_execution_id`` only records what the action was decided from.
+        """
+        body: dict[str, Any] = {"update_params": update_params, "reconfigure": reconfigure}
+        if source_execution_id is not None:
+            body["source_execution_id"] = source_execution_id
         response = self._request(
             "POST",
             f"/agent-sessions/{session_id}/actions/{action_id}/execute",
-            json={
-                "source_execution_id": source_execution_id,
-                "update_params": update_params,
-                "reconfigure": reconfigure,
-            },
+            json=body,
         )
         return self._validate_model_payload(AgentActionResponse, response.data)
 
@@ -928,37 +932,37 @@ class QDashClient:
         )
         return self._validate_model_payload(AgentCandidateCommitResponse, response.data)
 
-    def commit_agent_campaign_candidates(
+    def commit_agent_candidate_set(
         self,
         session_id: str,
         candidates: list[dict[str, str]],
         *,
         idempotency_key: str,
         expected_state_version: int,
-    ) -> AgentCampaignCommitResponse:
-        """Commit the final accepted same-qubit candidate set after campaign success."""
+    ) -> AgentCandidateSetCommitResponse:
+        """Commit the final accepted same-qubit candidate set after plan success."""
         response = self._request(
             "POST",
-            f"/agent-sessions/{session_id}/campaign-commits",
+            f"/agent-sessions/{session_id}/candidate-set-commits",
             json={
                 "idempotency_key": idempotency_key,
                 "expected_state_version": expected_state_version,
                 "candidates": candidates,
             },
         )
-        return self._validate_model_payload(AgentCampaignCommitResponse, response.data)
+        return self._validate_model_payload(AgentCandidateSetCommitResponse, response.data)
 
-    def get_agent_campaign_commit(
+    def get_agent_candidate_set_commit(
         self,
         session_id: str,
         commit_id: str,
-    ) -> AgentCampaignCommitResponse:
-        """Get one audited final campaign candidate-set commit."""
+    ) -> AgentCandidateSetCommitResponse:
+        """Get one audited final candidate-set commit."""
         response = self._request(
             "GET",
-            f"/agent-sessions/{session_id}/campaign-commits/{commit_id}",
+            f"/agent-sessions/{session_id}/candidate-set-commits/{commit_id}",
         )
-        return self._validate_model_payload(AgentCampaignCommitResponse, response.data)
+        return self._validate_model_payload(AgentCandidateSetCommitResponse, response.data)
 
     def get_agent_candidate_commit(
         self,
@@ -1042,53 +1046,77 @@ class QDashClient:
         response = self._request("GET", f"/tasks/{task_name}/knowledge/markdown")
         return response.data if isinstance(response.data, str) else ""
 
+    def get_task_next_actions(self, task_name: str) -> dict[str, TaskNextAction]:
+        """The task's autonomous-plan table: evaluation status code -> next step."""
+        response = self._request("GET", f"/tasks/{task_name}/knowledge")
+        data = response.data if isinstance(response.data, dict) else {}
+        raw = data.get("next_actions") or {}
+        if not isinstance(raw, dict):
+            return {}
+        return {
+            str(code): self._validate_model_payload(TaskNextAction, item)
+            for code, item in raw.items()
+        }
+
+    # ---- calibration evaluations ----
+
+    def create_evaluation_run(
+        self,
+        *,
+        chip_id: str,
+        task: str,
+        task_ids: list[str],
+        trigger: str = "single",
+        entity_type: str = "qubit",
+    ) -> CreateEvaluationRunResponse:
+        """Queue evaluations of the given task results; they run in the background."""
+        response = self._request(
+            "POST",
+            "/evaluations/runs",
+            json={
+                "chip_id": chip_id,
+                "task": task,
+                "task_ids": list(task_ids),
+                "entity_type": entity_type,
+                "trigger": trigger,
+            },
+        )
+        return self._validate_model_payload(CreateEvaluationRunResponse, response.data)
+
+    def get_evaluation_run(self, run_id: str) -> EvaluationRunDetailResponse:
+        response = self._request("GET", f"/evaluations/runs/{run_id}")
+        return self._validate_model_payload(EvaluationRunDetailResponse, response.data)
+
+    def list_task_evaluations(self, task_id: str) -> list[EvaluationItem]:
+        response = self._request("GET", "/evaluations", params={"task_id": task_id})
+        data = response.data if isinstance(response.data, dict) else {}
+        items = data.get("evaluations") or []
+        return [self._validate_model_payload(EvaluationItem, item) for item in items]
+
+    def wait_for_evaluation_run(
+        self,
+        run_id: str,
+        *,
+        timeout_seconds: float = 300.0,
+        poll_interval_seconds: float = 2.0,
+    ) -> EvaluationRunDetailResponse:
+        """Poll an evaluation run until it is no longer running, or time out."""
+        if timeout_seconds < 0 or poll_interval_seconds < 0:
+            raise ValueError("Polling timeout and interval must be non-negative")
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            detail = self.get_evaluation_run(run_id)
+            if detail.run.status != "running":
+                return detail
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Evaluation run '{run_id}' did not finish within {timeout_seconds} seconds"
+                )
+            self._sleep(poll_interval_seconds)
+
     def get_task_note(self, task_id: str) -> NoteModel:
         response = self._request("GET", f"/task-results/{task_id}/note")
         return self._validate_model_payload(NoteModel, response.data)
-
-    def list_task_result_ai_reviews(
-        self,
-        *,
-        chip_id: str | None = None,
-        task_name: str | None = None,
-        status: str | None = None,
-        decision: str | None = None,
-        latest_only: bool = False,
-        skip: int = 0,
-        limit: int = 50,
-    ) -> AiReviewListResponse:
-        params = self._query_params(
-            chip_id=chip_id,
-            task_name=task_name,
-            status=status,
-            decision=decision,
-            latest_only=latest_only,
-            skip=skip,
-            limit=limit,
-        )
-        response = self._request("GET", "/task-results/ai-review", params=params)
-        return self._validate_model_payload(AiReviewListResponse, response.data)
-
-    def list_task_result_ai_review_runs(
-        self,
-        *,
-        chip_id: str | None = None,
-        task_name: str | None = None,
-        skip: int = 0,
-        limit: int = 50,
-    ) -> AiReviewRunListResponse:
-        params = self._query_params(
-            chip_id=chip_id,
-            task_name=task_name,
-            skip=skip,
-            limit=limit,
-        )
-        response = self._request("GET", "/task-results/ai-review/runs", params=params)
-        return self._validate_model_payload(AiReviewRunListResponse, response.data)
-
-    def get_task_result_ai_review_run(self, review_run_id: str) -> AiReviewRunDetailResponse:
-        response = self._request("GET", f"/task-results/ai-review/runs/{review_run_id}")
-        return self._validate_model_payload(AiReviewRunDetailResponse, response.data)
 
     def cancel_execution(self, flow_run_id: str) -> CancelExecutionResponse:
         response = self._request("POST", f"/executions/{flow_run_id}/cancel", json={})

@@ -19,9 +19,9 @@ import {
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 
-import { FluentEmoji } from "@/components/ui/FluentEmoji";
 import type { LineageNodeResponse, LineageEdgeResponse } from "@/schemas";
 import { TaskDetailPanel } from "./TaskDetailPanel";
+import { Network } from "lucide-react";
 
 interface ProvenanceGraphProps {
   nodes: LineageNodeResponse[];
@@ -88,16 +88,15 @@ function EntityNode({ data, selected }: NodeProps) {
       {typedData.hasNewerVersion && (
         <>
           <span className="absolute -top-1 -right-1 flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-75" />
             <span className="relative inline-flex rounded-full h-3 w-3 bg-info" />
           </span>
           {/* Hover tooltip - stale */}
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 border border-info/30 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover/entity:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-            <div className="font-semibold text-info mb-1">Input version updated</div>
+            <div className="font-medium text-info mb-1">Input version updated</div>
             <div>
               <span className="font-mono">v{typedData.nodeVersion}</span>
               <span className="mx-1">&rarr;</span>
-              <span className="font-mono font-semibold">v{typedData.latestVersion}</span>
+              <span className="font-mono font-medium">v{typedData.latestVersion}</span>
             </div>
             <div className="text-base-content/60 mt-1">Recalibration recommended</div>
             <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-base-100" />
@@ -113,18 +112,16 @@ function EntityNode({ data, selected }: NodeProps) {
               typedData.isOrigin ? "bg-primary" : "bg-primary/40"
             }`}
           />
-          <div className="font-semibold text-xs truncate">{typedData.label}</div>
+          <div className="font-medium text-xs truncate">{typedData.label}</div>
         </div>
         {typedData.qid && (
-          <span className="text-[10px] text-primary/70 font-mono flex-shrink-0">
-            {typedData.qid}
-          </span>
+          <span className="text-xs text-primary/70 font-mono flex-shrink-0">{typedData.qid}</span>
         )}
       </div>
       {/* Row 2: value ± error (single line) */}
       {valueText && (
         <div
-          className={`text-[10px] font-mono mt-0.5 text-center truncate ${
+          className={`text-xs font-mono mt-0.5 text-center truncate ${
             typedData.lowConfidence ? "text-warning" : "text-base-content/60"
           }`}
         >
@@ -135,7 +132,7 @@ function EntityNode({ data, selected }: NodeProps) {
       {typedData.hasNewerVersion &&
         typedData.nodeVersion != null &&
         typedData.latestVersion != null && (
-          <div className="text-[9px] font-mono mt-0.5 rounded-full px-2 py-0.5 text-center bg-info/10 text-info">
+          <div className="text-xs font-mono mt-0.5 rounded-full px-2 py-0.5 text-center bg-info/10 text-info">
             v{typedData.nodeVersion} &rarr; v{typedData.latestVersion}
           </div>
         )}
@@ -188,16 +185,15 @@ function ActivityNode({ data, selected }: NodeProps) {
       {hasStaleInputs && (
         <>
           <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-75" />
             <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-info" />
           </span>
           {/* Hover tooltip */}
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 border border-info/30 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover/activity:opacity-100 transition-opacity pointer-events-none z-50 min-w-[180px]">
-            <div className="font-semibold text-info mb-1">Stale inputs detected</div>
+            <div className="font-medium text-info mb-1">Stale inputs detected</div>
             {typedData.staleInputNames && typedData.staleInputNames.length > 0 ? (
               <ul className="space-y-0.5">
                 {typedData.staleInputNames.map((name, i) => (
-                  <li key={i} className="font-mono text-[11px] text-base-content/80">
+                  <li key={i} className="font-mono text-xs text-base-content/80">
                     {name}
                   </li>
                 ))}
@@ -217,11 +213,7 @@ function ActivityNode({ data, selected }: NodeProps) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-2 h-2 rounded-sm bg-secondary/60 flex-shrink-0" />
-          <div
-            className={`font-semibold truncate ${typedData.isTaskFlow ? "text-base" : "text-sm"}`}
-          >
-            {typedData.label}
-          </div>
+          <div className="font-medium truncate text-sm">{typedData.label}</div>
         </div>
         {typedData.isTaskFlow && typedData.qid && (
           <span className="badge badge-secondary badge-sm flex-shrink-0">{typedData.qid}</span>
@@ -231,13 +223,13 @@ function ActivityNode({ data, selected }: NodeProps) {
         <div className={`text-xs ${statusClass} mt-1 capitalize`}>{typedData.status}</div>
       )}
       {hasStaleInputs && (
-        <div className="text-[10px] font-mono mt-1 rounded px-2 py-1 text-center bg-info/10 text-info">
+        <div className="text-xs font-mono mt-1 rounded px-2 py-1 text-center bg-info/10 text-info">
           {typedData.staleInputCount} stale input
           {typedData.staleInputCount === 1 ? "" : "s"}
         </div>
       )}
       {typedData.taskId && !hasStaleInputs && (
-        <div className="text-[10px] text-base-content/50 mt-1 truncate">Click to view details</div>
+        <div className="text-xs text-base-content/50 mt-1 truncate">Click to view details</div>
       )}
       <Handle type="source" position={Position.Bottom} className="!bg-secondary !w-2 !h-2" />
     </div>
@@ -862,10 +854,10 @@ export function ProvenanceGraph({
   if (apiNodes.length === 0) {
     return (
       <div className="h-[calc(100vh-16rem)] min-h-[500px] flex flex-col items-center justify-center text-base-content/50 bg-base-200 rounded-lg border border-base-300">
-        <div className="mb-4">
-          <FluentEmoji name="empty" size={64} />
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-base-100 text-base-content/50">
+          <Network className="h-6 w-6" aria-hidden="true" />
         </div>
-        <p className="text-lg font-medium">No lineage data</p>
+        <p className="text-sm font-medium">No lineage data</p>
         <p className="text-sm mt-1">Select a parameter to explore its provenance</p>
       </div>
     );
@@ -1052,7 +1044,7 @@ export function ProvenanceGraph({
                   <span className="text-base-content/60">derived</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="px-1.5 py-0.5 rounded bg-info/10 text-info text-[9px] font-mono leading-none">
+                  <div className="px-1.5 py-0.5 rounded bg-info/10 text-info text-xs font-mono leading-none">
                     v1→v2
                   </div>
                   <span className="text-base-content/60">newer available</span>

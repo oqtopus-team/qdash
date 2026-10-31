@@ -49,7 +49,7 @@ function SectionHeading({ title, description, href, linkLabel }: SectionHeadingP
   return (
     <div className="flex items-start justify-between gap-4">
       <div>
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <h2 className="text-sm font-medium">{title}</h2>
         <p className="mt-0.5 text-sm text-base-content/60">{description}</p>
       </div>
       {href && linkLabel && (
@@ -96,7 +96,7 @@ function QuickActions({ canEdit }: QuickActionsProps) {
 
   return (
     <section aria-labelledby="quick-actions-heading">
-      <h2 id="quick-actions-heading" className="mb-3 text-sm font-semibold text-base-content/60">
+      <h2 id="quick-actions-heading" className="mb-3 text-sm font-medium text-base-content/60">
         Quick actions
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -107,11 +107,11 @@ function QuickActions({ canEdit }: QuickActionsProps) {
             className="card card-interactive border border-base-300 bg-base-100 shadow-sm"
           >
             <div className="card-body flex-row items-center gap-3 p-4">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-200 text-base-content/70">
                 <Icon className="h-5 w-5" />
               </span>
               <span className="min-w-0">
-                <span className="block font-semibold">{label}</span>
+                <span className="block font-medium">{label}</span>
                 <span className="block text-xs text-base-content/55">{description}</span>
               </span>
             </div>
@@ -134,7 +134,7 @@ function RecentNotifications() {
   };
 
   return (
-    <section className="card bg-base-200 shadow-lg">
+    <section className="card bg-base-200 shadow-sm">
       <div className="card-body gap-4 p-5">
         <SectionHeading
           title="Recent notifications"
@@ -230,7 +230,7 @@ export function HomePageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Home"
-        description="Start work and review what needs your attention"
+        description="What is running and what needs attention"
         actions={
           showHeaderTour && (
             <Link href="/chip?tutorial=create-chip" className="btn btn-ghost btn-sm gap-2">
@@ -245,11 +245,11 @@ export function HomePageContent() {
         {showGettingStarted && (
           <section className="flex flex-col gap-4 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-200 text-base-content/70">
                 <Cpu size={20} />
               </span>
               <div>
-                <h2 className="font-semibold">Create your first chip</h2>
+                <h2 className="font-medium">Create your first chip</h2>
                 <p className="mt-1 text-sm text-base-content/60">
                   Set up the device QDash will use for calibration tasks and results.
                 </p>
@@ -269,7 +269,7 @@ export function HomePageContent() {
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
           <div className="space-y-6">
-            <section className="card bg-base-200 shadow-lg">
+            <section className="card bg-base-200 shadow-sm">
               <div className="card-body gap-4 p-5">
                 <SectionHeading
                   title="Current execution"
@@ -288,7 +288,7 @@ export function HomePageContent() {
                       <span className="loading loading-spinner loading-sm" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">
+                      <span className="block truncate font-medium">
                         {lock?.name || "Calibration execution"}
                       </span>
                       <span className="mt-1 flex flex-wrap gap-x-3 text-xs text-base-content/60">
@@ -312,7 +312,7 @@ export function HomePageContent() {
               </div>
             </section>
 
-            <section className="card bg-base-200 shadow-lg">
+            <section className="card bg-base-200 shadow-sm">
               <div className="card-body gap-4 p-5">
                 <SectionHeading
                   title="Needs attention"
@@ -345,11 +345,11 @@ export function HomePageContent() {
                         href={`/task-results/${encodeURIComponent(result.task_id)}`}
                         className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:text-error"
                       >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-error/10 text-error">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-base-200 text-error">
                           <AlertCircle className="h-5 w-5" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold">
+                          <span className="block truncate text-sm font-medium">
                             {result.task_name}
                           </span>
                           <span className="mt-0.5 block truncate text-xs text-base-content/55">

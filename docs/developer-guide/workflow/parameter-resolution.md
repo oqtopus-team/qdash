@@ -1,0 +1,377 @@
+# Parameter Resolution
+
+The workflow engine resolves task inputs, experiment configuration, snapshots, user overrides, and output persistence at different lifecycle stages.
+
+The [Frequency Parameter Policy](./frequency-parameter-policy.md) specifies frequency roles,
+task-specific fallbacks, multi-target publication, YAML export, and update UX.
+[Calibration Data Lifecycle](./calibration-data-lifecycle.md) shows how accepted calibration
+values, task history, active workflow state, and Qubex parameter files differ.
+
+## Parameter model contracts
+
+`BaseTask` defines three symmetric declaration/runtime pairs:
+
+| Collection | Model | Meaning |
+| --- | --- | --- |
+| `input_spec` | `InputParameterSpec` | Resolution and override policy declared by the task class |
+| `input_parameters` | `InputParameterModel` | Values resolved for one task instance |
+| `run_spec` | `RunParameterSpec` | Experiment configuration specified by the task class |
+| `run_parameters` | `RunParameterModel` | Effective experiment configuration for one run |
+| `output_spec` | `OutputParameterSpec` | Calibration outputs declared by the task class |
+| `output_parameters` | `OutputParameterModel` | Calibration values produced by one task instance |
+
+Every calibration input spec explicitly states its resolution and override policies through a named constructor:
+
+```python
+input_spec = {
+    "control_frequency": InputParameterSpec.required_database(
+        fallback_parameter_names=("qubit_frequency",),
+        unit="GHz",
+    ),
+    "readout_amplitude": InputParameterSpec.database_or_default(
+        default=DEFAULT_READOUT_AMPLITUDE,
+        unit="a.u.",
+    ),
+}
+```
+
+`resolution` has three explicit values:
+
+- `database_required`: use the database value and fail when it is absent.
+- `database_or_default`: prefer the database value and otherwise use `default`.
+- `default_only`: do not read this parameter from the database.
+
+The constructors default to allowing user overrides; pass `user_override="forbidden"` when a task must prohibit them. A permitted user override has higher precedence than the selected baseline. The constructor's `default` is spec-time fallback data; the effective runtime value is stored separately in `input_parameters` as an `InputParameterModel`.
+
+For coupling tasks, `InputParameterSpec.parameter_name` selects the database key and `InputParameterSpec.qid_role` selects `control`, `target`, or `coupling` data. Qubit tasks read from the selected qubit record. `parameter_aliases` lists legacy names with identical semantics. `fallback_parameter_names` lists lower-priority parameters with different semantics, such as resolving `control_frequency` from `qubit_frequency` only when the operational value is absent.
+
+## Normal workflow execution
+
+A workflow sets parameters for one task through `CalibService(task_parameters=...)`. Each task
+entry has up to three keys:
+
+```python
+from qdash.workflow import sweep
+
+task_parameters={
+    "CheckAdaptiveChevron": {
+        "run": {"shots": 256},
+        "input": {"coarse_control_amplitude": 0.05},
+        "update_calibration_parameters": False,
+    },
+    "CheckChevron": {
+        "run": {"detuning_range": sweep.linspace(-0.08, 0.08, 81)},
+    },
+}
+```
+
+| Key | Holds | Declared by |
+| --- | --- | --- |
+| `run` | Run parameter overrides as plain values or `sweep` declarations | `run_spec` |
+| `input` | Calibration input overrides as plain values | `input_spec` |
+| `update_calibration_parameters` | Output persistence policy for the task (see [Output persistence](#output-persistence)) | — |
+
+Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or `sweep.range` when a run parameter
+declares a generated range, and `sweep.values(...)` for explicit points. The helper keeps the
+constructor and its arguments explicit and normalizes them to the task parameter's serializable
+`value` and `value_type` fields without materializing an array. A parameter that declares one
+sweep constructor takes any of the five forms: Qubex consumes the generated points, so a
+`time_range` declared as `range` runs with `sweep.logspace(2, 5, 11)` and records `np.logspace` as
+the `value_type` it ran with. The declared type is the form the task uses when the workflow sets
+none. Use plain values for other `run` values and for `input` values. QDash continues to accept
+three-element lists or tuples and `{"value": ...}` mappings in existing workflows.
+
+`qdash.workflow.engine.task_parameters` normalizes this mapping when `CalibService` starts. The
+orchestrator validates it against the task class when it creates the task: a name under `run`
+that the task declares in `input_spec` fails with a message pointing to `input`, the reverse
+fails the same way, and an undeclared name fails. A misplaced value therefore stops the run
+instead of being ignored. `CalibService` also rejects a task name that no task registered for its
+backend uses, and suggests the closest registered name, so a misspelled entry fails before the
+session starts.
+
+`task_run_parameters` is the deprecated flat form that holds run parameters and
+`update_calibration_parameters` side by side in each task entry. `CalibService` still accepts it,
+emits a `DeprecationWarning`, and converts it to the `run` section; `task_parameters` wins for a
+parameter set in both.
+
+Task construction resolves Run parameters in this order, from highest to lowest precedence:
+
+1. `run` in the call-level `parameters` of `CalibService.execute_task()`
+2. `task_parameters[task_name]["run"]`
+3. Legacy per-task entries in `CalibConfig.default_run_parameters`
+4. Shared entries in `CalibConfig.default_run_parameters`
+5. `run_spec` specified on the task class
+
+A shared default reaches a task only when the task declares that name in its `run_spec`; any
+other name is ignored and logged at debug level, so a shared default meant for one task (a pulse
+duration for the pulse tasks) is neither used nor recorded by the others.
+
+Use `default_run_parameters` only for values intentionally shared by every declaring task.
+A shared value overrides task-specific defaults, including Qubex optimized defaults: qubit
+spectroscopy normally uses a 1024 ns interval and resonator spectroscopy uses 0 ns. Use
+`task_parameters` when a template should preserve or configure one named task. Nested entries
+in `default_run_parameters` remain readable only for existing flow documents. Shared defaults use
+the same plain-value and `sweep` declaration forms as `task_parameters[task_name]["run"]`; wrapped
+`{"value": ...}` mappings remain compatible. A value must fit the declared type of every task it
+reaches: a sweep form for a parameter that declares a sweep, a scalar for a scalar. A shared
+`sweep.linspace` for `shots`, or a shared `{"value": 100, "value_type": "float"}` for a
+`time_range` declared as `range`, fails when that task is created, unless `task_parameters` sets
+that task's own value. `qdash.datamodel.task.compatible_value_type` holds the rule; the workflow
+validator, the task, and the catalog run API apply it. The `sweep` helpers also reject a zero step or a
+non-positive count when the workflow is defined.
+
+`readout_duration` is session-scoped in Qubex. QDash passes the shared value when constructing the
+Experiment, records the effective value on each task that uses the session readout pulse, and rejects
+a per-task value that differs from the session. When no shared value is set, the session starts
+from `DEFAULT_READOUT_DURATION` (1024 ns), the same default every declaring task uses, rather than
+from the Qubex default or the chip's `measurement_defaults.yaml`; a pipeline spec or flow therefore
+only needs a shared `readout_duration` to run with a different value. Qubex spectroscopy is an intentional exception:
+qubit/control spectroscopy uses its dedicated 1024 ns pulse and resonator spectroscopy uses its
+dedicated 8192 ns pulse, so those tasks do not expose the shared `readout_duration` parameter.
+
+`QubexTask.preprocess()` then resolves each declared Input parameter by following the input
+spec's resolution policy and produces an effective `InputParameterModel` for the task instance.
+After preprocess, `TaskExecutor._apply_input_overrides()` replaces that baseline with every
+explicit input override, so an override wins over the database value even in a normal workflow.
+
+`CalibService.execute_task()` and `execute_task_batch()` take call-level `parameters` in the
+form of one `task_parameters` entry. They take precedence over the service's `task_parameters`
+for that call only, which suits values computed at run time, such as the MUX IDs that
+the `ConfigureAll` step passes to the `ConfigureAll` task:
+
+```python
+service.execute_task("CheckRabi", "0", parameters={"input": {"control_amplitude": 0.05}})
+```
+
+The task records the merged explicit values when it is created: input overrides in
+`BaseTask.input_overrides` and run values in `BaseTask.run_overrides`. Creation fails for an
+undeclared name or when the input spec sets `user_override="forbidden"`; scalar values are
+converted to the declared `value_type`, and a sweep parameter takes the `value_type` of the sweep
+it was given. Batch execution has no preprocess step, so
+`TaskExecutor.execute_batch()` rejects a task that carries input overrides.
+
+`task_details` is the deprecated call-level form keyed by task name. `execute_task` still accepts
+it with a `DeprecationWarning` and converts its keys: `run`, `run_parameters`, and the older
+`input_parameters` become `run`; `input` and `calibration_inputs` become `input`.
+
+```mermaid
+flowchart TD
+    A[InputParameterSpec] --> B{User override supplied?}
+    B -->|Yes| C{user_override}
+    C -->|allowed| U[Use user value]
+    C -->|forbidden| X[Reject execution]
+    B -->|No| R{resolution}
+    R -->|database_required| D{DB value exists?}
+    D -->|Yes| V[Use DB value]
+    D -->|No| X
+    R -->|database_or_default| F{DB value exists?}
+    F -->|Yes| V
+    F -->|No| G[Use default]
+    R -->|default_only| G
+    U --> P[Resolved InputParameterModel]
+    V --> P
+    G --> P
+```
+
+The effective Input and Run parameter models are recorded in task result history for provenance and later snapshot re-execution.
+
+## Execution-level parameter policy
+
+The operation itself determines the baseline; no additional source selector is needed:
+
+| Operation | Calibration input baseline | Run parameter baseline | Output persistence default |
+| --- | --- | --- | --- |
+| Normal workflow | Current DB, following task input specs | Task/workflow specs | Enabled |
+| Tasks quick run | Current DB, following task input specs | Task specs and submitted overrides | Disabled |
+| Task re-execution | Source task snapshot | Source task snapshot | Existing re-execution setting |
+
+This gives `re-execution` one stable meaning: reproduce the recorded execution conditions, optionally with explicit parameter overrides. Running the same task against current calibration state is a new Tasks quick run, not a re-execution mode.
+
+`user_override` and `persist_output_parameters` remain independent policies. A permitted override has the highest precedence; choosing to persist new outputs does not change how inputs were selected.
+
+```mermaid
+flowchart TD
+    A[Start execution] --> B{Operation}
+    B -->|Workflow or Tasks quick run| C[Resolve current DB and declared defaults]
+    B -->|Re-execution| E[Load effective inputs from source history]
+    C --> F[Apply input spec resolution]
+    E --> G{Snapshot complete?}
+    G -->|Yes| H[Selected baseline]
+    G -->|No| X[Fail with missing snapshot input]
+    F --> H
+    H --> I{User override supplied?}
+    I -->|No| J[Use selected baseline]
+    I -->|Yes, allowed| K[Use user value]
+    I -->|Yes, forbidden| X
+```
+
+A re-execution must not silently fall back to current database values. Such fallback would make it non-reproducible. Missing required snapshot data should fail with an actionable error; the operator can then start a new Tasks quick run against current state.
+
+### Model boundaries
+
+Task classes declare immutable intent with `InputParameterSpec`, `RunParameterSpec`, and `OutputParameterSpec`. Each task instance receives the matching mutable runtime model: `InputParameterModel`, `RunParameterModel`, and `OutputParameterModel`. All three specs use `default` for their initial value and expose `create_model()` for the conversion.
+
+The three runtime models may share persisted calibration metadata internally, but their distinct types keep input, run, and output roles visible at API boundaries and in type checking.
+
+```mermaid
+flowchart LR
+    D[InputParameterSpec<br/>task input spec] --> R[CalibrationInputResolver]
+    P[Execution context<br/>fresh or re-execution] --> R
+    S[Snapshot history] --> R
+    DB[Calibration DB] --> R
+    O[Permitted user overrides] --> R
+    R --> V[InputParameterModel<br/>effective task value]
+    V --> T[Task preprocess and run]
+    V --> H[Task result history]
+```
+
+## Snapshot re-execution
+
+### Re-execution behavior
+
+For a single-task re-execution, `CalibService` passes `source_task_id` to `SnapshotParameterLoader`, which loads that exact task result. `task_name` and `qid` then validate that the selected history record matches the requested task. This avoids resolving an already identified task indirectly through its execution.
+
+`TaskExecutor` applies parameters in this sequence:
+
+1. Construct the task from class defaults and the request's overrides.
+2. Require a matching source snapshot and validate its declared Input coverage.
+3. Replace Input and Run collections with the snapshot, with the task's `input_overrides` and
+   `run_overrides` merged on top.
+4. Mark calibration Inputs as resolved, so `preprocess()` cannot refresh them from the database.
+5. Reapply only explicit input overrides.
+6. Run the experiment and record the resulting effective parameters.
+
+```mermaid
+sequenceDiagram
+    participant O as Orchestrator
+    participant S as SnapshotParameterLoader
+    participant H as Task result history
+    participant T as TaskExecutor
+    participant P as Task preprocess
+
+    O->>S: Create with source_task_id
+    O->>T: Construct task with defaults and request overrides
+    T->>S: Request snapshot for expected task_name and qid
+    S->>H: find_one(project_id, source_task_id)
+    H-->>S: Exact source task result
+    S->>S: Validate result name and qid
+    S-->>T: Recorded Input and Run parameters
+    T->>T: Apply snapshot with explicit overrides merged
+    T->>T: Mark calibration inputs resolved
+    T->>P: preprocess(backend, qid)
+    P-->>T: PreProcessResult without calibration DB reload
+    T->>T: Reapply explicit input overrides only
+    T->>T: Run, postprocess, and record effective values
+```
+
+The second override application preserves values computed during preprocessing while guaranteeing that explicit user input remains authoritative. The snapshot marker prevents preprocessing from replacing calibration inputs with current database values.
+
+Calibration inputs are resolved before task preprocessing and passed as `InputParameterModel` values:
+
+```text
+Execution request
+  -> CalibrationInputResolver(operation context)
+  -> Apply permitted user overrides
+  -> Task.preprocess(resolved inputs)
+  -> Task.run()
+```
+
+Task preprocessing may compute derived runtime values, but it must not independently change the selected point-in-time source. Database access for declared calibration inputs belongs to `CalibrationInputResolver`.
+
+### Effective-input validation
+
+Numeric constraints such as `greater_than` and `less_than` belong to `InputParameterSpec`. The executor validates them after database or snapshot resolution and after user overrides, but before `run()`.
+
+Concrete task `preprocess()` and `run()` methods must treat Input and Run parameters as read-only. They must not repair an invalid value, replace it with a default, or otherwise change the effective parameter collections. A missing database value may select the specified default only when the input spec uses `database_or_default()`; a present but invalid database, snapshot, or override value fails execution.
+
+For a single-task re-execution, a missing `source_task_id`, a mismatch between the selected result and the requested task, or incomplete declared snapshot inputs causes execution to fail instead of silently changing its baseline.
+
+### Single-task result re-execution
+
+`POST /task-results/{task_id}/re-execute` invokes the system `single-task-executor` with the source execution and source task IDs. It accepts task-level overrides in this shape:
+
+```json
+{
+  "parameter_overrides": {
+    "input": {"qubit_frequency": 5.1},
+    "run": {"shots": 2000}
+  }
+}
+```
+
+`single-task-executor` turns `parameter_overrides` into the requested task's entry in
+`task_parameters`, so the overrides apply to that task only and not to a `Configure` step run
+before it. The source task ID both selects the recorded parameter snapshot and links the child
+result to its parent. The source execution ID remains execution context; it is not used to re-identify the single source task.
+
+This endpoint is available for API clients that require exact snapshot re-execution. The Tasks UI instead offers **Run again**, which uses the current task definition and prefills compatible values from the selected historical result.
+
+## Tasks page quick run
+
+`POST /tasks/{task_name}/execute` also uses `single-task-executor`, but sets `source_execution_id` to `None`.
+
+- `input_parameter_overrides` becomes `parameter_overrides.input` and then the selected task's
+  `input` entry in `task_parameters`.
+- `run_parameter_overrides` becomes the `task_run_parameters` argument of
+  `single-task-executor`, which converts it to the selected task's `run` entry.
+- No `SnapshotParameterLoader` is needed for the overrides: the task carries them and
+  `TaskExecutor` reapplies the input overrides after preprocessing.
+- When `source_task_id` is supplied by **Run again**, it records provenance without restoring the source snapshot; the submitted form values and current task definition remain authoritative.
+- With no Input override, Qubex preprocessing loads current database values normally.
+
+The Tasks page **Reload** action is client-side preparation only. It reads the selected qubit or coupling record and fills the form. The server treats every non-empty submitted field as an explicit override; it does not distinguish a typed value from a value inserted by Reload.
+
+## Output persistence
+
+`persist_output_parameters` controls authoritative write-back. When false, task history, execution state, figures, raw data, and in-memory output processing still occur, but `BackendSaver` skips calibration database and backend parameter writes.
+
+Normal workflows apply validated task outputs by default. A workflow template can make one task
+measurement-only by setting `update_calibration_parameters` in that task's
+`task_parameters` entry:
+
+```python
+cal = CalibService(
+    username,
+    chip_id,
+    task_parameters={
+        "CheckChevron": {
+            "update_calibration_parameters": False,
+        }
+    },
+)
+```
+
+The key is an execution policy and is not passed to the task or recorded as a Run parameter. A direct `execute_task` call can also put
+the key in its `parameters`; that call-level value takes precedence over the service
+configuration. When both are omitted, the task inherits the execution-level value: normal
+workflows default to `True`, while Tasks quick runs default to `False`.
+
+A successful measurement-only task keeps its outputs in task history and metrics but does not
+replace current calibration values, update the workflow's in-memory calibration state, or update
+mapped backend files. Its output parameters explicitly record `database_updated: false`, allowing
+Task Result views to label it as measurement-only. Persisted outputs record `database_updated:
+true` with `previous_database_value`, which the UI presents as a Previous/New comparison.
+Validation-rejected outputs are still cleared before history aggregation;
+figures, raw data, quality metrics, and the validation message remain available for diagnosis
+without introducing rejected values into Metrics.
+
+When persistence is enabled:
+
+- Qubit outputs update the qubit calibration repository.
+- Coupling outputs update the coupling calibration repository.
+- Successful qubit outputs are synchronized through the backend parameter updater.
+- Failed validation skips backend parameter updates unless `force_update_params` is true.
+
+The API field `update_params` is passed to `single-task-executor` as `force_update_params` and also controls GitHub integration for that run. It does not replace `persist_output_parameters`; persistence must be enabled before output values can be written.
+
+## Implementation files
+
+- `src/qdash/workflow/calibtasks/base.py`
+- `src/qdash/workflow/calibtasks/qubex/base.py`
+- `src/qdash/workflow/engine/orchestrator.py`
+- `src/qdash/workflow/engine/task_parameters.py`
+- `src/qdash/workflow/engine/task/snapshot_loader.py`
+- `src/qdash/workflow/engine/task/executor.py`
+- `src/qdash/workflow/engine/task/backend_saver.py`
+- `src/qdash/workflow/service/calib_service.py`
+- `src/qdash/workflow/service/single_task_flow.py`

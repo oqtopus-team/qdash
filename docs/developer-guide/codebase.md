@@ -9,7 +9,13 @@ QDash keeps application code and generated clients in the following areas.
 | Workflow | `src/qdash/workflow/` | Prefect flows, deployment service, user flow worker, scheduler, task execution |
 | Shared model/repository code | `src/qdash/common/`, `src/qdash/datamodel/`, `src/qdash/dbmodel/`, `src/qdash/repository/` | Shared config, document models, repositories |
 | Python client | `clients/python/` | Typed client package and service wrappers |
-| TypeScript client | `clients/typescript/` | Standalone generated TypeScript client |
+| TypeScript client | `clients/typescript/` | Published client; local workspace dependency of pi-qdash |
+| Agent runtime | `agent-runtime/` | Copilot sessions and host integration for pi tools |
+| Pi extensions | `packages/pi-qdash/`, `packages/pi-qcaleval/` | Independently published tools and skills |
+
+The runtime, TypeScript client, and pi extensions share the root Bun workspace and
+`bun.lock`. The UI and docs keep separate installs. See [Pi Packages](./copilot/packages.md)
+for setup and [Pi Extension Design](./copilot/extensions.md) for extension boundaries.
 
 ## Generated Files
 

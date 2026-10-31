@@ -1,0 +1,56 @@
+{
+  "name": "@oqtopus-team/pi-qdash",
+  "version": "0.1.10",
+  "description": "Pi extension for querying QDash via @oqtopus-team/qdash-client",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "OQTOPUS Team <oqtopus-team@googlegroups.com>",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oqtopus-team/qdash.git",
+    "directory": "packages/pi-qdash"
+  },
+  "homepage": "https://github.com/oqtopus-team/qdash/tree/develop/packages/pi-qdash#readme",
+  "bugs": "https://github.com/oqtopus-team/qdash/issues",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "qdash"
+  ],
+  "files": [
+    "extensions",
+    "skills"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@oqtopus-team/qdash-client": "workspace:*"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/qdash.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "rm -rf .test-dist && tsc --noEmit false --outDir .test-dist && node --test tests/*.test.mjs; status=$?; rm -rf .test-dist; exit $status"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "1.4.0",
+    "typebox": "^1.0.55",
+    "typescript": "^5.8.0",
+    "@earendil-works/pi-tui": "1.4.0"
+  }
+}

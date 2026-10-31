@@ -12,9 +12,6 @@ if TYPE_CHECKING:
 import pytest
 
 from qdash.client import (
-    AiReviewListResponse,
-    AiReviewRunDetailResponse,
-    AiReviewRunListResponse,
     CancelExecutionResponse,
     ChipResponse,
     CouplingResponse,
@@ -786,7 +783,7 @@ def test_chip_topology_read_helpers_return_models() -> None:
         client.close()
 
 
-def test_task_file_flow_and_ai_review_read_helpers_return_models() -> None:
+def test_task_file_and_flow_read_helpers_return_models() -> None:
     issue_payload = {
         "id": "issue-1",
         "task_id": "task-1",
@@ -827,25 +824,6 @@ def test_task_file_flow_and_ai_review_read_helpers_return_models() -> None:
         "failure_modes": [{"severity": "warning", "description": "Noisy curve"}],
         "tips": ["Inspect the fitted decay"],
         "prompt_text": "Review t1",
-    }
-    review_run_payload: dict[str, object] = {
-        "review_run_id": "run-1",
-        "trigger_type": "manual_chip_bulk",
-        "chip_id": "chip-a",
-        "task_name": "t1",
-        "entity_type": "qubit",
-        "execution_ids": ["exec-1"],
-        "requested_by": "operator",
-        "requested_at": "2026-01-01T00:00:00Z",
-        "completed_at": None,
-        "model": "gpt-test",
-        "total": 0,
-        "completed_count": 0,
-        "failed_count": 0,
-        "running_count": 0,
-        "requested_count": 0,
-        "decision_counts": {},
-        "status_counts": {},
     }
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -904,32 +882,6 @@ def test_task_file_flow_and_ai_review_read_helpers_return_models() -> None:
                         "updated_at": "2026-01-01T00:00:00Z",
                     },
                 )
-            case "/task-results/ai-review":
-                assert request.url.params.get("chip_id") == "chip-a"
-                assert request.url.params.get("task_name") == "t1"
-                assert request.url.params.get("status") == "completed"
-                assert request.url.params.get("decision") == "accept"
-                assert request.url.params.get("latest_only") == "true"
-                return httpx.Response(
-                    200,
-                    json={
-                        "items": [],
-                        "total": 0,
-                        "skip": 2,
-                        "limit": 5,
-                        "decision_counts": {},
-                        "status_counts": {},
-                    },
-                )
-            case "/task-results/ai-review/runs":
-                assert request.url.params.get("chip_id") == "chip-a"
-                assert request.url.params.get("task_name") == "t1"
-                return httpx.Response(
-                    200,
-                    json={"items": [review_run_payload], "total": 1, "skip": 0, "limit": 10},
-                )
-            case "/task-results/ai-review/runs/run-1":
-                return httpx.Response(200, json={"run": review_run_payload, "items": []})
         return httpx.Response(404, json={"detail": "missing"})
 
     client = _build_client(httpx.MockTransport(handler), api_token="api-token")
@@ -946,23 +898,6 @@ def test_task_file_flow_and_ai_review_read_helpers_return_models() -> None:
         assert isinstance(client.get_task_knowledge("t1"), TaskKnowledgeResponse)
         assert client.get_task_knowledge_markdown("t1") == "# T1"
         assert isinstance(client.get_task_note("task-1"), NoteModel)
-        assert isinstance(
-            client.list_task_result_ai_reviews(
-                chip_id="chip-a",
-                task_name="t1",
-                status="completed",
-                decision="accept",
-                latest_only=True,
-                skip=2,
-                limit=5,
-            ),
-            AiReviewListResponse,
-        )
-        assert isinstance(
-            client.list_task_result_ai_review_runs(chip_id="chip-a", task_name="t1", limit=10),
-            AiReviewRunListResponse,
-        )
-        assert isinstance(client.get_task_result_ai_review_run("run-1"), AiReviewRunDetailResponse)
     finally:
         client.close()
 
@@ -1674,11 +1609,11 @@ def test_agent_session_client_methods() -> None:
         client.close()
 
 
-def test_agent_campaign_commit_client_methods() -> None:
+def test_agent_candidate_set_commit_client_methods() -> None:
     payload = {
-        "commit_id": "campaign-commit-1",
+        "commit_id": "candidate-set-commit-1",
         "session_id": "session-1",
-        "idempotency_key": "campaign-key",
+        "idempotency_key": "plan-key",
         "chip_id": "chip-a",
         "qid": "Q00",
         "candidates": [
@@ -1709,9 +1644,9 @@ def test_agent_campaign_commit_client_methods() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
-            assert request.url.path == "/agent-sessions/session-1/campaign-commits"
+            assert request.url.path == "/agent-sessions/session-1/candidate-set-commits"
             assert json.loads(request.read()) == {
-                "idempotency_key": "campaign-key",
+                "idempotency_key": "plan-key",
                 "expected_state_version": 1,
                 "candidates": [
                     {
@@ -1722,12 +1657,14 @@ def test_agent_campaign_commit_client_methods() -> None:
                 ],
             }
             return httpx.Response(201, json=payload)
-        assert request.url.path == ("/agent-sessions/session-1/campaign-commits/campaign-commit-1")
+        assert request.url.path == (
+            "/agent-sessions/session-1/candidate-set-commits/candidate-set-commit-1"
+        )
         return httpx.Response(200, json=payload)
 
     client = _build_client(httpx.MockTransport(handler), api_token="api-token")
     try:
-        committed = client.commit_agent_campaign_candidates(
+        committed = client.commit_agent_candidate_set(
             "session-1",
             [
                 {
@@ -1736,11 +1673,11 @@ def test_agent_campaign_commit_client_methods() -> None:
                     "task_id": "task-1",
                 }
             ],
-            idempotency_key="campaign-key",
+            idempotency_key="plan-key",
             expected_state_version=1,
         )
         assert committed.candidates[0].parameter_name == "t1"
-        fetched = client.get_agent_campaign_commit("session-1", "campaign-commit-1")
+        fetched = client.get_agent_candidate_set_commit("session-1", "candidate-set-commit-1")
         assert fetched.commit_id == committed.commit_id
     finally:
         client.close()
@@ -1927,3 +1864,43 @@ def test_agent_polling_helpers_timeout() -> None:
             )
     finally:
         client.close()
+
+
+@pytest.mark.parametrize(("source", "expected"), [(None, None), ("exec-1", "exec-1")])
+def test_execute_agent_action_sends_the_source_execution_only_when_given(
+    source: str | None, expected: str | None
+) -> None:
+    """The source execution is provenance only; the task runs on current calibration state."""
+    sent: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "action_id": "action-1",
+                "session_id": "session-1",
+                "idempotency_key": "key",
+                "action_type": "run_task",
+                "task_name": "CheckRabi",
+                "qids": ["Q04"],
+                "parameter_overrides": {},
+                "diagnosis": "",
+                "decision": "authorized",
+                "reason": "allowed",
+                "execution_status": "queued",
+                "state_version_before": 0,
+                "state_version_after": 1,
+                "created_at": "2026-10-12T00:00:00Z",
+            },
+        )
+
+    client = _build_client(httpx.MockTransport(handler), api_token="api-token")
+    try:
+        client.execute_agent_action("session-1", "action-1", source_execution_id=source)
+    finally:
+        client.close()
+
+    assert sent[0].get("source_execution_id") == expected
+    assert ("source_execution_id" in sent[0]) is (source is not None)
+    assert sent[0]["update_params"] is False

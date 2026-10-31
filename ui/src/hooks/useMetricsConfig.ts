@@ -24,6 +24,11 @@ interface ThresholdConfig {
   range: ThresholdRange;
 }
 
+interface ColorRangeConfig {
+  min: number;
+  max: number;
+}
+
 interface MetricMetadata {
   title: string;
   unit: string;
@@ -31,6 +36,7 @@ interface MetricMetadata {
   description?: string;
   evaluation: EvaluationConfig;
   threshold?: ThresholdConfig;
+  color_range?: ColorRangeConfig;
 }
 
 interface CdfGroup {
@@ -72,6 +78,8 @@ export interface MetricConfig {
     value: number;
     range: ThresholdRange;
   };
+  /** Default heatmap color range in raw (unscaled) units, when the YAML sets one. */
+  colorRange?: ColorRangeConfig;
 }
 
 /**
@@ -124,6 +132,7 @@ export function useMetricsConfig(enabled = true) {
               range: metadata.threshold.range,
             }
           : undefined,
+        colorRange: metadata.color_range,
       }),
     );
 
@@ -142,6 +151,7 @@ export function useMetricsConfig(enabled = true) {
               range: metadata.threshold.range,
             }
           : undefined,
+        colorRange: metadata.color_range,
       }),
     );
 

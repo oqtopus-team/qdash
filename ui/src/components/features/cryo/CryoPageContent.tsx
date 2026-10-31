@@ -1,6 +1,9 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { AlertCircle, CircleDot, Cpu, Plus, Refrigerator, RotateCcw, X } from "lucide-react";
 
@@ -19,6 +22,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { CryostatCard } from "./CryostatCard";
@@ -83,8 +87,8 @@ export function CryoPageContent() {
       <div className="flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <PageHeader
-            title="Cryostats & Cool-downs"
-            description="Manage cryostats and their cool-down cycles. Assign chips to a cool-down so calibration data gets tagged at write time."
+            title="Cryo"
+            description="Cryostats and cool-down cycles; chips assigned to a cool-down tag their calibration data"
             className="mb-0"
           />
           {showNewCryostatHeaderBtn && (
@@ -104,7 +108,7 @@ export function CryoPageContent() {
           <div className="alert alert-error" role="alert">
             <AlertCircle className="h-5 w-5" aria-hidden="true" />
             <div className="min-w-0 flex-1">
-              <div className="font-semibold">Failed to load cryogenic operations</div>
+              <div className="font-medium">Failed to load cryogenic operations</div>
               <div className="text-sm opacity-80">
                 Cryostats or cool-down history could not be retrieved. Existing data has not been
                 changed.
@@ -212,7 +216,7 @@ function CryoOverview({
               aria-hidden="true"
             />
           </div>
-          <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
+          <div className="mt-1 text-2xl font-medium tabular-nums">{value}</div>
         </div>
       ))}
     </section>
@@ -248,82 +252,169 @@ function CryoLoadingSkeleton() {
   );
 }
 
-function NewCryostatModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const create = useCreateCryostat();
-  const [cryoId, setCryoId] = useState("");
-  const [name, setName] = useState("");
-  const [location, setLocation] = useState("");
-  const [manufacturer, setManufacturer] = useState("");
-  const [model, setModel] = useState("");
+/** Zod schema for the new cryostat form; limits mirror the backend CryostatCreateRequest. */
+const newCryostatSchema = z.object({
+  cryoId: z
+    .string()
+    .trim()
+    .min(1, "Cryo ID is required")
+    .max(100, "Cryo ID must be 100 characters or fewer"),
+  name: z.string().trim().max(200, "Name must be 200 characters or fewer"),
+  manufacturer: z.string().trim().max(200, "Manufacturer must be 200 characters or fewer"),
+  model: z.string().trim().max(200, "Model must be 200 characters or fewer"),
+  location: z.string().trim().max(200, "Location must be 200 characters or fewer"),
+});
 
-  const handleCreate = async () => {
-    if (!cryoId.trim()) return;
-    await create.mutateAsync({
-      data: {
-        cryo_id: cryoId.trim(),
-        name,
-        location,
-        manufacturer,
-        model,
-        status: "active",
-      },
-    });
-    onCreated();
-    onClose();
+type NewCryostatFormValues = z.infer<typeof newCryostatSchema>;
+
+/** Modal form for registering a new cryostat. */
+export function NewCryostatModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const create = useCreateCryostat();
+  const [serverError, setServerError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<NewCryostatFormValues>({
+    resolver: zodResolver(newCryostatSchema),
+    defaultValues: {
+      cryoId: "",
+      name: "",
+      manufacturer: "",
+      model: "",
+      location: "",
+    },
+  });
+
+  /** Creates the cryostat and surfaces API failures as a server error. */
+  const submit = async (values: NewCryostatFormValues) => {
+    setServerError(null);
+    try {
+      await create.mutateAsync({
+        data: {
+          cryo_id: values.cryoId,
+          name: values.name,
+          location: values.location,
+          manufacturer: values.manufacturer,
+          model: values.model,
+          status: "active",
+        },
+      });
+      onCreated();
+      onClose();
+    } catch (err) {
+      setServerError(getApiErrorMessage(err, "Failed to create cryostat"));
+    }
   };
+
+  /** Returns the input class names, adding the error style when invalid. */
+  const inputClass = (invalid: boolean) =>
+    `input input-sm input-bordered w-full${invalid ? " input-error" : ""}`;
 
   return (
     <ModalShell title="New cryostat" onClose={onClose} pending={create.isPending}>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Cryo ID" required>
-          <input
-            className="input input-sm input-bordered w-full"
-            value={cryoId}
-            onChange={(e) => setCryoId(e.target.value)}
-            placeholder="K-101"
-            autoFocus
-          />
-        </Field>
-        <Field label="Name">
-          <input
-            className="input input-sm input-bordered w-full"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Triton XL #2"
-          />
-        </Field>
-        <Field label="Manufacturer">
-          <input
-            className="input input-sm input-bordered w-full"
-            value={manufacturer}
-            onChange={(e) => setManufacturer(e.target.value)}
-            placeholder="Oxford Instruments"
-          />
-        </Field>
-        <Field label="Model">
-          <input
-            className="input input-sm input-bordered w-full"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder="Triton 200"
-          />
-        </Field>
-        <Field label="Location" wide>
-          <input
-            className="input input-sm input-bordered w-full"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="Lab B-204"
-          />
-        </Field>
-      </div>
-      <ModalFooter
-        onCancel={onClose}
-        onSubmit={handleCreate}
-        submitLabel="Create cryostat"
-        disabled={!cryoId.trim() || create.isPending}
-        pending={create.isPending}
-      />
+      <form onSubmit={handleSubmit(submit)} noValidate>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Cryo ID" required htmlFor="cryostat-cryo-id">
+            <input
+              id="cryostat-cryo-id"
+              className={inputClass(Boolean(errors.cryoId))}
+              {...register("cryoId")}
+              aria-invalid={Boolean(errors.cryoId)}
+              aria-describedby={errors.cryoId ? "cryostat-cryo-id-error" : undefined}
+              disabled={create.isPending}
+              placeholder="K-101"
+              autoFocus
+            />
+            {errors.cryoId && (
+              <p id="cryostat-cryo-id-error" className="mt-1 text-xs text-error">
+                {errors.cryoId.message}
+              </p>
+            )}
+          </Field>
+          <Field label="Name" htmlFor="cryostat-name">
+            <input
+              id="cryostat-name"
+              className={inputClass(Boolean(errors.name))}
+              {...register("name")}
+              aria-invalid={Boolean(errors.name)}
+              aria-describedby={errors.name ? "cryostat-name-error" : undefined}
+              disabled={create.isPending}
+              placeholder="Triton XL #2"
+            />
+            {errors.name && (
+              <p id="cryostat-name-error" className="mt-1 text-xs text-error">
+                {errors.name.message}
+              </p>
+            )}
+          </Field>
+          <Field label="Manufacturer" htmlFor="cryostat-manufacturer">
+            <input
+              id="cryostat-manufacturer"
+              className={inputClass(Boolean(errors.manufacturer))}
+              {...register("manufacturer")}
+              aria-invalid={Boolean(errors.manufacturer)}
+              aria-describedby={errors.manufacturer ? "cryostat-manufacturer-error" : undefined}
+              disabled={create.isPending}
+              placeholder="Oxford Instruments"
+            />
+            {errors.manufacturer && (
+              <p id="cryostat-manufacturer-error" className="mt-1 text-xs text-error">
+                {errors.manufacturer.message}
+              </p>
+            )}
+          </Field>
+          <Field label="Model" htmlFor="cryostat-model">
+            <input
+              id="cryostat-model"
+              className={inputClass(Boolean(errors.model))}
+              {...register("model")}
+              aria-invalid={Boolean(errors.model)}
+              aria-describedby={errors.model ? "cryostat-model-error" : undefined}
+              disabled={create.isPending}
+              placeholder="Triton 200"
+            />
+            {errors.model && (
+              <p id="cryostat-model-error" className="mt-1 text-xs text-error">
+                {errors.model.message}
+              </p>
+            )}
+          </Field>
+          <Field label="Location" wide htmlFor="cryostat-location">
+            <input
+              id="cryostat-location"
+              className={inputClass(Boolean(errors.location))}
+              {...register("location")}
+              aria-invalid={Boolean(errors.location)}
+              aria-describedby={errors.location ? "cryostat-location-error" : undefined}
+              disabled={create.isPending}
+              placeholder="Lab B-204"
+            />
+            {errors.location && (
+              <p id="cryostat-location-error" className="mt-1 text-xs text-error">
+                {errors.location.message}
+              </p>
+            )}
+          </Field>
+        </div>
+        {serverError && (
+          <div className="alert alert-error mt-3 py-2 text-xs" role="alert">
+            <span>{serverError}</span>
+          </div>
+        )}
+        <ModalFooter
+          onCancel={onClose}
+          submitLabel="Create cryostat"
+          disabled={create.isPending}
+          pending={create.isPending}
+        />
+      </form>
     </ModalShell>
   );
 }
@@ -410,20 +501,23 @@ function ModalShell({
   );
 }
 
+/** Labeled form field wrapper used by the cryo modals. */
 function Field({
   label,
   required,
   wide,
+  htmlFor,
   children,
 }: {
   label: string;
   required?: boolean;
   wide?: boolean;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className={wide ? "sm:col-span-2" : ""}>
-      <label className="block text-xs text-base-content/60 mb-1">
+      <label htmlFor={htmlFor} className="block text-xs text-base-content/60 mb-1">
         {label}
         {required && <span className="text-error ml-0.5">*</span>}
       </label>
@@ -432,6 +526,7 @@ function Field({
   );
 }
 
+/** Cancel and submit buttons shared by the cryo modals. */
 function ModalFooter({
   onCancel,
   onSubmit,
@@ -440,7 +535,7 @@ function ModalFooter({
   pending,
 }: {
   onCancel: () => void;
-  onSubmit: () => void;
+  onSubmit?: () => void;
   submitLabel: string;
   disabled: boolean;
   pending: boolean;
@@ -451,7 +546,7 @@ function ModalFooter({
         Cancel
       </button>
       <button
-        type="button"
+        type={onSubmit ? "button" : "submit"}
         className="btn btn-sm btn-primary"
         onClick={onSubmit}
         disabled={disabled}

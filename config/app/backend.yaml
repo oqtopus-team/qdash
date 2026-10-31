@@ -34,6 +34,9 @@ backends:
         - RabiOscillation
         - CheckRabi
         - CheckCoarseReadoutParams
+        - CheckCKP
+        - CheckQuantumEfficiency
+        - CheckCPMGNoiseSpectroscopy
         - CreateHPIPulse
         - CheckHPIPulse
         - CreatePIPulse
@@ -45,12 +48,23 @@ backends:
         - CheckDRAGHPIPulse
         - CreateDRAGPIPulse
         - CheckDRAGPIPulse
+        - CheckAdaptiveEFChevron
+        - CheckEFRabi
+        - CreateEFHPIPulse
+        - CreateEFPIPulse
+        - CheckAdaptiveFHChevron
+        - EFReadoutClassification
+        - CheckThermalExcitation
+        - CheckSpinLockSpectroscopy
+        - CheckReadoutMIST
         - ReadoutClassification
         - RandomizedBenchmarking
         - X90InterleavedRandomizedBenchmarking
         - X180InterleavedRandomizedBenchmarking
 
       Two Qubit:
+        - CheckCouplingStrength
+        - CheckJAZZ
         - CheckCrossResonance
         - CreateZX90
         - CheckZX90
@@ -66,6 +80,7 @@ backends:
 
       Other:
         - Configure
+        - ConfigureEF
         - ConfigureAll
         - LinkUp
         - CheckStatus

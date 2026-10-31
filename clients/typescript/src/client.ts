@@ -6,12 +6,12 @@ import { QDashConfig } from "./config.js";
 import { QDashNotFoundError } from "./errors.js";
 import type {
   AgentActionResponse,
-  AgentCampaignCommitResponse,
+  AgentCandidateSetCommitResponse,
   AgentCandidateCommitResponse,
   AgentCandidateResponse,
   AgentSessionPolicy,
   AgentActionType,
-  AgentCampaignCandidateReference,
+  AgentCandidateReference,
   FileTreeNode,
   ForumImageUploadResponse,
   ForumPostCreate,
@@ -109,6 +109,12 @@ export interface SubmitAgentActionOptions {
 export interface PollOptions {
   timeoutSeconds?: number;
   pollIntervalSeconds?: number;
+  /**
+   * For an execution that is one step of a pipeline run, wait for the whole
+   * run rather than that step (default true). The returned detail's
+   * `pipeline.status` then carries the run's outcome.
+   */
+  wholePipeline?: boolean;
 }
 
 export interface DownloadedFile {
@@ -421,9 +427,13 @@ export class QDashClient {
     this.validatePollOptions(timeoutSeconds, pollIntervalSeconds);
     const deadline = Date.now() + timeoutSeconds * 1_000;
     const terminal = new Set(["completed", "failed", "cancelled", "canceled", "crashed"]);
+    const wholePipeline = options.wholePipeline ?? true;
     while (true) {
       const execution = await this.getExecution(executionId);
-      if (terminal.has(execution.status.toLowerCase())) return execution;
+      // A pipeline step's own execution completes long before the run does.
+      const status =
+        wholePipeline && execution.pipeline ? execution.pipeline.status : execution.status;
+      if (terminal.has(status.toLowerCase())) return execution;
       if (Date.now() >= deadline) {
         throw new Error(
           `Execution '${executionId}' did not reach a terminal state within ${timeoutSeconds} seconds`,
@@ -475,15 +485,19 @@ export class QDashClient {
     });
   }
 
+  /**
+   * Dispatch one authorized agent action. The task runs like a Task Workbench run, on the
+   * current calibration state; `sourceExecutionId` only records what it was decided from.
+   */
   async executeAgentAction(
     sessionId: string,
     actionId: string,
-    options: { sourceExecutionId: string; updateParams?: boolean; reconfigure?: boolean },
+    options: { sourceExecutionId?: string; updateParams?: boolean; reconfigure?: boolean } = {},
   ): Promise<AgentActionResponse> {
     return this.post(
       `/agent-sessions/${pathPart(sessionId)}/actions/${pathPart(actionId)}/execute`,
       {
-        source_execution_id: options.sourceExecutionId,
+        ...(options.sourceExecutionId ? { source_execution_id: options.sourceExecutionId } : {}),
         update_params: options.updateParams ?? false,
         reconfigure: options.reconfigure ?? false,
       },
@@ -548,24 +562,24 @@ export class QDashClient {
     );
   }
 
-  async commitAgentCampaignCandidates(
+  async commitAgentCandidateSet(
     sessionId: string,
-    candidates: AgentCampaignCandidateReference[],
+    candidates: AgentCandidateReference[],
     options: { idempotencyKey: string; expectedStateVersion: number },
-  ): Promise<AgentCampaignCommitResponse> {
-    return this.post(`/agent-sessions/${pathPart(sessionId)}/campaign-commits`, {
+  ): Promise<AgentCandidateSetCommitResponse> {
+    return this.post(`/agent-sessions/${pathPart(sessionId)}/candidate-set-commits`, {
       idempotency_key: options.idempotencyKey,
       expected_state_version: options.expectedStateVersion,
       candidates,
     });
   }
 
-  async getAgentCampaignCommit(
+  async getAgentCandidateSetCommit(
     sessionId: string,
     commitId: string,
-  ): Promise<AgentCampaignCommitResponse> {
+  ): Promise<AgentCandidateSetCommitResponse> {
     return this.get(
-      `/agent-sessions/${pathPart(sessionId)}/campaign-commits/${pathPart(commitId)}`,
+      `/agent-sessions/${pathPart(sessionId)}/candidate-set-commits/${pathPart(commitId)}`,
     );
   }
 

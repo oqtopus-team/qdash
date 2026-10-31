@@ -41,6 +41,27 @@ async function responsePayload(response: Response): Promise<unknown> {
   }
 }
 
+/**
+ * Render an error `detail` as readable text.
+ *
+ * FastAPI validation errors carry a list of `{ loc, msg }` objects, which
+ * `String()` turns into "[object Object]" and hides which field was wrong.
+ */
+function formatDetail(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return detail.map(formatDetail).join("; ");
+  if (typeof detail === "object" && detail !== null) {
+    const { loc, msg } = detail as { loc?: unknown; msg?: unknown };
+    if (typeof msg === "string") {
+      // loc starts with where the value came from ("body", "query", ...).
+      const path = Array.isArray(loc) ? loc.slice(1).join(".") : "";
+      return path ? `${path}: ${msg}` : msg;
+    }
+    return JSON.stringify(detail);
+  }
+  return String(detail);
+}
+
 function errorMessage(response: Response, payload: unknown): string {
   let detail: unknown;
   if (typeof payload === "object" && payload !== null && "detail" in payload) {
@@ -49,7 +70,7 @@ function errorMessage(response: Response, payload: unknown): string {
     detail = payload;
   }
   const endpoint = response.url ? new URL(response.url).pathname : "<unknown>";
-  return `${response.status} ${endpoint}${detail ? `: ${String(detail)}` : ""}`;
+  return `${response.status} ${endpoint}${detail ? `: ${formatDetail(detail)}` : ""}`;
 }
 
 export class QDashTransport {

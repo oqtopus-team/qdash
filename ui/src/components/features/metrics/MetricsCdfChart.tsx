@@ -1,9 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Minimize2, MoveHorizontal } from "lucide-react";
 import { useId, useMemo, useState } from "react";
-import { FluentEmoji } from "@/components/ui/FluentEmoji";
 
 const Plot = dynamic(() => import("@/components/charts/Plot"), { ssr: false });
 
@@ -177,12 +176,12 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
 
   return (
     <div
-      className={`bg-base-100 rounded-lg shadow-sm border border-base-300 transition-all ${isCompact ? "max-w-xl mx-auto" : ""}`}
+      className={`bg-base-100 rounded-lg shadow-sm border border-base-300 transition-colors ${isCompact ? "max-w-xl mx-auto" : ""}`}
     >
       <div className="flex items-center px-2 py-1 min-h-10">
         <button
           type="button"
-          className="btn btn-sm btn-ghost min-h-0 h-8 flex-1 justify-start px-2 font-semibold"
+          className="btn btn-sm btn-ghost min-h-0 h-8 flex-1 justify-start px-2 font-medium"
           aria-expanded={isOpen}
           aria-controls={contentId}
           onClick={() => setIsOpen((open) => !open)}
@@ -200,7 +199,11 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
           onClick={() => setIsCompact((compact) => !compact)}
           title={isCompact ? "Expand width" : "Compact width"}
         >
-          <FluentEmoji name={isCompact ? "left-right" : "compress"} size={14} />
+          {isCompact ? (
+            <MoveHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+          ) : (
+            <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
           <span className="text-xs">{isCompact ? "Expand" : "Compact"}</span>
         </button>
       </div>

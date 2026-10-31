@@ -17,9 +17,11 @@ import {
 import type { GetChipNotesSummaryParams, NoteCommentModel } from "@/schemas";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor, type MentionCandidate } from "@/components/ui/MarkdownEditor";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import { formatForumPostTitle, getForumLabel } from "../forum/categories";
+import { ForumLabelBadge } from "../forum/ForumLabelBadge";
 
 export interface NoteEntry {
   targetId: string;
@@ -174,6 +176,7 @@ export function MetricNotePanel({
   const relatedForumPosts =
     forumPostsResponse?.data.posts.filter((post) => matchesForumTarget(post, chipId, targetId)) ??
     [];
+  const { labels: forumLabels } = useForumLabels();
 
   useEffect(() => {
     setLocalExisting(existing);
@@ -271,7 +274,7 @@ export function MetricNotePanel({
     >
       {/* Section header */}
       <div className="px-4 pt-4 pb-2 border-b border-base-300/70">
-        <div className="flex items-center gap-2 text-sm font-semibold">
+        <div className="flex items-center gap-2 text-sm font-medium">
           <StickyNote className="h-4 w-4 text-warning" />
           Pinned summary
         </div>
@@ -301,8 +304,8 @@ export function MetricNotePanel({
         <div className="rounded-md bg-base-100 border border-base-300 p-3 space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <span className="text-xs font-semibold">Linked forum discussions</span>
-              <p className="mt-0.5 text-[11px] leading-snug text-base-content/50">
+              <span className="text-xs font-medium">Linked forum discussions</span>
+              <p className="mt-0.5 text-xs leading-snug text-base-content/50">
                 Use for separate issues, images, MTG discussion, and resolved follow-up.
               </p>
             </div>
@@ -328,14 +331,13 @@ export function MetricNotePanel({
                       </span>
                       {(post.labels ?? []).length > 0 && (
                         <span className="mt-1 flex flex-wrap gap-1">
-                          {(post.labels ?? []).map((label) => {
-                            const labelDef = getForumLabel(label);
-                            return (
-                              <span key={label} className={`badge badge-xs ${labelDef.badgeClass}`}>
-                                {labelDef.label}
-                              </span>
-                            );
-                          })}
+                          {(post.labels ?? []).map((label) => (
+                            <ForumLabelBadge
+                              key={label}
+                              size="xs"
+                              label={getForumLabel(label, forumLabels)}
+                            />
+                          ))}
                         </span>
                       )}
                     </span>
@@ -354,7 +356,7 @@ export function MetricNotePanel({
 
         {(legacyMetricNote || (legacyMetricNotes && legacyMetricNotes.length > 0)) && (
           <details className="rounded-md bg-base-100 border border-base-300">
-            <summary className="px-3 py-2 cursor-pointer text-xs font-semibold flex items-center justify-between">
+            <summary className="px-3 py-2 cursor-pointer text-xs font-medium flex items-center justify-between">
               <span>
                 Legacy metric notes
                 <span className="ml-1 text-base-content/60 font-normal">
@@ -363,7 +365,7 @@ export function MetricNotePanel({
               </span>
               <span className="text-base-content/40 font-normal">old dashboard notes</span>
             </summary>
-            <div className="px-3 pb-2 text-[11px] text-base-content/50">
+            <div className="px-3 pb-2 text-xs text-base-content/50">
               Read-only notes originally written on individual metric cells. Use pinned summary or
               forum discussions for new notes.
             </div>
@@ -371,7 +373,7 @@ export function MetricNotePanel({
               {legacyMetricNote && (
                 <li className="border-l-2 border-warning pl-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold">{metricTitle}</span>
+                    <span className="font-medium">{metricTitle}</span>
                     <span className="text-base-content/50">
                       {legacyMetricNote.username} · {formatDateTime(legacyMetricNote.updatedAt)}
                     </span>
@@ -384,7 +386,7 @@ export function MetricNotePanel({
               {(legacyMetricNotes ?? []).map((note) => (
                 <li key={note.metricKey} className="border-l-2 border-base-300 pl-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold">{note.metricTitle}</span>
+                    <span className="font-medium">{note.metricTitle}</span>
                     <span className="text-base-content/50">
                       {note.username} · {formatDateTime(note.updatedAt)}
                     </span>
@@ -423,7 +425,7 @@ function ViewState({ existing, onEdit }: { existing?: TargetNoteEntry; onEdit: (
       <div className="rounded-md bg-base-100 border border-base-300 p-3">
         <MarkdownContent content={existing.content} />
       </div>
-      <div className="text-[11px] text-base-content/60 flex flex-wrap gap-x-2">
+      <div className="text-xs text-base-content/60 flex flex-wrap gap-x-2">
         <span>
           Last edited by{" "}
           <span className="font-medium text-base-content/80">{existing.username || "—"}</span>
@@ -470,7 +472,7 @@ function EditState({
         disabled={mutationPending}
         mentionCandidates={mentionCandidates}
       />
-      <div className="flex items-center justify-between text-[11px] text-base-content/50">
+      <div className="flex items-center justify-between text-xs text-base-content/50">
         <span className={isTooLong ? "text-error" : undefined}>{draft.length} / 5000</span>
         {existing?.updatedAt && (
           <span>

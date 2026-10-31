@@ -162,7 +162,7 @@ function TaskResultRow({
       <td className="min-w-52">
         <Link
           href={`/task-results/${item.task_id}`}
-          className="inline-flex max-w-full items-center gap-1 font-semibold text-primary hover:underline"
+          className="inline-flex max-w-full items-center gap-1 font-medium text-primary hover:underline"
           onClick={(event) => event.stopPropagation()}
         >
           <span className="truncate">{item.task_name || "Unnamed"}</span>
@@ -191,13 +191,13 @@ function TaskResultRow({
         {message ? (
           <div className="flex gap-2">
             {isFailure ? (
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-error" />
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-base-content/40" />
             ) : (
               <MessageSquareText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-base-content/35" />
             )}
             <div>
               <div
-                className={`line-clamp-2 text-xs ${isFailure ? "text-error/80" : "text-base-content/60"}`}
+                className={`line-clamp-2 text-xs ${isFailure ? "text-base-content/70" : "text-base-content/60"}`}
               >
                 {message}
               </div>
@@ -339,7 +339,7 @@ function ParameterPreview({
 
   return (
     <div className="rounded-lg border border-base-300">
-      <div className="border-b border-base-300 px-3 py-2 text-xs font-semibold text-base-content/70">
+      <div className="border-b border-base-300 px-3 py-2 text-xs font-medium text-base-content/70">
         {title}
       </div>
       {renderEntries(entries)}
@@ -354,7 +354,7 @@ function ParameterPreview({
           className="collapse collapse-arrow rounded-none border-t border-base-300 bg-base-100"
           open={!group.collapsed}
         >
-          <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-semibold">
+          <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-medium">
             <span className="flex items-center gap-2">
               {groupName}
               <span className="badge badge-xs badge-ghost">{group.entries.length}</span>
@@ -446,7 +446,7 @@ function TaskResultPreviewSidebar({
                 <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
               )}
             </div>
-            <h2 className="text-xl font-bold">{taskResult?.task_name || "Task Result"}</h2>
+            <h2 className="text-sm font-medium">{taskResult?.task_name || "Task Result"}</h2>
             {taskResult && (
               <ExecutionTaskProgress status={taskResult.status} note={taskResult.note} />
             )}
@@ -483,7 +483,7 @@ function TaskResultPreviewSidebar({
             <div className="space-y-4">
               {(figures.length > 0 || jsonFigures.length > 0) && (
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold">Figures</h3>
+                  <h3 className="mb-2 text-xs font-medium text-base-content/60">Figures</h3>
                   <div className="flex h-56 items-center gap-3 overflow-x-auto rounded-lg bg-base-200/60 p-3">
                     {figures.length > 0 ? (
                       figures.map((figure, index) => (
@@ -507,7 +507,7 @@ function TaskResultPreviewSidebar({
               )}
 
               <div className="rounded-lg bg-base-200/60 p-3">
-                <h3 className="mb-2 text-sm font-semibold">Metadata</h3>
+                <h3 className="mb-2 text-xs font-medium text-base-content/60">Metadata</h3>
                 <dl className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <dt className="text-base-content/50">Chip</dt>
@@ -650,7 +650,7 @@ export function TaskResultsPageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Task Results"
-        description="Review task outcomes across executions and focus on failed results."
+        description="Outcomes of every task across executions"
         actions={
           <span className="badge badge-neutral gap-1">
             <strong>{data?.total ?? 0}</strong> results

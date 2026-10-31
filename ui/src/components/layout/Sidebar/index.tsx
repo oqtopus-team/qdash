@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 import {
   BookOpen,
@@ -25,7 +26,6 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
-import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { DARK_THEMES } from "@/constants/themes";
 import { getNavigationSections } from "@/components/layout/navigation";
 import type { NavItem, NavSection } from "@/components/layout/navigation";
@@ -74,16 +74,140 @@ function SidebarLogo({ size, onClick }: { size: "sm" | "lg"; onClick: () => void
 function SectionHeader({ label, visible }: { label: string; visible: boolean }) {
   if (!visible) return null;
   return (
-    <li className="menu-title px-3 pb-1 pt-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-base-content/50">
-      {label}
-    </li>
+    <li className="menu-title px-3 pb-2 pt-5 text-xs font-medium text-base-content/50">{label}</li>
+  );
+}
+
+const MENU_CLASS = "menu w-full max-lg:flex-nowrap max-lg:[&>li]:flex-nowrap p-2 py-0";
+
+/** Resolves whether `item` owns the current route, honouring its `match` mode. */
+function isNavItemActive(item: NavItem, pathname: string): boolean {
+  return item.match === "prefix" ? pathname.startsWith(item.href) : pathname === item.href;
+}
+
+type IndicatorPlacement = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  /** False once the active route has left this section; the pill fades out in place. */
+  visible: boolean;
+  /**
+   * True only when the pill was already showing in this section, so a move to a
+   * sibling row slides. Entering a section from elsewhere snaps into place and
+   * fades in instead, which keeps every slide short.
+   */
+  slide: boolean;
+};
+
+/**
+ * Every section mounts its pill hidden at zero size, so the first time a section
+ * becomes active the pill already exists and its opacity can transition in.
+ */
+const HIDDEN_PLACEMENT: IndicatorPlacement = {
+  top: 0,
+  left: 0,
+  width: 0,
+  height: 0,
+  visible: false,
+  slide: false,
+};
+
+/**
+ * One navigation section with a single shared active-row highlight. The highlight
+ * is an absolutely positioned pill measured against the active link, so it can
+ * animate between rows: it slides within the section and fades when the active
+ * route crosses into another section. Row text colour still changes per link.
+ */
+function SidebarNavSection({
+  label,
+  headerVisible,
+  activeHref,
+  layoutKey,
+  children,
+}: {
+  label: string;
+  headerVisible: boolean;
+  activeHref: string | null;
+  /** Changes whenever the rail geometry changes, so the pill is re-measured. */
+  layoutKey: string;
+  children: ReactNode;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const previousHrefRef = useRef<string | null>(activeHref);
+  const [placement, setPlacement] = useState<IndicatorPlacement>(HIDDEN_PLACEMENT);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const measure = (allowSlide: boolean) => {
+      const active = container.querySelector<HTMLElement>('a[aria-current="page"]');
+      setPlacement((previous) => {
+        if (!active) {
+          return previous.visible ? { ...previous, visible: false, slide: false } : previous;
+        }
+        const containerRect = container.getBoundingClientRect();
+        const rect = active.getBoundingClientRect();
+        const box = {
+          top: rect.top - containerRect.top,
+          left: rect.left - containerRect.left,
+          width: rect.width,
+          height: rect.height,
+        };
+        // A re-measure that lands on the same box (such as the ResizeObserver's
+        // initial notification) must not touch `slide`, or it would cut short a
+        // slide that is still in flight.
+        const sameBox = (Object.keys(box) as (keyof typeof box)[]).every(
+          (key) => previous[key] === box[key],
+        );
+        if (sameBox && previous.visible) return previous;
+        return { ...box, visible: true, slide: allowSlide && previous.visible };
+      });
+    };
+
+    // Only a route change inside the section may slide; geometry changes
+    // (expand/collapse, font load, row visibility) reposition instantly.
+    const hrefChanged = previousHrefRef.current !== activeHref;
+    previousHrefRef.current = activeHref;
+    measure(hrefChanged);
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => measure(false));
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [activeHref, layoutKey]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <span
+        aria-hidden="true"
+        data-testid="sidebar-active-indicator"
+        data-state={placement.visible ? "visible" : "hidden"}
+        data-motion={placement.slide ? "slide" : "fade"}
+        className={`pointer-events-none absolute left-0 top-0 rounded-lg bg-primary/12 duration-200 ease-out motion-reduce:transition-none before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-primary ${
+          placement.slide ? "transition-[transform,width,height,opacity]" : "transition-opacity"
+        }`}
+        style={{
+          transform: `translate(${placement.left}px, ${placement.top}px)`,
+          width: placement.width,
+          height: placement.height,
+          opacity: placement.visible ? 1 : 0,
+        }}
+      />
+      <ul className={`${MENU_CLASS} relative`}>
+        <SectionHeader visible={headerVisible} label={label} />
+        {children}
+      </ul>
+    </div>
   );
 }
 
 /**
  * One in-app navigation row. Marks itself active from `pathname` (exact or
  * prefix match per `item.match`), truncates its label so a long entry cannot
- * widen the row, and closes the mobile drawer through `onClick`.
+ * widen the row, and closes the mobile drawer through `onClick`. The active
+ * background is drawn by the enclosing `SidebarNavSection`, not by the row.
  */
 function SidebarNavItem({
   item,
@@ -103,9 +227,8 @@ function SidebarNavItem({
   onClick: () => void;
 }) {
   const Icon = item.icon;
-  const active = item.match === "prefix" ? pathname.startsWith(item.href) : pathname === item.href;
+  const active = isNavItemActive(item, pathname);
   const showLabel = isOpen || isMobileOpen;
-  const badge = item.badge ?? 0;
 
   return (
     <li>
@@ -118,11 +241,6 @@ function SidebarNavItem({
       >
         <Icon size={18} />
         {showLabel && <span className="ml-2 truncate">{item.label}</span>}
-        {badge > 0 && (
-          <span className="badge badge-primary badge-xs ml-auto shrink-0">
-            {badge > 99 ? "99+" : badge}
-          </span>
-        )}
       </Link>
     </li>
   );
@@ -182,8 +300,6 @@ export function Sidebar() {
   const { canEdit } = useProject();
   const { user, logout: authLogout } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { data: unreadNotificationsResponse } = useUnreadNotificationCount();
-  const unreadNotifications = unreadNotificationsResponse?.data.unread_count ?? 0;
   const isAdmin = user?.system_role === "admin";
   const isDarkTheme = DARK_THEMES.includes(theme as (typeof DARK_THEMES)[number]);
 
@@ -231,26 +347,19 @@ export function Sidebar() {
 
   // Mobile sidebar style
   const linkClass = (active: boolean) =>
-    `relative min-h-10 px-3 mx-1 my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
-      active
-        ? "bg-primary/12 text-primary before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-primary"
-        : "text-base-content/75 hover:bg-base-300 hover:text-base-content"
+    `relative min-h-9 px-3 mx-1 my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
+      active ? "text-primary" : "text-base-content/75 hover:bg-base-300 hover:text-base-content"
     }`;
 
   // Desktop sidebar style
   const desktopLinkClass = (active: boolean) =>
     `relative min-h-9 ${isOpen ? "px-3 mx-1" : "px-2 mx-1 justify-center"} my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
-      active
-        ? "bg-primary/12 text-primary before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-primary"
-        : "text-base-content/75 hover:bg-base-300 hover:text-base-content"
+      active ? "text-primary" : "text-base-content/75 hover:bg-base-300 hover:text-base-content"
     }`;
 
   const sectionHeaderVisible = isOpen || isMobileOpen;
-  const navSections: NavSection[] = getNavigationSections({
-    canEdit,
-    isAdmin,
-    unreadNotifications,
-  });
+  const indicatorLayoutKey = `${isOpen}:${isMobileOpen}`;
+  const navSections: NavSection[] = getNavigationSections({ canEdit, isAdmin });
   const externalItems: ExternalNavItem[] = [
     {
       href: "https://oqtopus-team.github.io/qdash/",
@@ -272,38 +381,49 @@ export function Sidebar() {
     },
   ];
 
+  // `w-fit` keeps the stacked section lists as wide as the widest row, matching
+  // the single fit-content menu they replaced; the drawer stretches them instead.
   const sidebarContent = (
-    <>
-      <ul className="menu max-lg:w-full max-lg:flex-nowrap max-lg:[&>li]:flex-nowrap p-2 py-0">
-        {isOpen && (
+    <div className="flex w-fit flex-col max-lg:w-full">
+      {isOpen && (
+        <ul className={MENU_CLASS}>
           <li className="mb-1 hidden lg:block">
             <SidebarLogo size="lg" onClick={handleLinkClick} />
           </li>
-        )}
+        </ul>
+      )}
 
-        {navSections.map((section) => {
-          const visibleItems = section.items.filter((item) => item.visible !== false);
-          if (visibleItems.length === 0) return null;
+      {navSections.map((section) => {
+        const visibleItems = section.items.filter((item) => item.visible !== false);
+        if (visibleItems.length === 0) return null;
+        const activeHref =
+          visibleItems.find((item) => isNavItemActive(item, pathname))?.href ?? null;
 
-          return (
-            <Fragment key={section.label}>
-              <SectionHeader visible={sectionHeaderVisible} label={section.label} />
-              {visibleItems.map((item) => (
-                <SidebarNavItem
-                  key={item.href}
-                  item={item}
-                  isMobileOpen={isMobileOpen}
-                  isOpen={isOpen}
-                  pathname={pathname}
-                  linkClass={linkClass}
-                  desktopLinkClass={desktopLinkClass}
-                  onClick={handleLinkClick}
-                />
-              ))}
-            </Fragment>
-          );
-        })}
+        return (
+          <SidebarNavSection
+            key={section.label}
+            label={section.label}
+            headerVisible={sectionHeaderVisible}
+            activeHref={activeHref}
+            layoutKey={indicatorLayoutKey}
+          >
+            {visibleItems.map((item) => (
+              <SidebarNavItem
+                key={item.href}
+                item={item}
+                isMobileOpen={isMobileOpen}
+                isOpen={isOpen}
+                pathname={pathname}
+                linkClass={linkClass}
+                desktopLinkClass={desktopLinkClass}
+                onClick={handleLinkClick}
+              />
+            ))}
+          </SidebarNavSection>
+        );
+      })}
 
+      <ul className={MENU_CLASS}>
         <div className={`divider ${isMobileOpen ? "my-1" : "my-0"}`} />
         {externalItems
           .filter((item) => item.visible !== false)
@@ -319,7 +439,7 @@ export function Sidebar() {
             />
           ))}
       </ul>
-    </>
+    </div>
   );
 
   const userSection = (
@@ -371,7 +491,7 @@ export function Sidebar() {
           <div className="mb-3">
             <UserAvatar username={user?.username || ""} avatarKey={user?.avatar_key} size={64} />
           </div>
-          <h2 className="text-lg font-bold">{user?.username}</h2>
+          <h2 className="text-sm font-medium">{user?.username}</h2>
           {user?.display_name && (
             <p className="text-sm text-base-content/60">{user?.display_name}</p>
           )}
@@ -433,7 +553,7 @@ export function Sidebar() {
       {/* Desktop Sidebar */}
       <aside
         aria-label="Primary navigation"
-        className={`hidden h-full border-r border-base-300 bg-base-200 transition-all duration-300 lg:flex lg:flex-col ${
+        className={`hidden h-full border-r border-base-300 bg-base-200 transition-colors duration-300 lg:flex lg:flex-col ${
           isOpen ? "w-48" : "w-16"
         }`}
       >

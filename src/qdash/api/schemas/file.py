@@ -29,4 +29,4 @@ class ValidateFileRequest(BaseModel):
 class GitPushRequest(BaseModel):
     """Request model for Git push operation."""
 
-    commit_message: str = "Update config files from UI"
+    commit_message: str = "Update files from UI"

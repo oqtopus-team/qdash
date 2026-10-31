@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
+/**
+ * Run parameter values keyed by name. A bare value takes the task's declared type. A parameter that declares a generated range also takes {"value": [...], "value_type": ...} with np.linspace, np.logspace, np.arange, range, or list to run the sweep in another form.
+ */
 export type QuickRunTaskRequestRunParameterOverrides = { [key: string]: unknown };

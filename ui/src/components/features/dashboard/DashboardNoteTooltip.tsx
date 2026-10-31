@@ -86,17 +86,17 @@ export function DashboardNoteTooltip({
         zIndex: 9999,
       }}
     >
-      <div className="font-semibold tabular-nums">{header}</div>
+      <div className="font-medium tabular-nums">{header}</div>
       {hasTargetNote && targetNote && (
         <div className="space-y-1.5 border-l-2 border-warning pl-2">
-          <div className="text-[10px] uppercase tracking-wide text-warning">
+          <div className="text-xs text-warning">
             pinned summary
             {targetComments.length > 0 ? ` (${targetComments.length})` : ""}
           </div>
           {targetNote.content.trim() && (
             <div>
               <p className="whitespace-pre-wrap break-words">{targetNote.content}</p>
-              <div className="text-[10px] text-base-content/50 mt-0.5">
+              <div className="text-xs text-base-content/50 mt-0.5">
                 {targetNote.username || "-"}
                 {targetNote.updatedAt ? ` · ${formatDateTime(targetNote.updatedAt)}` : ""}
               </div>
@@ -107,14 +107,14 @@ export function DashboardNoteTooltip({
               {targetComments.slice(-3).map((comment) => (
                 <li key={comment.comment_id || `${comment.created_by}-${comment.created_at}`}>
                   <p className="whitespace-pre-wrap break-words">{comment.content}</p>
-                  <div className="text-[10px] text-base-content/50 mt-0.5">
+                  <div className="text-xs text-base-content/50 mt-0.5">
                     {comment.created_by || "-"}
                     {comment.created_at ? ` · ${formatDateTime(comment.created_at)}` : ""}
                   </div>
                 </li>
               ))}
               {targetComments.length > 3 && (
-                <li className="text-[10px] text-base-content/50">
+                <li className="text-xs text-base-content/50">
                   +{targetComments.length - 3} earlier entries
                 </li>
               )}
@@ -124,35 +124,31 @@ export function DashboardNoteTooltip({
       )}
       {current && (
         <div className="border-l-2 border-base-300 pl-2">
-          <div className="text-[10px] uppercase tracking-wide text-base-content/60">
-            legacy metric note
-          </div>
+          <div className="text-xs text-base-content/60">legacy metric note</div>
           <p className="whitespace-pre-wrap break-words">{current.content}</p>
-          <div className="text-[10px] text-base-content/50 mt-0.5">
+          <div className="text-xs text-base-content/50 mt-0.5">
             {current.username} · {formatDateTime(current.updatedAt)}
           </div>
         </div>
       )}
       {hasForumLinks && (
         <div className="space-y-1.5 border-l-2 border-info pl-2">
-          <div className="text-[10px] uppercase tracking-wide text-info">
-            linked forum discussions ({forumLinks.length})
-          </div>
+          <div className="text-xs text-info">linked forum discussions ({forumLinks.length})</div>
           <ul className="space-y-1.5">
             {forumLinks.slice(0, 6).map((post) => (
               <li key={post.id}>
-                <div className="font-semibold text-[11px]">
+                <div className="font-medium text-xs">
                   {post.number ? `#${post.number} ` : ""}
                   {post.title?.trim() || "Untitled discussion"}
                 </div>
-                <div className="text-[10px] text-base-content/50">
+                <div className="text-xs text-base-content/50">
                   {post.status || "open"} · {post.replyCount ?? 0} replies
                   {post.labels && post.labels.length > 0 ? ` · ${post.labels.join(", ")}` : ""}
                 </div>
               </li>
             ))}
             {forumLinks.length > 6 && (
-              <li className="text-[10px] text-base-content/50">
+              <li className="text-xs text-base-content/50">
                 +{forumLinks.length - 6} more discussions
               </li>
             )}
@@ -161,15 +157,15 @@ export function DashboardNoteTooltip({
       )}
       {others && others.length > 0 && (
         <div className="space-y-1.5">
-          <div className="text-[10px] uppercase tracking-wide text-base-content/60">
+          <div className="text-xs text-base-content/60">
             legacy notes on other metrics ({others.length})
           </div>
           <ul className="space-y-1.5">
             {others.map((n) => (
               <li key={n.metricKey} className="border-l-2 border-base-300 pl-2">
-                <div className="font-semibold text-[11px]">{n.metricTitle}</div>
+                <div className="font-medium text-xs">{n.metricTitle}</div>
                 <p className="whitespace-pre-wrap break-words text-base-content/80">{n.content}</p>
-                <div className="text-[10px] text-base-content/50">
+                <div className="text-xs text-base-content/50">
                   {n.username} · {formatDateTime(n.updatedAt)}
                 </div>
               </li>

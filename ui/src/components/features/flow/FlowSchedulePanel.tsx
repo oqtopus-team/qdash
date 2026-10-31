@@ -142,7 +142,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold">SCHEDULE</h3>
+      <h3 className="text-sm font-medium">Schedule</h3>
 
       {/* Schedule Type Toggle */}
       <div className="flex gap-2">
@@ -243,7 +243,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                   );
                 })}
               </select>
-              <span className="text-lg">:</span>
+              <span className="text-sm">:</span>
               <select
                 className="select select-bordered select-sm text-xs flex-1"
                 value={scheduledTime.split("T")[1]?.split(":")[1] || "00"}
@@ -288,7 +288,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       {/* Existing Schedules List */}
       <div className="divider my-2"></div>
 
-      <h4 className="text-xs font-semibold text-base-content/60 uppercase">Active Schedules</h4>
+      <h4 className="text-xs font-medium text-base-content/60">Active Schedules</h4>
 
       {isLoading ? (
         <div className="flex justify-center py-4">
@@ -368,7 +368,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       {/* Cron Expression Helper */}
       {scheduleType === "cron" && (
         <div className="bg-base-200 rounded p-3 mt-4">
-          <h5 className="text-xs font-semibold text-base-content/60 mb-2">Cron Examples</h5>
+          <h5 className="text-xs font-medium text-base-content/60 mb-2">Cron Examples</h5>
           <div className="space-y-1 text-xs text-base-content/50">
             <p>
               <code className="text-base-content">0 2 * * *</code> - Daily at 2:00 AM

@@ -2,10 +2,18 @@
   {
     "id": "bringup",
     "name": "Bring-up",
-    "description": "MUX-level bring-up calibration: ConfigureAll -> resonator spectroscopy. Requires explicit mux_ids and runs once per selected MUX.",
+    "description": "MUX-level bring-up calibration starting with resonator spectroscopy. Requires explicit mux_ids and runs once per selected MUX.",
     "category": "production",
     "filename": "bringup.py",
     "function_name": "bringup"
+  },
+  {
+    "id": "box_setup",
+    "name": "Box Setup",
+    "description": "Box setup with capture delay correction for QuEL-1 and QuEL-3: CorrectCaptureDelay once per MUX. Sweeps the capture delay with a fixed readout tone, then writes capture_delay.yaml (and capture_delay_word.yaml on QuEL-1). Requires explicit mux_ids; run first, before resonator spectroscopy.",
+    "category": "production",
+    "filename": "box_setup.py",
+    "function_name": "box_setup"
   },
   {
     "id": "check_waveform",
@@ -56,6 +64,22 @@
     "function_name": "fine_one"
   },
   {
+    "id": "ef_calibration",
+    "name": "EF Calibration",
+    "description": "Minimal GE pulse setup and EF-transition calibration: ConfigureEF -> GE Rabi -> GE HPI -> EF Chevron -> EF Rabi -> EF HPI -> EF PI -> three-state readout classification. Pre-calibrated GE Rabi, HPI, and DRAG pulses are not required; an existing GE control frequency and readout frequency/amplitude are required. Requires explicit mux_ids or qids and supports ge-ef-cr or ge-ef-fh control layouts.",
+    "category": "production",
+    "filename": "ef_calibration.py",
+    "function_name": "ef_calibration"
+  },
+  {
+    "id": "characterization",
+    "name": "Characterization",
+    "description": "End-to-end GE, optional EF, and coupling characterization with selectable stages. The selected MUXes are configured once using the layout required by the enabled tasks. Calibration failures filter dependent work, while characterization measurement failures are recorded without stopping later measurements. JAZZ measures static ZZ after optional EF work and calculates coupling strength when both qubits have calibrated anharmonicities in QDash.",
+    "category": "production",
+    "filename": "characterization.py",
+    "function_name": "characterization"
+  },
+  {
     "id": "full_calibration",
     "name": "Full Calibration",
     "description": "Complete calibration for explicitly selected mux_ids using step-based pipeline: ConfigureAll -> 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule (forward/reverse) -> 2Q.",
@@ -86,14 +110,6 @@
     "category": "production",
     "filename": "two_qubit_scheduled.py",
     "function_name": "two_qubit_scheduled"
-  },
-  {
-    "id": "parallel_retry",
-    "name": "Parallel Retry Calibration",
-    "description": "Parallel execution with @task + submit(). Demonstrates retry logic with frequency offset.",
-    "category": "advanced",
-    "filename": "retry.py",
-    "function_name": "parallel_retry_calibration"
   },
   {
     "id": "fake_calibration",

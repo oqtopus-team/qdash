@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import secrets
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
@@ -16,9 +17,12 @@ from starlette.exceptions import HTTPException
 
 from qdash.api.schemas.forum import (
     ForumCategoryResponse,
+    ForumLabelResponse,
     ForumPostResponse,
+    ForumTaskResultSummary,
     ForumThreadStatus,
     ListForumCategoriesResponse,
+    ListForumLabelsResponse,
     ListForumPostsResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
@@ -29,9 +33,11 @@ from qdash.dbmodel.forum import (
     FORUM_THREAD_STATUSES,
     ForumCategoryDocument,
     ForumCounterDocument,
+    ForumLabelDocument,
     ForumPostDocument,
 )
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
+from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
 
 if TYPE_CHECKING:
@@ -84,8 +90,7 @@ DEFAULT_FORUM_CATEGORIES = [
 ]
 
 CATEGORY_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
-ALLOWED_FORUM_LABELS = {"review", "anomaly"}
-LEGACY_FORUM_LABEL_ALIASES = {"discussion": "review", "info": "review", "mtg": "review"}
+LABEL_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 FORUM_IMAGE_DIR = CALIB_DATA_BASE / "forum"
 
 
@@ -109,6 +114,17 @@ def _normalize_forum_target(
     return chip[:128], kind, target[:128]
 
 
+def _linked_task_result(project_id: str, task_id: str | None) -> TaskResultHistoryDocument | None:
+    """The task result a thread is about, when one is named; unknown ids are rejected."""
+    value = task_id.strip() if isinstance(task_id, str) and task_id.strip() else None
+    if value is None:
+        return None
+    doc = TaskResultHistoryDocument.find_one({"project_id": project_id, "task_id": value}).run()
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Task result {value} not found")
+    return doc
+
+
 def _normalize_forum_cooldown(cooldown_id: str | None) -> str | None:
     value = cooldown_id.strip() if isinstance(cooldown_id, str) and cooldown_id.strip() else None
     return value[:128] if value else None
@@ -123,21 +139,17 @@ def _normalize_forum_assignee(assignee_username: str | None) -> str | None:
     return value[:64] if value else None
 
 
-def _normalize_forum_labels(labels: list[str] | None) -> list[str]:
-    """Normalize user-provided labels and keep at most one semantic label per thread."""
+def _dedupe_forum_label_keys(labels: list[str] | None) -> list[str]:
+    """Strip, lowercase, and dedupe raw label strings while preserving order."""
+    normalized: list[str] = []
+    seen: set[str] = set()
     for label in labels or []:
-        value = re.sub(r"[^a-z0-9_-]+", "-", label.strip().lower()).strip("-_")[:32]
-        if not value:
+        value = label.strip().lower() if isinstance(label, str) else ""
+        if not value or value in seen:
             continue
-        if value == "resolved":
-            raise HTTPException(
-                status_code=422, detail="Use thread status instead of resolved label"
-            )
-        value = LEGACY_FORUM_LABEL_ALIASES.get(value, value)
-        if value not in ALLOWED_FORUM_LABELS:
-            raise HTTPException(status_code=422, detail="Unknown forum label")
-        return [value]
-    return []
+        seen.add(value)
+        normalized.append(value)
+    return normalized
 
 
 def _normalize_forum_status(
@@ -295,9 +307,60 @@ class ForumService:
         )
 
     @staticmethod
-    def _to_response(doc: ForumPostDocument, reply_count: int = 0) -> ForumPostResponse:
-        """Convert a document to an API response."""
+    def _task_result_summaries(
+        project_id: str, task_ids: list[str | None]
+    ) -> dict[str, ForumTaskResultSummary]:
+        """Summaries of the task results the given threads are about, in one query."""
+        wanted = sorted({task_id for task_id in task_ids if task_id})
+        if not wanted:
+            return {}
+        docs = TaskResultHistoryDocument.find(
+            {"project_id": project_id, "task_id": {"$in": wanted}}
+        ).to_list()
+        return {
+            doc.task_id: ForumTaskResultSummary(
+                task_id=doc.task_id,
+                task_name=doc.name,
+                qid=doc.qid or "",
+                chip_id=doc.chip_id,
+                status=doc.status,
+                end_at=doc.end_at,
+                figure_path=list(doc.figure_path or []),
+                json_figure_path=list(doc.json_figure_path or []),
+            )
+            for doc in docs
+        }
+
+    @staticmethod
+    def _defined_label_keys(project_id: str, docs: list[ForumPostDocument]) -> set[str]:
+        """Return the stored label keys across docs that have a definition in the project."""
+        keys = {key for doc in docs for key in getattr(doc, "labels", [])}
+        if not keys:
+            return set()
+        return {
+            label.key
+            for label in ForumLabelDocument.find(
+                {"project_id": project_id, "key": {"$in": list(keys)}}
+            ).to_list()
+        }
+
+    @staticmethod
+    def _to_response(
+        doc: ForumPostDocument,
+        reply_count: int = 0,
+        task_result: ForumTaskResultSummary | None = None,
+        defined_label_keys: set[str] | None = None,
+    ) -> ForumPostResponse:
+        """Convert a document to an API response, omitting label keys that have no definition."""
         user = UserDocument.find_one({"user_id": doc.user_id}).run() if doc.user_id else None
+        labels = list(getattr(doc, "labels", []))
+        if labels:
+            defined = (
+                defined_label_keys
+                if defined_label_keys is not None
+                else ForumService._defined_label_keys(doc.project_id, [doc])
+            )
+            labels = [key for key in labels if key in defined]
         return ForumPostResponse(
             id=str(doc.id),
             project_id=doc.project_id,
@@ -310,12 +373,14 @@ class ForumService:
             content=doc.content,
             content_blocks=list(doc.content_blocks),
             parent_id=doc.parent_id,
-            labels=list(getattr(doc, "labels", [])),
+            labels=labels,
             assignee_username=getattr(doc, "assignee_username", None),
             chip_id=getattr(doc, "chip_id", None),
             target_type=getattr(doc, "target_type", None),
             target_id=getattr(doc, "target_id", None),
             cooldown_id=getattr(doc, "cooldown_id", None),
+            task_id=getattr(doc, "task_id", None),
+            task_result=task_result,
             reply_count=reply_count,
             status=_normalize_forum_status(getattr(doc, "status", None)),
             is_deleted=doc.is_deleted,
@@ -341,10 +406,25 @@ class ForumService:
 
     @staticmethod
     def format_ai_response_as_markdown(result: dict[str, Any]) -> str | None:
-        """Convert an AI response dict to Markdown."""
-        from qdash.api.services.issue_service import IssueService
+        """Convert an AI response dict to Markdown via ``blocks_to_markdown``.
 
-        return IssueService.format_ai_response_as_markdown(result)
+        Falls back to a JSON code block when the conversion returns empty.
+        Returns ``None`` only if even the fallback fails.
+        """
+        from qdash.copilot.blocks import blocks_to_markdown
+
+        markdown_content = blocks_to_markdown(result)
+        if markdown_content:
+            return markdown_content
+
+        logger.warning("blocks_to_markdown returned empty, full result=%s", result)
+        try:
+            import json
+
+            raw_json = json.dumps(result, indent=2, ensure_ascii=False)
+            return f"```json\n{raw_json}\n```"
+        except (TypeError, ValueError):
+            return None
 
     @staticmethod
     def _make_category_key(name: str) -> str:
@@ -497,6 +577,141 @@ class ForumService:
         doc.save()
         return SuccessResponse(message="Forum category archived")
 
+    @staticmethod
+    def _label_to_response(doc: ForumLabelDocument) -> ForumLabelResponse:
+        """Convert a label document to an API response."""
+        return ForumLabelResponse(
+            key=doc.key,
+            name=doc.name,
+            description=doc.description,
+            color=doc.color,
+        )
+
+    @staticmethod
+    def _make_label_key(name: str, existing_keys: set[str]) -> str:
+        """Create a stable, project-unique label key from a display name.
+
+        Slugifies the name; when nothing usable remains (e.g. a Japanese-only
+        name), falls back to a random ``label-xxxxxx`` key. Either way, a
+        collision with *existing_keys* is resolved with a ``-2``, ``-3``, ...
+        suffix (or a fresh random key) rather than failing the request.
+        """
+        base = re.sub(r"[^a-z0-9_-]+", "-", name.strip().lower())
+        base = re.sub(r"-+", "-", base).strip("-_")[:32]
+
+        if not base:
+            for _ in range(20):
+                candidate = f"label-{secrets.token_hex(3)}"
+                if candidate not in existing_keys:
+                    return candidate
+            raise HTTPException(status_code=500, detail="Failed to generate a label key")
+
+        if base not in existing_keys:
+            return base
+
+        for suffix in range(2, 1000):
+            suffix_text = f"-{suffix}"
+            candidate = f"{base[: 32 - len(suffix_text)]}{suffix_text}"
+            if candidate not in existing_keys and LABEL_KEY_RE.match(candidate):
+                return candidate
+        raise HTTPException(status_code=500, detail="Failed to generate a unique label key")
+
+    def _normalize_forum_labels(self, project_id: str, labels: list[str] | None) -> list[str]:
+        """Normalize user-provided labels and require each to exist for the project."""
+        normalized = _dedupe_forum_label_keys(labels)
+        if not normalized:
+            return []
+
+        docs = ForumLabelDocument.find(
+            {"project_id": project_id, "key": {"$in": normalized}}
+        ).to_list()
+        existing_keys = {doc.key for doc in docs}
+        if any(value not in existing_keys for value in normalized):
+            raise HTTPException(status_code=422, detail="Unknown forum label")
+        return normalized
+
+    def list_labels(self, *, project_id: str) -> ListForumLabelsResponse:
+        """List forum labels for a project."""
+        docs = (
+            ForumLabelDocument.find({"project_id": project_id})
+            .sort("system_info.created_at")
+            .to_list()
+        )
+        return ListForumLabelsResponse(labels=[self._label_to_response(doc) for doc in docs])
+
+    def create_label(
+        self,
+        *,
+        project_id: str,
+        name: str,
+        description: str,
+        color: str,
+    ) -> ForumLabelResponse:
+        """Create a forum label; the key is always generated from the name, never from a client."""
+        existing = ForumLabelDocument.find({"project_id": project_id}).to_list()
+        normalized_name = name.strip().lower()
+        if any(doc.name.strip().lower() == normalized_name for doc in existing):
+            raise HTTPException(status_code=409, detail="Forum label already exists")
+
+        label_key = self._make_label_key(name, {doc.key for doc in existing})
+
+        doc = ForumLabelDocument(
+            project_id=project_id,
+            key=label_key,
+            name=name,
+            description=description,
+            color=color.lower(),
+        )
+        try:
+            doc.insert()
+        except DuplicateKeyError as e:
+            raise HTTPException(status_code=409, detail="Forum label already exists") from e
+        return self._label_to_response(doc)
+
+    def update_label(
+        self,
+        *,
+        project_id: str,
+        key: str,
+        name: str | None,
+        description: str | None,
+        color: str | None,
+    ) -> ForumLabelResponse:
+        """Update a forum label. The label key is immutable."""
+        doc = ForumLabelDocument.find_one({"project_id": project_id, "key": key}).run()
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Forum label not found")
+
+        if name is not None:
+            normalized_name = name.strip().lower()
+            others = ForumLabelDocument.find({"project_id": project_id}).to_list()
+            if any(
+                other.key != key and other.name.strip().lower() == normalized_name
+                for other in others
+            ):
+                raise HTTPException(status_code=409, detail="Forum label already exists")
+            doc.name = name
+        if description is not None:
+            doc.description = description
+        if color is not None:
+            doc.color = color.lower()
+        doc.system_info.update_time()
+        doc.save()
+        return self._label_to_response(doc)
+
+    def delete_label(self, *, project_id: str, key: str) -> SuccessResponse:
+        """Delete a forum label and remove it from every thread that used it."""
+        doc = ForumLabelDocument.find_one({"project_id": project_id, "key": key}).run()
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Forum label not found")
+
+        doc.delete()
+        ForumPostDocument.get_motor_collection().update_many(
+            {"project_id": project_id, "labels": key},
+            {"$pull": {"labels": key}},
+        )
+        return SuccessResponse(message="Forum label deleted")
+
     def list_posts(
         self,
         *,
@@ -509,21 +724,26 @@ class ForumService:
         target_type: str | None = None,
         target_id: str | None = None,
         cooldown_id: str | None = None,
+        task_id: str | None = None,
         number: int | None = None,
         status: str | None = "open",
         q: str | None = None,
     ) -> ListForumPostsResponse:
-        """List root forum threads with reply counts."""
+        """List root forum threads with reply counts; ``status`` "all" or None lists every status."""
         query: dict[str, object] = {
             "project_id": project_id,
             "parent_id": None,
             "is_deleted": False,
         }
+        if task_id:
+            query["task_id"] = task_id
+        if isinstance(status, str) and status.strip().lower() == "all":
+            status = None
         if category:
             query["category"] = category
         if label:
-            normalized_label = _normalize_forum_labels([label])
-            query["labels"] = normalized_label[0] if normalized_label else label
+            normalized_labels = _dedupe_forum_label_keys([label])
+            query["labels"] = normalized_labels[0] if normalized_labels else label
         if chip_id:
             query["chip_id"] = chip_id
         if target_type:
@@ -564,6 +784,9 @@ class ForumService:
             .limit(limit)
             .to_list()
         )
+        summaries = self._task_result_summaries(
+            project_id, [getattr(doc, "task_id", None) for doc in docs]
+        )
 
         root_ids = [str(doc.id) for doc in docs]
         reply_counts: dict[str, int] = {}
@@ -582,9 +805,16 @@ class ForumService:
             for item in results:
                 reply_counts[item["_id"]] = item["count"]
 
+        defined_label_keys = self._defined_label_keys(project_id, docs)
         return ListForumPostsResponse(
             posts=[
-                self._to_response(doc, reply_count=reply_counts.get(str(doc.id), 0)) for doc in docs
+                self._to_response(
+                    doc,
+                    reply_count=reply_counts.get(str(doc.id), 0),
+                    task_result=summaries.get(getattr(doc, "task_id", None) or ""),
+                    defined_label_keys=defined_label_keys,
+                )
+                for doc in docs
             ],
             total=total,
             skip=skip,
@@ -605,7 +835,10 @@ class ForumService:
                 {"project_id": project_id, "parent_id": post_id, "is_deleted": False}
             ).count()
 
-        return self._to_response(doc, reply_count=reply_count)
+        task_result = self._task_result_summaries(project_id, [getattr(doc, "task_id", None)]).get(
+            getattr(doc, "task_id", None) or ""
+        )
+        return self._to_response(doc, reply_count=reply_count, task_result=task_result)
 
     def get_replies(
         self, *, project_id: str, post_id: str, skip: int = 0, limit: int = 100
@@ -631,7 +864,8 @@ class ForumService:
             .limit(limit)
             .to_list()
         )
-        return [self._to_response(doc) for doc in docs]
+        defined_label_keys = self._defined_label_keys(project_id, docs)
+        return [self._to_response(doc, defined_label_keys=defined_label_keys) for doc in docs]
 
     def create_post(
         self,
@@ -648,11 +882,17 @@ class ForumService:
         target_type: str | None = None,
         target_id: str | None = None,
         cooldown_id: str | None = None,
+        task_id: str | None = None,
         assignee_username: str | None = None,
         status: str | None = "open",
         background_tasks: BackgroundTasks | None = None,
     ) -> ForumPostResponse:
-        """Create a new forum thread or reply."""
+        """Create a new forum thread or reply.
+
+        A root thread may be about one task result (``task_id``); its chip and
+        target are then taken from that result unless given explicitly, and
+        replies inherit the link.
+        """
         if parent_id is None and not title:
             raise HTTPException(status_code=422, detail="Title is required for forum threads")
 
@@ -671,6 +911,11 @@ class ForumService:
         else:
             self._ensure_active_category(project_id, category)
 
+        linked_task = None if root_doc else _linked_task_result(project_id, task_id)
+        if linked_task is not None and not (chip_id and target_id):
+            chip_id = linked_task.chip_id
+            target_id = linked_task.qid or None
+            target_type = "coupling" if "-" in (linked_task.qid or "") else "qubit"
         normalized_chip_id, normalized_target_type, normalized_target_id = (
             (root_doc.chip_id, root_doc.target_type, root_doc.target_id)
             if root_doc
@@ -680,11 +925,17 @@ class ForumService:
                 target_id=target_id,
             )
         )
+        normalized_task_id = (
+            getattr(root_doc, "task_id", None)
+            if root_doc
+            else (linked_task.task_id if linked_task is not None else None)
+        )
         thread_number = (
             self._ensure_root_thread_number(root_doc)
             if root_doc
             else self._next_thread_number(project_id)
         )
+
         doc = ForumPostDocument(
             project_id=project_id,
             number=thread_number,
@@ -694,7 +945,9 @@ class ForumService:
             title=title if parent_id is None else None,
             content=content,
             content_blocks=content_blocks or [],
-            labels=list(root_doc.labels) if root_doc else _normalize_forum_labels(labels),
+            labels=list(root_doc.labels)
+            if root_doc
+            else self._normalize_forum_labels(project_id, labels),
             status=_normalize_forum_status(root_doc.status if root_doc else status),
             chip_id=normalized_chip_id,
             target_type=normalized_target_type,
@@ -702,6 +955,7 @@ class ForumService:
             cooldown_id=root_doc.cooldown_id
             if root_doc
             else _normalize_forum_cooldown(cooldown_id),
+            task_id=normalized_task_id,
             assignee_username=root_doc.assignee_username
             if root_doc
             else self._ensure_project_assignee(project_id, assignee_username),
@@ -753,7 +1007,12 @@ class ForumService:
                         actor_username=username,
                     )
 
-        return self._to_response(doc)
+        return self._to_response(
+            doc,
+            task_result=self._task_result_summaries(project_id, [normalized_task_id]).get(
+                normalized_task_id or ""
+            ),
+        )
 
     def build_ai_reply_context(self, *, project_id: str, post_id: str) -> dict[str, Any]:
         """Build conversation context for a forum AI reply."""
@@ -954,7 +1213,7 @@ class ForumService:
                 self._ensure_active_category(project_id, category)
                 doc.category = category
             if labels is not None:
-                doc.labels = _normalize_forum_labels(labels)
+                doc.labels = self._normalize_forum_labels(project_id, labels)
             if update_target_context:
                 normalized_chip_id, normalized_target_type, normalized_target_id = (
                     _normalize_forum_target(
@@ -974,6 +1233,7 @@ class ForumService:
                 new_status = _normalize_forum_status(status)
                 status_changed = new_status != _normalize_forum_status(doc.status)
                 doc.status = new_status
+
         doc.content = content
         # None means the caller omitted the field: keep existing rich content.
         # An explicit [] clears it (e.g. a plain-Markdown edit).

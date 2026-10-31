@@ -1,6 +1,7 @@
 """Tests for task API routes."""
 
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -50,8 +51,12 @@ def _task_info() -> TaskInfo:
 async def test_catalog_run_source_is_provenance_only(
     monkeypatch: pytest.MonkeyPatch, source_error: str | None
 ) -> None:
-    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
-    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: True)
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: True
+    )
     execute = AsyncMock()
     source = SimpleNamespace(
         username="bob" if source_error == "owner" else "alice",
@@ -96,8 +101,12 @@ async def test_catalog_run_source_is_provenance_only(
 async def test_quick_run_passes_readout_duration_to_task_and_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
-    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: True)
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: True
+    )
     execute = AsyncMock()
 
     await quick_run_task(
@@ -124,9 +133,57 @@ async def test_quick_run_passes_readout_duration_to_task_and_session(
 
 
 @pytest.mark.asyncio
+async def test_quick_run_passes_sweep_form_to_task(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A sweep parameter may run in another form; the type travels with the value."""
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: True
+    )
+    execute = AsyncMock()
+
+    await quick_run_task(
+        task_name="CheckRabi",
+        body=QuickRunTaskRequest(
+            chip_id="chip-1",
+            qid="0",
+            backend_name="fake",
+            run_parameter_overrides={
+                "frequency_range": {"value": [5.75, 6.75, 11], "value_type": "np.linspace"},
+                "resonator_assignment_order": [3, 0, 2, 1],
+                "readout_duration": {"value": 1024},
+            },
+        ),
+        ctx=_project_context(),  # type: ignore[arg-type]
+        flow_service=SimpleNamespace(  # type: ignore[arg-type]
+            execute_single_task_from_snapshot=execute
+        ),
+        task_service=SimpleNamespace(),  # type: ignore[arg-type]
+        task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
+    )
+
+    sent = execute.await_args_list[0].kwargs
+    assert sent["default_run_parameters"] == {
+        "readout_duration": {"value": 1024, "value_type": "float"}
+    }
+    assert sent["task_run_parameters"] == {
+        "CheckRabi": {
+            "frequency_range": {"value": [5.75, 6.75, 11], "value_type": "np.linspace"},
+            "resonator_assignment_order": {"value": [3, 0, 2, 1]},
+            "readout_duration": {"value": 1024},
+        }
+    }
+
+
+@pytest.mark.asyncio
 async def test_quick_run_task_rejects_disabled_task(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
-    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: False)
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: False
+    )
     flow_service = SimpleNamespace(execute_single_task_from_snapshot=AsyncMock())
 
     with pytest.raises(HTTPException, match="not enabled") as exc_info:
@@ -147,9 +204,13 @@ async def test_quick_run_task_rejects_disabled_task(monkeypatch: pytest.MonkeyPa
 async def test_quick_run_task_resolves_and_validates_default_backend(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("qdash.api.routers.task.get_default_backend", lambda: "fake")
-    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
-    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: True)
+    monkeypatch.setattr("qdash.api.services.catalog_task_run.get_default_backend", lambda: "fake")
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: True
+    )
     response = ExecuteFlowResponse(
         execution_id="flow-run-1",
         flow_run_id="flow-run-1",
@@ -233,6 +294,35 @@ async def test_quick_run_task_resolves_and_validates_default_backend(
             ),
             "invalid parameter types: run.frequency_range must be np.arange",
         ),
+        (
+            QuickRunTaskRequest(
+                chip_id="chip-1",
+                qid="0",
+                backend_name="fake",
+                run_parameter_overrides={
+                    "frequency_range": {"value": [5.75, 6.75], "value_type": "np.linspace"}
+                },
+            ),
+            "invalid parameter types: run.frequency_range must be np.linspace",
+        ),
+        (
+            QuickRunTaskRequest(
+                chip_id="chip-1",
+                qid="0",
+                backend_name="fake",
+                run_parameter_overrides={"shots": {"value": [0, 1, 2], "value_type": "range"}},
+            ),
+            "invalid parameter types: run.shots declares int and cannot take range",
+        ),
+        (
+            QuickRunTaskRequest(
+                chip_id="chip-1",
+                qid="0",
+                backend_name="fake",
+                run_parameter_overrides={"frequency_range": {"value": 6.0, "value_type": "float"}},
+            ),
+            "invalid parameter types: run.frequency_range declares np.arange and cannot take float",
+        ),
     ],
 )
 async def test_quick_run_task_rejects_invalid_overrides(
@@ -240,8 +330,12 @@ async def test_quick_run_task_rejects_invalid_overrides(
     body: QuickRunTaskRequest,
     message: str,
 ) -> None:
-    monkeypatch.setattr("qdash.api.routers.task.get_available_backends", lambda: ["fake"])
-    monkeypatch.setattr("qdash.api.routers.task.is_task_available", lambda *_args: True)
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: True
+    )
     flow_service = SimpleNamespace(execute_single_task_from_snapshot=AsyncMock())
 
     with pytest.raises(HTTPException, match=message) as exc_info:
@@ -287,6 +381,7 @@ async def test_re_execute_passes_snapshot_or_override_duration_to_session(
         flow_service=SimpleNamespace(  # type: ignore[arg-type]
             execute_single_task_from_snapshot=execute
         ),
+        task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
         parameter_overrides=parameter_overrides,
     )
 
@@ -339,6 +434,7 @@ async def test_re_execute_restores_legacy_snapshot_duration(
         flow_service=SimpleNamespace(  # type: ignore[arg-type]
             execute_single_task_from_snapshot=execute
         ),
+        task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
     )
 
     assert execute.await_args_list[0].kwargs["default_run_parameters"] == {
@@ -378,7 +474,165 @@ async def test_re_execute_rejects_conflicting_legacy_two_qubit_durations(
             flow_service=SimpleNamespace(  # type: ignore[arg-type]
                 execute_single_task_from_snapshot=execute
             ),
+            task_file_service=_task_file_service(_task_info()),  # type: ignore[arg-type]
         )
 
     assert exc_info.value.status_code == 400
     execute.assert_not_awaited()
+
+
+def _reexecution_doc(monkeypatch: pytest.MonkeyPatch, name: str = "CheckRabi") -> None:
+    doc = SimpleNamespace(
+        username="alice",
+        name=name,
+        qid="0",
+        chip_id="chip-1",
+        execution_id="exec-1",
+        tags=["calibration"],
+        input_parameters={},
+        run_parameters={"readout_duration": {"value": 2048}},
+    )
+    monkeypatch.setattr(
+        TaskResultHistoryDocument,
+        "find_one",
+        lambda *_args: SimpleNamespace(run=lambda: doc),
+    )
+
+
+def _empty_namespace() -> SimpleNamespace:
+    return SimpleNamespace()
+
+
+@pytest.mark.parametrize(
+    ("parameter_overrides", "expected_detail"),
+    [
+        (
+            {"run": {"shotz": 100}},
+            "Invalid parameter overrides: unknown run parameters: shotz",
+        ),
+        (
+            {"input": {"unknown_input": 1.0}},
+            "Invalid parameter overrides: unknown input parameters: unknown_input",
+        ),
+        (
+            {"inputs": {"qubit_frequency": 5.0}},
+            "Invalid parameter overrides: unknown keys ['inputs']",
+        ),
+    ],
+)
+def test_re_execute_rejects_overrides_the_task_cannot_apply_via_http(
+    test_client: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    parameter_overrides: dict[str, dict[str, Any]],
+    expected_detail: str,
+) -> None:
+    from qdash.api.dependencies import (
+        get_flow_service,
+        get_task_file_service,
+        get_task_result_service,
+    )
+    from qdash.api.lib.auth import get_current_active_user
+    from qdash.api.lib.project import get_project_context_editor
+    from qdash.api.main import app
+
+    _reexecution_doc(monkeypatch)
+    execute = AsyncMock()
+    previous_overrides = app.dependency_overrides.copy()
+    app.dependency_overrides[get_current_active_user] = lambda: _project_context().user
+    app.dependency_overrides[get_project_context_editor] = _project_context
+    app.dependency_overrides[get_task_result_service] = _empty_namespace
+    app.dependency_overrides[get_flow_service] = lambda: SimpleNamespace(
+        execute_single_task_from_snapshot=execute
+    )
+    app.dependency_overrides[get_task_file_service] = lambda: _task_file_service(_task_info())
+    try:
+        response = test_client.post(
+            "/task-results/task-1/re-execute",
+            json={"parameter_overrides": parameter_overrides},
+        )
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": expected_detail}
+    execute.assert_not_awaited()
+
+
+@pytest.mark.parametrize("invalid_duration", ["invalid", True])
+def test_re_execute_rejects_invalid_session_duration_via_http(
+    test_client: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_duration: Any,
+) -> None:
+    from qdash.api.dependencies import (
+        get_flow_service,
+        get_task_file_service,
+        get_task_result_service,
+    )
+    from qdash.api.lib.auth import get_current_active_user
+    from qdash.api.lib.project import get_project_context_editor
+    from qdash.api.main import app
+
+    _reexecution_doc(monkeypatch, name="CheckQubitSpectroscopy")
+    task = _task_info().model_copy(
+        update={
+            "name": "CheckQubitSpectroscopy",
+            "run_parameters": {"shots": {"value_type": "int"}},
+        }
+    )
+    execute = AsyncMock()
+    previous_overrides = app.dependency_overrides.copy()
+    app.dependency_overrides[get_current_active_user] = lambda: _project_context().user
+    app.dependency_overrides[get_project_context_editor] = _project_context
+    app.dependency_overrides[get_task_result_service] = _empty_namespace
+    app.dependency_overrides[get_flow_service] = lambda: SimpleNamespace(
+        execute_single_task_from_snapshot=execute
+    )
+    app.dependency_overrides[get_task_file_service] = lambda: _task_file_service(task)
+    try:
+        response = test_client.post(
+            "/task-results/task-1/re-execute",
+            json={"parameter_overrides": {"run": {"readout_duration": invalid_duration}}},
+        )
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Invalid parameter overrides: invalid parameter types: "
+        "run.readout_duration must be float"
+    }
+    execute.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_re_execute_keeps_session_duration_out_of_undeclared_run_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _reexecution_doc(monkeypatch, name="CheckQubitSpectroscopy")
+    task = _task_info().model_copy(
+        update={
+            "name": "CheckQubitSpectroscopy",
+            "run_parameters": {"shots": {"value_type": "int"}},
+        }
+    )
+    execute = AsyncMock()
+
+    await re_execute_task_result(
+        task_id="task-1",
+        ctx=_project_context(),  # type: ignore[arg-type]
+        service=SimpleNamespace(),  # type: ignore[arg-type]
+        flow_service=SimpleNamespace(  # type: ignore[arg-type]
+            execute_single_task_from_snapshot=execute
+        ),
+        task_file_service=_task_file_service(task),  # type: ignore[arg-type]
+        parameter_overrides={"run": {"readout_duration": 1024, "shots": 256}},
+    )
+
+    sent = execute.await_args_list[0].kwargs
+    assert sent["parameter_overrides"] == {"input": {}, "run": {"shots": 256}}
+    assert sent["default_run_parameters"] == {
+        "readout_duration": {"value": 1024, "value_type": "float"}
+    }

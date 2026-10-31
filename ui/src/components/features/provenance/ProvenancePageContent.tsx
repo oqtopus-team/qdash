@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 
-import { GitBranch, History, GitCompare, BarChart3 } from "lucide-react";
+import { GitBranch, History, GitCompare } from "lucide-react";
 
 import { useGetProvenanceStats } from "@/client/provenance/provenance";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -53,42 +53,24 @@ export function ProvenancePageContent() {
     <PageContainer maxWidth>
       <div className="space-y-4 sm:space-y-6">
         {/* Header */}
-        <PageHeader
-          title="Data Provenance"
-          description="Track calibration parameter history and lineage following W3C PROV-DM standards"
-        />
+        <PageHeader title="Provenance" description="Parameter history and lineage (W3C PROV-DM)" />
 
         {/* Stats Cards */}
         {stats && stats.total_entities > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="stat bg-base-200 rounded-box p-4">
-              <div className="stat-figure text-primary">
-                <History className="h-6 w-6 sm:h-8 sm:w-8" />
-              </div>
-              <div className="stat-title text-xs sm:text-sm">Parameter Versions</div>
-              <div className="stat-value text-lg sm:text-2xl text-primary">
-                {stats.total_entities.toLocaleString()}
-              </div>
+              <div className="stat-title text-sm">Parameter Versions</div>
+              <div className="stat-value">{stats.total_entities.toLocaleString()}</div>
               <div className="stat-desc text-xs">Tracked parameter values</div>
             </div>
             <div className="stat bg-base-200 rounded-box p-4">
-              <div className="stat-figure text-secondary">
-                <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8" />
-              </div>
-              <div className="stat-title text-xs sm:text-sm">Activities</div>
-              <div className="stat-value text-lg sm:text-2xl text-secondary">
-                {stats.total_activities.toLocaleString()}
-              </div>
+              <div className="stat-title text-sm">Activities</div>
+              <div className="stat-value">{stats.total_activities.toLocaleString()}</div>
               <div className="stat-desc text-xs">Task executions</div>
             </div>
             <div className="stat bg-base-200 rounded-box p-4">
-              <div className="stat-figure text-accent">
-                <GitBranch className="h-6 w-6 sm:h-8 sm:w-8" />
-              </div>
-              <div className="stat-title text-xs sm:text-sm">Relations</div>
-              <div className="stat-value text-lg sm:text-2xl text-accent">
-                {stats.total_relations.toLocaleString()}
-              </div>
+              <div className="stat-title text-sm">Relations</div>
+              <div className="stat-value">{stats.total_relations.toLocaleString()}</div>
               <div className="stat-desc text-xs">Provenance links</div>
             </div>
           </div>
@@ -99,7 +81,7 @@ export function ProvenancePageContent() {
           <div className="card bg-base-200">
             <div className="card-body text-center py-12">
               <GitBranch className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-base-content/30 mb-4" />
-              <h3 className="text-base sm:text-lg font-medium">No Provenance Data Yet</h3>
+              <h3 className="text-sm font-medium">No Provenance Data Yet</h3>
               <p className="text-sm text-base-content/70 max-w-md mx-auto">
                 Provenance tracking is enabled. Run a calibration workflow to start tracking
                 parameter lineage and history.

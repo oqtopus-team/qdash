@@ -54,7 +54,7 @@ def test_postprocess_outputs_optimal_power_from_resonator_analysis() -> None:
             "1",
         )
 
-    assert result.output_parameters["readout_frequency"].value == 6.3
+    assert result.output_parameters["resonator_frequency"].value == 6.3
     assert result.output_parameters["optimal_power"].value == -35.0
     assert result.output_parameters["readout_amplitude"].value == 10 ** (-35.0 / 20)
     assert result.output_parameters["optimal_power"].execution_id == "exec-1"
@@ -105,7 +105,7 @@ def test_postprocess_uses_custom_resonator_assignment_order() -> None:
         )
 
     assert result.validation_error is None
-    assert result.output_parameters["readout_frequency"].value == 6.2
+    assert result.output_parameters["resonator_frequency"].value == 6.2
 
 
 def test_postprocess_rejects_invalid_resonator_result_without_outputs() -> None:
@@ -199,7 +199,7 @@ def test_postprocess_allows_partial_mux_success_when_qid_slot_is_available() -> 
         )
 
     assert result.validation_error is None
-    assert result.output_parameters["readout_frequency"].value == 6.1
+    assert result.output_parameters["resonator_frequency"].value == 6.1
     assert result.output_parameters["optimal_power"].value == -35.0
 
 
@@ -330,7 +330,7 @@ def test_postprocess_allows_left_edge_missing_partial_mux_when_qid_slot_is_avail
         )
 
     assert result.validation_error is None
-    assert result.output_parameters["readout_frequency"].value == 6.3
+    assert result.output_parameters["resonator_frequency"].value == 6.3
     annotations = result.figures[0].layout.annotations
     texts = [annotation["text"] for annotation in annotations]
     assert "left-edge-missing-cluster-right" in texts

@@ -8,12 +8,13 @@ from typing import Any
 
 from qdash.client.services.agent_runner import (
     AgentCalibrationRunner,
-    AgentCampaignNode,
-    AgentCampaignOutcome,
-    AgentCampaignRunner,
+    AgentPlanNode,
+    AgentPlanOutcome,
+    AgentPlanRunner,
     AgentStepOutcome,
 )
 from qdash.client.services.client import QDashClient as QDashClient  # noqa: PLC0414
+from qdash.client.services.evaluation_planner import EvaluationPlanner
 
 
 def _json_object(value: str) -> dict[str, Any]:
@@ -23,10 +24,10 @@ def _json_object(value: str) -> dict[str, Any]:
     return parsed
 
 
-def _campaign_plan(value: str) -> list[AgentCampaignNode]:
+def _plan_nodes(value: str) -> list[AgentPlanNode]:
     parsed = json.loads(value)
     if not isinstance(parsed, list) or not parsed:
-        raise argparse.ArgumentTypeError("campaign plan must be a non-empty JSON array")
+        raise argparse.ArgumentTypeError("plan must be a non-empty JSON array")
 
     allowed_keys = {
         "task_name",
@@ -41,20 +42,20 @@ def _campaign_plan(value: str) -> list[AgentCampaignNode]:
         "apply_backend",
         "push_to_github",
     }
-    nodes: list[AgentCampaignNode] = []
+    nodes: list[AgentPlanNode] = []
     for index, item in enumerate(parsed):
         if not isinstance(item, dict):
-            raise argparse.ArgumentTypeError(f"campaign node {index} must be a JSON object")
+            raise argparse.ArgumentTypeError(f"plan node {index} must be a JSON object")
         unknown = sorted(set(item) - allowed_keys)
         if unknown:
             raise argparse.ArgumentTypeError(
-                f"campaign node {index} has unknown fields: {', '.join(unknown)}"
+                f"plan node {index} has unknown fields: {', '.join(unknown)}"
             )
         task_name = item.get("task_name")
         candidate_parameter = item.get("candidate_parameter")
         if not isinstance(task_name, str) or not isinstance(candidate_parameter, str):
             raise argparse.ArgumentTypeError(
-                f"campaign node {index} requires string task_name and candidate_parameter"
+                f"plan node {index} requires string task_name and candidate_parameter"
             )
         node_id = item.get("id")
         on_pass = item.get("on_pass")
@@ -63,12 +64,12 @@ def _campaign_plan(value: str) -> list[AgentCampaignNode]:
             value is not None and not isinstance(value, str)
             for value in (node_id, on_pass, on_rollback)
         ):
-            raise argparse.ArgumentTypeError(f"campaign node {index} graph fields must be strings")
+            raise argparse.ArgumentTypeError(f"plan node {index} graph fields must be strings")
         diagnosis = item.get("diagnosis", "")
         overrides = item.get("parameter_overrides", {})
         if not isinstance(diagnosis, str) or not isinstance(overrides, dict):
             raise argparse.ArgumentTypeError(
-                f"campaign node {index} diagnosis must be a string and overrides an object"
+                f"plan node {index} diagnosis must be a string and overrides an object"
             )
         bool_fields = (
             "reconfigure_before_task",
@@ -77,7 +78,7 @@ def _campaign_plan(value: str) -> list[AgentCampaignNode]:
             "push_to_github",
         )
         if any(not isinstance(item.get(name, False), bool) for name in bool_fields):
-            raise argparse.ArgumentTypeError(f"campaign node {index} flags must be booleans")
+            raise argparse.ArgumentTypeError(f"plan node {index} flags must be booleans")
         try:
             if any(
                 not isinstance(key, str)
@@ -88,7 +89,7 @@ def _campaign_plan(value: str) -> list[AgentCampaignNode]:
                 raise ValueError("parameter overrides must contain numeric values")
             numeric_overrides = {str(key): float(raw) for key, raw in overrides.items()}
             nodes.append(
-                AgentCampaignNode(
+                AgentPlanNode(
                     task_name=task_name,
                     candidate_parameter=candidate_parameter,
                     node_id=node_id,
@@ -100,7 +101,7 @@ def _campaign_plan(value: str) -> list[AgentCampaignNode]:
                 )
             )
         except (TypeError, ValueError) as exc:
-            raise argparse.ArgumentTypeError(f"invalid campaign node {index}: {exc}") from exc
+            raise argparse.ArgumentTypeError(f"invalid plan node {index}: {exc}") from exc
     return nodes
 
 
@@ -140,6 +141,21 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Authorize explicit hardware Configure before an agent task",
     )
+    start.add_argument(
+        "--autonomy",
+        choices=("confirm_each", "auto"),
+        default="confirm_each",
+        help=(
+            "auto: approve the plan, bounds, and budget once; a plan run with "
+            "--planner evaluation then chooses each next node from the evaluation"
+        ),
+    )
+    start.add_argument(
+        "--max-rounds-per-target",
+        type=int,
+        default=3,
+        help="How many times an autonomous plan may run one node on a target",
+    )
     start.add_argument("--expires-in-seconds", type=int, default=21_600)
     start.add_argument("--skill-name", default="")
     start.add_argument("--skill-version", default="")
@@ -150,7 +166,10 @@ def _build_parser() -> argparse.ArgumentParser:
     step.add_argument("--session-id", required=True)
     step.add_argument("--task", required=True)
     step.add_argument("--qid", required=True)
-    step.add_argument("--source-execution-id", required=True)
+    step.add_argument(
+        "--source-execution-id",
+        help="Execution the step was decided from, recorded for provenance; the task runs on the current calibration state",
+    )
     step.add_argument("--candidate-parameter", required=True)
     step.add_argument(
         "--parameter-overrides",
@@ -184,22 +203,41 @@ def _build_parser() -> argparse.ArgumentParser:
     step.add_argument("--backend-apply-timeout-seconds", type=float, default=300.0)
     step.add_argument("--poll-interval-seconds", type=float, default=1.0)
 
-    campaign = commands.add_parser(
-        "run-campaign",
-        help="Run an autonomous bounded single-qubit campaign",
+    plan_cmd = commands.add_parser(
+        "run-plan",
+        help="Run a bounded single-qubit plan",
     )
-    campaign.add_argument("--session-id", required=True)
-    campaign.add_argument("--qid", required=True)
-    campaign.add_argument("--source-execution-id", required=True)
-    campaign.add_argument("--plan", required=True, type=_campaign_plan)
-    campaign.add_argument("--max-pre-dispatch-retries", type=int, default=1)
-    campaign.add_argument("--max-node-executions", type=int)
-    campaign.add_argument("--commit-on-success", action="store_true")
-    campaign.add_argument("--idempotency-prefix")
-    campaign.add_argument("--action-timeout-seconds", type=float, default=120.0)
-    campaign.add_argument("--execution-timeout-seconds", type=float, default=600.0)
-    campaign.add_argument("--backend-apply-timeout-seconds", type=float, default=300.0)
-    campaign.add_argument("--poll-interval-seconds", type=float, default=1.0)
+    plan_cmd.add_argument("--session-id", required=True)
+    plan_cmd.add_argument("--qid", required=True)
+    plan_cmd.add_argument(
+        "--source-execution-id",
+        help="Execution the step was decided from, recorded for provenance; the task runs on the current calibration state",
+    )
+    plan_cmd.add_argument("--plan", required=True, type=_plan_nodes)
+    plan_cmd.add_argument("--max-pre-dispatch-retries", type=int, default=1)
+    plan_cmd.add_argument("--max-node-executions", type=int)
+    plan_cmd.add_argument("--commit-on-success", action="store_true")
+    plan_cmd.add_argument("--idempotency-prefix")
+    plan_cmd.add_argument("--action-timeout-seconds", type=float, default=120.0)
+    plan_cmd.add_argument("--execution-timeout-seconds", type=float, default=600.0)
+    plan_cmd.add_argument("--backend-apply-timeout-seconds", type=float, default=300.0)
+    plan_cmd.add_argument("--poll-interval-seconds", type=float, default=1.0)
+    plan_cmd.add_argument(
+        "--planner",
+        choices=("none", "evaluation"),
+        default="none",
+        help=(
+            "evaluation: after each node, evaluate its result with the calibration-evaluation "
+            "model and take the task knowledge's next action for the reported status. "
+            "Needs a session whose policy sets autonomy=auto."
+        ),
+    )
+    plan_cmd.add_argument(
+        "--evaluation-timeout-seconds",
+        type=float,
+        default=300.0,
+        help="How long to wait for one evaluation with --planner evaluation",
+    )
 
     return parser
 
@@ -218,7 +256,51 @@ def _outcome_payload(outcome: AgentStepOutcome) -> dict[str, Any]:
     }
 
 
-def _campaign_outcome_payload(outcome: AgentCampaignOutcome) -> dict[str, Any]:
+def _evaluation_planner(
+    client: QDashClient, args: argparse.Namespace
+) -> tuple[EvaluationPlanner | None, dict[str, Any] | None]:
+    """The evaluation planner for the session, or the refusal to print when it is not allowed."""
+    session = client.get_agent_session(args.session_id)
+    if session.policy.autonomy != "auto":
+        return None, {
+            "transition": "human_escalation",
+            "reason": (
+                "The session policy sets autonomy="
+                f"{session.policy.autonomy!r}; --planner evaluation needs autonomy='auto'"
+            ),
+            "session_id": args.session_id,
+        }
+    planner = EvaluationPlanner(
+        client,
+        chip_id=session.chip_id,
+        allowed_overrides=session.policy.allowed_overrides,
+        max_rounds_per_target=session.policy.max_rounds_per_target,
+        evaluation_timeout_seconds=args.evaluation_timeout_seconds,
+        poll_interval_seconds=args.poll_interval_seconds,
+    )
+    return planner, None
+
+
+def _planner_trace_payload(planner: EvaluationPlanner) -> list[dict[str, Any]]:
+    return [
+        {
+            "node_id": trace.node_id,
+            "task_id": trace.task_id,
+            "evaluation_id": trace.verdict.evaluation_id if trace.verdict else None,
+            "status": trace.verdict.status if trace.verdict else None,
+            "suggested_range": list(trace.verdict.suggested_range)
+            if trace.verdict and trace.verdict.suggested_range
+            else None,
+            "fit_reliability": trace.verdict.fit_reliability if trace.verdict else None,
+            "target_node_id": trace.decision.target_node_id,
+            "parameter_overrides": trace.decision.parameter_overrides,
+            "reason": trace.decision.reason,
+        }
+        for trace in planner.traces
+    ]
+
+
+def _plan_outcome_payload(outcome: AgentPlanOutcome) -> dict[str, Any]:
     return {
         "transition": outcome.transition.value,
         "reason": outcome.reason,
@@ -229,13 +311,16 @@ def _campaign_outcome_payload(outcome: AgentCampaignOutcome) -> dict[str, Any]:
         "attempts": outcome.attempts,
         "carried_overrides": outcome.carried_overrides,
         "node_path": outcome.node_path,
-        "campaign_commit": (
-            outcome.campaign_commit.model_dump(mode="json") if outcome.campaign_commit else None
+        "candidate_set_commit": (
+            outcome.candidate_set_commit.model_dump(mode="json")
+            if outcome.candidate_set_commit
+            else None
         ),
         "planner_decisions": [
             {
                 "target_node_id": decision.target_node_id,
                 "reason": decision.reason,
+                "parameter_overrides": decision.parameter_overrides,
             }
             for decision in outcome.planner_decisions
         ],
@@ -249,6 +334,17 @@ def run(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "run-step" and args.apply_backend and not args.commit_candidate:
         parser.error("--apply-backend requires --commit")
+    if (
+        args.command == "run-plan"
+        and args.planner == "evaluation"
+        and any(
+            node.commit_candidate or node.apply_backend or node.push_to_github for node in args.plan
+        )
+    ):
+        parser.error(
+            "--planner evaluation cannot be combined with per-node commit_candidate, "
+            "apply_backend, or push_to_github; use --commit-on-success"
+        )
     client = (
         QDashClient.from_env()
         if args.from_env
@@ -265,6 +361,8 @@ def run(argv: list[str] | None = None) -> int:
                     "quality_gates": args.quality_gates,
                     "allow_reconfigure": args.allow_reconfigure,
                     "max_actions": args.max_actions,
+                    "autonomy": args.autonomy,
+                    "max_rounds_per_target": args.max_rounds_per_target,
                 },
                 expires_in_seconds=args.expires_in_seconds,
                 skill_name=args.skill_name,
@@ -275,26 +373,45 @@ def run(argv: list[str] | None = None) -> int:
             print(json.dumps(session.model_dump(mode="json"), sort_keys=True))
             return 0
 
-        if args.command == "run-campaign":
-            campaign_runner = AgentCampaignRunner(
+        if args.command == "run-plan":
+            plan_runner = AgentPlanRunner(
                 client,
                 action_timeout_seconds=args.action_timeout_seconds,
                 execution_timeout_seconds=args.execution_timeout_seconds,
                 backend_apply_timeout_seconds=args.backend_apply_timeout_seconds,
                 poll_interval_seconds=args.poll_interval_seconds,
             )
-            campaign_outcome = campaign_runner.run_campaign(
+            planner = None
+            max_node_executions = args.max_node_executions
+            max_node_visits = None
+            if args.planner == "evaluation":
+                planner, refusal = _evaluation_planner(client, args)
+                if refusal is not None:
+                    print(json.dumps(refusal, sort_keys=True))
+                    return 2
+                assert planner is not None
+                # The session's round budget bounds every node visit, whichever rule
+                # led back to the node, and the plan as a whole.
+                max_node_visits = planner.max_rounds_per_target
+                if max_node_executions is None:
+                    max_node_executions = len(args.plan) * planner.max_rounds_per_target
+            plan_outcome = plan_runner.run_plan(
                 session_id=args.session_id,
                 qid=args.qid,
                 source_execution_id=args.source_execution_id,
                 nodes=args.plan,
                 max_pre_dispatch_retries=args.max_pre_dispatch_retries,
-                max_node_executions=args.max_node_executions,
+                max_node_executions=max_node_executions,
                 commit_on_success=args.commit_on_success,
+                planner=planner,
+                max_node_visits=max_node_visits,
                 idempotency_prefix=args.idempotency_prefix,
             )
-            print(json.dumps(_campaign_outcome_payload(campaign_outcome), sort_keys=True))
-            return 0 if campaign_outcome.transition.value == "pass" else 2
+            payload = _plan_outcome_payload(plan_outcome)
+            if planner is not None:
+                payload["evaluations"] = _planner_trace_payload(planner)
+            print(json.dumps(payload, sort_keys=True))
+            return 0 if plan_outcome.transition.value == "pass" else 2
 
         runner = AgentCalibrationRunner(
             client,

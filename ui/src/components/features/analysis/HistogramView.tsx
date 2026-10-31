@@ -781,14 +781,14 @@ export function HistogramView() {
 
               {isPercentageMetric(currentMetricConfig?.unit) && (
                 <label className="cursor-pointer flex items-center gap-1 sm:gap-2 h-8 sm:h-9">
-                  <span className="text-xs sm:text-sm">Fidelity</span>
+                  <span className="text-sm">Fidelity</span>
                   <input
                     type="checkbox"
                     className="toggle toggle-primary toggle-xs sm:toggle-sm"
                     checked={showAsErrorRate}
                     onChange={(e) => setShowAsErrorRate(e.target.checked)}
                   />
-                  <span className="text-xs sm:text-sm">Error</span>
+                  <span className="text-sm">Error</span>
                 </label>
               )}
 
@@ -804,7 +804,7 @@ export function HistogramView() {
 
           {/* Row 2: Threshold Slider */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <span className="text-xs sm:text-sm font-medium shrink-0 w-40">
+            <span className="text-sm font-medium shrink-0 w-40">
               Threshold: {thresholdDisplayText}
             </span>
             <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -837,31 +837,31 @@ export function HistogramView() {
               <div className="grid grid-cols-3 gap-2 sm:hidden">
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Count</div>
-                  <div className="text-sm font-bold text-primary">{statistics.count}</div>
+                  <div className="text-sm font-medium text-primary">{statistics.count}</div>
                 </div>
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Mean</div>
-                  <div className="text-sm font-bold text-secondary">
+                  <div className="text-sm font-medium text-secondary">
                     {statistics.mean.toFixed(2)}
                   </div>
                 </div>
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Median</div>
-                  <div className="text-sm font-bold text-accent">
+                  <div className="text-sm font-medium text-accent">
                     {statistics.median.toFixed(2)}
                   </div>
                 </div>
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Min</div>
-                  <div className="text-sm font-bold">{statistics.min.toFixed(2)}</div>
+                  <div className="text-sm font-medium">{statistics.min.toFixed(2)}</div>
                 </div>
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Max</div>
-                  <div className="text-sm font-bold">{statistics.max.toFixed(2)}</div>
+                  <div className="text-sm font-medium">{statistics.max.toFixed(2)}</div>
                 </div>
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Yield</div>
-                  <div className="text-sm font-bold text-warning">
+                  <div className="text-sm font-medium text-warning">
                     {statistics.yieldPercent.toFixed(1)}%
                   </div>
                 </div>
@@ -873,29 +873,25 @@ export function HistogramView() {
               <div className="stats stats-horizontal shadow w-full hidden sm:inline-grid [grid-auto-columns:1fr]">
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Count</div>
-                  <div className="stat-value text-primary text-lg">{statistics.count}</div>
+                  <div className="stat-value">{statistics.count}</div>
                 </div>
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Mean</div>
-                  <div className="stat-value text-secondary text-lg">
-                    {statistics.mean.toFixed(4)}
-                  </div>
+                  <div className="stat-value">{statistics.mean.toFixed(4)}</div>
                 </div>
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Median</div>
-                  <div className="stat-value text-accent text-lg">
-                    {statistics.median.toFixed(4)}
-                  </div>
+                  <div className="stat-value">{statistics.median.toFixed(4)}</div>
                 </div>
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Min / Max</div>
-                  <div className="stat-value text-base">
+                  <div className="stat-value">
                     {statistics.min.toFixed(2)} / {statistics.max.toFixed(2)}
                   </div>
                 </div>
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Yield</div>
-                  <div className="stat-value text-warning text-lg">
+                  <div className="stat-value text-warning">
                     {statistics.yieldPercent.toFixed(1)}%
                   </div>
                   <div className="stat-desc text-xs">

@@ -232,6 +232,7 @@ config/qubex/*
 !config/qubex/qubex.example/
 config/qubex-config/*
 config/task-knowledge/
+config/quelware-client/*
 src/tools/schedule/*
 .serena/
 .mcp.json
@@ -240,7 +241,16 @@ src/tools/schedule/*
 docs/internal/*
 docs/papers/*
 config/qubex-config
+# Local pi extension checkouts mounted into the Agent Runtime during development.
+# The directory itself is tracked (.gitkeep) so the compose bind mount always exists.
+agent-runtime/extensions/*
+!agent-runtime/extensions/.gitkeep
 scripts/estimate_qubit_frequency
 scripts/estimate-resonator-frequency
 .direnv
 tmp
+/notes
+
+# Compiled pi package tests and release tarballs.
+packages/*/.test-dist/
+*.tgz

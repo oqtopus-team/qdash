@@ -1,28 +1,39 @@
 from collections.abc import Mapping
-from typing import ClassVar
+from typing import Any, ClassVar, cast
 
-import numpy as np
 import plotly.graph_objects as go
+from qubex.contrib.experiment import estimate_qubit_frequency_from_chevron
 from qubex.experiment.experiment_constants import DEFAULT_INTERVAL, DEFAULT_SHOTS
 
-from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
+from qdash.datamodel.task import (
+    InputParameterSpec,
+    OutputParameterSpec,
+    RunParameterSpec,
+)
 from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qubex.base import QubexTask, readout_duration_run_parameter
+from qdash.workflow.calibtasks.qubex.validation import finite_value_error, first_validation_error
 from qdash.workflow.engine.backend.qubex import QubexBackend
 
 DEFAULT_CONTROL_AMPLITUDE = 0.0625
+DEFAULT_MINIMUM_PEAK_BACKGROUND_RMS_RATIO = 5.0
+DEFAULT_TARGET_OMEGA_RABI = 0.0125
 CONTROL_AMPLITUDE_MIN = 1e-4
 CONTROL_AMPLITUDE_MAX = 1.0
 
 
 class CheckChevron(QubexTask):
-    """Measure one fixed-grid Chevron pattern and estimate the qubit frequency."""
+    """Estimate qubit frequency and control amplitude from a fixed-grid Chevron."""
 
     name: str = "CheckChevron"
     task_type: str = "qubit"
     input_spec: ClassVar[dict[str, InputParameterSpec]] = {
-        "qubit_frequency": InputParameterSpec.required_database(),
-        "readout_frequency": InputParameterSpec.required_database(),
+        "control_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("qubit_frequency",)
+        ),
+        "readout_frequency": InputParameterSpec.required_database(
+            fallback_parameter_names=("resonator_frequency",)
+        ),
         "readout_amplitude": InputParameterSpec.required_database(),
         "control_amplitude": InputParameterSpec.database_or_default(
             default=DEFAULT_CONTROL_AMPLITUDE,
@@ -37,19 +48,19 @@ class CheckChevron(QubexTask):
         "detuning_range": RunParameterSpec(
             unit="GHz",
             value_type="np.linspace",
-            default=(-0.05, 0.05, 51),
-            description="Drive-frequency detuning sweep around qubit_frequency",
+            default=(-0.05, 0.05, 41),
+            description="Drive-frequency detuning sweep around control_frequency",
         ),
         "time_range": RunParameterSpec(
             unit="ns",
-            value_type="range",
-            default=(0, 401, 8),
+            value_type="np.linspace",
+            default=(0, 250, 26),
             description="Control-pulse duration sweep",
         ),
         "shots": RunParameterSpec(
             unit="a.u.",
             value_type="int",
-            default=DEFAULT_SHOTS,
+            default=DEFAULT_SHOTS // 4,
             description="Number of shots per Chevron sweep point",
         ),
         "interval": RunParameterSpec(
@@ -58,10 +69,31 @@ class CheckChevron(QubexTask):
             default=DEFAULT_INTERVAL,
             description="Time interval between shots",
         ),
+        "target_omega_rabi": RunParameterSpec(
+            unit="GHz",
+            value_type="float",
+            default=DEFAULT_TARGET_OMEGA_RABI,
+            description="Target Rabi frequency used to estimate control amplitude",
+        ),
+        "minimum_peak_background_rms_ratio": RunParameterSpec(
+            unit="a.u.",
+            value_type="float",
+            default=DEFAULT_MINIMUM_PEAK_BACKGROUND_RMS_RATIO,
+            description="Minimum matched-transform peak/background RMS ratio",
+        ),
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "qubit_frequency": OutputParameterSpec(
-            unit="GHz", description="Qubit bare frequency estimated from the Chevron fit"
+            unit="GHz",
+            description="Qubit bare frequency estimated by matched-transform analysis",
+            publish_targets=(
+                "qubit_frequency",
+                "control_frequency",
+            ),
+        ),
+        "control_amplitude": OutputParameterSpec(
+            unit="a.u.",
+            description="Control pulse amplitude estimated for the target Rabi frequency",
         ),
     }
 
@@ -73,38 +105,106 @@ class CheckChevron(QubexTask):
         data = getattr(result, "data", result)
         if not isinstance(data, Mapping):
             raise TypeError(
-                f"chevron_pattern returned unsupported data type: {type(data).__name__}"
+                "estimate_qubit_frequency_from_chevron returned "
+                f"unsupported data type: {type(data).__name__}"
             )
 
-        resonant_frequencies = data.get("resonant_frequencies")
-        if not isinstance(resonant_frequencies, Mapping) or label not in resonant_frequencies:
-            raise ValueError(f"CheckChevron produced no resonant frequency for {label}")
-        resonant_frequency = float(resonant_frequencies[label])
-        self.output_parameters["qubit_frequency"].value = resonant_frequency
+        resonant_frequency = self._target_value(data, "resonant_frequencies", label)
+        omega_rabi = self._target_value(data, "omega_rabis", label)
+        amplitude_used = self._target_value(data, "amplitudes_used", label)
+        peak_background_rms_ratio = self._target_value(data, "peak_background_rms_ratios", label)
+        target_omega_rabi = self.run_parameters["target_omega_rabi"].value
+        threshold = self.run_parameters["minimum_peak_background_rms_ratio"].value
+
+        frequency_value_error = finite_value_error(
+            resonant_frequency,
+            f"CheckChevron qubit frequency for {label}",
+        )
+        frequency_error = finite_value_error(
+            resonant_frequency,
+            f"CheckChevron qubit frequency for {label}",
+            minimum=2.5,
+        )
+        omega_rabi_error = self._positive_value_error(
+            omega_rabi, f"CheckChevron Rabi frequency for {label}"
+        )
+        amplitude_used_error = finite_value_error(
+            amplitude_used,
+            f"CheckChevron control amplitude used for {label}",
+            minimum=CONTROL_AMPLITUDE_MIN,
+            maximum=CONTROL_AMPLITUDE_MAX,
+        )
+        target_omega_rabi_error = self._positive_value_error(target_omega_rabi, "target_omega_rabi")
+        threshold_error = finite_value_error(
+            threshold,
+            "minimum_peak_background_rms_ratio",
+            minimum=0.0,
+        )
+        ratio_error = finite_value_error(
+            peak_background_rms_ratio,
+            f"CheckChevron peak/background RMS ratio for {label}",
+            minimum=(
+                float(cast("int | float | str", threshold)) if threshold_error is None else None
+            ),
+        )
+
+        target_control_amplitude: float | None = None
+        if (
+            omega_rabi_error is None
+            and amplitude_used_error is None
+            and target_omega_rabi_error is None
+        ):
+            amplitude_used_value = float(cast("int | float | str", amplitude_used))
+            target_omega_rabi_value = float(cast("int | float | str", target_omega_rabi))
+            omega_rabi_value = float(cast("int | float | str", omega_rabi))
+            target_control_amplitude = (
+                amplitude_used_value * target_omega_rabi_value / omega_rabi_value
+            )
+            target_control_amplitude = min(
+                max(target_control_amplitude, CONTROL_AMPLITUDE_MIN),
+                CONTROL_AMPLITUDE_MAX,
+            )
+
+        resonant_frequency_value = (
+            float(cast("int | float | str", resonant_frequency))
+            if frequency_value_error is None
+            else None
+        )
+        self.output_parameters["qubit_frequency"].value = resonant_frequency_value
+        self.output_parameters["control_amplitude"].value = target_control_amplitude
         output_parameters = self.attach_execution_id(execution_id)
 
         figures_map = getattr(result, "figures", None)
-        base_figure = figures_map.get(label) if isinstance(figures_map, Mapping) else None
         figures: list[go.Figure] = []
-        if base_figure is not None:
-            figures.append(base_figure)
-            marked_figure = go.Figure(base_figure)
-            marked_figure.add_vline(
-                x=resonant_frequency,
-                line_width=1,
-                line_color="red",
-                line_dash="dash",
-                annotation_text=f"f = {resonant_frequency:.6f} GHz",
-                annotation_position="top",
-                annotation_font_color="red",
-            )
-            figures.append(marked_figure)
+        if isinstance(figures_map, Mapping):
+            measurement_figure = figures_map.get(f"{label}_measurement")
+            transform_figure = figures_map.get(f"{label}_transform")
+            if measurement_figure is not None:
+                figures.append(measurement_figure)
+                if resonant_frequency_value is not None:
+                    marked_figure = go.Figure(measurement_figure)
+                    marked_figure.add_vline(
+                        x=resonant_frequency_value,
+                        line_width=1,
+                        line_color="red",
+                        line_dash="dash",
+                        annotation_text=f"f = {resonant_frequency_value:.6f} GHz",
+                        annotation_position="top",
+                        annotation_font_color="red",
+                    )
+                    figures.append(marked_figure)
+            if transform_figure is not None:
+                figures.append(transform_figure)
 
-        validation_error = None
-        if resonant_frequency < 2.5:
-            validation_error = (
-                f"Qubit frequency too low for qid={qid}: {resonant_frequency:.6f} GHz < 2.5 GHz"
-            )
+        validation_error = first_validation_error(
+            frequency_error,
+            threshold_error,
+            ratio_error,
+            omega_rabi_error,
+            amplitude_used_error,
+            target_omega_rabi_error,
+        )
+        if validation_error is not None:
             print(f"[ERROR] {validation_error}")
 
         return PostProcessResult(
@@ -117,7 +217,7 @@ class CheckChevron(QubexTask):
         exp = self.get_experiment(backend)
         label = exp.get_qubit_label(int(qid))
 
-        qubit_frequency = self._required_input_value("qubit_frequency")
+        control_frequency = self._required_input_value("control_frequency")
         readout_frequency = self._required_input_value("readout_frequency")
         readout_amplitude = self._required_input_value("readout_amplitude")
         control_amplitude = self._required_input_value("control_amplitude")
@@ -125,7 +225,7 @@ class CheckChevron(QubexTask):
         print(
             f"[run] CheckChevron params for {label}: "
             f"control_amplitude={control_amplitude}, "
-            f"qubit_frequency={qubit_frequency}, "
+            f"control_frequency={control_frequency}, "
             f"readout_amplitude={readout_amplitude}, "
             f"readout_frequency={readout_frequency}"
         )
@@ -134,11 +234,12 @@ class CheckChevron(QubexTask):
         with self._modified_qubit_readout_frequencies(
             exp,
             qubit_label=label,
-            frequency_overrides={label: qubit_frequency, "R" + label: readout_frequency},
+            frequency_overrides={label: control_frequency, "R" + label: readout_frequency},
         ):
-            result = exp.chevron_pattern(
+            result = estimate_qubit_frequency_from_chevron(
+                exp=exp,
                 targets=[label],
-                frequencies={label: qubit_frequency},
+                frequencies={label: control_frequency},
                 amplitudes={label: control_amplitude},
                 detuning_range=self.run_parameters["detuning_range"].get_value(),
                 time_range=self.run_parameters["time_range"].get_value(),
@@ -149,23 +250,23 @@ class CheckChevron(QubexTask):
             )
 
         self.save_calibration(backend)
-        return RunResult(raw_result=result, r2={qid: self._mean_rabi_fit_r2(result, label)})
+        return RunResult(raw_result=result)
 
     @staticmethod
-    def _mean_rabi_fit_r2(result: object, label: str) -> float | None:
-        data = getattr(result, "data", result)
-        if not isinstance(data, Mapping):
+    def _target_value(data: Mapping[str, Any], key: str, label: str) -> Any:
+        values = data.get(key)
+        if not isinstance(values, Mapping):
             return None
+        return values.get(label)
 
-        r2_by_target = data.get("rabi_fit_r2")
-        if not isinstance(r2_by_target, Mapping) or label not in r2_by_target:
-            return None
-
-        r2_values = np.asarray(r2_by_target[label], dtype=float).reshape(-1)
-        finite_r2_values = r2_values[np.isfinite(r2_values)]
-        if finite_r2_values.size == 0:
-            return None
-        return float(np.mean(finite_r2_values))
+    @staticmethod
+    def _positive_value_error(value: Any, name: str) -> str | None:
+        error = finite_value_error(value, name, minimum=0.0)
+        if error is not None:
+            return error
+        if float(value) == 0.0:
+            return f"{name} must be positive: {value}"
+        return None
 
     def _required_input_value(self, name: str) -> float:
         parameter = self.input_parameters[name]

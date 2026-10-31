@@ -150,16 +150,6 @@ class TaskHistoryRecorder:
                 # Log but don't fail the task - provenance is optional
                 logger.warning(f"Failed to record provenance for task {task.name}: {e}")
 
-        # Secondary hook for automatic AI review. The repository also enqueues
-        # this after persistence so direct-save paths are covered; the review
-        # queue de-duplicates in-flight task IDs to avoid duplicate LLM calls.
-        try:
-            from qdash.workflow.engine.task.ai_review import enqueue_ai_review_note
-
-            enqueue_ai_review_note(task, execution_model)
-        except Exception as e:
-            logger.warning(f"Failed to attach AI review note for task {task.name}: {e}")
-
     def update_progress(
         self, *, project_id: str | None, task_id: str, progress: TaskProgress
     ) -> None:
