@@ -76,7 +76,7 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
     <section className="rounded-lg border border-base-300 bg-base-100 overflow-hidden">
       <div className="px-4 py-3 border-b border-base-300 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-semibold">
+          <div className="flex items-center gap-2 text-sm font-medium">
             <StickyNote className="h-4 w-4 text-warning" />
             Chip note · {chipId}
           </div>
@@ -105,7 +105,7 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
             <div className="rounded-md bg-base-100 border border-base-300 p-3">
               <MarkdownContent content={note?.content ?? ""} />
             </div>
-            <div className="text-[11px] text-base-content/60 flex flex-wrap gap-x-2">
+            <div className="text-xs text-base-content/60 flex flex-wrap gap-x-2">
               {note?.updated_by && <span>Last edited by {note.updated_by}</span>}
               {note?.updated_at && <span>· {formatDateTime(note.updated_at)}</span>}
             </div>
@@ -134,7 +134,7 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
               rows={6}
               disabled={isPending}
             />
-            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-base-content/50">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/50">
               <span>{draft.length} characters</span>
               {note?.updated_by && (
                 <span>

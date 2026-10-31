@@ -101,7 +101,7 @@ export function ProfileSettingsPanel() {
   return (
     <div className="card bg-base-200 shadow-lg">
       <div className="card-body">
-        <h2 className="card-title text-xl mb-4">Profile</h2>
+        <h2 className="card-title mb-4">Profile</h2>
         <form onSubmit={handleSubmit(submit)} noValidate>
           <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
             <div className="flex flex-col items-center gap-3 rounded-lg bg-base-100 p-4">

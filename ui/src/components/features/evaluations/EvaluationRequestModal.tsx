@@ -415,7 +415,7 @@ export function EvaluationRequestModal({
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
-            <DialogTitle className="font-semibold">
+            <DialogTitle className="font-medium">
               {onChat ? "Ask AI" : "Request AI evaluation"}
             </DialogTitle>
           </div>

@@ -42,7 +42,7 @@ function TaskResultLinkPreview({ taskId }: { taskId: string }) {
       <div className="min-w-0 p-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-          <span className="truncate text-sm font-semibold">{taskResult.task_name}</span>
+          <span className="truncate text-sm font-medium">{taskResult.task_name}</span>
           <span className={`badge badge-sm ${statusClass(taskResult.status)}`}>
             {taskResult.status}
           </span>
@@ -61,7 +61,7 @@ function TaskResultLinkPreview({ taskId }: { taskId: string }) {
             </span>
           )}
         </div>
-        <div className="mt-2 truncate font-mono text-[11px] text-base-content/40">{taskId}</div>
+        <div className="mt-2 truncate font-mono text-xs text-base-content/40">{taskId}</div>
       </div>
       {(figurePath || jsonFigurePath) && (
         <div className="hidden h-28 items-center justify-center overflow-hidden border-l border-base-300 bg-base-200/40 p-2 sm:flex">
@@ -91,7 +91,7 @@ export function TaskResultLinkPreviews({
 
   return (
     <div className={className}>
-      <div className="text-xs font-semibold uppercase tracking-wide text-base-content/45">
+      <div className="text-xs font-medium uppercase tracking-wide text-base-content/45">
         {heading}
       </div>
       {taskIds.map((taskId) => (

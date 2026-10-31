@@ -131,7 +131,7 @@ export function PasswordChangeCard() {
   return (
     <div className="card bg-base-200 shadow-lg">
       <div className="card-body">
-        <h2 className="card-title mb-4 text-xl">Change Password</h2>
+        <h2 className="card-title mb-4">Change Password</h2>
         <form onSubmit={handleSubmit(submit)} className="flex flex-col gap-4" noValidate>
           <PasswordInput
             field="currentPassword"

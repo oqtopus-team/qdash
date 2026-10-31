@@ -75,7 +75,7 @@ function SidebarLogo({ size, onClick }: { size: "sm" | "lg"; onClick: () => void
 function SectionHeader({ label, visible }: { label: string; visible: boolean }) {
   if (!visible) return null;
   return (
-    <li className="menu-title px-3 pb-1 pt-2 text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-base-content/50">
+    <li className="menu-title px-3 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-base-content/50">
       {label}
     </li>
   );
@@ -506,7 +506,7 @@ export function Sidebar() {
           <div className="mb-3">
             <UserAvatar username={user?.username || ""} avatarKey={user?.avatar_key} size={64} />
           </div>
-          <h2 className="text-lg font-bold">{user?.username}</h2>
+          <h2 className="text-sm font-medium">{user?.username}</h2>
           {user?.display_name && (
             <p className="text-sm text-base-content/60">{user?.display_name}</p>
           )}

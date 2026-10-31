@@ -69,7 +69,7 @@ function highlightMentions(text: string): React.ReactNode {
     parts.push(
       <span
         key={match.index}
-        className="inline-flex items-center bg-primary/15 text-primary font-semibold rounded px-1 py-0.5 text-[0.85em]"
+        className="inline-flex items-center bg-primary/15 text-primary font-medium rounded px-1 py-0.5 text-[0.85em]"
       >
         @{match[1]}
       </span>,
@@ -360,7 +360,7 @@ export function MarkdownContent({
     <div
       className={`prose prose-sm max-w-none ${
         preview
-          ? "prose-p:my-0 prose-headings:my-0 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-pre:my-0 prose-img:my-0"
+          ? "prose-p:my-0 prose-headings:my-0 prose-headings:text-sm prose-headings:font-medium prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-pre:my-0 prose-img:my-0"
           : ""
       } ${className ?? ""}`}
     >

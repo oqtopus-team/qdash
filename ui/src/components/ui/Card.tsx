@@ -73,7 +73,7 @@ export function Card({
       {hasHeader && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
-            {title && <h3 className="text-lg font-semibold">{title}</h3>}
+            {title && <h3 className="text-sm font-medium">{title}</h3>}
             {description && <p className="text-sm text-base-content/60">{description}</p>}
           </div>
           {actions && <div className="flex-shrink-0">{actions}</div>}

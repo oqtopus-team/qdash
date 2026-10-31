@@ -143,7 +143,7 @@ const GridCell = memo(function GridCell({
         } ${isDownloadMode && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""}`}
       >
         {showLabels && (
-          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-bold">
+          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-medium">
             {qid}
           </div>
         )}
@@ -626,7 +626,7 @@ export function QubitGrid({
                     gridRow: `${startRow} / span ${spanRows}`,
                   }}
                 >
-                  <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
+                  <div className="text-[0.45rem] md:text-[0.6rem] font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
                     MUX{muxIndex}
                   </div>
                 </div>
@@ -679,7 +679,7 @@ export function QubitGrid({
                   }}
                   title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
                 >
-                  <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                  <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
                     {regionRow},{regionCol}
                   </span>
                 </button>

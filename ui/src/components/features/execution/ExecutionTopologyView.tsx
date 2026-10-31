@@ -101,7 +101,7 @@ const TopologyCell = memo(function TopologyCell({
         className={`aspect-square rounded-lg shadow-sm relative group cursor-pointer ${getStatusColor(status)} ${muxBgClass}`}
       >
         {showLabels && (
-          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-bold">
+          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-medium">
             {qid}
           </div>
         )}
@@ -140,7 +140,7 @@ const TopologyCell = memo(function TopologyCell({
       )}
       <div className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(status)}`} />
       {tasks.length > 1 && (
-        <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-bold">
+        <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-medium">
           {tasks.length}
         </div>
       )}
@@ -219,12 +219,12 @@ const CouplingMarker = memo(function CouplingMarker({
           />
         </div>
       )}
-      <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-[0.65rem] font-medium">
+      <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
         {couplingId}
       </div>
       <div className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(status)}`} />
       {tasks.length > 1 && (
-        <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-bold">
+        <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-medium">
           {tasks.length}
         </div>
       )}
@@ -478,7 +478,7 @@ export function ExecutionTopologyView({
                     gridRow: `${startRow} / span ${spanRows}`,
                   }}
                 >
-                  <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
+                  <div className="text-[0.45rem] md:text-[0.6rem] font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
                     MUX{muxIndex}
                   </div>
                 </div>

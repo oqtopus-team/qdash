@@ -182,7 +182,7 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
       <div className="flex items-center px-2 py-1 min-h-10">
         <button
           type="button"
-          className="btn btn-sm btn-ghost min-h-0 h-8 flex-1 justify-start px-2 font-semibold"
+          className="btn btn-sm btn-ghost min-h-0 h-8 flex-1 justify-start px-2 font-medium"
           aria-expanded={isOpen}
           aria-controls={contentId}
           onClick={() => setIsOpen((open) => !open)}

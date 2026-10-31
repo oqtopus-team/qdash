@@ -49,7 +49,7 @@ export const DialogTitle = forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={mergeClassNames("font-bold text-lg", className)}
+    className={mergeClassNames("font-medium text-sm", className)}
     {...props}
   />
 ));

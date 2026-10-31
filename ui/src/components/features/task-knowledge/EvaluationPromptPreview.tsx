@@ -49,7 +49,7 @@ export function EvaluationPromptPreview({ taskName, exampleCount }: Props) {
     <section className="mt-10" aria-labelledby="evaluation-prompts-heading">
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <div>
-          <h2 id="evaluation-prompts-heading" className="text-lg font-semibold">
+          <h2 id="evaluation-prompts-heading" className="text-sm font-medium">
             Evaluation prompts
           </h2>
           <p className="text-sm text-base-content/60">

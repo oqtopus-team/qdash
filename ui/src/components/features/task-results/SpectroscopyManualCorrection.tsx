@@ -200,7 +200,7 @@ export function SpectroscopyManualCorrection({
               <Pencil size={16} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold">Manual correction</h3>
+              <h3 className="text-sm font-medium">Manual correction</h3>
               <p className="mt-0.5 text-xs leading-relaxed text-base-content/60">
                 Correct a misassigned spectroscopy result without changing the original result or
                 running analysis again.
@@ -222,7 +222,7 @@ export function SpectroscopyManualCorrection({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Pencil size={16} className="text-warning" />
-            <h3 className="text-sm font-semibold">Manual spectroscopy correction</h3>
+            <h3 className="text-sm font-medium">Manual spectroscopy correction</h3>
           </div>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-base-content/60">
             Enter the values read from the stored figure. The measurement is preserved and a linked
@@ -251,7 +251,7 @@ export function SpectroscopyManualCorrection({
             <div className="flex items-center gap-2 text-xs">
               <Crosshair size={14} className="shrink-0 text-primary" />
               <span className="text-base-content/60">Selected point</span>
-              <span className="font-mono font-semibold">
+              <span className="font-mono font-medium">
                 x={formatCoordinate(selectedPoint.x)}, y={formatCoordinate(selectedPoint.y)}
               </span>
             </div>
@@ -356,7 +356,7 @@ export function SpectroscopyManualCorrection({
                 {changedNames.map((name) => (
                   <li key={name} className="flex items-center justify-between gap-4 px-3 py-2.5">
                     <span className="min-w-0 truncate font-mono text-xs">{name}</span>
-                    <span className="shrink-0 font-mono text-xs font-semibold">
+                    <span className="shrink-0 font-mono text-xs font-medium">
                       {values[name]} {parameterUnit(parameterRaw(outputParameters, name), name)}
                     </span>
                   </li>

@@ -217,7 +217,7 @@ export function ParametersTable({
               )}
               <td
                 className={`font-mono text-xs ${
-                  showsDatabaseComparison ? "bg-success/10 text-success font-semibold" : ""
+                  showsDatabaseComparison ? "bg-success/10 text-success font-medium" : ""
                 }`}
               >
                 {override ? (
@@ -225,7 +225,7 @@ export function ParametersTable({
                     <span className="line-through text-base-content/40">
                       {formatParameterValue(paramValue)}
                     </span>
-                    <span className="text-warning font-semibold">
+                    <span className="text-warning font-medium">
                       {formatValue(override.currentValue)}
                     </span>
                   </span>
@@ -247,7 +247,7 @@ export function ParametersTable({
     <div className="border border-base-300 bg-base-100 rounded-lg overflow-hidden">
       <div className="px-3 py-2 bg-base-200 border-b border-base-300 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">{title}</span>
+          <span className="text-sm font-medium">{title}</span>
           <span className="badge badge-xs badge-ghost">{entries.length}</span>
           {title === "Output Parameters" && (
             <CalibrationUpdateStatusBadge parameters={parameters} />
@@ -261,7 +261,7 @@ export function ParametersTable({
           className="collapse collapse-arrow rounded-none border-t border-base-300 bg-base-100"
           open={!group.collapsed}
         >
-          <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-semibold">
+          <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-medium">
             <span className="flex items-center gap-2">
               {groupName}
               <span className="badge badge-xs badge-ghost">{group.entries.length}</span>

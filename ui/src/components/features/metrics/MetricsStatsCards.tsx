@@ -102,7 +102,7 @@ export function MetricsStatsCards({
       <div className="stats shadow-sm bg-base-200">
         <div className="stat py-3 px-4">
           <div className="stat-title text-xs">Average {title}</div>
-          <div className="stat-value text-xl text-primary">{renderValue(stats.avg)}</div>
+          <div className="stat-value text-primary">{renderValue(stats.avg)}</div>
           <div className="stat-desc text-xs">{unit}</div>
         </div>
       </div>
@@ -111,7 +111,7 @@ export function MetricsStatsCards({
       <div className="stats shadow-sm bg-base-200">
         <div className="stat py-3 px-4">
           <div className="stat-title text-xs">Median {title}</div>
-          <div className="stat-value text-xl text-secondary">{renderValue(stats.median)}</div>
+          <div className="stat-value text-secondary">{renderValue(stats.median)}</div>
           <div className="stat-desc text-xs">{unit}</div>
         </div>
       </div>
@@ -120,7 +120,7 @@ export function MetricsStatsCards({
       <div className="stats shadow-sm bg-base-200">
         <div className="stat py-3 px-4">
           <div className="stat-title text-xs">Minimum</div>
-          <div className="stat-value text-xl text-info">{renderValue(stats.min)}</div>
+          <div className="stat-value text-info">{renderValue(stats.min)}</div>
           <div className="stat-desc text-xs">{unit}</div>
         </div>
       </div>
@@ -129,7 +129,7 @@ export function MetricsStatsCards({
       <div className="stats shadow-sm bg-base-200">
         <div className="stat py-3 px-4">
           <div className="stat-title text-xs">Maximum</div>
-          <div className="stat-value text-xl text-success">{renderValue(stats.max)}</div>
+          <div className="stat-value text-success">{renderValue(stats.max)}</div>
           <div className="stat-desc text-xs">{unit}</div>
         </div>
       </div>

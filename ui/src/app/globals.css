@@ -95,6 +95,24 @@ select,
    Card & Box Styles - Rich Interactive
    ---------------------------------------- */
 
+/* Body text is the 14px step; unsized text must not fall back to the browser's 16px. */
+body {
+  font-size: 0.875rem;
+}
+
+/* Numerals get emphasis from size, not weight: the only step above the page title. */
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Card titles share the section-heading step (14px / 500). */
+.card-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
 /* Rich card with deeper shadow */
 .card {
   border-radius: 1rem;
@@ -123,7 +141,7 @@ a.card:hover {
 /* Base button improvements */
 .btn {
   border-radius: 0.75rem;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.02em;
   position: relative;
   overflow: hidden;
@@ -257,7 +275,7 @@ a.card:hover {
 
 .badge {
   border-radius: 9999px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.02em;
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.1);
 }
@@ -304,7 +322,6 @@ a.card:hover {
   box-shadow:
     0 2px 8px 0 rgb(0 0 0 / 0.12),
     0 1px 2px 0 rgb(0 0 0 / 0.08);
-  font-weight: 600;
 }
 
 /* ----------------------------------------
@@ -403,7 +420,7 @@ a.card:hover {
 }
 
 .table th {
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.08em;
@@ -462,7 +479,7 @@ a.card:hover {
     color-mix(in oklch, var(--color-primary) 85%, var(--color-accent))
   );
   color: var(--color-primary-content);
-  font-weight: 600;
+  font-weight: 500;
   box-shadow: 0 2px 8px -2px color-mix(in oklch, var(--color-primary) 50%, transparent);
 }
 
@@ -1171,11 +1188,6 @@ html[data-theme="dark"],
   gap: 1rem;
 }
 
-.dashboard-focus-chip h1 {
-  /* Smaller title for dashboard */
-  font-size: 1.5rem;
-}
-
 /* Optimize content area for dashboard */
 .dashboard-focus-chip .pt-4 {
   padding-top: 0.5rem;
@@ -1191,11 +1203,6 @@ html[data-theme="dark"],
   /* Reduce horizontal padding */
   padding-left: 1rem;
   padding-right: 1rem;
-}
-
-.dashboard-focus-execution h1 {
-  /* Smaller title for dashboard */
-  font-size: 1.5rem;
 }
 
 /* Hide execution stats section in dashboard view */
@@ -1354,7 +1361,7 @@ html[data-theme="dark"],
 .css-1tkfr4s-group,
 [class$="-group"] > div:first-child {
   color: var(--color-base-content) !important;
-  font-weight: 600 !important;
+  font-weight: 500 !important;
   font-size: 0.75rem !important;
   text-transform: uppercase !important;
   opacity: 0.7 !important;
@@ -1562,7 +1569,7 @@ html[data-theme="dark"],
   align-items: center;
   padding: 0.4rem 2rem 0.4rem 0.625rem;
   border-radius: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   text-align: left;
   color: color-mix(in oklch, var(--color-base-content) 85%, transparent);
   transition: background-color 0.15s ease;
@@ -1600,7 +1607,7 @@ html[data-theme="dark"],
   height: 2rem;
   padding: 0 0.5rem;
   border-radius: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   background: var(--color-base-100);
   border: 1px solid color-mix(in oklch, var(--color-primary) 50%, transparent);
   outline: none;
@@ -1704,9 +1711,9 @@ html[data-theme="dark"],
     0 6px 20px -8px rgb(0 0 0 / 0.12);
 }
 
-/* Answer typography: a little roomier than prose-sm, like chat products. */
+/* Answer typography: body size, with roomier leading like chat products. */
 .chat-prose {
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
@@ -1722,7 +1729,7 @@ html[data-theme="dark"],
 .chat-prose :where(h1, h2, h3, h4) {
   margin-top: 1.4em;
   margin-bottom: 0.5em;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .chat-prose :where(ul, ol) {
@@ -1763,7 +1770,7 @@ html[data-theme="dark"],
 
 .chat-table-wrap table {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
 .chat-table-wrap :where(th, td) {
@@ -1937,7 +1944,7 @@ html[data-theme="dark"],
   max-height: 16rem;
   overflow-y: auto;
   white-space: pre-wrap;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   line-height: 1.6;
   color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
   border-left: 2px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
@@ -2007,7 +2014,7 @@ html[data-theme="dark"],
   padding: 0.05rem 0.4rem;
   border-radius: 0.3rem;
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1.4;
   color: color-mix(in oklch, var(--color-base-content) 75%, transparent);
   background: color-mix(in oklch, var(--color-base-content) 7%, transparent);
@@ -2028,14 +2035,13 @@ html[data-theme="dark"],
   flex-shrink: 0;
   border-radius: 0.375rem;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 500;
   color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
   background: color-mix(in oklch, var(--color-base-content) 7%, transparent);
 }
 
 /* Narrow chat surfaces (docked panel, floating window). */
 .chat-compact .chat-prose {
-  font-size: 0.875rem;
   line-height: 1.65;
 }
 
@@ -2044,17 +2050,13 @@ html[data-theme="dark"],
   padding: 0.5rem 0.5rem 0.4rem 0.625rem;
 }
 
-.chat-compact-xs .chat-prose {
-  font-size: 0.8125rem;
-}
-
 /* highlight.js tokens mapped onto the active DaisyUI theme. */
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-built_in,
 .hljs-literal {
   color: var(--color-primary);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .hljs-string,
@@ -2102,8 +2104,8 @@ html[data-theme="dark"],
 .driver-popover.qdash-tour-popover .driver-popover-title {
   color: var(--color-base-content);
   font-family: inherit;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .driver-popover.qdash-tour-popover .driver-popover-description,

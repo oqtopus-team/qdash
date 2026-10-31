@@ -108,7 +108,7 @@ export function ExecutionProgress({ executionId }: { executionId: string }) {
       </div>
 
       {finished.length > 0 && (
-        <ul className="mt-1.5 space-y-0.5 text-[11px]">
+        <ul className="mt-1.5 space-y-0.5 text-xs">
           {finished.slice(-RECENT_TASKS).map((task) => (
             <li key={task.task_id ?? taskLabel(task)} className="flex items-center gap-1.5">
               {task.status === "failed" ? (
@@ -184,7 +184,7 @@ function PipelineCard({ pipeline, chipId }: { pipeline: PipelineProgress; chipId
         )}
       </div>
 
-      <ol className="mt-1.5 space-y-0.5 text-[11px]">
+      <ol className="mt-1.5 space-y-0.5 text-xs">
         {pipeline.steps.map((step) => (
           <li key={step.index} className="flex items-center gap-1.5">
             <StepIcon status={step.status} />
@@ -209,9 +209,7 @@ function PipelineCard({ pipeline, chipId }: { pipeline: PipelineProgress; chipId
 
       {figures.length > 0 && <FigureStrip paths={figures} compact className="mt-2" />}
       {running && finishedSteps === 0 && figures.length === 0 && (
-        <div className="mt-1.5 text-[11px] text-base-content/40">
-          Waiting for the first results…
-        </div>
+        <div className="mt-1.5 text-xs text-base-content/40">Waiting for the first results…</div>
       )}
     </div>
   );

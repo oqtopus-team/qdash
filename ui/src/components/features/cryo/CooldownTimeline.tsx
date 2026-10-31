@@ -190,7 +190,7 @@ export function CooldownTimeline({ cooldowns, selectedId, onSelect }: CooldownTi
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/60">
         <span>Timeline</span>
-        <span className="text-[10px] text-base-content/40">
+        <span className="text-xs text-base-content/40">
           {cooldowns.length} cool-down{cooldowns.length !== 1 ? "s" : ""} / {chipLegend.length} chip
           {chipLegend.length !== 1 ? "s" : ""}
         </span>
@@ -230,7 +230,7 @@ export function CooldownTimeline({ cooldowns, selectedId, onSelect }: CooldownTi
                 cd.ended_at ? formatDate(cd.ended_at) : "now"
               }) · ${chipSummary}`}
             >
-              <span className="flex h-full min-w-0 items-center gap-1.5 px-2 text-[10px] font-semibold leading-none text-white">
+              <span className="flex h-full min-w-0 items-center gap-1.5 px-2 text-xs font-medium leading-none text-white">
                 <span className="truncate font-mono">{cd.cooldown_id}</span>
                 {cd.chip_ids.length > 0 && (
                   <span className="hidden min-w-0 flex-1 truncate font-mono opacity-90 sm:inline">
@@ -249,7 +249,7 @@ export function CooldownTimeline({ cooldowns, selectedId, onSelect }: CooldownTi
         {ticks.map((t) => (
           <span
             key={t.pct}
-            className={`absolute text-[10px] text-base-content/50 ${
+            className={`absolute text-xs text-base-content/50 ${
               t.pct === 0 ? "" : t.pct === 100 ? "-translate-x-full" : "-translate-x-1/2"
             }`}
             style={{ left: `${t.pct}%` }}
@@ -259,7 +259,7 @@ export function CooldownTimeline({ cooldowns, selectedId, onSelect }: CooldownTi
         ))}
       </div>
       {chipLegend.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           {chipLegend.map((chipId) => {
             const style = chipStyle(chipId);
             return (

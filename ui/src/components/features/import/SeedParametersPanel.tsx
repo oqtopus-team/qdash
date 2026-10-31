@@ -557,7 +557,7 @@ export function SeedParametersPanel() {
               <Database className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
-              <h3 className="card-title text-base sm:text-lg">Calibration data</h3>
+              <h3 className="card-title">Calibration data</h3>
               <p className="text-xs text-base-content/60">
                 Inspect current values or review operational settings from YAML.
               </p>
@@ -753,7 +753,7 @@ export function SeedParametersPanel() {
           (counts.new > 0 || counts.different > 0 || editedCount > 0) && (
             <div className="sticky top-16 z-20 flex flex-col gap-3 rounded-box border border-base-300 bg-base-100/95 p-3 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
               <div className="text-xs text-base-content/60">
-                <span className="font-semibold text-base-content">
+                <span className="font-medium text-base-content">
                   {visibleParameters.length} parameters shown
                 </span>
                 {selectedCount > 0 && <span> · {selectedCount} values selected</span>}
@@ -1057,7 +1057,7 @@ export function SeedParametersPanel() {
                                     ) : (
                                       <div className="flex items-center gap-2">
                                         <span
-                                          className={`font-mono text-xs ${selectable ? "font-semibold text-success" : ""}`}
+                                          className={`font-mono text-xs ${selectable ? "font-medium text-success" : ""}`}
                                         >
                                           {formatValue(
                                             isEdited ? parsedValue : qubitData.yaml_value,
@@ -1196,7 +1196,7 @@ export function SeedParametersPanel() {
                   <DialogTitle>Review calibration updates</DialogTitle>
                   <DialogDescription className="py-3">
                     Apply {confirmDialog.entries.length} value(s) to {selectedChip}.{" "}
-                    <span className="font-semibold text-warning">
+                    <span className="font-medium text-warning">
                       {
                         confirmDialog.entries.filter(
                           (entry) =>
@@ -1234,7 +1234,7 @@ export function SeedParametersPanel() {
                             <td className="font-mono text-base-content/60">
                               {formatValue(entry.currentValue)}
                             </td>
-                            <td className="font-mono font-semibold text-success">
+                            <td className="font-mono font-medium text-success">
                               {formatValue(entry.value)} {entry.unit}
                             </td>
                           </tr>

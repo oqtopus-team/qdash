@@ -165,7 +165,7 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
           <button className="btn btn-square btn-ghost btn-sm shrink-0" onClick={goBack}>
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <h1 className="text-xl font-bold">AI Evaluation</h1>
+          <h1 className="text-xl font-medium">AI Evaluation</h1>
         </div>
         <div className="alert alert-error">
           <XCircle className="h-5 w-5" />
@@ -191,7 +191,7 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold">
+            <h1 className="truncate text-xl font-medium">
               {run.task_name} · {run.chip_id}
             </h1>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/50">

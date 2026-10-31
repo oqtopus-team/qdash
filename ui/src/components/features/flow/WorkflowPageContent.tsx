@@ -59,24 +59,24 @@ export function WorkflowPageContent() {
             <div className="stat-figure text-primary">
               <Workflow className="h-6 w-6 sm:h-8 sm:w-8" />
             </div>
-            <div className="stat-title text-xs sm:text-sm">Workflows</div>
-            <div className="stat-value text-lg sm:text-2xl text-primary">{flows.length}</div>
+            <div className="stat-title text-sm">Workflows</div>
+            <div className="stat-value text-primary">{flows.length}</div>
             <div className="stat-desc text-xs">Defined for this project</div>
           </div>
           <div className="stat bg-base-200 rounded-box p-4">
             <div className="stat-figure text-secondary">
               <Users className="h-6 w-6 sm:h-8 sm:w-8" />
             </div>
-            <div className="stat-title text-xs sm:text-sm">Creators</div>
-            <div className="stat-value text-lg sm:text-2xl text-secondary">{folders.length}</div>
+            <div className="stat-title text-sm">Creators</div>
+            <div className="stat-value text-secondary">{folders.length}</div>
             <div className="stat-desc text-xs">Distinct authors</div>
           </div>
           <div className="stat bg-base-200 rounded-box p-4">
             <div className="stat-figure text-accent">
               <Tags className="h-6 w-6 sm:h-8 sm:w-8" />
             </div>
-            <div className="stat-title text-xs sm:text-sm">Tags</div>
-            <div className="stat-value text-lg sm:text-2xl text-accent">{tagCount}</div>
+            <div className="stat-title text-sm">Tags</div>
+            <div className="stat-value text-accent">{tagCount}</div>
             <div className="stat-desc text-xs">Unique labels in use</div>
           </div>
         </div>

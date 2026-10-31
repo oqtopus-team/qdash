@@ -551,7 +551,7 @@ export function CorrelationView() {
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-xs sm:text-sm font-medium">X:</span>
+                <span className="text-sm font-medium">X:</span>
                 <div className="flex-1 sm:w-56 sm:flex-none">
                   <Select<MetricOption, false>
                     className="text-base-content"
@@ -571,7 +571,7 @@ export function CorrelationView() {
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <span className="text-xs sm:text-sm font-medium">Y:</span>
+                <span className="text-sm font-medium">Y:</span>
                 <div className="flex-1 sm:w-56 sm:flex-none">
                   <Select<MetricOption, false>
                     className="text-base-content"
@@ -665,12 +665,12 @@ export function CorrelationView() {
               <div className="grid grid-cols-2 gap-2 sm:hidden">
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Sample Size</div>
-                  <div className="text-sm font-bold text-primary">{statistics.sampleSize}</div>
+                  <div className="text-sm font-medium text-primary">{statistics.sampleSize}</div>
                 </div>
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Correlation (r)</div>
                   <div
-                    className={`text-sm font-bold ${
+                    className={`text-sm font-medium ${
                       statistics.correlation >= 0.7
                         ? "text-success"
                         : statistics.correlation >= 0.3
@@ -696,7 +696,7 @@ export function CorrelationView() {
                   <div className="text-xs text-base-content/60 truncate">
                     {xMetricConfig?.title || xParameter}
                   </div>
-                  <div className="text-sm font-bold text-secondary">
+                  <div className="text-sm font-medium text-secondary">
                     {statistics.xMean.toFixed(2)}
                   </div>
                   <div className="text-xs text-base-content/60">
@@ -707,7 +707,9 @@ export function CorrelationView() {
                   <div className="text-xs text-base-content/60 truncate">
                     {yMetricConfig?.title || yParameter}
                   </div>
-                  <div className="text-sm font-bold text-accent">{statistics.yMean.toFixed(2)}</div>
+                  <div className="text-sm font-medium text-accent">
+                    {statistics.yMean.toFixed(2)}
+                  </div>
                   <div className="text-xs text-base-content/60">
                     {statistics.yMin.toFixed(1)}-{statistics.yMax.toFixed(1)}
                   </div>
@@ -717,12 +719,12 @@ export function CorrelationView() {
               <div className="stats stats-horizontal shadow w-full hidden sm:inline-grid">
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Sample Size</div>
-                  <div className="stat-value text-primary text-lg">{statistics.sampleSize}</div>
+                  <div className="stat-value text-primary">{statistics.sampleSize}</div>
                 </div>
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Correlation (r)</div>
                   <div
-                    className={`stat-value text-lg ${
+                    className={`stat-value text-sm ${
                       statistics.correlation >= 0.7
                         ? "text-success"
                         : statistics.correlation >= 0.3
@@ -748,9 +750,7 @@ export function CorrelationView() {
                   <div className="stat-title text-xs">
                     {xMetricConfig?.title || xParameter} (Mean)
                   </div>
-                  <div className="stat-value text-secondary text-lg">
-                    {statistics.xMean.toFixed(2)}
-                  </div>
+                  <div className="stat-value text-secondary">{statistics.xMean.toFixed(2)}</div>
                   <div className="stat-desc text-xs">
                     Range: {statistics.xMin.toFixed(2)} - {statistics.xMax.toFixed(2)}
                   </div>
@@ -759,9 +759,7 @@ export function CorrelationView() {
                   <div className="stat-title text-xs">
                     {yMetricConfig?.title || yParameter} (Mean)
                   </div>
-                  <div className="stat-value text-accent text-lg">
-                    {statistics.yMean.toFixed(2)}
-                  </div>
+                  <div className="stat-value text-accent">{statistics.yMean.toFixed(2)}</div>
                   <div className="stat-desc text-xs">
                     Range: {statistics.yMin.toFixed(2)} - {statistics.yMax.toFixed(2)}
                   </div>

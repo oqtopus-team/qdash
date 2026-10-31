@@ -426,7 +426,7 @@ export function MetricsPageContent() {
           >
             <h2
               id="metrics-data-scope"
-              className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-base-content/55"
+              className="mb-3 text-xs font-medium uppercase tracking-wide text-base-content/55"
             >
               Data scope
             </h2>
@@ -557,7 +557,7 @@ export function MetricsPageContent() {
           <>
             {/* Metric Title */}
             <div className="flex items-center gap-3">
-              <h2 className="text-xl md:text-2xl font-bold">{currentMetricConfig.title}</h2>
+              <h2 className="text-sm font-medium">{currentMetricConfig.title}</h2>
               <span className="badge badge-outline badge-sm">{currentMetricConfig.unit}</span>
             </div>
 

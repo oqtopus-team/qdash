@@ -229,7 +229,7 @@ function DraftView({ step }: { step: ToolStep }) {
   return (
     <div>
       {others.length > 0 && (
-        <dl className="mb-1 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-[11px]">
+        <dl className="mb-1 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-xs">
           {others.map(([key, value]) => (
             <div key={key} className="contents">
               <dt className="font-mono text-base-content/45">{key}</dt>
@@ -243,7 +243,7 @@ function DraftView({ step }: { step: ToolStep }) {
           {code}
         </LiveCode>
       ) : (
-        <p className="text-[11px] text-base-content/45">Writing the call…</p>
+        <p className="text-xs text-base-content/45">Writing the call…</p>
       )}
     </div>
   );
@@ -252,7 +252,7 @@ function DraftView({ step }: { step: ToolStep }) {
 function PathLine({ path, detail }: { path: string | undefined; detail?: string }) {
   if (!path) return null;
   return (
-    <div className="mb-1 font-mono text-[11px] text-base-content/60">
+    <div className="mb-1 font-mono text-xs text-base-content/60">
       {path}
       {detail && <span className="text-base-content/40"> · {detail}</span>}
     </div>
@@ -265,7 +265,7 @@ function OutputPanel({ step }: { step: ToolStep }) {
   const failed = step.status === "error" || (step.exitCode !== undefined && step.exitCode !== 0);
   return (
     <div className="mt-1.5">
-      <div className="mb-0.5 flex items-center gap-2 text-[11px] text-base-content/50">
+      <div className="mb-0.5 flex items-center gap-2 text-xs text-base-content/50">
         <span>Output</span>
         {step.exitCode !== undefined && step.exitCode !== 0 && (
           <span className="rounded bg-error/10 px-1.5 py-px font-mono text-error/80">
@@ -274,7 +274,7 @@ function OutputPanel({ step }: { step: ToolStep }) {
         )}
       </div>
       <pre
-        className={`m-0 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md p-2 font-mono text-[11px] leading-relaxed ${
+        className={`m-0 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md p-2 font-mono text-xs leading-relaxed ${
           failed ? "bg-error/5 text-base-content/75" : "bg-base-200/60 text-base-content/70"
         }`}
       >
@@ -290,7 +290,7 @@ function EditsView({ edits }: { edits: unknown[] }) {
       {edits.map((edit, i) => {
         const pair = record(edit);
         return (
-          <div key={i} className="overflow-hidden rounded-md border border-base-300/60 text-[11px]">
+          <div key={i} className="overflow-hidden rounded-md border border-base-300/60 text-xs">
             <pre className="m-0 whitespace-pre-wrap break-words bg-error/5 px-2 py-1 font-mono text-base-content/70">
               {`- ${text(pair?.oldText) ?? ""}`}
             </pre>

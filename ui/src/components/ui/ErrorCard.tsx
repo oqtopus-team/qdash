@@ -43,7 +43,7 @@ export function ErrorCard({
         )}
 
         {/* Error Title */}
-        <h3 className="text-xl font-semibold text-error">{title}</h3>
+        <h3 className="text-sm font-medium text-error">{title}</h3>
 
         {/* Error Message */}
         <p className="text-base-content/70 max-w-md">{message}</p>

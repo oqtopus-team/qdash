@@ -21,7 +21,7 @@ export function SettingsCard() {
     <section className="card card-border bg-base-100">
       <div className="card-body gap-5 p-5 sm:p-6">
         <div>
-          <h2 className="card-title text-lg">System settings</h2>
+          <h2 className="card-title">System settings</h2>
           <p className="mt-1 text-sm text-base-content/60">
             Runtime configuration reported by the QDash API.
           </p>

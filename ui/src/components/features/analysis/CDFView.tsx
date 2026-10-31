@@ -774,14 +774,14 @@ export function CDFView() {
 
               {hasPercentageMetrics && (
                 <label className="cursor-pointer flex items-center gap-1 sm:gap-2 h-8 sm:h-9">
-                  <span className="text-xs sm:text-sm">Fidelity</span>
+                  <span className="text-sm">Fidelity</span>
                   <input
                     type="checkbox"
                     className="toggle toggle-primary toggle-xs sm:toggle-sm"
                     checked={showAsErrorRate}
                     onChange={(e) => setShowAsErrorRate(e.target.checked)}
                   />
-                  <span className="text-xs sm:text-sm">Error</span>
+                  <span className="text-sm">Error</span>
                 </label>
               )}
 
@@ -834,27 +834,27 @@ export function CDFView() {
                       <div className="grid grid-cols-3 gap-2">
                         <div className="bg-base-200 rounded-lg p-2 text-center">
                           <div className="text-xs text-base-content/60">N</div>
-                          <div className="text-sm font-bold text-success">
+                          <div className="text-sm font-medium text-success">
                             {data.tableData.length}
                           </div>
                         </div>
                         <div className="bg-base-200 rounded-lg p-2 text-center">
                           <div className="text-xs text-base-content/60">Median</div>
-                          <div className="text-sm font-bold text-primary">
+                          <div className="text-sm font-medium text-primary">
                             {formatValue(data.median)}
                             {unit}
                           </div>
                         </div>
                         <div className="bg-base-200 rounded-lg p-2 text-center">
                           <div className="text-xs text-base-content/60">Mean</div>
-                          <div className="text-sm font-bold text-secondary">
+                          <div className="text-sm font-medium text-secondary">
                             {formatValue(data.mean)}
                             {unit}
                           </div>
                         </div>
                         <div className="bg-base-200 rounded-lg p-2 text-center col-span-3">
                           <div className="text-xs text-base-content/60">P10 / P90</div>
-                          <div className="text-sm font-bold text-accent">
+                          <div className="text-sm font-medium text-accent">
                             {formatValue(data.percentile10!)}
                             {unit} / {formatValue(data.percentile90!)}
                             {unit}
@@ -870,34 +870,32 @@ export function CDFView() {
                       </div>
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">N_valid</div>
-                        <div className="stat-value text-success text-sm">
-                          {data.tableData.length}
-                        </div>
+                        <div className="stat-value text-success">{data.tableData.length}</div>
                       </div>
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">Median</div>
-                        <div className="stat-value text-primary text-sm">
+                        <div className="stat-value text-primary">
                           {formatValue(data.median)}
                           {unit}
                         </div>
                       </div>
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">Mean</div>
-                        <div className="stat-value text-secondary text-sm">
+                        <div className="stat-value text-secondary">
                           {formatValue(data.mean)}
                           {unit}
                         </div>
                       </div>
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">10th %ile</div>
-                        <div className="stat-value text-accent text-sm">
+                        <div className="stat-value text-accent">
                           {formatValue(data.percentile10!)}
                           {unit}
                         </div>
                       </div>
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">90th %ile</div>
-                        <div className="stat-value text-accent text-sm">
+                        <div className="stat-value text-accent">
                           {formatValue(data.percentile90!)}
                           {unit}
                         </div>

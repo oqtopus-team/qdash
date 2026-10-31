@@ -79,7 +79,7 @@ export function DashboardCdfChart({
       className="bg-base-100 rounded-lg shadow-sm border border-base-300 p-2 w-full"
       style={{ minHeight: height }}
     >
-      <div className="px-1 pb-1 text-xs font-semibold text-base-content/80">
+      <div className="px-1 pb-1 text-xs font-medium text-base-content/80">
         CDF · {title} <span className="text-base-content/50 font-normal">(n={cdf.n})</span>
       </div>
       <Plot

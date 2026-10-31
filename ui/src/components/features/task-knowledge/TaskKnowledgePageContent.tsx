@@ -33,7 +33,7 @@ function TaskCard({ item }: { item: TaskKnowledgeSummaryResponse }) {
       className="bg-base-100 rounded-lg border border-base-300 cursor-pointer hover:border-primary/50 transition-colors"
     >
       <div className="p-4">
-        <h3 className="text-sm font-semibold font-mono text-primary mb-1">{item.name}</h3>
+        <h3 className="text-sm font-medium font-mono text-primary mb-1">{item.name}</h3>
         <p className="text-sm text-base-content/70 line-clamp-2 mb-2">{item.summary}</p>
         <div className="flex items-center gap-3 text-xs text-base-content/50">
           {(item.example_count ?? 0) > 0 && (
@@ -123,7 +123,7 @@ export function TaskKnowledgePageContent() {
         <div className="space-y-8">
           {Array.from(grouped.entries()).map(([category, catItems]) => (
             <div key={category}>
-              <h2 className="text-base font-semibold mb-3">
+              <h2 className="text-sm font-medium mb-3">
                 {categories[category] || category || "Other"}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

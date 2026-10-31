@@ -75,7 +75,7 @@ export function WorkspaceChangesView({
       <div className="flex h-full items-center justify-center text-base-content/50">
         <div className="text-center">
           <FileDiff className="mx-auto mb-2 h-8 w-8 opacity-60" />
-          <p className="text-lg mb-1">No changes</p>
+          <p className="text-sm mb-1">No changes</p>
           <p className="text-sm">Saved edits appear here, ready for a pull request.</p>
         </div>
       </div>

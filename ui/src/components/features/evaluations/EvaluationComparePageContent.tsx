@@ -74,7 +74,7 @@ function RunHeadline({ side, run }: { side: Side; run: EvaluationRunSummary }) {
   return (
     <div className="min-w-0 rounded-lg border border-base-300 bg-base-100 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="badge badge-primary badge-sm font-bold">{SIDE_LABEL[side]}</span>
+        <span className="badge badge-primary badge-sm font-medium">{SIDE_LABEL[side]}</span>
         <Link
           href={`/evaluations/${run.run_id}`}
           className="link link-hover truncate font-mono text-xs"
@@ -141,8 +141,8 @@ function SettingsTable({ a, b }: { a: RunSide; b: RunSide }) {
               data-testid={`setting-${setting.key}`}
             >
               <td className="text-base-content/60">{setting.label}</td>
-              <td className={`break-all ${setting.differs ? "font-semibold" : ""}`}>{setting.a}</td>
-              <td className={`break-all ${setting.differs ? "font-semibold" : ""}`}>{setting.b}</td>
+              <td className={`break-all ${setting.differs ? "font-medium" : ""}`}>{setting.a}</td>
+              <td className={`break-all ${setting.differs ? "font-medium" : ""}`}>{setting.b}</td>
             </tr>
           ))}
         </tbody>
@@ -346,7 +346,7 @@ function ExpandedRow({ row }: { row: CompareRow }) {
               const item = row[side];
               return (
                 <div key={side} className="min-w-0">
-                  <div className="mb-1 text-xs font-semibold text-base-content/60">
+                  <div className="mb-1 text-xs font-medium text-base-content/60">
                     {SIDE_LABEL[side]}
                   </div>
                   {item ? (
@@ -441,7 +441,7 @@ export function EvaluationComparePageContent() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-bold">
+          <h1 className="truncate text-xl font-medium">
             Compare runs
             {dataA && ` · ${dataA.run.task_name} · ${dataA.run.chip_id}`}
           </h1>
@@ -603,7 +603,7 @@ export function EvaluationComparePageContent() {
                             <ChevronRight className="h-4 w-4 text-base-content/50" />
                           )}
                         </td>
-                        <td className="font-semibold">
+                        <td className="font-medium">
                           {row.qid}
                           {row.sameResult === false && (
                             <span

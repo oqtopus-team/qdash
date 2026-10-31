@@ -34,7 +34,7 @@ function ProjectAccessState() {
         <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-base-200 text-base-content/70">
           <FolderLock size={28} aria-hidden="true" />
         </div>
-        <h1 className="text-2xl font-semibold text-base-content">No project access</h1>
+        <h1 className="text-xl font-medium text-base-content">No project access</h1>
         <p className="mt-3 text-sm leading-6 text-base-content/70">
           You are not a member of any project yet. Ask a project owner or administrator to invite
           you before viewing measurement results, chips, workflows, or project discussions.

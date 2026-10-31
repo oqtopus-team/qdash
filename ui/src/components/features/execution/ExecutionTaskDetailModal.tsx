@@ -112,7 +112,7 @@ export function ExecutionTaskDetailModal({
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
           <History className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-bold text-base-content">Execution History</h3>
+          <h3 className="text-sm font-medium text-base-content">Execution History</h3>
         </div>
         <p className="text-xs text-base-content/50">Current execution</p>
       </div>
@@ -120,7 +120,7 @@ export function ExecutionTaskDetailModal({
         <button className="w-full text-left p-3 rounded-lg transition-all border-2 bg-primary text-primary-content border-primary">
           <div className="flex justify-between items-start">
             <div className="min-w-0 flex-1">
-              <div className="font-bold text-lg truncate">{executionName || "Execution"}</div>
+              <div className="font-medium text-sm truncate">{executionName || "Execution"}</div>
               <div className="text-xs opacity-70 mt-1 font-mono truncate">{executionId}</div>
               <span className="badge badge-xs mt-1 badge-primary-content">Current</span>
             </div>
@@ -136,9 +136,9 @@ export function ExecutionTaskDetailModal({
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
           <ListTodo className="h-4 w-4 text-secondary" />
-          <h3 className="text-sm font-bold text-base-content">Tasks in Execution</h3>
+          <h3 className="text-sm font-medium text-base-content">Tasks in Execution</h3>
         </div>
-        <p className="text-[0.65rem] text-base-content/50 font-mono truncate">{executionId}</p>
+        <p className="text-xs text-base-content/50 font-mono truncate">{executionId}</p>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         {tasks.length === 0 ? (
@@ -162,7 +162,7 @@ export function ExecutionTaskDetailModal({
                 >
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
-                      <div className="font-bold text-sm truncate">{task.name || "Unnamed"}</div>
+                      <div className="font-medium text-sm truncate">{task.name || "Unnamed"}</div>
                       <div className="text-xs opacity-70 mt-1">
                         {task.start_at ? formatDateTimeCompact(String(task.start_at)) : ""}
                       </div>
@@ -191,7 +191,7 @@ export function ExecutionTaskDetailModal({
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-bold text-base-content">Task Details</h3>
+          <h3 className="text-sm font-medium text-base-content">Task Details</h3>
         </div>
         {tasks.length > 0 && (
           <div className="text-xs text-base-content/60">
@@ -257,17 +257,17 @@ export function ExecutionTaskDetailModal({
         <div className="mt-2 text-xs text-base-content/60 space-y-1 bg-base-200 p-3 rounded-lg">
           {selectedTask.name && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Task Name:</span>
+              <span className="font-medium">Task Name:</span>
               <span className="font-mono">{selectedTask.name}</span>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <span className="font-semibold">Execution ID:</span>
+            <span className="font-medium">Execution ID:</span>
             <span className="font-mono truncate">{executionId}</span>
           </div>
           {selectedTask.task_id && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Task ID:</span>
+              <span className="font-medium">Task ID:</span>
               <Link
                 href={`/task-results/${selectedTask.task_id}`}
                 className="font-mono truncate link link-primary"
@@ -278,13 +278,13 @@ export function ExecutionTaskDetailModal({
           )}
           {selectedTask.start_at != null && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Start:</span>
+              <span className="font-medium">Start:</span>
               <span>{formatDateTime(String(selectedTask.start_at))}</span>
             </div>
           )}
           {selectedTask.end_at != null && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">End:</span>
+              <span className="font-medium">End:</span>
               <span>{formatDateTime(String(selectedTask.end_at))}</span>
             </div>
           )}
@@ -377,10 +377,10 @@ export function ExecutionTaskDetailModal({
       <DialogContent className="max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none w-full max-w-[112rem] h-[90vh] sm:h-[95vh] p-0 !overflow-hidden flex flex-col">
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
+            <DialogTitle className="text-sm font-medium truncate">
               {selectedTask?.name || "Task Details"}
             </DialogTitle>
-            <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+            <DialogDescription className="text-sm text-base-content/70 mt-0.5 sm:mt-1">
               {qid.includes("-") ? "Coupling" : "QID"} {qid}
             </DialogDescription>
           </div>

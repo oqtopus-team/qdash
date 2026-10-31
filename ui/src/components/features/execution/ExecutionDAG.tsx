@@ -109,7 +109,7 @@ const CustomNode = ({ data }: NodeProps) => {
       }}
     >
       <Handle type="target" position={Position.Left} />
-      <div className="font-semibold truncate">{nodeData.name}</div>
+      <div className="font-medium truncate">{nodeData.name}</div>
       <div className="text-sm font-medium truncate">{nodeData.status}</div>
       {nodeData.startAt && (
         <div className="tooltip tooltip-bottom absolute -bottom-12 opacity-0 group-hover:opacity-100 transition-opacity bg-base-300 p-2 rounded text-xs whitespace-nowrap z-10">
@@ -319,7 +319,7 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
     <div className={isFullscreen ? gridFullscreenPanelClass : ""}>
       {isFullscreen && (
         <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
-          <h2 className="text-lg sm:text-xl font-bold">Execution Flow</h2>
+          <h2 className="text-sm font-medium">Execution Flow</h2>
         </div>
       )}
 
@@ -339,7 +339,7 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
         {selectedTask && (
           <div className="w-[30%] h-full overflow-y-auto rounded-lg bg-base-100 p-4 shadow">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">{selectedTask.name}</h3>
+              <h3 className="text-sm font-medium">{selectedTask.name}</h3>
               <button
                 type="button"
                 onClick={() => setSelectedTask(null)}

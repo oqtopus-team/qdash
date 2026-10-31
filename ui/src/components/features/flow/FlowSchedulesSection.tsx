@@ -33,7 +33,7 @@ function ScheduleRow({ schedule }: { schedule: FlowScheduleSummary }) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate font-semibold">{schedule.flow_name}</div>
+          <div className="truncate font-medium">{schedule.flow_name}</div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/60">
             <span>{formatScheduleType(schedule)}</span>
             <span className={`badge badge-xs ${schedule.active ? "badge-success" : "badge-ghost"}`}>
