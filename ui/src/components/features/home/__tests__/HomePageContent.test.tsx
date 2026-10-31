@@ -4,12 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HomePageContent } from "@/components/features/home/HomePageContent";
 
 const mockExecutionLock = vi.hoisted(() => vi.fn());
+const mockExecution = vi.hoisted(() => vi.fn());
 const mockChips = vi.hoisted(() => vi.fn());
 const mockTaskResults = vi.hoisted(() => vi.fn());
 const mockNotifications = vi.hoisted(() => vi.fn());
 
 vi.mock("@/client/execution/execution", () => ({
   useGetExecutionLockStatus: mockExecutionLock,
+  useGetExecution: mockExecution,
 }));
 
 vi.mock("@/client/chip/chip", () => ({
@@ -36,6 +38,7 @@ describe("HomePageContent", () => {
       isLoading: false,
       error: null,
     });
+    mockExecution.mockReturnValue({ data: undefined });
     mockExecutionLock.mockReturnValue({
       data: {
         data: {
@@ -155,5 +158,25 @@ describe("HomePageContent", () => {
       "/chip?tutorial=create-chip",
     );
     expect(screen.queryByRole("link", { name: "Setup tour" })).toBeNull();
+  });
+
+  it("shows task progress for the running execution", () => {
+    mockExecution.mockReturnValue({
+      data: {
+        data: {
+          task: [
+            { name: "CheckT1", status: "completed" },
+            { name: "CheckT2Echo", status: "completed" },
+            { name: "CheckRamsey", status: "running" },
+            { name: "RandomizedBenchmarking", status: "scheduled" },
+          ],
+        },
+      },
+    });
+
+    render(<HomePageContent />);
+
+    expect(screen.getByText(/2\/4 tasks/)).toBeTruthy();
+    expect(screen.getByText("CheckRamsey")).toBeTruthy();
   });
 });

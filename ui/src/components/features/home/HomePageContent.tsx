@@ -1,8 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import {
-  AlertCircle,
   ArrowRight,
   CheckCircle2,
   ClipboardList,
@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { useGetExecutionLockStatus } from "@/client/execution/execution";
+import { useGetExecution, useGetExecutionLockStatus } from "@/client/execution/execution";
 import { useListChips } from "@/client/chip/chip";
 import { useListTaskResults } from "@/client/task-result/task-result";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -26,6 +26,7 @@ import { useNotificationActions, useNotifications } from "@/hooks/useNotificatio
 import { isExecutionInProgress } from "@/lib/executionStatus";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { NotificationResponse } from "@/schemas";
+import { QubitTile } from "@/components/ui/QubitTile";
 
 interface SectionHeadingProps {
   title: string;
@@ -217,6 +218,26 @@ export function HomePageContent() {
 
   const lock = lockResponse?.data;
   const isRunning = Boolean(lock?.lock && lock.status && isExecutionInProgress(lock.status));
+
+  // While a calibration runs, poll its task list so the card shows real progress.
+  const runningExecutionId = isRunning ? (lock?.execution_id ?? undefined) : undefined;
+  const { data: runningExecution } = useGetExecution(runningExecutionId ?? "", {
+    query: { enabled: Boolean(runningExecutionId), refetchInterval: 5000 },
+  });
+  const runningProgress = useMemo(() => {
+    const tasks = runningExecution?.data?.task ?? [];
+    const done = tasks.filter((task) => task.status === "completed").length;
+    const failed = tasks.filter((task) => task.status === "failed").length;
+    const current = tasks.find((task) => task.status === "running")?.name;
+    const total = tasks.length;
+    return {
+      done,
+      failed,
+      total,
+      current,
+      percent: total ? Math.round(((done + failed) / total) * 100) : 0,
+    };
+  }, [runningExecution]);
   const executionHref =
     lock?.chip_id && lock.execution_id
       ? `/execution/${encodeURIComponent(lock.chip_id)}/${encodeURIComponent(lock.execution_id)}`
@@ -282,19 +303,42 @@ export function HomePageContent() {
                 ) : isRunning ? (
                   <Link
                     href={executionHref}
-                    className="flex items-center gap-4 rounded-lg border border-info/30 bg-info/10 p-4 transition-colors hover:bg-info/15"
+                    className="flex items-center gap-4 rounded-lg border border-base-300 bg-base-100 p-4 transition-colors hover:border-base-content/20"
                   >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-info text-info-content">
-                      <span className="loading loading-spinner loading-sm" />
-                    </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">
-                        {lock?.name || "Calibration execution"}
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full bg-info"
+                          aria-hidden="true"
+                        />
+                        <span className="truncate font-medium">
+                          {lock?.name || "Calibration execution"}
+                        </span>
                       </span>
-                      <span className="mt-1 flex flex-wrap gap-x-3 text-xs text-base-content/60">
-                        <span className="capitalize">{lock?.status}</span>
+                      <span className="mt-1 flex flex-wrap gap-x-3 text-xs text-base-content/60 tabular-nums">
+                        {runningProgress.total > 0 ? (
+                          <span>
+                            {runningProgress.done}/{runningProgress.total} tasks
+                            {runningProgress.failed > 0
+                              ? ` · ${runningProgress.failed} failed`
+                              : ""}
+                          </span>
+                        ) : (
+                          <span className="capitalize">{lock?.status}</span>
+                        )}
+                        {runningProgress.current && (
+                          <span className="truncate font-mono">{runningProgress.current}</span>
+                        )}
                         {lock?.chip_id && <span>Chip {lock.chip_id}</span>}
                       </span>
+                      {runningProgress.total > 0 && (
+                        <span className="mt-3 block h-1 w-full overflow-hidden rounded-full bg-base-300">
+                          <span
+                            className="block h-full rounded-full bg-primary"
+                            style={{ width: `${runningProgress.percent}%` }}
+                          />
+                        </span>
+                      )}
                     </span>
                     <ArrowRight className="h-5 w-5 shrink-0" />
                   </Link>
@@ -345,16 +389,14 @@ export function HomePageContent() {
                         href={`/task-results/${encodeURIComponent(result.task_id)}`}
                         className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:text-error"
                       >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-base-200 text-error">
-                          <AlertCircle className="h-5 w-5" />
-                        </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">
                             {result.task_name}
                           </span>
-                          <span className="mt-0.5 block truncate text-xs text-base-content/55">
-                            {result.qid} · {result.chip_id}
-                            {result.message ? ` · ${result.message}` : ""}
+                          <span className="mt-1 flex items-center gap-2 text-xs text-base-content/55">
+                            <QubitTile qid={result.qid} status="failed" />
+                            <span className="shrink-0">{result.chip_id}</span>
+                            {result.message && <span className="truncate">{result.message}</span>}
                           </span>
                         </span>
                         {result.start_at && (

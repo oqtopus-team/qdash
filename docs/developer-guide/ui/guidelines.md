@@ -145,6 +145,10 @@ Color means status. `success`, `warning`, `error`, and `info` mark state; `prima
 action or selection on screen. A number in a stat tile is neutral unless it reports a state, and
 decorative uses of `secondary` and `accent` are avoided.
 
+A qubit or coupling id is always a `QubitTile` (`ui/src/components/ui/QubitTile.tsx`): a mono id in a
+small square-cornered box, the same shape as a cell of the chip grid, with a status dot when the
+reference carries a status. Do not render ids as plain badges.
+
 Icons come from `lucide-react`, 16px to 18px, in the color of their text role (`text-base-content/60`
 for meta), never in `secondary` or `accent`. Product UI does not use emoji or emoji images; `EmptyState` renders
 a lucide icon from its `emoji` name map, and toasts use lucide status icons. `FluentEmoji` remains

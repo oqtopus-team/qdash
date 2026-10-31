@@ -41,6 +41,7 @@ import type {
   TaskInfo,
   TaskResultListItem,
 } from "@/schemas";
+import { QubitTile } from "@/components/ui/QubitTile";
 
 const PAGE_SIZE = 50;
 const STATUS_TABS = ["all", "failed", "running", "completed", "cancelled"] as const;
@@ -171,7 +172,11 @@ function TaskResultRow({
         <div className="mt-1 font-mono text-xs text-base-content/45">{compactId(item.task_id)}</div>
       </td>
       <td>
-        <div className="font-mono text-xs">{item.qid || "-"}</div>
+        {item.qid ? (
+          <QubitTile qid={item.qid} />
+        ) : (
+          <span className="text-xs text-base-content/50">-</span>
+        )}
         <div className="mt-1 text-xs text-base-content/50">{item.chip_id || "-"}</div>
       </td>
       <td className="min-w-44">
@@ -442,9 +447,7 @@ function TaskResultPreviewSidebar({
                   {taskResult.status}
                 </span>
               )}
-              {taskResult?.qid && (
-                <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
-              )}
+              {taskResult?.qid && <QubitTile qid={taskResult.qid} />}
             </div>
             <h2 className="text-sm font-medium">{taskResult?.task_name || "Task Result"}</h2>
             {taskResult && (
