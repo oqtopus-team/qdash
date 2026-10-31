@@ -24,10 +24,25 @@ the project toolchain.
 
 ## Clone the Repository
 
+Clone QDash on the development host. Keep the checkout in a directory where you want to store
+other repositories too:
+
 ```bash
 git clone https://github.com/oqtopus-team/qdash.git
 cd qdash
 ```
+
+The DevContainer bind-mounts the checkout at `/workspace/qdash` and, by default, its host parent
+directory at `/workspace/repos`. Git changes and commits in QDash are visible from either
+environment. With the default mount, clones made under `/workspace/repos` in the container appear
+beside QDash on the host; clones made beside QDash on the host appear under `/workspace/repos` in
+the container. For example,
+`git clone <repository-url> /workspace/repos/<repository-name>` works from the container.
+Use `/workspace/qdash` for QDash development so its dependencies stay in the separate
+DevContainer volumes. The initial QDash clone must be made on the host because its Compose file
+is needed to start the DevContainer. If you want a different shared directory, set
+`QDASH_SHARED_REPOS_DIR` to its absolute host path before starting the container. No repository
+manager is required.
 
 A DevContainer can start without `.env`. Before running Qubex-backed calibration tasks, follow
 [Operator Setup](../user-guide/setup.md) for `.env` and `CONFIG_PATH` configuration.
@@ -46,7 +61,9 @@ the checkout remain writable from the host. Docker Compose direct sessions can s
 when needed.
 
 On Linux, build the `vscode` user with the host UID and GID so files created in the checkout
-remain writable from both the host and the container:
+and shared repository directory remain writable from both the host and the container. VS Code's
+`updateRemoteUserUID` handles this for Dev Containers opened through the extension; when
+starting Compose directly, pass the IDs explicitly:
 
 ```shell
 LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose -f compose.devcontainer.yaml up -d --build
@@ -66,8 +83,11 @@ keep their Python environment outside the checkout, so they do not reuse root-ow
 artifacts.
 
 Use the same `task` commands from the host or DevContainer. Both sessions edit the same source
-checkout and use the same Docker daemon. Run development commands as the `vscode` user in the
-DevContainer; reserve root for container setup.
+checkout and use the same Docker daemon. Run Git and development commands as the `vscode` user
+in the DevContainer; reserve root for container setup. The container sets `umask 022` so new
+files are readable in both environments. Git credentials and global identity are per-user; set
+`user.name` and `user.email` in both environments, and authenticate Git separately in each
+environment. A repository-local Git setting is shared because `.git/config` is in the bind mount.
 
 The DevContainer keeps its Python `.venv` in a Docker volume mounted at the usual workspace path.
 The host retains its own `.venv`, so running `uv sync` or `uv run` in one environment does not
