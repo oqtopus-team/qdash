@@ -93,7 +93,7 @@ export function ExecutionComparisonPanel() {
       {/* Comparison Form */}
       <div className="card bg-base-200">
         <div className="card-body">
-          <h3 className="card-title text-lg">Compare Executions</h3>
+          <h3 className="card-title">Compare Executions</h3>
           <p className="text-sm text-base-content/70 mb-4">
             Compare parameter values between two calibration executions to see what changed.
           </p>
@@ -197,27 +197,25 @@ export function ExecutionComparisonPanel() {
                 <Plus className="h-6 w-6" />
               </div>
               <div className="stat-title">Added</div>
-              <div className="stat-value text-success text-2xl">{data.added_parameters.length}</div>
+              <div className="stat-value text-success">{data.added_parameters.length}</div>
             </div>
             <div className="stat bg-error/10 rounded-lg border border-error/20">
               <div className="stat-figure text-error">
                 <Minus className="h-6 w-6" />
               </div>
               <div className="stat-title">Removed</div>
-              <div className="stat-value text-error text-2xl">{data.removed_parameters.length}</div>
+              <div className="stat-value text-error">{data.removed_parameters.length}</div>
             </div>
             <div className="stat bg-warning/10 rounded-lg border border-warning/20">
               <div className="stat-figure text-warning">
                 <TrendingUp className="h-6 w-6" />
               </div>
               <div className="stat-title">Changed</div>
-              <div className="stat-value text-warning text-2xl">
-                {data.changed_parameters.length}
-              </div>
+              <div className="stat-value text-warning">{data.changed_parameters.length}</div>
             </div>
             <div className="stat bg-base-200 rounded-lg">
               <div className="stat-title">Unchanged</div>
-              <div className="stat-value text-2xl">{data.unchanged_count}</div>
+              <div className="stat-value">{data.unchanged_count}</div>
             </div>
           </div>
 
@@ -225,7 +223,7 @@ export function ExecutionComparisonPanel() {
           {data.changed_parameters.length > 0 && (
             <div className="card bg-base-200">
               <div className="card-body">
-                <h3 className="card-title text-lg text-warning">
+                <h3 className="card-title text-warning">
                   <TrendingUp className="h-5 w-5" />
                   Changed Parameters
                 </h3>
@@ -279,7 +277,7 @@ export function ExecutionComparisonPanel() {
           {data.added_parameters.length > 0 && (
             <div className="card bg-base-200">
               <div className="card-body">
-                <h3 className="card-title text-lg text-success">
+                <h3 className="card-title text-success">
                   <Plus className="h-5 w-5" />
                   Added Parameters
                 </h3>
@@ -311,7 +309,7 @@ export function ExecutionComparisonPanel() {
           {data.removed_parameters.length > 0 && (
             <div className="card bg-base-200">
               <div className="card-body">
-                <h3 className="card-title text-lg text-error">
+                <h3 className="card-title text-error">
                   <Minus className="h-5 w-5" />
                   Removed Parameters
                 </h3>

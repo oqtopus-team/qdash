@@ -197,7 +197,7 @@ export function LineageExplorerPanel({
           {/* View Mode Toggle & Version Selector */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div className="flex items-center gap-3 flex-wrap">
-              <h3 className="text-base sm:text-lg font-medium">
+              <h3 className="text-sm font-medium">
                 Lineage Graph
                 <span className="badge badge-primary badge-sm sm:badge-md ml-2">
                   {data.nodes.length} nodes
@@ -328,7 +328,7 @@ export function LineageExplorerPanel({
               {/* Nodes List */}
               <div className="card bg-base-200">
                 <div className="card-body p-4 sm:p-6">
-                  <h3 className="card-title text-base sm:text-lg">
+                  <h3 className="card-title">
                     Nodes
                     <span className="badge badge-primary badge-sm ml-2">{data.nodes.length}</span>
                   </h3>
@@ -373,7 +373,7 @@ export function LineageExplorerPanel({
               {/* Edges List */}
               <div className="card bg-base-200">
                 <div className="card-body p-4 sm:p-6">
-                  <h3 className="card-title text-base sm:text-lg">
+                  <h3 className="card-title">
                     Relations
                     <span className="badge badge-accent badge-sm ml-2">{data.edges.length}</span>
                   </h3>

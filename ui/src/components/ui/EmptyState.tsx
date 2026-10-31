@@ -38,14 +38,14 @@ export function EmptyState({
     md: {
       container: "py-10",
       emoji: 64,
-      title: "text-base",
+      title: "text-sm",
       description: "text-sm",
     },
     lg: {
       container: "py-16",
       emoji: 80,
-      title: "text-lg",
-      description: "text-base",
+      title: "text-sm",
+      description: "text-sm",
     },
   };
 

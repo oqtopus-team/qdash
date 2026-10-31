@@ -52,7 +52,7 @@ export function DownloadConfirmModal({
       <DialogContent className="max-w-lg">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <DialogTitle className="font-semibold">Download task artifacts</DialogTitle>
+            <DialogTitle className="font-medium">Download task artifacts</DialogTitle>
             <DialogDescription className="text-sm text-base-content/70 mt-1">
               {selectedCount} task result{selectedCount === 1 ? "" : "s"} selected
             </DialogDescription>

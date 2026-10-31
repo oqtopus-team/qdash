@@ -52,7 +52,7 @@ function formatRelativeDays(days: number): string {
 function StatChip({ label, emphasis }: { label: string; emphasis?: boolean }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] tabular-nums ${
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs tabular-nums ${
         emphasis
           ? "border-primary/30 bg-primary/10 text-primary"
           : "border-base-300 bg-base-200/50 text-base-content/70"
@@ -136,7 +136,7 @@ export function CryostatCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-xl tracking-tight">{cryo.cryo_id}</span>
+            <span className="text-sm font-medium">{cryo.cryo_id}</span>
             {cryo.name && (
               <span className="text-base-content/70 text-sm truncate">{cryo.name}</span>
             )}
@@ -270,14 +270,14 @@ function ActiveCooldownBanner({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm">Currently cooling</span>
-            <span className="font-mono font-bold text-sm">{cooldown.cooldown_id}</span>
+            <span className="font-medium text-sm">Currently cooling</span>
+            <span className="font-mono font-medium text-sm">{cooldown.cooldown_id}</span>
             <span className="text-xs text-base-content/60 tabular-nums">
               · {formatRelativeDays(days)} ({formatDate(cooldown.started_at)})
             </span>
           </div>
           {cooldown.chip_ids.length > 0 && (
-            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-base-content/70">
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-base-content/70">
               <span className="text-base-content/50">Chips:</span>
               {cooldown.chip_ids.map((id) => (
                 <span

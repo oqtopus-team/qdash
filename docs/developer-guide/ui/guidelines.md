@@ -83,6 +83,33 @@ not import another headless primitive to replace an established wrapper.
 
 How these boundaries connect: [UI Architecture](./architecture.md).
 
+## Set Type with Three Sizes and Two Weights
+
+Text uses three sizes and two weights. Hierarchy comes from spacing and color, not from a larger
+or bolder font. `body` in `ui/src/app/globals.css` sets 14px, so unsized text is body text.
+
+| Role | Classes |
+| --- | --- |
+| Page title (`h1`, `PageHeader`) | `text-xl font-medium` |
+| Section, card, dialog, and item title (`h2`, `h3`, `card-title`, `DialogTitle`) | `text-sm font-medium` |
+| Body, labels, buttons, table cells | `text-sm` |
+| Supporting text, timestamps, badges | `text-xs text-base-content/60` |
+| Sub-section label inside a card | `text-xs font-medium uppercase tracking-wide text-base-content/60` |
+| Numeral in a stat tile | `stat-value` |
+
+`font-medium` is the only emphasis; do not use `font-semibold` or `font-bold`. Do not use
+`text-base`, `text-lg`, `text-2xl` and above, arbitrary sizes such as `text-[11px]`, or responsive
+size variants such as `sm:text-lg`; pick one size for every viewport. When primary and secondary
+text share a line, separate them with color, not size.
+
+`globals.css` applies the same scale to DaisyUI: `.btn`, `.badge`, `.card-title`, `.table th`, and
+`.stat-value` use weight 500, and `.stat-value` is the one step above the page title (1.5rem,
+tabular numerals). `ui/src/lib/react-select-theme.ts` and
+`ui/src/components/features/cryo/blocknote-theme.css` follow the same values.
+
+Exceptions: the error and not-found pages, the sign-in hero title, Monaco editor font settings,
+and chip, coupling, and topology grid cells whose text scales with the cell size.
+
 ## Write TypeScript
 
 `ui/tsconfig.json` enables strict checking, unused-symbol checks, fallthrough checks, and

@@ -62,7 +62,7 @@ export function LoginPageContent() {
             <EnvironmentBadge className="badge-lg" />
           </div>
 
-          <p className="mx-auto mt-5 max-w-lg text-lg leading-relaxed text-base-content/70 sm:text-xl lg:mx-0">
+          <p className="mx-auto mt-5 max-w-lg text-sm leading-relaxed text-base-content/70 lg:mx-0">
             Manage and monitor qubit calibration workflows from one focused dashboard.
           </p>
 
@@ -109,7 +109,7 @@ export function LoginPageContent() {
           className="card mx-auto w-full max-w-sm border border-base-300 bg-base-100/95 shadow-2xl backdrop-blur-sm"
         >
           <div className="card-body gap-0 p-6 sm:p-8">
-            <h2 id="sign-in-heading" className="text-2xl font-semibold tracking-tight">
+            <h2 id="sign-in-heading" className="text-xl font-medium tracking-tight">
               Welcome back
             </h2>
             <p className="mt-1 text-sm text-base-content/60">Sign in to continue to QDash.</p>

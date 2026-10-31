@@ -429,7 +429,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
         <div className="flex min-w-0 flex-col justify-between gap-3 sm:flex-row sm:items-start">
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h1 className="min-w-0 break-words text-2xl font-bold">{task.name}</h1>
+              <h1 className="min-w-0 break-words text-xl font-medium">{task.name}</h1>
               <span className="badge badge-outline max-w-full truncate">
                 {task.task_type || "task"}
               </span>
@@ -465,7 +465,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
         <div className="grid items-start gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
           <section className="min-w-0 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm">
             <div className="flex min-w-0 flex-col gap-4">
-              <h2 className="text-lg font-semibold">Setup</h2>
+              <h2 className="text-sm font-medium">Setup</h2>
               <div className="grid gap-3">
                 <label className="form-control min-w-0">
                   <span className="label-text mb-1">Chip</span>
@@ -505,7 +505,9 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 <div>
                   <div className="mb-2 flex min-w-0 items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h3 className="text-sm font-semibold">Input parameter overrides</h3>
+                      <h3 className="text-xs font-medium uppercase tracking-wide text-base-content/60">
+                        Input parameter overrides
+                      </h3>
                       <p className="break-words text-xs text-base-content/50">
                         Leave blank to use the current calibration value.
                       </p>
@@ -535,7 +537,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                         className="collapse collapse-arrow rounded-lg border border-base-300 bg-base-100"
                         open={!group.collapsed}
                       >
-                        <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-semibold">
+                        <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-medium">
                           <span className="flex items-center gap-2">
                             {groupName}
                             <span className="badge badge-xs badge-ghost">
@@ -556,7 +558,9 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
 
               {Object.keys(task.run_parameters ?? {}).length > 0 && (
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold">Run parameters</h3>
+                  <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-base-content/60">
+                    Run parameters
+                  </h3>
                   <div className="grid max-h-80 gap-3 overflow-y-auto rounded-lg border border-base-300 p-3">
                     {Object.entries(task.run_parameters ?? {}).map(([name, parameter]) =>
                       isSweepValueType(parameter.value_type) ? (
@@ -690,7 +694,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
           <section className="min-h-[38rem] min-w-0 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm sm:p-5">
             <div className="flex min-h-[34rem] min-w-0 flex-col gap-4">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">Results</h2>
+                <h2 className="text-sm font-medium">Results</h2>
                 {execution && (
                   <span className={`badge ${badgeClass(execution.status)}`}>
                     {execution.status}

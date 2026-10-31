@@ -231,8 +231,8 @@ export function DashboardQubitGrid({
             <span
               className={
                 isSummaryPresentation
-                  ? "text-sm font-bold leading-none"
-                  : `absolute top-0.5 left-0.5 text-[10px] font-semibold px-1 rounded leading-tight ${
+                  ? "text-sm font-medium leading-none"
+                  : `absolute top-0.5 left-0.5 text-xs font-medium px-1 rounded leading-tight ${
                       bg ? "bg-black/30 text-white" : "bg-base-200 text-base-content"
                     }`
               }
@@ -266,11 +266,11 @@ export function DashboardQubitGrid({
             )}
             {!isSummaryPresentation &&
               (value !== null ? (
-                <span className="text-[11px] font-bold text-white drop-shadow leading-tight mt-1.5">
+                <span className="text-xs font-medium text-white drop-shadow leading-tight mt-1.5">
                   {value.toFixed(2)}
                 </span>
               ) : (
-                <span className="text-[10px] text-base-content/40 mt-1.5">N/A</span>
+                <span className="text-xs text-base-content/40 mt-1.5">N/A</span>
               ))}
           </Tag>
         );

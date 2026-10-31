@@ -171,7 +171,7 @@ export function ApiAccessTokenPanel() {
   return (
     <div className="card bg-base-200 shadow-lg" key="api">
       <div className="card-body">
-        <h2 className="card-title text-xl mb-4">API Access Token</h2>
+        <h2 className="card-title mb-4">API Access Token</h2>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
             <p className="text-sm text-base-content/70">
@@ -280,7 +280,7 @@ export function ApiAccessTokenPanel() {
             )}
 
             <div className="relative">
-              <div className="mockup-code overflow-x-auto pr-28 text-xs sm:text-sm">
+              <div className="mockup-code overflow-x-auto pr-28 text-sm">
                 <pre className="whitespace-pre-wrap break-all sm:whitespace-pre sm:break-normal">
                   <code>curl \</code>
                 </pre>
@@ -334,7 +334,7 @@ export function ApiAccessTokenPanel() {
                   <span>{testResult.message}</span>
                 </div>
                 <div className="relative">
-                  <div className="mockup-code max-h-72 overflow-auto pr-24 text-xs sm:text-sm">
+                  <div className="mockup-code max-h-72 overflow-auto pr-24 text-sm">
                     <pre className="whitespace-pre-wrap break-all sm:break-normal">
                       <code>{testResult.responseBody}</code>
                     </pre>

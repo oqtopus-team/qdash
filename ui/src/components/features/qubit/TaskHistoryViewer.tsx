@@ -239,7 +239,7 @@ export function TaskHistoryViewer({
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold">{taskName}</span>
+              <span className="text-sm font-medium">{taskName}</span>
               <span className="badge badge-sm badge-outline">Q{qubitId}</span>
               <span className="badge badge-sm badge-primary">{taskHistory.length} runs</span>
             </div>
@@ -267,7 +267,7 @@ export function TaskHistoryViewer({
           <div className="mb-3 shrink-0">
             <div className="mb-1 flex items-center gap-2">
               <History className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-bold text-base-content">Execution History</h3>
+              <h3 className="text-sm font-medium text-base-content">Execution History</h3>
             </div>
             <p className="text-xs text-base-content/50">
               {taskHistory.length} runs with {taskName}
@@ -298,7 +298,7 @@ export function TaskHistoryViewer({
                           <StatusIcon
                             className={`h-4 w-4 shrink-0 ${isSelected ? "" : meta.iconClass}`}
                           />
-                          <span className="truncate text-sm font-bold">
+                          <span className="truncate text-sm font-medium">
                             {task.start_at
                               ? formatDateTime(task.start_at, "MM/dd HH:mm")
                               : "No start time"}
@@ -345,7 +345,7 @@ export function TaskHistoryViewer({
               <div className="mb-3 flex shrink-0 items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-accent" />
-                  <h3 className="text-sm font-bold text-base-content">Task Details</h3>
+                  <h3 className="text-sm font-medium text-base-content">Task Details</h3>
                 </div>
                 <div className="text-xs text-base-content/60">
                   {taskHistory.findIndex((task) => task.taskId === selectedTask.taskId) + 1} /{" "}
@@ -423,11 +423,11 @@ export function TaskHistoryViewer({
 
                   <div className="rounded-lg bg-base-200 p-3 text-xs text-base-content/60">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">Task Name:</span>
+                      <span className="font-medium">Task Name:</span>
                       <span className="font-mono">{selectedTask.name || taskName}</span>
                     </div>
                     <div className="mt-1 flex items-center gap-2">
-                      <span className="font-semibold">Task ID:</span>
+                      <span className="font-medium">Task ID:</span>
                       <Link
                         href={taskResultHref(selectedTask)}
                         className="link link-primary truncate font-mono"

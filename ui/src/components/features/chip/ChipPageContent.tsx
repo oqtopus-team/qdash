@@ -645,7 +645,7 @@ export function ChipPageContent() {
                       className="p-4 cursor-pointer flex flex-wrap justify-between gap-2 items-center hover:bg-base-200/50 transition-colors"
                       onClick={() => toggleMuxExpansion(muxId)}
                     >
-                      <div className="text-xl font-medium flex items-center gap-2">
+                      <div className="text-sm font-medium flex items-center gap-2">
                         <span className="whitespace-nowrap">MUX {muxDetail.mux_id}</span>
                         {updateInfo.isRecent && (
                           <div className="badge badge-primary gap-2 rounded-lg">
@@ -674,7 +674,7 @@ export function ChipPageContent() {
                               key={taskName}
                               className="border-t pt-4 first:border-t-0 first:pt-0"
                             >
-                              <h3 className="text-lg font-medium mb-3">{taskName}</h3>
+                              <h3 className="text-sm font-medium mb-3">{taskName}</h3>
                               <div className="grid grid-cols-1 min-[400px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                                 {qids.map((qid) => {
                                   const task = qidResults[qid];

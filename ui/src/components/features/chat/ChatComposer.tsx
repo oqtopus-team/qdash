@@ -250,9 +250,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         placeholder={placeholder}
         rows={1}
         aria-label="Message"
-        className={`w-full resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 placeholder:text-base-content/35 ${
-          compact ? "text-sm" : "text-[15px]"
-        }`}
+        className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 text-sm placeholder:text-base-content/35"
       />
       <div className="flex items-center gap-2 pt-1">
         {onAttach && (

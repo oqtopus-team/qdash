@@ -49,7 +49,7 @@ export function SurfaceTitle() {
   const hasMessages = Boolean(activeSession?.messages.length);
   return (
     <div className="min-w-0 flex-1">
-      <div className="text-sm font-semibold truncate">
+      <div className="text-sm font-medium truncate">
         {activeSession && hasMessages ? activeSession.title : "Ask AI"}
       </div>
       {activeSession?.context && hasMessages && (

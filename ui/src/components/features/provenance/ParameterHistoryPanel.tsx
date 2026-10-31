@@ -431,11 +431,11 @@ export function ParameterHistoryPanel({
       {/* Search Form */}
       <div className="card bg-base-200">
         <div className="card-body p-4 sm:p-6">
-          <h3 className="card-title text-base sm:text-lg">Search Parameter History</h3>
+          <h3 className="card-title">Search Parameter History</h3>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="form-control flex-1">
               <label className="label py-1">
-                <span className="label-text text-xs sm:text-sm">Parameter Name</span>
+                <span className="label-text text-sm">Parameter Name</span>
               </label>
               <Select<ParameterOption, false, GroupBase<ParameterOption>>
                 options={parameterOptions}
@@ -450,7 +450,7 @@ export function ParameterHistoryPanel({
             </div>
             <div className="form-control flex-1">
               <label className="label py-1">
-                <span className="label-text text-xs sm:text-sm">Qubit ID</span>
+                <span className="label-text text-sm">Qubit ID</span>
               </label>
               <input
                 type="text"
@@ -482,7 +482,7 @@ export function ParameterHistoryPanel({
           <div className="card-body p-4 sm:p-6">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              <h3 className="card-title text-sm sm:text-base">Compare with another parameter</h3>
+              <h3 className="card-title">Compare with another parameter</h3>
             </div>
             {isComparing && compareData ? (
               <div className="flex items-center gap-2 flex-wrap">
@@ -550,7 +550,7 @@ export function ParameterHistoryPanel({
         <div className="card bg-base-200">
           <div className="card-body p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-              <h3 className="card-title text-base sm:text-lg">
+              <h3 className="card-title">
                 {data.parameter_name} ({data.qid})
               </h3>
               <span className="badge badge-primary badge-sm sm:badge-md">
@@ -652,9 +652,7 @@ export function ParameterHistoryPanel({
                           <td>
                             <span className="badge badge-outline badge-sm">v{version.version}</span>
                           </td>
-                          <td className="font-mono text-xs sm:text-sm">
-                            {formatValue(version.value)}
-                          </td>
+                          <td className="font-mono text-sm">{formatValue(version.value)}</td>
                           <td className="hidden sm:table-cell">{version.unit || "-"}</td>
                           <td className="font-mono text-xs hidden md:table-cell">
                             {version.error ? `±${version.error.toExponential(2)}` : "-"}
@@ -675,7 +673,7 @@ export function ParameterHistoryPanel({
                               return (
                                 <>
                                   <td
-                                    className="font-mono text-xs sm:text-sm border-l border-base-300"
+                                    className="font-mono text-sm border-l border-base-300"
                                     style={{ color: "#e377c2" }}
                                   >
                                     {matched ? formatValue(matched.value) : "-"}
@@ -702,7 +700,7 @@ export function ParameterHistoryPanel({
                           <td className="hidden lg:table-cell">
                             <span className="text-sm">{version.task_name || "-"}</span>
                           </td>
-                          <td className="text-xs sm:text-sm hidden md:table-cell">
+                          <td className="text-sm hidden md:table-cell">
                             {formatDate(version.valid_from)}
                           </td>
                           <td className="hidden lg:table-cell">
@@ -735,9 +733,7 @@ export function ParameterHistoryPanel({
       {!isSearching && !data && (
         <div className="text-center py-12 text-base-content/50">
           <Search className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm sm:text-base">
-            Select a parameter and enter a qubit ID to view version history
-          </p>
+          <p className="text-sm">Select a parameter and enter a qubit ID to view version history</p>
         </div>
       )}
     </div>
@@ -771,7 +767,7 @@ function DiffCard({
   return (
     <div className="bg-base-300/50 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="font-semibold text-sm flex items-center gap-2">
+        <h4 className="font-medium text-sm flex items-center gap-2">
           Version Diff
           <span className="badge badge-outline badge-sm">
             v{older.version} → v{newer.version}
@@ -829,7 +825,7 @@ function DiffCard({
         <div className="flex items-center gap-3 text-sm">
           <span className="text-base-content/60">Delta:</span>
           <span
-            className={`font-mono font-semibold ${delta > 0 ? "text-success" : delta < 0 ? "text-error" : "text-base-content/50"}`}
+            className={`font-mono font-medium ${delta > 0 ? "text-success" : delta < 0 ? "text-error" : "text-base-content/50"}`}
           >
             {delta > 0 ? "+" : ""}
             {delta.toExponential(4)}
@@ -850,7 +846,7 @@ function DiffCard({
 
       {/* Figure Comparison */}
       <div className="space-y-2">
-        <h4 className="font-semibold text-sm flex items-center gap-2">
+        <h4 className="font-medium text-sm flex items-center gap-2">
           <Image className="h-4 w-4" />
           Figures
         </h4>

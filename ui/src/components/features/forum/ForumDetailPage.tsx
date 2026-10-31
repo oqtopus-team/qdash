@@ -720,7 +720,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 </button>
               </div>
             ) : (
-              <h1 className="min-w-0 flex-1 truncate text-xl font-bold">
+              <h1 className="min-w-0 flex-1 truncate text-xl font-medium">
                 {post.title || "Untitled thread"}
               </h1>
             )}
@@ -881,7 +881,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
 
         <aside className="space-y-5 border-t border-base-300 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
               <CategoryIcon className="h-3.5 w-3.5" />
               Category
             </div>
@@ -905,7 +905,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
               <Crosshair className="h-3.5 w-3.5" />
               Target
             </div>
@@ -1000,7 +1000,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
 
           {targetContext && (
             <section className="space-y-3 rounded-lg border border-base-300 bg-base-100 p-3">
-              <div className="text-xs font-semibold uppercase text-base-content/50">Related</div>
+              <div className="text-xs font-medium uppercase text-base-content/50">Related</div>
               <div className="space-y-2">
                 <div className="text-xs font-medium text-base-content/60">Recent task results</div>
                 {relatedTaskResults.length > 0 ? (
@@ -1060,7 +1060,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           )}
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
               <CalendarDays className="h-3.5 w-3.5" />
               Cooldown
             </div>
@@ -1102,7 +1102,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
               <UserRound className="h-3.5 w-3.5" />
               Assignee
             </div>
@@ -1134,7 +1134,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
               <Tag className="h-3.5 w-3.5" />
               Labels
             </div>
@@ -1159,7 +1159,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
               <StatusIcon className="h-3.5 w-3.5" />
               Status
             </div>
@@ -1187,7 +1187,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
               <UserRound className="h-3.5 w-3.5" />
               Author
             </div>

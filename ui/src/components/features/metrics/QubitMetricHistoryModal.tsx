@@ -224,7 +224,7 @@ export function QubitMetricHistoryModal({
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
           <History className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-bold text-base-content">Execution History</h3>
+          <h3 className="text-sm font-medium text-base-content">Execution History</h3>
         </div>
         <p className="text-xs text-base-content/50">
           {executionGroups.length} executions with {metricName}
@@ -258,7 +258,7 @@ export function QubitMetricHistoryModal({
               >
                 <div className="flex justify-between items-start">
                   <div className="min-w-0 flex-1">
-                    <div className={`font-bold text-lg ${isExcluded ? "line-through" : ""}`}>
+                    <div className={`font-medium text-sm ${isExcluded ? "line-through" : ""}`}>
                       {formatMetricValue(metricItem?.value, metricUnit, 4)}{" "}
                       <span className="text-sm font-normal opacity-80">{metricUnit}</span>
                     </div>
@@ -304,12 +304,10 @@ export function QubitMetricHistoryModal({
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
           <ListTodo className="h-4 w-4 text-secondary" />
-          <h3 className="text-sm font-bold text-base-content">Tasks in Execution</h3>
+          <h3 className="text-sm font-medium text-base-content">Tasks in Execution</h3>
         </div>
         {selectedExecutionId && (
-          <p className="text-[0.65rem] text-base-content/50 font-mono truncate">
-            {selectedExecutionId}
-          </p>
+          <p className="text-xs text-base-content/50 font-mono truncate">{selectedExecutionId}</p>
         )}
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
@@ -351,7 +349,9 @@ export function QubitMetricHistoryModal({
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm truncate">{task.name || "Unnamed"}</span>
+                        <span className="font-medium text-sm truncate">
+                          {task.name || "Unnamed"}
+                        </span>
                         {isMatchingMetric && (
                           <span
                             className={`badge badge-xs ${
@@ -399,7 +399,7 @@ export function QubitMetricHistoryModal({
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-bold text-base-content">Task Details</h3>
+          <h3 className="text-sm font-medium text-base-content">Task Details</h3>
         </div>
         {executionTasks.length > 0 && (
           <div className="text-xs text-base-content/60">
@@ -466,17 +466,17 @@ export function QubitMetricHistoryModal({
         <div className="mt-2 text-xs text-base-content/60 space-y-1 bg-base-200 p-3 rounded-lg">
           {selectedTask.name && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Task Name:</span>
+              <span className="font-medium">Task Name:</span>
               <span className="font-mono">{selectedTask.name}</span>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <span className="font-semibold">Execution ID:</span>
+            <span className="font-medium">Execution ID:</span>
             <span className="font-mono truncate">{selectedExecutionId}</span>
           </div>
           {selectedTask.task_id && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Task ID:</span>
+              <span className="font-medium">Task ID:</span>
               <a
                 href={`/task-results/${selectedTask.task_id}`}
                 className="font-mono truncate link link-primary"
@@ -487,20 +487,20 @@ export function QubitMetricHistoryModal({
           )}
           {selectedTask.start_at != null && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Start:</span>
+              <span className="font-medium">Start:</span>
               <span>{formatDateTime(String(selectedTask.start_at))}</span>
             </div>
           )}
           {selectedTask.end_at != null && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">End:</span>
+              <span className="font-medium">End:</span>
               <span>{formatDateTime(String(selectedTask.end_at))}</span>
             </div>
           )}
           {/* Metric Value from history if available */}
           {selectedGroup && selectedGroup.items.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Metric Value:</span>
+              <span className="font-medium">Metric Value:</span>
               <span className="font-mono">
                 {formatMetricValue(selectedGroup.items[0].value, metricUnit, 4)} {metricUnit}
               </span>

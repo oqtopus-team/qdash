@@ -394,7 +394,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                     role="tab"
                     aria-selected={!showChanges}
                     onClick={() => setShowChanges(false)}
-                    className={`flex flex-1 items-center justify-center gap-1 px-2 py-2 text-xs font-semibold tracking-wider ${showChanges ? "text-base-content/50 hover:text-base-content" : "border-b-2 border-primary text-base-content"}`}
+                    className={`flex flex-1 items-center justify-center gap-1 px-2 py-2 text-xs font-medium tracking-wide ${showChanges ? "text-base-content/50 hover:text-base-content" : "border-b-2 border-primary text-base-content"}`}
                   >
                     <FolderTree size={14} />
                     EXPLORER
@@ -404,7 +404,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                     role="tab"
                     aria-selected={showChanges}
                     onClick={() => setShowChanges(true)}
-                    className={`flex flex-1 items-center justify-center gap-1 px-2 py-2 text-xs font-semibold tracking-wider ${showChanges ? "border-b-2 border-primary text-base-content" : "text-base-content/50 hover:text-base-content"}`}
+                    className={`flex flex-1 items-center justify-center gap-1 px-2 py-2 text-xs font-medium tracking-wide ${showChanges ? "border-b-2 border-primary text-base-content" : "text-base-content/50 hover:text-base-content"}`}
                     title="All saved changes against the last commit"
                   >
                     <FileDiff size={14} />
@@ -579,7 +579,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
             ) : (
               <div className="flex items-center justify-center h-full text-base-content/50">
                 <div className="text-center">
-                  <p className="text-lg mb-2">No file selected</p>
+                  <p className="text-sm mb-2">No file selected</p>
                   <p className="text-sm">Select a file from the tree to edit</p>
                 </div>
               </div>

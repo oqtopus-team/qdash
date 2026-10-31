@@ -44,7 +44,7 @@ function FlowCard({ flow }: { flow: FlowSummary }) {
       className="block rounded-lg border border-base-300 bg-base-100 p-4 transition-colors hover:border-primary/50"
     >
       <div className="flex min-w-0 items-center gap-2">
-        <h2 className="truncate text-base font-semibold">{flow.name}</h2>
+        <h2 className="truncate text-sm font-medium">{flow.name}</h2>
         {flow.file_exists === false && (
           <span
             className="badge badge-warning badge-sm shrink-0 gap-1"
@@ -110,7 +110,7 @@ function FlowTable({ flows }: { flows: FlowSummary[] }) {
               <td className="max-w-[260px]">
                 <Link
                   href={`/workflow/${flow.name}`}
-                  className="block truncate font-semibold text-primary hover:underline"
+                  className="block truncate font-medium text-primary hover:underline"
                 >
                   {flow.name}
                 </Link>
@@ -223,7 +223,7 @@ export function FlowFolderSection({ folder }: { folder: FlowFolder }) {
       <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
         <ChevronRight className="h-4 w-4 shrink-0 text-base-content/60 transition-transform group-open:rotate-90" />
         <FolderOpen className="h-5 w-5 shrink-0 text-primary" />
-        <span className="truncate text-base font-semibold">{folder.creator}</span>
+        <span className="truncate text-sm font-medium">{folder.creator}</span>
         {folder.mine && <span className="badge badge-primary badge-sm shrink-0">You</span>}
         <span className="ml-auto shrink-0 text-xs text-base-content/60">
           {count} {count === 1 ? "workflow" : "workflows"}

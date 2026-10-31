@@ -79,7 +79,7 @@
    globals.css (~L1529) styles react-select group headings with:
      [class$="-group"] > div:first-child {
        text-transform: uppercase !important; font-size: .75rem !important;
-       font-weight: 600 !important; opacity: .7 !important; color: ... !important; }
+       font-weight: 500 !important; opacity: .7 !important; color: ... !important; }
    `[class$="-group"]` (any class ending in "-group") also matches BlockNote's
    `.bn-block-group`, so `> div:first-child` hits the editor's first block
    (`.bn-block-outer`) — regardless of block type (paragraph, heading, …),
@@ -110,7 +110,7 @@
 
 .wiring-blocknote .tableWrapper th {
   background-color: color-mix(in oklch, var(--color-base-200) 60%, transparent);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Slash / suggestion menu polish */
@@ -159,7 +159,7 @@
 
 .wiring-blocknote .bn-block-content[data-content-type="codeBlock"] pre {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   line-height: 1.6;
   padding: 1rem 2.5rem 1rem 1.25rem;
   overflow-x: auto;

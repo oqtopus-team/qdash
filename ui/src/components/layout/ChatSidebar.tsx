@@ -127,10 +127,7 @@ export function ChatSidebar() {
           title="Ask AI"
         >
           <Bot className="w-5 h-5" />
-          <span
-            className="text-[10px] font-semibold select-none"
-            style={{ writingMode: "vertical-rl" }}
-          >
+          <span className="text-xs font-medium select-none" style={{ writingMode: "vertical-rl" }}>
             Ask AI
           </span>
         </button>

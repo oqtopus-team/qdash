@@ -363,7 +363,7 @@ export function CouplingMetricsGrid({
                 }}
               >
                 <div
-                  className="font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
+                  className="font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
                   style={{ fontSize: cellFontSize(displayCellSize, 0.13) }}
                 >
                   MUX{muxIndex}
@@ -443,7 +443,7 @@ export function CouplingMetricsGrid({
                 {/* Value Display - LOD controlled */}
                 {value !== null && value !== undefined && showValues && (
                   <div
-                    className="font-bold text-white drop-shadow-md leading-tight"
+                    className="font-medium text-white drop-shadow-md leading-tight"
                     style={{ fontSize: valueFontSizes.valueSize }}
                   >
                     {value.toFixed(showUnits ? 2 : 1)}
@@ -528,7 +528,7 @@ export function CouplingMetricsGrid({
                 }}
                 title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
               >
-                <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
                   {regionRow},{regionCol}
                 </span>
               </button>
@@ -674,10 +674,10 @@ export function CouplingMetricsGrid({
               {/* Modal Header */}
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
+                  <DialogTitle className="text-sm font-medium truncate">
                     {selectedCouplingInfo.couplingId} - {title}
                   </DialogTitle>
-                  <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+                  <DialogDescription className="text-sm text-base-content/70 mt-0.5 sm:mt-1">
                     {selectedCouplingInfo.metric.value !== null
                       ? `${selectedCouplingInfo.metric.value.toFixed(4)} ${unit}`
                       : "No data"}

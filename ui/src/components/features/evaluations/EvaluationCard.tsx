@@ -279,7 +279,7 @@ export function EvaluationCard({
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <StatusIcon item={item} />
-            {showTarget && <span className="font-semibold">{item.qid}</span>}
+            {showTarget && <span className="font-medium">{item.qid}</span>}
             {showTarget && <span className="text-xs text-base-content/60">{item.task_name}</span>}
             {item.status !== "completed" && (
               <span className="badge badge-ghost badge-sm">{item.status}</span>

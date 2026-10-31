@@ -199,7 +199,7 @@ function ForumThreadCard({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
-              <h2 className="line-clamp-2 text-sm font-semibold leading-6 text-base-content sm:text-base">
+              <h2 className="line-clamp-2 text-sm font-medium leading-6 text-base-content">
                 {displayNumber && (
                   <span className="mr-2 font-mono text-xs font-medium text-base-content/50">
                     {displayNumber}
@@ -510,7 +510,7 @@ function ForumThreadPreviewSidebar({
                     {statusDef.label}
                   </span>
                 </div>
-                <h2 className="text-xl font-bold leading-tight">
+                <h2 className="text-sm font-medium leading-tight">
                   {formatForumPostNumber(post.number) && (
                     <span className="mr-2 font-mono text-sm text-base-content/50">
                       {formatForumPostNumber(post.number)}
@@ -582,14 +582,16 @@ function ForumThreadPreviewSidebar({
               {editingMetadata && canManageMetadata && (
                 <section className="rounded-lg border border-base-300 bg-base-200/40 p-3">
                   <div className="mb-3 flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold">Metadata</h3>
+                    <h3 className="text-xs font-medium uppercase tracking-wide text-base-content/60">
+                      Metadata
+                    </h3>
                     {updateMutation.isPending && (
                       <span className="loading loading-spinner loading-xs" />
                     )}
                   </div>
                   <div className="space-y-4">
                     <label className="block space-y-1">
-                      <span className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+                      <span className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
                         {CategoryIcon && <CategoryIcon className="h-3.5 w-3.5" />}
                         Category
                       </span>
@@ -609,7 +611,7 @@ function ForumThreadPreviewSidebar({
                     </label>
 
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+                      <div className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
                         <Crosshair className="h-3.5 w-3.5" />
                         Target
                       </div>
@@ -674,7 +676,7 @@ function ForumThreadPreviewSidebar({
                     </div>
 
                     <label className="block space-y-1">
-                      <span className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+                      <span className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
                         <CalendarDays className="h-3.5 w-3.5" />
                         Cooldown
                       </span>
@@ -703,7 +705,7 @@ function ForumThreadPreviewSidebar({
                     </label>
 
                     <label className="block space-y-1">
-                      <span className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+                      <span className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
                         <UserRound className="h-3.5 w-3.5" />
                         Assignee
                       </span>
@@ -726,7 +728,7 @@ function ForumThreadPreviewSidebar({
                     </label>
 
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-base-content/50">
+                      <div className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
                         <Tag className="h-3.5 w-3.5" />
                         Labels
                       </div>
@@ -742,7 +744,9 @@ function ForumThreadPreviewSidebar({
               )}
 
               <section>
-                <h3 className="mb-2 text-sm font-semibold">Root thread</h3>
+                <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-base-content/60">
+                  Root thread
+                </h3>
                 <div className="rounded-lg border border-base-300 bg-base-100 p-4">
                   <ForumPostContent
                     content={post.content}
@@ -753,7 +757,9 @@ function ForumThreadPreviewSidebar({
               </section>
 
               <section>
-                <h3 className="mb-2 text-sm font-semibold">Recent replies</h3>
+                <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-base-content/60">
+                  Recent replies
+                </h3>
                 {repliesLoading ? (
                   <div className="flex justify-center py-4">
                     <span className="loading loading-spinner loading-sm" />
@@ -1161,7 +1167,7 @@ export function ForumPageContent() {
         <div className="card bg-base-200 shadow-lg mb-4">
           <div className="card-body">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="card-title text-sm">Forum Categories</h2>
+              <h2 className="card-title">Forum Categories</h2>
               <span className="text-xs text-base-content/50">
                 Deleting archives the category and keeps existing threads readable.
               </span>
@@ -1283,7 +1289,7 @@ export function ForumPageContent() {
       {!isLoading && !isError && posts.length > 0 && (
         <div className="mb-3 flex items-center justify-between gap-3 text-xs text-base-content/60">
           <span>
-            <strong className="font-semibold text-base-content">{total}</strong>{" "}
+            <strong className="font-medium text-base-content">{total}</strong>{" "}
             {total === 1 ? "thread" : "threads"} in this view
           </span>
           {hasListFilters && <span>Filters applied</span>}
@@ -1298,7 +1304,7 @@ export function ForumPageContent() {
         <div className="alert alert-error" role="alert">
           <AlertCircle className="h-5 w-5" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <div className="font-semibold">Failed to load forum threads</div>
+            <div className="font-medium">Failed to load forum threads</div>
             <div className="text-sm opacity-80">The discussion list could not be retrieved.</div>
           </div>
           <button type="button" className="btn btn-sm btn-ghost gap-1" onClick={() => refetch()}>

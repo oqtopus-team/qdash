@@ -650,7 +650,7 @@ export function TimeSeriesView() {
       {/* Parameter Selection Card */}
       <div className="col-span-1 lg:col-span-3 card bg-base-100 shadow-xl rounded-xl p-4 sm:p-8 border border-base-300">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-4 sm:mb-6">
-          <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+          <h2 className="text-sm font-medium flex items-center gap-2">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="w-4 h-4 sm:w-5 sm:h-5"

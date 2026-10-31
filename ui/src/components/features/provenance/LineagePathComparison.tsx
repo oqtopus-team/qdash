@@ -356,7 +356,7 @@ export function LineagePathComparison({
                     {step.paramAfter && (
                       <span
                         className={`font-mono ${
-                          step.status === "changed" ? "text-success font-semibold" : ""
+                          step.status === "changed" ? "text-success font-medium" : ""
                         }`}
                       >
                         {formatValue(step.paramAfter.value)}

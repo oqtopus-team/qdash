@@ -687,7 +687,7 @@ export function WorkflowEditorPageContent() {
         <div className="alert alert-error">
           <AlertTriangle className="h-5 w-5" />
           <div>
-            <div className="font-semibold">Failed to load flow</div>
+            <div className="font-medium">Failed to load flow</div>
             <div className="text-sm">{(error as Error)?.message}</div>
           </div>
         </div>
@@ -935,7 +935,7 @@ export function WorkflowEditorPageContent() {
                   >
                     <Icon size={18} />
                     {item.count ? (
-                      <span className="absolute right-0 top-0 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-content">
+                      <span className="absolute right-0 top-0 min-w-4 rounded-full bg-primary px-1 text-xs leading-4 text-primary-content">
                         {item.count > 99 ? "99+" : item.count}
                       </span>
                     ) : null}
@@ -966,7 +966,7 @@ export function WorkflowEditorPageContent() {
           >
             <div className="flex h-full w-56 min-w-56 flex-col sm:w-72 sm:min-w-72">
               <div className="flex h-9 items-center justify-between border-b border-base-300 px-3">
-                <span className="text-xs font-semibold uppercase tracking-wider text-base-content/60">
+                <span className="text-xs font-medium uppercase tracking-wide text-base-content/60">
                   {sidePanelItems.find((item) => item.id === activeSidePanel)?.label}
                 </span>
                 <button
@@ -1033,7 +1033,7 @@ export function WorkflowEditorPageContent() {
                     <div className="flex items-center gap-2">
                       <FileCode size={16} className="text-primary" />
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold">{name}.py</div>
+                        <div className="truncate text-sm font-medium">{name}.py</div>
                         <div className="truncate text-xs text-base-content/50">
                           {flowFunctionName ? `${flowFunctionName}()` : "No entrypoint set"}
                         </div>

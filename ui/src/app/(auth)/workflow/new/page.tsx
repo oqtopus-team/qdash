@@ -301,7 +301,7 @@ export default function NewFlowPage() {
             <div className="p-4">
               {/* Mobile Close Button */}
               <div className="flex justify-between items-center mb-4 sm:hidden">
-                <span className="text-sm font-semibold">Properties</span>
+                <span className="text-sm font-medium">Properties</span>
                 <button
                   onClick={() => setIsSidebarVisible(false)}
                   className="btn btn-ghost btn-sm btn-square"
@@ -311,7 +311,7 @@ export default function NewFlowPage() {
               </div>
               {/* Template Selector */}
               <div className="mb-6">
-                <h2 className="text-sm font-semibold mb-3">TEMPLATE</h2>
+                <h2 className="text-sm font-medium mb-3">TEMPLATE</h2>
                 <select
                   className="select select-bordered select-sm w-full"
                   value={selectedTemplateId}
@@ -340,7 +340,7 @@ export default function NewFlowPage() {
                 )}
               </div>
 
-              <h2 className="text-sm font-semibold mb-4">PROPERTIES</h2>
+              <h2 className="text-sm font-medium mb-4">PROPERTIES</h2>
 
               <div className="space-y-4">
                 <div className="form-control">

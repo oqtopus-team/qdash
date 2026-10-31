@@ -207,7 +207,7 @@ export function DashboardCouplingGrid({
                 height: cellSize,
               }}
             >
-              <span className="text-[10px] font-semibold px-1 leading-tight">{qid}</span>
+              <span className="text-xs font-medium px-1 leading-tight">{qid}</span>
             </div>
           );
         })}
@@ -292,11 +292,11 @@ export function DashboardCouplingGrid({
                   Q{qid1}→Q{qid2}
                 </span>
               ) : value !== null ? (
-                <span className="text-[10px] font-bold text-white drop-shadow leading-none">
+                <span className="text-xs font-medium text-white drop-shadow leading-none">
                   {value.toFixed(2)}
                 </span>
               ) : (
-                <span className="text-[9px] text-base-content/50 leading-none">—</span>
+                <span className="text-xs text-base-content/50 leading-none">—</span>
               )}
               {!isSummaryPresentation && (
                 <svg

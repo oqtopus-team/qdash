@@ -109,7 +109,7 @@ export function PlotCard({
       className={`card bg-base-100 shadow-xl rounded-xl p-4 sm:p-8 border border-base-300 ${className}`}
     >
       <div className="flex items-center justify-between mb-4 sm:mb-6">
-        <h2 className="text-lg sm:text-2xl font-semibold flex items-center gap-2">
+        <h2 className="text-sm font-medium flex items-center gap-2">
           {icon}
           {title}
         </h2>
@@ -195,7 +195,7 @@ export function PlotCard({
                 <path d="M3 12h18"></path>
                 <path d="M12 3v18"></path>
               </svg>
-              <p className="text-lg">{emptyStateMessage}</p>
+              <p className="text-sm">{emptyStateMessage}</p>
             </div>
           </div>
         )}

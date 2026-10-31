@@ -30,7 +30,7 @@ type ChatThreadVariant = "page" | "panel" | "compact";
 export function ContextChip({ context }: { context: TaskChatContext }) {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium max-w-full"
+      className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium max-w-full"
       title={`${context.taskName} · ${context.qid} · ${context.chipId}`}
     >
       <FlaskConical className="w-3 h-3 shrink-0" />
@@ -92,7 +92,7 @@ function EmptyState({
             <ContextChip context={context} />
           </div>
         )}
-        <h2 className="text-2xl sm:text-[28px] font-medium tracking-tight">{title}</h2>
+        <h2 className="text-xl font-medium tracking-tight">{title}</h2>
       </div>
     );
   }
@@ -104,7 +104,7 @@ function EmptyState({
           <ContextChip context={context} />
         </div>
       )}
-      <h2 className="text-sm font-semibold mb-1">{title}</h2>
+      <h2 className="text-sm font-medium mb-1">{title}</h2>
       <p className="text-xs text-base-content/50 mb-4">
         {context
           ? "The result figures are attached to your first question."
@@ -145,7 +145,7 @@ function SuggestionPills({
           className="chat-suggestion-pill group"
         >
           <Icon className="w-3.5 h-3.5 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
-          <span className="text-[13px] leading-snug">{text}</span>
+          <span className="text-xs leading-snug">{text}</span>
         </button>
       ))}
     </div>
@@ -348,7 +348,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
           <div className={variant === "page" ? "max-w-3xl mx-auto" : ""}>
             {composer}
             {variant === "page" && (
-              <p className="text-[11px] text-base-content/35 text-center mt-2">
+              <p className="text-xs text-base-content/35 text-center mt-2">
                 AI can make mistakes. Verify important calibration values.
               </p>
             )}
