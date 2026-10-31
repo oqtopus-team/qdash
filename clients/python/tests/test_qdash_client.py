@@ -835,7 +835,7 @@ def test_task_file_and_flow_read_helpers_return_models() -> None:
             case "/task-results/task-1/issues":
                 return httpx.Response(200, json=[issue_payload])
             case "/flows/templates":
-                if request.url.params.get("backend") == "fake":
+                if request.url.params.get("backend") in {"fake", ""}:
                     return httpx.Response(200, json=[])
                 return httpx.Response(200, json=[flow_template_payload])
             case "/flows/templates/rabi":
@@ -894,6 +894,8 @@ def test_task_file_and_flow_read_helpers_return_models() -> None:
         assert isinstance(client.list_flow_templates()[0], FlowTemplate)
         assert client.list_flow_templates()[0].backend == "qubex"
         assert client.list_flow_templates(backend="fake") == []
+        # An explicit empty backend is sent as-is and matches nothing, like the API.
+        assert client.list_flow_templates(backend="") == []
         assert isinstance(client.get_flow_template("rabi"), FlowTemplateWithCode)
         assert client.list_flow_helper_files() == ["common.py"]
         assert client.get_flow_helper_file("common.py") == "def helper(): pass"

@@ -12,8 +12,10 @@ Copy the closest file under `src/qdash/workflow/templates/` before writing a flo
 Templates contain the terminal hooks, target validation, task order, and defaults required by the
 current runtime. Their matching tests under `tests/qdash/workflow/` protect those decisions. A
 template the editor should offer is registered in `templates/templates.json` with the `backend`
-its tasks run on (`qubex` or `fake`); the API and the **New Flow** page list templates per backend,
-so a hardware template never appears on a fake deployment.
+its tasks run on (`qubex` or `fake`). `GET /flows/templates?backend=fake` returns only the fake
+templates, and the **New Flow** page requests the list with the selected backend, so its selector
+never offers a hardware template on a fake deployment; a request without `backend` still returns
+every template.
 
 The smallest useful flow has four parts:
 

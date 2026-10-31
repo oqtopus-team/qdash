@@ -149,10 +149,20 @@ export default function NewFlowPage() {
     }
   }, [chipsData, chipId]);
 
+  // Only the newest template request may touch the editor: a backend switch or a newer pick
+  // retires older requests, and a source edit made while a request is in flight wins over it.
+  const latestTemplateRequest = useRef(0);
+  const sourceVersion = useRef(0);
+
   const loadTemplate = async (templateId: string, { notify }: { notify: boolean }) => {
+    const requestId = ++latestTemplateRequest.current;
+    const sourceAtRequest = sourceVersion.current;
     setSelectedTemplateId(templateId);
+    const isCurrent = () =>
+      requestId === latestTemplateRequest.current && sourceAtRequest === sourceVersion.current;
     try {
       const response = await getFlowTemplate(templateId);
+      if (!isCurrent()) return;
       const template = response.data;
 
       setCode(template.code);
@@ -161,6 +171,7 @@ export default function NewFlowPage() {
       if (notify) toast.success("Template loaded successfully");
     } catch (error) {
       console.error("Failed to load template:", error);
+      if (!isCurrent()) return;
       toast.error("Failed to load template");
       if (!notify) setCode("# Failed to load template. Please select one from the dropdown.");
     }
@@ -299,7 +310,10 @@ export default function NewFlowPage() {
               language="python"
               theme="vs-dark"
               value={code}
-              onChange={(value) => setCode(value || "")}
+              onChange={(value) => {
+                sourceVersion.current += 1;
+                setCode(value || "");
+              }}
               onMount={(editor, monaco) => {
                 remeasureMonacoFontsWhenLoaded(monaco);
                 editor.onDidChangeCursorPosition((e) => {
@@ -359,6 +373,7 @@ export default function NewFlowPage() {
                   className="select select-bordered select-sm w-full mb-3"
                   value={selectedBackend ?? ""}
                   onChange={(e) => {
+                    latestTemplateRequest.current += 1;
                     setSelectedBackend(e.target.value);
                     setSelectedTemplateId("");
                   }}

@@ -613,7 +613,7 @@ class QDashClient:
 
     def list_flow_templates(self, backend: str | None = None) -> list[FlowTemplate]:
         """List flow templates, optionally only those written for ``backend``."""
-        params = {"backend": backend} if backend else None
+        params = {"backend": backend} if backend is not None else None
         response = self._request("GET", "/flows/templates", params=params)
         return self._validate_model_list_payload(FlowTemplate, response.data)
 
