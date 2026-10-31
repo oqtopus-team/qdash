@@ -10,14 +10,15 @@ Secondary actions use the default, ghost, or outline treatment. Destructive acti
 intent and require confirmation when the result is not easily reversible.
 
 Dense scientific views prioritize readable data over decoration. Keep labels, units, selected
-scope, and status visible before adding gradients, shadows, or motion.
+scope, and status visible; surfaces stay flat as described in
+[Keep Surfaces Flat](./guidelines.md#keep-surfaces-flat).
 
 ## Use the Established Visual Vocabulary
 
 | Need | Use |
 | --- | --- |
 | Interface action or status | Lucide React icon |
-| Empty-state illustration | `FluentEmoji` through `EmptyState` |
+| Empty state | `EmptyState`, which renders a Lucide icon from its `emoji` name |
 | User identity | `UserAvatar` |
 | Status or count | DaisyUI badge or status color |
 | Main page framing | `PageContainer` and `PageHeader` |
