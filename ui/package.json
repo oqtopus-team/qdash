@@ -56,7 +56,6 @@
     "react-resizable-panels": "^4.12.2",
     "react-select": "^5.10.2",
     "react-zoom-pan-pinch": "^4.0.3",
-    "react18-json-view": "0.2.10",
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",

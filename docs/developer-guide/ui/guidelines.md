@@ -38,6 +38,11 @@ Package versions live in `ui/package.json`; do not duplicate them elsewhere in t
 Do not edit generated API code. A route file delegates substantial rendering and state to a
 `*PageContent` component.
 
+A preview of one task result, opened from a Task Results row or an Execution Flow node, is
+`TaskResultPreviewSidebar` in `ui/src/components/features/task-results/`. It fetches the result
+from the task id and links to the full page, so a page holds only the selected id and does not
+build a result panel of its own.
+
 ## Name and Export Modules
 
 Use PascalCase for React component and context files, `use` plus camelCase for hooks, and camelCase
