@@ -372,20 +372,16 @@ export function ExecutionDurationBreakdown({
                     layout={{
                       autosize: true,
                       margin: { l: 64, r: 20, t: 12, b: 56 },
-                      paper_bgcolor: "transparent",
-                      plot_bgcolor: "transparent",
                       hovermode: "closest",
                       showlegend: false,
                       xaxis: {
                         title: { text: "Task start time", font: { size: 11 } },
                         type: "date",
-                        gridcolor: "rgba(128,128,128,0.2)",
                         zeroline: false,
                         automargin: true,
                       },
                       yaxis: {
                         title: { text: "Duration (seconds)", font: { size: 11 } },
-                        gridcolor: "rgba(128,128,128,0.2)",
                         zeroline: false,
                         rangemode: "tozero",
                         automargin: true,

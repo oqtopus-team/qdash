@@ -17,6 +17,8 @@ import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig, type MetricConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useCDFUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
+import { chartTheme, seriesColor } from "@/lib/chartTheme";
 
 interface CumulativeDataPoint {
   value: number;
@@ -32,10 +34,32 @@ function isPercentageMetric(unit: string | undefined): boolean {
   return unit === "%";
 }
 
+/** Metrics in palette order, so a chart line and its statistics label share one color. */
+const METRIC_COLOR_ORDER = [
+  "t1",
+  "t2_echo",
+  "t2_star",
+  "gate_fidelity",
+  "x90_fidelity",
+  "x180_fidelity",
+  "zx90_fidelity",
+  "bell_state_fidelity",
+  "readout_fidelity",
+];
+
 /**
  * Cumulative distribution function view for comparing chip metrics across qubits or couplings
  */
 export function CDFView() {
+  const isDark = useIsDarkTheme();
+  const palette = chartTheme(isDark);
+  const metricColors = useMemo<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        METRIC_COLOR_ORDER.map((key, index) => [key, seriesColor(palette, index)]),
+      ),
+    [palette],
+  );
   // URL state management
   const {
     selectedChip,
@@ -420,18 +444,6 @@ export function CDFView() {
 
   // Create combined plot data when multiple parameters are selected
   const combinedPlotData = useMemo(() => {
-    const colors: Record<string, string> = {
-      t1: "#3b82f6",
-      t2_echo: "#f97316",
-      t2_star: "#10b981",
-      gate_fidelity: "#ef4444",
-      x90_fidelity: "#8b5cf6",
-      x180_fidelity: "#f59e0b",
-      zx90_fidelity: "#84cc16",
-      bell_state_fidelity: "#ec4899",
-      readout_fidelity: "#06b6d4",
-    };
-
     if (selectedParameters.length > 1) {
       return selectedParameters.flatMap((param) => {
         const data = processedDataByParameter[param];
@@ -444,7 +456,7 @@ export function CDFView() {
               ...trace,
               line: {
                 ...trace.line,
-                color: colors[param] || "#6b7280",
+                color: metricColors[param] || palette.muted,
               },
               name: config?.title || param,
             };
@@ -455,7 +467,7 @@ export function CDFView() {
               ...trace,
               line: {
                 ...trace.line,
-                color: colors[param] || "#6b7280",
+                color: metricColors[param] || palette.muted,
                 dash: "dash" as const,
               },
               name: `${config?.title || param} median: ${data.median?.toFixed(2)}${unit}`,
@@ -476,7 +488,7 @@ export function CDFView() {
             ...trace,
             line: {
               ...trace.line,
-              color: colors[primaryParameter] || "#3b82f6",
+              color: metricColors[primaryParameter] || palette.accent,
             },
           };
         }
@@ -486,6 +498,8 @@ export function CDFView() {
 
     return [];
   }, [
+    palette,
+    metricColors,
     selectedParameters,
     processedDataByParameter,
     primaryData,
@@ -527,7 +541,6 @@ export function CDFView() {
                     : primaryConfig?.unit || ""
                 })`,
         },
-        gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
         type: hasPercentageMetrics && showAsErrorRate ? ("log" as const) : ("linear" as const),
@@ -535,7 +548,6 @@ export function CDFView() {
       },
       yaxis: {
         title: { text: "Cumulative Probability P(X ≤ value)" },
-        gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
         range: [0, 1],
@@ -545,13 +557,8 @@ export function CDFView() {
       legend: {
         x: 0.02,
         y: 0.98,
-        bgcolor: "rgba(255, 255, 255, 0.8)",
-        bordercolor: "#e5e7eb",
-        borderwidth: 1,
       },
       margin: { t: 60, r: 50, b: 100, l: 80 },
-      plot_bgcolor: "#ffffff",
-      paper_bgcolor: "#ffffff",
       annotations: primaryData.tableData
         ? [
             {
@@ -563,7 +570,7 @@ export function CDFView() {
               y: -0.12,
               xanchor: "left" as const,
               yanchor: "top" as const,
-              font: { size: 11, color: "#666" },
+              font: { size: 11 },
             },
           ]
         : [],
@@ -803,21 +810,9 @@ export function CDFView() {
                 const config = selectedMetricConfigs[param];
                 if (!data || data.median === null || data.mean === null || !config) return null;
 
-                const colors: Record<string, string> = {
-                  t1: "text-blue-600",
-                  t2_echo: "text-orange-600",
-                  t2_star: "text-green-600",
-                  gate_fidelity: "text-red-600",
-                  x90_fidelity: "text-violet-600",
-                  x180_fidelity: "text-amber-600",
-                  zx90_fidelity: "text-lime-600",
-                  bell_state_fidelity: "text-pink-600",
-                  readout_fidelity: "text-cyan-600",
-                };
-
                 const isPercent = isPercentageMetric(config.unit);
                 const unit = isPercent ? "%" : ` ${config.unit}`;
-                const colorClass = colors[param] || "text-gray-600";
+                const labelColor = metricColors[param] || palette.muted;
 
                 const formatValue = (value: number) => {
                   if (isPercent && showAsErrorRate) {
@@ -830,7 +825,9 @@ export function CDFView() {
                   <div key={param}>
                     {/* Mobile: Grid layout */}
                     <div className="sm:hidden">
-                      <div className={`text-xs font-medium mb-1 ${colorClass}`}>{config.title}</div>
+                      <div className="text-xs font-medium mb-1" style={{ color: labelColor }}>
+                        {config.title}
+                      </div>
                       <div className="grid grid-cols-3 gap-2">
                         <div className="bg-base-200 rounded-lg p-2 text-center">
                           <div className="text-xs text-base-content/60">N</div>
@@ -866,7 +863,9 @@ export function CDFView() {
                     <div className="stats shadow w-full hidden sm:inline-grid">
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">Parameter</div>
-                        <div className={`stat-value text-sm ${colorClass}`}>{config.title}</div>
+                        <div className="stat-value text-sm" style={{ color: labelColor }}>
+                          {config.title}
+                        </div>
                       </div>
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">N_valid</div>

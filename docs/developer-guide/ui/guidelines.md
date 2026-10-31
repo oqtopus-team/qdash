@@ -154,6 +154,21 @@ for meta), never in `secondary` or `accent`. Product UI does not use emoji or em
 a lucide icon from its `emoji` name map, and toasts use lucide status icons. `FluentEmoji` remains
 only for user-chosen avatars and the sign-in page.
 
+## Draw Charts from One Theme
+
+Every Plotly chart renders through `Plot` in `ui/src/components/charts/Plot.tsx`, which merges
+`themedLayout` from `ui/src/lib/chartTheme.ts` under the caller's layout: transparent backgrounds,
+a hairline grid, muted ticks and legend, the interface font and a shared `colorway`. A chart file
+therefore sets only what is specific to it (titles, ranges, margins, axis types) and never
+`plot_bgcolor`, `paper_bgcolor`, `gridcolor` or legend backgrounds. A fetched figure that paints
+its own `paper_bgcolor` keeps its own text, grid and series colors, because the theme cannot know
+which text reads on that background; it receives only the font family.
+
+Series colors come from `chartTheme(useIsDarkTheme())`: `accent` for the one series that matters,
+`secondary` for a right-hand axis, `seriesColor(theme, i)` for the i-th of several, and `pass` /
+`fail` / `warn` only when a color means a threshold result. Do not write hex colors in chart
+code; the palette has a light and a dark variant and the hook keeps charts readable on every theme.
+
 ## Write TypeScript
 
 `ui/tsconfig.json` enables strict checking, unused-symbol checks, fallthrough checks, and

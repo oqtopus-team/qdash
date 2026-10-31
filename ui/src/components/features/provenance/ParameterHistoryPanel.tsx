@@ -22,6 +22,8 @@ import { getDaisySelectStyles, getDaisySelectStylesSm } from "@/lib/react-select
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { ParameterVersionResponse } from "@/schemas/parameterVersionResponse";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
+import { chartTheme } from "@/lib/chartTheme";
 
 interface ParameterOption {
   value: string;
@@ -54,6 +56,8 @@ export function ParameterHistoryPanel({
   onParameterChange,
   onQidChange,
 }: ParameterHistoryPanelProps) {
+  const isDark = useIsDarkTheme();
+  const palette = chartTheme(isDark);
   // Use controlled state from URL when callbacks are provided
   const [localParameter, setLocalParameter] = useState(initialParameter);
   const [prevInitialParameter, setPrevInitialParameter] = useState(initialParameter);
@@ -312,7 +316,7 @@ export function ParameterHistoryPanel({
       mode: "lines+markers" as const,
       name: `${data?.parameter_name} (${data?.qid})`,
       marker: { size: 7, symbol: "circle" },
-      line: { width: 2, color: "#1f77b4" },
+      line: { width: 2, color: palette.accent },
       yaxis: "y",
     });
 
@@ -336,12 +340,13 @@ export function ParameterHistoryPanel({
         mode: "lines+markers" as const,
         name: `${compareLabel} (${compareData?.qid})`,
         marker: { size: 7, symbol: "diamond" },
-        line: { width: 2, dash: "dash", color: "#e377c2" },
+        line: { width: 2, dash: "dash", color: palette.secondary },
         yaxis: "y2",
       });
     }
     return traces;
   }, [
+    palette,
     showChart,
     chartVersions,
     compareChartVersions,
@@ -358,7 +363,6 @@ export function ParameterHistoryPanel({
         title: "Time",
         type: "date",
         tickformat: "%Y-%m-%d %H:%M",
-        gridcolor: "#eee",
         zeroline: false,
         domain: showDual ? [0, 0.92] : [0, 1],
       },
@@ -367,11 +371,10 @@ export function ParameterHistoryPanel({
           ? `${data.parameter_name}${data.versions[0]?.unit ? ` [${data.versions[0].unit}]` : ""}`
           : "",
         type: "linear",
-        gridcolor: "#eee",
         zeroline: false,
         exponentformat: "e",
-        titlefont: { color: "#1f77b4" },
-        tickfont: { color: "#1f77b4" },
+        titlefont: { color: palette.accent },
+        tickfont: { color: palette.accent },
       },
       showlegend: showDual,
       legend: {
@@ -379,12 +382,9 @@ export function ParameterHistoryPanel({
         y: 1,
         xanchor: "left",
         yanchor: "top",
-        bgcolor: "rgba(255, 255, 255, 0.8)",
       },
       autosize: true,
       margin: { l: 80, r: showDual ? 180 : 40, t: 30, b: 60 },
-      plot_bgcolor: "transparent",
-      paper_bgcolor: "transparent",
       hovermode: "closest",
     };
 
@@ -394,16 +394,15 @@ export function ParameterHistoryPanel({
         type: "linear",
         overlaying: "y",
         side: "right",
-        gridcolor: "rgba(227, 119, 194, 0.2)",
         zeroline: false,
         exponentformat: "e",
-        titlefont: { color: "#e377c2" },
-        tickfont: { color: "#e377c2" },
+        titlefont: { color: palette.secondary },
+        tickfont: { color: palette.secondary },
       };
     }
 
     return layout;
-  }, [data, compareData, compareLabel, isComparing, compareChartVersions.length]);
+  }, [palette, data, compareData, compareLabel, isComparing, compareChartVersions.length]);
 
   // Version diff computation
   const diffVersions = useMemo(() => {
@@ -609,17 +608,17 @@ export function ParameterHistoryPanel({
                       {showCompareColumns && (
                         <>
                           <th className="border-l border-base-300">
-                            <span className="text-xs" style={{ color: "#e377c2" }}>
+                            <span className="text-xs" style={{ color: palette.secondary }}>
                               {compareLabel}
                             </span>
                           </th>
                           <th className="hidden md:table-cell">
-                            <span className="text-xs" style={{ color: "#e377c2" }}>
+                            <span className="text-xs" style={{ color: palette.secondary }}>
                               Error
                             </span>
                           </th>
                           <th className="hidden sm:table-cell">
-                            <span className="text-xs" style={{ color: "#e377c2" }}>
+                            <span className="text-xs" style={{ color: palette.secondary }}>
                               Trend
                             </span>
                           </th>
@@ -674,13 +673,13 @@ export function ParameterHistoryPanel({
                                 <>
                                   <td
                                     className="font-mono text-sm border-l border-base-300"
-                                    style={{ color: "#e377c2" }}
+                                    style={{ color: palette.secondary }}
                                   >
                                     {matched ? formatValue(matched.value) : "-"}
                                   </td>
                                   <td
                                     className="font-mono text-xs hidden md:table-cell"
-                                    style={{ color: "#e377c2" }}
+                                    style={{ color: palette.secondary }}
                                   >
                                     {matched?.error ? `±${matched.error.toExponential(2)}` : "-"}
                                   </td>
