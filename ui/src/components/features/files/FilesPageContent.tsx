@@ -45,6 +45,7 @@ import {
   gitStatusEntries,
 } from "./WorkspaceChangesView";
 import { useGitWorkspace } from "./useGitWorkspace";
+import { monoFontFamily } from "@/lib/fonts";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -522,6 +523,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                           options={{
                             minimap: { enabled: false },
                             fontSize: 14,
+                            fontFamily: monoFontFamily,
                             lineNumbers: "on",
                             automaticLayout: true,
                             scrollBeyondLastLine: false,
@@ -561,6 +563,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                     options={{
                       minimap: { enabled: true },
                       fontSize: 14,
+                      fontFamily: monoFontFamily,
                       lineNumbers: "on",
                       automaticLayout: true,
                       scrollBeyondLastLine: false,

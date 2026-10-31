@@ -16,6 +16,7 @@ import { useGetCurrentUser } from "@/client/auth/auth";
 import { useChatDock } from "@/contexts/ChatDockContext";
 import { useListChips } from "@/client/chip/chip";
 import { getFlowTemplate, listFlowTemplates, saveFlow } from "@/client/flow/flow";
+import { monoFontFamily } from "@/lib/fonts";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -274,6 +275,7 @@ export default function NewFlowPage() {
               options={{
                 minimap: { enabled: true },
                 fontSize: 14,
+                fontFamily: monoFontFamily,
                 lineNumbers: "on",
                 automaticLayout: true,
                 scrollBeyondLastLine: false,

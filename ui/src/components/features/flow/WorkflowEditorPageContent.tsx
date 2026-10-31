@@ -75,6 +75,7 @@ import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeleto
 import { isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
+import { monoFontFamily } from "@/lib/fonts";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -82,8 +83,7 @@ const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 const EDITOR_OPTIONS = {
   minimap: { enabled: true, renderCharacters: false, maxColumn: 80, scale: 2 },
   fontSize: 14,
-  fontFamily:
-    "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace",
+  fontFamily: monoFontFamily,
   fontLigatures: true,
   lineNumbers: "on" as const,
   automaticLayout: true,
