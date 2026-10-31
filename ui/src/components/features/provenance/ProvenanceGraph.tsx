@@ -19,9 +19,9 @@ import {
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 
-import { FluentEmoji } from "@/components/ui/FluentEmoji";
 import type { LineageNodeResponse, LineageEdgeResponse } from "@/schemas";
 import { TaskDetailPanel } from "./TaskDetailPanel";
+import { Network } from "lucide-react";
 
 interface ProvenanceGraphProps {
   nodes: LineageNodeResponse[];
@@ -856,8 +856,8 @@ export function ProvenanceGraph({
   if (apiNodes.length === 0) {
     return (
       <div className="h-[calc(100vh-16rem)] min-h-[500px] flex flex-col items-center justify-center text-base-content/50 bg-base-200 rounded-lg border border-base-300">
-        <div className="mb-4">
-          <FluentEmoji name="empty" size={64} />
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-base-100 text-base-content/50">
+          <Network className="h-6 w-6" aria-hidden="true" />
         </div>
         <p className="text-sm font-medium">No lineage data</p>
         <p className="text-sm mt-1">Select a parameter to explore its provenance</p>

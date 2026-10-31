@@ -118,7 +118,7 @@ export function DataTable<TData extends object>({
 
   return (
     <div
-      className={`card bg-base-100 shadow-xl rounded-xl p-4 sm:p-8 border border-base-300 ${className}`}
+      className={`card bg-base-100 shadow-sm rounded-xl p-4 sm:p-8 border border-base-300 ${className}`}
     >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <div className="flex flex-wrap items-center gap-2 sm:gap-4">

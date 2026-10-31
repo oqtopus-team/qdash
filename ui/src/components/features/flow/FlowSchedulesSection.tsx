@@ -65,7 +65,7 @@ function SectionShell({
   headerActions?: React.ReactNode;
 }) {
   return (
-    <div className="card bg-base-200 shadow-lg">
+    <div className="card bg-base-200 shadow-sm">
       <div className="card-body">
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <h2 className="card-title">Schedule Status</h2>

@@ -217,7 +217,7 @@ export function FlowFolderSection({ folder }: { folder: FlowFolder }) {
   return (
     <details
       open={folder.mine}
-      className="group card bg-base-200 shadow-lg"
+      className="group card bg-base-200 shadow-sm"
       data-testid={`flow-folder-${folder.creator}`}
     >
       <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">

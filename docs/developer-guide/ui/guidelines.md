@@ -117,6 +117,27 @@ tabular numerals). `ui/src/lib/react-select-theme.ts` and
 Exceptions: the error and not-found pages, the sign-in hero title, Monaco editor font settings,
 and chip, coupling, and topology grid cells whose text scales with the cell size.
 
+## Keep Surfaces Flat
+
+Depth comes from borders and spacing, not from gradients, glow, or motion. `globals.css` sets the
+DaisyUI components once; feature code does not add decoration on top.
+
+| Surface | Rule |
+| --- | --- |
+| Button | Solid DaisyUI fill, `0.5rem` radius, no shadow, no hover lift |
+| Card, table, alert, dropdown | 1px border in `base-content/10`, hairline shadow, `0.5rem` to `0.75rem` radius |
+| Input | 1px border, primary border plus a 3px soft ring on focus |
+| Active navigation or tab | Tinted background (`primary` at 12%) with primary text, not a filled gradient |
+| Floating layer (modal, drawer, menu) | One soft shadow; this is the only place `shadow-md` or larger belongs |
+
+Color means status. `success`, `warning`, `error`, and `info` mark state; `primary` marks the one
+action or selection on screen. A number in a stat tile is neutral unless it reports a state, and
+decorative uses of `secondary` and `accent` are avoided.
+
+Icons come from `lucide-react`. Product UI does not use emoji or emoji images; `EmptyState` renders
+a lucide icon from its `emoji` name map, and toasts use lucide status icons. `FluentEmoji` remains
+only for user-chosen avatars and the sign-in page.
+
 ## Write TypeScript
 
 `ui/tsconfig.json` enables strict checking, unused-symbol checks, fallthrough checks, and

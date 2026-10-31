@@ -106,7 +106,7 @@ export function LoginPageContent() {
 
         <section
           aria-labelledby="sign-in-heading"
-          className="card mx-auto w-full max-w-sm border border-base-300 bg-base-100/95 shadow-2xl backdrop-blur-sm"
+          className="card mx-auto w-full max-w-sm border border-base-300 bg-base-100/95 shadow-sm backdrop-blur-sm"
         >
           <div className="card-body gap-0 p-6 sm:p-8">
             <h2 id="sign-in-heading" className="text-xl font-medium tracking-tight">
@@ -178,11 +178,7 @@ export function LoginPageContent() {
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn btn-primary btn-glow mt-6 w-full"
-              >
+              <button type="submit" disabled={loading} className="btn btn-primary mt-6 w-full">
                 {loading && <Loader2 size={18} className="animate-spin" aria-hidden="true" />}
                 {loading ? "Signing in…" : "Sign in"}
               </button>

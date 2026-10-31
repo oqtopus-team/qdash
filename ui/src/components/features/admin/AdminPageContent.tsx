@@ -1315,7 +1315,7 @@ function AssignUsersToProjectModal({
                 <div className="stats stats-vertical sm:stats-horizontal w-full bg-base-200">
                   <div className="stat py-2 px-3">
                     <div className="stat-title text-xs">Will add</div>
-                    <div className="stat-value text-primary">
+                    <div className="stat-value">
                       {selectedProjectMembersLoading ? "-" : assignableUsers.length}
                     </div>
                   </div>

@@ -61,7 +61,7 @@ function CopilotSettingsPanel() {
   };
 
   return (
-    <div className="card bg-base-200 shadow-lg" key="copilot">
+    <div className="card bg-base-200 shadow-sm" key="copilot">
       <div className="card-body">
         <h2 className="card-title mb-4">Copilot Settings</h2>
         <div className="flex flex-col gap-6">
@@ -210,7 +210,7 @@ function ProjectMembersPanel() {
 
   return (
     <div className="space-y-4" key="project">
-      <div className="card bg-base-200 shadow-lg">
+      <div className="card bg-base-200 shadow-sm">
         <div className="card-body">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>

@@ -25,7 +25,7 @@ export function AppearanceSettingsPanel() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className="card bg-base-200 shadow-lg" key="appearance">
+    <div className="card bg-base-200 shadow-sm" key="appearance">
       <div className="card-body">
         <h2 className="card-title mb-4">Theme Settings</h2>
         <div className="flex flex-col gap-6">
