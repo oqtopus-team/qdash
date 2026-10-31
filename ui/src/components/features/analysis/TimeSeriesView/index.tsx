@@ -861,7 +861,7 @@ export function TimeSeriesView() {
                     </svg>
                   </button>
                   {isLoadingSecondary && (
-                    <span className="loading loading-spinner loading-sm text-secondary"></span>
+                    <span className="loading loading-spinner loading-sm text-base-content/60"></span>
                   )}
                 </div>
               )}

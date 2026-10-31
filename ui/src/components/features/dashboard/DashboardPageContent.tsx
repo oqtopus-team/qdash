@@ -552,8 +552,8 @@ export function DashboardPageContent() {
       <div className="h-full flex flex-col gap-4 md:gap-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <PageHeader
-            title="Chip Dashboard"
-            description="One-page summary of every metric on the selected chip. Click any qubit or coupling to update its pinned summary or start a forum topic."
+            title="Dashboard"
+            description="Every metric of the selected chip on one page"
             className="mb-0"
           />
         </div>
@@ -563,10 +563,7 @@ export function DashboardPageContent() {
           aria-labelledby="dashboard-data-scope"
           className="rounded-xl border border-base-300 bg-base-200/45 p-3 sm:p-4"
         >
-          <h2
-            id="dashboard-data-scope"
-            className="mb-3 text-xs font-medium uppercase tracking-wide text-base-content/55"
-          >
+          <h2 id="dashboard-data-scope" className="mb-3 text-xs font-medium text-base-content/55">
             Data scope
           </h2>
           <div className="flex flex-col gap-4">

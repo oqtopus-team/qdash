@@ -628,7 +628,7 @@ export function CouplingGrid({
                 width: displayCellSize * 0.6,
                 height: displayCellSize * 0.6,
               }}
-              className={`rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
+              className={`rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-transform duration-200 hover:shadow-xl hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
                 downloadSelectionEnabled && isSelectedForDownload
                   ? "ring-2 ring-primary ring-offset-2"
                   : ""

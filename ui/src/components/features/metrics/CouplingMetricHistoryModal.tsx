@@ -337,7 +337,7 @@ export function CouplingMetricHistoryModal({
     <div className="flex flex-col min-h-0 h-full">
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
-          <ListTodo className="h-4 w-4 text-secondary" />
+          <ListTodo className="h-4 w-4 text-base-content/60" />
           <h3 className="text-sm font-medium text-base-content">Tasks in Execution</h3>
         </div>
         {selectedExecutionId && (
@@ -432,7 +432,7 @@ export function CouplingMetricHistoryModal({
     <div className="flex flex-col">
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-accent" />
+          <FileText className="h-4 w-4 text-base-content/60" />
           <h3 className="text-sm font-medium text-base-content">Task Details</h3>
         </div>
         {executionTasks.length > 0 && (

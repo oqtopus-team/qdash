@@ -197,9 +197,7 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
         <div id={contentId} className="px-4 pb-4 pt-1 space-y-4 border-t border-base-300">
           {/* Dates inline edit */}
           <div className="text-xs">
-            <div className="text-base-content/60 font-medium uppercase tracking-wide mb-1">
-              Dates
-            </div>
+            <div className="text-base-content/60 font-medium mb-1">Dates</div>
             {!editingDates ? (
               <button
                 onClick={() => setEditingDates(true)}
@@ -212,7 +210,7 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
             ) : (
               <div className="flex flex-wrap items-end gap-2">
                 <label className="flex flex-col">
-                  <span className="text-xs text-base-content/60 uppercase">Started</span>
+                  <span className="text-xs text-base-content/60">Started</span>
                   <input
                     type="date"
                     className="input input-xs input-bordered tabular-nums"
@@ -222,9 +220,7 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
                   />
                 </label>
                 <label className="flex flex-col">
-                  <span className="text-xs text-base-content/60 uppercase">
-                    Ended (empty = active)
-                  </span>
+                  <span className="text-xs text-base-content/60">Ended (empty = active)</span>
                   <input
                     type="date"
                     className="input input-xs input-bordered tabular-nums"
@@ -260,7 +256,7 @@ export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(functi
 
           {/* Chip management */}
           <div className="text-xs">
-            <div className="text-base-content/60 font-medium uppercase tracking-wide mb-1">
+            <div className="text-base-content/60 font-medium mb-1">
               Chips loaded
               <span className="text-base-content/40 normal-case font-normal ml-1">
                 ({cooldown.chip_ids.length})

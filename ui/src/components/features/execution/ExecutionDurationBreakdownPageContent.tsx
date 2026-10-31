@@ -127,7 +127,7 @@ export function ExecutionDurationBreakdownPageContent() {
       </Link>
       <PageHeader
         title="Task Duration Breakdown"
-        description="Analyze which tasks consume execution time across the selected executions."
+        description="Which tasks consume execution time across the selected executions"
       />
 
       <PageFiltersBar className="mb-4 sm:mb-6">

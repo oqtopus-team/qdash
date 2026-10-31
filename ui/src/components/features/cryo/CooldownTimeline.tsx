@@ -217,7 +217,7 @@ export function CooldownTimeline({ cooldowns, selectedId, onSelect }: CooldownTi
             <button
               key={cd.cooldown_id}
               onClick={() => onSelect(cd.cooldown_id)}
-              className={`absolute overflow-hidden rounded-md border border-white/20 text-left shadow-sm transition-all hover:brightness-110 ${primaryChipStyle.bar} ${
+              className={`absolute overflow-hidden rounded-md border border-white/20 text-left shadow-sm transition-colors hover:brightness-110 ${primaryChipStyle.bar} ${
                 isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-base-100 z-10" : ""
               }`}
               style={{

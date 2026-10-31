@@ -200,7 +200,7 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
             key={key}
             type="button"
             onClick={() => setPreviewSrc(src)}
-            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-colors cursor-pointer"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- runtime-generated API preview */}
             <img

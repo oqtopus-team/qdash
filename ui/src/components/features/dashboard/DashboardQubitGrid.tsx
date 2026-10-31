@@ -220,7 +220,7 @@ export function DashboardQubitGrid({
               });
             }}
             onMouseLeave={() => setHover(null)}
-            className={`aspect-square rounded-md flex flex-col items-center justify-center relative shadow-sm text-left transition-all ${
+            className={`aspect-square rounded-md flex flex-col items-center justify-center relative shadow-sm text-left transition-colors ${
               isSummaryPresentation ? `border ${summaryTileClass}` : ""
             } ${onQubitClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""}`}
             style={{

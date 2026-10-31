@@ -88,7 +88,6 @@ function EntityNode({ data, selected }: NodeProps) {
       {typedData.hasNewerVersion && (
         <>
           <span className="absolute -top-1 -right-1 flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-75" />
             <span className="relative inline-flex rounded-full h-3 w-3 bg-info" />
           </span>
           {/* Hover tooltip - stale */}
@@ -186,7 +185,6 @@ function ActivityNode({ data, selected }: NodeProps) {
       {hasStaleInputs && (
         <>
           <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-75" />
             <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-info" />
           </span>
           {/* Hover tooltip */}

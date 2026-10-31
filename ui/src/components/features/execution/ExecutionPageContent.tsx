@@ -293,10 +293,7 @@ export function ExecutionPageContent() {
   if (isError) {
     return (
       <PageContainer>
-        <PageHeader
-          title="Execution History"
-          description="Monitor workflow runs and task results"
-        />
+        <PageHeader title="Execution" description="Workflow runs and their task results" />
         <div role="alert" className="alert alert-error">
           <AlertCircle className="h-5 w-5" />
           <span>Execution history could not be loaded. Please try again.</span>
@@ -371,7 +368,7 @@ export function ExecutionPageContent() {
 
   return (
     <PageContainer>
-      <PageHeader title="Execution History" description="Monitor workflow runs and task results" />
+      <PageHeader title="Execution" description="Workflow runs and their task results" />
       <PageFiltersBar className="mb-4 sm:mb-6">
         <PageFiltersBar.Group>
           <PageFiltersBar.Item className="sm:w-64">
@@ -621,7 +618,7 @@ export function ExecutionPageContent() {
               </div>
             </div>
             <div>
-              <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-base-content/60 sm:mb-4">
+              <h3 className="mb-3 text-xs font-medium text-base-content/60 sm:mb-4">
                 Execution Details
               </h3>
               {isDetailLoading && (
@@ -671,7 +668,7 @@ export function ExecutionPageContent() {
                           )}
                         </h4>
                         <span
-                          className={`text-sm  font-medium flex-shrink-0 ${
+                          className={`text-sm font-medium flex-shrink-0 ${
                             detailTask.status === "running"
                               ? "text-info status-pulse"
                               : detailTask.status === "completed"

@@ -415,7 +415,7 @@ export function ForumNewPage() {
           <section className="space-y-2">
             <label
               htmlFor="forum-new-category"
-              className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50"
+              className="flex items-center gap-2 text-xs font-medium text-base-content/50"
             >
               <CategoryIcon className="h-3.5 w-3.5" />
               Category
@@ -447,7 +447,7 @@ export function ForumNewPage() {
           <section className="space-y-2">
             <label
               htmlFor="forum-new-chip"
-              className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50"
+              className="flex items-center gap-2 text-xs font-medium text-base-content/50"
             >
               <Crosshair className="h-3.5 w-3.5" />
               Target
@@ -528,7 +528,7 @@ export function ForumNewPage() {
           <section className="space-y-2">
             <label
               htmlFor="forum-new-cooldown"
-              className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50"
+              className="flex items-center gap-2 text-xs font-medium text-base-content/50"
             >
               <CalendarDays className="h-3.5 w-3.5" />
               Cooldown
@@ -568,7 +568,7 @@ export function ForumNewPage() {
           <section className="space-y-2">
             <label
               htmlFor="forum-new-assignee"
-              className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50"
+              className="flex items-center gap-2 text-xs font-medium text-base-content/50"
             >
               <UserRound className="h-3.5 w-3.5" />
               Assignee
@@ -604,7 +604,7 @@ export function ForumNewPage() {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium text-base-content/50">
               <Tag className="h-3.5 w-3.5" />
               Labels
             </div>
@@ -617,7 +617,7 @@ export function ForumNewPage() {
           </section>
 
           <section className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium uppercase text-base-content/50">
+            <div className="flex items-center gap-2 text-xs font-medium text-base-content/50">
               <UserRound className="h-3.5 w-3.5" />
               Author
             </div>

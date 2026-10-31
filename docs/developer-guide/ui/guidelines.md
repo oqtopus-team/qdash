@@ -101,13 +101,14 @@ bypass the cascade (Monaco, Plotly) take `sansFontFamily` and `monoFontFamily` f
 | Section, card, dialog, and item title (`h2`, `h3`, `card-title`, `DialogTitle`) | `text-sm font-medium` |
 | Body, labels, buttons, table cells | `text-sm` |
 | Supporting text, timestamps, badges | `text-xs text-base-content/60` |
-| Sub-section label inside a card | `text-xs font-medium uppercase tracking-wide text-base-content/60` |
+| Sub-section label inside a card, table header, sidebar section | `text-xs font-medium text-base-content/60`, sentence case |
 | Numeral in a stat tile | `stat-value` |
 
 `font-medium` is the only emphasis; do not use `font-semibold` or `font-bold`. Do not use
 `text-base`, `text-lg`, `text-2xl` and above, arbitrary sizes such as `text-[11px]`, or responsive
 size variants such as `sm:text-lg`; pick one size for every viewport. When primary and secondary
 text share a line, separate them with color, not size.
+Labels are sentence case; no `uppercase` or `tracking-*` on interface text.
 
 `globals.css` applies the same scale to DaisyUI: `.btn`, `.badge`, `.card-title`, `.table th`, and
 `.stat-value` use weight 500, and `.stat-value` is the one step above the page title (1.5rem,
@@ -116,6 +117,14 @@ tabular numerals). `ui/src/lib/react-select-theme.ts` and
 
 Exceptions: the error and not-found pages, the sign-in hero title, Monaco editor font settings,
 and chip, coupling, and topology grid cells whose text scales with the cell size.
+
+## Write Interface Copy
+
+A page title is the navigation label (`Metrics`, not `Chip Metrics Dashboard`); the description
+under it is one line of what the page shows, without a trailing period. Headings, labels, buttons
+and placeholders end without a period and never carry an exclamation mark. Empty states name the
+context, not the visitor: `Ask about calibration data`, not `Good evening, Alice`. Placeholders
+are short (`Ask a question`, `Search tasks`).
 
 ## Keep Surfaces Flat
 
@@ -129,12 +138,15 @@ DaisyUI components once; feature code does not add decoration on top.
 | Input | 1px border, primary border plus a 3px soft ring on focus |
 | Active navigation or tab | Tinted background (`primary` at 12%) with primary text, not a filled gradient |
 | Floating layer (modal, drawer, menu) | One soft shadow; this is the only place `shadow-md` or larger belongs |
+| Transitions | `transition-colors` or `transition-transform`; `transition-all` only where a width or height must animate |
+| Motion | No `animate-ping`, no `hover:scale`, no pulsing status dots; `animate-pulse` only on skeletons and `animate-spin` only on loaders |
 
 Color means status. `success`, `warning`, `error`, and `info` mark state; `primary` marks the one
 action or selection on screen. A number in a stat tile is neutral unless it reports a state, and
 decorative uses of `secondary` and `accent` are avoided.
 
-Icons come from `lucide-react`. Product UI does not use emoji or emoji images; `EmptyState` renders
+Icons come from `lucide-react`, 16px to 18px, in the color of their text role (`text-base-content/60`
+for meta), never in `secondary` or `accent`. Product UI does not use emoji or emoji images; `EmptyState` renders
 a lucide icon from its `emoji` name map, and toasts use lucide status icons. `FluentEmoji` remains
 only for user-chosen avatars and the sign-in page.
 

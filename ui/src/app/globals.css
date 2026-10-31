@@ -183,6 +183,19 @@ a.card:hover {
   box-shadow: none;
 }
 
+/* Colored badges are tints: the hue marks state or role without filling the pill. */
+.badge-primary,
+.badge-secondary,
+.badge-accent,
+.badge-info,
+.badge-success,
+.badge-warning,
+.badge-error {
+  color: var(--badge-color);
+  background-color: color-mix(in oklch, var(--badge-color) 12%, var(--color-base-100));
+  border-color: color-mix(in oklch, var(--badge-color) 25%, transparent);
+}
+
 /* ----------------------------------------
    Tab Styles - Rich Interactive
    ---------------------------------------- */
@@ -304,9 +317,7 @@ a.card:hover {
 
 .table th {
   font-weight: 500;
-  text-transform: uppercase;
   font-size: 0.75rem;
-  letter-spacing: 0.08em;
   color: var(--color-base-content);
   opacity: 0.7;
   background-color: color-mix(in oklch, var(--color-base-200) 50%, transparent);
@@ -529,6 +540,104 @@ html[data-theme="dark"],
   background-clip: text;
 }
 
+/* Sign-in and 404 hero: the one place the logo may float and glow. */
+/* Login page floating logo animation */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes glow-light {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(31, 31, 221, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 15px rgba(31, 31, 221, 0.4))
+      drop-shadow(0 0 25px rgba(226, 19, 49, 0.2));
+  }
+}
+
+@keyframes glow-dark {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(85, 85, 240, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 15px rgba(85, 85, 240, 0.5))
+      drop-shadow(0 0 25px rgba(246, 111, 129, 0.3));
+  }
+}
+
+.floating-logo {
+  animation:
+    float 4s ease-in-out infinite,
+    glow-light 3s ease-in-out infinite;
+}
+
+[data-theme="dark"] .floating-logo {
+  animation:
+    float 4s ease-in-out infinite,
+    glow-dark 3s ease-in-out infinite;
+}
+
+/* 404 Page - Lost logo animation */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(10px, -5px) rotate(3deg);
+  }
+  50% {
+    transform: translate(-5px, 5px) rotate(-2deg);
+  }
+  75% {
+    transform: translate(-10px, -3px) rotate(2deg);
+  }
+}
+
+@keyframes pulse-fade {
+  0%,
+  100% {
+    opacity: 0.6;
+    filter: drop-shadow(0 0 5px rgba(31, 31, 221, 0.2));
+  }
+  50% {
+    opacity: 0.4;
+    filter: drop-shadow(0 0 15px rgba(31, 31, 221, 0.3));
+  }
+}
+
+@keyframes pulse-fade-dark {
+  0%,
+  100% {
+    opacity: 0.6;
+    filter: drop-shadow(0 0 5px rgba(85, 85, 240, 0.3));
+  }
+  50% {
+    opacity: 0.4;
+    filter: drop-shadow(0 0 15px rgba(85, 85, 240, 0.4));
+  }
+}
+
+.not-found-logo {
+  animation:
+    drift 8s ease-in-out infinite,
+    pulse-fade 4s ease-in-out infinite;
+}
+
+[data-theme="dark"] .not-found-logo {
+  animation:
+    drift 8s ease-in-out infinite,
+    pulse-fade-dark 4s ease-in-out infinite;
+}
 /* ========================================
    Status Animations & Effects
    ======================================== */
@@ -652,104 +761,6 @@ html[data-theme="dark"],
 
 .modal-box {
   animation: modal-slide-up 0.2s ease-out;
-}
-
-/* Login page floating logo animation */
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes glow-light {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 8px rgba(31, 31, 221, 0.3));
-  }
-  50% {
-    filter: drop-shadow(0 0 15px rgba(31, 31, 221, 0.4))
-      drop-shadow(0 0 25px rgba(226, 19, 49, 0.2));
-  }
-}
-
-@keyframes glow-dark {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 8px rgba(85, 85, 240, 0.4));
-  }
-  50% {
-    filter: drop-shadow(0 0 15px rgba(85, 85, 240, 0.5))
-      drop-shadow(0 0 25px rgba(246, 111, 129, 0.3));
-  }
-}
-
-.floating-logo {
-  animation:
-    float 4s ease-in-out infinite,
-    glow-light 3s ease-in-out infinite;
-}
-
-[data-theme="dark"] .floating-logo {
-  animation:
-    float 4s ease-in-out infinite,
-    glow-dark 3s ease-in-out infinite;
-}
-
-/* 404 Page - Lost logo animation */
-@keyframes drift {
-  0%,
-  100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-  25% {
-    transform: translate(10px, -5px) rotate(3deg);
-  }
-  50% {
-    transform: translate(-5px, 5px) rotate(-2deg);
-  }
-  75% {
-    transform: translate(-10px, -3px) rotate(2deg);
-  }
-}
-
-@keyframes pulse-fade {
-  0%,
-  100% {
-    opacity: 0.6;
-    filter: drop-shadow(0 0 5px rgba(31, 31, 221, 0.2));
-  }
-  50% {
-    opacity: 0.4;
-    filter: drop-shadow(0 0 15px rgba(31, 31, 221, 0.3));
-  }
-}
-
-@keyframes pulse-fade-dark {
-  0%,
-  100% {
-    opacity: 0.6;
-    filter: drop-shadow(0 0 5px rgba(85, 85, 240, 0.3));
-  }
-  50% {
-    opacity: 0.4;
-    filter: drop-shadow(0 0 15px rgba(85, 85, 240, 0.4));
-  }
-}
-
-.not-found-logo {
-  animation:
-    drift 8s ease-in-out infinite,
-    pulse-fade 4s ease-in-out infinite;
-}
-
-[data-theme="dark"] .not-found-logo {
-  animation:
-    drift 8s ease-in-out infinite,
-    pulse-fade-dark 4s ease-in-out infinite;
 }
 
 /* Dashboard focus styles for hiding non-essential elements */
@@ -1002,7 +1013,6 @@ html[data-theme="dark"],
   color: var(--color-base-content) !important;
   font-weight: 500 !important;
   font-size: 0.75rem !important;
-  text-transform: uppercase !important;
   opacity: 0.7 !important;
 }
 

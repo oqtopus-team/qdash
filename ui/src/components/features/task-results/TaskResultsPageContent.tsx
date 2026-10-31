@@ -191,13 +191,13 @@ function TaskResultRow({
         {message ? (
           <div className="flex gap-2">
             {isFailure ? (
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-error" />
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-base-content/40" />
             ) : (
               <MessageSquareText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-base-content/35" />
             )}
             <div>
               <div
-                className={`line-clamp-2 text-xs ${isFailure ? "text-error/80" : "text-base-content/60"}`}
+                className={`line-clamp-2 text-xs ${isFailure ? "text-base-content/70" : "text-base-content/60"}`}
               >
                 {message}
               </div>
@@ -483,9 +483,7 @@ function TaskResultPreviewSidebar({
             <div className="space-y-4">
               {(figures.length > 0 || jsonFigures.length > 0) && (
                 <div>
-                  <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-base-content/60">
-                    Figures
-                  </h3>
+                  <h3 className="mb-2 text-xs font-medium text-base-content/60">Figures</h3>
                   <div className="flex h-56 items-center gap-3 overflow-x-auto rounded-lg bg-base-200/60 p-3">
                     {figures.length > 0 ? (
                       figures.map((figure, index) => (
@@ -509,9 +507,7 @@ function TaskResultPreviewSidebar({
               )}
 
               <div className="rounded-lg bg-base-200/60 p-3">
-                <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-base-content/60">
-                  Metadata
-                </h3>
+                <h3 className="mb-2 text-xs font-medium text-base-content/60">Metadata</h3>
                 <dl className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <dt className="text-base-content/50">Chip</dt>
@@ -654,7 +650,7 @@ export function TaskResultsPageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Task Results"
-        description="Review task outcomes across executions and focus on failed results."
+        description="Outcomes of every task across executions"
         actions={
           <span className="badge badge-neutral gap-1">
             <strong>{data?.total ?? 0}</strong> results

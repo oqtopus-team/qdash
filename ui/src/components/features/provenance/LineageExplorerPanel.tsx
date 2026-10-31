@@ -135,7 +135,7 @@ export function LineageExplorerPanel({
 
   const getNodeIcon = (nodeType: string) => {
     if (nodeType === "activity") {
-      return <Activity className="h-4 w-4 text-secondary" />;
+      return <Activity className="h-4 w-4 text-base-content/60" />;
     }
     return <Circle className="h-4 w-4 text-primary" />;
   };
@@ -392,11 +392,11 @@ export function LineageExplorerPanel({
                             <span className="font-mono truncate max-w-[100px]">
                               {edge.source_id.split(":").slice(0, 2).join(":")}
                             </span>
-                            <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
+                            <ChevronRight className="h-3 w-3 text-base-content/60 flex-shrink-0" />
                             <span className="badge badge-accent badge-xs">
                               {edge.relation_type}
                             </span>
-                            <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
+                            <ChevronRight className="h-3 w-3 text-base-content/60 flex-shrink-0" />
                             <span className="font-mono truncate max-w-[100px]">
                               {edge.target_id.split(":").slice(0, 2).join(":")}
                             </span>

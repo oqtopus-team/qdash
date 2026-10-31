@@ -154,9 +154,7 @@ export function TaskDetailPanel({ activityNodeId, nodes, edges, onClose }: TaskD
         <section>
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-4 rounded bg-green-500" />
-            <h4 className="text-xs font-medium uppercase tracking-wide text-base-content/60">
-              Output Parameters
-            </h4>
+            <h4 className="text-xs font-medium text-base-content/60">Output Parameters</h4>
             <span className="badge badge-ghost badge-xs">{outputParams.length}</span>
           </div>
           {outputParams.length === 0 ? (
@@ -189,9 +187,7 @@ export function TaskDetailPanel({ activityNodeId, nodes, edges, onClose }: TaskD
         <section>
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-4 rounded bg-amber-500" />
-            <h4 className="text-xs font-medium uppercase tracking-wide text-base-content/60">
-              Input Parameters
-            </h4>
+            <h4 className="text-xs font-medium text-base-content/60">Input Parameters</h4>
             <span className="badge badge-ghost badge-xs">{inputParams.length}</span>
           </div>
           {inputParams.length === 0 ? (

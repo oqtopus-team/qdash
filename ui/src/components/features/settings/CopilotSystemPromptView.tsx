@@ -45,13 +45,13 @@ export function CopilotSystemPromptView() {
         {shown && (
           <>
             <section>
-              <div className="mb-1 text-xs uppercase text-base-content/50">System prompt</div>
+              <div className="mb-1 text-xs text-base-content/50">System prompt</div>
               <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded border border-base-300 bg-base-200/40 p-3 text-xs">
                 {shown.system_prompt}
               </pre>
             </section>
             <section>
-              <div className="mb-1 text-xs uppercase text-base-content/50">
+              <div className="mb-1 text-xs text-base-content/50">
                 Your instructions, as appended
               </div>
               {shown.user_preferences ? (
@@ -64,7 +64,7 @@ export function CopilotSystemPromptView() {
             </section>
             {(shown.tools?.length ?? 0) > 0 && (
               <section>
-                <div className="mb-1 text-xs uppercase text-base-content/50">
+                <div className="mb-1 text-xs text-base-content/50">
                   Tools offered ({shown.tools?.length})
                 </div>
                 <div className="flex flex-wrap gap-1">

@@ -96,7 +96,7 @@ export function TaskKnowledgePageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Knowledge"
-        description="The background of each calibration task and its expert-labeled example plots, laid out like the calibtasks packages, as published in the task-knowledge repository. To try a change, download a task as a zip and upload the edited zip as a knowledge draft in an AI evaluation."
+        description="Background and labeled example plots for each calibration task, as published in the task-knowledge repository"
       />
 
       {/* Search bar */}

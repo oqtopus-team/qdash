@@ -62,7 +62,7 @@ function useRun(runId: string | null) {
 function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
     <div title={hint}>
-      <div className="text-xs uppercase text-base-content/50">{label}</div>
+      <div className="text-xs text-base-content/50">{label}</div>
       <div className="mt-1 text-sm">{value}</div>
     </div>
   );
@@ -283,7 +283,7 @@ function PromptDiff({ row }: { row: CompareRow }) {
         <div className="mt-2 space-y-3">
           {systemA !== systemB && (
             <div>
-              <div className="mb-1 text-xs uppercase text-base-content/50">System prompt</div>
+              <div className="mb-1 text-xs text-base-content/50">System prompt</div>
               <PierreDiffViewer
                 filename="system-prompt.txt"
                 oldContent={systemA}
@@ -293,7 +293,7 @@ function PromptDiff({ row }: { row: CompareRow }) {
             </div>
           )}
           <div>
-            <div className="mb-1 text-xs uppercase text-base-content/50">User turn</div>
+            <div className="mb-1 text-xs text-base-content/50">User turn</div>
             {same ? (
               <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded bg-base-100 p-2 text-xs">
                 {promptA}

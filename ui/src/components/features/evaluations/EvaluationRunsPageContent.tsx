@@ -260,7 +260,7 @@ export function EvaluationRunsPageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="AI Evaluations"
-        description="Runs of the calibration evaluation model over task results. Open a run to read each evaluation, see what the model saw, and record whether you agree. Pick two runs to compare them entity by entity."
+        description="Runs of the evaluation model over task results, with your agreement recorded per evaluation"
         actions={
           <span className="badge badge-neutral gap-1">
             <strong>{runs.length}</strong> runs

@@ -273,7 +273,7 @@ export function ModelInputView({
   return (
     <div className="mt-2 space-y-3 rounded-lg border border-base-300 bg-base-200/40 p-3">
       <section>
-        <div className="mb-1 text-xs uppercase text-base-content/50">System prompt</div>
+        <div className="mb-1 text-xs text-base-content/50">System prompt</div>
         {input.system_prompt ? (
           <pre className="whitespace-pre-wrap rounded bg-base-100 p-2 text-xs">
             {input.system_prompt}
@@ -285,7 +285,7 @@ export function ModelInputView({
         )}
       </section>
       <section className="space-y-2">
-        <div className="text-xs uppercase text-base-content/50">User turn</div>
+        <div className="text-xs text-base-content/50">User turn</div>
         {parts.map((part, index) =>
           part.type === "text" ? (
             <pre

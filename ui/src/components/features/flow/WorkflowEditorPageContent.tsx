@@ -959,7 +959,7 @@ export function WorkflowEditorPageContent() {
 
           {/* Side Panel */}
           <div
-            className={`flex flex-col overflow-hidden bg-base-200 transition-all duration-200 ${
+            className={`flex flex-col overflow-hidden bg-base-200 transition-colors duration-200 ${
               isSidebarVisible
                 ? "w-56 min-w-56 border-r border-base-300 sm:w-72 sm:min-w-72"
                 : "w-0 min-w-0"
@@ -967,7 +967,7 @@ export function WorkflowEditorPageContent() {
           >
             <div className="flex h-full w-56 min-w-56 flex-col sm:w-72 sm:min-w-72">
               <div className="flex h-9 items-center justify-between border-b border-base-300 px-3">
-                <span className="text-xs font-medium uppercase tracking-wide text-base-content/60">
+                <span className="text-xs font-medium text-base-content/60">
                   {sidePanelItems.find((item) => item.id === activeSidePanel)?.label}
                 </span>
                 <button

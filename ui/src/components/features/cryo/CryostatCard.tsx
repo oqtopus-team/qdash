@@ -259,15 +259,15 @@ function ActiveCooldownBanner({
   return (
     <button
       onClick={onSelect}
-      className={`group w-full text-left rounded-xl border bg-success/8 px-4 py-3 transition-all hover:bg-success/12 ${
+      className={`group w-full text-left rounded-xl border bg-success/8 px-4 py-3 transition-colors hover:bg-success/12 ${
         isSelected ? "border-success/60 ring-2 ring-success/30" : "border-success/30"
       }`}
     >
       <div className="flex items-center gap-3">
-        <span className="relative inline-flex h-3 w-3 flex-shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/60" />
-          <span className="relative inline-flex h-3 w-3 rounded-full bg-success" />
-        </span>
+        <span
+          className="inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full bg-success"
+          aria-hidden="true"
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-sm">Currently cooling</span>

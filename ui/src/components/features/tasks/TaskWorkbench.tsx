@@ -505,7 +505,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 <div>
                   <div className="mb-2 flex min-w-0 items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h3 className="text-xs font-medium uppercase tracking-wide text-base-content/60">
+                      <h3 className="text-xs font-medium text-base-content/60">
                         Input parameter overrides
                       </h3>
                       <p className="break-words text-xs text-base-content/50">
@@ -558,9 +558,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
 
               {Object.keys(task.run_parameters ?? {}).length > 0 && (
                 <div>
-                  <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-base-content/60">
-                    Run parameters
-                  </h3>
+                  <h3 className="mb-2 text-xs font-medium text-base-content/60">Run parameters</h3>
                   <div className="grid max-h-80 gap-3 overflow-y-auto rounded-lg border border-base-300 p-3">
                     {Object.entries(task.run_parameters ?? {}).map(([name, parameter]) =>
                       isSweepValueType(parameter.value_type) ? (

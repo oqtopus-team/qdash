@@ -87,8 +87,8 @@ export function CryoPageContent() {
       <div className="flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <PageHeader
-            title="Cryostats & Cool-downs"
-            description="Manage cryostats and their cool-down cycles. Assign chips to a cool-down so calibration data gets tagged at write time."
+            title="Cryo"
+            description="Cryostats and cool-down cycles; chips assigned to a cool-down tag their calibration data"
             className="mb-0"
           />
           {showNewCryostatHeaderBtn && (

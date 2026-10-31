@@ -176,7 +176,7 @@ const GridCell = memo(function GridCell({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={handleKeyDown}
-      className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${muxBgClass} ${
+      className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 relative w-full ${muxBgClass} ${
         isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-2" : ""
       } ${isDownloadMode && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""}`}
     >

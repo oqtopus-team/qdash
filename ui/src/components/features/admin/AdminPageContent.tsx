@@ -384,7 +384,7 @@ export function AdminPageContent() {
 
   return (
     <PageContainer>
-      <PageHeader title="Admin" description="Manage access, projects, and this deployment" />
+      <PageHeader title="Admin" description="Users, projects and deployment settings" />
 
       {bulkFeedback && (
         <div

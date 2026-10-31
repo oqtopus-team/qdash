@@ -99,7 +99,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     onStop,
     isStreaming,
     disabled = false,
-    placeholder = "Ask about calibration data...",
+    placeholder = "Ask a question",
     modelOptions,
     selectedModelKey,
     onModelChange,

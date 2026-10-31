@@ -64,9 +64,7 @@ export function CooldownWiringHistory({ cooldownId }: CooldownWiringHistoryProps
   return (
     <div className="text-xs">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-base-content/60 font-medium uppercase tracking-wide">
-          Wiring history
-        </span>
+        <span className="text-base-content/60 font-medium">Wiring history</span>
         <button type="button" className="btn btn-xs btn-primary" onClick={openModal}>
           Save checkpoint
         </button>

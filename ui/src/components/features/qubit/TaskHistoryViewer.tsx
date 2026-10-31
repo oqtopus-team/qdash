@@ -344,7 +344,7 @@ export function TaskHistoryViewer({
             <div className="flex flex-col">
               <div className="mb-3 flex shrink-0 items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-accent" />
+                  <FileText className="h-4 w-4 text-base-content/60" />
                   <h3 className="text-sm font-medium text-base-content">Task Details</h3>
                 </div>
                 <div className="text-xs text-base-content/60">

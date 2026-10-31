@@ -314,7 +314,7 @@ export default function NewFlowPage() {
               </div>
               {/* Template Selector */}
               <div className="mb-6">
-                <h2 className="text-sm font-medium mb-3">TEMPLATE</h2>
+                <h2 className="text-sm font-medium mb-3">Template</h2>
                 <select
                   className="select select-bordered select-sm w-full"
                   value={selectedTemplateId}
@@ -343,7 +343,7 @@ export default function NewFlowPage() {
                 )}
               </div>
 
-              <h2 className="text-sm font-medium mb-4">PROPERTIES</h2>
+              <h2 className="text-sm font-medium mb-4">Properties</h2>
 
               <div className="space-y-4">
                 <div className="form-control">

@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 
-import { GitBranch, History, GitCompare, BarChart3 } from "lucide-react";
+import { GitBranch, History, GitCompare } from "lucide-react";
 
 import { useGetProvenanceStats } from "@/client/provenance/provenance";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -53,34 +53,22 @@ export function ProvenancePageContent() {
     <PageContainer maxWidth>
       <div className="space-y-4 sm:space-y-6">
         {/* Header */}
-        <PageHeader
-          title="Data Provenance"
-          description="Track calibration parameter history and lineage following W3C PROV-DM standards"
-        />
+        <PageHeader title="Provenance" description="Parameter history and lineage (W3C PROV-DM)" />
 
         {/* Stats Cards */}
         {stats && stats.total_entities > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="stat bg-base-200 rounded-box p-4">
-              <div className="stat-figure text-primary">
-                <History className="h-6 w-6 sm:h-8 sm:w-8" />
-              </div>
               <div className="stat-title text-sm">Parameter Versions</div>
               <div className="stat-value">{stats.total_entities.toLocaleString()}</div>
               <div className="stat-desc text-xs">Tracked parameter values</div>
             </div>
             <div className="stat bg-base-200 rounded-box p-4">
-              <div className="stat-figure text-secondary">
-                <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8" />
-              </div>
               <div className="stat-title text-sm">Activities</div>
               <div className="stat-value">{stats.total_activities.toLocaleString()}</div>
               <div className="stat-desc text-xs">Task executions</div>
             </div>
             <div className="stat bg-base-200 rounded-box p-4">
-              <div className="stat-figure text-accent">
-                <GitBranch className="h-6 w-6 sm:h-8 sm:w-8" />
-              </div>
               <div className="stat-title text-sm">Relations</div>
               <div className="stat-value">{stats.total_relations.toLocaleString()}</div>
               <div className="stat-desc text-xs">Provenance links</div>

@@ -142,7 +142,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium">SCHEDULE</h3>
+      <h3 className="text-sm font-medium">Schedule</h3>
 
       {/* Schedule Type Toggle */}
       <div className="flex gap-2">
@@ -288,7 +288,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       {/* Existing Schedules List */}
       <div className="divider my-2"></div>
 
-      <h4 className="text-xs font-medium text-base-content/60 uppercase">Active Schedules</h4>
+      <h4 className="text-xs font-medium text-base-content/60">Active Schedules</h4>
 
       {isLoading ? (
         <div className="flex justify-center py-4">
