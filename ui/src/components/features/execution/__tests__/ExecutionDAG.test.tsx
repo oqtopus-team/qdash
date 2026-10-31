@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ExecutionDAG } from "@/components/features/execution/ExecutionDAG";
@@ -64,8 +64,37 @@ vi.mock("@/components/charts/TaskFigure", () => ({
   TaskFigure: () => <div>TaskFigure</div>,
 }));
 
-vi.mock("react18-json-view", () => ({
-  default: ({ src }: { src: unknown }) => <pre>{JSON.stringify(src)}</pre>,
+const results: Record<string, Record<string, unknown>> = {
+  "task-1": {
+    task_id: "task-1",
+    task_name: "CheckT1",
+    status: "completed",
+    qid: "0",
+    chip_id: "64Q",
+    execution_id: "20261031-003",
+    output_parameters: { t1: { value: 12.3, unit: "us" } },
+  },
+  "task-2": {
+    task_id: "task-2",
+    task_name: "CheckT2",
+    status: "running",
+    qid: "0",
+    chip_id: "64Q",
+    execution_id: "20261031-003",
+  },
+};
+
+vi.mock("@/client/task/task", () => ({
+  useGetTaskResult: (taskId: string) => ({
+    data: taskId ? { data: results[taskId] } : undefined,
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
+vi.mock("@/client/task-file/task-file", () => ({
+  useGetTaskFileSettings: () => ({ data: undefined }),
+  useListTaskInfo: () => ({ data: undefined }),
 }));
 
 const tasks = [
@@ -149,14 +178,66 @@ describe("ExecutionDAG fullscreen", () => {
 });
 
 describe("ExecutionDAG node interaction", () => {
-  it("opens the task detail panel when a node is clicked", () => {
+  it("opens the shared task result preview for the clicked node", () => {
     render(<ExecutionDAG tasks={tasks} />);
 
+    const preview = screen.getByRole("complementary", { hidden: true });
+    expect(preview).toHaveAttribute("aria-hidden", "true");
     expect(screen.queryByText("CheckT1")).toBeNull();
 
     fireEvent.click(screen.getByTestId("node-task-1"));
 
-    expect(screen.getAllByText("CheckT1").length).toBeGreaterThan(0);
+    expect(preview).toHaveAttribute("aria-hidden", "false");
+    expect(screen.getByRole("heading", { name: "CheckT1" })).toBeTruthy();
     expect(screen.getByText("completed")).toBeTruthy();
+    expect(screen.getByText("12.3 us")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Open full page/ })).toHaveAttribute(
+      "href",
+      "/task-results/task-1",
+    );
+    // The preview already sits on the execution page.
+    expect(screen.queryByRole("link", { name: /^Execution$/ })).toBeNull();
+  });
+
+  it("gives the canvas up to the preview and re-fits the graph afterwards", async () => {
+    render(<ExecutionDAG tasks={tasks} />);
+    const canvas = screen.getByTestId("execution-flow-canvas");
+    expect(canvas).not.toHaveClass("lg:mr-[calc(40vw-2rem)]");
+    const fitCallsBefore = mocks.fitView.mock.calls.length;
+
+    fireEvent.click(screen.getByTestId("node-task-1"));
+
+    expect(canvas).toHaveClass("lg:mr-[calc(40vw-2rem)]");
+    await waitFor(() =>
+      expect(mocks.fitView).toHaveBeenCalledWith(expect.objectContaining({ duration: 300 })),
+    );
+    expect(mocks.fitView.mock.calls.length).toBeGreaterThan(fitCallsBefore);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(canvas).not.toHaveClass("lg:mr-[calc(40vw-2rem)]");
+  });
+
+  it("marks the selected node and closes the preview on Escape", () => {
+    render(<ExecutionDAG tasks={tasks} />);
+
+    fireEvent.click(screen.getByTestId("node-task-2"));
+
+    const nodes = mocks.capturedProps?.nodes as Array<{
+      id: string;
+      data: { isSelected: boolean };
+    }>;
+    expect(nodes.find((node) => node.id === "task-2")?.data.isSelected).toBe(true);
+    expect(nodes.find((node) => node.id === "task-1")?.data.isSelected).toBe(false);
+    expect(screen.getByRole("heading", { name: "CheckT2" })).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.getByRole("complementary", { hidden: true })).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(screen.queryByText("CheckT2")).toBeNull();
+    const nodesAfterClose = mocks.capturedProps?.nodes as Array<{ data: { isSelected: boolean } }>;
+    expect(nodesAfterClose.every((node) => !node.data.isSelected)).toBe(true);
   });
 });

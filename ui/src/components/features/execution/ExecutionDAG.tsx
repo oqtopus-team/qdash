@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ReactFlow,
@@ -14,11 +14,10 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import dagre from "dagre";
-import JsonView from "react18-json-view";
 
 import type { Node, Edge, NodeProps, NodeTypes } from "@xyflow/react";
 
-import { TaskFigure } from "@/components/charts/TaskFigure";
+import { TaskResultPreviewSidebar } from "@/components/features/task-results/TaskResultPreviewSidebar";
 import {
   GridFullscreenButton,
   gridFullscreenPanelClass,
@@ -28,6 +27,8 @@ import { formatDateTime } from "@/lib/utils/datetime";
 import "@xyflow/react/dist/style.css";
 
 const FIT_VIEW_OPTIONS = { padding: 0.05, minZoom: 0.1, maxZoom: 1.5 };
+/** Matches the sidebar's slide and the canvas margin transition (Tailwind `duration-300`). */
+const PREVIEW_TRANSITION_MS = 300;
 
 interface TaskNode {
   task_id: string;
@@ -87,16 +88,18 @@ interface NodeData extends Record<string, unknown> {
   status: string;
   startAt?: string;
   elapsedTime?: string;
-  figurePath?: string[];
-  inputParameters?: Record<string, unknown>;
-  outputParameters?: Record<string, unknown>;
+  /** True while this node's result is open in the preview sidebar. */
+  isSelected: boolean;
 }
 
 const CustomNode = ({ data }: NodeProps) => {
   const nodeData = data as NodeData;
   return (
     <div
-      className="group px-4 shadow-lg rounded-lg border relative transition-colors"
+      className={`group relative cursor-pointer rounded-lg border px-4 shadow-lg transition-shadow ${
+        nodeData.isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-base-200" : ""
+      }`}
+      aria-current={nodeData.isSelected ? "true" : undefined}
       style={{
         ...getStatusStyles(nodeData.status),
         borderWidth: "2px",
@@ -126,16 +129,6 @@ const nodeTypes: NodeTypes = {
   custom: CustomNode,
 };
 
-interface TaskDetails {
-  name: string;
-  status: string;
-  startAt?: string;
-  elapsedTime?: string;
-  figurePath?: string[];
-  inputParameters?: Record<string, unknown>;
-  outputParameters?: Record<string, unknown>;
-}
-
 interface ExecutionDAGProps {
   tasks: TaskNode[];
 }
@@ -147,13 +140,15 @@ interface ExecutionDAGProps {
 function FlowContent({
   nodes,
   edges,
-  setSelectedTask,
+  onSelectTask,
   isFullscreen,
+  isPreviewOpen,
 }: {
   nodes: Node[];
   edges: Edge[];
-  setSelectedTask: (task: TaskDetails | null) => void;
+  onSelectTask: (taskId: string) => void;
   isFullscreen: boolean;
+  isPreviewOpen: boolean;
 }) {
   const { fitView } = useReactFlow();
   const [isLocked, setIsLocked] = useState(true);
@@ -165,6 +160,18 @@ function FlowContent({
     });
     return () => cancelAnimationFrame(frame);
   }, [isFullscreen, fitView]);
+
+  // The canvas gives up width to the preview sidebar with a CSS transition; once that has
+  // finished, glide the graph into the space that is left. The initial fit is handled above.
+  const previousPreviewOpen = useRef(isPreviewOpen);
+  useEffect(() => {
+    if (previousPreviewOpen.current === isPreviewOpen) return;
+    previousPreviewOpen.current = isPreviewOpen;
+    const timer = setTimeout(() => {
+      fitView({ ...FIT_VIEW_OPTIONS, duration: PREVIEW_TRANSITION_MS });
+    }, PREVIEW_TRANSITION_MS + 50);
+    return () => clearTimeout(timer);
+  }, [isPreviewOpen, fitView]);
 
   return (
     <ReactFlow
@@ -194,23 +201,12 @@ function FlowContent({
         },
       }}
       fitViewOptions={FIT_VIEW_OPTIONS}
-      onNodeClick={(_, node) => {
-        const data = node.data as NodeData;
-        setSelectedTask({
-          name: data.name,
-          status: data.status,
-          startAt: data.startAt,
-          elapsedTime: data.elapsedTime,
-          figurePath: data.figurePath,
-          inputParameters: data.inputParameters,
-          outputParameters: data.outputParameters,
-        });
-      }}
+      onNodeClick={(_, node) => onSelectTask(node.id)}
     >
       <Background />
       <Controls showInteractive onInteractiveChange={(interactive) => setIsLocked(!interactive)} />
       <Panel position="top-left" className="bg-base-100 p-2 rounded flex items-center gap-2">
-        <div className="text-sm">Click nodes to see details</div>
+        <div className="text-sm">Select a node to preview its result</div>
         <button
           type="button"
           onClick={() => fitView({ ...FIT_VIEW_OPTIONS, duration: 300 })}
@@ -238,13 +234,14 @@ function FlowContent({
 }
 
 /**
- * Execution task graph with fullscreen support and a side panel for the selected task's details.
+ * Execution task graph with fullscreen support. Selecting a node opens the selected task's result
+ * in the same preview sidebar the Task Results page uses.
  */
 export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
-  const [selectedTask, setSelectedTask] = useState<TaskDetails | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
 
-  const getLayoutedElements = useCallback(() => {
+  const layout = useMemo(() => {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
     dagreGraph.setGraph({
@@ -264,10 +261,8 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
         status: task.status,
         startAt: task.start_at,
         elapsedTime: task.elapsed_time,
-        figurePath: task.figure_path,
-        inputParameters: task.input_parameters,
-        outputParameters: task.output_parameters,
-      },
+        isSelected: false,
+      } satisfies NodeData,
       width: 180,
       height: 60,
     }));
@@ -313,7 +308,15 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
     return { nodes, edges: initialEdges };
   }, [tasks]);
 
-  const { nodes, edges } = getLayoutedElements();
+  const nodes = useMemo(
+    () =>
+      layout.nodes.map((node) => ({
+        ...node,
+        data: { ...node.data, isSelected: node.id === selectedTaskId },
+      })),
+    [layout.nodes, selectedTaskId],
+  );
+  const { edges } = layout;
 
   return (
     <div className={isFullscreen ? gridFullscreenPanelClass : ""}>
@@ -323,100 +326,31 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
         </div>
       )}
 
-      <div className={`flex gap-4 ${isFullscreen ? "flex-1 min-h-0" : "h-[600px]"}`}>
+      <div className={isFullscreen ? "flex-1 min-h-0" : "h-[600px]"}>
         <ReactFlowProvider>
-          <div className={`relative h-full ${selectedTask ? "w-[70%]" : "w-full"}`}>
+          <div
+            data-testid="execution-flow-canvas"
+            className={`relative h-full transition-[margin] duration-300 ${
+              selectedTaskId ? "lg:mr-[calc(40vw-2rem)]" : ""
+            }`}
+          >
             <FlowContent
               nodes={nodes}
               edges={edges}
-              setSelectedTask={setSelectedTask}
+              onSelectTask={setSelectedTaskId}
               isFullscreen={isFullscreen}
+              isPreviewOpen={selectedTaskId !== null}
             />
             <GridFullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />
           </div>
         </ReactFlowProvider>
-
-        {selectedTask && (
-          <div className="w-[30%] h-full overflow-y-auto rounded-lg bg-base-100 p-4 shadow">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-medium">{selectedTask.name}</h3>
-              <button
-                type="button"
-                onClick={() => setSelectedTask(null)}
-                className="text-base-content/60 hover:text-base-content"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <div className="font-medium">Status</div>
-                <div
-                  className={`text-sm ${
-                    selectedTask.status === "running"
-                      ? "text-info"
-                      : selectedTask.status === "completed"
-                        ? "text-success"
-                        : selectedTask.status === "scheduled"
-                          ? "text-warning"
-                          : selectedTask.status === "cancelled"
-                            ? "text-neutral"
-                            : "text-error"
-                  }`}
-                >
-                  {selectedTask.status}
-                </div>
-              </div>
-
-              {selectedTask.startAt && (
-                <div>
-                  <div className="font-medium">Start Time</div>
-                  <div className="text-sm">{formatDateTime(selectedTask.startAt)}</div>
-                </div>
-              )}
-
-              {selectedTask.elapsedTime && (
-                <div>
-                  <div className="font-medium">Duration</div>
-                  <div className="text-sm">{selectedTask.elapsedTime}</div>
-                </div>
-              )}
-
-              {selectedTask.figurePath && selectedTask.figurePath.length > 0 && (
-                <div>
-                  <div className="font-medium mb-2">Figures</div>
-                  <div className="space-y-2">
-                    <TaskFigure
-                      path={selectedTask.figurePath}
-                      qid={selectedTask.name}
-                      className="w-full h-auto rounded border max-h-[200px] object-contain"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {selectedTask.inputParameters && (
-                <div>
-                  <div className="font-medium mb-1">Input Parameters</div>
-                  <div className="bg-base-200 p-2 rounded text-sm">
-                    <JsonView src={selectedTask.inputParameters} theme="vscode" collapsed={1} />
-                  </div>
-                </div>
-              )}
-
-              {selectedTask.outputParameters && (
-                <div>
-                  <div className="font-medium mb-1">Output Parameters</div>
-                  <div className="bg-base-200 p-2 rounded text-sm">
-                    <JsonView src={selectedTask.outputParameters} theme="vscode" collapsed={1} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
+
+      <TaskResultPreviewSidebar
+        taskId={selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
+        showExecutionLink={false}
+      />
     </div>
   );
 }
