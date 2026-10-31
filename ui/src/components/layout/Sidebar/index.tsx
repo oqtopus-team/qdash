@@ -26,7 +26,6 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
-import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { DARK_THEMES } from "@/constants/themes";
 import { getNavigationSections } from "@/components/layout/navigation";
 import type { NavItem, NavSection } from "@/components/layout/navigation";
@@ -232,7 +231,6 @@ function SidebarNavItem({
   const Icon = item.icon;
   const active = isNavItemActive(item, pathname);
   const showLabel = isOpen || isMobileOpen;
-  const badge = item.badge ?? 0;
 
   return (
     <li>
@@ -245,11 +243,6 @@ function SidebarNavItem({
       >
         <Icon size={18} />
         {showLabel && <span className="ml-2 truncate">{item.label}</span>}
-        {badge > 0 && (
-          <span className="badge badge-primary badge-xs ml-auto shrink-0">
-            {badge > 99 ? "99+" : badge}
-          </span>
-        )}
       </Link>
     </li>
   );
@@ -309,8 +302,6 @@ export function Sidebar() {
   const { canEdit } = useProject();
   const { user, logout: authLogout } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { data: unreadNotificationsResponse } = useUnreadNotificationCount();
-  const unreadNotifications = unreadNotificationsResponse?.data.unread_count ?? 0;
   const isAdmin = user?.system_role === "admin";
   const isDarkTheme = DARK_THEMES.includes(theme as (typeof DARK_THEMES)[number]);
 
@@ -370,11 +361,7 @@ export function Sidebar() {
 
   const sectionHeaderVisible = isOpen || isMobileOpen;
   const indicatorLayoutKey = `${isOpen}:${isMobileOpen}`;
-  const navSections: NavSection[] = getNavigationSections({
-    canEdit,
-    isAdmin,
-    unreadNotifications,
-  });
+  const navSections: NavSection[] = getNavigationSections({ canEdit, isAdmin });
   const externalItems: ExternalNavItem[] = [
     {
       href: "https://oqtopus-team.github.io/qdash/",

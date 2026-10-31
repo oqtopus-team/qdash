@@ -55,11 +55,13 @@ permission. See [Running Calibrations](./running-calibrations.md) for the end-to
 
 | Page | Purpose | Guide |
 | --- | --- | --- |
-| **Inbox** | Review mentions, replies, and system notifications. | [Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) |
 | **Forum** | Hold project-wide discussions that are not tied to one result. | [Reviewing and Sharing Results](./reviewing-results.md#start-a-discussion) |
 | **Knowledge** | Maintain task background and expert-labeled examples. | [Reviewing and Sharing Results](./reviewing-results.md#reuse-the-finding) |
 
-See [Reviewing and Sharing Results](./reviewing-results.md) for how these records relate.
+Mentions and replies arrive at the bell in the top bar, which shows the unread count. Select the
+bell to preview the newest notifications, or **View all** to open **Inbox**. See
+[Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) for the notification
+flow and the same page for how these records relate.
 
 ## Manage
 

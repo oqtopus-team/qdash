@@ -41,12 +41,6 @@ vi.mock("@/contexts/ThemeContext", () => ({
   useTheme: () => ({ theme: "light", setTheme: vi.fn() }),
 }));
 
-vi.mock("@/hooks/useNotifications", () => ({
-  useUnreadNotificationCount: () => ({
-    data: { data: { unread_count: 0 } },
-  }),
-}));
-
 /**
  * Pulls the desktop and mobile navigation asides out of a render. Both carry the
  * same aria-label, so they are told apart by their `lg:` visibility class.
