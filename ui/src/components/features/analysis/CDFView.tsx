@@ -17,6 +17,8 @@ import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig, type MetricConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useCDFUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
+import { chartTheme, seriesColor } from "@/lib/chartTheme";
 
 interface CumulativeDataPoint {
   value: number;
@@ -36,6 +38,8 @@ function isPercentageMetric(unit: string | undefined): boolean {
  * Cumulative distribution function view for comparing chip metrics across qubits or couplings
  */
 export function CDFView() {
+  const isDark = useIsDarkTheme();
+  const palette = chartTheme(isDark);
   // URL state management
   const {
     selectedChip,
@@ -420,17 +424,19 @@ export function CDFView() {
 
   // Create combined plot data when multiple parameters are selected
   const combinedPlotData = useMemo(() => {
-    const colors: Record<string, string> = {
-      t1: "#3b82f6",
-      t2_echo: "#f97316",
-      t2_star: "#10b981",
-      gate_fidelity: "#ef4444",
-      x90_fidelity: "#8b5cf6",
-      x180_fidelity: "#f59e0b",
-      zx90_fidelity: "#84cc16",
-      bell_state_fidelity: "#ec4899",
-      readout_fidelity: "#06b6d4",
-    };
+    const colors: Record<string, string> = Object.fromEntries(
+      [
+        "t1",
+        "t2_echo",
+        "t2_star",
+        "gate_fidelity",
+        "x90_fidelity",
+        "x180_fidelity",
+        "zx90_fidelity",
+        "bell_state_fidelity",
+        "readout_fidelity",
+      ].map((key, index) => [key, seriesColor(palette, index)]),
+    );
 
     if (selectedParameters.length > 1) {
       return selectedParameters.flatMap((param) => {
@@ -444,7 +450,7 @@ export function CDFView() {
               ...trace,
               line: {
                 ...trace.line,
-                color: colors[param] || "#6b7280",
+                color: colors[param] || palette.muted,
               },
               name: config?.title || param,
             };
@@ -455,7 +461,7 @@ export function CDFView() {
               ...trace,
               line: {
                 ...trace.line,
-                color: colors[param] || "#6b7280",
+                color: colors[param] || palette.muted,
                 dash: "dash" as const,
               },
               name: `${config?.title || param} median: ${data.median?.toFixed(2)}${unit}`,
@@ -476,7 +482,7 @@ export function CDFView() {
             ...trace,
             line: {
               ...trace.line,
-              color: colors[primaryParameter] || "#3b82f6",
+              color: colors[primaryParameter] || palette.accent,
             },
           };
         }
@@ -486,6 +492,7 @@ export function CDFView() {
 
     return [];
   }, [
+    palette,
     selectedParameters,
     processedDataByParameter,
     primaryData,
@@ -527,7 +534,6 @@ export function CDFView() {
                     : primaryConfig?.unit || ""
                 })`,
         },
-        gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
         type: hasPercentageMetrics && showAsErrorRate ? ("log" as const) : ("linear" as const),
@@ -535,7 +541,6 @@ export function CDFView() {
       },
       yaxis: {
         title: { text: "Cumulative Probability P(X ≤ value)" },
-        gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
         range: [0, 1],
@@ -545,13 +550,8 @@ export function CDFView() {
       legend: {
         x: 0.02,
         y: 0.98,
-        bgcolor: "rgba(255, 255, 255, 0.8)",
-        bordercolor: "#e5e7eb",
-        borderwidth: 1,
       },
       margin: { t: 60, r: 50, b: 100, l: 80 },
-      plot_bgcolor: "#ffffff",
-      paper_bgcolor: "#ffffff",
       annotations: primaryData.tableData
         ? [
             {
@@ -563,7 +563,7 @@ export function CDFView() {
               y: -0.12,
               xanchor: "left" as const,
               yanchor: "top" as const,
-              font: { size: 11, color: "#666" },
+              font: { size: 11 },
             },
           ]
         : [],

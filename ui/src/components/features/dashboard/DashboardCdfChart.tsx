@@ -2,6 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
+import { chartTheme } from "@/lib/chartTheme";
 
 const Plot = dynamic(() => import("@/components/charts/Plot"), { ssr: false });
 
@@ -61,6 +63,8 @@ export function DashboardCdfChart({
   unit,
   height = 280,
 }: DashboardCdfChartProps) {
+  const isDark = useIsDarkTheme();
+  const palette = chartTheme(isDark);
   const cdf = useMemo(() => calculateCdf(metricData), [metricData]);
 
   if (!cdf) {
@@ -90,7 +94,7 @@ export function DashboardCdfChart({
             type: "scatter",
             mode: "lines",
             name: title,
-            line: { color: "#3b82f6", width: 2, shape: "hv" },
+            line: { color: palette.accent, width: 2, shape: "hv" },
             hovertemplate: `${title}: %{x:.3f} ${unit}<br>Percentile: %{y:.1f}%<extra></extra>`,
           },
           {
@@ -99,7 +103,7 @@ export function DashboardCdfChart({
             type: "scatter",
             mode: "lines",
             name: `Median: ${cdf.median.toFixed(2)}`,
-            line: { color: "#3b82f6", width: 1, dash: "dot" },
+            line: { color: palette.accent, width: 1, dash: "dot" },
             hoverinfo: "skip",
           },
         ]}
@@ -109,18 +113,14 @@ export function DashboardCdfChart({
           margin: { l: 50, r: 16, t: 8, b: 40 },
           xaxis: {
             title: { text: `${title} (${unit})`, font: { size: 10 } },
-            gridcolor: "rgba(128,128,128,0.2)",
             zeroline: false,
           },
           yaxis: {
             title: { text: "Cumulative %", font: { size: 10 } },
             range: [0, 100],
-            gridcolor: "rgba(128,128,128,0.2)",
             zeroline: false,
           },
           showlegend: false,
-          paper_bgcolor: "rgba(0,0,0,0)",
-          plot_bgcolor: "rgba(0,0,0,0)",
           hovermode: "x unified",
         }}
         config={{ displayModeBar: false, responsive: true }}

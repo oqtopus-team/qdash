@@ -12,7 +12,8 @@ import type {
   PlotSelectionEvent,
 } from "plotly.js";
 import Plotly from "plotly.js-dist-min";
-import { sansFontFamily } from "@/lib/fonts";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
+import { chartTheme, themedLayout } from "@/lib/chartTheme";
 
 interface PlotFigure {
   data: Plotly.Data[];
@@ -66,12 +67,10 @@ export default function Plot({
 }: PlotProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitializedRef = useRef(false);
-  const layout = useMemo<Partial<Layout> | undefined>(
-    () =>
-      layoutProp
-        ? { ...layoutProp, font: { family: sansFontFamily, ...layoutProp.font } }
-        : undefined,
-    [layoutProp],
+  const isDark = useIsDarkTheme();
+  const layout = useMemo<Partial<Layout>>(
+    () => themedLayout(layoutProp, chartTheme(isDark)),
+    [layoutProp, isDark],
   );
 
   useEffect(() => {

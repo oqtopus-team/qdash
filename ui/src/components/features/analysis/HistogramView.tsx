@@ -17,6 +17,8 @@ import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useHistogramUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 import { naturalSortQIDs } from "@/lib/utils/qid";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
+import { chartTheme } from "@/lib/chartTheme";
 
 interface HistogramDataPoint {
   qid: string;
@@ -39,6 +41,8 @@ function isPercentageMetric(unit: string | undefined): boolean {
  * Histogram view showing the distribution of a chip metric across qubits or couplings
  */
 export function HistogramView() {
+  const isDark = useIsDarkTheme();
+  const palette = chartTheme(isDark);
   // URL state management
   const {
     selectedChip,
@@ -387,11 +391,11 @@ export function HistogramView() {
       name: currentMetricConfig?.title || selectedParameter,
       marker: {
         color: histogramData.map((item) => {
-          if (!activeThreshold) return "#3b82f6"; // Default blue
+          if (!activeThreshold) return palette.accent;
 
           if (!isPercent) {
             // Non-percentage metrics: higher is better
-            return item.value >= activeThreshold ? "#10b981" : "#ef4444";
+            return item.value >= activeThreshold ? palette.pass : palette.fail;
           } else {
             // Percentage metrics
             const thresholdPercent = showAsErrorRate
@@ -399,11 +403,11 @@ export function HistogramView() {
               : activeThreshold * 100;
             return showAsErrorRate
               ? item.value <= thresholdPercent
-                ? "#10b981"
-                : "#ef4444"
+                ? palette.pass
+                : palette.fail
               : item.value >= thresholdPercent
-                ? "#10b981"
-                : "#ef4444";
+                ? palette.pass
+                : palette.fail;
           }
         }),
       },
@@ -453,6 +457,7 @@ export function HistogramView() {
 
     return traces;
   }, [
+    palette,
     histogramData,
     selectedParameter,
     showAsErrorRate,
@@ -473,7 +478,6 @@ export function HistogramView() {
       },
       xaxis: {
         title: { text: isCoupling ? "Coupling Pair" : "Qubit ID" },
-        gridcolor: "#e5e7eb",
         showgrid: false,
         tickangle: -45,
         automargin: true,
@@ -486,7 +490,6 @@ export function HistogramView() {
               ? "Error Rate (%)"
               : `${currentMetricConfig?.title || selectedParameter} (%)`,
         },
-        gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
         type: isPercent && showAsErrorRate ? ("log" as const) : ("linear" as const),
@@ -498,13 +501,8 @@ export function HistogramView() {
         x: 1,
         y: 1,
         xanchor: "right" as const,
-        bgcolor: "rgba(255, 255, 255, 0.8)",
-        bordercolor: "#e5e7eb",
-        borderwidth: 1,
       },
       margin: { t: 60, r: 50, b: 120, l: 80 },
-      plot_bgcolor: "#ffffff",
-      paper_bgcolor: "#ffffff",
       bargap: 0.1,
       annotations: [
         {
@@ -516,7 +514,7 @@ export function HistogramView() {
           y: -0.18,
           xanchor: "left" as const,
           yanchor: "top" as const,
-          font: { size: 11, color: "#666" },
+          font: { size: 11 },
         },
       ],
     };
