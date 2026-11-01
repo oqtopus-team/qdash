@@ -12,6 +12,8 @@ const nextConfig = {
     return [
       { source: "/files", destination: "/config", permanent: true },
       { source: "/task-knowledge", destination: "/knowledge", permanent: true },
+      // Provenance is shown on task results, metric history and executions; the page is gone.
+      { source: "/provenance", destination: "/analysis", permanent: true },
       { source: "/task-knowledge/:taskName", destination: "/knowledge/:taskName", permanent: true },
       // The knowledge file editor was removed: Knowledge is read-only.
       { source: "/knowledge/files", destination: "/knowledge", permanent: false },

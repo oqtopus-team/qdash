@@ -5,8 +5,10 @@ import { ExternalLink, X, XCircle } from "lucide-react";
 
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
 import { useGetTaskResult } from "@/client/task/task";
+import { FigureStrip } from "@/components/charts/FigureStrip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
+import { TaskLineageSection } from "@/components/features/provenance/TaskLineageSection";
 import { QubitTile } from "@/components/ui/QubitTile";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useEscapeLayer } from "@/hooks/useFullscreenPanel";
@@ -241,7 +243,7 @@ export function TaskResultPreviewSidebar({
               {(figures.length > 0 || jsonFigures.length > 0) && (
                 <div>
                   <h3 className="mb-2 text-xs font-medium text-base-content/60">Figures</h3>
-                  <div className="flex h-56 items-center gap-3 overflow-x-auto rounded-lg bg-base-200/60 p-3">
+                  <FigureStrip className="h-56 gap-3 rounded-lg bg-base-200/60 p-3">
                     {figures.length > 0 ? (
                       figures.map((figure, index) => (
                         <TaskFigure
@@ -259,7 +261,7 @@ export function TaskResultPreviewSidebar({
                         className="h-full w-auto shrink-0 rounded object-contain"
                       />
                     )}
-                  </div>
+                  </FigureStrip>
                 </div>
               )}
 
@@ -294,6 +296,16 @@ export function TaskResultPreviewSidebar({
                   </div>
                 </dl>
               </div>
+
+              <TaskLineageSection
+                taskId={taskId}
+                executionId={taskResult.execution_id}
+                qid={taskResult.qid ?? ""}
+                outputParameters={
+                  taskResult.output_parameters as Record<string, unknown> | undefined
+                }
+                className="rounded-lg bg-base-200/60 p-3"
+              />
 
               <TaskMessagePanel
                 status={taskResult.status}

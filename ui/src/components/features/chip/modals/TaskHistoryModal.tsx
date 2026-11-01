@@ -6,6 +6,7 @@ import { ChevronRight, History, FileText, GitBranch, ListTodo } from "lucide-rea
 
 import type { TaskResult as Task } from "@/schemas";
 
+import { firstPublishedParameter } from "@/lib/provenanceTarget";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import { useGetExecution } from "@/client/execution/execution";
@@ -19,6 +20,7 @@ import {
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
@@ -66,12 +68,6 @@ export function TaskHistoryModal({
     if (!isOpen) setIsChatOpen(false);
   }, [isOpen]);
   const manualOverrides = useManualOverrides(qid);
-
-  const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
-    const p = encodeURIComponent(parameterName);
-    const q = encodeURIComponent(qidValue);
-    return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
-  };
 
   const { data, isLoading, isError } = useGetQubitTaskHistory(
     qid,
@@ -455,31 +451,19 @@ export function TaskHistoryModal({
             </div>
           )}
           <TaskArtifactDownloads jsonFigurePaths={jsonFigures} rawDataPaths={rawDataPaths} />
-          {/* Provenance link and Ask AI */}
+          {/* Lineage and Ask AI */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
-            <Link
-              href={(() => {
-                const outputs = selectedTask.output_parameters
-                  ? Object.entries(selectedTask.output_parameters)
-                  : [];
-                const inputs = selectedTask.input_parameters
-                  ? Object.entries(selectedTask.input_parameters)
-                  : [];
-                const [key, paramValue] =
-                  (outputs[0] as [string, Record<string, unknown>] | undefined) ??
-                  (inputs[0] as [string, Record<string, unknown>] | undefined) ??
-                  [];
-                if (key && paramValue) {
-                  const parameterName = (paramValue?.parameter_name as string | undefined) || key;
-                  return buildProvenanceUrl(parameterName, qid);
-                }
-                return "/provenance";
-              })()}
+            <LineageButton
+              target={firstPublishedParameter(
+                qid,
+                selectedTask.output_parameters,
+                selectedTask.input_parameters,
+              )}
               className="btn btn-xs btn-outline gap-1"
             >
               <GitBranch className="h-3 w-3" />
-              View Provenance Lineage
-            </Link>
+              Lineage
+            </LineageButton>
             {chatContext && (
               <AskAiButton
                 taskId={chatContext.taskId}

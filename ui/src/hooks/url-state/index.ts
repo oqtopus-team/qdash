@@ -6,5 +6,4 @@ export { useQubitTimeSeriesUrlState } from "./useQubitTimeSeriesUrlState";
 export { useCDFUrlState } from "./useCDFUrlState";
 export { useHistogramUrlState } from "./useHistogramUrlState";
 export { useMetricsUrlState } from "./useMetricsUrlState";
-export { useProvenanceUrlState } from "./useProvenanceUrlState";
 export { useRangeModeUrlState } from "./useRangeModeUrlState";

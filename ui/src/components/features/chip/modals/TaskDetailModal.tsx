@@ -13,6 +13,7 @@ import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { CalibrationUpdateStatusBadge } from "@/components/features/metrics/ParametersTable";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
+import { ParameterLineageDialog } from "@/components/features/provenance/ParameterLineageDialog";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import {
   DropdownMenu,
@@ -26,6 +27,11 @@ import {
   formatTime as formatTimeUtil,
   formatDateTime as formatDateTimeUtil,
 } from "@/lib/utils/datetime";
+import {
+  firstPublishedParameter,
+  resolveParameterQid,
+  type ProvenanceTarget,
+} from "@/lib/provenanceTarget";
 import { formatSweepValue } from "@/lib/utils/task-parameters";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
@@ -76,22 +82,7 @@ export function TaskDetailModal({
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [subIndex, setSubIndex] = useState(initialSubIndex);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  const resolveQid = (taskQid: string, qidRole?: string): string => {
-    if (!qidRole || qidRole === "self" || qidRole === "coupling") return taskQid;
-    const match = taskQid.match(/^(\d+)-(\d+)$/);
-    if (!match) return taskQid;
-    const [, control, target] = match;
-    if (qidRole === "control") return control;
-    if (qidRole === "target") return target;
-    return taskQid;
-  };
-
-  const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
-    const p = encodeURIComponent(parameterName);
-    const q = encodeURIComponent(qidValue);
-    return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
-  };
+  const [lineageTarget, setLineageTarget] = useState<ProvenanceTarget | null>(null);
 
   // Use generated API client hook when taskId is provided
   const {
@@ -743,16 +734,15 @@ export function TaskDetailModal({
                                             <DropdownMenuItem
                                               onSelect={() => {
                                                 const pv = paramValue as Record<string, unknown>;
-                                                const parameterName =
-                                                  (pv?.parameter_name as string | undefined) || key;
-                                                const resolvedQid = resolveQid(
-                                                  qid,
-                                                  pv?.qid_role as string | undefined,
-                                                );
-                                                router.push(
-                                                  buildProvenanceUrl(parameterName, resolvedQid),
-                                                );
-                                                onClose();
+                                                setLineageTarget({
+                                                  parameterName:
+                                                    (pv?.parameter_name as string | undefined) ||
+                                                    key,
+                                                  qid: resolveParameterQid(
+                                                    qid,
+                                                    pv?.qid_role as string | undefined,
+                                                  ),
+                                                });
                                               }}
                                             >
                                               View Lineage
@@ -776,42 +766,29 @@ export function TaskDetailModal({
                         })}
                       </div>
 
-                      {/* Lineage Graph Button */}
+                      {/* Lineage of the first published parameter */}
                       <div className="mt-4 text-center">
                         <button
-                          className="btn btn-ghost btn-sm gap-2 hover:btn-primary"
-                          onClick={() => {
-                            const outputs =
-                              task?.output_parameters && typeof task.output_parameters === "object"
-                                ? Object.entries(task.output_parameters)
-                                : [];
-                            const inputs =
-                              task?.input_parameters && typeof task.input_parameters === "object"
-                                ? Object.entries(task.input_parameters)
-                                : [];
-
-                            const [key, paramValue] =
-                              (outputs[0] as [string, Record<string, unknown>] | undefined) ??
-                              (inputs[0] as [string, Record<string, unknown>] | undefined) ??
-                              [];
-
-                            if (key && paramValue) {
-                              const pv = paramValue as Record<string, unknown>;
-                              const parameterName =
-                                (pv?.parameter_name as string | undefined) || key;
-                              const resolvedQid = resolveQid(
+                          className="btn btn-ghost btn-sm gap-2"
+                          disabled={
+                            !firstPublishedParameter(
+                              qid,
+                              task?.output_parameters,
+                              task?.input_parameters,
+                            )
+                          }
+                          onClick={() =>
+                            setLineageTarget(
+                              firstPublishedParameter(
                                 qid,
-                                pv?.qid_role as string | undefined,
-                              );
-                              router.push(buildProvenanceUrl(parameterName, resolvedQid));
-                            } else {
-                              router.push("/provenance");
-                            }
-                            onClose();
-                          }}
+                                task?.output_parameters,
+                                task?.input_parameters,
+                              ),
+                            )
+                          }
                         >
                           <GitBranch size={16} />
-                          Explore Provenance
+                          Lineage
                         </button>
                       </div>
                     </div>
@@ -856,6 +833,7 @@ export function TaskDetailModal({
           )}
         </div>
       </DialogContent>
+      <ParameterLineageDialog target={lineageTarget} onClose={() => setLineageTarget(null)} />
     </Dialog>
   );
 }

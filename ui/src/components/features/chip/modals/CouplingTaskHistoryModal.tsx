@@ -2,11 +2,11 @@
 
 import dynamic from "next/dynamic";
 import React, { useState, useMemo } from "react";
-import Link from "next/link";
 import { ChevronRight, History, FileText, GitBranch, ListTodo } from "lucide-react";
 
 import type { TaskResult as Task } from "@/schemas";
 
+import { firstPublishedParameter } from "@/lib/provenanceTarget";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import { useGetExecution } from "@/client/execution/execution";
@@ -20,6 +20,7 @@ import {
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
@@ -56,22 +57,6 @@ export function CouplingTaskHistoryModal({
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
   const { openMiniChat } = useChatDock();
   const manualOverrides = useManualOverrides(couplingId);
-
-  const resolveQid = (taskQid: string, qidRole?: string): string => {
-    if (!qidRole || qidRole === "self" || qidRole === "coupling") return taskQid;
-    const match = taskQid.match(/^(\d+)-(\d+)$/);
-    if (!match) return taskQid;
-    const [, control, target] = match;
-    if (qidRole === "control") return control;
-    if (qidRole === "target") return target;
-    return taskQid;
-  };
-
-  const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
-    const p = encodeURIComponent(parameterName);
-    const q = encodeURIComponent(qidValue);
-    return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
-  };
 
   const { data, isLoading, isError } = useGetCouplingTaskHistory(
     couplingId,
@@ -483,33 +468,19 @@ export function CouplingTaskHistoryModal({
             </div>
           )}
           <TaskArtifactDownloads jsonFigurePaths={jsonFigures} rawDataPaths={rawDataPaths} />
-          {/* Provenance link and Ask AI */}
+          {/* Lineage and Ask AI */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
-            <Link
-              href={(() => {
-                const outputs = selectedTask.output_parameters
-                  ? Object.entries(selectedTask.output_parameters)
-                  : [];
-                const inputs = selectedTask.input_parameters
-                  ? Object.entries(selectedTask.input_parameters)
-                  : [];
-                const [key, paramValue] =
-                  (outputs[0] as [string, Record<string, unknown>] | undefined) ??
-                  (inputs[0] as [string, Record<string, unknown>] | undefined) ??
-                  [];
-                if (key && paramValue) {
-                  const pv = paramValue as Record<string, unknown>;
-                  const parameterName = (pv?.parameter_name as string | undefined) || key;
-                  const resolvedQid = resolveQid(couplingId, pv?.qid_role as string | undefined);
-                  return buildProvenanceUrl(parameterName, resolvedQid);
-                }
-                return "/provenance";
-              })()}
+            <LineageButton
+              target={firstPublishedParameter(
+                couplingId,
+                selectedTask.output_parameters,
+                selectedTask.input_parameters,
+              )}
               className="btn btn-xs btn-outline gap-1"
             >
               <GitBranch className="h-3 w-3" />
-              View Provenance Lineage
-            </Link>
+              Lineage
+            </LineageButton>
             {chatContext && (
               <AskAiButton
                 taskId={chatContext.taskId}

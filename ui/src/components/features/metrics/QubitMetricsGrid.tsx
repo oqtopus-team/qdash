@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useRef, useCallback, useEffect, memo } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import { GitBranch, Lock, ZoomIn } from "lucide-react";
@@ -11,6 +10,7 @@ import {
   GridFullscreenButton,
   gridFullscreenPanelClass,
 } from "@/components/ui/GridFullscreenButton";
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -775,13 +775,13 @@ export function QubitMetricsGrid({
                 />
               </div>
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
-                <Link
-                  href={`/provenance?parameter=${encodeURIComponent(metricKey)}&qid=${encodeURIComponent(selectedQubitInfo.qid)}&tab=lineage`}
+                <LineageButton
+                  target={{ parameterName: metricKey, qid: selectedQubitInfo.qid }}
                   className="btn btn-ghost btn-sm sm:btn-md gap-1"
                 >
                   <GitBranch className="h-4 w-4" />
                   <span className="hidden sm:inline">Lineage</span>
-                </Link>
+                </LineageButton>
                 <div className="flex gap-2">
                   <button
                     type="button"
