@@ -282,7 +282,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           <p className="text-xs text-base-content/60 mb-3">
             Values this run wrote to the calibration database, against the previous run.
           </p>
-          <ExecutionParameterChanges executionId={executionId} />
+          <ExecutionParameterChanges chipId={chipId} executionId={executionId} />
         </div>
 
         {/* Execution Note (if available) */}

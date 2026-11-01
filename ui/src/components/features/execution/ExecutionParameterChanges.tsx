@@ -2,24 +2,29 @@
 
 import { useMemo, useState } from "react";
 
-import { useCompareExecutions, useGetRecentExecutions } from "@/client/provenance/provenance";
+import { useListExecutions } from "@/client/execution/execution";
+import { useCompareExecutions } from "@/client/provenance/provenance";
 import { ParameterLineageDialog } from "@/components/features/provenance/ParameterLineageDialog";
 import { QubitTile } from "@/components/ui/QubitTile";
 import { formatParameterValue } from "@/lib/formatParameterValue";
 import type { ProvenanceTarget } from "@/lib/provenanceTarget";
 import type { ParameterDiffResponse } from "@/schemas";
 
-/** How many recent runs to search for the one published just before this execution (API maximum). */
+/** How many of the chip's latest runs to search for the one just before this execution. */
 const EXECUTION_WINDOW = 50;
 /** Targets listed when a parameter is expanded, before the list folds behind "Show all". */
 const VISIBLE_TARGETS = 10;
 
+/**
+ * "removed" is the API's word for a parameter the previous run wrote and this run did not; the
+ * published value is untouched, so the UI calls it "not written by this run".
+ */
 type DiffKind = "changed" | "added" | "removed";
 
 interface TargetChange {
   row: ParameterDiffResponse;
   kind: DiffKind;
-  /** Absolute relative change, used for ordering; new and removed values sort first. */
+  /** Absolute relative change, used for ordering; new and unwritten values sort first. */
   magnitude: number;
 }
 
@@ -32,12 +37,13 @@ interface ParameterGroup {
   removed: number;
   /** The target with the largest relative change, if any value changed. */
   largest: TargetChange | null;
+  /** Median absolute relative change over the targets that have one. */
   medianPercent: number | null;
 }
 
 function changeText(change: TargetChange): string {
   if (change.kind === "added") return "new";
-  if (change.kind === "removed") return "removed";
+  if (change.kind === "removed") return "not written";
   const percent = change.row.delta_percent;
   if (percent === null || percent === undefined) return "-";
   return `${percent > 0 ? "+" : ""}${percent.toFixed(2)} %`;
@@ -80,7 +86,12 @@ function groupByParameter(diff: {
     group.targets.sort((a, b) => b.magnitude - a.magnitude);
     const changedTargets = group.targets.filter((target) => target.kind === "changed");
     group.largest = changedTargets[0] ?? null;
-    group.medianPercent = median(changedTargets.map((target) => target.magnitude));
+    group.medianPercent = median(
+      changedTargets
+        .map((target) => target.row.delta_percent)
+        .filter((percent): percent is number => typeof percent === "number")
+        .map(Math.abs),
+    );
   }
   return [...groups.values()].sort(
     (a, b) =>
@@ -94,7 +105,7 @@ function countText(group: ParameterGroup): string {
   const parts = [];
   if (group.changed) parts.push(`${group.changed} changed`);
   if (group.added) parts.push(`${group.added} new`);
-  if (group.removed) parts.push(`${group.removed} removed`);
+  if (group.removed) parts.push(`${group.removed} not written by this run`);
   return parts.join(", ");
 }
 
@@ -103,7 +114,7 @@ function ParameterGroupRow({
   onSelect,
 }: {
   group: ParameterGroup;
-  onSelect: (target: ProvenanceTarget) => void;
+  onSelect: (target: ProvenanceTarget, kind: DiffKind) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? group.targets : group.targets.slice(0, VISIBLE_TARGETS);
@@ -154,7 +165,10 @@ function ParameterGroupRow({
                     type="button"
                     className="btn btn-ghost btn-xs"
                     onClick={() =>
-                      onSelect({ parameterName: group.parameterName, qid: change.row.qid })
+                      onSelect(
+                        { parameterName: group.parameterName, qid: change.row.qid },
+                        change.kind,
+                      )
                     }
                     aria-label={`Lineage of ${group.parameterName} ${change.row.qid}`}
                   >
@@ -180,16 +194,27 @@ function ParameterGroupRow({
 }
 
 /**
- * Values this execution wrote to the calibration database, compared with the run published just
+ * Values this execution wrote to the calibration database, compared with the chip's run just
  * before it. Changes are grouped by parameter, ordered by the largest relative change, so a
- * chip-wide run stays readable; expanding a parameter lists its targets, each with its lineage.
+ * chip-wide run stays readable; expanding a parameter lists its targets, each with the lineage of
+ * the version shown.
  */
-export function ExecutionParameterChanges({ executionId }: { executionId: string }) {
+export function ExecutionParameterChanges({
+  chipId,
+  executionId,
+}: {
+  chipId: string;
+  executionId: string;
+}) {
+  // The chip's own runs, newest first, so the predecessor is never another chip's run.
   const {
     data: executionsResponse,
     isLoading: isListLoading,
     isError: isListError,
-  } = useGetRecentExecutions({ limit: EXECUTION_WINDOW });
+  } = useListExecutions(
+    { chip_id: chipId, limit: EXECUTION_WINDOW },
+    { query: { enabled: !!chipId } },
+  );
   const executions = useMemo(
     () => executionsResponse?.data?.executions ?? [],
     [executionsResponse],
@@ -217,14 +242,15 @@ export function ExecutionParameterChanges({ executionId }: { executionId: string
   if (index < 0) {
     return (
       <p className="text-sm text-base-content/60">
-        No values published by this run were found among the last {EXECUTION_WINDOW} recorded runs.
+        This run is not among the chip&apos;s last {EXECUTION_WINDOW} runs, so there is nothing to
+        compare it with.
       </p>
     );
   }
   if (!previousId) {
     return (
       <p className="text-sm text-base-content/60">
-        First run with published values; there is no earlier run to compare against.
+        This is the chip&apos;s earliest recorded run; there is no earlier run to compare against.
       </p>
     );
   }
@@ -241,15 +267,27 @@ export function ExecutionParameterChanges({ executionId }: { executionId: string
     <div className="space-y-3 text-sm">
       <p className="text-base-content/60">
         Compared with <span className="font-mono text-base-content">{previousId}</span>:{" "}
-        {groups.length} parameters differ on {targetCount} targets, largest change first. Expand a
-        parameter for its targets and their lineage.
+        {groups.length} parameters differ on {targetCount} targets, largest change first.{" "}
+        {diff.removed_parameters.length > 0 &&
+          "A value not written by this run keeps the previous run's version. "}
+        Expand a parameter for its targets and their lineage.
       </p>
       {groups.length === 0 ? (
         <p className="text-base-content/60">No published value differs from the previous run.</p>
       ) : (
         <div className="space-y-2">
           {groups.map((group) => (
-            <ParameterGroupRow key={group.parameterName} group={group} onSelect={setTarget} />
+            <ParameterGroupRow
+              key={group.parameterName}
+              group={group}
+              onSelect={(selected, kind) =>
+                // A value this run did not write is the previous run's version.
+                setTarget({
+                  ...selected,
+                  executionId: kind === "removed" ? previousId : executionId,
+                })
+              }
+            />
           ))}
         </div>
       )}

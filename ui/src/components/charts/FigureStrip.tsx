@@ -36,8 +36,9 @@ export function FigureStrip({ children, className = "" }: FigureStripProps) {
     const canScroll = row.scrollWidth > row.clientWidth + 1;
     const atStart = row.scrollLeft <= 1;
     const atEnd = row.scrollLeft + row.clientWidth >= row.scrollWidth - 1;
-    // The current figure is the first one whose middle is past the scrolled-away part.
-    let index = 0;
+    // The current figure is the first one whose middle is past the scrolled-away part; once
+    // every middle has gone by, it is the last one.
+    let index = Math.max(0, items.length - 1);
     for (let i = 0; i < items.length; i += 1) {
       if (items[i].offsetLeft + items[i].offsetWidth / 2 > row.scrollLeft) {
         index = i;
@@ -70,7 +71,7 @@ export function FigureStrip({ children, className = "" }: FigureStripProps) {
   };
 
   return (
-    <div className="relative">
+    <div className="relative h-full">
       <div ref={rowRef} className={`flex items-center overflow-x-auto ${className}`}>
         {children}
       </div>

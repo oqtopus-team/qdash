@@ -6,7 +6,7 @@ import { ChevronRight, History, FileText, GitBranch, ListTodo } from "lucide-rea
 
 import type { TaskResult as Task } from "@/schemas";
 
-import { firstPublishedParameter } from "@/lib/provenanceTarget";
+import { firstPublishedParameter, inExecution } from "@/lib/provenanceTarget";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import { useGetExecution } from "@/client/execution/execution";
@@ -471,10 +471,13 @@ export function CouplingTaskHistoryModal({
           {/* Lineage and Ask AI */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
             <LineageButton
-              target={firstPublishedParameter(
-                couplingId,
-                selectedTask.output_parameters,
-                selectedTask.input_parameters,
+              target={inExecution(
+                firstPublishedParameter(
+                  couplingId,
+                  selectedTask.output_parameters,
+                  selectedTask.input_parameters,
+                ),
+                selectedExecutionId,
               )}
               className="btn btn-xs btn-outline gap-1"
             >

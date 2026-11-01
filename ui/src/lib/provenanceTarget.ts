@@ -1,7 +1,23 @@
-/** A published parameter value: the parameter name and the qubit or coupling it belongs to. */
+/**
+ * A published parameter value: the parameter name and the qubit or coupling it belongs to, and
+ * optionally which version of it to open; without either, the current version.
+ */
 export interface ProvenanceTarget {
   parameterName: string;
   qid: string;
+  /** The exact version, as an entity ID. */
+  entityId?: string;
+  /** The run whose version to open, when the entity ID is not known. */
+  executionId?: string;
+}
+
+/** The same target pinned to the version a given run published. */
+export function inExecution(
+  target: ProvenanceTarget | null,
+  executionId: string | null | undefined,
+): ProvenanceTarget | null {
+  if (!target) return null;
+  return executionId ? { ...target, executionId } : target;
 }
 
 /**

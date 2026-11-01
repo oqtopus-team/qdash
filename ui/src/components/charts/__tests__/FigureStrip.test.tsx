@@ -59,4 +59,14 @@ describe("FigureStrip", () => {
     expect(screen.getByText("3 / 3")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Next figure" })).toBeNull();
   });
+
+  it("counts the last figure as current once every middle has scrolled by", () => {
+    const { row } = renderStrip();
+    row.scrollLeft = 1150;
+    act(() => fireEvent.scroll(row));
+
+    expect(screen.getByText("3 / 3")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Previous figure" }));
+    expect(row.scrollTo).toHaveBeenCalledWith({ left: 400, behavior: "smooth" });
+  });
 });

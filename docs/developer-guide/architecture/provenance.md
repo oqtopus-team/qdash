@@ -58,7 +58,7 @@ Manual calibration edits and seed imports write through `ManualUpdateService` an
 `SeedImportService`. They create their own activities and parameter versions because neither path
 runs through the workflow task recorder.
 
-<Diagram name="provenance-architecture" caption="Workflow tasks, manual edits, and seed imports write the provenance graph. ProvenanceService reads it for the Data Provenance interface and API." />
+<Diagram name="provenance-architecture" caption="Workflow tasks, manual edits, and seed imports write the provenance graph. ProvenanceService reads it for the lineage panels in the UI and for the API." />
 
 The three MongoDB collection names and their document classes are listed in
 [Database Collections](../../reference/database-structure.md#agent-and-provenance). Do not repeat

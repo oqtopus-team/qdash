@@ -23,14 +23,10 @@ const DIRECT_HOPS = 1;
 /** Versions offered in the version selector. */
 const VERSION_LIMIT = 50;
 
-/** One step of in-panel exploration: a parameter and, optionally, the exact version to show. */
-interface LineageFocus extends ProvenanceTarget {
-  entityId?: string;
-}
+/** One step of in-panel exploration: a parameter and, optionally, which version to show. */
+type LineageFocus = ProvenanceTarget;
 
 interface ParameterLineagePanelProps extends ProvenanceTarget {
-  /** Open on this version (an entity ID) rather than the current one. */
-  entityId?: string;
   /**
    * Hide the list of inputs while the panel shows the value it was opened on. A task result page
    * already lists the same values in its input parameter table; the dialog opened from a metric
@@ -161,10 +157,13 @@ export function ParameterLineagePanel({
   parameterName,
   qid,
   entityId,
+  executionId,
   hideInputs = false,
   currentTaskId,
 }: ParameterLineagePanelProps) {
-  const [trail, setTrail] = useState<LineageFocus[]>([{ parameterName, qid, entityId }]);
+  const [trail, setTrail] = useState<LineageFocus[]>([
+    { parameterName, qid, entityId, executionId },
+  ]);
   const focus = trail[trail.length - 1];
   const [pickedEntityId, setPickedEntityId] = useState<string | null>(null);
   const [graphOpen, setGraphOpen] = useState(false);
@@ -178,14 +177,21 @@ export function ParameterLineagePanel({
     { query: { enabled: !!focus.parameterName && !!focus.qid } },
   );
   const versions = useMemo(() => historyResponse?.data?.versions ?? [], [historyResponse]);
-  const requestedEntityId = pickedEntityId ?? focus.entityId ?? null;
-  const requestedVersion = requestedEntityId
-    ? versions.find((version) => version.entity_id === requestedEntityId)
-    : undefined;
+  const requestedVersion = pickedEntityId
+    ? versions.find((version) => version.entity_id === pickedEntityId)
+    : focus.entityId
+      ? versions.find((version) => version.entity_id === focus.entityId)
+      : focus.executionId
+        ? versions.find((version) => version.execution_id === focus.executionId)
+        : undefined;
   const version = requestedVersion ?? versions[0];
   const currentEntityId = version?.entity_id ?? "";
-  // The caller named a run that did not publish this parameter; the current value stands in.
-  const requestedMissing = !!focus.entityId && !pickedEntityId && !!version && !requestedVersion;
+  // The caller named a version or run that did not publish this parameter; the current value
+  // stands in.
+  const requestedMissing =
+    !!(focus.entityId || focus.executionId) && !pickedEntityId && !!version && !requestedVersion;
+  // Inputs are redundant only while the panel shows the very version the host already lists.
+  const inputsRedundant = hideInputs && trail.length === 1 && !pickedEntityId && !requestedMissing;
 
   const { data: lineageResponse, isLoading: isLineageLoading } = useGetProvenanceLineage(
     currentEntityId,
@@ -351,7 +357,7 @@ export function ParameterLineagePanel({
         </div>
       </div>
 
-      {!(hideInputs && trail.length === 1) && (
+      {!inputsRedundant && (
         <EntityList
           title="Inputs"
           hint="Current values the producing task read."

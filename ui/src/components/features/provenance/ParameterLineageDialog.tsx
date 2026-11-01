@@ -39,9 +39,11 @@ export function ParameterLineageDialog({ target, onClose }: ParameterLineageDial
         <div className="px-5 py-4">
           {target && (
             <ParameterLineagePanel
-              key={`${target.parameterName}:${target.qid}`}
+              key={`${target.parameterName}:${target.qid}:${target.entityId ?? target.executionId ?? ""}`}
               parameterName={target.parameterName}
               qid={target.qid}
+              entityId={target.entityId}
+              executionId={target.executionId}
             />
           )}
         </div>

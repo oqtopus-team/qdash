@@ -178,6 +178,18 @@ describe("ParameterLineagePanel", () => {
   });
 });
 
+describe("ParameterLineagePanel opened on a run", () => {
+  it("shows the version that run published when only the execution id is known", () => {
+    mocks.history["qubit_frequency:1"] = [current, older];
+    render(
+      <ParameterLineagePanel parameterName="qubit_frequency" qid="1" executionId="20261101-050" />,
+    );
+
+    const select = screen.getByRole("combobox", { name: "Version" }) as HTMLSelectElement;
+    expect(select.value).toBe(older.entity_id);
+  });
+});
+
 describe("ParameterLineagePanel on a task result", () => {
   it("hides the inputs the result's own table already lists, until another value is followed", () => {
     mocks.history["qubit_frequency:1"] = [current];
@@ -192,6 +204,25 @@ describe("ParameterLineagePanel on a task result", () => {
         "button",
       )[0],
     );
+    expect(screen.getByRole("region", { name: "Inputs" })).toBeTruthy();
+  });
+
+  it("shows the inputs again once another version is selected", () => {
+    mocks.history["qubit_frequency:1"] = [current, older];
+    render(
+      <ParameterLineagePanel
+        parameterName="qubit_frequency"
+        qid="1"
+        entityId={current.entity_id}
+        hideInputs
+      />,
+    );
+    expect(screen.queryByRole("region", { name: "Inputs" })).toBeNull();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Version" }), {
+      target: { value: older.entity_id },
+    });
+
     expect(screen.getByRole("region", { name: "Inputs" })).toBeTruthy();
   });
 });

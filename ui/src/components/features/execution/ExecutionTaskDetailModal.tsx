@@ -21,7 +21,7 @@ import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useChatDock } from "@/contexts/ChatDockContext";
 import type { TaskChatContext } from "@/types/copilotChat";
-import { firstPublishedParameter } from "@/lib/provenanceTarget";
+import { firstPublishedParameter, inExecution } from "@/lib/provenanceTarget";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 interface ExecutionTaskDetailModalProps {
@@ -276,10 +276,13 @@ export function ExecutionTaskDetailModal({
           )}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
             <LineageButton
-              target={firstPublishedParameter(
-                qid,
-                selectedTask.output_parameters,
-                selectedTask.input_parameters,
+              target={inExecution(
+                firstPublishedParameter(
+                  qid,
+                  selectedTask.output_parameters,
+                  selectedTask.input_parameters,
+                ),
+                executionId,
               )}
               className="btn btn-xs btn-outline gap-1"
             >
