@@ -42,7 +42,7 @@ function AnalyzePageContent() {
         />
 
         {/* View Selection Tabs */}
-        <div className="tabs tabs-boxed w-full sm:w-fit gap-1 sm:gap-2 p-1 sm:p-2 overflow-x-auto flex-nowrap">
+        <div className="tabs tabs-boxed w-full sm:w-fit gap-1 p-1 overflow-x-auto flex-nowrap">
           <button
             className={`tab tab-sm sm:tab-md whitespace-nowrap ${
               currentView === "timeseries" ? "tab-active" : ""
