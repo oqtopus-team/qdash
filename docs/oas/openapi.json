@@ -1216,7 +1216,7 @@
           "projects"
         ],
         "summary": "List project members",
-        "description": "List all members of a project.",
+        "description": "List active members of a project.",
         "operationId": "listProjectMembers",
         "security": [
           {

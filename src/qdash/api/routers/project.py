@@ -155,7 +155,7 @@ def list_members(
     ctx: Annotated[ProjectContext, Depends(get_project_context_from_path)],
     service: Annotated[ProjectService, Depends(get_project_service)],
 ) -> MemberListResponse:
-    """List all members of a project."""
+    """List active members of a project."""
     memberships = service.list_members(ctx.project_id)
 
     return MemberListResponse(

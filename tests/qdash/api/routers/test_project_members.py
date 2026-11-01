@@ -160,6 +160,58 @@ def test_owner_can_remove_project_member(
     assert response.status_code == 204
 
 
+def test_removed_project_member_is_excluded_from_member_list(
+    test_client: TestClient,
+    project_with_members: ProjectDocument,
+) -> None:
+    """Removed members no longer appear in the project member listing."""
+    response = test_client.delete(
+        "/projects/project-1/members/viewer",
+        headers=_headers("owner-token"),
+    )
+    assert response.status_code == 204
+
+    response = test_client.get(
+        "/projects/project-1/members",
+        headers=_headers("owner-token"),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    usernames = sorted(member["username"] for member in data["members"])
+    assert usernames == ["editor", "owner"]
+    assert data["total"] == 2
+
+
+def test_removed_project_member_can_be_reinvited(
+    test_client: TestClient,
+    project_with_members: ProjectDocument,
+) -> None:
+    """Re-inviting a removed member restores an active membership in the listing."""
+    response = test_client.delete(
+        "/projects/project-1/members/viewer",
+        headers=_headers("owner-token"),
+    )
+    assert response.status_code == 204
+
+    response = test_client.post(
+        "/projects/project-1/members",
+        headers=_headers("owner-token"),
+        json={"username": "viewer", "role": "viewer"},
+    )
+    assert response.status_code == 201
+
+    response = test_client.get(
+        "/projects/project-1/members",
+        headers=_headers("owner-token"),
+    )
+
+    assert response.status_code == 200
+    viewer = next(member for member in response.json()["members"] if member["username"] == "viewer")
+    assert viewer["status"] == "active"
+    assert viewer["role"] == "viewer"
+
+
 def test_owner_can_remove_reregistered_member_with_stale_membership(
     test_client: TestClient,
     project_with_members: ProjectDocument,

@@ -439,7 +439,7 @@ export const useDeleteProject = <TError = void | HTTPValidationError,
       return useMutation(getDeleteProjectMutationOptions(options), queryClient);
     }
     /**
- * List all members of a project.
+ * List active members of a project.
  * @summary List project members
  */
 export const listProjectMembers = (
