@@ -64,9 +64,7 @@ export function CooldownWiringHistory({ cooldownId }: CooldownWiringHistoryProps
   return (
     <div className="text-xs">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-base-content/60 font-semibold uppercase tracking-wide">
-          Wiring history
-        </span>
+        <span className="text-base-content/60 font-medium">Wiring history</span>
         <button type="button" className="btn btn-xs btn-primary" onClick={openModal}>
           Save checkpoint
         </button>
@@ -97,7 +95,7 @@ export function CooldownWiringHistory({ cooldownId }: CooldownWiringHistoryProps
         onOpenChange={(open) => !open && !createCheckpoint.isPending && setDialogOpen(false)}
       >
         <DialogContent className="max-w-md">
-          <DialogTitle className="font-semibold text-sm mb-2">Save wiring checkpoint</DialogTitle>
+          <DialogTitle className="font-medium text-sm mb-2">Save wiring checkpoint</DialogTitle>
           <DialogDescription className="text-xs text-base-content/60 mb-3">
             Capture the current wiring as a snapshot. Briefly describe what changed (required).
           </DialogDescription>
@@ -180,7 +178,7 @@ function CheckpointRow({
               (Wiring was empty at this checkpoint.)
             </div>
           )}
-          <div className="text-[10px] text-base-content/40 mt-1">
+          <div className="text-xs text-base-content/40 mt-1">
             {event.block_count} block{event.block_count === 1 ? "" : "s"}
             {event.image_count > 0
               ? ` · ${event.image_count} image${event.image_count === 1 ? "" : "s"} (not shown in snapshot)`

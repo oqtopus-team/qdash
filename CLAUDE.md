@@ -12,7 +12,7 @@ QDash is a web platform for managing and monitoring qubit calibration workflows.
 
 ## Architecture
 
-See [docs/getting-started/architecture.md](docs/getting-started/architecture.md) for detailed architecture documentation.
+See [docs/developer-guide/architecture.md](docs/developer-guide/architecture.md) for detailed architecture documentation.
 
 | Component       | Location               | Technology                                      |
 | --------------- | ---------------------- | ----------------------------------------------- |
@@ -24,10 +24,10 @@ See [docs/getting-started/architecture.md](docs/getting-started/architecture.md)
 
 ```
 qdash/
-├── ui/                      # Frontend (see docs/development/ui/)
+├── ui/                      # Frontend (see docs/developer-guide/ui/)
 ├── src/qdash/
-│   ├── api/                 # Backend API (see docs/development/api/)
-│   └── workflow/            # Workflow engine (see docs/development/workflow/)
+│   ├── api/                 # Backend API (see docs/developer-guide/api/)
+│   └── workflow/            # Workflow engine (see docs/developer-guide/workflow/)
 ├── docs/                    # Documentation
 ├── tests/                   # Test files
 └── config/                  # Configuration files
@@ -46,22 +46,22 @@ uvicorn src.qdash.api.main:app --reload
 task generate
 ```
 
-For detailed setup instructions, see [docs/development/setup.md](docs/development/setup.md).
+For detailed setup instructions, see [docs/developer-guide/setup.md](docs/developer-guide/setup.md).
 
 ## Key Documentation
 
 | Topic              | Location                                                                     |
 | ------------------ | ---------------------------------------------------------------------------- |
-| UI Guidelines      | [docs/development/ui/guidelines.md](docs/development/ui/guidelines.md)       |
-| UI Architecture    | [docs/development/ui/architecture.md](docs/development/ui/architecture.md)   |
-| API Design         | [docs/development/api/design.md](docs/development/api/design.md)             |
-| Development Flow   | [docs/development/development-flow.md](docs/development/development-flow.md) |
-| Database Structure | [docs/reference/database-structure.md](docs/reference/database-structure.md) |
-| Database Indexes   | [docs/reference/database-indexes.md](docs/reference/database-indexes.md)     |
-| Notes Architecture | [docs/architecture/notes.md](docs/architecture/notes.md)                     |
+| UI Guidelines      | [docs/developer-guide/ui/guidelines.md](docs/developer-guide/ui/guidelines.md)       |
+| UI Architecture    | [docs/developer-guide/ui/architecture.md](docs/developer-guide/ui/architecture.md)   |
+| API Design         | [docs/developer-guide/api/design.md](docs/developer-guide/api/design.md)             |
+| Development Flow   | [docs/developer-guide/development-flow.md](docs/developer-guide/development-flow.md) |
+| Database Collections | [docs/reference/database-structure.md](docs/reference/database-structure.md) |
+| Notes Architecture | [docs/developer-guide/architecture/notes.md](docs/developer-guide/architecture/notes.md)                     |
+| Copilot Knowledge  | [docs/developer-guide/copilot/knowledge-layout.md](docs/developer-guide/copilot/knowledge-layout.md) |
 | Dashboard Guide    | [docs/user-guide/dashboard.md](docs/user-guide/dashboard.md)                 |
-| Cryo Guide         | [docs/user-guide/cryo.md](docs/user-guide/cryo.md)                           |
-| Docs Guidelines    | [docs/development/docs-guidelines.md](docs/development/docs-guidelines.md)   |
+| Cryo Guide         | [docs/user-guide/cryostats-and-cool-downs.md](docs/user-guide/cryostats-and-cool-downs.md)                           |
+| Docs Guidelines    | [docs/developer-guide/docs-guidelines.md](docs/developer-guide/docs-guidelines.md)   |
 
 ## Claude Code Custom Commands
 
@@ -69,15 +69,23 @@ For detailed setup instructions, see [docs/development/setup.md](docs/developmen
 | ----------------- | ----------------------------------------------------- |
 | `/commit`         | Analyze changes and suggest a commit message          |
 | `/suggest-commit` | Generate commit message suggestion without committing |
-| `/auto-commit`    | Automatically commit with generated message           |
+
+## Git Publishing Boundary
+
+Claude must not create commits, push branches, or create or update pull requests in this
+repository. Do not perform these actions through Git commands, GitHub CLI, APIs, or other tools,
+even when a task asks for a commit, push, or PR. Complete the requested file changes and checks,
+then leave the changes uncommitted and provide the suggested commit message, PR title and
+description, and verification results for a human to publish.
 
 ## Notes for AI Assistants
 
+- **Validation handoff**: Run focused checks for the changes and report their results. The person publishing the work must follow [Before Pushing](docs/developer-guide/development-flow.md#before-pushing), including a successful `task check` on the final content before every push.
 - **Don't edit generated code**: `ui/src/client/` and `ui/src/schemas/` are auto-generated from OpenAPI
 - **Regenerate after API changes**: Run `task generate` when backend API changes
-- **Follow existing patterns**: Check `docs/development/ui/guidelines.md` for coding standards
-- **Follow docs guidelines**: Check `docs/development/docs-guidelines.md` when writing documentation
-- **Use conventional commits**: See `docs/development/development-flow.md`
+- **Follow existing patterns**: Check `docs/developer-guide/ui/guidelines.md` for coding standards
+- **Follow docs guidelines**: Check `docs/developer-guide/docs-guidelines.md` when writing documentation. Use the shared `technical-docs` skill to write, verify and review a page, and the shared `document-changes` skill to audit code changes for documentation impact (`.agents/skills/` is the source; `.claude/skills/` links to it)
+- **Use conventional commits**: See `docs/developer-guide/development-flow.md`
 
 ## Useful Links
 

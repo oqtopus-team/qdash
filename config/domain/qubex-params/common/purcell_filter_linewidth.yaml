@@ -1,0 +1,6 @@
+meta:
+  description: Linewidth of the Purcell filter (κ_p)
+  unit: MHz
+  default: null
+  scope: qubit
+data: {}

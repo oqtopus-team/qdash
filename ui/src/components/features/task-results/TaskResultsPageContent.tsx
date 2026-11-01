@@ -8,39 +8,38 @@ import {
   AlertCircle,
   ArrowUpRight,
   ChevronDown,
-  ExternalLink,
   MessageSquareText,
   RefreshCw,
   Search,
   SlidersHorizontal,
-  X,
   XCircle,
 } from "lucide-react";
 import Select from "react-select";
 import type { SingleValue } from "react-select";
 
 import { useListExecutions } from "@/client/execution/execution";
-import { useGetTaskResult } from "@/client/task/task";
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
 import { useListTaskResults } from "@/client/task-result/task-result";
-import { TaskFigure } from "@/components/charts/TaskFigure";
-import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
 import { formatDateTime } from "@/lib/utils/datetime";
-import { getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
 import type {
   ExecutionResponseSummary,
   ListTaskResultsParams,
   TaskInfo,
   TaskResultListItem,
 } from "@/schemas";
+import { QubitTile } from "@/components/ui/QubitTile";
+import {
+  TaskResultPreviewSidebar,
+  compactId,
+  statusBadgeClass,
+} from "@/components/features/task-results/TaskResultPreviewSidebar";
 
 const PAGE_SIZE = 50;
 const STATUS_TABS = ["all", "failed", "running", "completed", "cancelled"] as const;
@@ -78,22 +77,8 @@ function readFilters(searchParams: SearchParamReader): FilterState {
   };
 }
 
-function statusBadgeClass(status: string): string {
-  if (status === "completed" || status === "success") return "badge-success";
-  if (status === "failed") return "badge-error";
-  if (status === "running") return "badge-info";
-  if (status === "scheduled" || status === "pending") return "badge-warning";
-  if (status === "cancelled") return "badge-neutral";
-  return "badge-ghost";
-}
-
 function isFailureStatus(status: string): boolean {
   return status === "failed";
-}
-
-function compactId(value: string): string {
-  if (!value) return "-";
-  return value.length > 16 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
 }
 
 function executionOptionLabel(execution: ExecutionResponseSummary): string {
@@ -162,7 +147,7 @@ function TaskResultRow({
       <td className="min-w-52">
         <Link
           href={`/task-results/${item.task_id}`}
-          className="inline-flex max-w-full items-center gap-1 font-semibold text-primary hover:underline"
+          className="inline-flex max-w-full items-center gap-1 font-medium text-primary hover:underline"
           onClick={(event) => event.stopPropagation()}
         >
           <span className="truncate">{item.task_name || "Unnamed"}</span>
@@ -171,7 +156,11 @@ function TaskResultRow({
         <div className="mt-1 font-mono text-xs text-base-content/45">{compactId(item.task_id)}</div>
       </td>
       <td>
-        <div className="font-mono text-xs">{item.qid || "-"}</div>
+        {item.qid ? (
+          <QubitTile qid={item.qid} />
+        ) : (
+          <span className="text-xs text-base-content/50">-</span>
+        )}
         <div className="mt-1 text-xs text-base-content/50">{item.chip_id || "-"}</div>
       </td>
       <td className="min-w-44">
@@ -191,13 +180,13 @@ function TaskResultRow({
         {message ? (
           <div className="flex gap-2">
             {isFailure ? (
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-error" />
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-base-content/40" />
             ) : (
               <MessageSquareText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-base-content/35" />
             )}
             <div>
               <div
-                className={`line-clamp-2 text-xs ${isFailure ? "text-error/80" : "text-base-content/60"}`}
+                className={`line-clamp-2 text-xs ${isFailure ? "text-base-content/70" : "text-base-content/60"}`}
               >
                 {message}
               </div>
@@ -272,294 +261,6 @@ function ExecutionFilter({
       isDisabled={!chipId}
       isClearable
     />
-  );
-}
-
-function compactParameterValue(value: unknown): string {
-  if (value === null || value === undefined) return "-";
-  if (typeof value === "object" && "value" in (value as Record<string, unknown>)) {
-    const record = value as Record<string, unknown>;
-    const unit = typeof record.unit === "string" ? record.unit : "";
-    return `${String(record.value ?? "-")}${unit ? ` ${unit}` : ""}`;
-  }
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
-}
-
-function ParameterPreview({
-  title,
-  parameters,
-  parameterDefinitions,
-  maxItems = 6,
-}: {
-  title: string;
-  parameters: Record<string, unknown> | undefined;
-  parameterDefinitions?: Record<string, unknown>;
-  maxItems?: number;
-}) {
-  const allEntries = Object.entries(parameters ?? {});
-  const regularEntries: [string, unknown][] = [];
-  const parameterGroups = new Map<string, { collapsed: boolean; entries: [string, unknown][] }>();
-  for (const entry of allEntries) {
-    const group = getTaskParameterUiGroup(parameterDefinitions?.[entry[0]] ?? entry[1]);
-    if (!group) {
-      regularEntries.push(entry);
-      continue;
-    }
-    const existing = parameterGroups.get(group.name);
-    if (existing) {
-      existing.entries.push(entry);
-    } else {
-      parameterGroups.set(group.name, { collapsed: group.collapsed, entries: [entry] });
-    }
-  }
-  const entries = regularEntries.slice(0, maxItems);
-  if (allEntries.length === 0) return null;
-
-  const renderEntries = (items: [string, unknown][]) => (
-    <dl className="divide-y divide-base-200">
-      {items.map(([key, value]) => {
-        const formattedValue = compactParameterValue(value);
-        return (
-          <div
-            key={key}
-            className="grid grid-cols-[minmax(120px,0.8fr)_1fr] gap-3 px-3 py-2 text-xs"
-          >
-            <dt className="truncate font-mono text-base-content/55" title={key}>
-              {key}
-            </dt>
-            <dd className="truncate font-mono text-base-content/80" title={formattedValue}>
-              {formattedValue}
-            </dd>
-          </div>
-        );
-      })}
-    </dl>
-  );
-
-  return (
-    <div className="rounded-lg border border-base-300">
-      <div className="border-b border-base-300 px-3 py-2 text-xs font-semibold text-base-content/70">
-        {title}
-      </div>
-      {renderEntries(entries)}
-      {regularEntries.length > maxItems && (
-        <div className="border-t border-base-300 px-3 py-2 text-xs text-base-content/45">
-          +{regularEntries.length - maxItems} more on full page
-        </div>
-      )}
-      {[...parameterGroups.entries()].map(([groupName, group]) => (
-        <details
-          key={groupName}
-          className="collapse collapse-arrow rounded-none border-t border-base-300 bg-base-100"
-          open={!group.collapsed}
-        >
-          <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-semibold">
-            <span className="flex items-center gap-2">
-              {groupName}
-              <span className="badge badge-xs badge-ghost">{group.entries.length}</span>
-            </span>
-          </summary>
-          <div className="collapse-content px-0 pb-0">{renderEntries(group.entries)}</div>
-        </details>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Slide-over preview of the selected row on the Task Results list page.
- *
- * Fetches the full result for `taskId` and shows its figures, metadata, message, and a
- * trimmed set of parameters. Pass `taskId` as null to keep it closed.
- */
-function TaskResultPreviewSidebar({
-  taskId,
-  onClose,
-  tasks,
-}: {
-  taskId: string | null;
-  onClose: () => void;
-  tasks: TaskInfo[];
-}) {
-  const {
-    data: response,
-    isLoading,
-    isError,
-  } = useGetTaskResult(taskId ?? "", {
-    query: {
-      enabled: !!taskId,
-      refetchInterval: (query) => {
-        const status = query.state.data?.data.status;
-        return status === "running" || status === "scheduled" || status === "pending"
-          ? 2000
-          : false;
-      },
-      refetchIntervalInBackground: true,
-    },
-  });
-  const taskResult = response?.data;
-  const taskDefinition = tasks.find((task) => task.name === taskResult?.task_name);
-  const isOpen = !!taskId;
-  const figures = taskResult && Array.isArray(taskResult.figure_path) ? taskResult.figure_path : [];
-  const jsonFigures =
-    taskResult && Array.isArray(taskResult.json_figure_path) ? taskResult.json_figure_path : [];
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [isOpen, onClose]);
-
-  return (
-    <div
-      role="complementary"
-      aria-label="Task result preview"
-      aria-hidden={!isOpen}
-      inert={!isOpen}
-      className={`fixed right-0 top-0 z-50 h-full w-full overflow-y-auto border-l border-base-300 bg-base-100 p-4 shadow-xl transition-transform duration-300 sm:w-3/4 sm:p-6 lg:w-2/5 ${
-        isOpen ? "translate-x-0" : "translate-x-full"
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onClose}
-        className="btn btn-ghost btn-sm btn-circle absolute right-3 top-3 sm:right-4 sm:top-4"
-        aria-label="Close task result preview"
-      >
-        <X className="h-4 w-4" />
-      </button>
-
-      {taskId && (
-        <div className="pr-8">
-          <div className="mb-5">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              {taskResult?.status && (
-                <span className={`badge badge-sm ${statusBadgeClass(taskResult.status)}`}>
-                  {taskResult.status}
-                </span>
-              )}
-              {taskResult?.qid && (
-                <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
-              )}
-            </div>
-            <h2 className="text-xl font-bold">{taskResult?.task_name || "Task Result"}</h2>
-            {taskResult && (
-              <ExecutionTaskProgress status={taskResult.status} note={taskResult.note} />
-            )}
-            <p className="mt-1 font-mono text-xs text-base-content/50">{taskId}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link href={`/task-results/${taskId}`} className="btn btn-primary btn-sm gap-1">
-                <ExternalLink className="h-3.5 w-3.5" />
-                Open full page
-              </Link>
-              {taskResult?.chip_id && taskResult?.execution_id && (
-                <Link
-                  href={`/execution/${encodeURIComponent(taskResult.chip_id)}/${encodeURIComponent(
-                    taskResult.execution_id,
-                  )}`}
-                  className="btn btn-ghost btn-sm gap-1"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Execution
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <span className="loading loading-spinner loading-lg" />
-            </div>
-          ) : isError || !taskResult ? (
-            <div className="alert alert-error">
-              <XCircle className="h-5 w-5" />
-              <span>Failed to load task result.</span>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {(figures.length > 0 || jsonFigures.length > 0) && (
-                <div>
-                  <h3 className="mb-2 text-sm font-semibold">Figures</h3>
-                  <div className="flex h-56 items-center gap-3 overflow-x-auto rounded-lg bg-base-200/60 p-3">
-                    {figures.length > 0 ? (
-                      figures.map((figure, index) => (
-                        <TaskFigure
-                          key={`${figure}-${index}`}
-                          path={figure}
-                          jsonFigurePath={jsonFigures[index]}
-                          qid={taskResult.qid}
-                          className="h-full w-auto shrink-0 rounded object-contain"
-                        />
-                      ))
-                    ) : (
-                      <TaskFigure
-                        jsonFigurePath={jsonFigures[0]}
-                        qid={taskResult.qid}
-                        className="h-full w-auto shrink-0 rounded object-contain"
-                      />
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="rounded-lg bg-base-200/60 p-3">
-                <h3 className="mb-2 text-sm font-semibold">Metadata</h3>
-                <dl className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <dt className="text-base-content/50">Chip</dt>
-                    <dd className="font-mono">{taskResult.chip_id || "-"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-base-content/50">QID</dt>
-                    <dd className="font-mono">{taskResult.qid || "-"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-base-content/50">Execution</dt>
-                    <dd className="font-mono" title={taskResult.execution_id}>
-                      {compactId(taskResult.execution_id)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-base-content/50">User</dt>
-                    <dd>{taskResult.username || taskResult.user_id || "-"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-base-content/50">Started</dt>
-                    <dd>{formatDateTime(taskResult.start_at)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-base-content/50">Elapsed</dt>
-                    <dd>{taskResult.elapsed_time || "-"}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              <TaskMessagePanel
-                status={taskResult.status}
-                message={taskResult.message}
-                stackTrace={taskResult.stack_trace}
-                showEmptyFallback
-              />
-
-              <ParameterPreview
-                title="Output Parameters"
-                parameters={taskResult.output_parameters as Record<string, unknown> | undefined}
-              />
-              <ParameterPreview
-                title="Input Parameters"
-                parameters={taskResult.input_parameters as Record<string, unknown> | undefined}
-                parameterDefinitions={taskDefinition?.input_parameters}
-                maxItems={4}
-              />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -650,7 +351,7 @@ export function TaskResultsPageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Task Results"
-        description="Review task outcomes across executions and focus on failed results."
+        description="Outcomes of every task across executions"
         actions={
           <span className="badge badge-neutral gap-1">
             <strong>{data?.total ?? 0}</strong> results
@@ -889,11 +590,7 @@ export function TaskResultsPageContent() {
           )}
         </>
       )}
-      <TaskResultPreviewSidebar
-        taskId={selectedTaskId}
-        onClose={() => setSelectedTaskId(null)}
-        tasks={tasks}
-      />
+      <TaskResultPreviewSidebar taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} />
     </PageContainer>
   );
 }

@@ -22,4 +22,12 @@ skip?: number;
  * @maximum 100
  */
 limit?: number;
+/**
+ * Only executions started on this day, YYYYMMDD
+ */
+date?: string | null;
+/**
+ * IANA time zone that defines the day for ``date``
+ */
+timezone?: string;
 };

@@ -85,6 +85,24 @@ class InMemoryCouplingCalibrationRepository:
 
         return coupling
 
+    def delete_calib_parameter(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+        parameter_name: str,
+        project_id: str | None,
+    ) -> CouplingModel:
+        """Delete one current calibration parameter."""
+        coupling = self._couplings.get(self._make_key(username, qid, chip_id))
+        if coupling is None:
+            raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
+        if parameter_name not in coupling.data:
+            raise ValueError(f"Parameter {parameter_name} not found for coupling {qid}")
+        del coupling.data[parameter_name]
+        return coupling
+
     def find_one(
         self,
         *,

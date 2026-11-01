@@ -1,0 +1,6 @@
+meta:
+  description: Resistance charge after annealing
+  unit: ohms
+  default: null
+  scope: qubit
+data: {}

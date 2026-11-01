@@ -66,25 +66,16 @@ def _split_legacy_ai_generated_note(content: str) -> tuple[str, str]:
 
 
 def _task_note_entry(doc: TaskResultHistoryDocument) -> TaskNoteEntry | None:
-    user_content, legacy_ai_review_content = _split_legacy_ai_generated_note(
-        doc.user_note.content or ""
-    )
+    user_content, _legacy_ai_text = _split_legacy_ai_generated_note(doc.user_note.content or "")
     user_note = (
         doc.user_note.model_copy(update={"content": user_content}) if user_content else NoteModel()
     )
-    ai_review_note = getattr(doc, "ai_review_note", NoteModel())
-    if not _is_set(ai_review_note) and legacy_ai_review_content:
-        ai_review_note = doc.user_note.model_copy(update={"content": legacy_ai_review_content})
-
-    if not _is_set(user_note) and not _is_set(ai_review_note):
+    # A note the retired automatic review wrote in front of the user's text is
+    # dropped: the evaluation records hold the model's judgements now.
+    if not _is_set(user_note):
         return None
 
-    return TaskNoteEntry(
-        task_id=doc.task_id,
-        qid=doc.qid,
-        note=user_note,
-        ai_review_note=ai_review_note,
-    )
+    return TaskNoteEntry(task_id=doc.task_id, qid=doc.qid, note=user_note)
 
 
 @dataclass(frozen=True)
@@ -1416,17 +1407,14 @@ class NoteService:
                 CouplingDocument.chip_id == chip_id,
             ).run()
         )
-        # Use partial sparse note indexes so the dashboard only scans task
-        # results with user-authored notes or AI review notes.
+        # The partial sparse note index keeps this to task results with a
+        # user-authored note.
         task_docs = list(
             TaskResultHistoryDocument.find(
                 {
                     "project_id": project_id,
                     "chip_id": chip_id,
-                    "$or": [
-                        {"user_note.updated_at": {"$ne": None}},
-                        {"ai_review_note.updated_at": {"$ne": None}},
-                    ],
+                    "user_note.updated_at": {"$ne": None},
                 }
             ).run()
         )

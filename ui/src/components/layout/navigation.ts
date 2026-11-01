@@ -2,18 +2,15 @@ import {
   BarChart3,
   BookMarked,
   Bot,
-  Brain,
-  CircleDot,
   ClipboardCheck,
   ClipboardList,
   Code,
   Cpu,
   Database,
   Files,
+  Gauge,
   House,
-  Inbox,
   LayoutDashboard,
-  LayoutGrid,
   ListTodo,
   MessagesSquare,
   Settings,
@@ -29,7 +26,6 @@ export type NavItem = {
   title?: string;
   icon: LucideIcon;
   match?: "exact" | "prefix";
-  badge?: number;
   visible?: boolean;
 };
 
@@ -41,21 +37,16 @@ export type NavSection = {
 interface NavigationOptions {
   canEdit: boolean;
   isAdmin: boolean;
-  unreadNotifications?: number;
 }
 
-export function getNavigationSections({
-  canEdit,
-  isAdmin,
-  unreadNotifications = 0,
-}: NavigationOptions): NavSection[] {
+export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): NavSection[] {
   return [
     {
       label: "Overview",
       items: [
         { href: "/home", label: "Home", icon: House },
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/metrics", label: "Metrics", icon: LayoutGrid },
+        { href: "/metrics", label: "Metrics", icon: Gauge },
         { href: "/chip", label: "Chip", icon: Cpu },
         { href: "/analysis", label: "Analysis", icon: BarChart3 },
         { href: "/chat", label: "AI Chat", icon: Bot },
@@ -78,6 +69,12 @@ export function getNavigationSections({
           icon: ClipboardList,
           match: "prefix",
         },
+        {
+          href: "/evaluations",
+          label: "AI Evaluations",
+          icon: ClipboardCheck,
+          match: "prefix",
+        },
         { href: "/tasks", label: "Tasks", icon: ListTodo, visible: canEdit },
         { href: "/cryo", label: "Cryo", icon: Snowflake },
         { href: "/import", label: "Calibration DB", icon: Database },
@@ -87,33 +84,14 @@ export function getNavigationSections({
       label: "Collaborate",
       items: [
         {
-          href: "/inbox",
-          label: "Inbox",
-          icon: Inbox,
-          badge: unreadNotifications,
-        },
-        { href: "/issues", label: "Issues", icon: CircleDot, match: "prefix" },
-        {
           href: "/forum",
           label: "Forum",
           icon: MessagesSquare,
           match: "prefix",
         },
         {
-          href: "/issue-knowledge",
+          href: "/knowledge",
           label: "Knowledge",
-          icon: Brain,
-          match: "prefix",
-        },
-        {
-          href: "/ai-reviews",
-          label: "AI Reviews",
-          icon: ClipboardCheck,
-          match: "prefix",
-        },
-        {
-          href: "/task-knowledge",
-          label: "Task Knowledge",
           icon: BookMarked,
           match: "prefix",
         },
@@ -123,8 +101,8 @@ export function getNavigationSections({
       label: "Manage",
       items: [
         {
-          href: "/files",
-          label: "Files",
+          href: "/config",
+          label: "Config",
           icon: Files,
           match: "prefix",
           visible: canEdit,

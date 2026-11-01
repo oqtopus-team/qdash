@@ -109,6 +109,44 @@ class QubitDocument(Document):
         return qubit_doc
 
     @classmethod
+    def delete_calib_parameter(
+        cls,
+        username: str,
+        qid: str,
+        chip_id: str,
+        parameter_name: str,
+        project_id: str | None,
+    ) -> "QubitDocument":
+        """Delete one current calibration parameter and record a history snapshot."""
+        query = (
+            {"project_id": project_id, "qid": qid, "chip_id": chip_id}
+            if project_id is not None
+            else {"username": username, "qid": qid, "chip_id": chip_id}
+        )
+        qubit_doc = cls.find_one(query).run()
+        if qubit_doc is None:
+            raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
+        if parameter_name not in qubit_doc.data:
+            raise ValueError(f"Parameter {parameter_name} not found for qubit {qid}")
+
+        qubit_doc.user_id = cls._user_id_for_username(username)
+        qubit_doc.username = username
+        qubit_doc.data.pop(parameter_name)
+        qubit_doc.system_info.update_time()
+        qubit_doc.save()
+        QubitHistoryDocument.create_history(
+            QubitModel(
+                project_id=qubit_doc.project_id,
+                user_id=qubit_doc.user_id,
+                qid=qid,
+                chip_id=chip_id,
+                data=qubit_doc.data,
+                username=username,
+            )
+        )
+        return qubit_doc
+
+    @classmethod
     def update_status(cls, qid: str, chip_id: str, status: str) -> "QubitDocument":
         """Update the QubitDocument's status."""
         doc = cls.find_one({"qid": qid, "chip_id": chip_id}).run()

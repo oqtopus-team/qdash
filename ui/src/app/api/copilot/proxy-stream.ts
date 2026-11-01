@@ -48,6 +48,8 @@ export async function proxySSEStream(request: Request, backendPath: string): Pro
     method: "POST",
     headers: forwardHeaders(request),
     body,
+    // Stop in the browser closes this upstream request as well.
+    signal: request.signal,
   });
 
   if (!upstream.ok) {

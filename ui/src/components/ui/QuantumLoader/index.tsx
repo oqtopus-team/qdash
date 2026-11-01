@@ -28,7 +28,7 @@ export function QuantumLoader({
   };
 
   const orbitSize = {
-    sm: "w-1.5 h-1.5 -ml-[3px] -mt-[3px]",
+    sm: "w-1.5 h-1.5 -ml-0.5 -mt-0.5",
     md: "w-2 h-2 -ml-1 -mt-1",
     lg: "w-3 h-3 -ml-1.5 -mt-1.5",
   };

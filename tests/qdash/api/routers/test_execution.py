@@ -1,11 +1,12 @@
 """Tests for execution router endpoints."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from zipfile import ZipFile
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pytest
@@ -159,6 +160,120 @@ def sample_execution(test_project: ProjectDocument) -> ExecutionHistoryDocument:
 CANCEL_FLOW_RUN_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
 
+def _seed_execution(
+    *,
+    execution_id: str,
+    status: str,
+    start_at: datetime | None,
+    chip_id: str = "chip-1",
+    project_id: str = "test_project",
+) -> None:
+    ExecutionHistoryDocument(
+        project_id=project_id,
+        username="test_user",
+        name="flow",
+        execution_id=execution_id,
+        calib_data_path="/tmp/calib",
+        note={},
+        status=status,
+        tags=[],
+        chip_id=chip_id,
+        start_at=start_at,
+        message="",
+        system_info=SystemInfoModel(),
+    ).insert()
+
+
+class TestExecutionActivity:
+    """GET /executions/activity buckets a chip's executions per calendar day."""
+
+    def test_counts_per_day_by_status_with_empty_days(
+        self, test_client, test_project, auth_headers
+    ) -> None:
+        zone = ZoneInfo("Asia/Tokyo")
+        today = datetime.now(tz=zone).replace(hour=12, minute=0, second=0, microsecond=0)
+        _seed_execution(execution_id="e-1", status="completed", start_at=today)
+        _seed_execution(execution_id="e-2", status="completed", start_at=today)
+        _seed_execution(execution_id="e-3", status="failed", start_at=today - timedelta(days=1))
+        _seed_execution(execution_id="e-4", status="cancelling", start_at=today)
+        _seed_execution(execution_id="e-5", status="pending", start_at=today)
+        _seed_execution(execution_id="old", status="completed", start_at=today - timedelta(days=40))
+        _seed_execution(execution_id="other-chip", status="failed", start_at=today, chip_id="x")
+        _seed_execution(
+            execution_id="other-project", status="completed", start_at=today, project_id="p2"
+        )
+        _seed_execution(execution_id="unstarted", status="scheduled", start_at=None)
+
+        response = test_client.get(
+            "/executions/activity",
+            params={"chip_id": "chip-1", "days": 7, "timezone": "Asia/Tokyo"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["chip_id"] == "chip-1"
+        assert body["days"] == 7
+        assert body["timezone"] == "Asia/Tokyo"
+        assert len(body["buckets"]) == 7
+        assert body["until"] == today.date().isoformat()
+        assert body["buckets"][-1]["date"] == body["until"]
+        assert body["buckets"][0]["date"] == body["since"]
+        last = body["buckets"][-1]
+        assert last == {
+            "date": today.date().isoformat(),
+            "completed": 2,
+            "failed": 0,
+            "running": 1,
+            "scheduled": 1,
+            "cancelled": 0,
+            "other": 0,
+            "total": 4,
+        }
+        yesterday = body["buckets"][-2]
+        assert yesterday["failed"] == 1 and yesterday["total"] == 1
+        assert all(bucket["total"] == 0 for bucket in body["buckets"][:-2])
+
+    def test_days_follow_the_requested_time_zone(
+        self, test_client, test_project, auth_headers
+    ) -> None:
+        """An execution late in the UTC evening belongs to the next day in Tokyo."""
+        utc_today = datetime.now(tz=timezone.utc).date()
+        late_utc = datetime.combine(utc_today, datetime.min.time(), tzinfo=timezone.utc).replace(
+            hour=22
+        )
+        _seed_execution(execution_id="late", status="completed", start_at=late_utc)
+
+        in_utc = test_client.get(
+            "/executions/activity",
+            params={"chip_id": "chip-1", "days": 3, "timezone": "UTC"},
+            headers=auth_headers,
+        ).json()
+        in_tokyo = test_client.get(
+            "/executions/activity",
+            params={"chip_id": "chip-1", "days": 3, "timezone": "Asia/Tokyo"},
+            headers=auth_headers,
+        ).json()
+
+        utc_day = next(b for b in in_utc["buckets"] if b["total"] == 1)["date"]
+        tokyo_days = [b["date"] for b in in_tokyo["buckets"] if b["total"] == 1]
+        expected_tokyo = late_utc.astimezone(ZoneInfo("Asia/Tokyo")).date().isoformat()
+        assert utc_day == utc_today.isoformat()
+        # The Tokyo day is tomorrow in UTC terms; it is inside the window only when the
+        # Tokyo calendar has already reached it, which is exactly what the API reports.
+        assert tokyo_days in ([expected_tokyo], [])
+
+    def test_rejects_an_unknown_time_zone(self, test_client, test_project, auth_headers) -> None:
+        response = test_client.get(
+            "/executions/activity",
+            params={"chip_id": "chip-1", "timezone": "Mars/Olympus"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 400
+        assert "Unknown time zone" in response.json()["detail"]
+
+
 def test_get_execution_lock_status_includes_latest_execution(
     test_client: TestClient,
     test_project: ProjectDocument,
@@ -193,6 +308,13 @@ def test_get_execution_lock_status_includes_latest_execution(
     }
 
 
+@pytest.fixture
+def calib_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Serve ``tmp_path`` as the calibration data tree."""
+    monkeypatch.setenv("CALIB_DATA_PATH", str(tmp_path))
+    return tmp_path
+
+
 def test_get_figure_by_path_maps_container_calib_data_path(
     test_client: TestClient,
     tmp_path: Path,
@@ -216,8 +338,9 @@ def test_get_figure_by_path_maps_container_calib_data_path(
 
 def test_download_artifact_by_path(
     test_client: TestClient,
-    tmp_path: Path,
+    calib_data: Path,
 ) -> None:
+    tmp_path = calib_data
     artifact = tmp_path / "raw_data.nc"
     artifact.write_bytes(b"netcdf")
 
@@ -230,8 +353,9 @@ def test_download_artifact_by_path(
 
 def test_download_artifacts_as_archive(
     test_client: TestClient,
-    tmp_path: Path,
+    calib_data: Path,
 ) -> None:
+    tmp_path = calib_data
     figure_dir = tmp_path / "figures"
     raw_dir = tmp_path / "raw"
     figure_dir.mkdir()
@@ -257,8 +381,9 @@ def test_download_artifacts_as_archive(
 
 def test_preview_artifact_by_path_returns_complex_table(
     test_client: TestClient,
-    tmp_path: Path,
+    calib_data: Path,
 ) -> None:
+    tmp_path = calib_data
     artifact = tmp_path / "raw_data.nc"
     PreFitRawData(
         target="Q00",
@@ -287,14 +412,65 @@ def test_preview_artifact_by_path_returns_complex_table(
 
 def test_preview_artifact_by_path_rejects_non_netcdf(
     test_client: TestClient,
-    tmp_path: Path,
+    calib_data: Path,
 ) -> None:
+    tmp_path = calib_data
     artifact = tmp_path / "figure.json"
     artifact.write_text("{}")
 
     response = test_client.get("/executions/artifact/preview", params={"path": str(artifact)})
 
     assert response.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    ["/executions/figure", "/executions/artifact", "/executions/artifact/preview"],
+)
+@pytest.mark.parametrize("escape", ["absolute", "traversal", "symlink"])
+def test_calibration_file_endpoints_serve_nothing_outside_calib_data(
+    test_client: TestClient,
+    calib_data: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+    endpoint: str,
+    escape: str,
+) -> None:
+    """These endpoints take no token, so a path must not reach other server files."""
+    secret = tmp_path_factory.mktemp("outside") / "secret.nc"
+    secret.write_bytes(b"TOP-SECRET-CONTENT")
+    if escape == "absolute":
+        path = str(secret)
+    elif escape == "traversal":
+        path = f"{calib_data}/../{secret.parent.name}/secret.nc"
+        (calib_data.parent / secret.parent.name).mkdir(exist_ok=True)
+        (calib_data.parent / secret.parent.name / "secret.nc").write_bytes(b"TOP-SECRET-CONTENT")
+    else:
+        link = calib_data / "link.nc"
+        link.symlink_to(secret)
+        path = str(link)
+
+    response = test_client.get(endpoint, params={"path": path})
+
+    assert response.status_code == 404
+    assert b"TOP-SECRET-CONTENT" not in response.content
+
+
+def test_artifact_archive_refuses_a_path_outside_calib_data(
+    test_client: TestClient,
+    calib_data: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    inside = calib_data / "figure.json"
+    inside.write_text("{}")
+    secret = tmp_path_factory.mktemp("outside") / "secret.txt"
+    secret.write_text("secret")
+
+    response = test_client.get(
+        "/executions/artifacts/archive",
+        params=[("paths", str(inside)), ("paths", str(secret))],
+    )
+
+    assert response.status_code == 404
 
 
 class TestCancelExecution:
@@ -582,6 +758,63 @@ class TestListExecutions:
         data = response.json()
         assert len(data["executions"]) == 1
         assert data["total"] == 3
+
+    def test_list_executions_for_one_day_in_the_requested_time_zone(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        """``date`` keeps only that calendar day, with the day defined by ``timezone``."""
+        _seed_execution(
+            execution_id="noon",
+            status="completed",
+            start_at=datetime(2024, 1, 1, 10, tzinfo=timezone.utc),
+        )
+        _seed_execution(
+            execution_id="late",
+            status="failed",
+            start_at=datetime(2024, 1, 1, 22, tzinfo=timezone.utc),
+        )
+        _seed_execution(execution_id="unstarted", status="scheduled", start_at=None)
+        _seed_execution(
+            execution_id="other-project",
+            status="completed",
+            start_at=datetime(2024, 1, 1, 10, tzinfo=timezone.utc),
+            project_id="p2",
+        )
+
+        def ids(params: dict[str, str]) -> tuple[list[str], int]:
+            response = test_client.get(
+                "/executions", headers=auth_headers, params={"chip_id": "chip-1", **params}
+            )
+            assert response.status_code == 200
+            body = response.json()
+            return [e["execution_id"] for e in body["executions"]], body["total"]
+
+        assert ids({"date": "20240101"}) == (["late", "noon"], 2)
+        # 22:00 UTC is already January 2 in Tokyo.
+        assert ids({"date": "20240101", "timezone": "Asia/Tokyo"}) == (["noon"], 1)
+        assert ids({"date": "20240102", "timezone": "Asia/Tokyo"}) == (["late"], 1)
+        assert ids({"date": "20240103"}) == ([], 0)
+        assert ids({})[1] == 3
+
+    def test_list_executions_rejects_a_malformed_date(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        response = test_client.get(
+            "/executions", headers=auth_headers, params={"chip_id": "chip-1", "date": "2024-01-01"}
+        )
+        assert response.status_code == 422
+
+        response = test_client.get(
+            "/executions", headers=auth_headers, params={"chip_id": "chip-1", "date": "20241399"}
+        )
+        assert response.status_code == 400
+        assert "Invalid date" in response.json()["detail"]
 
 
 class TestGetExecution:

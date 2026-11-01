@@ -7,10 +7,11 @@ import { z } from "zod";
 
 import { useQueryClient } from "@tanstack/react-query";
 
-import { useCreateChip, getListChipsQueryKey } from "@/client/chip/chip";
+import { useCreateChip, getListChipsQueryKey, useListChipConfigSources } from "@/client/chip/chip";
 import { useListTopologies } from "@/client/topology/topology";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 import { SelectedLabel } from "@/components/ui/SelectedLabel";
+import { useToast } from "@/components/ui/Toast/useToast";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 interface TopologyItem {
@@ -25,9 +26,14 @@ interface CreateChipModalProps {
   onSuccess?: (chipId: string) => void;
 }
 
+const EMPTY_WIRING = "";
+
 const createChipSchema = z.object({
   chipId: z.string().trim().min(1, "Chip ID is required"),
   topologyId: z.string().min(1, "Please select a topology template"),
+  createConfig: z.boolean(),
+  wiringSource: z.string(),
+  backend: z.enum(["quel1", "quel3"]),
 });
 
 type CreateChipFormData = z.infer<typeof createChipSchema>;
@@ -44,9 +50,30 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
     formState: { errors },
   } = useForm<CreateChipFormData>({
     resolver: zodResolver(createChipSchema),
-    defaultValues: { chipId: "", topologyId: "" },
+    defaultValues: {
+      chipId: "",
+      topologyId: "",
+      createConfig: true,
+      wiringSource: EMPTY_WIRING,
+      backend: "quel1",
+    },
   });
   const selectedTopologyId = watch("topologyId");
+  const chipIdValue = watch("chipId");
+  const createConfig = watch("createConfig");
+  const wiringSource = watch("wiringSource");
+  const toast = useToast();
+
+  // Systems in the Qubex configuration tree whose wiring a new chip can copy
+  const {
+    data: configSourcesData,
+    isLoading: isLoadingSources,
+    isError: isConfigSourcesError,
+  } = useListChipConfigSources({
+    query: { enabled: isOpen },
+  });
+  const configAvailable = configSourcesData?.data?.available ?? false;
+  const configSources = configSourcesData?.data?.sources ?? [];
 
   // Fetch available topologies
   const { data: topologiesData, isLoading: isLoadingTopologies } = useListTopologies(undefined, {
@@ -96,6 +123,15 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
         // Invalidate chips list to refresh
         queryClient.invalidateQueries({ queryKey: getListChipsQueryKey() });
 
+        const config = data.data?.config;
+        if (config?.message) {
+          if (config.status === "created") {
+            toast.success(config.message);
+          } else {
+            toast.info(config.message);
+          }
+        }
+
         // Call success callback if provided
         if (onSuccess && data.data) {
           onSuccess(data.data.chip_id);
@@ -113,18 +149,24 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
   });
 
   const submit = (data: CreateChipFormData) => {
+    if (isLoadingSources || isConfigSourcesError) return;
     setServerError(null);
     if (!selectedTopology) {
       setError("topologyId", { message: "Please select a topology template" });
       return;
     }
 
-    // Create chip
+    const withConfig = configAvailable && data.createConfig;
     createChipMutation.mutate({
       data: {
         chip_id: data.chipId,
         size: selectedTopology.num_qubits,
         topology_id: data.topologyId,
+        config: withConfig
+          ? data.wiringSource
+            ? { source_system_id: data.wiringSource }
+            : { backend: data.backend }
+          : { create: false },
       },
     });
   };
@@ -210,6 +252,85 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
             )}
           </div>
 
+          {/* Qubex configuration directory (system_id == chip_id) */}
+          <fieldset className="space-y-2 rounded-lg border border-base-300 p-3">
+            <legend className="px-1 text-sm font-medium">Qubex configuration</legend>
+            {isLoadingSources ? (
+              <div className="flex items-center gap-2">
+                <span className="loading loading-spinner loading-sm"></span>
+                <span className="text-sm text-base-content/60">Checking configuration...</span>
+              </div>
+            ) : isConfigSourcesError ? (
+              <p className="text-sm text-error" role="alert">
+                Unable to check the Qubex configuration tree. Close and reopen this dialog to retry.
+              </p>
+            ) : !configAvailable ? (
+              <p className="text-sm text-base-content/60">
+                No Qubex configuration tree is mounted, so only the chip record is created.
+              </p>
+            ) : (
+              <>
+                <label className="label cursor-pointer justify-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm"
+                    disabled={createChipMutation.isPending}
+                    {...register("createConfig")}
+                  />
+                  <span className="label-text">
+                    Create <code>{chipIdValue.trim() || "<chip_id>"}/</code> with system ID = chip
+                    ID
+                  </span>
+                </label>
+                {createConfig && (
+                  <>
+                    <div className="form-control">
+                      <label className="label" htmlFor="wiring-source-select">
+                        <span className="label-text">Wiring</span>
+                      </label>
+                      <select
+                        id="wiring-source-select"
+                        className="select select-bordered select-sm w-full"
+                        disabled={createChipMutation.isPending}
+                        {...register("wiringSource")}
+                      >
+                        <option value={EMPTY_WIRING}>Start from template</option>
+                        {configSources.map((source) => (
+                          <option key={source.system_id} value={source.system_id}>
+                            Copy from {source.system_id} ({source.backend}, {source.mux_count} MUX)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {wiringSource === EMPTY_WIRING && (
+                      <div className="form-control">
+                        <label className="label" htmlFor="backend-select">
+                          <span className="label-text">Backend</span>
+                        </label>
+                        <select
+                          id="backend-select"
+                          className="select select-bordered select-sm w-full"
+                          disabled={createChipMutation.isPending}
+                          {...register("backend")}
+                        >
+                          <option value="quel1">quel1</option>
+                          <option value="quel3">quel3</option>
+                        </select>
+                      </div>
+                    )}
+                    <p className="text-xs text-base-content/60">
+                      {wiringSource === EMPTY_WIRING
+                        ? "Config templates include commented examples. Edit hardware settings on the Config page before running."
+                        : `Wiring, boxes and other hardware files are copied from ${wiringSource}.`}{" "}
+                      Parameter files start from templates. An existing directory is kept as is.
+                      Push the new files from the Config page.
+                    </p>
+                  </>
+                )}
+              </>
+            )}
+          </fieldset>
+
           {/* Error Message */}
           {serverError && (
             <div id="chip-error" className="alert alert-error" role="alert">
@@ -244,7 +365,7 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={createChipMutation.isPending}
+              disabled={createChipMutation.isPending || isLoadingSources || isConfigSourcesError}
               data-tour="submit-chip"
             >
               {createChipMutation.isPending ? (

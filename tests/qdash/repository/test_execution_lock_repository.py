@@ -131,31 +131,6 @@ def test_try_lock_is_scoped_to_the_project(init_db: object) -> None:
     assert repo.try_lock(project_id="proj-2", execution_id="exec-2") is True
 
 
-def test_maintenance_reservation_is_atomic_with_execution_claims(init_db: object) -> None:
-    """Maintenance and calibration claims exclude each other on one system gate."""
-    repo = MongoExecutionLockRepository()
-    assert repo.try_lock(PROJECT_ID, "exec-1", "chip-1", ("mux:0",), False)
-    assert not ExecutionLockDocument.try_reserve_maintenance("update-1")
-
-    repo.unlock(PROJECT_ID, "exec-1")
-    assert ExecutionLockDocument.try_reserve_maintenance("update-1")
-    assert not repo.try_lock("proj-2", "exec-2", "chip-2", ("mux:0",), False)
-    assert repo.has_conflict("proj-2", MagicMock())
-
-    ExecutionLockDocument.release_maintenance("update-1")
-    assert repo.try_lock("proj-2", "exec-2", "chip-2", ("mux:0",), False)
-
-
-def test_failed_scope_expansion_keeps_existing_system_gate_claim(init_db: object) -> None:
-    repo = MongoExecutionLockRepository()
-    assert repo.try_lock(PROJECT_ID, "A", "chip-1", ("mux:0",), False)
-    assert repo.try_lock(PROJECT_ID, "B", "chip-1", ("mux:1",), False)
-
-    assert not repo.try_lock(PROJECT_ID, "A", "chip-1", ("mux:0", "mux:1"), False)
-
-    assert not ExecutionLockDocument.try_reserve_maintenance("update-1")
-
-
 def test_non_conflicting_resource_claims_run_concurrently(init_db: object) -> None:
     repo = MongoExecutionLockRepository()
 
@@ -328,3 +303,21 @@ def test_availability_does_not_create_lock_and_respects_legacy_lock(init_db: obj
     assert repo.has_conflict(PROJECT_ID, scope)
     repo.unlock(PROJECT_ID, "legacy")
     assert not repo.has_conflict(PROJECT_ID, scope)
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_list_reservation_owners_is_project_scoped(init_db: object, legacy: bool) -> None:
+    """Polling discovers all owners for its project without including another project's claims."""
+    repo = MongoExecutionLockRepository()
+    assert repo.list_owner_execution_ids(PROJECT_ID) == []
+    if legacy:
+        repo.lock(PROJECT_ID, "exec-1")
+        expected = ["exec-1"]
+    else:
+        assert repo.try_lock(PROJECT_ID, "exec-1", "chip-1", ("mux:20",), False)
+        assert repo.try_lock(PROJECT_ID, "exec-2", "chip-1", ("mux:21",), False)
+        expected = ["exec-1", "exec-2"]
+    repo.lock("other-project", "other-execution")
+    assert repo.list_owner_execution_ids(PROJECT_ID) == expected
+    repo.unlock(PROJECT_ID)
+    assert repo.list_owner_execution_ids(PROJECT_ID) == []

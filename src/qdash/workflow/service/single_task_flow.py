@@ -6,11 +6,10 @@ and allows re-executing a single calibration task from the task detail page.
 Unlike user flows, this flow does not require a FlowDocument to exist.
 It is always available as a system deployment.
 
-This flow always runs with ``use_lock=False`` (see ``single_task_executor``
-below), so it never owns the project execution lock. It therefore registers
-the ``*_keep_lock`` terminal hooks, which close its own executions on
-cancellation/failure/crash without releasing a lock that belongs to an
-unrelated, concurrently running calibration.
+This top-level flow owns its hardware reservation (``use_lock=True``). Its
+terminal hooks must release that reservation even when cancellation interrupts
+CalibService construction, before the in-process cleanup handler is installed.
+The shared finalizer preserves reservations belonging to other executions.
 """
 
 from __future__ import annotations
@@ -22,20 +21,25 @@ from prefect import flow, get_run_logger
 
 from qdash.common.config.backend import get_default_backend
 from qdash.common.config.loader import ConfigLoader
+from qdash.workflow.engine.task_parameters import (
+    merge_task_parameters,
+    normalize_task_parameters,
+    task_parameters_from_run_parameters,
+)
 from qdash.workflow.service.calib_service import (
     CalibService,
-    on_flow_cancellation_keep_lock,
-    on_flow_crashed_keep_lock,
-    on_flow_failure_keep_lock,
+    on_flow_cancellation,
+    on_flow_crashed,
+    on_flow_failure,
 )
 from qdash.workflow.service.github import GitHubPushConfig
 
 
 @flow(
     name="single-task-executor",
-    on_cancellation=[on_flow_cancellation_keep_lock],
-    on_failure=[on_flow_failure_keep_lock],
-    on_crashed=[on_flow_crashed_keep_lock],
+    on_cancellation=[on_flow_cancellation],
+    on_failure=[on_flow_failure],
+    on_crashed=[on_flow_crashed],
 )
 def single_task_executor(
     username: str,
@@ -71,6 +75,9 @@ def single_task_executor(
         flow_name: Flow name for display (auto-injected)
         tags: Tags for categorization
         source_task_id: Task result ID that triggered this re-execution
+        parameter_overrides: Overrides for the requested task, shaped as
+            ``{"input": {...}, "run": {...}}``. They become that task's entry in
+            ``task_parameters`` and are applied on top of the source snapshot.
         default_run_parameters: Shared fallback run parameters for compatibility.
         task_run_parameters: Explicit run parameters keyed by task name.
 
@@ -111,12 +118,15 @@ def single_task_executor(
         project_id=project_id,
         backend_name=backend_name,
         default_run_parameters=default_run_parameters,
-        task_run_parameters=task_run_parameters,
+        task_parameters=merge_task_parameters(
+            task_parameters_from_run_parameters(task_run_parameters),
+            # Request overrides ({"input": ..., "run": ...}) apply to the requested task.
+            normalize_task_parameters({task_name: parameter_overrides or {}}),
+        ),
         enable_github_pull=github_enabled,
         enable_github=push_config.enabled,
         github_push_config=push_config,
         use_lock=True,
-        parameter_overrides=parameter_overrides,
         source_task_id=source_task_id,
         snapshot_exempt_tasks=snapshot_exempt_tasks or None,
         force_update_params=update_params,

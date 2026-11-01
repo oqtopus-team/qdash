@@ -6,12 +6,12 @@ import { QDashConfig } from "./config.js";
 import { QDashNotFoundError } from "./errors.js";
 import type {
   AgentActionResponse,
-  AgentCampaignCommitResponse,
+  AgentCandidateSetCommitResponse,
   AgentCandidateCommitResponse,
   AgentCandidateResponse,
   AgentSessionPolicy,
   AgentActionType,
-  AgentCampaignCandidateReference,
+  AgentCandidateReference,
   FileTreeNode,
   ForumImageUploadResponse,
   ForumPostCreate,
@@ -45,6 +45,7 @@ import type {
   FlowTemplateWithCode,
   GetFlowResponse,
   ListChipsResponse,
+  ExecutionActivityResponse,
   ListExecutionsResponse,
   ListTaskKnowledgeResponse,
   ListTaskResponse,
@@ -109,6 +110,12 @@ export interface SubmitAgentActionOptions {
 export interface PollOptions {
   timeoutSeconds?: number;
   pollIntervalSeconds?: number;
+  /**
+   * For an execution that is one step of a pipeline run, wait for the whole
+   * run rather than that step (default true). The returned detail's
+   * `pipeline.status` then carries the run's outcome.
+   */
+  wholePipeline?: boolean;
 }
 
 export interface DownloadedFile {
@@ -330,8 +337,9 @@ export class QDashClient {
     return this.get(`/flows/${pathPart(name)}`);
   }
 
-  async listFlowTemplates(): Promise<FlowTemplate[]> {
-    return this.get("/flows/templates");
+  /** List flow templates, optionally only those written for one backend (e.g. "fake"). */
+  async listFlowTemplates(backend?: string): Promise<FlowTemplate[]> {
+    return this.get("/flows/templates", query({ backend }));
   }
 
   async getFlowTemplate(templateId: string): Promise<FlowTemplateWithCode> {
@@ -346,11 +354,27 @@ export class QDashClient {
     return this.post(`/flows/${pathPart(name)}/execute`, { parameters });
   }
 
+  /** Count a chip's executions per calendar day over the trailing window. */
+  async getExecutionActivity(options: {
+    chipId: string;
+    days?: number;
+    timezone?: string;
+  }): Promise<ExecutionActivityResponse> {
+    return this.get(
+      "/executions/activity",
+      query({ chip_id: options.chipId, days: options.days, timezone: options.timezone }),
+    );
+  }
+
   async listExecutions(options: {
     flowName?: string;
     status?: string;
     skip?: number;
     limit?: number;
+    /** Only executions started on this calendar day, YYYYMMDD. */
+    date?: string;
+    /** IANA time zone that defines the day for `date`. */
+    timezone?: string;
   } = {}): Promise<ListExecutionsResponse> {
     return this.get(
       "/executions",
@@ -359,6 +383,8 @@ export class QDashClient {
         status: options.status,
         skip: options.skip,
         limit: options.limit,
+        date: options.date,
+        timezone: options.timezone,
       }),
     );
   }
@@ -421,9 +447,13 @@ export class QDashClient {
     this.validatePollOptions(timeoutSeconds, pollIntervalSeconds);
     const deadline = Date.now() + timeoutSeconds * 1_000;
     const terminal = new Set(["completed", "failed", "cancelled", "canceled", "crashed"]);
+    const wholePipeline = options.wholePipeline ?? true;
     while (true) {
       const execution = await this.getExecution(executionId);
-      if (terminal.has(execution.status.toLowerCase())) return execution;
+      // A pipeline step's own execution completes long before the run does.
+      const status =
+        wholePipeline && execution.pipeline ? execution.pipeline.status : execution.status;
+      if (terminal.has(status.toLowerCase())) return execution;
       if (Date.now() >= deadline) {
         throw new Error(
           `Execution '${executionId}' did not reach a terminal state within ${timeoutSeconds} seconds`,
@@ -475,15 +505,19 @@ export class QDashClient {
     });
   }
 
+  /**
+   * Dispatch one authorized agent action. The task runs like a Task Workbench run, on the
+   * current calibration state; `sourceExecutionId` only records what it was decided from.
+   */
   async executeAgentAction(
     sessionId: string,
     actionId: string,
-    options: { sourceExecutionId: string; updateParams?: boolean; reconfigure?: boolean },
+    options: { sourceExecutionId?: string; updateParams?: boolean; reconfigure?: boolean } = {},
   ): Promise<AgentActionResponse> {
     return this.post(
       `/agent-sessions/${pathPart(sessionId)}/actions/${pathPart(actionId)}/execute`,
       {
-        source_execution_id: options.sourceExecutionId,
+        ...(options.sourceExecutionId ? { source_execution_id: options.sourceExecutionId } : {}),
         update_params: options.updateParams ?? false,
         reconfigure: options.reconfigure ?? false,
       },
@@ -548,24 +582,24 @@ export class QDashClient {
     );
   }
 
-  async commitAgentCampaignCandidates(
+  async commitAgentCandidateSet(
     sessionId: string,
-    candidates: AgentCampaignCandidateReference[],
+    candidates: AgentCandidateReference[],
     options: { idempotencyKey: string; expectedStateVersion: number },
-  ): Promise<AgentCampaignCommitResponse> {
-    return this.post(`/agent-sessions/${pathPart(sessionId)}/campaign-commits`, {
+  ): Promise<AgentCandidateSetCommitResponse> {
+    return this.post(`/agent-sessions/${pathPart(sessionId)}/candidate-set-commits`, {
       idempotency_key: options.idempotencyKey,
       expected_state_version: options.expectedStateVersion,
       candidates,
     });
   }
 
-  async getAgentCampaignCommit(
+  async getAgentCandidateSetCommit(
     sessionId: string,
     commitId: string,
-  ): Promise<AgentCampaignCommitResponse> {
+  ): Promise<AgentCandidateSetCommitResponse> {
     return this.get(
-      `/agent-sessions/${pathPart(sessionId)}/campaign-commits/${pathPart(commitId)}`,
+      `/agent-sessions/${pathPart(sessionId)}/candidate-set-commits/${pathPart(commitId)}`,
     );
   }
 

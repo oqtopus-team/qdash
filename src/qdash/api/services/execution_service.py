@@ -7,9 +7,10 @@ abstracting away the repository layer from the routers.
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any, NamedTuple
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from bunnet import SortDirection
 from fastapi import HTTPException
@@ -19,9 +20,13 @@ from prefect.states import Cancelling
 
 from qdash.api.schemas.execution import (
     CancelExecutionResponse,
+    ExecutionActivityDay,
+    ExecutionActivityResponse,
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ExecutionResponseSummary,
+    PipelineProgress,
+    PipelineStepProgress,
     Task,
 )
 from qdash.common.utils.datetime import now, parse_elapsed_time
@@ -38,6 +43,38 @@ if TYPE_CHECKING:
     from qdash.repository.execution_lock import MongoExecutionLockRepository
 
 logger = logging.getLogger(__name__)
+
+# Execution statuses folded into the activity chart's buckets; anything else counts as "other".
+_ACTIVITY_BUCKET_BY_STATUS: dict[str, str] = {
+    "completed": "completed",
+    "failed": "failed",
+    "running": "running",
+    "cancelling": "running",
+    "scheduled": "scheduled",
+    "pending": "scheduled",
+    "cancelled": "cancelled",
+}
+
+
+def _resolve_zone(timezone: str) -> ZoneInfo:
+    """Return the IANA zone, or a 400 the client can act on."""
+    try:
+        return ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"Unknown time zone: {timezone}") from exc
+
+
+def _day_window(date: str, zone: ZoneInfo) -> tuple[datetime, datetime]:
+    """UTC bounds ``[start, end)`` of the calendar day ``date`` (YYYYMMDD) in ``zone``."""
+    try:
+        day = datetime.strptime(date, "%Y%m%d").date()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid date: {date}; expected YYYYMMDD"
+        ) from exc
+    start = datetime.combine(day, time.min, tzinfo=zone)
+    return start.astimezone(UTC), (start + timedelta(days=1)).astimezone(UTC)
+
 
 _OPEN_EXECUTION_STATUSES = ("running", "scheduled", "cancelling")
 _RECONCILE_TIMEOUT_SECONDS = 5.0
@@ -109,6 +146,11 @@ def _reconcile_outcome(
     return _TERMINAL_STATE_OUTCOMES.get(flow_run_state)
 
 
+def by_index_ids(by_index: dict[int, ExecutionHistoryDocument]) -> set[str]:
+    """Execution ids of a pipeline's started steps."""
+    return {doc.execution_id for doc in by_index.values()}
+
+
 class ExecutionService:
     """Service for execution-related operations.
 
@@ -133,37 +175,75 @@ class ExecutionService:
         self._history_repo = execution_history_repository
         self._lock_repo = execution_lock_repository
 
+    def get_execution_activity(
+        self,
+        project_id: str,
+        chip_id: str,
+        days: int = 30,
+        timezone: str = "UTC",
+    ) -> ExecutionActivityResponse:
+        """Count executions per calendar day over the trailing ``days`` days.
+
+        Days are bucketed in ``timezone`` so the chart matches the dates the user sees;
+        every day of the window is present, empty days with zero counts. Only executions
+        with a start time are counted, since the day is taken from it.
+        """
+        zone = _resolve_zone(timezone)
+        today = datetime.now(tz=zone).date()
+        first_day = today - timedelta(days=days - 1)
+        since = datetime.combine(first_day, time.min, tzinfo=zone).astimezone(UTC)
+
+        buckets = {
+            first_day + timedelta(days=offset): ExecutionActivityDay(
+                date=(first_day + timedelta(days=offset)).isoformat()
+            )
+            for offset in range(days)
+        }
+        executions = self._history_repo.list_started_since(
+            project_id=project_id, chip_id=chip_id, since=since
+        )
+        for execution in executions:
+            if execution.start_at is None:
+                continue
+            started = execution.start_at
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=UTC)
+            bucket = buckets.get(started.astimezone(zone).date())
+            if bucket is None:
+                continue
+            field = _ACTIVITY_BUCKET_BY_STATUS.get(execution.status, "other")
+            setattr(bucket, field, getattr(bucket, field) + 1)
+            bucket.total += 1
+
+        return ExecutionActivityResponse(
+            chip_id=chip_id,
+            days=days,
+            timezone=timezone,
+            since=first_day.isoformat(),
+            until=today.isoformat(),
+            buckets=list(buckets.values()),
+        )
+
     def list_executions(
         self,
         project_id: str,
         chip_id: str,
         skip: int = 0,
         limit: int = 20,
+        date: str | None = None,
+        timezone: str = "UTC",
     ) -> list[ExecutionResponseSummary]:
-        """List executions for a chip with pagination.
+        """List a chip's executions, newest first, with pagination.
 
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-        skip : int
-            Number of items to skip
-        limit : int
-            Number of items to return
-
-        Returns
-        -------
-        list[ExecutionResponseSummary]
-            List of execution summaries
-
+        With ``date`` (YYYYMMDD) only executions started on that calendar day in
+        ``timezone`` are returned, using the same day rule as the activity chart.
         """
         executions = self._history_repo.list_by_chip(
             project_id=project_id,
             chip_id=chip_id,
             skip=skip,
             limit=limit,
+            started_between=_day_window(date, _resolve_zone(timezone)) if date else None,
         )
         return [
             ExecutionResponseSummary(
@@ -186,25 +266,14 @@ class ExecutionService:
         self,
         project_id: str,
         chip_id: str,
+        date: str | None = None,
+        timezone: str = "UTC",
     ) -> int:
-        """Count executions for a chip.
-
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-
-        Returns
-        -------
-        int
-            Total number of executions for the chip
-
-        """
+        """Count a chip's executions, with the same optional day filter as ``list_executions``."""
         return self._history_repo.count_by_chip(
             project_id=project_id,
             chip_id=chip_id,
+            started_between=_day_window(date, _resolve_zone(timezone)) if date else None,
         )
 
     def get_execution(
@@ -255,6 +324,125 @@ class ExecutionService:
             note=execution.note,
             tags=execution.tags,
             chip_id=execution.chip_id,
+            pipeline=self._pipeline_progress(project_id, execution),
+        )
+
+    def _pipeline_progress(
+        self, project_id: str, execution: ExecutionHistoryDocument
+    ) -> PipelineProgress | None:
+        """The whole pipeline run this execution is a step of, or None.
+
+        Steps are the executions sharing ``note.flow_run_id``; the plan comes
+        from ``note.pipeline`` written by the calibration-pipeline flow.
+        """
+        note = execution.note or {}
+        plan = note.get("pipeline")
+        flow_run_id = note.get("flow_run_id")
+        if not isinstance(plan, dict) or not isinstance(flow_run_id, str) or not flow_run_id:
+            return None
+        planned = plan.get("steps")
+        if not isinstance(planned, list) or not planned:
+            return None
+
+        siblings = self._history_repo.list_by_flow_run_id(project_id, flow_run_id)
+        self._reconcile_with_prefect(siblings)
+        by_index: dict[int, ExecutionHistoryDocument] = {}
+        for doc in siblings:
+            index = (doc.note or {}).get("step_index")
+            if isinstance(index, int) and index not in by_index:
+                by_index[index] = doc
+
+        steps: list[PipelineStepProgress] = []
+        open_statuses = {
+            ExecutionStatusModel.RUNNING.value,
+            ExecutionStatusModel.SCHEDULED.value,
+            ExecutionStatusModel.CANCELLING.value,
+        }
+        any_open = False
+        last_terminal: str | None = None
+        for entry in planned:
+            if not isinstance(entry, dict):
+                continue
+            index = int(entry.get("index", 0))
+            kind = str(entry.get("kind") or "calibration")
+            started = by_index.get(index)
+            if kind == "transform":
+                steps.append(
+                    PipelineStepProgress(
+                        index=index,
+                        name=str(entry.get("name") or ""),
+                        type=str(entry.get("type") or ""),
+                        kind=kind,
+                        status="skipped",
+                    )
+                )
+                continue
+            if started is None:
+                steps.append(
+                    PipelineStepProgress(
+                        index=index,
+                        name=str(entry.get("name") or ""),
+                        type=str(entry.get("type") or ""),
+                        kind=kind,
+                        status="pending",
+                    )
+                )
+                continue
+            tasks = self._fetch_tasks_for_execution(project_id, started.execution_id)
+            finished = [t for t in tasks if t.status in ("completed", "failed")]
+            figures = [
+                path for t in finished for path in (t.figure_path or []) if isinstance(path, str)
+            ]
+            if started.status in open_statuses:
+                any_open = True
+            else:
+                last_terminal = started.status
+            steps.append(
+                PipelineStepProgress(
+                    index=index,
+                    name=str(entry.get("name") or ""),
+                    type=str(entry.get("type") or ""),
+                    kind=kind,
+                    execution_id=started.execution_id,
+                    status=started.status,
+                    task_total=len(tasks),
+                    task_finished=len(finished),
+                    task_failed=sum(1 for t in finished if t.status == "failed"),
+                    figure_paths=figures,
+                )
+            )
+
+        root = min(by_index.items(), key=lambda item: item[0])[1] if by_index else execution
+        pending_left = any(s.status == "pending" for s in steps)
+        if any_open:
+            status = ExecutionStatusModel.RUNNING.value
+        elif last_terminal in (
+            ExecutionStatusModel.FAILED.value,
+            ExecutionStatusModel.CANCELLED.value,
+        ):
+            status = last_terminal
+        elif pending_left:
+            # Between steps the flow still holds the project lock as the root
+            # execution; without it the run died before finishing the plan.
+            lock = self._lock_repo.get_lock_status(project_id)
+            latest = self._history_repo.find_latest_by_project(project_id)
+            held_by_run = (
+                bool(lock) and latest is not None and latest.execution_id in by_index_ids(by_index)
+            )
+            status = (
+                ExecutionStatusModel.RUNNING.value
+                if held_by_run
+                else ExecutionStatusModel.FAILED.value
+            )
+        else:
+            status = last_terminal or ExecutionStatusModel.COMPLETED.value
+
+        return PipelineProgress(
+            name=str(plan.get("name") or execution.name),
+            flow_run_id=flow_run_id,
+            root_execution_id=root.execution_id,
+            status=status,
+            steps=steps,
         )
 
     def get_execution_metadata(
@@ -290,9 +478,10 @@ class ExecutionService:
     def get_lock_status(self, project_id: str) -> ExecutionLockStatusResponse:
         """Get the execution lock status.
 
-        A still ``scheduled`` execution is reconciled against Prefect first: a
-        run that died before its flow process started would otherwise hold the
-        lock with nothing left to release it.
+        ``scheduled`` and ``cancelling`` reservation owners are reconciled against
+        Prefect, even when a newer execution has started. The latest execution
+        is also checked for legacy reservations with no owner ID. Non-terminal
+        Prefect states retain reservations until termination is confirmed.
 
         Parameters
         ----------
@@ -306,8 +495,23 @@ class ExecutionService:
 
         """
         latest = self._history_repo.find_latest_by_project(project_id)
-        if latest is not None and latest.status == ExecutionStatusModel.SCHEDULED:
-            self._reconcile_with_prefect([latest])
+        candidates = {latest.execution_id: latest} if latest is not None else {}
+        for owner_id in self._lock_repo.list_owner_execution_ids(project_id):
+            if owner_id in candidates:
+                continue
+            if owner_id.startswith("flow:"):
+                owners = self._history_repo.list_by_flow_run_id(project_id, owner_id[5:])
+            else:
+                owner = self._history_repo.find_by_id(project_id, owner_id)
+                owners = [owner] if owner is not None else []
+            candidates.update({owner.execution_id: owner for owner in owners})
+        targets = [
+            doc
+            for doc in candidates.values()
+            if doc.status in (ExecutionStatusModel.SCHEDULED, ExecutionStatusModel.CANCELLING)
+        ]
+        if targets:
+            self._reconcile_with_prefect(targets)
 
         status = self._lock_repo.get_lock_status(project_id)
         if latest is None:

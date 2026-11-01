@@ -1,12 +1,11 @@
 """Structured domain knowledge model for calibration tasks.
 
-Provides a ``TaskKnowledge`` Pydantic model and a central registry
-(``TASK_KNOWLEDGE_REGISTRY``) that maps task class names to their
-knowledge entries.
+Provides a ``TaskKnowledge`` Pydantic model and a registry that maps task
+class names to their knowledge entries.
 
 Knowledge is loaded from ``config/task-knowledge/task-knowledge.json``
-(cloned knowledge repo), which is generated from Markdown files by
-``scripts/generate_task_knowledge.py`` (run via ``task knowledge``).
+(cloned knowledge repo), which that repo's ``generate.py`` builds from the
+Markdown sources. The registry re-reads the file whenever it changes.
 
 The registry lives in ``datamodel`` so that both the API container and
 the workflow container can access it without cross-importing.
@@ -14,388 +13,408 @@ the workflow container can access it without cross-importing.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
-from typing import TYPE_CHECKING
+import re
+from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
+TASK_KNOWLEDGE_SCHEMA_VERSION = 1
 
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
 
 
-class TaskKnowledgeImage(BaseModel):
-    """Image reference extracted from a Markdown knowledge file."""
+OUTCOMES = ("expected", "suboptimal", "anomalous", "apparatus")
+"""Plot classification the evaluation model answers with (QCalEval's four outcomes)."""
 
-    alt_text: str = Field(description="Alt text from ![alt](path)")
-    relative_path: str = Field(description="Relative path from the markdown file")
-    section: str = Field(description="H2 section where the image was found")
-    base64_data: str = Field(default="", description="Base64-encoded image data")
+VERDICTS = ("pass", "pass_with_note", "fail")
+"""A human's decision about a result; separate from the plot's outcome."""
+
+_MIME_BY_SUFFIX = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
 
 
-class RelatedContextItem(BaseModel):
-    """Declarative specification for additional data to load during analysis.
+class KnowledgeFigure(BaseModel):
+    """An image file in the knowledge repository, relative to the task directory."""
 
-    Parsed from ``## Related context`` section in Markdown knowledge files.
+    alt: str = Field(default="", description="Alt text from ![alt](path)")
+    path: str = Field(description="Path relative to the task directory")
+
+
+class KnowledgeExample(BaseModel):
+    """One expert-labeled plot: a demonstration for in-context evaluation."""
+
+    id: str = Field(description="File stem under examples/")
+    title: str
+    date: str = ""
+    chip: str = ""
+    qid: str = ""
+    outcome: str = Field(description="One of the four outcomes")
+    fit_quality: str = Field(default="", description="good | marginal | poor")
+    verdict: str = Field(default="", description="pass | pass_with_note | fail")
+    source: str = ""
+    status: str = Field(
+        default="",
+        description="The task's status code the example demonstrates (QCalEval Q6), e.g. SUCCESS",
+    )
+    suggested_range: str = Field(
+        default="", description="The corrective range the example's status calls for, as text"
+    )
+    parameters: str = Field(
+        default="", description="JSON of the values read from the example's plot (QCalEval Q5)"
+    )
+    figures: list[KnowledgeFigure] = Field(default_factory=list)
+    diagnosis: str = Field(default="", description="The diagnosis the way the model should answer")
+
+    def label(self) -> str:
+        """The demonstration label shown after the example's figure."""
+        parts = [f"Outcome: {self.outcome}"]
+        if self.fit_quality:
+            parts.append(f"Fit quality: {self.fit_quality}")
+        if self.verdict:
+            parts.append(f"Verdict: {self.verdict}")
+        if self.status:
+            parts.append(f"Status: {self.status}")
+        return "\n".join([*parts, self.diagnosis]).strip()
+
+
+class TaskReference(BaseModel):
+    """The task's background the way QCalEval gives it before a plot, with the
+    family-specific parts of its question templates.
+
+    Derived from ``task.md``: the background from the intro and the expected
+    plot, the status criteria from the expected plot and the common failures,
+    the extraction schema from the parameters to extract.
     """
 
-    type: str = Field(description="Context type: 'history' | 'neighbor_qubits' | 'coupling'")
-    params: list[str] = Field(default_factory=list, description="Parameter names to extract")
-    last_n: int = Field(default=5, description="Number of recent results (for history type)")
-
-
-class ExpectedResult(BaseModel):
-    """Structured description of the expected experimental result."""
-
-    description: str = Field(
-        default="", description="Natural-language description of expected result"
+    background: str = Field(
+        default="", description="Two to four sentences: what the experiment does, what success is"
     )
-    result_type: str = Field(
-        default="",
-        description="Result type: decay_curve|oscillation|2d_map|histogram|scatter_plot|peak_curve|scalar_metric",
+    guidance: list[str] = Field(
+        default_factory=list, description="Points the significance question asks to explain"
     )
-    x_axis: str = Field(default="", description="X-axis label and unit")
-    y_axis: str = Field(default="", description="Y-axis label and unit")
-    z_axis: str = Field(default="", description="Z-axis label and unit (for 2D maps)")
-    fit_model: str = Field(default="", description="Fitting model equation (if applicable)")
-    typical_range: str = Field(default="", description="Typical value range for the metric")
-    good_visual: str = Field(default="", description="Visual characteristics of a good result")
+    parameters: dict[str, str] = Field(
+        default_factory=dict, description="Extraction schema: parameter name -> JSON type"
+    )
+    statuses: dict[str, str] = Field(
+        default_factory=dict,
+        description="Decision criteria: status code -> criterion, SUCCESS first",
+    )
+    range_format: str | None = Field(
+        default=None, description="How a suggested corrective range is written"
+    )
 
 
-class FailureMode(BaseModel):
-    """Structured failure pattern with severity and remediation info."""
-
-    severity: str = Field(description="Severity level: 'critical', 'warning', or 'info'")
-    description: str = Field(description="Description of the failure pattern")
-    cause: str = Field(default="", description="Root cause explanation")
-    visual: str = Field(default="", description="Visual characteristics in the result graph")
-    next_action: str = Field(default="", description="Recommended next action")
+_HEADING_RE = re.compile(r"^##\s+(.+?)\s*$")
+_BULLET_RE = re.compile(r"^\s*[-*]\s+(.*)$")
+_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z\[(])")
 
 
-class OutputParameterInfo(BaseModel):
-    """Description of an output parameter and its expected value."""
+def _sections(background: str) -> tuple[str, dict[str, str]]:
+    """The intro before the first ``##`` heading, and each section's text by lowercased heading."""
+    intro: list[str] = []
+    sections: dict[str, list[str]] = {}
+    current: list[str] | None = None
+    for line in background.splitlines():
+        match = _HEADING_RE.match(line)
+        if match:
+            current = sections.setdefault(match.group(1).strip().lower(), [])
+            continue
+        (intro if current is None else current).append(line)
+    return "\n".join(intro).strip(), {k: "\n".join(v).strip() for k, v in sections.items()}
 
-    name: str = Field(description="Parameter key name")
-    description: str = Field(description="Explanation and expected value range")
+
+def _paragraphs(text: str) -> list[str]:
+    """Prose paragraphs of a section: bullet lists and blank lines left out."""
+    paragraphs: list[str] = []
+    for block in re.split(r"\n\s*\n", text):
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if not lines or _BULLET_RE.match(lines[0]):
+            continue
+        paragraphs.append(" ".join(lines))
+    return paragraphs
 
 
-class KnowledgeCase(BaseModel):
-    """A concrete case derived from an issue postmortem.
+def _bullets(text: str) -> list[str]:
+    """List items of a section, continuation lines joined."""
+    items: list[str] = []
+    for line in text.splitlines():
+        match = _BULLET_RE.match(line)
+        if match:
+            items.append(match.group(1).strip())
+        elif items and line.strip():
+            items[-1] = f"{items[-1]} {line.strip()}"
+    return items
 
-    Represents a real-world incident and its resolution, providing
-    the LLM with specific examples to draw on during analysis.
+
+def _sentences(text: str) -> list[str]:
+    return [s.strip() for s in _SENTENCE_RE.split(text) if s.strip()]
+
+
+def _status_code(title: str) -> str:
+    """``Low contrast (<70%)`` -> ``LOW_CONTRAST``."""
+    bare = re.sub(r"\([^)]*\)", "", title)
+    code = re.sub(r"[^A-Za-z0-9]+", "_", bare).strip("_").upper()
+    return code or "FAILURE"
+
+
+def _split_failure(item: str) -> tuple[str, str]:
+    """A common-failure bullet as (title, criterion).
+
+    ``Low contrast (<70%) — small amplitude; next: check readout`` and
+    ``Short T1 (<20 μs): the curve flattens early; check TLS`` both split at
+    their first separator; the criterion stops at the first ``;``.
+    """
+    for separator in (" \u2014 ", " \u2013 ", ": "):  # em dash, en dash, colon
+        if separator in item:
+            title, rest = item.split(separator, 1)
+            break
+    else:
+        words = item.split()
+        title, rest = " ".join(words[:4]), item
+    criterion = rest.split(";", 1)[0].strip().rstrip(".")
+    return title.strip(), criterion
+
+
+def _parameter_type(description: str) -> str:
+    lowered = description.lower()
+    if "bool" in lowered:
+        return "true | false"
+    if re.search(r"\b(int|integer|count|number of)\b", lowered):
+        return "int"
+    return "float"
+
+
+def derive_reference(name: str, background: str) -> TaskReference:
+    """The QCalEval-style reference of a task from its ``task.md`` body."""
+    intro, sections = _sections(background)
+    expected = _paragraphs(sections.get("expected plot", ""))
+    intro_paragraphs = _paragraphs(intro)
+    pieces = [f"This is a {name} experiment:" if name else "This is a calibration experiment:"]
+    if intro_paragraphs:
+        pieces.append(intro_paragraphs[0])
+    if expected:
+        pieces.append(expected[0])
+    text = " ".join(pieces).strip()
+    if text.endswith(":"):
+        text = text[:-1] + "."
+
+    statuses: dict[str, str] = {}
+    expected_sentences = _sentences(expected[0]) if expected else []
+    success = next(
+        (s for s in expected_sentences if re.match(r"a good result\b", s, re.IGNORECASE)), None
+    )
+    if success:
+        success = re.sub(r"^a good result\s*[:\uff1a]?\s*", "", success, flags=re.IGNORECASE)
+    elif expected_sentences:
+        success = expected_sentences[0]
+    statuses["SUCCESS"] = (success or "The result matches the expected plot").rstrip(".")
+    for item in _bullets(sections.get("common failures", "")):
+        title, criterion = _split_failure(item)
+        code = _status_code(title)
+        if code in statuses:
+            continue
+        statuses[code] = criterion or title
+
+    parameters: dict[str, str] = {}
+    for item in _bullets(sections.get("parameters to extract", "")):
+        if ":" not in item:
+            continue
+        pname, description = item.split(":", 1)
+        pname = pname.strip().strip("`")
+        if pname and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", pname):
+            parameters[pname] = _parameter_type(description)
+
+    return TaskReference(background=text, statuses=statuses, parameters=parameters)
+
+
+NextActionKind = Literal["continue", "retry", "run_task", "request_human"]
+
+
+class NextAction(BaseModel):
+    """What an autonomous plan does after the evaluation reports one status.
+
+    Declared in ``task.md``'s frontmatter under ``next_actions``, keyed by the
+    status codes the evaluation offers for the task: ``SUCCESS`` plus one code per
+    bullet under ``## Common failures``. A task without that section offers only
+    ``SUCCESS``, so it cannot branch. The frontmatter never reaches the evaluation
+    prompt.
     """
 
-    title: str = Field(description="Short descriptive title of the case")
-    date: str = Field(default="", description="Date of the incident (YYYY-MM-DD)")
-    severity: str = Field(default="warning", description="Severity: critical, warning, info")
-    chip_id: str = Field(default="", description="Chip identifier")
-    qid: str = Field(default="", description="Qubit identifier")
-    status: str = Field(default="resolved", description="Case status: resolved, open, workaround")
-    human_label: str = Field(default="", description="Human review label for the case")
-    failure_mode_labels: list[str] = Field(
-        default_factory=list,
-        description="Structured failure-mode labels for retrieval and filtering",
+    model_config = ConfigDict(extra="ignore")
+
+    action: NextActionKind = Field(description="continue, retry, run_task, or request_human")
+    task: str | None = Field(default=None, description="The task to run next, for run_task")
+    overrides: dict[str, float] = Field(
+        default_factory=dict,
+        description="Calibration input overrides for the next run (retry or run_task)",
     )
-    case_type: list[str] = Field(
-        default_factory=list,
-        description="Knowledge case type: positive_example, boundary_case, counterexample, etc.",
+    suggested_range_parameter: str | None = Field(
+        default=None,
+        description=(
+            "Input to set from the midpoint of the evaluation's suggested range, for retry; "
+            "the session's override bounds still apply"
+        ),
     )
-    model_error_type: str = Field(
-        default="",
-        description="Verifier outcome type: true_positive, false_positive, false_negative, etc.",
-    )
-    resolution_label: str = Field(
-        default="",
-        description="Structured resolution label such as accept_heuristic or rerun_task",
-    )
-    symptom: str = Field(default="", description="Observed symptom")
-    model_prediction: str = Field(default="", description="Verifier/model prediction summary")
-    human_review_decision: str = Field(default="", description="Human review decision summary")
-    root_cause: str = Field(default="", description="Identified root cause")
-    resolution: str = Field(default="", description="How the issue was resolved")
-    boundary_criteria: str = Field(
-        default="",
-        description="Criteria that make this a boundary or counterexample case",
-    )
-    lesson_learned: list[str] = Field(
-        default_factory=list,
-        description="Key takeaways from the case",
-    )
-    applicability: str = Field(default="", description="When this case should be retrieved")
-    counterexample: str = Field(default="", description="What rule this case counters")
-    prompt_guidance: str = Field(
-        default="", description="Prompt/checklist guidance derived from case"
-    )
-    images: list[TaskKnowledgeImage] = Field(
-        default_factory=list,
-        description="Image references from the case file (with base64 data)",
-    )
-    model_config = ConfigDict(protected_namespaces=())
+    note: str = Field(default="", description="Why this step follows, for the reviewer")
+
+    @model_validator(mode="after")
+    def _shape(self) -> NextAction:
+        if self.action == "run_task" and not self.task:
+            raise ValueError("next action run_task needs a task")
+        if self.action != "run_task" and self.task:
+            raise ValueError(f"next action {self.action} takes no task")
+        if self.action in {"continue", "request_human"} and (
+            self.overrides or self.suggested_range_parameter
+        ):
+            raise ValueError(f"next action {self.action} takes no overrides")
+        return self
 
 
 class TaskKnowledge(BaseModel):
-    """LLM-oriented structured knowledge for a calibration task."""
+    """What the knowledge repository says about one calibration task.
+
+    The shape follows the QCalEval / Ising-Calibration papers: a prose
+    background for the experiment (the task's ``task.md``) and labeled
+    example plots. The category is the calibtasks package the task lives in.
+    Old-format entries (summary, what_it_measures, ...) are read for their
+    background only.
+    """
+
+    model_config = ConfigDict(extra="ignore")
 
     name: str = Field(description="Task name (e.g. CheckT1)")
-    category: str = Field(default="", description="Category slug (e.g. td-characterization)")
-    summary: str = Field(description="One-line experiment summary")
-    what_it_measures: str = Field(description="What physical quantity is measured")
-    physical_principle: str = Field(
-        description="Concise explanation of the physical principle, including pulse sequences"
+    category: str = Field(default="", description="calibtasks package (e.g. one_qubit_coarse)")
+    background: str = Field(
+        default="", description="The task's task.md: what the experiment does and shows"
     )
-    expected_result: ExpectedResult = Field(
-        default_factory=ExpectedResult,
-        description="Expected shape and features of the result",
+    figures: list[KnowledgeFigure] = Field(
+        default_factory=list, description="Figures task.md references"
     )
-    evaluation_criteria: str = Field(
-        default="",
-        description="Qualitative evaluation criteria (thresholds are in copilot/review.yaml)",
-    )
-    check_questions: list[str] = Field(
-        default_factory=list,
-        description="Rubric-style questions for LLM to evaluate",
-    )
-    failure_modes: list[FailureMode] = Field(
-        default_factory=list,
-        description="Common failure patterns with severity and remediation",
-    )
-    tips: list[str] = Field(
-        default_factory=list,
-        description="Practical tips for improving results",
-    )
-    output_parameters_info: list[OutputParameterInfo] = Field(
-        default_factory=list,
-        description="Descriptions of output parameter keys",
-    )
-    analysis_guide: list[str] = Field(
-        default_factory=list,
-        description="Step-by-step reasoning guide for the LLM",
-    )
-    prerequisites: list[str] = Field(
-        default_factory=list,
-        description="Tasks that should be completed before this one",
-    )
-    images: list[TaskKnowledgeImage] = Field(
-        default_factory=list,
-        description="Image references from the markdown file",
-    )
-    review_markdown: str = Field(
-        default="",
-        description="Optional AI-review-specific markdown guidance",
-    )
-    review_images: list[TaskKnowledgeImage] = Field(
-        default_factory=list,
-        description="Image references from the review markdown file",
-    )
-    related_context: list[RelatedContextItem] = Field(
-        default_factory=list,
-        description="Additional data sources to load during analysis",
-    )
-    cases: list[KnowledgeCase] = Field(
-        default_factory=list,
-        description="Concrete cases derived from issue postmortems",
+    examples: list[KnowledgeExample] = Field(default_factory=list)
+    next_actions: dict[str, NextAction] = Field(
+        default_factory=dict,
+        description="Autonomous-plan step per evaluation status code, from the frontmatter",
     )
 
-    def to_prompt(self) -> str:
-        """Convert to a markdown string suitable for an LLM system prompt.
+    # A draft's figures live in its own directory, not the shared repository.
+    _task_dir: Any = PrivateAttr(default=None)
 
-        Note: Deployment-specific scoring thresholds are NOT included here;
-        they are injected separately by copilot_agent._build_system_prompt().
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_previous_format(cls, data: Any) -> Any:
+        if not isinstance(data, dict) or data.get("background") or not data.get("summary"):
+            return data
+        data = dict(data)
+        parts = [data.get("summary", ""), data.get("what_it_measures", "")]
+        data["background"] = "\n\n".join(p for p in parts if p)
+        data.setdefault(
+            "figures",
+            [
+                {"alt": img.get("alt_text", ""), "path": img.get("relative_path", "")}
+                for img in data.get("images", [])
+                if isinstance(img, dict) and img.get("relative_path")
+            ],
+        )
+        return data
+
+    @property
+    def summary(self) -> str:
+        """The background's first paragraph, for listings."""
+        return self.background.split("\n\n", 1)[0].strip()
+
+    def reference(self) -> TaskReference:
+        """The background and question-template parts for the evaluation model."""
+        return derive_reference(self.name, self.background)
+
+    def status_codes(self) -> tuple[str, ...]:
+        """The Q6 statuses the evaluation offers for this task, in the order shown.
+
+        The task's criteria replace the evaluator's built-in statuses, so these
+        are exactly ``SUCCESS`` and the common-failure codes derived from task.md.
         """
-        lines = [
-            f"## Experiment: {self.name}",
-            self.summary,
-            "",
-            "### What it measures",
-            self.what_it_measures,
-            "",
-            "### Physical principle",
-            self.physical_principle,
-            "",
-            "### Expected result",
-            self.expected_result.description,
-        ]
-        # Add structured metadata if present
-        er = self.expected_result
-        meta_parts = []
-        if er.result_type:
-            meta_parts.append(f"- Result type: {er.result_type}")
-        if er.x_axis:
-            meta_parts.append(f"- X-axis: {er.x_axis}")
-        if er.y_axis:
-            meta_parts.append(f"- Y-axis: {er.y_axis}")
-        if er.z_axis:
-            meta_parts.append(f"- Z-axis: {er.z_axis}")
-        if er.fit_model:
-            meta_parts.append(f"- Fit model: {er.fit_model}")
-        if er.typical_range:
-            meta_parts.append(f"- Typical range: {er.typical_range}")
-        if er.good_visual:
-            meta_parts.append(f"- Good result looks like: {er.good_visual}")
-        if meta_parts:
-            lines += ["", *meta_parts]
+        return tuple(self.reference().statuses)
 
-        if self.evaluation_criteria:
-            lines += [
-                "",
-                "### Evaluation criteria",
-                self.evaluation_criteria,
-            ]
-        if self.check_questions:
-            lines += ["", "**Check questions:**"]
-            lines += [f"- {q}" for q in self.check_questions]
-
-        if self.output_parameters_info:
-            lines += ["", "### Output parameters"]
-            for p in self.output_parameters_info:
-                lines.append(f"- **{p.name}**: {p.description}")
-
-        if self.failure_modes:
-            lines += ["", "### Common failure patterns"]
-            for f in self.failure_modes:
-                lines.append(f"- [{f.severity}] {f.description}")
-                if f.cause:
-                    lines.append(f"  - Cause: {f.cause}")
-                if f.visual:
-                    lines.append(f"  - Visual: {f.visual}")
-                if f.next_action:
-                    lines.append(f"  - Next: {f.next_action}")
-
-        if self.tips:
-            lines += [
-                "",
-                "### Tips for improvement",
-                *[f"- {t}" for t in self.tips],
-            ]
-
-        if self.analysis_guide:
-            lines += ["", "### Analysis guide"]
-            for i, step in enumerate(self.analysis_guide, 1):
-                lines.append(f"{i}. {step}")
-
-        if self.prerequisites:
-            lines += ["", "### Prerequisites"]
-            lines += [f"- {p}" for p in self.prerequisites]
-
-        if self.images:
-            lines += ["", "### Reference figures"]
-            for img in self.images:
-                lines.append(f"- {img.alt_text}: {img.relative_path}")
-
-        if self.cases:
-            lines += [
-                "",
-                "### Past cases",
-                "For each case below, check the diagnostic criteria in the lessons"
-                " and report whether the current conditions satisfy or violate them.",
-            ]
-            for i, case in enumerate(self.cases, 1):
-                header = f"{i}. [{case.severity}] {case.title}"
-                if case.date:
-                    header += f" ({case.date}"
-                    if case.qid:
-                        header += f", {case.qid}"
-                    header += ")"
-                lines.append(header)
-                labels = []
-                if case.human_label:
-                    labels.append(f"human_label={case.human_label}")
-                if case.failure_mode_labels:
-                    labels.append(f"failure_modes={', '.join(case.failure_mode_labels)}")
-                if case.case_type:
-                    labels.append(f"case_type={', '.join(case.case_type)}")
-                if case.model_error_type:
-                    labels.append(f"model_error_type={case.model_error_type}")
-                if case.resolution_label:
-                    labels.append(f"resolution_label={case.resolution_label}")
-                if labels:
-                    lines.append(f"   - Labels: {'; '.join(labels)}")
-                if case.symptom:
-                    lines.append(f"   - Symptom: {case.symptom}")
-                if case.model_prediction:
-                    lines.append(f"   - Model prediction: {case.model_prediction}")
-                if case.human_review_decision:
-                    lines.append(f"   - Human review decision: {case.human_review_decision}")
-                if case.root_cause:
-                    lines.append(f"   - Root cause: {case.root_cause}")
-                if case.resolution:
-                    lines.append(f"   - Resolution: {case.resolution}")
-                if case.boundary_criteria:
-                    lines.append(f"   - Boundary criteria: {case.boundary_criteria}")
-                if case.lesson_learned:
-                    lines.append(f"   - Lessons: {'; '.join(case.lesson_learned)}")
-                if case.applicability:
-                    lines.append(f"   - Applicability: {case.applicability}")
-                if case.counterexample:
-                    lines.append(f"   - Counterexample: {case.counterexample}")
-                if case.prompt_guidance:
-                    lines.append(f"   - Prompt guidance: {case.prompt_guidance}")
-                if case.images:
-                    for img in case.images:
-                        lines.append(f"   - Image: {img.alt_text} ({img.relative_path})")
-
-        return "\n".join(lines)
-
-    @staticmethod
-    def _normalize_markdown_block(markdown: str) -> str:
-        """Strip top-level heading and image lines from a markdown block."""
-        normalized_lines: list[str] = []
-        for line in markdown.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("# "):
-                continue
-            if stripped.startswith("!["):
-                continue
-            normalized_lines.append(line)
-        return "\n".join(normalized_lines).strip()
-
-    def to_review_prompt(self) -> str:
-        """Build a compact prompt focused on AI review decisions."""
-        lines = [
-            f"## Experiment: {self.name}",
-            self.summary,
-            "",
-            "### What it measures",
-            self.what_it_measures,
-            "",
-            "### Expected result",
-            self.expected_result.description,
+    def next_action_problems(self) -> list[str]:
+        """Why a ``next_actions`` entry can never apply: its key is not a status the evaluation offers."""
+        offered = set(self.status_codes())
+        return [
+            f"next_actions.{code}: {self.name} evaluation never reports {code} "
+            f"(it offers {', '.join(self.status_codes())})"
+            for code in self.next_actions
+            if code not in offered
         ]
 
-        if self.expected_result.good_visual:
-            lines += ["", f"- Good result looks like: {self.expected_result.good_visual}"]
+    def to_prompt(self, *, include_examples: bool = False) -> str:
+        """Render the task's reference text for a model: the background as written.
 
-        if self.check_questions:
-            lines += ["", "### Review questions"]
-            lines += [f"- {question}" for question in self.check_questions]
+        Examples are appended as text only on request (the chat opens with
+        them); the evaluation path shows them as figure + label pairs instead.
+        """
+        lines = [f"## Experiment: {self.name}", self.background.strip()]
+        if include_examples and self.examples:
+            lines += ["", "### Labeled examples"]
+            for example in self.examples:
+                lines.append(
+                    f"- {example.title} ({example.outcome}"
+                    + (f", {example.verdict}" if example.verdict else "")
+                    + f"): {example.diagnosis}"
+                )
+        return "\n".join(lines).strip()
 
-        if self.failure_modes:
-            lines += ["", "### Common failure patterns"]
-            for failure in self.failure_modes:
-                lines.append(f"- [{failure.severity}] {failure.description}")
-                if failure.visual:
-                    lines.append(f"  - Visual: {failure.visual}")
-                if failure.next_action:
-                    lines.append(f"  - Next: {failure.next_action}")
+    # --- figures on disk ---
 
-        if self.analysis_guide:
-            lines += ["", "### Analysis guide"]
-            for index, step in enumerate(self.analysis_guide, 1):
-                lines.append(f"{index}. {step}")
+    def task_dir(self) -> Path | None:
+        """The task's directory: a draft's own, else the cloned knowledge repository's."""
+        if self._task_dir is not None:
+            return self._task_dir if self._task_dir.is_dir() else None
+        repo_dir = _resolve_repo_dir()
+        if repo_dir is None or not self.category:
+            return None
+        task_dir = repo_dir / self.category / self.name
+        return task_dir if task_dir.is_dir() else None
 
-        review_markdown = self._normalize_markdown_block(self.review_markdown)
-        if review_markdown:
-            lines += ["", "### AI review guidance", review_markdown]
+    def figure_file(self, relative_path: str) -> Path | None:
+        """Resolve a figure path inside the task directory; ``None`` if outside or missing."""
+        task_dir = self.task_dir()
+        if task_dir is None:
+            return None
+        candidate = (task_dir / relative_path.strip().lstrip("./")).resolve()
+        try:
+            candidate.relative_to(task_dir.resolve())
+        except ValueError:
+            return None
+        return candidate if candidate.is_file() else None
 
-        return "\n".join(lines)
+    def load_figure(self, relative_path: str) -> tuple[bytes, str] | None:
+        """Read a figure's bytes and media type."""
+        file = self.figure_file(relative_path)
+        if file is None:
+            return None
+        return file.read_bytes(), _MIME_BY_SUFFIX.get(
+            file.suffix.lower(), "application/octet-stream"
+        )
+
+    def load_figure_base64(self, relative_path: str) -> tuple[str, str] | None:
+        """A figure as (base64, media type), for JSON responses and model inputs."""
+        loaded = self.load_figure(relative_path)
+        if loaded is None:
+            return None
+        data, mime = loaded
+        return base64.b64encode(data).decode("ascii"), mime
 
 
 # ---------------------------------------------------------------------------
@@ -439,32 +458,104 @@ def _resolve_repo_dir() -> Path | None:
     return None
 
 
-def _build_registry() -> dict[str, TaskKnowledge]:
+def _build_registry(json_path: Path) -> dict[str, TaskKnowledge]:
     """Build the task knowledge registry from the generated JSON file."""
-    json_path = _resolve_json_path()
-    if json_path is None:
-        logger.warning("task-knowledge.json not found; run 'task knowledge' to generate it")
-        return {}
-
     raw = json.loads(json_path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("task-knowledge.json must contain an object")
+    if "schema_version" in raw or "tasks" in raw:
+        version = raw.get("schema_version")
+        if version != TASK_KNOWLEDGE_SCHEMA_VERSION:
+            raise ValueError(f"unsupported task-knowledge schema_version: {version!r}")
+        raw = raw.get("tasks")
+        if not isinstance(raw, dict):
+            raise ValueError("task-knowledge.json tasks must contain an object")
     registry: dict[str, TaskKnowledge] = {}
     for name, data in raw.items():
+        if not isinstance(data, dict):
+            raise ValueError(f"task-knowledge entry {name!r} must contain an object")
         registry[name] = TaskKnowledge(**data)
     logger.info("Loaded %d task knowledge entries from %s", len(registry), json_path)
     return registry
 
 
-TASK_KNOWLEDGE_REGISTRY: dict[str, TaskKnowledge] = _build_registry()
+# The registry follows the JSON file on disk: it is rebuilt whenever the file's
+# identity (path, mtime, size) changes, so ``task knowledge-pull`` on the host
+# reaches every API worker without a restart.
+_REGISTRY_CACHE: tuple[tuple[str, int, int] | None, dict[str, TaskKnowledge]] = (None, {})
+_WARNED_MISSING = False
+
+
+def _registry() -> dict[str, TaskKnowledge]:
+    global _REGISTRY_CACHE, _WARNED_MISSING
+    json_path = _resolve_json_path()
+    if json_path is None:
+        if not _WARNED_MISSING:
+            logger.warning("task-knowledge.json not found; run 'task knowledge-pull' to fetch it")
+            _WARNED_MISSING = True
+        _REGISTRY_CACHE = (None, {})
+        return {}
+    stat = json_path.stat()
+    key = (str(json_path), stat.st_mtime_ns, stat.st_size)
+    cached_key, cached = _REGISTRY_CACHE
+    if cached_key == key:
+        return cached
+    registry = _build_registry(json_path)
+    _REGISTRY_CACHE = (key, registry)
+    return registry
+
+
+def parse_task_dir(task_dir: Path, *, category: str = "") -> tuple[TaskKnowledge | None, list[str]]:
+    """Parse one task directory with the knowledge repository's own generator.
+
+    The same parser builds ``task-knowledge.json``, so a draft reads exactly as
+    the published entry would. Returns the entry, ``None`` when the generator
+    rejects it, and the generator's warnings. Figures resolve inside
+    ``task_dir``.
+    """
+    import importlib.util
+
+    repo_dir = _resolve_repo_dir()
+    generator = repo_dir / "generate.py" if repo_dir is not None else None
+    if generator is None or not generator.is_file():
+        raise RuntimeError("generate.py not found in the task-knowledge repository")
+    spec = importlib.util.spec_from_file_location("_task_knowledge_generate", generator)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {generator}")
+    # A fresh module per call: the generator collects warnings in a module-level list.
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    if hasattr(module, "parse_task_dir"):
+        result = module.parse_task_dir(task_dir, category)
+        if isinstance(result, dict):
+            version = result.get("schema_version")
+            if version != TASK_KNOWLEDGE_SCHEMA_VERSION:
+                raise RuntimeError(f"unsupported task-knowledge schema_version: {version!r}")
+            entry = result.get("entry")
+            raised = result.get("warnings", [])
+        else:
+            # Public parsers deployed before the versioned result returned a tuple.
+            entry, raised = result
+    else:
+        # Checkouts from before the public entry point.
+        entry = module._parse_task(task_dir, category)
+        raised = getattr(module, "warnings", [])
+    warnings = [str(warning) for warning in raised]
+    if not entry:
+        return None, warnings
+    knowledge = TaskKnowledge(**entry)
+    knowledge._task_dir = task_dir
+    return knowledge, warnings
 
 
 def get_task_knowledge(task_name: str) -> TaskKnowledge | None:
     """Look up TaskKnowledge by task class name."""
-    return TASK_KNOWLEDGE_REGISTRY.get(task_name)
+    return _registry().get(task_name)
 
 
 def list_all_task_knowledge() -> list[TaskKnowledge]:
     """Return all task knowledge entries."""
-    return list(TASK_KNOWLEDGE_REGISTRY.values())
+    return list(_registry().values())
 
 
 def get_task_knowledge_repo_metadata() -> tuple[str | None, str | None]:
@@ -486,109 +577,21 @@ def get_task_knowledge_repo_metadata() -> tuple[str | None, str | None]:
         return repo_url, None
 
 
-# Category slug → display name mapping
+# Category = the calibtasks package the task lives in → display name.
 CATEGORY_DISPLAY_NAMES: dict[str, str] = {
-    "box-setup": "Box Setup",
+    "box_setup": "Box Setup",
     "system": "System",
-    "cw-characterization": "CW Characterization",
-    "td-characterization": "TD Characterization",
-    "one-qubit-gate-calibration": "One-Qubit Gate Calibration",
-    "two-qubit-gate-calibration": "Two-Qubit Gate Calibration",
-    "benchmarking": "Benchmarking",
+    "cw": "CW Characterization",
+    "measurement": "Measurement",
+    "one_qubit_coarse": "One-Qubit Coarse",
+    "one_qubit_fine": "One-Qubit Fine",
+    "two_qubit": "Two-Qubit",
+    "benchmark": "Benchmark",
+    "analysis": "Analysis",
 }
-
-# Canonical task → category directory mapping.
-# This is the single source of truth used by both the API and the
-# ``generate_task_knowledge.py`` script.
-TASK_TO_CATEGORY_DIR: dict[str, str] = {}
-_CATEGORIES: list[tuple[str, str, list[str]]] = [
-    (
-        "Box Setup",
-        "box-setup",
-        [
-            "CheckStatus",
-            "LinkUp",
-            "DumpBox",
-            "CheckNoise",
-            "Configure",
-            "ConfigureAll",
-            "ReadoutConfigure",
-        ],
-    ),
-    (
-        "CW Characterization",
-        "cw-characterization",
-        [
-            "CheckResonatorSpectroscopy",
-            "CheckQubitSpectroscopy",
-        ],
-    ),
-    (
-        "TD Characterization",
-        "td-characterization",
-        [
-            "CheckRabi",
-            "CheckT1",
-            "CheckT2Echo",
-            "CheckRamsey",
-            "CheckOptimalReadoutAmplitude",
-            "ReadoutClassification",
-            "CheckFineChevron",
-        ],
-    ),
-    (
-        "One-Qubit Gate Calibration",
-        "one-qubit-gate-calibration",
-        [
-            "CheckPIPulse",
-            "CheckHPIPulse",
-            "CheckDRAGPIPulse",
-            "CheckDRAGHPIPulse",
-            "CreatePIPulse",
-            "CreateHPIPulse",
-            "CreateDRAGPIPulse",
-            "CreateDRAGHPIPulse",
-        ],
-    ),
-    (
-        "Two-Qubit Gate Calibration",
-        "two-qubit-gate-calibration",
-        [
-            "CheckCrossResonance",
-            "CheckZX90",
-            "CreateZX90",
-            "CheckBellState",
-            "CheckBellStateTomography",
-        ],
-    ),
-    (
-        "Benchmarking",
-        "benchmarking",
-        [
-            "RandomizedBenchmarking",
-            "X90InterleavedRandomizedBenchmarking",
-            "X180InterleavedRandomizedBenchmarking",
-            "ZX90InterleavedRandomizedBenchmarking",
-        ],
-    ),
-]
-for _cat_name, _cat_dir, _cat_tasks in _CATEGORIES:
-    for _t in _cat_tasks:
-        TASK_TO_CATEGORY_DIR[_t] = _cat_dir
 
 
 def get_task_category_dir(task_name: str) -> str:
-    """Return the category directory slug for a task name.
-
-    First checks the static ``TASK_TO_CATEGORY_DIR`` mapping (covers
-    all known tasks even without a knowledge entry), then falls back
-    to the loaded registry's ``category`` field.
-    Returns ``"other"`` if the task is completely unknown.
-    """
-    cat = TASK_TO_CATEGORY_DIR.get(task_name)
-    if cat:
-        return cat
-    entry = TASK_KNOWLEDGE_REGISTRY.get(task_name)
-    if entry and entry.category:
-        return entry.category
-    return "other"
+    """The calibtasks package a task's knowledge lives under, or ``"other"``."""
+    entry = _registry().get(task_name)
+    return entry.category if entry and entry.category else "other"

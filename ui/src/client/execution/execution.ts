@@ -30,10 +30,12 @@ import type {
   Detail,
   DownloadArtifactByPathParams,
   DownloadArtifactsAsArchiveParams,
+  ExecutionActivityResponse,
   ExecutionAvailabilityRequest,
   ExecutionAvailabilityResponse,
   ExecutionLockStatusResponse,
   ExecutionResponseDetail,
+  GetExecutionActivityParams,
   GetFigureByPathParams,
   HTTPValidationError,
   ListExecutionsParams,
@@ -632,7 +634,7 @@ export const useCheckExecutionAvailability = <TError = Detail | HTTPValidationEr
       return useMutation(getCheckExecutionAvailabilityMutationOptions(options), queryClient);
     }
     /**
- * List executions for a given chip with pagination.
+ * List executions for a given chip with pagination, optionally for one calendar day.
  *
  * Parameters
  * ----------
@@ -732,6 +734,103 @@ export function useListExecutions<TData = Awaited<ReturnType<typeof listExecutio
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListExecutionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Count a chip's executions per calendar day, by status, over a trailing window.
+ *
+ * Every day of the window is returned, empty days included, so a chart can draw a
+ * continuous axis. Days follow ``timezone`` so they match what the user sees.
+ * @summary Count executions per day
+ */
+export const getExecutionActivity = (
+    params: GetExecutionActivityParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ExecutionActivityResponse>(
+      {url: `/executions/activity`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetExecutionActivityQueryKey = (params?: GetExecutionActivityParams,) => {
+    return [
+    `/executions/activity`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetExecutionActivityQueryOptions = <TData = Awaited<ReturnType<typeof getExecutionActivity>>, TError = HTTPValidationError>(params: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetExecutionActivityQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExecutionActivity>>> = ({ signal }) => getExecutionActivity(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetExecutionActivityQueryResult = NonNullable<Awaited<ReturnType<typeof getExecutionActivity>>>
+export type GetExecutionActivityQueryError = HTTPValidationError
+
+
+export function useGetExecutionActivity<TData = Awaited<ReturnType<typeof getExecutionActivity>>, TError = HTTPValidationError>(
+ params: GetExecutionActivityParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getExecutionActivity>>,
+          TError,
+          Awaited<ReturnType<typeof getExecutionActivity>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetExecutionActivity<TData = Awaited<ReturnType<typeof getExecutionActivity>>, TError = HTTPValidationError>(
+ params: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getExecutionActivity>>,
+          TError,
+          Awaited<ReturnType<typeof getExecutionActivity>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetExecutionActivity<TData = Awaited<ReturnType<typeof getExecutionActivity>>, TError = HTTPValidationError>(
+ params: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Count executions per day
+ */
+
+export function useGetExecutionActivity<TData = Awaited<ReturnType<typeof getExecutionActivity>>, TError = HTTPValidationError>(
+ params: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetExecutionActivityQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

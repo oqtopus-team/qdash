@@ -101,7 +101,7 @@ const TopologyCell = memo(function TopologyCell({
         className={`aspect-square rounded-lg shadow-sm relative group cursor-pointer ${getStatusColor(status)} ${muxBgClass}`}
       >
         {showLabels && (
-          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-bold">
+          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-medium">
             {qid}
           </div>
         )}
@@ -120,7 +120,7 @@ const TopologyCell = memo(function TopologyCell({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(event) => handleActivationKey(event, onClick)}
-      className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${muxBgClass}`}
+      className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 relative w-full ${muxBgClass}`}
     >
       {figurePath && (
         <div className="absolute inset-1">
@@ -140,7 +140,7 @@ const TopologyCell = memo(function TopologyCell({
       )}
       <div className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(status)}`} />
       {tasks.length > 1 && (
-        <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-bold">
+        <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-medium">
           {tasks.length}
         </div>
       )}
@@ -200,7 +200,7 @@ const CouplingMarker = memo(function CouplingMarker({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(event) => handleActivationKey(event, onClick)}
-      className="absolute z-20 rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2"
+      className="absolute z-20 rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-transform duration-200 hover:shadow-xl hover:border-primary/40 -translate-x-1/2 -translate-y-1/2"
       style={{
         left,
         top,
@@ -219,12 +219,12 @@ const CouplingMarker = memo(function CouplingMarker({
           />
         </div>
       )}
-      <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-[0.65rem] font-medium">
+      <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
         {couplingId}
       </div>
       <div className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(status)}`} />
       {tasks.length > 1 && (
-        <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-bold">
+        <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-medium">
           {tasks.length}
         </div>
       )}
@@ -389,7 +389,6 @@ export function ExecutionTopologyView({
         gridTemplateColumns: `repeat(${gridCols}, minmax(${baseCellSize}px, 1fr))`,
         gridTemplateRows: `repeat(${gridRows}, minmax(${baseCellSize}px, 1fr))`,
         width: calculateGridContainerWidth(gridCols, baseCellSize, isMobile, viewportHeight),
-        willChange: "transform",
       }}
     >
       {Array.from({ length: gridRows * gridCols }).map((_, index) => {
@@ -479,7 +478,7 @@ export function ExecutionTopologyView({
                     gridRow: `${startRow} / span ${spanRows}`,
                   }}
                 >
-                  <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
+                  <div className="text-[0.45rem] md:text-[0.6rem] font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
                     MUX{muxIndex}
                   </div>
                 </div>

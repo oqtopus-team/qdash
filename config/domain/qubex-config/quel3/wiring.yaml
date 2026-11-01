@@ -1,0 +1,8 @@
+# TODO: Replace [] with your MUX rows; uncomment and adapt the example below.
+# Use box IDs from box.yaml and ports matching the physical wiring.
+# Repeat for each MUX; ctrl lists its qubit control ports in order.
+$chip_id: []
+#  - mux: 0
+#    ctrl: ["quel3-02-a01:4", "quel3-02-a01:2", "quel3-02-a01:11", "quel3-02-a01:9"]
+#    read_out: "quel3-02-a01:1"
+#    read_in: "quel3-02-a01:0"

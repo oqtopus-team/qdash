@@ -1,5 +1,6 @@
 "use client";
 
+import Axios from "axios";
 import {
   Activity,
   CalendarCheck2,
@@ -14,44 +15,49 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import type { ForumCategoryResponse } from "@/schemas";
+import type { ForumCategoryResponse, ForumLabelResponse } from "@/schemas";
+
+/** Returns a friendlier message for a forum label API error (e.g. a 409 duplicate name), falling back to the given default. */
+export function getForumLabelErrorMessage(error: unknown, fallback: string): string {
+  if (Axios.isAxiosError(error) && error.response?.status === 409) {
+    return "A label with this name already exists";
+  }
+  return fallback;
+}
+
+/** Neutral fallback color for labels that no longer exist in the project. */
+export const NEUTRAL_FORUM_LABEL_COLOR = "#6b7280";
 
 export type ForumLabelDefinition = {
   id: string;
   label: string;
-  badgeClass: string;
-  buttonClass: string;
+  description: string;
+  color: string;
 };
 
-export const FORUM_LABELS: ForumLabelDefinition[] = [
-  { id: "review", label: "Review", badgeClass: "badge-primary", buttonClass: "btn-primary" },
-  { id: "anomaly", label: "Anomaly", badgeClass: "badge-warning", buttonClass: "btn-warning" },
-];
-
-const LEGACY_LABEL_ALIASES: Record<string, string> = {
-  discussion: "review",
-  info: "review",
-  mtg: "review",
-  resolved: "review",
-};
-
-export function getForumLabel(label: string): ForumLabelDefinition {
-  const resolvedId = LEGACY_LABEL_ALIASES[label] ?? label;
-  const definition = FORUM_LABELS.find((item) => item.id === resolvedId);
-  return definition
-    ? { ...definition, id: label }
-    : {
-        id: label,
-        label,
-        badgeClass: "badge-ghost",
-        buttonClass: "btn-ghost",
-      };
+/** Maps an API label response to the UI label definition. */
+export function toForumLabelDefinition(label: ForumLabelResponse): ForumLabelDefinition {
+  return {
+    id: label.key,
+    label: label.name,
+    description: label.description ?? "",
+    color: label.color,
+  };
 }
 
-export function forumMarkerClass(label: string | undefined): string {
-  if (label === "anomaly") return "bg-warning text-warning-content";
-  if (label === "review") return "bg-primary text-primary-content";
-  return "bg-base-300 text-base-content";
+/** Returns the label definition for a key, falling back to a gray placeholder. */
+export function getForumLabel(
+  key: string,
+  labels: ForumLabelDefinition[] = [],
+): ForumLabelDefinition {
+  return (
+    labels.find((item) => item.id === key) ?? {
+      id: key,
+      label: key,
+      description: "",
+      color: NEUTRAL_FORUM_LABEL_COLOR,
+    }
+  );
 }
 
 export type ForumStatusDefinition = {
@@ -92,7 +98,7 @@ export function formatForumPostTitle(
   number: number | null | undefined,
 ): string {
   const displayNumber = formatForumPostNumber(number);
-  const displayTitle = title || "Untitled topic";
+  const displayTitle = title || "Untitled thread";
   return displayNumber ? `${displayNumber} · ${displayTitle}` : displayTitle;
 }
 

@@ -104,9 +104,7 @@ export function TaskMessagePanel({
 
   return (
     <div className={`overflow-hidden rounded-lg border ${tone.frameClass} ${className}`}>
-      <div
-        className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold ${tone.headerClass}`}
-      >
+      <div className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${tone.headerClass}`}>
         <Icon className="h-3.5 w-3.5 shrink-0" />
         {tone.title}
       </div>
@@ -120,7 +118,7 @@ export function TaskMessagePanel({
       {trimmedStackTrace && (
         <>
           <div
-            className={`flex items-center justify-between border-t px-3 py-1 text-xs font-semibold ${tone.stackHeaderClass}`}
+            className={`flex items-center justify-between border-t px-3 py-1 text-xs font-medium ${tone.stackHeaderClass}`}
           >
             Stack Trace
             <button type="button" className="btn btn-ghost btn-xs" onClick={copyStackTrace}>

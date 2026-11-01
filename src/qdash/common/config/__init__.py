@@ -28,9 +28,11 @@ from qdash.common.config.metrics import (
     load_metrics_config,
 )
 from qdash.common.config.path_resolver import (
+    PathOutsideCalibData,
     resolve_calib_data_path,
     resolve_calibtasks_base_path,
     resolve_config_base_path,
+    resolve_served_calib_data_path,
     resolve_user_flows_dir,
     resolve_workflow_path,
     resolve_workflow_service_dir,
@@ -76,6 +78,7 @@ __all__ = [
     "MetricMetadata",
     "MetricsConfig",
     "MuxConfig",
+    "PathOutsideCalibData",
     "QubitPosition",
     "ThresholdConfig",
     "ThresholdRange",
@@ -97,6 +100,7 @@ __all__ = [
     "resolve_calib_data_path",
     "resolve_calibtasks_base_path",
     "resolve_config_base_path",
+    "resolve_served_calib_data_path",
     "resolve_user_flows_dir",
     "resolve_workflow_path",
     "resolve_workflow_service_dir",

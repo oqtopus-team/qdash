@@ -12,16 +12,20 @@ import { CouplingGrid } from "./CouplingGrid";
 import { QubitGrid } from "./QubitGrid";
 import { ChipManageModal } from "./ChipManageModal";
 import { ChipCreationTour } from "./ChipCreationTour";
-import { getAiReviewBadgeState, type AiReviewBadgeState } from "./aiReviewBadge";
 import { CreateChipModal } from "./modals/CreateChipModal";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
 
 import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
-import { useGetChipNotesSummary } from "@/client/note/note";
 import { useListTaskInfo, useGetTaskFileSettings } from "@/client/task-file/task-file";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
+import {
+  EvaluationRequestModal,
+  evaluationTargets,
+} from "@/components/features/evaluations/EvaluationRequestModal";
+import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
+import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
@@ -80,6 +84,7 @@ export function ChipPageContent() {
   } = useChipUrlState();
 
   const [gridSize, setGridSize] = useState<number>(8);
+  const [isEvaluateOpen, setIsEvaluateOpen] = useState(false);
   const selectedDate = useMemo(() => {
     if (selectedCooldownId || hasTimeRangeParams) return dateTimeLocalToDateKey(endDate);
     return legacySelectedDate;
@@ -87,6 +92,27 @@ export function ChipPageContent() {
   const taskResultStartAt =
     selectedCooldownId || hasTimeRangeParams ? toIsoSeconds(startDate) : null;
   const taskResultEndAt = selectedCooldownId || hasTimeRangeParams ? toIsoSeconds(endDate) : null;
+  // The grid's own queries, shared through the query cache, so the evaluation
+  // request can offer the entities with a result to pick from.
+  const qubitResults = useQubitTaskResults({
+    chipId: selectedChip,
+    task: viewMode === "1q" ? selectedTask : "",
+    selectedDate,
+    startAt: taskResultStartAt,
+    endAt: taskResultEndAt,
+  });
+  const couplingResults = useCouplingTaskResults({
+    chipId: selectedChip,
+    task: viewMode === "2q" ? selectedTask : "",
+    selectedDate,
+    startAt: taskResultStartAt,
+    endAt: taskResultEndAt,
+  });
+  const evaluationResults = (viewMode === "2q" ? couplingResults : qubitResults).data?.data?.result;
+  const evaluationTargetList = useMemo(
+    () => evaluationTargets(evaluationResults),
+    [evaluationResults],
+  );
 
   // Use lightweight endpoints (~0.3KB vs ~300KB with embedded data)
   const { data: chipData } = useGetChip(selectedChip);
@@ -177,22 +203,6 @@ export function ChipPageContent() {
 
   // Get task list from task-files API
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
-
-  const { data: notesSummaryData } = useGetChipNotesSummary(selectedChip, undefined, {
-    query: { enabled: !!selectedChip, staleTime: 30_000 },
-  });
-
-  const aiReviewBadgesByTaskId = useMemo(() => {
-    const badges = new Map<string, AiReviewBadgeState>();
-    for (const entry of notesSummaryData?.data?.task_notes ?? []) {
-      const content = entry.ai_review_note?.content || entry.note?.content || "";
-      const badge = getAiReviewBadgeState(content);
-      if (badge) {
-        badges.set(entry.task_id, badge);
-      }
-    }
-    return badges;
-  }, [notesSummaryData]);
 
   // Use custom hook for date navigation
   const {
@@ -437,8 +447,8 @@ export function ChipPageContent() {
         {/* Header Section */}
         <div className="flex flex-col gap-3 md:gap-4">
           <PageHeader
-            title="Chip Experiments"
-            description="View calibration tasks and qubit results"
+            title="Chip"
+            description="Calibration results per qubit and coupling"
             actions={
               canEdit && (
                 <div className="flex items-center gap-2 w-fit">
@@ -518,6 +528,20 @@ export function ChipPageContent() {
                   disabled={viewMode === "mux"}
                 />
               </PageFiltersBar.Item>
+              {canEdit && (
+                <PageFiltersBar.Item>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline gap-1"
+                    onClick={() => setIsEvaluateOpen(true)}
+                    disabled={!selectedChip || !selectedTask || viewMode === "mux"}
+                    title="Evaluate the latest result of this task for every qubit or coupling with the calibration evaluation model"
+                  >
+                    <Bot className="h-4 w-4" />
+                    Evaluate
+                  </button>
+                </PageFiltersBar.Item>
+              )}
             </PageFiltersBar.Group>
           </PageFiltersBar>
 
@@ -582,7 +606,6 @@ export function ChipPageContent() {
               endAt={taskResultEndAt}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
-              aiReviewBadgesByTaskId={aiReviewBadgesByTaskId}
             />
           ) : viewMode === "2q" ? (
             <CouplingGrid
@@ -596,7 +619,6 @@ export function ChipPageContent() {
               endAt={taskResultEndAt}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
-              aiReviewBadgesByTaskId={aiReviewBadgesByTaskId}
             />
           ) : (
             <div className="space-y-4">
@@ -613,7 +635,7 @@ export function ChipPageContent() {
                 return (
                   <div
                     key={muxId}
-                    className={`bg-base-100 shadow-lg rounded-xl overflow-hidden transition-all duration-200 ${
+                    className={`bg-base-100 shadow-lg rounded-xl overflow-hidden transition-colors duration-200 ${
                       updateInfo.isRecent
                         ? "border-2 border-primary animate-pulse-light"
                         : "bg-base-200"
@@ -623,13 +645,10 @@ export function ChipPageContent() {
                       className="p-4 cursor-pointer flex flex-wrap justify-between gap-2 items-center hover:bg-base-200/50 transition-colors"
                       onClick={() => toggleMuxExpansion(muxId)}
                     >
-                      <div className="text-xl font-medium flex items-center gap-2">
+                      <div className="text-sm font-medium flex items-center gap-2">
                         <span className="whitespace-nowrap">MUX {muxDetail.mux_id}</span>
                         {updateInfo.isRecent && (
-                          <div className="badge badge-primary gap-2 rounded-lg">
-                            <div className="w-2 h-2 bg-primary-content rounded-full animate-ping" />
-                            New
-                          </div>
+                          <div className="badge badge-primary gap-2 rounded-lg">New</div>
                         )}
                         <div className="badge badge-ghost gap-2 rounded-lg whitespace-nowrap">
                           {Object.keys(taskGroups).length} Tasks
@@ -652,7 +671,7 @@ export function ChipPageContent() {
                               key={taskName}
                               className="border-t pt-4 first:border-t-0 first:pt-0"
                             >
-                              <h3 className="text-lg font-medium mb-3">{taskName}</h3>
+                              <h3 className="text-sm font-medium mb-3">{taskName}</h3>
                               <div className="grid grid-cols-1 min-[400px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                                 {qids.map((qid) => {
                                   const task = qidResults[qid];
@@ -681,9 +700,6 @@ export function ChipPageContent() {
                                   }
 
                                   const figurePath = getFigurePath(task);
-                                  const aiReviewBadge = task.task_id
-                                    ? aiReviewBadgesByTaskId.get(task.task_id)
-                                    : null;
 
                                   return (
                                     <div key={qid} className="relative group">
@@ -696,22 +712,13 @@ export function ChipPageContent() {
                                             });
                                           }
                                         }}
-                                        className="card bg-base-100 shadow-sm rounded-xl overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full"
+                                        className="card bg-base-100 shadow-sm rounded-xl overflow-hidden transition-all duration-200 hover:shadow-sm relative w-full"
                                       >
                                         <div className="card-body p-2">
                                           <div className="text-sm font-medium mb-2">
                                             <div className="flex justify-between items-center mb-1">
                                               <span>QID: {qid}</span>
                                               <div className="flex items-center gap-1">
-                                                {aiReviewBadge && (
-                                                  <span
-                                                    className={`badge ${aiReviewBadge.badgeClass} badge-xs gap-1`}
-                                                    title={aiReviewBadge.title}
-                                                  >
-                                                    <Bot className="h-3 w-3" />
-                                                    {aiReviewBadge.label}
-                                                  </span>
-                                                )}
                                                 <div
                                                   className={`w-2 h-2 rounded-full ${
                                                     task.status === "completed"
@@ -807,6 +814,22 @@ export function ChipPageContent() {
           completed={tutorialCompleted}
           restartKey={tutorialRestartKey}
           onDismiss={finishTutorial}
+        />
+      )}
+
+      {selectedChip && selectedTask && viewMode !== "mux" && (
+        <EvaluationRequestModal
+          isOpen={isEvaluateOpen}
+          onClose={() => setIsEvaluateOpen(false)}
+          scope={{
+            chipId: selectedChip,
+            taskName: selectedTask,
+            entityType: viewMode === "2q" ? "coupling" : "qubit",
+            date: selectedDate && selectedDate !== "latest" ? selectedDate : null,
+            targets: evaluationTargetList,
+            trigger: "bulk",
+          }}
+          scopeLabel={`${viewMode === "2q" ? "all couplings" : "all qubits"} on ${selectedChip}`}
         />
       )}
 

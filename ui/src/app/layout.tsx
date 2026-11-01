@@ -1,4 +1,6 @@
 import "./globals.css";
+import { GeistMono } from "geist/font/mono";
+import { GeistSans } from "geist/font/sans";
 import NextTopLoader from "nextjs-toploader";
 import Providers from "./providers";
 
@@ -14,7 +16,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body suppressHydrationWarning>
         <NextTopLoader
           color="oklch(var(--p))"

@@ -1,8 +1,43 @@
 """Calibration data operations and task type checking functions."""
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-from qdash.datamodel.task import CalibDataModel, TaskResultModel
+from qdash.datamodel.task import CalibDataModel, ParameterModel, TaskResultModel
+
+
+def expand_published_parameters(
+    output_parameters: Mapping[str, ParameterModel],
+    publish_targets: Mapping[str, Sequence[str]] | None,
+) -> dict[str, ParameterModel]:
+    """Key output parameters by the calibration parameter names they publish.
+
+    Parameters
+    ----------
+    output_parameters : Mapping[str, ParameterModel]
+        Task outputs keyed by output name
+    publish_targets : Mapping[str, Sequence[str]] | None
+        Published parameter names per output name. An output that is missing
+        from the mapping, or has no targets, publishes under its own name.
+
+    Returns
+    -------
+    dict[str, ParameterModel]
+        Parameters keyed by published name. A target that differs from the
+        output name receives a copy carrying that name as ``parameter_name``.
+
+    """
+    published: dict[str, ParameterModel] = {}
+    for output_name, parameter in output_parameters.items():
+        targets = tuple(publish_targets.get(output_name, ())) if publish_targets else ()
+        for target in targets or (output_name,):
+            if target in published:
+                raise ValueError(f"Multiple outputs publish to '{target}'")
+            if target == output_name:
+                published[target] = parameter
+            else:
+                published[target] = parameter.model_copy(update={"parameter_name": target})
+    return published
 
 
 def clear_qubit_calib_data(

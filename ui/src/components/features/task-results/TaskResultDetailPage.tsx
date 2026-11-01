@@ -1,46 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  MessageSquare,
-  Plus,
-  Lock,
-  Unlock,
-  RefreshCw,
-  ExternalLink,
-  CheckCircle,
-  UserRound,
-  Pencil,
-} from "lucide-react";
+import { ArrowLeft, RefreshCw, ExternalLink, CheckCircle, UserRound, Pencil } from "lucide-react";
 import { useGetTaskResult } from "@/client/task/task";
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
-import { useCreateIssue, getGetTaskResultIssuesQueryKey } from "@/client/issue/issue";
-import { useQueryClient } from "@tanstack/react-query";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
+import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
+import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { SpectroscopyManualCorrection } from "@/components/features/task-results/SpectroscopyManualCorrection";
 import { CalibrationGitHubSyncNotice } from "@/components/features/task-results/CalibrationGitHubSyncNotice";
 import { TaskResultHistoryNavigation } from "@/components/features/task-results/TaskResultHistoryNavigation";
 import type { CalibrationGitHubSync } from "@/schemas";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
-import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
-import { MarkdownContent } from "@/components/ui/MarkdownContent";
-import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
-import { useImageUpload } from "@/hooks/useImageUpload";
 import { EmptyState } from "@/components/ui/EmptyState";
-import {
-  useTaskResultIssues,
-  type StatusFilter,
-  type TaskResultIssue,
-} from "@/hooks/useTaskResultIssues";
-import { useAuth } from "@/contexts/AuthContext";
-import { useProject } from "@/contexts/ProjectContext";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
+import { QubitTile } from "@/components/ui/QubitTile";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
 
@@ -66,88 +45,8 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`badge badge-sm ${color}`}>{status}</span>;
 }
 
-function IssueCard({
-  issue,
-  onClose,
-  onReopen,
-  canManage,
-}: {
-  issue: TaskResultIssue;
-  onClose: (id: string) => void;
-  onReopen: (id: string) => void;
-  canManage: boolean;
-}) {
-  const router = useRouter();
-
-  return (
-    <div
-      onClick={() => router.push(`/issues/${issue.id}`)}
-      className={`bg-base-100 rounded-lg border border-base-300 cursor-pointer hover:border-primary/50 transition-colors ${issue.is_closed === true ? "opacity-70" : ""}`}
-    >
-      <div className="p-4">
-        <div className="flex items-center gap-3 mb-2 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <span className="badge badge-sm badge-neutral">{issue.username}</span>
-            <span className="text-xs text-base-content/40">
-              {formatRelativeTime(issue.created_at)}
-            </span>
-            {issue.is_closed === true && <span className="badge badge-sm badge-ghost">Closed</span>}
-          </div>
-          <span className="text-xs text-base-content/50 flex items-center gap-1 ml-auto">
-            <MessageSquare className="h-3 w-3" />
-            {issue.reply_count ?? 0} {issue.reply_count === 1 ? "reply" : "replies"}
-          </span>
-        </div>
-        {issue.title && <h3 className="text-sm font-semibold mb-1">{issue.title}</h3>}
-        <div className="text-sm text-base-content/80 mb-3 line-clamp-3">
-          <MarkdownContent content={issue.content} preview />
-        </div>
-        <div className="flex items-center gap-3">
-          {canManage &&
-            (issue.is_closed === true ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReopen(issue.id);
-                }}
-                className="btn btn-ghost btn-xs gap-1"
-              >
-                <Unlock className="h-3 w-3" />
-                Reopen
-              </button>
-            ) : (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose(issue.id);
-                }}
-                className="btn btn-ghost btn-xs gap-1"
-              >
-                <Lock className="h-3 w-3" />
-                Close
-              </button>
-            ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Full page view of a single task result.
- *
- * Shows figures, artifacts, and parameters, and links to the task workbench for re-execution.
- * Also hosts the AI review note, the memo editor, and linked issues.
- */
 export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const { username: currentUser } = useAuth();
-  const { isOwner } = useProject();
-  const [showEditor, setShowEditor] = useState(false);
-  const [newIssueTitle, setNewIssueTitle] = useState("");
-  const [newIssueContent, setNewIssueContent] = useState("");
-  const { uploadImage } = useImageUpload();
   // Task result
   const { data: taskResultResponse, isLoading: taskResultLoading } = useGetTaskResult(taskId, {
     query: {
@@ -171,38 +70,6 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         ?.input_parameters,
     [taskInfoData?.data?.tasks, taskResult?.task_name],
   );
-
-  // Issues
-  const {
-    issues,
-    total,
-    isLoading: issuesLoading,
-    statusFilter,
-    setStatusFilter,
-    closeIssue,
-    reopenIssue,
-    invalidateList,
-  } = useTaskResultIssues(taskId);
-
-  // Create issue
-  const createMutation = useCreateIssue();
-
-  const handleCreateIssue = async () => {
-    const trimmedTitle = newIssueTitle.trim();
-    const trimmedContent = newIssueContent.trim();
-    if (!trimmedTitle || !trimmedContent) return;
-    await createMutation.mutateAsync({
-      taskId,
-      data: { title: trimmedTitle, content: trimmedContent, parent_id: null },
-    });
-    setNewIssueTitle("");
-    setNewIssueContent("");
-    setShowEditor(false);
-    invalidateList();
-    queryClient.invalidateQueries({
-      queryKey: getGetTaskResultIssuesQueryKey(taskId),
-    });
-  };
 
   const canReExecute = !!taskResult;
 
@@ -246,8 +113,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="flex items-center gap-3 flex-wrap flex-1 min-w-0">
-          <span className="font-mono text-sm font-semibold truncate">{taskId}</span>
-          <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
+          <span className="font-mono text-sm font-medium truncate">{taskId}</span>
+          <QubitTile qid={taskResult.qid} />
           <StatusBadge status={taskResult.status} />
           <div className="ml-auto flex items-center gap-2">
             <TaskResultHistoryNavigation
@@ -288,7 +155,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-sm font-semibold">Manual correction applied</h2>
+                  <h2 className="text-sm font-medium">Manual correction applied</h2>
                   <span className="badge badge-sm badge-success">Calibration DB updated</span>
                 </div>
                 <p className="mt-1 text-xs text-base-content/60">
@@ -314,7 +181,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       )}
 
       <div className="bg-base-200/50 rounded-lg p-4 mb-4">
-        <h2 className="text-sm font-semibold mb-2">{taskResult.task_name}</h2>
+        <h2 className="text-sm font-medium mb-2">{taskResult.task_name}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
           <div>
             <span className="text-base-content/50">Execution ID</span>
@@ -373,7 +240,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           )}
           {manualCorrections.length > 0 && (
             <div>
-              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-base-content/60">
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
                 <Pencil className="h-3 w-3" />
                 Manual corrections ({manualCorrections.length})
               </h3>
@@ -400,7 +267,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           )}
           {relatedExecutions.length > 0 && (
             <div>
-              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-base-content/50">
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium text-base-content/50">
                 <RefreshCw className="h-3 w-3" />
                 Related executions ({relatedExecutions.length})
               </h3>
@@ -431,7 +298,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {((taskResult.json_figure_path && taskResult.json_figure_path.length > 0) ||
         (taskResult.raw_data_path && taskResult.raw_data_path.length > 0)) && (
         <div className="mb-4 rounded-lg bg-base-200/50 p-4">
-          <h2 className="mb-3 text-sm font-semibold">Artifacts</h2>
+          <h2 className="mb-3 text-sm font-medium">Artifacts</h2>
           <TaskArtifactDownloads
             jsonFigurePaths={taskResult.json_figure_path}
             rawDataPaths={taskResult.raw_data_path}
@@ -499,87 +366,20 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         />
       </div>
 
-      <TaskResultAiReviewNote note={taskResult.ai_review_note} hideWhenEmpty />
+      <TaskResultEvaluations
+        taskId={taskId}
+        chipId={taskResult.chip_id}
+        taskName={taskResult.task_name}
+        qid={taskResult.qid}
+        executionId={taskResult.execution_id}
+      />
+      <TaskResultThreads
+        taskId={taskId}
+        chipId={taskResult.chip_id}
+        taskName={taskResult.task_name}
+        qid={taskResult.qid}
+      />
       <TaskResultMemo taskId={taskId} chipId={taskResult.chip_id} />
-
-      {/* Divider: Issues */}
-      <div className="divider text-xs text-base-content/40">
-        <MessageSquare className="h-3.5 w-3.5" />
-        Issues ({total})
-      </div>
-
-      {/* Issues toolbar */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="tabs tabs-boxed w-fit">
-          {(["open", "closed", "all"] as const).map((status) => (
-            <button
-              key={status}
-              className={`tab tab-sm ${statusFilter === status ? "tab-active" : ""}`}
-              onClick={() => setStatusFilter(status as StatusFilter)}
-            >
-              {status.charAt(0).toUpperCase() + status.slice(1)}
-            </button>
-          ))}
-        </div>
-        <button className="btn btn-sm btn-primary gap-1" onClick={() => setShowEditor(!showEditor)}>
-          <Plus className="h-3.5 w-3.5" />
-          New Issue
-        </button>
-      </div>
-
-      {/* New issue editor */}
-      {showEditor && (
-        <div className="mb-4 border border-base-300 rounded-lg p-4 bg-base-100 space-y-3">
-          <input
-            type="text"
-            className="input input-bordered w-full"
-            placeholder="Issue title"
-            value={newIssueTitle}
-            onChange={(e) => setNewIssueTitle(e.target.value)}
-            maxLength={200}
-          />
-          <MarkdownEditor
-            value={newIssueContent}
-            onChange={setNewIssueContent}
-            onSubmit={handleCreateIssue}
-            placeholder="Describe the issue... (Ctrl+Enter to submit)"
-            rows={4}
-            submitLabel="Submit Issue"
-            isSubmitting={createMutation.isPending}
-            onImageUpload={uploadImage}
-          />
-        </div>
-      )}
-
-      {/* Issues list */}
-      {issuesLoading ? (
-        <div className="flex justify-center py-8">
-          <span className="loading loading-spinner loading-md"></span>
-        </div>
-      ) : issues.length === 0 ? (
-        <EmptyState
-          title="No issues"
-          description={
-            statusFilter !== "all"
-              ? `No ${statusFilter} issues for this task.`
-              : "No issues have been created for this task yet."
-          }
-          emoji="speech-balloon"
-          size="sm"
-        />
-      ) : (
-        <div className="space-y-3 pb-8">
-          {issues.map((issue) => (
-            <IssueCard
-              key={issue.id}
-              issue={issue}
-              onClose={closeIssue}
-              onReopen={reopenIssue}
-              canManage={isOwner || currentUser === issue.username}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

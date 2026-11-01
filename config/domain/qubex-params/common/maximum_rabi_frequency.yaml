@@ -1,0 +1,6 @@
+meta:
+  description: Maximum Rabi frequency of the qubit
+  unit: GHz
+  default: null
+  scope: qubit
+data: {}

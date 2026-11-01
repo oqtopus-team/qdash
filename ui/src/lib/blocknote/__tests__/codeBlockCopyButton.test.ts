@@ -3,12 +3,34 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { withCodeBlockCopyButton } from "../codeBlockCopyButton";
 
+const { toastErrorMock } = vi.hoisted(() => ({
+  toastErrorMock: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: toastErrorMock },
+}));
+
+/** Stubs `navigator.clipboard.writeText` with the given mock, leaving other `navigator` properties untouched. */
 function mockClipboard(writeText: ReturnType<typeof vi.fn>) {
   vi.stubGlobal(
     "navigator",
     new Proxy(navigator, {
       get(target, property) {
         if (property === "clipboard") return { writeText };
+        return Reflect.get(target, property, target);
+      },
+    }),
+  );
+}
+
+/** Stubs `navigator.clipboard` as `undefined`, simulating a non-secure context. */
+function mockMissingClipboard() {
+  vi.stubGlobal(
+    "navigator",
+    new Proxy(navigator, {
+      get(target, property) {
+        if (property === "clipboard") return undefined;
         return Reflect.get(target, property, target);
       },
     }),
@@ -35,6 +57,7 @@ function buildWrappedRender(renderResult: FakeRenderResult): FakeRender {
 describe("withCodeBlockCopyButton", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    toastErrorMock.mockReset();
   });
 
   it("appends a copy button to the rendered dom", () => {
@@ -84,6 +107,47 @@ describe("withCodeBlockCopyButton", () => {
     button?.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("shows an error toast and keeps the copy icon when writeText rejects", async () => {
+    const dom = document.createElement("div");
+    const code = document.createElement("code");
+    code.textContent = "print('hi')";
+    dom.appendChild(code);
+
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    mockClipboard(writeText);
+
+    const result = buildWrappedRender({ dom, contentDOM: code })(undefined, undefined);
+    const button = result.dom.querySelector<HTMLButtonElement>(".bn-code-block-copy-button");
+    const copyIcon = button?.innerHTML;
+
+    button?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(button?.innerHTML).toBe(copyIcon);
+    expect(toastErrorMock).toHaveBeenCalledWith("Failed to copy code");
+  });
+
+  it("shows an error toast when navigator.clipboard is unavailable", async () => {
+    const dom = document.createElement("div");
+    const code = document.createElement("code");
+    code.textContent = "print('hi')";
+    dom.appendChild(code);
+
+    mockMissingClipboard();
+
+    const result = buildWrappedRender({ dom, contentDOM: code })(undefined, undefined);
+    const button = result.dom.querySelector<HTMLButtonElement>(".bn-code-block-copy-button");
+    const copyIcon = button?.innerHTML;
+
+    button?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(button?.innerHTML).toBe(copyIcon);
+    expect(toastErrorMock).toHaveBeenCalledWith("Failed to copy code");
   });
 
   it("chains the original destroy callback", () => {

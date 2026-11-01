@@ -135,7 +135,7 @@ export function LineageExplorerPanel({
 
   const getNodeIcon = (nodeType: string) => {
     if (nodeType === "activity") {
-      return <Activity className="h-4 w-4 text-secondary" />;
+      return <Activity className="h-4 w-4 text-base-content/60" />;
     }
     return <Circle className="h-4 w-4 text-primary" />;
   };
@@ -197,7 +197,7 @@ export function LineageExplorerPanel({
           {/* View Mode Toggle & Version Selector */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div className="flex items-center gap-3 flex-wrap">
-              <h3 className="text-base sm:text-lg font-medium">
+              <h3 className="text-sm font-medium">
                 Lineage Graph
                 <span className="badge badge-primary badge-sm sm:badge-md ml-2">
                   {data.nodes.length} nodes
@@ -328,7 +328,7 @@ export function LineageExplorerPanel({
               {/* Nodes List */}
               <div className="card bg-base-200">
                 <div className="card-body p-4 sm:p-6">
-                  <h3 className="card-title text-base sm:text-lg">
+                  <h3 className="card-title">
                     Nodes
                     <span className="badge badge-primary badge-sm ml-2">{data.nodes.length}</span>
                   </h3>
@@ -373,7 +373,7 @@ export function LineageExplorerPanel({
               {/* Edges List */}
               <div className="card bg-base-200">
                 <div className="card-body p-4 sm:p-6">
-                  <h3 className="card-title text-base sm:text-lg">
+                  <h3 className="card-title">
                     Relations
                     <span className="badge badge-accent badge-sm ml-2">{data.edges.length}</span>
                   </h3>
@@ -392,11 +392,11 @@ export function LineageExplorerPanel({
                             <span className="font-mono truncate max-w-[100px]">
                               {edge.source_id.split(":").slice(0, 2).join(":")}
                             </span>
-                            <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
+                            <ChevronRight className="h-3 w-3 text-base-content/60 flex-shrink-0" />
                             <span className="badge badge-accent badge-xs">
                               {edge.relation_type}
                             </span>
-                            <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
+                            <ChevronRight className="h-3 w-3 text-base-content/60 flex-shrink-0" />
                             <span className="font-mono truncate max-w-[100px]">
                               {edge.target_id.split(":").slice(0, 2).join(":")}
                             </span>

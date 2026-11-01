@@ -1,0 +1,6 @@
+meta:
+  description: Control frequency for the f-h transition
+  unit: GHz
+  default: null
+  scope: qubit
+data: {}

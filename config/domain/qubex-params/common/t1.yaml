@@ -1,0 +1,6 @@
+meta:
+  description: T1 coherence time of the qubit
+  unit: µs
+  default: null
+  scope: qubit
+data: {}

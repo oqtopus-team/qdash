@@ -169,6 +169,7 @@ def _create_isolated_session(
             - project_id: Project ID (optional)
             - muxes: List of MUX IDs (optional)
             - execution_id: Parent's execution_id (to share Execution document)
+            - configuration_mode: Qubex control layout inherited from the parent
         qids: List of qubit IDs for this session
 
     Returns:
@@ -198,7 +199,8 @@ def _create_isolated_session(
         enable_github_pull=False,  # Parent session handles GitHub pull
         enable_github=False,  # No GitHub operations for isolated sessions
         default_run_parameters=session_config.get("default_run_parameters"),
-        task_run_parameters=session_config.get("task_run_parameters"),
+        task_parameters=session_config.get("task_parameters"),
+        configuration_mode=session_config.get("configuration_mode"),
         tags=session_config.get("tags"),
         flow_name=session_config.get("flow_name"),
         note=session_config.get("note"),
@@ -284,27 +286,13 @@ def _coupling_task_run_name() -> str:
     return f"coupling-{coupling_qid}"
 
 
-def _group_retry_task_run_name() -> str:
-    """Generate dynamic task name for group with retry calibration tasks."""
-    from prefect.runtime import task_run
-
-    params = task_run.parameters
-    qids = params.get("qids", [])
-    if qids:
-        return f"retry-group-Q{qids[0]}-{qids[-1]}"
-    return "retry-group"
-
-
-# =============================================================================
-# MUX-level Tasks (for scheduled/strategy execution)
-# =============================================================================
-
-
 def _execute_mux_qubits_with_session(
     session: CalibService,
     qids: list[str],
     tasks: list[str],
     logger: Any,
+    continue_on_failure: bool = False,
+    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Execute tasks for qubits using the provided session.
 
@@ -314,9 +302,10 @@ def _execute_mux_qubits_with_session(
     results = {}
 
     for qid in qids:
-        try:
-            result: dict[str, Any] = {}
-            for task_name in tasks:
+        result: dict[str, Any] = {}
+        failures: list[tuple[str, str, str]] = []
+        for task_name in tasks:
+            try:
                 # Skip MUX tasks for non-representative qubits
                 if _should_skip_task_for_qid(task_name, qid, backend_name):
                     logger.info(
@@ -326,11 +315,31 @@ def _execute_mux_qubits_with_session(
                     continue
                 task_result = session.execute_task(task_name, qid)
                 result[task_name] = task_result
+            except Exception as e:
+                error_details = _format_exception_details(e)
+                logger.error(f"Failed to execute {task_name} for qubit {qid}:\n{error_details}")
+                if not continue_on_failure:
+                    result = {
+                        "status": "failed",
+                        "error": str(e),
+                        "error_details": error_details,
+                    }
+                    break
+                result[task_name] = {
+                    "status": "failed",
+                    "error": str(e),
+                    "error_details": error_details,
+                }
+                failures.append((task_name, str(e), error_details))
+                if task_name in stop_on_failure_tasks:
+                    break
+
+        if failures:
+            result["status"] = "failed"
+            result["error"] = "; ".join(f"{name}: {error}" for name, error, _ in failures)
+            result["error_details"] = "\n\n".join(details for _, _, details in failures)
+        elif result.get("status") != "failed":
             result["status"] = "success"
-        except Exception as e:
-            error_details = _format_exception_details(e)
-            logger.error(f"Failed to calibrate qubit {qid}:\n{error_details}")
-            result = {"status": "failed", "error": str(e), "error_details": error_details}
         results[qid] = result
 
     return results
@@ -341,6 +350,8 @@ def calibrate_mux_qubits(
     qids: list[str],
     tasks: list[str],
     session_config: dict[str, Any] | None = None,
+    continue_on_failure: bool = False,
+    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Execute tasks for qubits in a single MUX sequentially (Prefect task).
 
@@ -357,6 +368,8 @@ def calibrate_mux_qubits(
         session_config: Optional configuration for creating isolated session.
             If provided, creates independent CalibService. If None, uses
             global session context.
+        continue_on_failure: Continue with later tasks after recording a task failure.
+        stop_on_failure_tasks: Tasks that remain fail-fast when continuation is enabled.
 
     Returns:
         Dictionary mapping qid to results
@@ -373,12 +386,26 @@ def calibrate_mux_qubits(
         assert session_config is not None
         session = _create_isolated_session(session_config, qids)
         try:
-            results = _execute_mux_qubits_with_session(session, qids, tasks, logger)
+            results = _execute_mux_qubits_with_session(
+                session,
+                qids,
+                tasks,
+                logger,
+                continue_on_failure,
+                stop_on_failure_tasks,
+            )
         finally:
             session.finish_calibration(update_chip_history=False, push_to_github=False)
     else:
         session = _get_session()
-        results = _execute_mux_qubits_with_session(session, qids, tasks, logger)
+        results = _execute_mux_qubits_with_session(
+            session,
+            qids,
+            tasks,
+            logger,
+            continue_on_failure,
+            stop_on_failure_tasks,
+        )
 
     # Flush logs before returning (critical for Dask worker processes)
     _flush_prefect_logs()
@@ -390,6 +417,8 @@ def _execute_single_qubit_with_session(
     qid: str,
     tasks: list[str],
     logger: Any,
+    continue_on_failure: bool = False,
+    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Execute tasks for a single qubit using the provided session.
 
@@ -398,8 +427,9 @@ def _execute_single_qubit_with_session(
     backend_name = session.backend_name
     result: dict[str, Any] = {}
 
-    try:
-        for task_name in tasks:
+    failures: list[tuple[str, str, str]] = []
+    for task_name in tasks:
+        try:
             # Skip MUX tasks for non-representative qubits
             if _should_skip_task_for_qid(task_name, qid, backend_name):
                 logger.info(f"Skipping MUX task {task_name} for qid={qid} (not MUX representative)")
@@ -407,11 +437,31 @@ def _execute_single_qubit_with_session(
                 continue
             task_result = session.execute_task(task_name, qid)
             result[task_name] = task_result
+        except Exception as e:
+            error_details = _format_exception_details(e)
+            logger.error(f"Failed to execute {task_name} for qubit {qid}:\n{error_details}")
+            if not continue_on_failure:
+                result = {
+                    "status": "failed",
+                    "error": str(e),
+                    "error_details": error_details,
+                }
+                break
+            result[task_name] = {
+                "status": "failed",
+                "error": str(e),
+                "error_details": error_details,
+            }
+            failures.append((task_name, str(e), error_details))
+            if task_name in stop_on_failure_tasks:
+                break
+
+    if failures:
+        result["status"] = "failed"
+        result["error"] = "; ".join(f"{name}: {error}" for name, error, _ in failures)
+        result["error_details"] = "\n\n".join(details for _, _, details in failures)
+    elif result.get("status") != "failed":
         result["status"] = "success"
-    except Exception as e:
-        error_details = _format_exception_details(e)
-        logger.error(f"Failed to calibrate qubit {qid}:\n{error_details}")
-        result = {"status": "failed", "error": str(e), "error_details": error_details}
 
     return result
 
@@ -421,6 +471,8 @@ def calibrate_single_qubit(
     qid: str,
     tasks: list[str],
     session_config: dict[str, Any] | None = None,
+    continue_on_failure: bool = False,
+    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> tuple[str, dict[str, Any]]:
     """Execute tasks for a single qubit (Prefect task).
 
@@ -437,6 +489,8 @@ def calibrate_single_qubit(
         session_config: Optional configuration for creating isolated session.
             If provided, creates independent CalibService. If None, uses
             global session context.
+        continue_on_failure: Continue with later tasks after recording a task failure.
+        stop_on_failure_tasks: Tasks that remain fail-fast when continuation is enabled.
 
     Returns:
         Tuple of (qid, results)
@@ -453,12 +507,26 @@ def calibrate_single_qubit(
         assert session_config is not None
         session = _create_isolated_session(session_config, [qid])
         try:
-            result = _execute_single_qubit_with_session(session, qid, tasks, logger)
+            result = _execute_single_qubit_with_session(
+                session,
+                qid,
+                tasks,
+                logger,
+                continue_on_failure,
+                stop_on_failure_tasks,
+            )
         finally:
             session.finish_calibration(update_chip_history=False, push_to_github=False)
     else:
         session = _get_session()
-        result = _execute_single_qubit_with_session(session, qid, tasks, logger)
+        result = _execute_single_qubit_with_session(
+            session,
+            qid,
+            tasks,
+            logger,
+            continue_on_failure,
+            stop_on_failure_tasks,
+        )
 
     # Flush logs before returning (critical for Dask worker processes)
     _flush_prefect_logs()
@@ -506,21 +574,46 @@ def _execute_coupling_pair_with_session(
     coupling_qid: str,
     tasks: list[str],
     logger: Any,
+    continue_on_failure: bool = False,
+    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Execute tasks for a coupling pair using the provided session.
 
     Internal helper that performs the actual task execution.
     """
     result: dict[str, Any] = {}
-    try:
-        for task_name in tasks:
+    failures: list[tuple[str, str, str]] = []
+    for task_name in tasks:
+        try:
             task_result = session.execute_task(task_name, coupling_qid)
             result[task_name] = task_result
+        except Exception as e:  # noqa: PERF203 - record each task failure independently
+            error_details = _format_exception_details(e)
+            logger.error(
+                f"Failed to execute {task_name} for coupling {coupling_qid}:\n{error_details}"
+            )
+            if not continue_on_failure:
+                result = {
+                    "status": "failed",
+                    "error": str(e),
+                    "error_details": error_details,
+                }
+                break
+            result[task_name] = {
+                "status": "failed",
+                "error": str(e),
+                "error_details": error_details,
+            }
+            failures.append((task_name, str(e), error_details))
+            if task_name in stop_on_failure_tasks:
+                break
+
+    if failures:
+        result["status"] = "failed"
+        result["error"] = "; ".join(f"{name}: {error}" for name, error, _ in failures)
+        result["error_details"] = "\n\n".join(details for _, _, details in failures)
+    elif result.get("status") != "failed":
         result["status"] = "success"
-    except Exception as e:
-        error_details = _format_exception_details(e)
-        logger.error(f"Failed to calibrate coupling {coupling_qid}:\n{error_details}")
-        result = {"status": "failed", "error": str(e), "error_details": error_details}
     return result
 
 
@@ -529,6 +622,8 @@ def execute_coupling_pair(
     coupling_qid: str,
     tasks: list[str],
     session_config: dict[str, Any] | None = None,
+    continue_on_failure: bool = False,
+    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> tuple[str, dict[str, Any]]:
     """Execute tasks for a single coupling pair.
 
@@ -538,6 +633,8 @@ def execute_coupling_pair(
         session_config: Optional configuration for creating isolated session.
             If provided, creates independent CalibService. If None, uses
             global session context.
+        continue_on_failure: Continue with later tasks after recording a task failure.
+        stop_on_failure_tasks: Tasks that remain fail-fast when continuation is enabled.
 
     Returns:
         Tuple of (coupling_qid, results)
@@ -557,12 +654,26 @@ def execute_coupling_pair(
         assert session_config is not None
         session = _create_isolated_session(session_config, qids)
         try:
-            result = _execute_coupling_pair_with_session(session, coupling_qid, tasks, logger)
+            result = _execute_coupling_pair_with_session(
+                session,
+                coupling_qid,
+                tasks,
+                logger,
+                continue_on_failure,
+                stop_on_failure_tasks,
+            )
         finally:
             session.finish_calibration(update_chip_history=False, push_to_github=False)
     else:
         session = _get_session()
-        result = _execute_coupling_pair_with_session(session, coupling_qid, tasks, logger)
+        result = _execute_coupling_pair_with_session(
+            session,
+            coupling_qid,
+            tasks,
+            logger,
+            continue_on_failure,
+            stop_on_failure_tasks,
+        )
 
     # Flush logs before returning (critical for Dask worker processes)
     _flush_prefect_logs()
@@ -693,6 +804,8 @@ def run_mux_calibrations_parallel(
     mux_groups: list[list[str]],
     tasks: list[str],
     session_config: dict[str, Any],
+    continue_on_failure: bool = False,
+    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Run multiple MUX group calibrations in parallel using separate processes.
 
@@ -703,6 +816,8 @@ def run_mux_calibrations_parallel(
         mux_groups: List of MUX groups, where each group is a list of qubit IDs
         tasks: List of task names to execute
         session_config: Configuration for creating isolated sessions
+        continue_on_failure: Continue with later tasks after recording a task failure.
+        stop_on_failure_tasks: Tasks that remain fail-fast when continuation is enabled.
 
     Returns:
         Dictionary mapping qid to results (combined from all MUX groups)
@@ -714,6 +829,8 @@ def run_mux_calibrations_parallel(
         mux_groups: list[list[str]],
         tasks: list[str],
         session_config: dict[str, Any],
+        continue_on_failure: bool,
+        stop_on_failure_tasks: tuple[str, ...],
     ) -> dict[str, Any]:
         logger = get_run_logger()
         logger.info(f"Running {len(mux_groups)} MUX groups in parallel processes")
@@ -724,6 +841,8 @@ def run_mux_calibrations_parallel(
                 qids=group,
                 tasks=tasks,
                 session_config=session_config,
+                continue_on_failure=continue_on_failure,
+                stop_on_failure_tasks=stop_on_failure_tasks,
             )
             for group in mux_groups
         ]
@@ -742,7 +861,13 @@ def run_mux_calibrations_parallel(
 
         return all_results
 
-    result: dict[str, Any] = _run_mux_parallel_flow(mux_groups, tasks, session_config)
+    result: dict[str, Any] = _run_mux_parallel_flow(
+        mux_groups,
+        tasks,
+        session_config,
+        continue_on_failure,
+        stop_on_failure_tasks,
+    )
     return result
 
 
@@ -750,6 +875,8 @@ def run_qubit_calibrations_parallel(
     qids: list[str],
     tasks: list[str],
     session_config: dict[str, Any],
+    continue_on_failure: bool = False,
+    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Run multiple qubit calibrations in parallel using separate processes.
 
@@ -760,6 +887,8 @@ def run_qubit_calibrations_parallel(
         qids: List of qubit IDs to calibrate in parallel
         tasks: List of task names to execute
         session_config: Configuration for creating isolated sessions
+        continue_on_failure: Continue with later tasks after recording a task failure.
+        stop_on_failure_tasks: Tasks that remain fail-fast when continuation is enabled.
 
     Returns:
         Dictionary mapping qid to results
@@ -771,6 +900,8 @@ def run_qubit_calibrations_parallel(
         qids: list[str],
         tasks: list[str],
         session_config: dict[str, Any],
+        continue_on_failure: bool,
+        stop_on_failure_tasks: tuple[str, ...],
     ) -> dict[str, Any]:
         logger = get_run_logger()
         logger.info(f"Running {len(qids)} qubits in parallel processes")
@@ -781,6 +912,8 @@ def run_qubit_calibrations_parallel(
                 qid=qid,
                 tasks=tasks,
                 session_config=session_config,
+                continue_on_failure=continue_on_failure,
+                stop_on_failure_tasks=stop_on_failure_tasks,
             )
             for qid in qids
         ]
@@ -797,157 +930,13 @@ def run_qubit_calibrations_parallel(
             pair_results.append((qid, qid_result))
         return dict(pair_results)
 
-    result: dict[str, Any] = _run_qubit_parallel_flow(qids, tasks, session_config)
-    return result
-
-
-@task(task_run_name=_group_retry_task_run_name, log_prints=True)
-def calibrate_group_with_retry(
-    qids: list[str],
-    tasks: list[str],
-    offsets: list[float],
-    session_config: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Calibrate a group of qubits sequentially with retry logic.
-
-    Each qubit in the group runs sequentially, with retry on failure
-    using frequency offsets.
-
-    Args:
-        qids: Qubit IDs in this group (run sequentially)
-        tasks: Task names (run sequentially per qubit)
-        offsets: Frequency offsets to try on failure (e.g., [0, 0.001, -0.001])
-        session_config: Optional configuration for creating isolated session.
-            If provided, creates independent CalibService. If None, uses
-            global session context.
-
-    Returns:
-        Results dict keyed by qubit ID
-    """
-    # Ensure Prefect logging is configured in Dask worker processes
-    _ensure_prefect_logging()
-
-    logger = get_run_logger()
-
-    # Create isolated session or use global session
-    use_isolated = session_config is not None
-
-    if use_isolated:
-        assert session_config is not None
-        session = _create_isolated_session(session_config, qids)
-    else:
-        session = _get_session()
-
-    results: dict[str, Any] = {}
-
-    try:
-        for qid in qids:
-            # Retry loop for each qubit
-            for attempt, offset in enumerate(offsets):
-                try:
-                    if offset != 0:
-                        logger.info(
-                            f"Q{qid}: Attempt {attempt + 1} with {offset * 1000:+.0f} MHz offset"
-                        )
-
-                    # Tasks run sequentially within qubit
-                    result: dict[str, Any] = {}
-                    for task_name in tasks:
-                        task_details = None
-                        if offset != 0:
-                            task_details = {
-                                task_name: {
-                                    "input_parameters": {
-                                        "qubit_frequency_offset": {"value": offset}
-                                    }
-                                }
-                            }
-                        result[task_name] = session.execute_task(
-                            task_name, qid, task_details=task_details
-                        )
-
-                    result["status"] = "success"
-                    result["attempt"] = attempt + 1
-                    results[qid] = result
-                    break  # Success, move to next qubit
-
-                except Exception as e:
-                    error_details = _format_exception_details(e)
-                    logger.warning(f"Q{qid}: Attempt {attempt + 1} failed:\n{error_details}")
-                    if attempt == len(offsets) - 1:
-                        results[qid] = {
-                            "status": "failed",
-                            "error": str(e),
-                            "error_details": error_details,
-                            "attempt": attempt + 1,
-                        }
-    finally:
-        if use_isolated:
-            session.finish_calibration(update_chip_history=False, push_to_github=False)
-
-    # Flush logs before returning (critical for Dask worker processes)
-    _flush_prefect_logs()
-    return results
-
-
-def run_groups_with_retry_parallel(
-    groups: list[list[str]],
-    tasks: list[str],
-    offsets: list[float],
-    session_config: dict[str, Any],
-) -> dict[str, Any]:
-    """Run multiple qubit groups with retry logic in parallel using separate processes.
-
-    Each group runs in its own process with isolated memory space.
-    Within each group, qubits are processed sequentially with retry logic.
-
-    Args:
-        groups: List of qubit groups, where each group is a list of qubit IDs
-        tasks: List of task names to execute
-        offsets: Frequency offsets to try on failure (e.g., [0, 0.001, -0.001])
-        session_config: Configuration for creating isolated sessions
-
-    Returns:
-        Dictionary mapping qid to results (combined from all groups)
-    """
-
-    # Define flow dynamically to avoid import errors when prefect-dask not installed
-    @flow(task_runner=_get_dask_task_runner())
-    def _run_groups_retry_parallel_flow(
-        groups: list[list[str]],
-        tasks: list[str],
-        offsets: list[float],
-        session_config: dict[str, Any],
-    ) -> dict[str, Any]:
-        logger = get_run_logger()
-        logger.info(f"Running {len(groups)} groups with retry in parallel processes")
-
-        # Submit all groups to run in parallel processes
-        futures = [
-            calibrate_group_with_retry.submit(
-                qids=group,
-                tasks=tasks,
-                offsets=offsets,
-                session_config=session_config,
-            )
-            for group in groups
-        ]
-
-        # Collect results and log any errors from subprocesses
-        all_results: dict[str, Any] = {}
-        for future in futures:
-            group_result = future.result()
-            # Log error details from subprocess (since subprocess logs don't propagate)
-            for qid, qid_result in group_result.items():
-                if qid_result.get("status") == "failed" and "error_details" in qid_result:
-                    logger.error(
-                        f"[From subprocess] Failed to calibrate qubit {qid}:\n{qid_result['error_details']}"
-                    )
-            all_results.update(group_result)
-
-        return all_results
-
-    result: dict[str, Any] = _run_groups_retry_parallel_flow(groups, tasks, offsets, session_config)
+    result: dict[str, Any] = _run_qubit_parallel_flow(
+        qids,
+        tasks,
+        session_config,
+        continue_on_failure,
+        stop_on_failure_tasks,
+    )
     return result
 
 
@@ -955,6 +944,8 @@ def run_coupling_calibrations_parallel(
     coupling_qids: list[str],
     tasks: list[str],
     session_config: dict[str, Any],
+    continue_on_failure: bool = False,
+    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Run multiple coupling pair calibrations in parallel using separate processes.
 
@@ -965,6 +956,8 @@ def run_coupling_calibrations_parallel(
         coupling_qids: List of coupling IDs (e.g., ["0-1", "2-3"])
         tasks: List of task names to execute
         session_config: Configuration for creating isolated sessions
+        continue_on_failure: Continue with later tasks after recording a task failure.
+        stop_on_failure_tasks: Tasks that remain fail-fast when continuation is enabled.
 
     Returns:
         Dictionary mapping coupling_qid to results
@@ -976,6 +969,8 @@ def run_coupling_calibrations_parallel(
         coupling_qids: list[str],
         tasks: list[str],
         session_config: dict[str, Any],
+        continue_on_failure: bool,
+        stop_on_failure_tasks: tuple[str, ...],
     ) -> dict[str, Any]:
         logger = get_run_logger()
         logger.info(f"Running {len(coupling_qids)} coupling pairs in parallel processes")
@@ -986,6 +981,8 @@ def run_coupling_calibrations_parallel(
                 coupling_qid=cqid,
                 tasks=tasks,
                 session_config=session_config,
+                continue_on_failure=continue_on_failure,
+                stop_on_failure_tasks=stop_on_failure_tasks,
             )
             for cqid in coupling_qids
         ]
@@ -1002,5 +999,11 @@ def run_coupling_calibrations_parallel(
             pair_results.append((cqid, cqid_result))
         return dict(pair_results)
 
-    result: dict[str, Any] = _run_coupling_parallel_flow(coupling_qids, tasks, session_config)
+    result: dict[str, Any] = _run_coupling_parallel_flow(
+        coupling_qids,
+        tasks,
+        session_config,
+        continue_on_failure,
+        stop_on_failure_tasks,
+    )
     return result

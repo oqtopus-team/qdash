@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Bot, ChevronRight, FileText, GitBranch, History, ListTodo } from "lucide-react";
+import { ChevronRight, FileText, GitBranch, History, ListTodo } from "lucide-react";
 
 import type { Task } from "@/schemas";
 
@@ -13,12 +13,13 @@ import {
   type ExecutionHistoryMobileTab,
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
-import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
-import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
+import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
+import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
-import type { AnalysisContext } from "@/hooks/useAnalysisChat";
+import { useChatDock } from "@/contexts/ChatDockContext";
+import type { TaskChatContext } from "@/types/copilotChat";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 interface ExecutionTaskDetailModalProps {
@@ -55,6 +56,7 @@ function buildProvenanceUrl(parameterName: string, qidValue: string) {
   return `/provenance?tab=lineage&parameter=${parameter}&qid=${encodedQid}`;
 }
 
+/** Details of one execution's tasks for a qubit or coupling. */
 export function ExecutionTaskDetailModal({
   isOpen,
   chipId,
@@ -67,7 +69,7 @@ export function ExecutionTaskDetailModal({
 }: ExecutionTaskDetailModalProps) {
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(initialTaskIndex);
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("tasks");
-  const { openMiniChat } = useAnalysisChatContext();
+  const { openMiniChat } = useChatDock();
 
   const selectedTask = tasks[selectedTaskIndex] ?? null;
 
@@ -87,7 +89,7 @@ export function ExecutionTaskDetailModal({
         : []
     : [];
 
-  const analysisContext: AnalysisContext | null = useMemo(() => {
+  const chatContext: TaskChatContext | null = useMemo(() => {
     if (!selectedTask?.task_id) return null;
     return {
       taskName: selectedTask.name || "",
@@ -110,7 +112,7 @@ export function ExecutionTaskDetailModal({
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
           <History className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-bold text-base-content">Execution History</h3>
+          <h3 className="text-sm font-medium text-base-content">Execution History</h3>
         </div>
         <p className="text-xs text-base-content/50">Current execution</p>
       </div>
@@ -118,7 +120,7 @@ export function ExecutionTaskDetailModal({
         <button className="w-full text-left p-3 rounded-lg transition-all border-2 bg-primary text-primary-content border-primary">
           <div className="flex justify-between items-start">
             <div className="min-w-0 flex-1">
-              <div className="font-bold text-lg truncate">{executionName || "Execution"}</div>
+              <div className="font-medium text-sm truncate">{executionName || "Execution"}</div>
               <div className="text-xs opacity-70 mt-1 font-mono truncate">{executionId}</div>
               <span className="badge badge-xs mt-1 badge-primary-content">Current</span>
             </div>
@@ -133,10 +135,10 @@ export function ExecutionTaskDetailModal({
     <div className="flex flex-col min-h-0 h-full">
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
-          <ListTodo className="h-4 w-4 text-secondary" />
-          <h3 className="text-sm font-bold text-base-content">Tasks in Execution</h3>
+          <ListTodo className="h-4 w-4 text-base-content/60" />
+          <h3 className="text-sm font-medium text-base-content">Tasks in Execution</h3>
         </div>
-        <p className="text-[0.65rem] text-base-content/50 font-mono truncate">{executionId}</p>
+        <p className="text-xs text-base-content/50 font-mono truncate">{executionId}</p>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         {tasks.length === 0 ? (
@@ -160,7 +162,7 @@ export function ExecutionTaskDetailModal({
                 >
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
-                      <div className="font-bold text-sm truncate">{task.name || "Unnamed"}</div>
+                      <div className="font-medium text-sm truncate">{task.name || "Unnamed"}</div>
                       <div className="text-xs opacity-70 mt-1">
                         {task.start_at ? formatDateTimeCompact(String(task.start_at)) : ""}
                       </div>
@@ -188,8 +190,8 @@ export function ExecutionTaskDetailModal({
     <div className="flex flex-col">
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-bold text-base-content">Task Details</h3>
+          <FileText className="h-4 w-4 text-base-content/60" />
+          <h3 className="text-sm font-medium text-base-content">Task Details</h3>
         </div>
         {tasks.length > 0 && (
           <div className="text-xs text-base-content/60">
@@ -255,17 +257,17 @@ export function ExecutionTaskDetailModal({
         <div className="mt-2 text-xs text-base-content/60 space-y-1 bg-base-200 p-3 rounded-lg">
           {selectedTask.name && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Task Name:</span>
+              <span className="font-medium">Task Name:</span>
               <span className="font-mono">{selectedTask.name}</span>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <span className="font-semibold">Execution ID:</span>
+            <span className="font-medium">Execution ID:</span>
             <span className="font-mono truncate">{executionId}</span>
           </div>
           {selectedTask.task_id && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Task ID:</span>
+              <span className="font-medium">Task ID:</span>
               <Link
                 href={`/task-results/${selectedTask.task_id}`}
                 className="font-mono truncate link link-primary"
@@ -276,13 +278,13 @@ export function ExecutionTaskDetailModal({
           )}
           {selectedTask.start_at != null && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Start:</span>
+              <span className="font-medium">Start:</span>
               <span>{formatDateTime(String(selectedTask.start_at))}</span>
             </div>
           )}
           {selectedTask.end_at != null && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">End:</span>
+              <span className="font-medium">End:</span>
               <span>{formatDateTime(String(selectedTask.end_at))}</span>
             </div>
           )}
@@ -311,22 +313,21 @@ export function ExecutionTaskDetailModal({
               <GitBranch className="h-3 w-3" />
               View Provenance Lineage
             </Link>
-            {analysisContext && (
-              <button
-                onClick={() => openMiniChat(analysisContext)}
-                className="btn btn-xs btn-primary gap-1"
-              >
-                <Bot className="h-3 w-3" />
-                Ask AI
-              </button>
+            {chatContext && (
+              <AskAiButton
+                taskId={chatContext.taskId}
+                chipId={chatContext.chipId}
+                taskName={chatContext.taskName}
+                qid={chatContext.qid}
+                chatContext={chatContext}
+                onChat={() => openMiniChat(chatContext)}
+                size="xs"
+              />
             )}
           </div>
         </div>
       )}
 
-      {selectedTask?.task_id && (
-        <TaskResultAiReviewNote taskId={selectedTask.task_id} hideWhenEmpty />
-      )}
       {selectedTask?.task_id && (
         <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} hideWhenEmpty />
       )}
@@ -356,7 +357,18 @@ export function ExecutionTaskDetailModal({
         </div>
       )}
 
-      {selectedTask?.task_id && <TaskResultIssues taskId={selectedTask.task_id} />}
+      {/* AI evaluations of this result, requested the same way as from the chip page */}
+      {selectedTask?.task_id && (
+        <TaskResultEvaluations
+          taskId={selectedTask.task_id}
+          chipId={chipId}
+          taskName={selectedTask.name || undefined}
+          qid={qid}
+          onChat={chatContext ? () => openMiniChat(chatContext) : undefined}
+        />
+      )}
+
+      {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
     </div>
   );
 
@@ -365,10 +377,10 @@ export function ExecutionTaskDetailModal({
       <DialogContent className="max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none w-full max-w-[112rem] h-[90vh] sm:h-[95vh] p-0 !overflow-hidden flex flex-col">
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
+            <DialogTitle className="text-sm font-medium truncate">
               {selectedTask?.name || "Task Details"}
             </DialogTitle>
-            <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+            <DialogDescription className="text-sm text-base-content/70 mt-0.5 sm:mt-1">
               {qid.includes("-") ? "Coupling" : "QID"} {qid}
             </DialogDescription>
           </div>

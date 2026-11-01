@@ -7,6 +7,18 @@ const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS || "")
 const nextConfig = {
   output: "standalone",
   ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
+  async redirects() {
+    // Pages renamed in 2026-10: the Files editor is Config, Task Knowledge is Knowledge.
+    return [
+      { source: "/files", destination: "/config", permanent: true },
+      { source: "/task-knowledge", destination: "/knowledge", permanent: true },
+      // The task duration breakdown page was folded into the Execution page's activity chart.
+      { source: "/execution/durations", destination: "/execution", permanent: true },
+      { source: "/task-knowledge/:taskName", destination: "/knowledge/:taskName", permanent: true },
+      // The knowledge file editor was removed: Knowledge is read-only.
+      { source: "/knowledge/files", destination: "/knowledge", permanent: false },
+    ];
+  },
   async rewrites() {
     // Proxy /api/* to backend API server
     // This allows UI-only deployment without exposing API port

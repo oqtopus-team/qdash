@@ -1,0 +1,42 @@
+# Copilot Evaluation Configuration
+# The calibration evaluation model.
+#
+# Evaluation is a recorded judgement of a task result's figure, made by the
+# evaluation model through pi-qcaleval's `qcal_evaluate` (chip page bulk runs,
+# single-result runs, the chat planner). Chat and planner models live in
+# chat.yaml; the pi runtime builds its models.json from both files.
+
+# Models that judge calibration plots. The first is the default in the evaluation
+# request dialog; a run passes its selected model explicitly to pi-qcaleval.
+evaluation_models:
+  # NVIDIA Ising-Calibration: Gemma 4 31B fine-tuned on qubit calibration plots
+  # (fit quality, parameter extraction, success classification). Served by an
+  # OpenAI-compatible endpoint such as vLLM; the base URL below must include /v1.
+  - provider: openai-compatible-evaluation
+    name: nvidia/Ising-Calibration-1.5-31B-NVFP4
+    # /v1/responses rejects input_image on vLLM; only chat/completions accepts
+    # figures, which task analysis depends on.
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_EVALUATION
+    # Must not exceed the server's max_model_len (16384 on llm.qiqb.dev).
+    num_ctx: 16384
+    # Greedy decoding, as the QCalEval benchmark queries every model: the same
+    # plot and prompt give the same diagnosis, so two runs can be compared.
+    # (The model card suggests 0.2.) The model is not a thinking model.
+    temperature: 0.0
+    reasoning_effort: none
+    disable_thinking_instruction: true
+    # The prompt (system prompt + tool schemas) already takes roughly half of
+    # the context, so leave the model card's 8192 for larger deployments.
+    max_output_tokens: 2048
+
+  # Qwen served by the dedicated vLLM evaluation endpoint.
+  - provider: openai-compatible-evaluation-vllm
+    name: qwen3.8-flash-next
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION_VLLM
+    api_key_env: OPENAI_COMPATIBLE_API_KEY_EVALUATION_VLLM
+    num_ctx: 65536
+    max_output_tokens: 8192
+    reasoning_effort: medium

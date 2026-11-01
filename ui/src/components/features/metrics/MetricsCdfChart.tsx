@@ -1,9 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Minimize2, MoveHorizontal } from "lucide-react";
 import { useId, useMemo, useState } from "react";
-import { FluentEmoji } from "@/components/ui/FluentEmoji";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
+import { chartTheme } from "@/lib/chartTheme";
 
 const Plot = dynamic(() => import("@/components/charts/Plot"), { ssr: false });
 
@@ -37,15 +38,6 @@ function isGroupedProps(props: MetricsCdfChartProps): props is GroupedMetricsCdf
 }
 
 // Color palette for multiple metrics
-const COLORS = [
-  "#3b82f6", // blue
-  "#10b981", // green
-  "#f59e0b", // amber
-  "#ef4444", // red
-  "#8b5cf6", // purple
-  "#06b6d4", // cyan
-];
-
 interface CdfDataPoint {
   cdfX: number[];
   cdfY: number[];
@@ -90,6 +82,8 @@ function calculateCdf(data: { [key: string]: MetricDataItem } | null): CdfDataPo
 }
 
 export function MetricsCdfChart(props: MetricsCdfChartProps) {
+  const isDark = useIsDarkTheme();
+  const palette = chartTheme(isDark);
   const isGrouped = isGroupedProps(props);
 
   const plotData = useMemo(() => {
@@ -101,7 +95,7 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
         const cdf = calculateCdf(metric.data);
         if (!cdf) return;
 
-        const color = COLORS[index % COLORS.length];
+        const color = palette.series[index % palette.series.length];
         const n = cdf.cdfX.length - 2; // Subtract the extension points
 
         // CDF line
@@ -142,7 +136,7 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
           type: "scatter",
           mode: "lines",
           name: `${props.title} (n=${n})`,
-          line: { color: "#3b82f6", width: 2, shape: "hv" },
+          line: { color: palette.accent, width: 2, shape: "hv" },
           hovertemplate: `${props.title}: %{x:.3f} ${props.unit}<br>Percentile: %{y:.1f}%<extra></extra>`,
         },
         {
@@ -151,14 +145,14 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
           type: "scatter",
           mode: "lines",
           name: `Median: ${cdf.median.toFixed(2)}`,
-          line: { color: "#3b82f6", width: 1, dash: "dot" },
+          line: { color: palette.accent, width: 1, dash: "dot" },
           hoverinfo: "skip",
         },
       );
 
       return traces;
     }
-  }, [isGrouped, props]);
+  }, [palette, isGrouped, props]);
 
   const title = isGrouped ? props.groupTitle : props.title;
   const unit = props.unit;
@@ -177,12 +171,12 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
 
   return (
     <div
-      className={`bg-base-100 rounded-lg shadow-sm border border-base-300 transition-all ${isCompact ? "max-w-xl mx-auto" : ""}`}
+      className={`bg-base-100 rounded-lg shadow-sm border border-base-300 transition-colors ${isCompact ? "max-w-xl mx-auto" : ""}`}
     >
       <div className="flex items-center px-2 py-1 min-h-10">
         <button
           type="button"
-          className="btn btn-sm btn-ghost min-h-0 h-8 flex-1 justify-start px-2 font-semibold"
+          className="btn btn-sm btn-ghost min-h-0 h-8 flex-1 justify-start px-2 font-medium"
           aria-expanded={isOpen}
           aria-controls={contentId}
           onClick={() => setIsOpen((open) => !open)}
@@ -200,7 +194,11 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
           onClick={() => setIsCompact((compact) => !compact)}
           title={isCompact ? "Expand width" : "Compact width"}
         >
-          <FluentEmoji name={isCompact ? "left-right" : "compress"} size={14} />
+          {isCompact ? (
+            <MoveHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+          ) : (
+            <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
           <span className="text-xs">{isCompact ? "Expand" : "Compact"}</span>
         </button>
       </div>
@@ -218,14 +216,12 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
               margin: { l: 50, r: 20, t: 10, b: 50 },
               xaxis: {
                 title: { text: `${title} (${unit})`, font: { size: 11 } },
-                gridcolor: "rgba(128,128,128,0.2)",
                 zeroline: false,
                 automargin: true,
               },
               yaxis: {
                 title: { text: "Cumulative %", font: { size: 11 } },
                 range: [0, 100],
-                gridcolor: "rgba(128,128,128,0.2)",
                 zeroline: false,
                 automargin: true,
               },
@@ -238,8 +234,6 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
                 font: { size: 10 },
                 yref: "container",
               },
-              paper_bgcolor: "rgba(0,0,0,0)",
-              plot_bgcolor: "rgba(0,0,0,0)",
               hovermode: "x unified",
             }}
             config={{

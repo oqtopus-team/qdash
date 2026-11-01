@@ -16,14 +16,14 @@ from pymongo import ReturnDocument
 
 from qdash.api.schemas.agent_session import (
     AgentActionResponse,
-    AgentCampaignCommitResponse,
     AgentCandidateCommitResponse,
     AgentCandidateResponse,
+    AgentCandidateSetCommitResponse,
     AgentSessionResponse,
     ApplyAgentCandidateRequest,
     CandidateGateResponse,
-    CommitAgentCampaignRequest,
     CommitAgentCandidateRequest,
+    CommitAgentCandidateSetRequest,
     CreateAgentSessionRequest,
     EvaluateCandidateGateRequest,
     ExecuteAgentActionRequest,
@@ -31,6 +31,7 @@ from qdash.api.schemas.agent_session import (
     ListAgentCandidatesResponse,
     SubmitAgentActionRequest,
 )
+from qdash.api.services.catalog_task_run import resolve_catalog_task, run_catalog_task
 from qdash.common.agent_gate import evaluate_numeric_candidate
 from qdash.common.utils.datetime import ensure_timezone, now
 from qdash.datamodel.agent_session import (
@@ -40,8 +41,8 @@ from qdash.datamodel.agent_session import (
 )
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
-    AgentCampaignCommitDocument,
     AgentCandidateCommitDocument,
+    AgentCandidateSetCommitDocument,
     AgentSessionDocument,
 )
 from qdash.dbmodel.chip import ChipDocument
@@ -50,7 +51,18 @@ from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 if TYPE_CHECKING:
+    from qdash.api.schemas.task_file import TaskInfo
     from qdash.api.services.flow_service import FlowService
+    from qdash.api.services.task_file_service import TaskFileService
+
+
+def _typed_overrides(task: TaskInfo, overrides: dict[str, float]) -> dict[str, Any]:
+    """Agent overrides arrive as floats; give whole numbers to integer inputs as ints."""
+    typed: dict[str, Any] = {}
+    for name, value in overrides.items():
+        value_type = task.input_parameters.get(name, {}).get("value_type")
+        typed[name] = int(value) if value_type == "int" and float(value).is_integer() else value
+    return typed
 
 
 class AgentSessionService:
@@ -71,10 +83,10 @@ class AgentSessionService:
         return AgentCandidateCommitResponse.model_validate(doc.model_dump())
 
     @staticmethod
-    def _campaign_commit_response(
-        doc: AgentCampaignCommitDocument,
-    ) -> AgentCampaignCommitResponse:
-        return AgentCampaignCommitResponse.model_validate(doc.model_dump())
+    def _candidate_set_commit_response(
+        doc: AgentCandidateSetCommitDocument,
+    ) -> AgentCandidateSetCommitResponse:
+        return AgentCandidateSetCommitResponse.model_validate(doc.model_dump())
 
     @staticmethod
     def _get_action_document(
@@ -101,10 +113,15 @@ class AgentSessionService:
         """Resolve a Prefect operation to its QDash execution without changing flow IDs."""
         if doc.operation_id is None:
             return doc
+        # operation_id is the Prefect flow run ID. Actions dispatched before that
+        # was fixed stored the QDash execution ID there instead, so match both.
         execution = ExecutionHistoryDocument.find_one(
             {
                 "project_id": doc.project_id,
-                "note.flow_run_id": doc.operation_id,
+                "$or": [
+                    {"note.flow_run_id": doc.operation_id},
+                    {"execution_id": doc.operation_id},
+                ],
             }
         ).run()
         if execution is None:
@@ -152,7 +169,7 @@ class AgentSessionService:
         return hashlib.sha256(payload.encode()).hexdigest()
 
     @staticmethod
-    def _campaign_commit_request_hash(body: CommitAgentCampaignRequest) -> str:
+    def _candidate_set_commit_request_hash(body: CommitAgentCandidateSetRequest) -> str:
         payload = json.dumps(
             body.model_dump(mode="json"),
             sort_keys=True,
@@ -701,17 +718,17 @@ class AgentSessionService:
 
         return self._candidate_commit_response(commit)
 
-    def commit_campaign_candidates(
+    def commit_candidate_set(
         self,
         *,
         project_id: str,
         session_id: str,
         username: str,
-        body: CommitAgentCampaignRequest,
-    ) -> AgentCampaignCommitResponse:
+        body: CommitAgentCandidateSetRequest,
+    ) -> AgentCandidateSetCommitResponse:
         """Commit one revalidated same-qubit candidate set in a single Qubit save."""
-        request_hash = self._campaign_commit_request_hash(body)
-        existing = AgentCampaignCommitDocument.find_one(
+        request_hash = self._candidate_set_commit_request_hash(body)
+        existing = AgentCandidateSetCommitDocument.find_one(
             {
                 "project_id": project_id,
                 "session_id": session_id,
@@ -722,15 +739,15 @@ class AgentSessionService:
             if existing.request_hash != request_hash:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail="Idempotency key was already used for a different campaign commit",
+                    detail="Idempotency key was already used for a different candidate set commit",
                 )
-            return self._campaign_commit_response(existing)
+            return self._candidate_set_commit_response(existing)
 
         parameter_names = [reference.parameter_name for reference in body.candidates]
         if len(set(parameter_names)) != len(parameter_names):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Campaign commit contains duplicate parameter names",
+                detail="Candidate set commit contains duplicate parameter names",
             )
 
         session = self._get_session_document(project_id, session_id)
@@ -765,7 +782,7 @@ class AgentSessionService:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=(
-                        f"Campaign candidate '{reference.parameter_name}' does not uniquely "
+                        f"Candidate '{reference.parameter_name}' does not uniquely "
                         "match its authoritative task result"
                     ),
                 )
@@ -774,8 +791,7 @@ class AgentSessionService:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=(
-                        f"Campaign candidate gate rejected '{candidate.parameter_name}': "
-                        f"{candidate.reason}"
+                        f"Candidate gate rejected '{candidate.parameter_name}': {candidate.reason}"
                     ),
                 )
             resolved.append(candidate)
@@ -784,13 +800,13 @@ class AgentSessionService:
         if len(qids) != 1:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Campaign commit candidates must target exactly one qubit",
+                detail="Candidate set must target exactly one qubit",
             )
         qid = next(iter(qids))
         if qid not in session.policy.qids:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Campaign candidate qid '{qid}' is outside the session scope",
+                detail=f"Candidate qid '{qid}' is outside the session scope",
             )
 
         timestamp = now()
@@ -807,10 +823,10 @@ class AgentSessionService:
         if updated_session is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Agent session changed while the campaign commit was being reserved",
+                detail="Agent session changed while the candidate set commit was being reserved",
             )
 
-        commit = AgentCampaignCommitDocument(
+        commit = AgentCandidateSetCommitDocument(
             commit_id=str(uuid4()),
             session_id=session_id,
             project_id=project_id,
@@ -820,7 +836,7 @@ class AgentSessionService:
             qid=qid,
             candidates=[candidate.model_dump(mode="json") for candidate in resolved],
             status="committing",
-            reason="Campaign candidates passed deterministic gates; persistence reserved",
+            reason="Candidate set passed deterministic gates; persistence reserved",
             committed_by=username,
             state_version_before=session.state_version,
             state_version_after=int(updated_session["state_version"]),
@@ -863,33 +879,33 @@ class AgentSessionService:
                 for candidate in resolved
             }
             commit.status = "committed"
-            commit.reason = "Campaign candidate set committed to authoritative QDash state"
+            commit.reason = "Candidate set committed to authoritative QDash state"
             commit.committed_at = now()
             commit.save()
         except Exception as exc:
             commit.status = "failed"
-            commit.reason = f"Campaign candidate persistence failed: {exc}"
+            commit.reason = f"Candidate persistence failed: {exc}"
             commit.save()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=(
-                    "Campaign commit failed after state reservation; "
+                    "Candidate set commit failed after state reservation; "
                     f"audit record '{commit.commit_id}' was retained"
                 ),
             ) from exc
 
-        return self._campaign_commit_response(commit)
+        return self._candidate_set_commit_response(commit)
 
-    def get_campaign_commit(
+    def get_candidate_set_commit(
         self,
         *,
         project_id: str,
         session_id: str,
         commit_id: str,
-    ) -> AgentCampaignCommitResponse:
-        """Return one audited campaign candidate-set commit."""
+    ) -> AgentCandidateSetCommitResponse:
+        """Return one audited candidate-set commit."""
         self._get_session_document(project_id, session_id)
-        commit = AgentCampaignCommitDocument.find_one(
+        commit = AgentCandidateSetCommitDocument.find_one(
             {
                 "project_id": project_id,
                 "session_id": session_id,
@@ -899,9 +915,9 @@ class AgentSessionService:
         if commit is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Agent campaign commit '{commit_id}' not found",
+                detail=f"Agent candidate set commit '{commit_id}' not found",
             )
-        return self._campaign_commit_response(commit)
+        return self._candidate_set_commit_response(commit)
 
     def get_candidate_commit(
         self,
@@ -1090,8 +1106,14 @@ class AgentSessionService:
         action_id: str,
         body: ExecuteAgentActionRequest,
         flow_service: FlowService,
+        task_file_service: TaskFileService,
     ) -> AgentActionResponse:
-        """Dispatch one authorized run-task action to the system workflow."""
+        """Dispatch one authorized run-task action to the system workflow.
+
+        The action runs the way the Task Workbench runs a task: inputs from the
+        current calibration state, the session's readout_duration from the task,
+        and the same override checks. Outputs stay staged for the candidate gate.
+        """
         action = AgentActionDocument.find_one(
             {"project_id": project_id, "session_id": session_id, "action_id": action_id}
         ).run()
@@ -1129,6 +1151,9 @@ class AgentSessionService:
                 detail="Hardware reconfiguration is not allowed by the agent session policy",
             )
 
+        task, backend_name = resolve_catalog_task(task_file_service, action.task_name, None)
+        input_overrides = _typed_overrides(task, action.parameter_overrides)
+
         reserved = AgentActionDocument.get_motor_collection().find_one_and_update(
             {
                 "project_id": project_id,
@@ -1150,21 +1175,21 @@ class AgentSessionService:
             return self._action_response(latest)
 
         try:
-            operation = await flow_service.execute_single_task_from_snapshot(
-                task_name=action.task_name,
-                qid=action.qids[0],
+            operation = await run_catalog_task(
+                flow_service=flow_service,
+                task=task,
+                backend_name=backend_name,
                 chip_id=session.chip_id,
-                source_execution_id=body.source_execution_id,
+                qid=action.qids[0],
                 username=session.created_by,
                 project_id=project_id,
-                tags=[f"agent-session:{session_id}"],
-                execution_name=f"agent:{action.task_name}",
-                parameter_overrides={"input": action.parameter_overrides}
-                if action.parameter_overrides
-                else None,
-                update_params=body.update_params,
+                input_overrides=input_overrides,
+                run_overrides={},
                 persist_output_parameters=False,
+                update_params=body.update_params,
                 reconfigure=body.reconfigure,
+                execution_name=f"agent:{action.task_name}",
+                tags=[f"agent-session:{session_id}"],
             )
         except Exception as exc:
             action.execution_status = "failed"
@@ -1173,6 +1198,9 @@ class AgentSessionService:
             raise
 
         action.execution_status = "queued"
-        action.operation_id = operation.execution_id
+        action.operation_id = operation.flow_run_id
+        if body.source_execution_id:
+            # Provenance only: the run reads the current calibration state.
+            action.metadata = {**action.metadata, "source_execution_id": body.source_execution_id}
         action.save()
-        return self._action_response(action)
+        return self._action_response(self._refresh_action_execution(action))

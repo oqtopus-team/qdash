@@ -137,6 +137,28 @@ describe("QDashClient", () => {
     });
   });
 
+  it("sends an agent action's source execution only as provenance", async () => {
+    const bodies: unknown[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(await new Request(input, init).json());
+      return jsonResponse({ action_id: "action-1" });
+    });
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch },
+    );
+
+    await client.executeAgentAction("session-1", "action-1");
+    await client.executeAgentAction("session-1", "action-1", { sourceExecutionId: "exec-1" });
+
+    expect(bodies[0]).toEqual({ update_params: false, reconfigure: false });
+    expect(bodies[1]).toEqual({
+      source_execution_id: "exec-1",
+      update_params: false,
+      reconfigure: false,
+    });
+  });
+
   it("downloads execution figures as binary files", async () => {
     let request: Request | undefined;
     const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -157,6 +179,47 @@ describe("QDashClient", () => {
     expect(file.mediaType).toBe("image/png");
     expect(file.filename).toBe("result.png");
     expect([...new Uint8Array(file.data)]).toEqual([...bytes]);
+  });
+
+  it("waits for a whole pipeline run, not just the first step's execution", async () => {
+    const detail = (pipelineStatus: string, status = "completed") => ({
+      name: "pipeline-exec-1",
+      status,
+      task: [],
+      note: {},
+      pipeline: {
+        name: "coarse",
+        flow_run_id: "run-1",
+        root_execution_id: "exec-1",
+        status: pipelineStatus,
+        steps: [],
+      },
+    });
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(detail("running")))
+      .mockResolvedValueOnce(jsonResponse(detail("completed")));
+    const wait = vi.fn(async () => undefined);
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch, sleep: wait },
+    );
+
+    const result = await client.waitForExecution("exec-1", { pollIntervalSeconds: 0.01 });
+
+    expect(result.pipeline?.status).toBe("completed");
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    // Opting out returns as soon as the step itself is done.
+    const single = vi.fn().mockResolvedValueOnce(jsonResponse(detail("running")));
+    const stepClient = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      { fetch: single, sleep: wait },
+    );
+    await expect(
+      stepClient.waitForExecution("exec-1", { wholePipeline: false }),
+    ).resolves.toMatchObject({ status: "completed" });
+    expect(single).toHaveBeenCalledTimes(1);
   });
 
   it("uploads forum images as multipart data with a fetch-generated boundary", async () => {
@@ -253,5 +316,29 @@ describe("QDashClient", () => {
       name: "QDashValidationError",
       statusCode: 422,
     });
+  });
+
+  it("spells out which field a FastAPI validation error is about", async () => {
+    const client = new QDashClient(
+      new QDashConfig({ baseUrl: "https://qdash.example/api", apiToken: "token" }),
+      {
+        fetch: async () =>
+          jsonResponse(
+            {
+              detail: [
+                { type: "missing", loc: ["body", "policy", "qids"], msg: "Field required" },
+                { type: "missing", loc: ["body", "policy", "allowed_tasks"], msg: "Field required" },
+              ],
+            },
+            422,
+          ),
+      },
+    );
+
+    const result = client.createAgentSession({ chipId: "144Qv2", policy: {} as never });
+    await expect(result).rejects.toThrow(
+      "policy.qids: Field required; policy.allowed_tasks: Field required",
+    );
+    await expect(result).rejects.not.toThrow("[object Object]");
   });
 });

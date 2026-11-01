@@ -165,7 +165,7 @@ export function useGetMetricsConfig<TData = Awaited<ReturnType<typeof getMetrics
  * Get chip calibration metrics for visualization.
  *
  * This endpoint returns calibration metrics for a specific chip from the database, including:
- * - Qubit frequency, anharmonicity, T1, T2 echo times
+ * - Qubit frequency, qubit anharmonicity, T1, T2 echo times
  * - Gate fidelities (single-qubit and two-qubit)
  * - Readout fidelities
  *

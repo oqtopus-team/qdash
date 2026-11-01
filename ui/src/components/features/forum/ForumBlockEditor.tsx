@@ -88,6 +88,7 @@ interface ForumBlockEditorProps {
   editable?: boolean;
 }
 
+/** Read-only BlockNote rendering of a forum post's blocks, used for previews. */
 export function ForumBlockViewer({ blocks }: { blocks: Record<string, unknown>[] }) {
   const colorScheme = useThemeScheme();
   const editor = useCreateBlockNote(

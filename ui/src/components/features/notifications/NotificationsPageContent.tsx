@@ -86,10 +86,7 @@ export function NotificationsPageContent() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Inbox"
-        description="Mentions, replies, and system messages that need your attention"
-      />
+      <PageHeader title="Inbox" description="Mentions, replies and system messages" />
 
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-base-content/60">
@@ -110,7 +107,7 @@ export function NotificationsPageContent() {
         </button>
       </div>
 
-      <div className="card bg-base-200 shadow-lg overflow-hidden">
+      <div className="card bg-base-200 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center py-16">
             <span className="loading loading-spinner loading-lg" />
@@ -122,7 +119,7 @@ export function NotificationsPageContent() {
         ) : notifications.length === 0 ? (
           <EmptyState
             title="Inbox is empty"
-            description="Mentions in issues and notes, replies, and system messages will appear here."
+            description="Mentions in forum threads and notes, replies, and system messages will appear here."
             emoji="empty"
             size="md"
           />

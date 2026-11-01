@@ -1,35 +1,29 @@
 "use client";
 
-import { CalibrationGitHubSyncNotice } from "@/components/features/task-results/CalibrationGitHubSyncNotice";
-import type { ManualParameterUpdateResponse } from "@/schemas";
-
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
 
-import { ChevronRight, GitBranch, History, ListTodo, FileText, Bot } from "lucide-react";
+import { ChevronRight, GitBranch, History, ListTodo, FileText } from "lucide-react";
 
 import { useGetQubitMetricHistory } from "@/client/metrics/metrics";
 import { useGetExecution } from "@/client/execution/execution";
-import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import {
   ExecutionHistoryModalContent,
   type ExecutionHistoryMobileTab,
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
-import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
-import { TaskResultAiReviewNote } from "./TaskResultAiReviewNote";
-import { TaskResultIssues } from "./TaskResultIssues";
+import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
+import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "./TaskResultMemo";
 import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
-import type { AnalysisContext } from "@/hooks/useAnalysisChat";
+import type { TaskChatContext } from "@/types/copilotChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
-import { getApiErrorMessage } from "@/lib/utils/apiError";
+import { useChatDock } from "@/contexts/ChatDockContext";
 
 interface QubitMetricHistoryModalProps {
   chipId: string;
@@ -52,6 +46,7 @@ function formatMetricValue(value: number | null, unit: string, precision: number
   return displayValue.toFixed(precision);
 }
 
+/** History of a qubit metric, with the selected execution's task details. */
 export function QubitMetricHistoryModal({
   chipId,
   qid,
@@ -63,14 +58,7 @@ export function QubitMetricHistoryModal({
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
-  const [githubResult, setGithubResult] = useState<ManualParameterUpdateResponse | null>(null);
-  const [saveMessage, setSaveMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
-  const { openMiniChat } = useAnalysisChatContext();
-  const queryClient = useQueryClient();
-  const updateParamsMutation = useUpdateCalibrationParameters();
+  const { openMiniChat } = useChatDock();
   const manualOverrides = useManualOverrides(qid);
 
   const { data, isLoading, isError } = useGetQubitMetricHistory(
@@ -186,8 +174,8 @@ export function QubitMetricHistoryModal({
     return selectedGroup.items[0] ?? null;
   }, [selectedGroup, selectedTask?.task_id]);
 
-  // Build analysis context for the AI chat panel
-  const analysisContext: AnalysisContext | null = useMemo(() => {
+  // The task result this chat is about
+  const chatContext: TaskChatContext | null = useMemo(() => {
     if (!selectedTask || !selectedExecutionId) return null;
     return {
       taskName: selectedTask.name || "",
@@ -197,37 +185,6 @@ export function QubitMetricHistoryModal({
       taskId: selectedTask.task_id || "",
     };
   }, [selectedTask, selectedExecutionId, chipId, qid]);
-
-  const handleSaveParameters = useCallback(
-    async (updatedParams: Record<string, unknown>) => {
-      setSaveMessage(null);
-      try {
-        const res = await updateParamsMutation.mutateAsync({
-          data: {
-            chip_id: chipId,
-            qid: qid,
-            parameters: updatedParams as Record<string, Record<string, unknown>>,
-          },
-        });
-        // Invalidate metrics queries so grid and history refresh
-        await queryClient.invalidateQueries({ predicate: isChipMetricsQuery });
-        await queryClient.invalidateQueries({
-          queryKey: [`/calibrations/manual-edits/${qid}`],
-        });
-        const count = res.data?.updated_count ?? 0;
-        setGithubResult(res.data);
-        setSaveMessage({
-          type: "success",
-          text: `${count} parameter(s) saved to DB`,
-        });
-        setTimeout(() => setSaveMessage(null), 5000);
-      } catch (err) {
-        const message = getApiErrorMessage(err, "Failed to save parameters");
-        setSaveMessage({ type: "error", text: message });
-      }
-    },
-    [chipId, qid, updateParamsMutation, queryClient],
-  );
 
   if (isLoading) {
     return (
@@ -267,7 +224,7 @@ export function QubitMetricHistoryModal({
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
           <History className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-bold text-base-content">Execution History</h3>
+          <h3 className="text-sm font-medium text-base-content">Execution History</h3>
         </div>
         <p className="text-xs text-base-content/50">
           {executionGroups.length} executions with {metricName}
@@ -301,7 +258,7 @@ export function QubitMetricHistoryModal({
               >
                 <div className="flex justify-between items-start">
                   <div className="min-w-0 flex-1">
-                    <div className={`font-bold text-lg ${isExcluded ? "line-through" : ""}`}>
+                    <div className={`font-medium text-sm ${isExcluded ? "line-through" : ""}`}>
                       {formatMetricValue(metricItem?.value, metricUnit, 4)}{" "}
                       <span className="text-sm font-normal opacity-80">{metricUnit}</span>
                     </div>
@@ -346,13 +303,11 @@ export function QubitMetricHistoryModal({
     <div className="flex flex-col min-h-0 h-full">
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
-          <ListTodo className="h-4 w-4 text-secondary" />
-          <h3 className="text-sm font-bold text-base-content">Tasks in Execution</h3>
+          <ListTodo className="h-4 w-4 text-base-content/60" />
+          <h3 className="text-sm font-medium text-base-content">Tasks in Execution</h3>
         </div>
         {selectedExecutionId && (
-          <p className="text-[0.65rem] text-base-content/50 font-mono truncate">
-            {selectedExecutionId}
-          </p>
+          <p className="text-xs text-base-content/50 font-mono truncate">{selectedExecutionId}</p>
         )}
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
@@ -394,7 +349,9 @@ export function QubitMetricHistoryModal({
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm truncate">{task.name || "Unnamed"}</span>
+                        <span className="font-medium text-sm truncate">
+                          {task.name || "Unnamed"}
+                        </span>
                         {isMatchingMetric && (
                           <span
                             className={`badge badge-xs ${
@@ -441,8 +398,8 @@ export function QubitMetricHistoryModal({
     <div className="flex flex-col">
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-bold text-base-content">Task Details</h3>
+          <FileText className="h-4 w-4 text-base-content/60" />
+          <h3 className="text-sm font-medium text-base-content">Task Details</h3>
         </div>
         {executionTasks.length > 0 && (
           <div className="text-xs text-base-content/60">
@@ -509,17 +466,17 @@ export function QubitMetricHistoryModal({
         <div className="mt-2 text-xs text-base-content/60 space-y-1 bg-base-200 p-3 rounded-lg">
           {selectedTask.name && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Task Name:</span>
+              <span className="font-medium">Task Name:</span>
               <span className="font-mono">{selectedTask.name}</span>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <span className="font-semibold">Execution ID:</span>
+            <span className="font-medium">Execution ID:</span>
             <span className="font-mono truncate">{selectedExecutionId}</span>
           </div>
           {selectedTask.task_id && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Task ID:</span>
+              <span className="font-medium">Task ID:</span>
               <a
                 href={`/task-results/${selectedTask.task_id}`}
                 className="font-mono truncate link link-primary"
@@ -530,20 +487,20 @@ export function QubitMetricHistoryModal({
           )}
           {selectedTask.start_at != null && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Start:</span>
+              <span className="font-medium">Start:</span>
               <span>{formatDateTime(String(selectedTask.start_at))}</span>
             </div>
           )}
           {selectedTask.end_at != null && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">End:</span>
+              <span className="font-medium">End:</span>
               <span>{formatDateTime(String(selectedTask.end_at))}</span>
             </div>
           )}
           {/* Metric Value from history if available */}
           {selectedGroup && selectedGroup.items.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Metric Value:</span>
+              <span className="font-medium">Metric Value:</span>
               <span className="font-mono">
                 {formatMetricValue(selectedGroup.items[0].value, metricUnit, 4)} {metricUnit}
               </span>
@@ -558,14 +515,16 @@ export function QubitMetricHistoryModal({
               <GitBranch className="h-3 w-3" />
               View Provenance Lineage
             </Link>
-            {analysisContext && (
-              <button
-                onClick={() => openMiniChat(analysisContext)}
-                className="btn btn-xs btn-primary gap-1"
-              >
-                <Bot className="h-3 w-3" />
-                Ask AI
-              </button>
+            {chatContext && (
+              <AskAiButton
+                taskId={chatContext.taskId}
+                chipId={chatContext.chipId}
+                taskName={chatContext.taskName}
+                qid={chatContext.qid}
+                chatContext={chatContext}
+                onChat={() => openMiniChat(chatContext)}
+                size="xs"
+              />
             )}
             {selectedHistoryItem?.task_id && (
               <TaskResultExcludeButton
@@ -596,25 +555,8 @@ export function QubitMetricHistoryModal({
                 <ParametersTable
                   title="Output Parameters"
                   parameters={selectedTask.output_parameters as Record<string, unknown>}
-                  editable
-                  onSave={handleSaveParameters}
-                  isSaving={updateParamsMutation.isPending}
                   overrides={manualOverrides}
                 />
-                {githubResult && (
-                  <CalibrationGitHubSyncNotice key={githubResult.task_id} result={githubResult} />
-                )}
-                {saveMessage && (
-                  <div
-                    className={`text-xs px-2 py-1 rounded ${
-                      saveMessage.type === "success"
-                        ? "text-success bg-success/10"
-                        : "text-error bg-error/10"
-                    }`}
-                  >
-                    {saveMessage.text}
-                  </div>
-                )}
               </>
             )}
           {selectedTask.run_parameters && Object.keys(selectedTask.run_parameters).length > 0 && (
@@ -626,14 +568,22 @@ export function QubitMetricHistoryModal({
         </div>
       )}
 
-      {/* Notes (above issues) */}
-      {selectedTask?.task_id && (
-        <TaskResultAiReviewNote taskId={selectedTask.task_id} hideWhenEmpty />
-      )}
+      {/* Notes (above threads) */}
       {selectedTask?.task_id && <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} />}
 
-      {/* Issues */}
-      {selectedTask?.task_id && <TaskResultIssues taskId={selectedTask.task_id} />}
+      {/* Forum threads about this result */}
+      {/* AI evaluations of this result, requested the same way as from the chip page */}
+      {selectedTask?.task_id && (
+        <TaskResultEvaluations
+          taskId={selectedTask.task_id}
+          chipId={chipId}
+          taskName={selectedTask.name || undefined}
+          qid={qid}
+          onChat={chatContext ? () => openMiniChat(chatContext) : undefined}
+        />
+      )}
+
+      {selectedTask?.task_id && <TaskResultThreads taskId={selectedTask.task_id} />}
     </div>
   );
 

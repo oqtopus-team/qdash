@@ -15,6 +15,7 @@ from qdash.workflow.worker.flows.push_props.processor import _process_data
 
 qubit_field_map = {
     "qubit_frequency": "qubit_frequency",
+    "qubit_anharmonicity": "qubit_anharmonicity",
     # "resonator_frequency": "resonator_frequency",
     "t1": "t1",
     "t1_average": "t1_average",
@@ -32,6 +33,15 @@ coupling_field_map = {
     "zx90_gate_fidelity": "zx90_gate_fidelity",
     "bell_state_fidelity": "bell_state_fidelity",
 }
+
+
+def _normalize_qubit_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Map legacy QDash parameter names to their canonical Qubex-aligned names."""
+    normalized = dict(data)
+    if "qubit_anharmonicity" not in normalized and "anharmonicity" in normalized:
+        normalized["qubit_anharmonicity"] = normalized["anharmonicity"]
+    normalized.pop("anharmonicity", None)
+    return normalized
 
 
 def merge_properties(
@@ -118,7 +128,11 @@ def get_chip_properties(
     for qid, q in qubit_models.items():
         stats["total_qubits"] += 1
         qubit_props = _process_data(
-            q.data, qubit_field_map, QubitProperties, within_24hrs, cutoff_hours
+            _normalize_qubit_data(q.data),
+            qubit_field_map,
+            QubitProperties,
+            within_24hrs,
+            cutoff_hours,
         )
         props.qubits[exp.get_qubit_label(int(qid))] = qubit_props
 

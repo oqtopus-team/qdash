@@ -20,7 +20,7 @@ export function ErrorCard({
 }: ErrorCardProps) {
   return (
     <div
-      className={`card bg-base-100 shadow-xl rounded-xl p-8 border border-error/20 ${className}`}
+      className={`card bg-base-100 shadow-sm rounded-xl p-8 border border-error/20 ${className}`}
     >
       <div className="flex flex-col items-center text-center space-y-4">
         {/* Error Icon */}
@@ -43,7 +43,7 @@ export function ErrorCard({
         )}
 
         {/* Error Title */}
-        <h3 className="text-xl font-semibold text-error">{title}</h3>
+        <h3 className="text-sm font-medium text-error">{title}</h3>
 
         {/* Error Message */}
         <p className="text-base-content/70 max-w-md">{message}</p>

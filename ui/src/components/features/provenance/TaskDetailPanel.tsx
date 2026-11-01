@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { X } from "lucide-react";
 import type { LineageNodeResponse, LineageEdgeResponse } from "@/schemas";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { QubitTile } from "@/components/ui/QubitTile";
 
 interface TaskDetailPanelProps {
   /** The graph node_id of the selected activity */
@@ -123,10 +124,10 @@ export function TaskDetailPanel({ activityNodeId, nodes, edges, onClose }: TaskD
       <div className="bg-secondary/10 px-4 py-3 border-b border-base-300 flex-shrink-0">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <div className="font-semibold text-sm truncate">{taskName}</div>
+            <div className="font-medium text-sm truncate">{taskName}</div>
             <div className="flex items-center gap-2 mt-1">
               {statusBadge}
-              {qid && <span className="badge badge-outline badge-sm">{qid}</span>}
+              {qid && <QubitTile qid={qid} />}
             </div>
           </div>
           <button
@@ -154,9 +155,7 @@ export function TaskDetailPanel({ activityNodeId, nodes, edges, onClose }: TaskD
         <section>
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-4 rounded bg-green-500" />
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-              Output Parameters
-            </h4>
+            <h4 className="text-xs font-medium text-base-content/60">Output Parameters</h4>
             <span className="badge badge-ghost badge-xs">{outputParams.length}</span>
           </div>
           {outputParams.length === 0 ? (
@@ -170,9 +169,7 @@ export function TaskDetailPanel({ activityNodeId, nodes, edges, onClose }: TaskD
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium truncate">{p.name}</span>
-                    {p.qid && (
-                      <span className="badge badge-outline badge-xs flex-shrink-0">{p.qid}</span>
-                    )}
+                    {p.qid && <QubitTile qid={p.qid} />}
                   </div>
                   {p.value && (
                     <div className="text-xs font-mono text-base-content/60 mt-0.5">
@@ -189,9 +186,7 @@ export function TaskDetailPanel({ activityNodeId, nodes, edges, onClose }: TaskD
         <section>
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-4 rounded bg-amber-500" />
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
-              Input Parameters
-            </h4>
+            <h4 className="text-xs font-medium text-base-content/60">Input Parameters</h4>
             <span className="badge badge-ghost badge-xs">{inputParams.length}</span>
           </div>
           {inputParams.length === 0 ? (
@@ -205,9 +200,7 @@ export function TaskDetailPanel({ activityNodeId, nodes, edges, onClose }: TaskD
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium truncate">{p.name}</span>
-                    {p.qid && (
-                      <span className="badge badge-outline badge-xs flex-shrink-0">{p.qid}</span>
-                    )}
+                    {p.qid && <QubitTile qid={p.qid} />}
                   </div>
                   {p.value && (
                     <div className="text-xs font-mono text-base-content/60 mt-0.5">

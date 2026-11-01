@@ -2,8 +2,8 @@ from typing import Any
 
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
-    AgentCampaignCommitDocument,
     AgentCandidateCommitDocument,
+    AgentCandidateSetCommitDocument,
     AgentSessionDocument,
 )
 from qdash.dbmodel.backend import BackendDocument
@@ -17,17 +17,24 @@ from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 from qdash.dbmodel.cryostat import CryostatDocument
+from qdash.dbmodel.evaluation import EvaluationDocument
+from qdash.dbmodel.evaluation_asset import EvaluationAssetDocument
+from qdash.dbmodel.evaluation_run import EvaluationRunDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.flow import FlowDocument
-from qdash.dbmodel.forum import ForumCategoryDocument, ForumCounterDocument, ForumPostDocument
-from qdash.dbmodel.issue import IssueDocument
-from qdash.dbmodel.issue_knowledge import IssueKnowledgeDocument
+from qdash.dbmodel.forum import (
+    ForumCategoryDocument,
+    ForumCounterDocument,
+    ForumLabelDocument,
+    ForumPostDocument,
+)
 from qdash.dbmodel.metric_note import MetricNoteDocument
 from qdash.dbmodel.note_event import NoteEventDocument
 from qdash.dbmodel.notification import NotificationDocument
 from qdash.dbmodel.project import ProjectDocument
+from qdash.dbmodel.project_execution_counter import ProjectExecutionCounterDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.provenance import (
     ActivityDocument,
@@ -50,7 +57,7 @@ def document_models() -> list[Any]:
         AgentSessionDocument,
         AgentActionDocument,
         AgentCandidateCommitDocument,
-        AgentCampaignCommitDocument,
+        AgentCandidateSetCommitDocument,
         ExecutionHistoryDocument,
         TaskResultHistoryDocument,
         QubitDocument,
@@ -63,6 +70,7 @@ def document_models() -> list[Any]:
         SlackForumThreadDocument,
         UserDocument,
         ExecutionCounterDocument,
+        ProjectExecutionCounterDocument,
         ExecutionLockDocument,
         TagDocument,
         CalibrationNoteDocument,
@@ -74,10 +82,12 @@ def document_models() -> list[Any]:
         ForumCategoryDocument,
         ForumPostDocument,
         ForumCounterDocument,
-        IssueDocument,
-        IssueKnowledgeDocument,
+        ForumLabelDocument,
         MetricNoteDocument,
         TargetNoteDocument,
+        EvaluationRunDocument,
+        EvaluationDocument,
+        EvaluationAssetDocument,
         NoteEventDocument,
         NotificationDocument,
         CryostatDocument,

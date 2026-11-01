@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
-import { Pencil, Save, X } from "lucide-react";
+import { useMemo } from "react";
 
-import { getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
+import { formatSweepValue, getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
 
 /** Manual override info for a parameter. */
 export interface ParameterOverride {
@@ -17,17 +16,36 @@ interface ParametersTableProps {
   title: string;
   parameters: Record<string, unknown>;
   parameterDefinitions?: Record<string, unknown>;
-  editable?: boolean;
-  onSave?: (params: Record<string, unknown>) => void;
-  isSaving?: boolean;
   /** Map of param name -> manual override info. Shows strikethrough on original value. */
   overrides?: Record<string, ParameterOverride>;
 }
 
 type DatabaseUpdateStatus = "updated" | "not-updated" | "partial" | "unknown";
 
+interface DatabaseUpdate {
+  parameter_name: string;
+  previous_value?: unknown;
+  updated_value?: unknown;
+  updated: boolean;
+}
+
+function getDatabaseUpdates(value: unknown): DatabaseUpdate[] {
+  if (typeof value !== "object" || value === null || !("database_updates" in value)) return [];
+  const updates = (value as Record<string, unknown>).database_updates;
+  if (!Array.isArray(updates)) return [];
+  return updates.filter(
+    (update): update is DatabaseUpdate =>
+      typeof update === "object" &&
+      update !== null &&
+      typeof (update as Record<string, unknown>).parameter_name === "string" &&
+      typeof (update as Record<string, unknown>).updated === "boolean",
+  );
+}
+
 function getDatabaseUpdateStatus(parameters: Record<string, unknown>): DatabaseUpdateStatus {
   const flags = Object.values(parameters).flatMap((value) => {
+    const updates = getDatabaseUpdates(value);
+    if (updates.length > 0) return updates.map((update) => update.updated);
     if (typeof value !== "object" || value === null || !("database_updated" in value)) return [];
     const flag = (value as Record<string, unknown>).database_updated;
     return typeof flag === "boolean" ? [flag] : [];
@@ -37,6 +55,12 @@ function getDatabaseUpdateStatus(parameters: Record<string, unknown>): DatabaseU
   if (flags.every(Boolean)) return "updated";
   if (flags.every((flag) => !flag)) return "not-updated";
   return "partial";
+}
+
+function getDatabaseUpdatesLabel(updates: DatabaseUpdate[]): string {
+  if (updates.every((update) => update.updated)) return "Applied to calibration database";
+  if (updates.every((update) => !update.updated)) return "Not applied to calibration database";
+  return "Calibration database updates";
 }
 
 export function CalibrationUpdateStatusBadge({
@@ -82,14 +106,16 @@ function formatValue(v: unknown): string {
   return String(v ?? "N/A");
 }
 
-/** Render a fully-expanded parameters table with optional inline editing. */
+/** Show a recorded sweep as the call that produced it; other values as before. */
+function formatParameterValue(parameter: Record<string, unknown>): string {
+  return formatSweepValue(parameter.value_type, parameter.value) ?? formatValue(parameter.value);
+}
+
+/** Render a fully-expanded parameters table with manual-edit markers. */
 export function ParametersTable({
   title,
   parameters,
   parameterDefinitions,
-  editable = false,
-  onSave,
-  isSaving = false,
   overrides,
 }: ParametersTableProps) {
   const entries = useMemo(() => Object.entries(parameters), [parameters]);
@@ -106,7 +132,10 @@ export function ParametersTable({
       if (existing) {
         existing.entries.push(entry);
       } else {
-        groups.set(group.name, { collapsed: group.collapsed, entries: [entry] });
+        groups.set(group.name, {
+          collapsed: group.collapsed,
+          entries: [entry],
+        });
       }
     }
     return { regularEntries: regular, parameterGroups: [...groups.entries()] };
@@ -122,46 +151,6 @@ export function ParametersTable({
       ),
     [entries],
   );
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedValues, setEditedValues] = useState<Record<string, string>>({});
-
-  const startEditing = useCallback(() => {
-    const initial: Record<string, string> = {};
-    for (const [key, val] of entries) {
-      const paramValue =
-        typeof val === "object" && val !== null && "value" in val
-          ? (val as Record<string, unknown>)
-          : { value: val };
-      // If there's an override, start with the overridden value
-      const override = overrides?.[key];
-      initial[key] = override ? String(override.currentValue) : String(paramValue.value ?? "");
-    }
-    setEditedValues(initial);
-    setIsEditing(true);
-  }, [entries, overrides]);
-
-  const cancelEditing = useCallback(() => {
-    setIsEditing(false);
-    setEditedValues({});
-  }, []);
-
-  const handleSave = useCallback(() => {
-    if (!onSave) return;
-    const updated: Record<string, unknown> = {};
-    for (const [key, val] of entries) {
-      const original =
-        typeof val === "object" && val !== null && "value" in val
-          ? (val as Record<string, unknown>)
-          : { value: val };
-      const newValueStr = editedValues[key];
-      const parsed = Number(newValueStr);
-      const newValue = isNaN(parsed) ? newValueStr : parsed;
-      updated[key] = { ...original, value: newValue };
-    }
-    onSave(updated);
-    setIsEditing(false);
-  }, [onSave, entries, editedValues]);
-
   const renderTable = (tableEntries: [string, unknown][]) => (
     <table className="table table-zebra table-xs w-full">
       <thead>
@@ -178,6 +167,7 @@ export function ParametersTable({
             typeof val === "object" && val !== null && "value" in val
               ? (val as Record<string, unknown>)
               : { value: val };
+          const databaseUpdates = getDatabaseUpdates(paramValue);
           const override = overrides?.[key];
           return (
             <tr key={key}>
@@ -195,6 +185,26 @@ export function ParametersTable({
                     edited
                   </span>
                 )}
+                {databaseUpdates.length > 0 && (
+                  <div
+                    className="mt-2 flex flex-wrap items-center gap-1.5"
+                    aria-label={`Database destinations for ${key}`}
+                  >
+                    <span className="text-xs font-normal text-base-content/60">
+                      {getDatabaseUpdatesLabel(databaseUpdates)}:
+                    </span>
+                    {databaseUpdates.map((update) => (
+                      <span
+                        key={`${key}:${update.parameter_name}`}
+                        className={`badge badge-xs font-mono ${
+                          update.updated ? "badge-success badge-soft" : "badge-ghost"
+                        }`}
+                      >
+                        {update.parameter_name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </td>
               {showsDatabaseComparison && (
                 <td className="font-mono text-xs bg-error/10 text-error">
@@ -207,32 +217,20 @@ export function ParametersTable({
               )}
               <td
                 className={`font-mono text-xs ${
-                  showsDatabaseComparison ? "bg-success/10 text-success font-semibold" : ""
+                  showsDatabaseComparison ? "bg-success/10 text-success font-medium" : ""
                 }`}
               >
-                {isEditing ? (
-                  <input
-                    type="text"
-                    className="input input-xs input-bordered w-full max-w-[140px] font-mono"
-                    value={editedValues[key] ?? ""}
-                    onChange={(e) =>
-                      setEditedValues((prev) => ({
-                        ...prev,
-                        [key]: e.target.value,
-                      }))
-                    }
-                  />
-                ) : override ? (
+                {override ? (
                   <span className="flex items-center gap-1.5">
                     <span className="line-through text-base-content/40">
-                      {formatValue(paramValue.value)}
+                      {formatParameterValue(paramValue)}
                     </span>
-                    <span className="text-warning font-semibold">
+                    <span className="text-warning font-medium">
                       {formatValue(override.currentValue)}
                     </span>
                   </span>
                 ) : (
-                  formatValue(paramValue.value)
+                  formatParameterValue(paramValue)
                 )}
               </td>
               <td className="text-xs">{String(paramValue.unit ?? "-")}</td>
@@ -249,49 +247,12 @@ export function ParametersTable({
     <div className="border border-base-300 bg-base-100 rounded-lg overflow-hidden">
       <div className="px-3 py-2 bg-base-200 border-b border-base-300 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">{title}</span>
+          <span className="text-sm font-medium">{title}</span>
           <span className="badge badge-xs badge-ghost">{entries.length}</span>
           {title === "Output Parameters" && (
             <CalibrationUpdateStatusBadge parameters={parameters} />
           )}
         </div>
-        {editable && onSave && (
-          <div className="flex items-center gap-1">
-            {isEditing ? (
-              <>
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="btn btn-xs btn-primary gap-1"
-                >
-                  {isSaving ? (
-                    <span className="loading loading-spinner loading-xs" />
-                  ) : (
-                    <Save className="w-3 h-3" />
-                  )}
-                  Save
-                </button>
-                <button
-                  onClick={cancelEditing}
-                  disabled={isSaving}
-                  className="btn btn-xs btn-ghost gap-1"
-                >
-                  <X className="w-3 h-3" />
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={startEditing}
-                className="btn btn-xs btn-ghost gap-1"
-                title="Edit parameters"
-              >
-                <Pencil className="w-3 h-3" />
-                Edit
-              </button>
-            )}
-          </div>
-        )}
       </div>
       {regularEntries.length > 0 && renderTable(regularEntries)}
       {parameterGroups.map(([groupName, group]) => (
@@ -300,7 +261,7 @@ export function ParametersTable({
           className="collapse collapse-arrow rounded-none border-t border-base-300 bg-base-100"
           open={!group.collapsed}
         >
-          <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-semibold">
+          <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-medium">
             <span className="flex items-center gap-2">
               {groupName}
               <span className="badge badge-xs badge-ghost">{group.entries.length}</span>

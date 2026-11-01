@@ -31,6 +31,7 @@ import contextlib
 import json
 import logging
 import time
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -60,6 +61,16 @@ from qdash.common.execution_resources import (
 from qdash.common.utils.datetime import now
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
 from qdash.workflow.engine.params_updater import get_params_updater
+from qdash.workflow.engine.task_parameters import (
+    INPUT,
+    RUN,
+    merge_task_parameters,
+    normalize_default_run_parameters,
+    normalize_task_settings,
+    resolve_task_parameters,
+    task_settings_from_task_details,
+    validate_task_names,
+)
 from qdash.workflow.service.execution_id import generate_execution_id
 from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
@@ -152,13 +163,23 @@ def _run_terminal_hook(
         project_id = params.get("project_id")
         flow_run_id = str(flow_run.id)
 
-        if not project_id:
-            _logger.warning("%s: no project_id in parameters, skipping", hook_name)
-            return
-
         from qdash.dbmodel.initialize import initialize
 
         initialize()
+
+        if not project_id:
+            # Direct callers may let CalibService resolve the project. Use the
+            # recorded execution, not a user's default that may have changed.
+            from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+
+            executions = ExecutionHistoryDocument.find({"note.flow_run_id": flow_run_id}).run()
+            projects = {execution.project_id for execution in executions if execution.project_id}
+            if len(projects) != 1:
+                _logger.warning(
+                    "%s: cannot identify one project for flow run %s", hook_name, flow_run_id
+                )
+                return
+            project_id = projects.pop()
 
         from qdash.repository.execution_finalizer import finalize_executions_by_flow_run_id
 
@@ -335,12 +356,13 @@ class CalibService:
         default_run_parameters: dict[str, Any] | None = None,
         task_run_parameters: dict[str, dict[str, Any]] | None = None,
         source_execution_id: str | None = None,
-        parameter_overrides: dict[str, dict[str, Any]] | None = None,
         source_task_id: str | None = None,
         snapshot_exempt_tasks: set[str] | None = None,
         force_update_params: bool = False,
         persist_output_parameters: bool = True,
         *,
+        task_parameters: dict[str, dict[str, Any]] | None = None,
+        configuration_mode: str | None = None,
         user_repo: UserRepository | None = None,
         lock_repo: ExecutionLockRepository | None = None,
         counter_repo: ExecutionCounterRepository | None = None,
@@ -385,10 +407,20 @@ class CalibService:
                 Execution. Pipelines automatically create one Execution per calibration
                 step, including when older templates pass this option. Default: False.
             default_run_parameters: Shared fallback run parameters applied to all tasks.
-            task_run_parameters: Explicit task settings keyed by task name. Alongside
-                run parameters, ``update_calibration_parameters`` can be set to ``False``
-                to keep a task's output as measurement history without applying it to
-                the current calibration parameters.
+                Values use the same plain, sweep, or wrapped form as task-specific
+                ``run`` values.
+            task_run_parameters: Deprecated flat form of ``task_parameters`` that holds
+                only run parameters and ``update_calibration_parameters``.
+            task_parameters: Settings keyed by task name. Each entry may contain
+                ``run`` (run parameters declared in the task's ``run_spec``), ``input``
+                (overrides for calibration inputs declared in its ``input_spec``), and
+                ``update_calibration_parameters`` (``False`` keeps the output as
+                measurement history without updating current calibration parameters).
+                For example: ``{"CheckAdaptiveChevron": {"run": {"shots": 256},
+                "input": {"coarse_control_amplitude": 0.05}}}``. An input override
+                applies to every qid the task runs on.
+            configuration_mode: Qubex control layout inherited by parent and isolated
+                worker sessions. If omitted, the backend default is used.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
@@ -404,8 +436,10 @@ class CalibService:
         self.backend_name = backend_name or get_default_backend()
         self.use_lock = use_lock
         self.skip_execution = skip_execution
-        self.default_run_parameters = default_run_parameters or {}
-        self.task_run_parameters = task_run_parameters or {}
+        self.default_run_parameters = normalize_default_run_parameters(default_run_parameters)
+        self.task_parameters = resolve_task_parameters(task_parameters, task_run_parameters)
+        self.configuration_mode = configuration_mode
+        validate_task_names(self.task_parameters, self.backend_name)
         self._lock_acquired = False
         self._lock_execution_id: str | None = None
         self._reserved_scope = resource_scope
@@ -414,7 +448,6 @@ class CalibService:
         if source_execution_id is None:
             source_execution_id = self._read_source_execution_id_from_context()
         self.source_execution_id = source_execution_id
-        self._parameter_overrides = parameter_overrides
         self._source_task_id = source_task_id
         self._snapshot_exempt_tasks = snapshot_exempt_tasks or set()
         self._force_update_params = force_update_params
@@ -459,10 +492,10 @@ class CalibService:
         if not self.default_run_parameters and self.flow_name:
             self._load_default_run_parameters()
         logger.debug(
-            "CalibService.__init__ flow_name=%s default_run_parameters=%s task_run_parameters=%s",
+            "CalibService.__init__ flow_name=%s default_run_parameters=%s task_parameters=%s",
             self.flow_name,
             self.default_run_parameters,
-            self.task_run_parameters,
+            self.task_parameters,
         )
 
         # Session state
@@ -517,7 +550,9 @@ class CalibService:
             flow_name = self.flow_name or ""
             flow = flow_repo.find_by_project_and_name(self.project_id, flow_name)
             if flow and flow.default_run_parameters:
-                self.default_run_parameters = flow.default_run_parameters
+                self.default_run_parameters = normalize_default_run_parameters(
+                    flow.default_run_parameters
+                )
                 logger.debug(
                     "Loaded default_run_parameters from flow '%s': %s",
                     self.flow_name,
@@ -610,6 +645,8 @@ class CalibService:
         qids: list[str],
         tags: list[str] | None = None,
         note: dict[str, Any] | None = None,
+        *,
+        connect_backend: bool = True,
     ) -> None:
         """Initialize session with given qids (internal method).
 
@@ -617,6 +654,7 @@ class CalibService:
             qids: List of qubit IDs to calibrate
             tags: List of tags for categorization
             note: Additional notes to store with execution
+            connect_backend: Whether the session itself executes hardware tasks
 
         """
         if self._initialized:
@@ -678,9 +716,9 @@ class CalibService:
 
             # Create CalibConfig
             logger.debug(
-                "CalibConfig default_run_parameters=%s task_run_parameters=%s",
+                "CalibConfig default_run_parameters=%s task_parameters=%s",
                 self.default_run_parameters,
-                self.task_run_parameters,
+                self.task_parameters,
             )
             config = CalibConfig(
                 username=self.username,
@@ -695,17 +733,23 @@ class CalibService:
                 project_id=self.project_id,
                 enable_github_pull=self._enable_github_pull,
                 skip_execution=self.skip_execution,
+                connect_backend=connect_backend,
                 default_run_parameters=self.default_run_parameters,
-                task_run_parameters=self.task_run_parameters,
+                task_parameters=self.task_parameters,
                 force_update_params=self._force_update_params,
                 persist_output_parameters=self._persist_output_parameters,
             )
+            if self.configuration_mode is not None:
+                config.configuration_mode = self.configuration_mode
+            else:
+                # Preserve CalibConfig's environment-backed default and expose the
+                # resolved value to isolated workers created by this service.
+                self.configuration_mode = config.configuration_mode
 
-            # Create a parameter loader for snapshot re-execution or standalone
-            # user overrides. Quick runs have no source snapshot, but still need
-            # input overrides to be re-applied after task preprocessing.
+            # Create a parameter loader for snapshot re-execution. Explicit
+            # overrides travel with each task through task_parameters.
             snapshot_loader = None
-            if self._source_task_id or self.source_execution_id or self._parameter_overrides:
+            if self._source_task_id or self.source_execution_id:
                 from qdash.workflow.engine.task.snapshot_loader import (
                     SnapshotParameterLoader,
                 )
@@ -714,7 +758,6 @@ class CalibService:
                     source_execution_id=self.source_execution_id,
                     project_id=self.project_id,
                     source_task_id=self._source_task_id,
-                    parameter_overrides=self._parameter_overrides,
                     snapshot_exempt_tasks=self._snapshot_exempt_tasks,
                 )
                 logger.info(
@@ -733,8 +776,9 @@ class CalibService:
             self._orchestrator.initialize()
 
             self._initialized = True
-        except Exception:
-            # Release lock if initialization fails
+        except BaseException:
+            # Construction can be interrupted before the caller has a session
+            # to clean up. Signals and cancellations also release this claim.
             if self._lock_acquired and self._lock_repo is not None:
                 self._lock_repo.unlock(
                     project_id=self.project_id,
@@ -774,22 +818,36 @@ class CalibService:
         # Access private attribute to avoid RuntimeError from property
         return self._orchestrator._backend
 
+    def _disconnect_backend(self) -> None:
+        """Release this session's backend without changing Execution ownership."""
+        backend = self.backend
+        if backend is None:
+            return
+        try:
+            backend.disconnect()
+        except Exception:
+            logger.exception("Failed to disconnect backend for execution %s", self.execution_id)
+
     def execute_task(
         self,
         task_name: str,
         qid: str,
         task_details: dict[str, Any] | None = None,
         upstream_id: str | None = None,
+        *,
+        parameters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute a calibration task with integrated save processing.
 
         Args:
             task_name: Name of the task to execute (e.g., 'CheckFreq')
             qid: Qubit ID to calibrate
-            task_details: Optional task-specific configuration parameters. Set
-                ``task_details[task_name]["update_calibration_parameters"]`` to ``False``
-                to retain a successful measurement without updating current calibration values.
+            task_details: Deprecated form of ``parameters`` keyed by task name.
             upstream_id: Optional explicit upstream task_id for dependency tracking
+            parameters: Settings for this call only, in the form of one
+                ``task_parameters`` entry: ``run``, ``input``, and
+                ``update_calibration_parameters``. They take precedence over the
+                service's ``task_parameters``.
 
         Returns:
             Dictionary containing the task's output parameters and task_id
@@ -802,24 +860,26 @@ class CalibService:
             # With explicit upstream_id for group execution
             result1 = session.execute_task("CheckRabi", "33")
             result2 = session.execute_task("CheckRabi", "32", upstream_id=result1["task_id"])
+
+            # Override one input for this call only
+            session.execute_task("CheckRabi", "0", parameters={"input": {"control_amplitude": 0.05}})
             ```
         """
         if self.use_lock and not self._lock_acquired:
             raise RuntimeError("No hardware reservation is held for this execution")
-        parameters: dict[str, Any] = {"qid": qid}
+        settings = self._call_settings(task_name, task_details, parameters)
+        effective_settings = merge_task_parameters(
+            {task_name: self.task_parameters.get(task_name, {RUN: {}, INPUT: {}})},
+            {task_name: settings},
+        )[task_name]
+        resource_parameters: dict[str, Any] = {"qid": qid}
         if task_name == "ConfigureAll":
-            parameters = {
-                "mux_ids": (task_details or {})
-                .get(task_name, {})
-                .get("run_parameters", {})
-                .get("mux_ids", {})
-                .get("value")
+            resource_parameters = {
+                "mux_ids": effective_settings[RUN].get("mux_ids", {}).get("value")
             }
-        self._validate_resource_scope(parameters)
+        self._validate_resource_scope(resource_parameters)
         assert self._orchestrator is not None, "Session not initialized"
-        result: dict[str, Any] = self._orchestrator.run_task(
-            task_name, qid, task_details, upstream_id
-        )
+        result: dict[str, Any] = self._orchestrator.run_task(task_name, qid, settings, upstream_id)
         return result
 
     def execute_task_batch(
@@ -828,13 +888,39 @@ class CalibService:
         qids: list[str],
         task_details: dict[str, Any] | None = None,
         upstream_id: str | None = None,
+        *,
+        parameters: dict[str, Any] | None = None,
     ) -> dict[str, dict[str, Any]]:
-        """Execute one calibration task with a single batch_run over qids."""
+        """Execute one calibration task with a single batch_run over qids.
+
+        ``parameters`` and the deprecated ``task_details`` behave as in ``execute_task``.
+        """
         if self.use_lock and not self._lock_acquired:
             raise RuntimeError("No hardware reservation is held for this execution")
+        settings = self._call_settings(task_name, task_details, parameters)
         self._validate_resource_scope({"qids": qids})
         assert self._orchestrator is not None, "Session not initialized"
-        return self._orchestrator.run_task_batch(task_name, qids, task_details, upstream_id)
+        return self._orchestrator.run_task_batch(task_name, qids, settings, upstream_id)
+
+    @staticmethod
+    def _call_settings(
+        task_name: str,
+        task_details: dict[str, Any] | None,
+        parameters: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Combine call-level ``parameters`` with the deprecated ``task_details``."""
+        if task_details is None:
+            return normalize_task_settings(task_name, parameters)
+        warnings.warn(
+            "task_details is deprecated; pass parameters="
+            '{"run": {...}, "input": {...}} for the task instead',
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return merge_task_parameters(
+            {task_name: task_settings_from_task_details(task_name, task_details)},
+            {task_name: normalize_task_settings(task_name, parameters)},
+        )[task_name]
 
     def get_parameter(self, qid: str, param_name: str) -> Any:
         """Get a calibration parameter value for a qubit.
@@ -1067,14 +1153,20 @@ class CalibService:
         except Exception as e:
             logger.warning(f"Failed to finalize tasks on cancel: {e}")
 
-    def _sync_backend_params_before_push(self, logger: Any) -> None:
-        """Sync recent calibration results into backend YAML params prior to GitHub push."""
+    def _sync_backend_params_before_push(self, logger: Any) -> GitHubPushConfig:
+        """Sync recent calibration results into backend YAML params prior to GitHub push.
+
+        Returns the push configuration for this execution. ``params_file_names`` is
+        narrowed to the files this execution touched on a copy, because pipeline
+        steps share ``self.github_push_config``: narrowing it in place would leave
+        later steps with only the files an earlier step touched.
+        """
         assert self.execution_service is not None, "ExecutionService not initialized"
         assert self.github_push_config is not None, "GitHubPushConfig not initialized"
         self._merge_task_result_calib_data_before_push(logger)
         updater_instance = get_params_updater(self.backend, self.chip_id)
         if updater_instance is None:
-            return
+            return self.github_push_config
 
         from qdash.workflow.engine.params_updater import resolve_param_yaml_file_names
 
@@ -1089,18 +1181,23 @@ class CalibService:
                 logger.warning(f"Failed to sync params for qid={qid}: {exc}")
 
         configured_param_files = self.github_push_config.params_file_names
-        if configured_param_files is not None:
-            self.github_push_config.params_file_names = [
-                file_name
-                for file_name in configured_param_files
-                if file_name in push_candidate_files
-            ]
-            skipped_files = sorted(set(configured_param_files) - push_candidate_files)
-            if skipped_files:
-                logger.info(
-                    "Skipping params files not touched by this calibration: %s",
-                    ", ".join(skipped_files),
-                )
+        if configured_param_files is None:
+            return self.github_push_config
+        skipped_files = sorted(set(configured_param_files) - push_candidate_files)
+        if skipped_files:
+            logger.info(
+                "Skipping params files not touched by this calibration: %s",
+                ", ".join(skipped_files),
+            )
+        return self.github_push_config.model_copy(
+            update={
+                "params_file_names": [
+                    file_name
+                    for file_name in configured_param_files
+                    if file_name in push_candidate_files
+                ]
+            }
+        )
 
     def _merge_task_result_calib_data_before_push(self, logger: Any) -> None:
         """Reload completed task outputs into parent calib_data before GitHub push.
@@ -1118,7 +1215,12 @@ class CalibService:
         try:
             from bunnet import SortDirection
 
-            from qdash.datamodel.task import CalibDataModel, ParameterModel, TaskTypes
+            from qdash.datamodel.task import (
+                CalibDataModel,
+                ParameterModel,
+                TaskResultOutputParameterModel,
+                TaskTypes,
+            )
             from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
             docs = (
@@ -1134,16 +1236,25 @@ class CalibService:
             )
 
             calib_data = CalibDataModel()
+            names_by_task: dict[tuple[str, str, str], set[str]] = {}
+            name_owner: dict[tuple[str, str, str], tuple[str, str, str]] = {}
+            stale_names: set[tuple[str, str, str]] = set()
             for doc in docs:
                 if not doc.qid or not doc.output_parameters:
                     continue
 
+                published_by_doc: dict[str, ParameterModel] = {}
                 for name, value in doc.output_parameters.items():
                     try:
-                        parameter = (
+                        output_parameter = (
                             value
-                            if isinstance(value, ParameterModel)
-                            else ParameterModel.model_validate(value)
+                            if isinstance(value, TaskResultOutputParameterModel)
+                            else TaskResultOutputParameterModel.model_validate(value)
+                        )
+                        if not output_parameter.database_updated:
+                            continue
+                        parameter = ParameterModel.model_validate(
+                            output_parameter.model_dump(exclude_none=True)
                         )
                     except Exception:
                         logger.debug(
@@ -1154,10 +1265,47 @@ class CalibService:
                         )
                         continue
 
-                    if doc.task_type == TaskTypes.COUPLING or "-" in doc.qid:
-                        calib_data.put_coupling_data(doc.qid, name, parameter)
+                    # Key by the published calibration parameter names recorded at
+                    # save time, matching the in-memory calib_data of the task run.
+                    # Results persisted before per-destination metadata existed only
+                    # carry the output name.
+                    if output_parameter.database_updates:
+                        published_targets = [
+                            (
+                                str(update["parameter_name"]),
+                                update.get("updated_value", parameter.value),
+                            )
+                            for update in output_parameter.database_updates
+                            if update.get("updated") is True
+                        ]
                     else:
-                        calib_data.put_qubit_data(doc.qid, name, parameter)
+                        published_targets = [(name, parameter.value)]
+                    for published_name, published_value in published_targets:
+                        published_by_doc[published_name] = parameter.model_copy(
+                            update={"parameter_name": published_name, "value": published_value}
+                        )
+
+                if not published_by_doc:
+                    continue
+                task_key = (doc.name, doc.task_type, doc.qid)
+                previous_names = names_by_task.get(task_key, set())
+                is_coupling = doc.task_type == TaskTypes.COUPLING or "-" in doc.qid
+                target_data = calib_data.coupling if is_coupling else calib_data.qubit
+                for old_name in previous_names - published_by_doc.keys():
+                    owner_key = (doc.task_type, doc.qid, old_name)
+                    if name_owner.get(owner_key) == task_key:
+                        target_data.get(doc.qid, {}).pop(old_name, None)
+                        stale_names.add(owner_key)
+                        del name_owner[owner_key]
+                for published_name, published in published_by_doc.items():
+                    owner_key = (doc.task_type, doc.qid, published_name)
+                    if is_coupling:
+                        calib_data.put_coupling_data(doc.qid, published_name, published)
+                    else:
+                        calib_data.put_qubit_data(doc.qid, published_name, published)
+                    name_owner[owner_key] = task_key
+                    stale_names.discard(owner_key)
+                names_by_task[task_key] = set(published_by_doc)
 
             if calib_data.qubit or calib_data.coupling:
                 self.execution_service.merge_calib_data(calib_data)
@@ -1166,6 +1314,14 @@ class CalibService:
                     len(calib_data.qubit),
                     len(calib_data.coupling),
                 )
+            current_data = self.execution_service.calib_data
+            for task_type, qid, stale_name in stale_names:
+                target_data = (
+                    current_data.coupling
+                    if task_type == TaskTypes.COUPLING or "-" in qid
+                    else current_data.qubit
+                )
+                target_data.get(qid, {}).pop(stale_name, None)
         except Exception as exc:
             logger.warning(f"Failed to merge task result calib_data before push: {exc}")
 
@@ -1240,7 +1396,10 @@ class CalibService:
             push_results = self._push_to_github_if_configured(logger, push_to_github)
 
         finally:
-            self._release_lock_if_acquired()
+            try:
+                self._disconnect_backend()
+            finally:
+                self._release_lock_if_acquired()
 
         return push_results
 
@@ -1309,10 +1468,10 @@ class CalibService:
         if not should_push:
             return None
 
-        self._sync_backend_params_before_push(logger)
+        push_config = self._sync_backend_params_before_push(logger)
         if GitHubIntegration.check_credentials() and self.github_integration is not None:
             try:
-                push_results = self.github_integration.push_files(self.github_push_config)
+                push_results = self.github_integration.push_files(push_config)
                 if push_results:
                     self.execution_service.note.github_push_results = push_results
                     self.execution_service.save()
@@ -1372,8 +1531,11 @@ class CalibService:
             if self.execution_service:
                 self.execution_service = self.execution_service.reload().fail(error_message)
         finally:
-            self._release_lock_if_acquired()
-            self._initialized = False
+            try:
+                self._disconnect_backend()
+            finally:
+                self._release_lock_if_acquired()
+                self._initialized = False
 
     def cancel_calibration(self) -> None:
         """Mark the calibration as cancelled and cleanup.
@@ -1394,8 +1556,11 @@ class CalibService:
             if self.execution_service:
                 self.execution_service = self.execution_service.reload().cancel()
         finally:
-            self._release_lock_if_acquired()
-            self._initialized = False
+            try:
+                self._disconnect_backend()
+            finally:
+                self._release_lock_if_acquired()
+                self._initialized = False
 
     def abandon_calibration(self) -> None:
         """Release resources without recording a terminal status.
@@ -1405,8 +1570,11 @@ class CalibService:
         so the execution is left open for ``on_flow_cancellation`` /
         ``on_flow_crashed``, or the API reconciliation, to close.
         """
-        self._release_lock_if_acquired()
-        self._initialized = False
+        try:
+            self._disconnect_backend()
+        finally:
+            self._release_lock_if_acquired()
+            self._initialized = False
 
     # =========================================================================
     # High-level API Methods
@@ -1522,7 +1690,12 @@ class CalibService:
                         was_skipped = self.skip_execution
                         self.skip_execution = False
                         if not self._initialized:
-                            self._initialize(ctx.candidate_qids, self.tags, self.note)
+                            self._initialize(
+                                ctx.candidate_qids,
+                                self.tags,
+                                self.note,
+                                connect_backend=step.connect_parent_backend,
+                            )
                         elif was_skipped and self.execution_service is not None:
                             assert self._orchestrator is not None
                             self._orchestrator.config.skip_execution = False

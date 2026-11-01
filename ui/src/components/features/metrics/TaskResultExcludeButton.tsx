@@ -72,7 +72,7 @@ export function TaskResultExcludeButton({
           </button>
         </div>
         {(excludedReason || excludedBy || excludedAt) && (
-          <div className="text-[0.7rem] text-base-content/70 space-y-0.5">
+          <div className="text-xs text-base-content/70 space-y-0.5">
             {excludedReason && <div>Reason: {excludedReason}</div>}
             {(excludedBy || excludedAt) && (
               <div>
@@ -103,7 +103,7 @@ export function TaskResultExcludeButton({
         onOpenChange={(nextOpen) => !nextOpen && !mutation.isPending && setOpen(false)}
       >
         <DialogContent>
-          <DialogTitle className="text-base mb-2">Exclude this measurement</DialogTitle>
+          <DialogTitle className="text-sm mb-2">Exclude this measurement</DialogTitle>
           <DialogDescription className="text-sm text-base-content/70 mb-3">
             Excluded measurements are skipped on the dashboard and metrics screens. Raw data is
             preserved and you can restore it later.

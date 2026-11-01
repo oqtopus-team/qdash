@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FluentEmoji } from "./FluentEmoji";
+import { Target } from "lucide-react";
 
 interface LinearGaugeProps {
   value: number; // 0-100
@@ -60,11 +60,11 @@ export function LinearGauge({
     return "text-error";
   };
 
-  const getBadge = (val: number): { emoji: string; text: string } | null => {
-    if (val >= 100) return { emoji: "crystal", text: "Perfect" };
-    if (val >= 95) return { emoji: "medal-gold", text: "Gold" };
-    if (val >= 80) return { emoji: "medal-silver", text: "Silver" };
-    if (val >= 50) return { emoji: "medal-bronze", text: "Bronze" };
+  const getBadge = (val: number): { text: string } | null => {
+    if (val >= 100) return { text: "Perfect" };
+    if (val >= 95) return { text: "Gold" };
+    if (val >= 80) return { text: "Silver" };
+    if (val >= 50) return { text: "Bronze" };
     return null;
   };
 
@@ -78,13 +78,13 @@ export function LinearGauge({
       {/* Gauge bar */}
       <div className="flex-1 h-2 bg-base-300 rounded-full overflow-hidden min-w-24 max-w-32">
         <div
-          className={`h-full rounded-full transition-all duration-100 ${getBarColor(animatedValue)}`}
+          className={`h-full rounded-full transition-colors duration-100 ${getBarColor(animatedValue)}`}
           style={{ width: `${animatedValue}%` }}
         />
       </div>
 
       {/* Percentage and count */}
-      <span className={`text-sm font-bold whitespace-nowrap ${getTextColor(animatedValue)}`}>
+      <span className={`text-sm font-medium whitespace-nowrap ${getTextColor(animatedValue)}`}>
         {animatedValue.toFixed(1)}%
       </span>
       <span className="text-xs text-base-content/50 whitespace-nowrap">
@@ -95,12 +95,10 @@ export function LinearGauge({
       {current === 0 ? (
         <span className="text-xs text-base-content/40 whitespace-nowrap">No data</span>
       ) : badge ? (
-        <span className="flex items-center gap-1">
-          <FluentEmoji name={badge.emoji} size={16} />
-        </span>
+        <span className="text-xs text-base-content/60 whitespace-nowrap">{badge.text}</span>
       ) : (
         <span className="flex items-center gap-1 text-xs text-base-content/50 whitespace-nowrap">
-          <FluentEmoji name="target" size={14} />
+          <Target className="h-3.5 w-3.5" aria-hidden="true" />
           {remaining} to go
         </span>
       )}

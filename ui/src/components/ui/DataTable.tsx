@@ -118,11 +118,11 @@ export function DataTable<TData extends object>({
 
   return (
     <div
-      className={`card bg-base-100 shadow-xl rounded-xl p-4 sm:p-8 border border-base-300 ${className}`}
+      className={`card bg-base-100 shadow-sm rounded-xl p-4 sm:p-8 border border-base-300 ${className}`}
     >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-          <h2 className="text-lg sm:text-2xl font-semibold">{title}</h2>
+          <h2 className="text-sm font-medium">{title}</h2>
           {actions}
         </div>
 
@@ -138,7 +138,7 @@ export function DataTable<TData extends object>({
               />
             </div>
           )}
-          <div className="text-xs sm:text-sm text-base-content/70 whitespace-nowrap">
+          <div className="text-sm text-base-content/70 whitespace-nowrap">
             {filter ? `${processedRows.length} filtered` : `${data.length} total`}
           </div>
         </div>
@@ -165,7 +165,7 @@ export function DataTable<TData extends object>({
                       return (
                         <th
                           key={header.id}
-                          className={`${meta?.className || "text-center"} text-xs sm:text-sm px-2 sm:px-4 ${
+                          className={`${meta?.className || "text-center"} text-sm  px-2 sm:px-4 ${
                             canSort ? "cursor-pointer hover:bg-base-300" : ""
                           }`}
                           onClick={header.column.getToggleSortingHandler()}
@@ -213,7 +213,7 @@ export function DataTable<TData extends object>({
                       return (
                         <td
                           key={cell.id}
-                          className={`${meta?.className || "text-center"} text-xs sm:text-sm px-2 sm:px-4`}
+                          className={`${meta?.className || "text-center"} text-sm  px-2 sm:px-4`}
                         >
                           <table.FlexRender cell={cell} />
                         </td>
@@ -226,7 +226,7 @@ export function DataTable<TData extends object>({
 
             {totalPages > 1 && (
               <div className="flex flex-col sm:flex-row justify-between items-center gap-2 mt-4 px-4 sm:px-0">
-                <div className="text-xs sm:text-sm text-base-content/70">
+                <div className="text-sm text-base-content/70">
                   {visibleRows.length} / {processedRows.length}
                 </div>
                 <div className="join">

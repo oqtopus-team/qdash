@@ -1,8 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import {
-  AlertCircle,
   ArrowRight,
   CheckCircle2,
   ClipboardList,
@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { useGetExecutionLockStatus } from "@/client/execution/execution";
+import { useGetExecution, useGetExecutionLockStatus } from "@/client/execution/execution";
 import { useListChips } from "@/client/chip/chip";
 import { useListTaskResults } from "@/client/task-result/task-result";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -26,6 +26,7 @@ import { useNotificationActions, useNotifications } from "@/hooks/useNotificatio
 import { isExecutionInProgress } from "@/lib/executionStatus";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { NotificationResponse } from "@/schemas";
+import { QubitTile } from "@/components/ui/QubitTile";
 
 interface SectionHeadingProps {
   title: string;
@@ -49,7 +50,7 @@ function SectionHeading({ title, description, href, linkLabel }: SectionHeadingP
   return (
     <div className="flex items-start justify-between gap-4">
       <div>
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <h2 className="text-sm font-medium">{title}</h2>
         <p className="mt-0.5 text-sm text-base-content/60">{description}</p>
       </div>
       {href && linkLabel && (
@@ -96,7 +97,7 @@ function QuickActions({ canEdit }: QuickActionsProps) {
 
   return (
     <section aria-labelledby="quick-actions-heading">
-      <h2 id="quick-actions-heading" className="mb-3 text-sm font-semibold text-base-content/60">
+      <h2 id="quick-actions-heading" className="mb-3 text-sm font-medium text-base-content/60">
         Quick actions
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -107,11 +108,11 @@ function QuickActions({ canEdit }: QuickActionsProps) {
             className="card card-interactive border border-base-300 bg-base-100 shadow-sm"
           >
             <div className="card-body flex-row items-center gap-3 p-4">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-200 text-base-content/70">
                 <Icon className="h-5 w-5" />
               </span>
               <span className="min-w-0">
-                <span className="block font-semibold">{label}</span>
+                <span className="block font-medium">{label}</span>
                 <span className="block text-xs text-base-content/55">{description}</span>
               </span>
             </div>
@@ -134,7 +135,7 @@ function RecentNotifications() {
   };
 
   return (
-    <section className="card bg-base-200 shadow-lg">
+    <section className="card bg-base-200 shadow-sm">
       <div className="card-body gap-4 p-5">
         <SectionHeading
           title="Recent notifications"
@@ -217,6 +218,26 @@ export function HomePageContent() {
 
   const lock = lockResponse?.data;
   const isRunning = Boolean(lock?.lock && lock.status && isExecutionInProgress(lock.status));
+
+  // While a calibration runs, poll its task list so the card shows real progress.
+  const runningExecutionId = isRunning ? (lock?.execution_id ?? undefined) : undefined;
+  const { data: runningExecution } = useGetExecution(runningExecutionId ?? "", {
+    query: { enabled: Boolean(runningExecutionId), refetchInterval: 5000 },
+  });
+  const runningProgress = useMemo(() => {
+    const tasks = runningExecution?.data?.task ?? [];
+    const done = tasks.filter((task) => task.status === "completed").length;
+    const failed = tasks.filter((task) => task.status === "failed").length;
+    const current = tasks.find((task) => task.status === "running")?.name;
+    const total = tasks.length;
+    return {
+      done,
+      failed,
+      total,
+      current,
+      percent: total ? Math.round(((done + failed) / total) * 100) : 0,
+    };
+  }, [runningExecution]);
   const executionHref =
     lock?.chip_id && lock.execution_id
       ? `/execution/${encodeURIComponent(lock.chip_id)}/${encodeURIComponent(lock.execution_id)}`
@@ -230,7 +251,7 @@ export function HomePageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="Home"
-        description="Start work and review what needs your attention"
+        description="What is running and what needs attention"
         actions={
           showHeaderTour && (
             <Link href="/chip?tutorial=create-chip" className="btn btn-ghost btn-sm gap-2">
@@ -245,11 +266,11 @@ export function HomePageContent() {
         {showGettingStarted && (
           <section className="flex flex-col gap-4 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
             <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-200 text-base-content/70">
                 <Cpu size={20} />
               </span>
               <div>
-                <h2 className="font-semibold">Create your first chip</h2>
+                <h2 className="font-medium">Create your first chip</h2>
                 <p className="mt-1 text-sm text-base-content/60">
                   Set up the device QDash will use for calibration tasks and results.
                 </p>
@@ -269,7 +290,7 @@ export function HomePageContent() {
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
           <div className="space-y-6">
-            <section className="card bg-base-200 shadow-lg">
+            <section className="card bg-base-200 shadow-sm">
               <div className="card-body gap-4 p-5">
                 <SectionHeading
                   title="Current execution"
@@ -282,19 +303,42 @@ export function HomePageContent() {
                 ) : isRunning ? (
                   <Link
                     href={executionHref}
-                    className="flex items-center gap-4 rounded-lg border border-info/30 bg-info/10 p-4 transition-colors hover:bg-info/15"
+                    className="flex items-center gap-4 rounded-lg border border-base-300 bg-base-100 p-4 transition-colors hover:border-base-content/20"
                   >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-info text-info-content">
-                      <span className="loading loading-spinner loading-sm" />
-                    </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">
-                        {lock?.name || "Calibration execution"}
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full bg-info"
+                          aria-hidden="true"
+                        />
+                        <span className="truncate font-medium">
+                          {lock?.name || "Calibration execution"}
+                        </span>
                       </span>
-                      <span className="mt-1 flex flex-wrap gap-x-3 text-xs text-base-content/60">
-                        <span className="capitalize">{lock?.status}</span>
+                      <span className="mt-1 flex flex-wrap gap-x-3 text-xs text-base-content/60 tabular-nums">
+                        {runningProgress.total > 0 ? (
+                          <span>
+                            {runningProgress.done}/{runningProgress.total} tasks
+                            {runningProgress.failed > 0
+                              ? ` · ${runningProgress.failed} failed`
+                              : ""}
+                          </span>
+                        ) : (
+                          <span className="capitalize">{lock?.status}</span>
+                        )}
+                        {runningProgress.current && (
+                          <span className="truncate font-mono">{runningProgress.current}</span>
+                        )}
                         {lock?.chip_id && <span>Chip {lock.chip_id}</span>}
                       </span>
+                      {runningProgress.total > 0 && (
+                        <span className="mt-3 block h-1 w-full overflow-hidden rounded-full bg-base-300">
+                          <span
+                            className="block h-full rounded-full bg-primary"
+                            style={{ width: `${runningProgress.percent}%` }}
+                          />
+                        </span>
+                      )}
                     </span>
                     <ArrowRight className="h-5 w-5 shrink-0" />
                   </Link>
@@ -312,7 +356,7 @@ export function HomePageContent() {
               </div>
             </section>
 
-            <section className="card bg-base-200 shadow-lg">
+            <section className="card bg-base-200 shadow-sm">
               <div className="card-body gap-4 p-5">
                 <SectionHeading
                   title="Needs attention"
@@ -345,16 +389,14 @@ export function HomePageContent() {
                         href={`/task-results/${encodeURIComponent(result.task_id)}`}
                         className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:text-error"
                       >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-error/10 text-error">
-                          <AlertCircle className="h-5 w-5" />
-                        </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold">
+                          <span className="block truncate text-sm font-medium">
                             {result.task_name}
                           </span>
-                          <span className="mt-0.5 block truncate text-xs text-base-content/55">
-                            {result.qid} · {result.chip_id}
-                            {result.message ? ` · ${result.message}` : ""}
+                          <span className="mt-1 flex items-center gap-2 text-xs text-base-content/55">
+                            <QubitTile qid={result.qid} status="failed" />
+                            <span className="shrink-0">{result.chip_id}</span>
+                            {result.message && <span className="truncate">{result.message}</span>}
                           </span>
                         </span>
                         {result.start_at && (
