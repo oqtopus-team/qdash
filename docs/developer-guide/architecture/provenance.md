@@ -81,9 +81,11 @@ Use the generated [OpenAPI reference](../../reference/openapi.md) for routes, pa
 and response schemas. Keeping that contract generated prevents this explanation from drifting when
 an endpoint changes.
 
-The **Data Provenance** page exposes parameter history, lineage exploration, execution comparison,
-and recalibration recommendations. The UI follows entity IDs through the graph; it does not infer
-lineage from task names.
+The UI shows provenance where a value is viewed rather than on a page of its own.
+`ParameterLineagePanel` renders the producing activity, the direct inputs and the values derived
+from the selected version, with the full graph (`ProvenanceGraph`) in a dialog on demand. It is embedded in task results, opened from metric history, and reached from the
+execution page's parameter diff (`ExecutionParameterChanges`, which uses the compare operation).
+The UI follows entity IDs through the graph; it does not infer lineage from task names.
 
 ## Extend Provenance Recording
 

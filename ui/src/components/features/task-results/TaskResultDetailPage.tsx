@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, RefreshCw, ExternalLink, CheckCircle, UserRound, Pencil } from "lucide-react";
 import { useGetTaskResult } from "@/client/task/task";
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
+import { TaskLineageSection } from "@/components/features/provenance/TaskLineageSection";
+import { FigureStrip } from "@/components/charts/FigureStrip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
@@ -309,16 +311,18 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {/* Figure */}
       {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
         (taskResult.json_figure_path && taskResult.json_figure_path.length > 0)) && (
-        <div className="h-[280px] overflow-x-auto overflow-y-hidden flex items-center justify-start gap-3 mb-4">
-          {(taskResult.figure_path ?? []).map((fig, i) => (
-            <TaskFigure
-              key={i}
-              path={fig}
-              jsonFigurePath={(taskResult.json_figure_path ?? [])[i]}
-              qid={taskResult.qid}
-              className="h-full w-auto object-contain rounded flex-shrink-0"
-            />
-          ))}
+        <div className="mb-4">
+          <FigureStrip className="h-[280px] gap-3 overflow-y-hidden">
+            {(taskResult.figure_path ?? []).map((fig, i) => (
+              <TaskFigure
+                key={i}
+                path={fig}
+                jsonFigurePath={(taskResult.json_figure_path ?? [])[i]}
+                qid={taskResult.qid}
+                className="h-full w-auto object-contain rounded flex-shrink-0"
+              />
+            ))}
+          </FigureStrip>
         </div>
       )}
 
@@ -358,6 +362,14 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             parameters={taskResult.run_parameters as Record<string, unknown>}
           />
         )}
+
+        <TaskLineageSection
+          taskId={taskId}
+          executionId={taskResult.execution_id}
+          qid={taskResult.qid ?? ""}
+          outputParameters={taskResult.output_parameters as Record<string, unknown> | undefined}
+          className="mb-4 rounded-lg bg-base-200/50 p-4"
+        />
 
         <TaskMessagePanel
           status={taskResult.status}

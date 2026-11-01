@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
   result: null as Record<string, unknown> | null,
 }));
 
+vi.mock("@/components/features/provenance/TaskLineageSection", () => ({
+  TaskLineageSection: () => null,
+}));
+
 vi.mock("@/client/task/task", () => ({
   useGetTaskResult: (taskId: string) => ({
     data: taskId && mocks.result ? { data: mocks.result } : undefined,

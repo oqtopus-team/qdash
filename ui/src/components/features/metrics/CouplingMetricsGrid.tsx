@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react";
-import Link from "next/link";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import { ArrowRightLeft, GitBranch, Lock, ZoomIn } from "lucide-react";
 
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
@@ -706,13 +706,13 @@ export function CouplingMetricsGrid({
 
               {/* Modal Footer */}
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
-                <Link
-                  href={`/provenance?parameter=${encodeURIComponent(metricKey)}&qid=${encodeURIComponent(selectedCouplingInfo.couplingId)}&tab=lineage`}
+                <LineageButton
+                  target={{ parameterName: metricKey, qid: selectedCouplingInfo.couplingId }}
                   className="btn btn-ghost btn-sm sm:btn-md gap-1"
                 >
                   <GitBranch className="h-4 w-4" />
                   <span className="hidden sm:inline">Lineage</span>
-                </Link>
+                </LineageButton>
                 <div className="flex gap-2">
                   <button
                     type="button"
