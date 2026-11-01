@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  AlertCircle,
   CheckCircle2,
   ClipboardList,
   Cpu,
@@ -48,13 +49,14 @@ interface QuickAction {
 
 function SectionHeading({ title, description, href, linkLabel }: SectionHeadingProps) {
   return (
-    <div className="flex items-start justify-between gap-4">
+    <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:gap-4">
       <div>
         <h2 className="text-sm font-medium">{title}</h2>
         <p className="mt-0.5 text-sm text-base-content/60">{description}</p>
       </div>
+      {/* Offset the ghost padding when stacked so the label lines up with the heading. */}
       {href && linkLabel && (
-        <Link href={href} className="btn btn-ghost btn-sm shrink-0 gap-1">
+        <Link href={href} className="btn btn-ghost btn-sm -ml-3 shrink-0 gap-1 sm:ml-0">
           {linkLabel}
           <ArrowRight className="h-4 w-4" />
         </Link>
@@ -204,9 +206,25 @@ export function HomePageContent() {
     isLoading: chipsLoading,
     error: chipsError,
   } = useListChips({ query: { staleTime: 30_000 } });
-  const { data: lockResponse, isLoading: lockLoading } = useGetExecutionLockStatus({
+  const {
+    data: lockResponse,
+    isLoading: lockLoading,
+    error: lockError,
+    refetch: refetchLock,
+  } = useGetExecutionLockStatus({
     query: { refetchInterval: 5000, refetchIntervalInBackground: true },
   });
+  // Track only user-initiated retries: background polling keeps the query fetching almost
+  // continuously while the endpoint fails, which would otherwise pin the button disabled.
+  const [lockRetrying, setLockRetrying] = useState(false);
+  const retryLock = async () => {
+    setLockRetrying(true);
+    try {
+      await refetchLock();
+    } finally {
+      setLockRetrying(false);
+    }
+  };
   const {
     data: failedResponse,
     isLoading: failedLoading,
@@ -300,6 +318,25 @@ export function HomePageContent() {
                 />
                 {lockLoading ? (
                   <div className="skeleton h-24 w-full" />
+                ) : lockError ? (
+                  <div
+                    role="alert"
+                    className="alert alert-error alert-soft alert-vertical sm:alert-horizontal"
+                  >
+                    <AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="font-medium">Execution status unavailable</p>
+                      <p className="text-sm">Could not check whether a calibration is running.</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-sm shrink-0"
+                      disabled={lockRetrying}
+                      onClick={() => void retryLock()}
+                    >
+                      {lockRetrying ? "Retrying…" : "Retry"}
+                    </button>
+                  </div>
                 ) : isRunning ? (
                   <Link
                     href={executionHref}
