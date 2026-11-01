@@ -5,6 +5,7 @@ history persistence operations.
 """
 
 import logging
+from datetime import datetime
 
 from bunnet import SortDirection
 
@@ -91,6 +92,23 @@ class MongoExecutionHistoryRepository:
 
         """
         return ExecutionHistoryDocument.find({"project_id": project_id, "chip_id": chip_id}).count()
+
+    def list_started_since(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        since: datetime,
+    ) -> list[ExecutionHistoryDocument]:
+        """List executions of a chip that started at or after ``since``, oldest first.
+
+        Used for activity charts, so the window is bounded by date rather than by count.
+        """
+        results: list[ExecutionHistoryDocument] = ExecutionHistoryDocument.find(
+            {"project_id": project_id, "chip_id": chip_id, "start_at": {"$gte": since}},
+            sort=[("start_at", SortDirection.ASCENDING)],
+        ).run()
+        return results
 
     def find_latest_by_project(self, project_id: str) -> ExecutionHistoryDocument | None:
         """Find the most recently started execution for a project."""

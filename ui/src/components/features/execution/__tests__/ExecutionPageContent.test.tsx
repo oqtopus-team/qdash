@@ -113,8 +113,24 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-vi.mock("@/components/features/execution/ExecutionDurationBreakdown", () => ({
-  ExecutionDurationBreakdown: () => <div>DurationBreakdown</div>,
+vi.mock("@/components/features/execution/ExecutionActivityChart", () => ({
+  ExecutionActivityChart: ({
+    days,
+    selectedDate,
+    onDateSelect,
+  }: {
+    days: number;
+    selectedDate: string;
+    onDateSelect: (date: string) => void;
+  }) => (
+    <div>
+      <span>ActivityChart {days}d</span>
+      <span>selected:{selectedDate}</span>
+      <button type="button" onClick={() => onDateSelect("20260101")}>
+        pick-day
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("@/components/charts/TaskFigure", () => ({
@@ -189,22 +205,19 @@ describe("ExecutionPageContent cancel confirmation", () => {
     expect(mockCancelMutate).not.toHaveBeenCalled();
   });
 
-  it("loads the duration breakdown only after it is expanded", () => {
+  it("shows the activity chart and lets it pick the day filter", () => {
     render(<ExecutionPageContent />);
 
-    expect(screen.queryByText("DurationBreakdown")).toBeNull();
+    expect(screen.getByText("ActivityChart 30d")).toBeTruthy();
+    expect(screen.getByText("selected:latest")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /Task duration breakdown/i }));
+    fireEvent.click(screen.getByRole("button", { name: "pick-day" }));
 
-    expect(screen.getByText("DurationBreakdown")).toBeTruthy();
+    expect(screen.getByText("selected:20260101")).toBeTruthy();
   });
 
-  it("summarizes the current executions and opens a non-modal details panel", () => {
+  it("opens a non-modal details panel", () => {
     render(<ExecutionPageContent />);
-
-    const summary = screen.getByRole("region", { name: "Execution status summary" });
-    expect(within(summary).getByText("Total")).toBeTruthy();
-    expect(within(summary).getByText("Running")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Running Execution"));
 

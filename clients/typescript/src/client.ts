@@ -45,6 +45,7 @@ import type {
   FlowTemplateWithCode,
   GetFlowResponse,
   ListChipsResponse,
+  ExecutionActivityResponse,
   ListExecutionsResponse,
   ListTaskKnowledgeResponse,
   ListTaskResponse,
@@ -351,6 +352,18 @@ export class QDashClient {
 
   async executeFlow(name: string, parameters: JsonObject = {}): Promise<ExecuteFlowResponse> {
     return this.post(`/flows/${pathPart(name)}/execute`, { parameters });
+  }
+
+  /** Count a chip's executions per calendar day over the trailing window. */
+  async getExecutionActivity(options: {
+    chipId: string;
+    days?: number;
+    timezone?: string;
+  }): Promise<ExecutionActivityResponse> {
+    return this.get(
+      "/executions/activity",
+      query({ chip_id: options.chipId, days: options.days, timezone: options.timezone }),
+    );
   }
 
   async listExecutions(options: {

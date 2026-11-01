@@ -1,11 +1,12 @@
 """Tests for execution router endpoints."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from zipfile import ZipFile
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pytest
@@ -157,6 +158,116 @@ def sample_execution(test_project: ProjectDocument) -> ExecutionHistoryDocument:
 
 
 CANCEL_FLOW_RUN_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+
+def _seed_execution(
+    *,
+    execution_id: str,
+    status: str,
+    start_at: datetime | None,
+    chip_id: str = "chip-1",
+) -> None:
+    ExecutionHistoryDocument(
+        project_id="test_project",
+        username="test_user",
+        name="flow",
+        execution_id=execution_id,
+        calib_data_path="/tmp/calib",
+        note={},
+        status=status,
+        tags=[],
+        chip_id=chip_id,
+        start_at=start_at,
+        message="",
+        system_info=SystemInfoModel(),
+    ).insert()
+
+
+class TestExecutionActivity:
+    """GET /executions/activity buckets a chip's executions per calendar day."""
+
+    def test_counts_per_day_by_status_with_empty_days(
+        self, test_client, test_project, auth_headers
+    ) -> None:
+        zone = ZoneInfo("Asia/Tokyo")
+        today = datetime.now(tz=zone).replace(hour=12, minute=0, second=0, microsecond=0)
+        _seed_execution(execution_id="e-1", status="completed", start_at=today)
+        _seed_execution(execution_id="e-2", status="completed", start_at=today)
+        _seed_execution(execution_id="e-3", status="failed", start_at=today - timedelta(days=1))
+        _seed_execution(execution_id="e-4", status="cancelling", start_at=today)
+        _seed_execution(execution_id="e-5", status="pending", start_at=today)
+        _seed_execution(execution_id="old", status="completed", start_at=today - timedelta(days=40))
+        _seed_execution(execution_id="other-chip", status="failed", start_at=today, chip_id="x")
+        _seed_execution(execution_id="unstarted", status="scheduled", start_at=None)
+
+        response = test_client.get(
+            "/executions/activity",
+            params={"chip_id": "chip-1", "days": 7, "timezone": "Asia/Tokyo"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["chip_id"] == "chip-1"
+        assert body["days"] == 7
+        assert body["timezone"] == "Asia/Tokyo"
+        assert len(body["buckets"]) == 7
+        assert body["until"] == today.date().isoformat()
+        assert body["buckets"][-1]["date"] == body["until"]
+        assert body["buckets"][0]["date"] == body["since"]
+        last = body["buckets"][-1]
+        assert last == {
+            "date": today.date().isoformat(),
+            "completed": 2,
+            "failed": 0,
+            "running": 1,
+            "scheduled": 1,
+            "cancelled": 0,
+            "other": 0,
+            "total": 4,
+        }
+        yesterday = body["buckets"][-2]
+        assert yesterday["failed"] == 1 and yesterday["total"] == 1
+        assert all(bucket["total"] == 0 for bucket in body["buckets"][:-2])
+
+    def test_days_follow_the_requested_time_zone(
+        self, test_client, test_project, auth_headers
+    ) -> None:
+        """An execution late in the UTC evening belongs to the next day in Tokyo."""
+        utc_today = datetime.now(tz=timezone.utc).date()
+        late_utc = datetime.combine(utc_today, datetime.min.time(), tzinfo=timezone.utc).replace(
+            hour=22
+        )
+        _seed_execution(execution_id="late", status="completed", start_at=late_utc)
+
+        in_utc = test_client.get(
+            "/executions/activity",
+            params={"chip_id": "chip-1", "days": 3, "timezone": "UTC"},
+            headers=auth_headers,
+        ).json()
+        in_tokyo = test_client.get(
+            "/executions/activity",
+            params={"chip_id": "chip-1", "days": 3, "timezone": "Asia/Tokyo"},
+            headers=auth_headers,
+        ).json()
+
+        utc_day = next(b for b in in_utc["buckets"] if b["total"] == 1)["date"]
+        tokyo_days = [b["date"] for b in in_tokyo["buckets"] if b["total"] == 1]
+        expected_tokyo = late_utc.astimezone(ZoneInfo("Asia/Tokyo")).date().isoformat()
+        assert utc_day == utc_today.isoformat()
+        # The Tokyo day is tomorrow in UTC terms; it is inside the window only when the
+        # Tokyo calendar has already reached it, which is exactly what the API reports.
+        assert tokyo_days in ([expected_tokyo], [])
+
+    def test_rejects_an_unknown_time_zone(self, test_client, test_project, auth_headers) -> None:
+        response = test_client.get(
+            "/executions/activity",
+            params={"chip_id": "chip-1", "timezone": "Mars/Olympus"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 400
+        assert "Unknown time zone" in response.json()["detail"]
 
 
 def test_get_execution_lock_status_includes_latest_execution(

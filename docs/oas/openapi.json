@@ -1961,6 +1961,98 @@
         }
       }
     },
+    "/executions/activity": {
+      "get": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Count executions per day",
+        "description": "Count a chip's executions per calendar day, by status, over a trailing window.\n\nEvery day of the window is returned, empty days included, so a chart can draw a\ncontinuous axis. Days follow ``timezone`` so they match what the user sees.",
+        "operationId": "getExecutionActivity",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Chip ID to count executions for",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID to count executions for"
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "description": "Trailing window in calendar days",
+              "default": 30,
+              "title": "Days"
+            },
+            "description": "Trailing window in calendar days"
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "IANA time zone used to assign executions to days",
+              "default": "UTC",
+              "title": "Timezone"
+            },
+            "description": "IANA time zone used to assign executions to days"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionActivityResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/executions/{execution_id}": {
       "get": {
         "tags": [
@@ -21403,6 +21495,106 @@
         ],
         "title": "ExecutePipelineResponse",
         "description": "Dispatch result plus the resolved plan that was started."
+      },
+      "ExecutionActivityDay": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "title": "Date",
+            "description": "Calendar day in the requested time zone, YYYY-MM-DD"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "default": 0
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running",
+            "description": "Executions still in progress (running, cancelling)",
+            "default": 0
+          },
+          "scheduled": {
+            "type": "integer",
+            "title": "Scheduled",
+            "description": "Executions not started yet (scheduled, pending)",
+            "default": 0
+          },
+          "cancelled": {
+            "type": "integer",
+            "title": "Cancelled",
+            "default": 0
+          },
+          "other": {
+            "type": "integer",
+            "title": "Other",
+            "description": "Any status not covered by the named buckets",
+            "default": 0
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "date"
+        ],
+        "title": "ExecutionActivityDay",
+        "description": "Executions started on one calendar day, counted by status."
+      },
+      "ExecutionActivityResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days",
+            "description": "Length of the window in calendar days"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "description": "IANA time zone the days are bucketed in"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since",
+            "description": "First day of the window, YYYY-MM-DD"
+          },
+          "until": {
+            "type": "string",
+            "title": "Until",
+            "description": "Last day of the window (today), YYYY-MM-DD"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionActivityDay"
+            },
+            "type": "array",
+            "title": "Buckets",
+            "description": "One entry per calendar day, oldest first, including empty days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "days",
+          "timezone",
+          "since",
+          "until",
+          "buckets"
+        ],
+        "title": "ExecutionActivityResponse",
+        "description": "Daily execution counts for a chip over a trailing window of days."
       },
       "ExecutionAvailabilityRequest": {
         "properties": {

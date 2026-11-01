@@ -6,8 +6,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowUpRight,
-  BarChart3,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -17,11 +15,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { isExecutionCancellable, isExecutionInProgress } from "@/lib/executionStatus";
+import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDate, formatDateTime } from "@/lib/utils/datetime";
 
-import { ExecutionDurationBreakdown } from "./ExecutionDurationBreakdown";
+import { type ActivityWindow, ExecutionActivityChart } from "./ExecutionActivityChart";
 
 import type { ExecutionResponseSummary } from "@/schemas";
 
@@ -127,9 +125,8 @@ export function ExecutionPageContent() {
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [showDurationBreakdown, setShowDurationBreakdown] = useState(false);
+  const [activityDays, setActivityDays] = useState<ActivityWindow>(30);
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const executionCards = useRef(new Map<string, HTMLDivElement>());
@@ -245,16 +242,6 @@ export function ExecutionPageContent() {
   useEffect(() => {
     if (sidebarRef.current) sidebarRef.current.scrollTop = 0;
   }, [selectedExecutionId]);
-
-  const statusSummary = useMemo(
-    () => ({
-      total: cardData.length,
-      running: cardData.filter((execution) => isExecutionInProgress(execution.status)).length,
-      failed: cardData.filter((execution) => execution.status === "failed").length,
-      completed: cardData.filter((execution) => execution.status === "completed").length,
-    }),
-    [cardData],
-  );
 
   useEffect(() => {
     if (!isSidebarOpen) return;
@@ -384,60 +371,13 @@ export function ExecutionPageContent() {
           </PageFiltersBar.Item>
         </PageFiltersBar.Group>
       </PageFiltersBar>
-      <section aria-label="Execution status summary" className="mb-4 sm:mb-6">
-        <div className="stats stats-horizontal w-full overflow-x-auto border border-base-300 bg-base-100 shadow-sm">
-          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
-            <div className="stat-title text-xs">Total</div>
-            <div className="stat-value">{statusSummary.total}</div>
-          </div>
-          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
-            <div className="stat-title text-xs">Running</div>
-            <div className="stat-value">{statusSummary.running}</div>
-          </div>
-          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
-            <div className="stat-title text-xs">Failed</div>
-            <div className="stat-value text-error">{statusSummary.failed}</div>
-          </div>
-          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
-            <div className="stat-title text-xs">Completed</div>
-            <div className="stat-value text-success">{statusSummary.completed}</div>
-          </div>
-        </div>
-      </section>
-      <section className="mb-6" aria-labelledby="duration-breakdown-heading">
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-box border border-base-300 bg-base-100 px-4 py-3 text-left transition-colors hover:bg-base-200/50"
-          aria-expanded={showDurationBreakdown}
-          aria-controls="duration-breakdown-content"
-          onClick={() => setShowDurationBreakdown((value) => !value)}
-        >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <BarChart3 className="h-5 w-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span id="duration-breakdown-heading" className="block font-medium">
-              Task duration breakdown
-            </span>
-            <span className="block text-sm text-base-content/60">
-              Compare task timing across the current execution set
-            </span>
-          </span>
-          <ChevronDown
-            className={`h-5 w-5 shrink-0 transition-transform ${showDurationBreakdown ? "rotate-180" : ""}`}
-          />
-        </button>
-        {showDurationBreakdown && (
-          <div id="duration-breakdown-content" className="mt-3">
-            <ExecutionDurationBreakdown
-              executions={cardData}
-              selectedTag={selectedTag}
-              onTagSelect={setSelectedTag}
-              allItemsHref={`/execution/durations${selectedChip ? `?chip=${encodeURIComponent(selectedChip)}` : ""}`}
-            />
-          </div>
-        )}
-      </section>
+      <ExecutionActivityChart
+        chipId={selectedChip || ""}
+        days={activityDays}
+        onDaysChange={setActivityDays}
+        selectedDate={selectedDate}
+        onDateSelect={handleDateChange}
+      />
       <section aria-labelledby="recent-executions-heading">
         <div className="mb-3">
           <h2

@@ -46,6 +46,7 @@ from qdash.client.services.models import (
     EvaluationItem,
     EvaluationRunDetailResponse,
     ExecuteFlowResponse,
+    ExecutionActivityResponse,
     ExecutionResponseDetail,
     FileTreeNode,
     FlowTemplate,
@@ -693,6 +694,20 @@ class QDashClient:
             ),
         )
         return self._validate_model_payload(ScheduleFlowResponse, response.data)
+
+    def get_execution_activity(
+        self,
+        *,
+        chip_id: str,
+        days: int = 30,
+        timezone: str | None = None,
+    ) -> ExecutionActivityResponse:
+        """Count a chip's executions per calendar day over the trailing ``days`` days."""
+        params: dict[str, object] = {"chip_id": chip_id, "days": days}
+        if timezone is not None:
+            params["timezone"] = timezone
+        response = self._request("GET", "/executions/activity", params=params)
+        return self._validate_model_payload(ExecutionActivityResponse, response.data)
 
     def list_executions(
         self,

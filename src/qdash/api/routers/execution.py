@@ -27,6 +27,7 @@ from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
     ArtifactPreviewResponse,
     CancelExecutionResponse,
+    ExecutionActivityResponse,
     ExecutionAvailabilityRequest,
     ExecutionAvailabilityResponse,
     ExecutionLockStatusResponse,
@@ -285,6 +286,34 @@ def list_executions(
         total=total,
         skip=skip,
         limit=limit,
+    )
+
+
+@router.get(
+    "/executions/activity",
+    response_model=ExecutionActivityResponse,
+    summary="Count executions per day",
+    operation_id="getExecutionActivity",
+)
+def get_execution_activity(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    execution_service: Annotated[ExecutionService, Depends(get_execution_service)],
+    chip_id: Annotated[str, Query(description="Chip ID to count executions for")],
+    days: Annotated[int, Query(ge=1, le=365, description="Trailing window in calendar days")] = 30,
+    timezone: Annotated[
+        str, Query(description="IANA time zone used to assign executions to days")
+    ] = "UTC",
+) -> ExecutionActivityResponse:
+    """Count a chip's executions per calendar day, by status, over a trailing window.
+
+    Every day of the window is returned, empty days included, so a chart can draw a
+    continuous axis. Days follow ``timezone`` so they match what the user sees.
+    """
+    return execution_service.get_execution_activity(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        days=days,
+        timezone=timezone,
     )
 
 
