@@ -57,7 +57,8 @@ or saving outputs.
 Open **Execution** to inspect a run's status, task topology, timing, parameters, output, and
 artifacts. Select a task in the topology to open its details, or select a node in the execution
 flow to preview its result in the same side panel that **Task Results** uses; open the full
-result from there.
+result from there. While a run is in progress, its details and its page show how many tasks have
+finished and which one is being measured, and the running task shows its measurement progress.
 
 Cancelling a run sends a cancellation request to the worker. A task that is inside an operation
 that cannot be interrupted can take time to stop.

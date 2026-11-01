@@ -84,6 +84,8 @@ interface EvaluationRequestModalProps {
    * (model only or via Copilot) or a conversation, chosen the same way.
    */
   onChat?: () => void;
+  /** Called once an evaluation run has been created, before the modal closes. */
+  onRequested?: () => void;
 }
 
 /** What the modal can do for one result: a recorded evaluation, or a chat about it. */
@@ -326,6 +328,7 @@ export function EvaluationRequestModal({
   scope,
   scopeLabel,
   onChat,
+  onRequested,
 }: EvaluationRequestModalProps) {
   const router = useRouter();
   const toast = useToast();
@@ -403,6 +406,7 @@ export function EvaluationRequestModal({
       );
       setDraft(null);
       setExcluded(new Set());
+      onRequested?.();
       onClose();
     } catch (error) {
       toast.error(errorDetail(error));
