@@ -634,7 +634,7 @@ export const useCheckExecutionAvailability = <TError = Detail | HTTPValidationEr
       return useMutation(getCheckExecutionAvailabilityMutationOptions(options), queryClient);
     }
     /**
- * List executions for a given chip with pagination.
+ * List executions for a given chip with pagination, optionally for one calendar day.
  *
  * Parameters
  * ----------

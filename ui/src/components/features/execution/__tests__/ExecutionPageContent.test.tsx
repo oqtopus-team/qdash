@@ -30,12 +30,21 @@ vi.mock("@/client/chip/chip", () => ({
 }));
 
 vi.mock("@/client/execution/execution", () => ({
-  useListExecutions: ({ skip, chip_id }: { skip: number; chip_id: string }) => ({
+  useListExecutions: ({
+    skip,
+    chip_id,
+    date,
+  }: {
+    skip: number;
+    chip_id: string;
+    date?: string;
+  }) => ({
     data: {
       data: {
-        total: 40,
-        executions:
-          skip > 0 || chip_id === "chip-2"
+        total: date ? 0 : 40,
+        executions: date
+          ? [] // the API returns nothing for a day with no runs
+          : skip > 0 || chip_id === "chip-2"
             ? [
                 {
                   execution_id: "exec-3",

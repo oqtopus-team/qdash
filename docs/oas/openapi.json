@@ -1874,7 +1874,7 @@
           "execution"
         ],
         "summary": "List executions",
-        "description": "List executions for a given chip with pagination.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
+        "description": "List executions for a given chip with pagination, optionally for one calendar day.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
         "operationId": "listExecutions",
         "security": [
           {
@@ -1919,6 +1919,37 @@
               "title": "Limit"
             },
             "description": "Number of items to return"
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{8}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only executions started on this day, YYYYMMDD",
+              "title": "Date"
+            },
+            "description": "Only executions started on this day, YYYYMMDD"
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "IANA time zone that defines the day for ``date``",
+              "default": "UTC",
+              "title": "Timezone"
+            },
+            "description": "IANA time zone that defines the day for ``date``"
           },
           {
             "name": "X-Project-Id",

@@ -166,9 +166,10 @@ def _seed_execution(
     status: str,
     start_at: datetime | None,
     chip_id: str = "chip-1",
+    project_id: str = "test_project",
 ) -> None:
     ExecutionHistoryDocument(
-        project_id="test_project",
+        project_id=project_id,
         username="test_user",
         name="flow",
         execution_id=execution_id,
@@ -198,6 +199,9 @@ class TestExecutionActivity:
         _seed_execution(execution_id="e-5", status="pending", start_at=today)
         _seed_execution(execution_id="old", status="completed", start_at=today - timedelta(days=40))
         _seed_execution(execution_id="other-chip", status="failed", start_at=today, chip_id="x")
+        _seed_execution(
+            execution_id="other-project", status="completed", start_at=today, project_id="p2"
+        )
         _seed_execution(execution_id="unstarted", status="scheduled", start_at=None)
 
         response = test_client.get(
@@ -754,6 +758,63 @@ class TestListExecutions:
         data = response.json()
         assert len(data["executions"]) == 1
         assert data["total"] == 3
+
+    def test_list_executions_for_one_day_in_the_requested_time_zone(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        """``date`` keeps only that calendar day, with the day defined by ``timezone``."""
+        _seed_execution(
+            execution_id="noon",
+            status="completed",
+            start_at=datetime(2024, 1, 1, 10, tzinfo=timezone.utc),
+        )
+        _seed_execution(
+            execution_id="late",
+            status="failed",
+            start_at=datetime(2024, 1, 1, 22, tzinfo=timezone.utc),
+        )
+        _seed_execution(execution_id="unstarted", status="scheduled", start_at=None)
+        _seed_execution(
+            execution_id="other-project",
+            status="completed",
+            start_at=datetime(2024, 1, 1, 10, tzinfo=timezone.utc),
+            project_id="p2",
+        )
+
+        def ids(params: dict[str, str]) -> tuple[list[str], int]:
+            response = test_client.get(
+                "/executions", headers=auth_headers, params={"chip_id": "chip-1", **params}
+            )
+            assert response.status_code == 200
+            body = response.json()
+            return [e["execution_id"] for e in body["executions"]], body["total"]
+
+        assert ids({"date": "20240101"}) == (["late", "noon"], 2)
+        # 22:00 UTC is already January 2 in Tokyo.
+        assert ids({"date": "20240101", "timezone": "Asia/Tokyo"}) == (["noon"], 1)
+        assert ids({"date": "20240102", "timezone": "Asia/Tokyo"}) == (["late"], 1)
+        assert ids({"date": "20240103"}) == ([], 0)
+        assert ids({})[1] == 3
+
+    def test_list_executions_rejects_a_malformed_date(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        response = test_client.get(
+            "/executions", headers=auth_headers, params={"chip_id": "chip-1", "date": "2024-01-01"}
+        )
+        assert response.status_code == 422
+
+        response = test_client.get(
+            "/executions", headers=auth_headers, params={"chip_id": "chip-1", "date": "20241399"}
+        )
+        assert response.status_code == 400
+        assert "Invalid date" in response.json()["detail"]
 
 
 class TestGetExecution:

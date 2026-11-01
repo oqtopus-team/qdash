@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import type { Layout, PlotMouseEvent } from "plotly.js";
 
@@ -8,6 +8,7 @@ import { useGetExecutionActivity } from "@/client/execution/execution";
 import Plot from "@/components/charts/Plot";
 import { useIsDarkTheme } from "@/contexts/ThemeContext";
 import { chartTheme } from "@/lib/chartTheme";
+import { DEFAULT_TIMEZONE } from "@/lib/utils/datetime";
 import type { ExecutionActivityDay } from "@/schemas";
 
 const ACTIVITY_WINDOWS = [7, 30, 90] as const;
@@ -35,14 +36,8 @@ interface ExecutionActivityChartProps {
   onDateSelect: (date: string) => void;
 }
 
-/** Browser time zone, so the bars line up with the dates shown elsewhere on the page. */
-function browserTimeZone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  } catch {
-    return "UTC";
-  }
-}
+/** Plotly options shared by every render, so the plot is not rebuilt for a new object. */
+const PLOT_CONFIG = { displayModeBar: false, responsive: true } as const;
 
 /**
  * Executions per day for the selected chip, stacked by status, over the last 7, 30 or 90 days.
@@ -55,10 +50,9 @@ export function ExecutionActivityChart({
   selectedDate,
   onDateSelect,
 }: ExecutionActivityChartProps) {
-  const timezone = useMemo(browserTimeZone, []);
   const palette = chartTheme(useIsDarkTheme());
   const { data, isLoading, isError } = useGetExecutionActivity(
-    { chip_id: chipId, days, timezone },
+    { chip_id: chipId, days, timezone: DEFAULT_TIMEZONE },
     { query: { enabled: !!chipId, refetchInterval: 60_000 } },
   );
   const activity = data?.data;
@@ -70,30 +64,39 @@ export function ExecutionActivityChart({
     return { total: sum("total"), failed: sum("failed"), running: sum("running") };
   }, [buckets]);
 
-  const colors: Record<(typeof SERIES)[number]["key"], string> = {
-    completed: palette.pass,
-    failed: palette.fail,
-    running: palette.accent,
-    scheduled: palette.warn,
-    cancelled: palette.muted,
-    other: palette.grid,
-  };
+  // Keyed on the palette strings, not the palette object, so the memo survives re-renders.
+  const colors = useMemo<Record<(typeof SERIES)[number]["key"], string>>(
+    () => ({
+      completed: palette.pass,
+      failed: palette.fail,
+      running: palette.accent,
+      scheduled: palette.warn,
+      cancelled: palette.muted,
+      other: palette.grid,
+    }),
+    [palette.pass, palette.fail, palette.accent, palette.warn, palette.muted, palette.grid],
+  );
 
   const selectedIso =
     selectedDate.length === 8
       ? `${selectedDate.slice(0, 4)}-${selectedDate.slice(4, 6)}-${selectedDate.slice(6, 8)}`
       : null;
 
-  const traces = SERIES.filter((series) =>
-    buckets.some((bucket) => (bucket[series.key] ?? 0) > 0),
-  ).map((series) => ({
-    type: "bar" as const,
-    name: series.label,
-    x: buckets.map((bucket) => bucket.date),
-    y: buckets.map((bucket) => bucket[series.key] ?? 0),
-    marker: { color: colors[series.key] },
-    hovertemplate: `%{x}<br>${series.label}: %{y}<extra></extra>`,
-  }));
+  // Stable between renders: Plot purges and redraws whenever it receives a new data array.
+  const traces = useMemo(
+    () =>
+      SERIES.filter((series) => buckets.some((bucket) => (bucket[series.key] ?? 0) > 0)).map(
+        (series) => ({
+          type: "bar" as const,
+          name: series.label,
+          x: buckets.map((bucket) => bucket.date),
+          y: buckets.map((bucket) => bucket[series.key] ?? 0),
+          marker: { color: colors[series.key] },
+          hovertemplate: `%{x}<br>${series.label}: %{y}<extra></extra>`,
+        }),
+      ),
+    [buckets, colors],
+  );
 
   const layout = useMemo<Partial<Layout>>(
     () => ({
@@ -127,12 +130,15 @@ export function ExecutionActivityChart({
     [days, palette.accent, selectedIso],
   );
 
-  const handleClick = (event: PlotMouseEvent) => {
-    const date = event.points?.[0]?.x;
-    if (typeof date !== "string") return;
-    const compact = date.replace(/-/g, "");
-    onDateSelect(compact === selectedDate ? "latest" : compact);
-  };
+  const handleClick = useCallback(
+    (event: PlotMouseEvent) => {
+      const date = event.points?.[0]?.x;
+      if (typeof date !== "string") return;
+      const compact = date.replace(/-/g, "");
+      onDateSelect(compact === selectedDate ? "latest" : compact);
+    },
+    [onDateSelect, selectedDate],
+  );
 
   return (
     <section
@@ -182,7 +188,7 @@ export function ExecutionActivityChart({
             <Plot
               data={traces}
               layout={layout}
-              config={{ displayModeBar: false, responsive: true }}
+              config={PLOT_CONFIG}
               useResizeHandler
               style={{ width: "100%", height: "220px" }}
               onClick={handleClick}

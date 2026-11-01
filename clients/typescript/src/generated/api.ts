@@ -914,7 +914,7 @@ const checkExecutionAvailability = (
     }
 
 /**
- * List executions for a given chip with pagination.
+ * List executions for a given chip with pagination, optionally for one calendar day.
  *
  * Parameters
  * ----------

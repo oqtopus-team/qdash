@@ -371,6 +371,10 @@ export class QDashClient {
     status?: string;
     skip?: number;
     limit?: number;
+    /** Only executions started on this calendar day, YYYYMMDD. */
+    date?: string;
+    /** IANA time zone that defines the day for `date`. */
+    timezone?: string;
   } = {}): Promise<ListExecutionsResponse> {
     return this.get(
       "/executions",
@@ -379,6 +383,8 @@ export class QDashClient {
         status: options.status,
         skip: options.skip,
         limit: options.limit,
+        date: options.date,
+        timezone: options.timezone,
       }),
     );
   }

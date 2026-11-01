@@ -17,7 +17,7 @@ import Link from "next/link";
 
 import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
-import { formatDate, formatDateTime } from "@/lib/utils/datetime";
+import { DEFAULT_TIMEZONE, formatDateTime } from "@/lib/utils/datetime";
 
 import { type ActivityWindow, ExecutionActivityChart } from "./ExecutionActivityChart";
 
@@ -170,6 +170,9 @@ export function ExecutionPageContent() {
       chip_id: selectedChip || "",
       skip: (currentPage - 1) * itemsPerPage,
       limit: itemsPerPage,
+      // A picked day is filtered on the server, so every run of that day is reachable,
+      // not only those on the first page. The day follows the UI's display time zone.
+      ...(selectedDate === "latest" ? {} : { date: selectedDate, timezone: DEFAULT_TIMEZONE }),
     },
     {
       query: {
@@ -202,15 +205,7 @@ export function ExecutionPageContent() {
   });
 
   // Compute card data from execution data (filter by date)
-  const cardData = useMemo(() => {
-    if (!executionData?.data?.executions) return [];
-    if (selectedDate === "latest") return executionData.data.executions;
-    return executionData.data.executions.filter((exec) => {
-      if (!exec.start_at) return false;
-      const execDateStr = formatDate(exec.start_at).replace(/-/g, "");
-      return execDateStr === selectedDate;
-    });
-  }, [executionData, selectedDate]);
+  const cardData = useMemo(() => executionData?.data?.executions ?? [], [executionData]);
 
   const selectedExecutionIndex = cardData.findIndex(
     (execution) => execution.execution_id === selectedExecutionId,
@@ -266,6 +261,8 @@ export function ExecutionPageContent() {
   const handleChipChange = (chipId: string) => {
     handleCloseSidebar();
     setSelectedChip(chipId || null);
+    // A day picked for one chip means nothing for another.
+    setSelectedDate("latest");
     setCurrentPage(1);
   };
 

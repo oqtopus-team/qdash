@@ -55,6 +55,27 @@ _ACTIVITY_BUCKET_BY_STATUS: dict[str, str] = {
     "cancelled": "cancelled",
 }
 
+
+def _resolve_zone(timezone: str) -> ZoneInfo:
+    """Return the IANA zone, or a 400 the client can act on."""
+    try:
+        return ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"Unknown time zone: {timezone}") from exc
+
+
+def _day_window(date: str, zone: ZoneInfo) -> tuple[datetime, datetime]:
+    """UTC bounds ``[start, end)`` of the calendar day ``date`` (YYYYMMDD) in ``zone``."""
+    try:
+        day = datetime.strptime(date, "%Y%m%d").date()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid date: {date}; expected YYYYMMDD"
+        ) from exc
+    start = datetime.combine(day, time.min, tzinfo=zone)
+    return start.astimezone(UTC), (start + timedelta(days=1)).astimezone(UTC)
+
+
 _OPEN_EXECUTION_STATUSES = ("running", "scheduled", "cancelling")
 _RECONCILE_TIMEOUT_SECONDS = 5.0
 
@@ -167,11 +188,7 @@ class ExecutionService:
         every day of the window is present, empty days with zero counts. Only executions
         with a start time are counted, since the day is taken from it.
         """
-        try:
-            zone = ZoneInfo(timezone)
-        except (ZoneInfoNotFoundError, ValueError) as exc:
-            raise HTTPException(status_code=400, detail=f"Unknown time zone: {timezone}") from exc
-
+        zone = _resolve_zone(timezone)
         today = datetime.now(tz=zone).date()
         first_day = today - timedelta(days=days - 1)
         since = datetime.combine(first_day, time.min, tzinfo=zone).astimezone(UTC)
@@ -213,31 +230,20 @@ class ExecutionService:
         chip_id: str,
         skip: int = 0,
         limit: int = 20,
+        date: str | None = None,
+        timezone: str = "UTC",
     ) -> list[ExecutionResponseSummary]:
-        """List executions for a chip with pagination.
+        """List a chip's executions, newest first, with pagination.
 
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-        skip : int
-            Number of items to skip
-        limit : int
-            Number of items to return
-
-        Returns
-        -------
-        list[ExecutionResponseSummary]
-            List of execution summaries
-
+        With ``date`` (YYYYMMDD) only executions started on that calendar day in
+        ``timezone`` are returned, using the same day rule as the activity chart.
         """
         executions = self._history_repo.list_by_chip(
             project_id=project_id,
             chip_id=chip_id,
             skip=skip,
             limit=limit,
+            started_between=_day_window(date, _resolve_zone(timezone)) if date else None,
         )
         return [
             ExecutionResponseSummary(
@@ -260,25 +266,14 @@ class ExecutionService:
         self,
         project_id: str,
         chip_id: str,
+        date: str | None = None,
+        timezone: str = "UTC",
     ) -> int:
-        """Count executions for a chip.
-
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-
-        Returns
-        -------
-        int
-            Total number of executions for the chip
-
-        """
+        """Count a chip's executions, with the same optional day filter as ``list_executions``."""
         return self._history_repo.count_by_chip(
             project_id=project_id,
             chip_id=chip_id,
+            started_between=_day_window(date, _resolve_zone(timezone)) if date else None,
         )
 
     def get_execution(

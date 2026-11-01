@@ -242,8 +242,15 @@ def list_executions(
     chip_id: Annotated[str, Query(description="Chip ID to filter executions")],
     skip: Annotated[int, Query(ge=0, description="Number of items to skip")] = 0,
     limit: Annotated[int, Query(ge=1, le=100, description="Number of items to return")] = 20,
+    date: Annotated[
+        str | None,
+        Query(pattern=r"^\d{8}$", description="Only executions started on this day, YYYYMMDD"),
+    ] = None,
+    timezone: Annotated[
+        str, Query(description="IANA time zone that defines the day for ``date``")
+    ] = "UTC",
 ) -> ListExecutionsResponse:
-    """List executions for a given chip with pagination.
+    """List executions for a given chip with pagination, optionally for one calendar day.
 
     Parameters
     ----------
@@ -276,10 +283,14 @@ def list_executions(
         chip_id=chip_id,
         skip=skip,
         limit=limit,
+        date=date,
+        timezone=timezone,
     )
     total = execution_service.count_executions(
         project_id=ctx.project_id,
         chip_id=chip_id,
+        date=date,
+        timezone=timezone,
     )
     return ListExecutionsResponse(
         executions=executions,
