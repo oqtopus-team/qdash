@@ -35,6 +35,7 @@ import {
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
+import { ExecutionRunSummary } from "@/components/features/execution/ExecutionRunSummary";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
@@ -585,6 +586,13 @@ export function ExecutionPageContent() {
               <h2 className="text-sm font-medium pr-8">
                 {cardData.find((exec) => getExecutionKey(exec) === selectedExecutionId)?.name}
               </h2>
+              {executionDetailData?.data && (
+                <ExecutionRunSummary
+                  status={executionDetailData.data.status}
+                  tasks={executionDetailData.data.task ?? []}
+                  className="mt-3"
+                />
+              )}
               <div className="mt-3 sm:mt-4 flex flex-wrap gap-2">
                 <Link
                   href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}

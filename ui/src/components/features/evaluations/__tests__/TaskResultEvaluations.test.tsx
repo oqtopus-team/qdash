@@ -150,3 +150,45 @@ describe("TaskResultEvaluations", () => {
     );
   });
 });
+
+describe("TaskResultEvaluations while an evaluation is on its way", () => {
+  const known = { chipId: "64Qv3", taskName: "CheckRabi", qid: "Q05", executionId: "e1" };
+
+  it("says so while a listed evaluation is still pending or running", () => {
+    listEvaluations.mockReturnValue({
+      data: {
+        data: {
+          evaluations: [
+            { evaluation_id: "ev1", run_id: "r1", task_id: "t1", status: "running", output: null },
+          ],
+        },
+      },
+    });
+    getTaskResult.mockReturnValue({ data: undefined });
+    renderSection(known);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Evaluating");
+  });
+
+  it("shows nothing extra when every evaluation has finished", () => {
+    listEvaluations.mockReturnValue({
+      data: {
+        data: {
+          evaluations: [
+            {
+              evaluation_id: "ev1",
+              run_id: "r1",
+              task_id: "t1",
+              status: "completed",
+              output: { complete: true },
+            },
+          ],
+        },
+      },
+    });
+    getTaskResult.mockReturnValue({ data: undefined });
+    renderSection(known);
+
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+});
