@@ -40,6 +40,9 @@ Project owners manage an existing project from **Settings**. They can update its
 description, invite existing QDash users, change member roles, and remove members.
 
 1. Open **Settings** in the project you own.
+
+   ![Opening the Project tab in Settings](/images/guides/open-project-settings.gif)
+
 2. Add an existing QDash user as a Viewer or Editor.
 
    ![Adding a project member from Settings](/images/guides/add-project-member.gif)
