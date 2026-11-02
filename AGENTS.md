@@ -137,3 +137,20 @@ regardless of change size, including documentation-only changes.
 - If changing UI behavior, add or adjust Vitest tests where practical and run the relevant UI checks.
 - If changing workflow or repository behavior, run the matching Python tests.
 - Mention any verification that could not be run and why.
+
+## T3 Code Model Roles
+
+When coordinating implementation work in T3 Code, use this project default unless the user
+requests another arrangement:
+
+- Astra (`gpt-6-astra`) owns planning, task boundaries, acceptance criteria, and final decisions.
+- Opus (`claude-opus-5-5`) implements and fixes the planned changes.
+- Codex Sol (`gpt-6.1-sol`, `reasoningEffort: low`, `serviceTier: priority`) runs release checks,
+  commits, pushes, and creates the PR after implementation is ready.
+
+Use T3 `delegate_task` for these cross-provider or explicitly configured workers. Discover
+available providers and model options before delegation; report unavailable models rather than
+silently substituting another one. Give each worker a concrete brief and validation requirements.
+Run implementation and release sequentially when they share a checkout. Delegated workers do not
+spawn more workers unless explicitly requested. The release worker must satisfy the full
+`task check` pre-push gate above; the model split does not relax repository checks.

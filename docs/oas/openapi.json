@@ -21218,6 +21218,17 @@
       },
       "ExecuteFlowRequest": {
         "properties": {
+          "target_override": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlowTargetOverride"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Targets for this run, overriding direct CalibService and pipeline targets"
+          },
           "parameters": {
             "additionalProperties": true,
             "type": "object",
@@ -22011,6 +22022,52 @@
         ],
         "title": "FlowSummary",
         "description": "Summary of a Flow for listing."
+      },
+      "FlowTargetOverride": {
+        "properties": {
+          "mux_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer",
+                  "minimum": 0.0
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mux Ids"
+          },
+          "qids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "pattern": "^\\d+$"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qids"
+          },
+          "exclude_qids": {
+            "items": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "type": "array",
+            "title": "Exclude Qids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FlowTargetOverride",
+        "description": "Replace workflow targets for one execution; omission preserves source behavior."
       },
       "FlowTemplate": {
         "properties": {
@@ -23086,6 +23143,17 @@
       },
       "GetFlowResponse": {
         "properties": {
+          "target_defaults": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlowTargetOverride"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Statically resolved source targets; null when dynamic or ambiguous"
+          },
           "name": {
             "type": "string",
             "title": "Name",
