@@ -416,7 +416,11 @@ class TestAdminProjectsEndpoints:
         self, test_client, admin_user, project_owner, test_project, admin_headers
     ):
         """Project member counts exclude revoked memberships."""
-        for username, status in [("activemember", "active"), ("revokedmember", "revoked")]:
+        for username, status in [
+            ("activemember", "active"),
+            ("revokedmember1", "revoked"),
+            ("revokedmember2", "revoked"),
+        ]:
             ProjectMembershipDocument(
                 project_id=test_project.project_id,
                 user_id=f"user-{username}",
