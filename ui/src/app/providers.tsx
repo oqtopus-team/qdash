@@ -9,6 +9,7 @@ import { AxiosProvider } from "@/contexts/AxiosContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 
 import { ToastContainer } from "@/components/ui/Toast";
+import { TooltipProvider } from "@/components/ui/Tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 
@@ -22,8 +23,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           <AxiosProvider>
             <ProjectProvider>
               <ThemeProvider>
-                {children}
-                <ToastContainer />
+                <TooltipProvider>
+                  {children}
+                  <ToastContainer />
+                </TooltipProvider>
               </ThemeProvider>
             </ProjectProvider>
           </AxiosProvider>

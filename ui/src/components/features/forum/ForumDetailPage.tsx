@@ -827,7 +827,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <p className="py-2 text-xs text-base-content/40">No replies yet</p>
             )}
             {isGenerating && (
-              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm animate-pulse">
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
                 <div className="flex items-center gap-2">
                   <QdashBotAvatar size={24} />
                   <span className="badge badge-sm badge-primary">qdash</span>

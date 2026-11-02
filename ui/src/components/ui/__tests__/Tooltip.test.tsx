@@ -1,10 +1,75 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/Tooltip";
+
+function NeighbourTooltips({ wrap }: { wrap: (children: ReactNode) => ReactNode }) {
+  return wrap(
+    <>
+      <Tooltip disableHoverableContent>
+        <TooltipTrigger asChild>
+          <button type="button">Qubit 0</button>
+        </TooltipTrigger>
+        <TooltipContent>Qubit 0: completed</TooltipContent>
+      </Tooltip>
+      <Tooltip disableHoverableContent>
+        <TooltipTrigger asChild>
+          <button type="button">Qubit 1</button>
+        </TooltipTrigger>
+        <TooltipContent>Qubit 1: failed</TooltipContent>
+      </Tooltip>
+    </>,
+  );
+}
+
+function hover(name: string) {
+  fireEvent.pointerMove(screen.getByRole("button", { name }), { pointerType: "mouse" });
+}
+
+function leave(name: string) {
+  fireEvent.pointerLeave(screen.getByRole("button", { name }), { pointerType: "mouse" });
+}
+
+/** Opens Qubit 0 after the full delay, then moves straight to its neighbour. */
+function moveToNeighbour() {
+  hover("Qubit 0");
+  act(() => vi.advanceTimersByTime(349));
+  expect(screen.queryByRole("tooltip")).toBeNull();
+  act(() => vi.advanceTimersByTime(1));
+  expect(screen.getByRole("tooltip").textContent).toBe("Qubit 0: completed");
+
+  leave("Qubit 0");
+  hover("Qubit 1");
+}
 
 describe("Tooltip", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("skips the open delay when moving to a neighbour under a shared provider", () => {
+    vi.useFakeTimers();
+    render(
+      <NeighbourTooltips wrap={(children) => <TooltipProvider>{children}</TooltipProvider>} />,
+    );
+
+    moveToNeighbour();
+
+    expect(screen.getByRole("tooltip").textContent).toBe("Qubit 1: failed");
+  });
+
+  it("keeps the full delay for a standalone tooltip outside a provider", () => {
+    vi.useFakeTimers();
+    render(<NeighbourTooltips wrap={(children) => children} />);
+
+    moveToNeighbour();
+
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    act(() => vi.advanceTimersByTime(350));
+    expect(screen.getByRole("tooltip").textContent).toBe("Qubit 1: failed");
+  });
 
   it("renders accessible portal content for a trigger", () => {
     render(
