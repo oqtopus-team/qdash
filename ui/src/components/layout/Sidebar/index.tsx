@@ -10,7 +10,6 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
-  FileJson2,
   LogOut,
   Moon,
   Settings,
@@ -247,7 +246,7 @@ function SidebarNavItem({
 }
 
 /**
- * One external-link navigation row (Docs, Prefect, API Docs). Opens in a new tab
+ * One external-link navigation row (Docs, Prefect). Opens in a new tab
  * and is never marked active, since the current route never matches it.
  */
 function SidebarExternalNavItem({
@@ -371,12 +370,6 @@ export function Sidebar() {
       label: "Prefect",
       title: "Prefect",
       icon: Workflow,
-      visible: canEdit,
-    },
-    {
-      href: "/api/docs",
-      label: "API Docs",
-      icon: FileJson2,
       visible: canEdit,
     },
   ];

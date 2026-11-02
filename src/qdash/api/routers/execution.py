@@ -27,6 +27,7 @@ from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
     ArtifactPreviewResponse,
     CancelExecutionResponse,
+    ExecutionActivityResponse,
     ExecutionAvailabilityRequest,
     ExecutionAvailabilityResponse,
     ExecutionLockStatusResponse,
@@ -241,8 +242,15 @@ def list_executions(
     chip_id: Annotated[str, Query(description="Chip ID to filter executions")],
     skip: Annotated[int, Query(ge=0, description="Number of items to skip")] = 0,
     limit: Annotated[int, Query(ge=1, le=100, description="Number of items to return")] = 20,
+    date: Annotated[
+        str | None,
+        Query(pattern=r"^\d{8}$", description="Only executions started on this day, YYYYMMDD"),
+    ] = None,
+    timezone: Annotated[
+        str, Query(description="IANA time zone that defines the day for ``date``")
+    ] = "UTC",
 ) -> ListExecutionsResponse:
-    """List executions for a given chip with pagination.
+    """List executions for a given chip with pagination, optionally for one calendar day.
 
     Parameters
     ----------
@@ -275,16 +283,48 @@ def list_executions(
         chip_id=chip_id,
         skip=skip,
         limit=limit,
+        date=date,
+        timezone=timezone,
     )
     total = execution_service.count_executions(
         project_id=ctx.project_id,
         chip_id=chip_id,
+        date=date,
+        timezone=timezone,
     )
     return ListExecutionsResponse(
         executions=executions,
         total=total,
         skip=skip,
         limit=limit,
+    )
+
+
+@router.get(
+    "/executions/activity",
+    response_model=ExecutionActivityResponse,
+    summary="Count executions per day",
+    operation_id="getExecutionActivity",
+)
+def get_execution_activity(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    execution_service: Annotated[ExecutionService, Depends(get_execution_service)],
+    chip_id: Annotated[str, Query(description="Chip ID to count executions for")],
+    days: Annotated[int, Query(ge=1, le=365, description="Trailing window in calendar days")] = 30,
+    timezone: Annotated[
+        str, Query(description="IANA time zone used to assign executions to days")
+    ] = "UTC",
+) -> ExecutionActivityResponse:
+    """Count a chip's executions per calendar day, by status, over a trailing window.
+
+    Every day of the window is returned, empty days included, so a chart can draw a
+    continuous axis. Days follow ``timezone`` so they match what the user sees.
+    """
+    return execution_service.get_execution_activity(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        days=days,
+        timezone=timezone,
     )
 
 

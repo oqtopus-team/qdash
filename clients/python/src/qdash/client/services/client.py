@@ -46,6 +46,7 @@ from qdash.client.services.models import (
     EvaluationItem,
     EvaluationRunDetailResponse,
     ExecuteFlowResponse,
+    ExecutionActivityResponse,
     ExecutionResponseDetail,
     FileTreeNode,
     FlowTemplate,
@@ -694,18 +695,36 @@ class QDashClient:
         )
         return self._validate_model_payload(ScheduleFlowResponse, response.data)
 
+    def get_execution_activity(
+        self,
+        *,
+        chip_id: str,
+        days: int = 30,
+        timezone: str | None = None,
+    ) -> ExecutionActivityResponse:
+        """Count a chip's executions per calendar day over the trailing ``days`` days."""
+        params: dict[str, object] = {"chip_id": chip_id, "days": days}
+        if timezone is not None:
+            params["timezone"] = timezone
+        response = self._request("GET", "/executions/activity", params=params)
+        return self._validate_model_payload(ExecutionActivityResponse, response.data)
+
     def list_executions(
         self,
         *,
         chip_id: str,
         skip: int = 0,
         limit: int = 20,
+        date: str | None = None,
+        timezone: str | None = None,
     ) -> ListExecutionsResponse:
-        response = self._request(
-            "GET",
-            "/executions",
-            params={"chip_id": chip_id, "skip": skip, "limit": limit},
-        )
+        """List a chip's executions; ``date`` (YYYYMMDD) keeps one calendar day in ``timezone``."""
+        params: dict[str, object] = {"chip_id": chip_id, "skip": skip, "limit": limit}
+        if date is not None:
+            params["date"] = date
+        if timezone is not None:
+            params["timezone"] = timezone
+        response = self._request("GET", "/executions", params=params)
         return self._validate_model_payload(ListExecutionsResponse, response.data)
 
     def get_execution(self, execution_id: str) -> ExecutionResponseDetail:

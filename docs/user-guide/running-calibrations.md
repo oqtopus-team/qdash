@@ -62,8 +62,9 @@ result from there.
 Cancelling a run sends a cancellation request to the worker. A task that is inside an operation
 that cannot be interrupted can take time to stop.
 
-Use **Task Duration Breakdown** to compare task timing across executions. Only results with start
-and end timestamps appear in the comparison.
+**Executions per day** at the top of the page counts the chip's runs for the last 7, 30 or 90
+days, stacked by status. Select a bar to limit the list below to that day; select it again to
+return to the latest runs.
 
 ## Inspect a Result
 
