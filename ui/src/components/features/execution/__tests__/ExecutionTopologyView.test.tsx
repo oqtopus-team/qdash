@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Task } from "@/schemas";
@@ -136,12 +136,40 @@ describe("ExecutionTopologyView task detail modal", () => {
       onToggleFullscreen: vi.fn(),
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "0" }));
+    fireEvent.click(screen.getByRole("button", { name: "Qubit 0: completed" }));
 
     expect(screen.getAllByText("CheckStatus").length).toBeGreaterThan(0);
     expect(screen.getAllByText("CheckRabi").length).toBeGreaterThan(0);
     expect(screen.getAllByText("CreateHPIPulse").length).toBeGreaterThan(0);
     expect(screen.getAllByText("CheckT1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("2 / 4").length).toBeGreaterThan(0);
+  });
+});
+
+describe("ExecutionTopologyView tile status", () => {
+  it("names each tile by id, status and task count, and explains it on keyboard focus", () => {
+    const tasks: Task[] = [
+      { task_id: "task-1", qid: "0", name: "CheckRabi", status: "completed" },
+      { task_id: "task-2", qid: "1", name: "CheckRabi", status: "failed" },
+      { task_id: "task-3", qid: "1", name: "CheckRabi", status: "completed" },
+    ];
+
+    renderTopologyView({
+      chipId: "chip-1",
+      executionId: "exec-1",
+      tasks,
+      topologyMode: "1q",
+      filterTaskName: "CheckRabi",
+      onToggleFullscreen: vi.fn(),
+    });
+
+    expect(screen.getByRole("button", { name: "Qubit 0: completed" })).toBeTruthy();
+    const failedTile = screen.getByRole("button", { name: "Qubit 1: failed (2 tasks)" });
+
+    act(() => failedTile.focus());
+
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.textContent).toBe("Qubit 1: failed (2 tasks)");
+    expect(failedTile.getAttribute("aria-describedby")).toBe(tooltip.id);
   });
 });
