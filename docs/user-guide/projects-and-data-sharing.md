@@ -42,13 +42,16 @@ description, invite existing QDash users, change member roles, and remove member
 <!-- MEDIA PLACEHOLDER
 File: /images/guides/project-members.gif
 Start: Settings with the current project and member list visible to its Owner.
-Sequence: Add a demo Viewer, change that member to Editor, and leave the updated row visible.
-Alt: Project membership controls in Settings for adding a member and changing their role.
+Sequence: Add a demo Viewer and leave the new member row visible.
+Alt: Project membership controls in Settings for adding a member.
 -->
 
 1. Open **Settings** in the project you own.
 2. Add an existing QDash user as a Viewer or Editor.
 3. Change the role when that person's responsibilities change.
+
+   ![Changing a project member's role from Settings](/images/guides/change-project-role.gif)
+
 4. Remove the member when they no longer need project access.
 
 Deleting a project removes its project-scoped records and is not reversible through the UI.
