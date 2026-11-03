@@ -6,6 +6,11 @@ import { LoginPageContent } from "@/components/features/auth/LoginPageContent";
 const mocks = vi.hoisted(() => ({
   login: vi.fn(),
   setTheme: vi.fn(),
+  navigateTo: vi.fn(),
+}));
+
+vi.mock("@/lib/navigation", () => ({
+  navigateTo: mocks.navigateTo,
 }));
 
 vi.mock("@/contexts/AuthContext", () => ({
@@ -24,8 +29,6 @@ vi.mock("next/image", () => ({
   default: ({ alt }: { alt: string }) => <span role="img" aria-label={alt} />,
 }));
 
-const originalLocation = window.location;
-
 /** Fills the login form fields with the given values. */
 function fillForm(username: string, password: string) {
   fireEvent.change(screen.getByLabelText("User ID"), { target: { value: username } });
@@ -40,16 +43,11 @@ function submitForm() {
 describe("LoginPageContent", () => {
   beforeEach(() => {
     mocks.login.mockReset();
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: { href: "/login", search: "", pathname: "/login" },
-    });
   });
 
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
-    Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
   });
 
   it("shows required errors and does not log in when submitted empty", async () => {
@@ -92,7 +90,7 @@ describe("LoginPageContent", () => {
     fillForm("alice", "secret");
     submitForm();
 
-    await waitFor(() => expect(window.location.href).toBe("/execution"));
+    await waitFor(() => expect(mocks.navigateTo).toHaveBeenCalledWith("/execution"));
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -104,7 +102,7 @@ describe("LoginPageContent", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Login failed. Please check your user ID and password.");
-    expect(window.location.href).toBe("/login");
+    expect(mocks.navigateTo).not.toHaveBeenCalled();
 
     const username = screen.getByLabelText("User ID");
     const password = screen.getByLabelText("Password");
