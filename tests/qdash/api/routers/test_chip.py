@@ -1,8 +1,11 @@
 """Tests for chip router endpoints."""
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
+import yaml
+from pymongo.errors import DuplicateKeyError
 
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
@@ -54,6 +57,25 @@ def test_project(init_db):
     return project
 
 
+@pytest.fixture(autouse=True)
+def config_tree(tmp_path):
+    """Point chip creation at a temporary Qubex configuration tree."""
+    from qdash.api.dependencies import get_chip_config_scaffolder
+    from qdash.api.main import app
+    from qdash.api.services.chip import ChipConfigScaffolder
+
+    root = tmp_path / "qubex-config"
+    wiring = root / "64Qv3" / "config" / "wiring.yaml"
+    wiring.parent.mkdir(parents=True)
+    wiring.write_text(yaml.safe_dump({"64Qv3": [{"mux": 0, "ctrl": ["S1R-7"]}]}))
+    templates = Path(__file__).resolve().parents[4] / "config" / "domain" / "qubex-params"
+    app.dependency_overrides[get_chip_config_scaffolder] = lambda: ChipConfigScaffolder(
+        config_base=root, templates_dir=templates
+    )
+    yield root
+    app.dependency_overrides.pop(get_chip_config_scaffolder, None)
+
+
 @pytest.fixture
 def auth_headers():
     """Get authentication headers with project context."""
@@ -65,6 +87,25 @@ def auth_headers():
 
 class TestChipRouter:
     """Tests for chip-related API endpoints."""
+
+    @pytest.mark.parametrize(
+        "chip_id", ["../escape", "my chip", "template", "archive", "schemas", "scripts", "chip\n"]
+    )
+    @pytest.mark.parametrize("create_config", [True, False])
+    @pytest.mark.parametrize("mounted", [True, False])
+    def test_rejects_unsafe_chip_ids_before_creation(
+        self, test_client, test_project, auth_headers, monkeypatch, chip_id, create_config, mounted
+    ):
+        from qdash.api.services.chip import ChipConfigScaffolder
+
+        monkeypatch.setattr(ChipConfigScaffolder, "available", property(lambda self: mounted))
+        response = test_client.post(
+            "/chips",
+            headers=auth_headers,
+            json={"chip_id": chip_id, "size": 64, "config": {"create": create_config}},
+        )
+        assert response.status_code == 422
+        assert ChipDocument.find_one({"chip_id": chip_id}).run() is None
 
     def test_list_chips_empty(self, test_client, test_project, auth_headers):
         """Test listing chips when no chips exist."""
@@ -338,6 +379,61 @@ class TestChipRouter:
         assert data["chip_id"] == "new_chip"
         assert data["size"] == 64
         assert data["activity_status"] == "active"
+        assert data["config"]["status"] == "created"
+
+    def test_create_chip_creates_config_with_chip_id_as_system_id(
+        self, test_client, test_project, auth_headers, config_tree
+    ):
+        """The new chip's directory copies wiring from the named system."""
+        response = test_client.post(
+            "/chips",
+            headers=auth_headers,
+            json={"chip_id": "64Qv4", "size": 64, "config": {"source_system_id": "64Qv3"}},
+        )
+
+        assert response.status_code == 200
+        config = response.json()["config"]
+        assert config["status"] == "created"
+        assert config["source_system_id"] == "64Qv3"
+        wiring = yaml.safe_load((config_tree / "64Qv4/config/wiring.yaml").read_text())
+        assert wiring == {"64Qv4": [{"mux": 0, "ctrl": ["S1R-7"]}]}
+        system = yaml.safe_load((config_tree / "64Qv4/config/system.yaml").read_text())
+        assert system["64Qv4"]["chip_id"] == "64Qv4"
+
+    def test_create_chip_without_config(self, test_client, test_project, auth_headers, config_tree):
+        """config.create=false registers the chip only."""
+        response = test_client.post(
+            "/chips",
+            headers=auth_headers,
+            json={"chip_id": "db_only", "size": 64, "config": {"create": False}},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["config"] is None
+        assert not (config_tree / "db_only").exists()
+
+    def test_create_chip_unknown_config_source(
+        self, test_client, test_project, auth_headers, config_tree
+    ):
+        """An unknown source system is a 400 and creates nothing."""
+        response = test_client.post(
+            "/chips",
+            headers=auth_headers,
+            json={"chip_id": "64Qv4", "size": 64, "config": {"source_system_id": "nope"}},
+        )
+
+        assert response.status_code == 400
+        assert not (config_tree / "64Qv4").exists()
+        assert ChipDocument.find_one({"chip_id": "64Qv4"}).run() is None
+
+    def test_list_chip_config_sources(self, test_client, test_project, auth_headers):
+        """Systems with a wiring file are offered as sources."""
+        response = test_client.get("/chips/config-sources", headers=auth_headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["available"] is True
+        assert [source["system_id"] for source in data["sources"]] == ["64Qv3"]
 
     def test_create_chip_invalid_size(self, test_client, test_project, auth_headers):
         """Test creating a chip with invalid size returns 400."""
@@ -349,17 +445,28 @@ class TestChipRouter:
 
         assert response.status_code == 400
 
-    def test_create_chip_duplicate(self, test_client, test_project, auth_headers):
+    @pytest.mark.parametrize("username", ["test_user", "another_user"])
+    def test_create_chip_duplicate(
+        self, test_client, test_project, auth_headers, config_tree, username, monkeypatch
+    ):
         """Test creating a duplicate chip returns 400."""
         # Arrange: Create initial chip
         chip = ChipDocument(
             chip_id="existing_chip",
-            username="test_user",
+            username=username,
             project_id="test_project",
             size=64,
             system_info=SystemInfoModel(),
         )
         chip.insert()
+
+        def unexpected_scaffold(*args, **kwargs):
+            pytest.fail("Duplicate chips must be rejected before filesystem work")
+
+        monkeypatch.setattr(
+            "qdash.api.services.chip.config_scaffold.ChipConfigScaffolder.scaffold",
+            unexpected_scaffold,
+        )
 
         # Act: Try to create duplicate
         response = test_client.post(
@@ -368,8 +475,37 @@ class TestChipRouter:
             json={"chip_id": "existing_chip", "size": 64},
         )
 
-        # Assert
+        # Reject duplicates regardless of the creator, before touching the tree.
         assert response.status_code == 400
+        assert not (config_tree / "existing_chip").exists()
+
+    def test_create_chip_duplicate_save_returns_validation_error(
+        self, test_client, test_project, auth_headers, config_tree, monkeypatch
+    ):
+        def duplicate_save(self, *args, **kwargs):
+            raise DuplicateKeyError("concurrent insert")
+
+        monkeypatch.setattr(ChipDocument, "save", duplicate_save)
+        response = test_client.post(
+            "/chips", headers=auth_headers, json={"chip_id": "racing_chip", "size": 64}
+        )
+        assert response.status_code == 400
+        assert "already exists" in response.json()["detail"]
+        # The winning creator may already use the shared configuration.
+        assert (config_tree / "racing_chip/config/wiring.yaml").exists()
+
+    def test_create_chip_failure_rolls_back_config(
+        self, test_client, test_project, auth_headers, config_tree, monkeypatch
+    ):
+        def failed_save(self, *args, **kwargs):
+            raise RuntimeError("database unavailable")
+
+        monkeypatch.setattr(ChipDocument, "save", failed_save)
+        response = test_client.post(
+            "/chips", headers=auth_headers, json={"chip_id": "failed_chip", "size": 64}
+        )
+        assert response.status_code == 500
+        assert not (config_tree / "failed_chip").exists()
 
     def test_list_chips_requires_authentication(self, test_client, test_project):
         """Test that listing chips without auth returns 401."""

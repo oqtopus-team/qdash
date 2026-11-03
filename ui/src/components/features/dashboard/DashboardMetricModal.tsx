@@ -80,7 +80,7 @@ export function DashboardMetricModal({
         {/* Header */}
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
+            <DialogTitle className="text-sm font-medium truncate">
               {formatTarget(targetId)} · {metricTitle}
             </DialogTitle>
             <DialogDescription className="text-sm text-base-content/70 mt-0.5">

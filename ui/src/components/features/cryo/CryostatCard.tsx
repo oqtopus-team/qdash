@@ -52,7 +52,7 @@ function formatRelativeDays(days: number): string {
 function StatChip({ label, emphasis }: { label: string; emphasis?: boolean }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] tabular-nums ${
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs tabular-nums ${
         emphasis
           ? "border-primary/30 bg-primary/10 text-primary"
           : "border-base-300 bg-base-200/50 text-base-content/70"
@@ -136,7 +136,7 @@ export function CryostatCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-xl tracking-tight">{cryo.cryo_id}</span>
+            <span className="text-sm font-medium">{cryo.cryo_id}</span>
             {cryo.name && (
               <span className="text-base-content/70 text-sm truncate">{cryo.name}</span>
             )}
@@ -259,25 +259,25 @@ function ActiveCooldownBanner({
   return (
     <button
       onClick={onSelect}
-      className={`group w-full text-left rounded-xl border bg-success/8 px-4 py-3 transition-all hover:bg-success/12 ${
+      className={`group w-full text-left rounded-xl border bg-success/8 px-4 py-3 transition-colors hover:bg-success/12 ${
         isSelected ? "border-success/60 ring-2 ring-success/30" : "border-success/30"
       }`}
     >
       <div className="flex items-center gap-3">
-        <span className="relative inline-flex h-3 w-3 flex-shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/60" />
-          <span className="relative inline-flex h-3 w-3 rounded-full bg-success" />
-        </span>
+        <span
+          className="inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full bg-success"
+          aria-hidden="true"
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm">Currently cooling</span>
-            <span className="font-mono font-bold text-sm">{cooldown.cooldown_id}</span>
+            <span className="font-medium text-sm">Currently cooling</span>
+            <span className="font-mono font-medium text-sm">{cooldown.cooldown_id}</span>
             <span className="text-xs text-base-content/60 tabular-nums">
               · {formatRelativeDays(days)} ({formatDate(cooldown.started_at)})
             </span>
           </div>
           {cooldown.chip_ids.length > 0 && (
-            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-base-content/70">
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-base-content/70">
               <span className="text-base-content/50">Chips:</span>
               {cooldown.chip_ids.map((id) => (
                 <span

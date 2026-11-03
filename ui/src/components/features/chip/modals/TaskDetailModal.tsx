@@ -26,6 +26,7 @@ import {
   formatTime as formatTimeUtil,
   formatDateTime as formatDateTimeUtil,
 } from "@/lib/utils/datetime";
+import { formatSweepValue } from "@/lib/utils/task-parameters";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
 
@@ -222,10 +223,8 @@ export function TaskDetailModal({
       >
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
-              {modalTitle}
-            </DialogTitle>
-            <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+            <DialogTitle className="text-sm font-medium truncate">{modalTitle}</DialogTitle>
+            <DialogDescription className="text-sm text-base-content/70 mt-0.5 sm:mt-1">
               QID {qid}
             </DialogDescription>
           </div>
@@ -314,7 +313,7 @@ export function TaskDetailModal({
               {/* Figures */}
               {figures.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-3">Figures ({figures.length})</h4>
+                  <h4 className="text-sm font-medium mb-3">Figures ({figures.length})</h4>
                   {variant === "detailed" ? (
                     /* Detailed view: 2-column grid */
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -484,7 +483,7 @@ export function TaskDetailModal({
                   {task.output_parameters && (
                     <div className="mb-6">
                       <div className="mb-3 flex items-center gap-2">
-                        <h4 className="text-lg font-semibold">Output Parameters</h4>
+                        <h4 className="text-sm font-medium">Output Parameters</h4>
                         <CalibrationUpdateStatusBadge
                           parameters={task.output_parameters as Record<string, unknown>}
                         />
@@ -537,7 +536,7 @@ export function TaskDetailModal({
                   {/* Run Parameters (Experiment Configuration) */}
                   {task.run_parameters && Object.keys(task.run_parameters).length > 0 && (
                     <div className="mb-6">
-                      <h4 className="text-lg font-semibold mb-3">Run Parameters</h4>
+                      <h4 className="text-sm font-medium mb-3">Run Parameters</h4>
                       <div className="overflow-x-auto">
                         <table className="table table-zebra table-sm">
                           <thead>
@@ -560,11 +559,13 @@ export function TaskDetailModal({
                                 value_type?: string;
                                 description?: string;
                               };
-                              const displayValue = Array.isArray(paramValue.value)
-                                ? paramValue.value.join(", ")
-                                : paramValue.value !== null && paramValue.value !== undefined
-                                  ? String(paramValue.value)
-                                  : "-";
+                              const displayValue =
+                                formatSweepValue(paramValue.value_type, paramValue.value) ??
+                                (Array.isArray(paramValue.value)
+                                  ? paramValue.value.join(", ")
+                                  : paramValue.value !== null && paramValue.value !== undefined
+                                    ? String(paramValue.value)
+                                    : "-");
                               return (
                                 <tr key={key}>
                                   <td className="font-medium">{key}</td>
@@ -597,7 +598,7 @@ export function TaskDetailModal({
                   {/* Input Parameters (Calibration Dependencies) - Card View */}
                   {task.input_parameters && Object.keys(task.input_parameters).length > 0 && (
                     <div className="mb-6">
-                      <h4 className="text-lg font-semibold mb-3">Calibration Inputs</h4>
+                      <h4 className="text-sm font-medium mb-3">Calibration Inputs</h4>
                       <div className="space-y-2">
                         {Object.entries(task.input_parameters).map(([key, value]) => {
                           const paramValue = (
@@ -685,7 +686,7 @@ export function TaskDetailModal({
                                       {freshness.icon}
                                     </span>
                                     <div>
-                                      <div className="font-semibold text-sm">{key}</div>
+                                      <div className="font-medium text-sm">{key}</div>
                                       <div className="text-xs text-base-content/60">
                                         {paramValue.description || "Calibration parameter"}
                                       </div>
@@ -694,7 +695,7 @@ export function TaskDetailModal({
 
                                   {/* Right: Value */}
                                   <div className="text-right">
-                                    <div className="font-mono font-semibold">
+                                    <div className="font-mono font-medium">
                                       {typeof paramValue.value === "number"
                                         ? paramValue.value.toFixed(precision)
                                         : typeof paramValue.value === "object"

@@ -18,10 +18,11 @@ Running a workflow or task requires project edit permission.
 
 ## Run a Workflow
 
-1. Open **Workflow** and select a workflow. Select **New Flow** if you need to create one.
-2. Select **Edit** before changing the source, then save the workflow.
+1. Open **Workflow** and select a workflow. Follow [Creating Workflows](./creating-workflows.md)
+   first if you need to create or change one.
+2. Select **Edit** before changing the source, then select **Save**.
 3. Select **Execute**.
-4. Review the chip, targets, and execution options in the confirmation dialog.
+4. Review the flow name, username, chip, and tags in the confirmation dialog.
 5. Confirm the run, then open **Execution** to follow its progress.
 
 Use the workflow schedule panel when the same flow must run automatically. Manage schedules in
@@ -54,13 +55,16 @@ or saving outputs.
 ## Monitor a Run
 
 Open **Execution** to inspect a run's status, task topology, timing, parameters, output, and
-artifacts. Select a task in the topology to open its details.
+artifacts. Select a task in the topology to open its details, or select a node in the execution
+flow to preview its result in the same side panel that **Task Results** uses; open the full
+result from there.
 
 Cancelling a run sends a cancellation request to the worker. A task that is inside an operation
 that cannot be interrupted can take time to stop.
 
-Use **Task Duration Breakdown** to compare task timing across executions. Only results with start
-and end timestamps appear in the comparison.
+**Executions per day** at the top of the page counts the chip's runs for the last 7, 30 or 90
+days, stacked by status. Select a bar to limit the list below to that day; select it again to
+return to the latest runs.
 
 ## Inspect a Result
 

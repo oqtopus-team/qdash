@@ -49,7 +49,6 @@ from qdash.copilot.contracts import (
     ChatRequest,
     ChatStopRequest,
     ChatStopResponse,
-    SandboxPythonRequest,
     TaskContextBundle,
 )
 from qdash.copilot.runtime import CopilotRuntime
@@ -101,22 +100,6 @@ def get_expected_image(task_name: str, index: int) -> Response:
         raise HTTPException(status_code=404, detail="Image file not found")
     data, mime = loaded
     return Response(content=data, media_type=mime)
-
-
-@router.post("/sandbox/python", include_in_schema=False)
-async def run_sandboxed_python(
-    request: SandboxPythonRequest,
-    _current_user: Annotated[User, Depends(get_current_active_user)],
-) -> dict[str, Any]:
-    """Run analysis code in the Copilot Python sandbox.
-
-    The restricted sandbox behind the chat's ``run_python`` tool, so the Pi Agent
-    Runtime can offer Python without running code itself.
-    """
-    from qdash.copilot.tooling import execute_python_analysis
-
-    result = await execute_python_analysis(request.code)
-    return dict(result)
 
 
 @router.post("/chat/stop", include_in_schema=False)

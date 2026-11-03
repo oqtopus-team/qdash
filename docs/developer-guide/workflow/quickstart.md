@@ -3,11 +3,19 @@
 Use a QDash flow template to define targets, an explicit sequence of calibration steps, and the
 parameters those steps need.
 
+To create, save, and run a workflow in the application, see
+[Creating Workflows](../../user-guide/creating-workflows.md).
+
 ## Start from an Existing Template
 
 Copy the closest file under `src/qdash/workflow/templates/` before writing a flow from scratch.
 Templates contain the terminal hooks, target validation, task order, and defaults required by the
-current runtime. Their matching tests under `tests/qdash/workflow/` protect those decisions.
+current runtime. Their matching tests under `tests/qdash/workflow/` protect those decisions. A
+template the editor should offer is registered in `templates/templates.json` with the `backend`
+its tasks run on (`qubex` or `fake`). `GET /flows/templates?backend=fake` returns only the fake
+templates, and the **New Flow** page requests the list with the selected backend, so its selector
+never offers a hardware template on a fake deployment; a request without `backend` still returns
+every template.
 
 The smallest useful flow has four parts:
 
@@ -115,38 +123,107 @@ step's default list. The visible order is part of the flow contract: repeated me
 configuration checkpoints must remain reviewable in the saved source. If two templates must stay
 aligned, compare their lists in template tests.
 
-## Set Run Parameters
+## State Between Steps
 
-Pass shared fallbacks through `default_run_parameters` and task-specific values through
-`task_run_parameters`:
+`CalibService._run_pipeline()` passes the returned `StepContext` to each step in order. Target
+selection and scheduling travel through this context; Qubex calibration inputs resolve from
+the current calibration database when each task preprocesses.
+
+| State | Owner | Consumer |
+| --- | --- | --- |
+| Remaining qubits | `StepContext.candidate_qids` | Filters, scheduling, and calibration steps |
+| Candidate coupling IDs | `StepContext.candidate_couplings` | Steps that consume coupling candidates |
+| CR parallel groups | `StepContext.metadata["cr_schedule"]` | `CustomTwoQubit` and `TwoQubitCalibration` |
+| Typed step results | `StepContext.one_qubit_check`, `one_qubit_fine_tune`, `two_qubit` | Filters and pipeline results |
+| Accepted calibration values | MongoDB qubit and coupling calibration records | Declared task inputs |
+| Experiment settings and overrides | `CalibService.default_run_parameters` and `task_parameters` | Task construction and isolated worker sessions |
+
+```mermaid
+flowchart TD
+    one[One-qubit calibration] -->|Typed results| ctx[StepContext]
+    one -->|Validated and applied outputs| db[(Current calibration DB)]
+    ctx --> filter[FilterByStatus or FilterByMetric]
+    filter -->|Remaining candidate_qids| schedule[GenerateCRSchedule]
+    schedule -->|metadata.cr_schedule| two[Two-qubit calibration]
+    two --> task[Coupling task preprocessing]
+    db -->|Declared calibration inputs| task
+```
+
+Each hardware step gets its own Execution. After a hardware step finishes, the pipeline creates
+a new orchestrator and session for the next hardware step; transform steps retain the context
+without opening an Execution. Calibration values survive this boundary because applied outputs
+are persisted, rather than copied from the preceding step's return value into the next task.
+
+For normal Qubex tasks, `QubexTask._load_parameters_from_db()` reads declared inputs from the
+selected qubit or, for coupling tasks, the control qubit, target qubit, and coupling records
+according to `qid_role`. Explicit input overrides take precedence. Measurement-only outputs do
+not replace accepted inputs for later tasks. Run parameters such as shots and sweep ranges
+come from task and workflow settings. See [Parameter Resolution](./parameter-resolution.md) for
+precedence and snapshot re-execution, and [Calibration Data Lifecycle](./calibration-data-lifecycle.md)
+for output promotion.
+
+Parallel coupling workers receive the shared settings and parent Execution ID in
+`session_config`, then create isolated sessions. Within each coupling, tasks run sequentially;
+workers do not share Python objects. See [CR Gate Scheduler](../architecture/cr-scheduler.md#workflow-integration)
+for schedule reuse and group ordering.
+
+The context and session lifecycle are implemented in `service/steps/pipeline.py` and
+`service/calib_service.py`; worker session construction is in
+`service/_internal/scheduling_tasks.py`, all under `src/qdash/workflow/`.
+When changing these boundaries, run the pipeline and worker tests under
+`tests/qdash/workflow/service/` using the [Workflow Testing](./testing.md) guidance.
+
+For the user-facing procedure, see
+[Use Earlier Calibration Results in Later Steps](../../user-guide/creating-workflows.md#use-earlier-calibration-results-in-later-steps).
+
+## Set Task Parameters
+
+Pass shared run-parameter fallbacks through `default_run_parameters` and settings for one task
+through `task_parameters`:
 
 ```python
+from qdash.workflow import sweep
+
 service = CalibService(
     username,
     chip_id,
     project_id=project_id,
     default_run_parameters={
-        "interval": {"value": 150 * 1024, "value_type": "int"},
+        "interval": 150 * 1024,
     },
-    task_run_parameters={
+    task_parameters={
         "CheckRamsey": {
-            "shots": {"value": 1024, "value_type": "int"},
+            "run": {
+                "shots": 1024,
+                "time_range": sweep.arange(0, 10_000, 100),
+            },
+            "input": {"control_frequency": 7.012},
             "update_calibration_parameters": False,
         },
     },
 )
 ```
 
-Explicit task settings override shared defaults. Setting
+`default_run_parameters` and `task_parameters[task_name]["run"]` use the same value syntax.
+`run` sets run parameters the task declares in its `run_spec`, and overrides shared defaults.
+`input` replaces calibration inputs the task declares in its `input_spec`; the value applies to
+every qid the task runs on. Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or
+`sweep.range` for generated run ranges, `sweep.values(...)` for explicit points, and plain values
+for other run values and `input` entries. The helper records the constructor without creating an
+array in the workflow process, and a parameter that declares one sweep constructor accepts any of
+them. Setting
 `update_calibration_parameters=False` retains task history without promoting validated outputs to
-the current calibration state. The complete precedence rules are in
-[Parameter Resolution](./parameter-resolution.md).
+the current calibration state. A name in the wrong section, or one the task does not declare,
+fails when the task is created. The complete precedence rules are in [Parameter
+Resolution](./parameter-resolution.md).
 
 ## Preserve Terminal Handling
 
 Every top-level flow that owns hardware reservations must register `on_flow_cancellation`,
 `on_flow_failure`, and `on_flow_crashed`. Do not reproduce their exception-classification logic in
-the template. Nested single-task flows use the `*_keep_lock` hooks supplied by the service layer.
+the template. The system `single-task-executor` also owns its reservation and uses these hooks.
+Use the `*_keep_lock` variants only for nested flows configured with `use_lock=False` that borrow
+the parent flow's reservation.
 
 The hooks finalize execution and task records that the worker cannot close itself and release only
 reservations owned by that flow. [Workflow Engine Architecture](./engine-architecture.md#cancellation)

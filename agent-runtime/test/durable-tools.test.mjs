@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { Type } from "typebox";
+import { REVIEWED_WRITE_TOOL_NAMES } from "../src/allowed-tools.ts";
 
-import { buildQDashExtension, decisionMessage } from "../src/durable-tools.ts";
+import { boundToolText, buildQDashExtension, decisionMessage, MAX_TOOL_TEXT_CHARS, ToolCancelled, untilAborted } from "../src/durable-tools.ts";
 
 const connection = {
   toolArgs: {
@@ -48,11 +49,11 @@ test("only explicitly reviewed pi-qdash tools enter the durable registry", () =>
 
   assert.deepEqual(
     extension.tools.map((tool) => tool.name),
-    ["qdash_get_default_chip"],
+    ["qdash_get_default_chip", "qdash_create_forum_post"],
   );
 });
 
-test("local extension checkouts are trusted by path, not by tool name", () => {
+test("local extension checkouts are trusted by path, not by tool name", async () => {
   const roots = ["/app/extensions/pi-qcaleval"];
   const readOnly = registered("qcal_evaluate");
   readOnly.definition.annotations = { readOnlyHint: true };
@@ -68,7 +69,7 @@ test("local extension checkouts are trusted by path, not by tool name", () => {
     tools: new Map([
       ["qcal_evaluate", readOnly],
       ["qcal_store_result", registered("qcal_store_result")],
-      // An experimental write name keeps its opt-in even from a checkout.
+      // Reviewed write names remain subject to approval even from a checkout.
       ["qdash_create_forum_post", registered("qdash_create_forum_post")],
     ]),
   };
@@ -77,19 +78,23 @@ test("local extension checkouts are trusted by path, not by tool name", () => {
     {},
     "/tmp/work",
     connection,
-    false,
     roots,
   );
   const byName = new Map(extension.tools.map((tool) => [tool.name, tool]));
 
   assert.deepEqual(
     [...byName.keys()].sort(),
-    ["qcal_evaluate", "qcal_store_result", "qdash_get_default_chip"],
+    ["qcal_evaluate", "qcal_store_result", "qdash_create_forum_post", "qdash_get_default_chip"],
   );
   // Only a tool annotated read-only may rerun after an interruption.
   assert.equal(byName.get("qcal_evaluate").replay, "safe");
   assert.equal(byName.get("qcal_store_result").replay, "unsafe");
   assert.equal(byName.get("qdash_get_default_chip").replay, "safe");
+  const approval = await byName.get("qdash_create_forum_post").execute(
+    {}, { callId: "local-write" }, { abortSignal: undefined },
+  );
+  assert.equal(approval.details.approval.tool, "qdash_create_forum_post");
+  assert.equal(local.tools.get("qdash_create_forum_post").calls(), 0);
 });
 
 test("a checkout tool with a pinned name replaces the pinned implementation", async () => {
@@ -103,7 +108,6 @@ test("a checkout tool with a pinned name replaces the pinned implementation", as
     {},
     "/tmp/work",
     connection,
-    false,
     ["/app/extensions/dev"],
   );
 
@@ -137,7 +141,6 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
     { getModel: (provider, id) => (provider === qwen.provider && id === qwen.id ? qwen : undefined) },
     "/tmp/work",
     connection,
-    false,
     ["/app/extensions/pi-qcaleval"],
   );
   const scans = [];
@@ -238,50 +241,51 @@ test("a checkout tool with an `images` parameter gets the newest transcript figu
   );
 });
 
-test("experimental write tools require opt-in and never run from the model's call", async () => {
-  const write = registered("qdash_create_forum_post");
-  const { extension, writeTools } = buildQDashExtension(
-    [
-      {
-        tools: new Map([
-          ["qdash_get_default_chip", registered("qdash_get_default_chip")],
-          ["qdash_create_forum_post", write],
-          ["qdash_future_unreviewed_tool", registered("qdash_future_unreviewed_tool")],
-        ]),
-      },
-    ],
-    {},
-    "/tmp/work",
-    connection,
-    true,
-  );
+for (const name of REVIEWED_WRITE_TOOL_NAMES) {
+  test(`${name} is available by default but only runs after approval`, async () => {
+    const write = registered(name);
+    const { extension, writeTools } = buildQDashExtension(
+      [
+        {
+          tools: new Map([
+            ["qdash_get_default_chip", registered("qdash_get_default_chip")],
+            [name, write],
+            ["qdash_future_unreviewed_tool", registered("qdash_future_unreviewed_tool")],
+          ]),
+        },
+      ],
+      {},
+      "/tmp/work",
+      connection,
+    );
 
-  assert.deepEqual(
-    extension.tools.map((tool) => tool.name),
-    ["qdash_get_default_chip", "qdash_create_forum_post"],
-  );
-  const writeTool = extension.tools.find((tool) => tool.name === "qdash_create_forum_post");
-  const context = { abortSignal: new AbortController().signal };
+    assert.deepEqual(
+      extension.tools.map((tool) => tool.name),
+      ["qdash_get_default_chip", name],
+    );
+    const writeTool = extension.tools.find((tool) => tool.name === name);
+    const context = { abortSignal: new AbortController().signal };
 
-  // Even a model that sets confirmWrite only gets an approval request.
-  const requested = await writeTool.execute(
-    { title: "T1 drop", confirmWrite: true, profile: "default" },
-    { callId: "call-1" },
-    context,
-  );
-  assert.equal(write.calls(), 0);
-  assert.match(requested.output[0].text, /Approval requested/);
-  assert.deepEqual(requested.control, { terminate: true });
-  assert.deepEqual(requested.details.approval, {
-    id: "call-1",
-    tool: "qdash_create_forum_post",
-    label: "qdash_create_forum_post",
-    args: { title: "T1 drop" },
+    // Even a model that sets confirmWrite only gets an approval request.
+    const requested = await writeTool.execute(
+      { title: "T1 drop", confirmWrite: true, profile: "default" },
+      { callId: "call-1" },
+      context,
+    );
+    assert.equal(write.calls(), 0);
+    assert.match(requested.output[0].text, /Approval requested/);
+    assert.deepEqual(requested.control, { terminate: true });
+    assert.deepEqual(requested.details.approval, {
+      id: "call-1",
+      tool: name,
+      label: name,
+      args: { title: "T1 drop" },
+    });
+
+    await writeTools.runApproved(requested.details.approval);
+    assert.equal(write.calls(), 1);
   });
-
-  await writeTools.runApproved(requested.details.approval);
-  assert.equal(write.calls(), 1);
-});
+}
 
 test("the model is not offered the confirmation flag", () => {
   const tool = registered("qdash_create_forum_post");
@@ -294,7 +298,6 @@ test("the model is not offered the confirmation flag", () => {
     {},
     "/tmp/work",
     connection,
-    true,
   );
   assert.deepEqual(Object.keys(extension.tools[0].parameters.properties), ["title"]);
 });
@@ -323,7 +326,7 @@ test("a trusted installed package gets the checkout treatment", () => {
   const { extension } = buildQDashExtension(
     [
       {
-        path: "/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval/extensions/qcaleval.ts",
+        path: "/app/.pi-agent/npm/node_modules/@oqtopus-team/pi-qcaleval/extensions/qcaleval.ts",
         tools: new Map([["qcal_evaluate", readOnly]]),
       },
       {
@@ -334,9 +337,8 @@ test("a trusted installed package gets the checkout treatment", () => {
     {},
     "/tmp/work",
     connection,
-    false,
     [],
-    ["@orangekame3/pi-qcaleval"],
+    ["@oqtopus-team/pi-qcaleval"],
   );
   // The listed package is offered; an unlisted installed package still needs the allowlist.
   assert.deepEqual(
@@ -344,4 +346,47 @@ test("a trusted installed package gets the checkout treatment", () => {
     ["qcal_evaluate"],
   );
   assert.equal(extension.tools[0].replay, "safe");
+});
+
+test("a tool's text reaches the model without inline images and within the budget", async () => {
+  const image = `data:image/png;base64,${"A".repeat(5000)}`;
+  const long = "x".repeat(MAX_TOOL_TEXT_CHARS + 500);
+  const tool = registered("qdash_get_task_knowledge");
+  tool.definition.execute = async () => ({
+    content: [
+      { type: "text", text: `# CheckRabi\n![plot](${image})\nAxes: time` },
+      { type: "text", text: long },
+      { type: "image", data: "ignored", mimeType: "image/png" },
+    ],
+    details: {},
+  });
+  const { extension } = buildQDashExtension(
+    [{ tools: new Map([["qdash_get_task_knowledge", tool]]) }],
+    {},
+    "/tmp/work",
+    connection,
+  );
+  const result = await extension.tools[0].execute({}, { callId: "c1" }, { abortSignal: undefined });
+  assert.equal(result.output[0].text, "# CheckRabi\n![plot](data:… (inline image omitted; QDash shows it))\nAxes: time");
+  assert.ok(result.output[1].text.length < MAX_TOOL_TEXT_CHARS + 200);
+  assert.match(result.output[1].text, /output truncated to 24000 characters/);
+  assert.deepEqual(result.output[2], { type: "image", data: "ignored", mimeType: "image/png" });
+  assert.equal(boundToolText("short", "t"), "short");
+});
+
+test("a cancelled turn does not wait for a tool that ignores the signal", async () => {
+  const tool = registered("qdash_wait_execution");
+  tool.definition.execute = () => new Promise(() => {}); // polls forever, never looks at the signal
+  const { extension } = buildQDashExtension(
+    [{ tools: new Map([["qdash_wait_execution", tool]]) }],
+    {},
+    "/tmp/work",
+    connection,
+  );
+  const controller = new AbortController();
+  const call = extension.tools[0].execute({}, { callId: "c1" }, { abortSignal: controller.signal });
+  setTimeout(() => controller.abort(), 10);
+  await assert.rejects(call, (error) => error instanceof ToolCancelled && /keeps running in QDash/.test(error.message));
+  await assert.rejects(untilAborted(new Promise(() => {}), controller.signal, "x"), ToolCancelled);
+  assert.equal(await untilAborted(Promise.resolve(3), new AbortController().signal, "x"), 3);
 });

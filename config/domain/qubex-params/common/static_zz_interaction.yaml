@@ -1,0 +1,6 @@
+meta:
+  description: Static ZZ interaction between qubits (ζ = the coefficient of ZZ/4 = E_00 + E_11 - E_01 - E_10 = the frequency shift of the target qubit depending on whether the spectator qubit is in |0> or |1> state)
+  unit: kHz
+  default: null
+  scope: coupling
+data: {}

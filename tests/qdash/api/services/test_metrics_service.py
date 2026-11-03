@@ -1,11 +1,38 @@
 """Tests for metrics_service helpers."""
 
 from datetime import datetime
+from unittest.mock import MagicMock
 
 import pytest
 from starlette.exceptions import HTTPException
 
-from qdash.api.services.metrics_service import _parse_date_range
+from qdash.api.services.metrics_service import MetricsService, _parse_date_range
+from qdash.common.config.metrics import load_metrics_config
+
+
+def test_coupling_strength_is_extracted_with_mhz_display_config():
+    repository = MagicMock()
+    repository.aggregate_latest_metrics.return_value = {
+        "qubit_qubit_coupling_strength": {
+            "0-1": {"value": 5.0, "task_id": "task-1", "execution_id": "exec-1"}
+        }
+    }
+    service = MetricsService(repository, MagicMock())
+
+    metrics = service.extract_entity_metrics("chip-1", "project-1", "coupling")
+
+    assert (
+        "qubit_qubit_coupling_strength"
+        in repository.aggregate_latest_metrics.call_args.kwargs["metric_keys"]
+    )
+    result = metrics["qubit_qubit_coupling_strength"]["0-1"]
+    assert result.value == 5.0
+    assert result.task_id == "task-1"
+    metadata = load_metrics_config().coupling_metrics["qubit_qubit_coupling_strength"]
+    assert metadata.unit == "MHz"
+    assert metadata.scale == 1
+    assert result.value * metadata.scale == pytest.approx(5.0)
+    assert metadata.evaluation.mode == "none"
 
 
 class TestParseDateRange:

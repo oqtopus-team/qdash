@@ -231,3 +231,75 @@ def test_example_demonstration_fields_are_optional_and_labeled() -> None:
         '{"t1": 14.2}',
     )
     assert tk.KnowledgeExample(id="e2", title="t", outcome="expected").status == ""
+
+
+RABI_BACKGROUND = """Measures Rabi oscillation.
+
+## Expected plot
+
+Damped oscillation. A good result: clear oscillation with high contrast.
+
+## Common failures
+
+- Low contrast (<70%) — small oscillation amplitude; next: check readout.
+- No signal — flat or random data; next: run CheckChevron.
+
+## Parameters to extract
+
+- rabi_amplitude: Rabi oscillation amplitude (a.u.)
+"""
+
+
+def test_next_actions_load_and_are_checked_against_the_offered_statuses() -> None:
+    knowledge = tk.TaskKnowledge.model_validate(
+        {
+            "name": "CheckRabi",
+            "background": RABI_BACKGROUND,
+            "next_actions": {
+                "SUCCESS": {"action": "continue"},
+                "LOW_CONTRAST": {"action": "retry", "overrides": {"readout_amplitude": 0.02}},
+                "NO_SIGNAL": {"action": "run_task", "task": "CheckChevron", "note": "find f01"},
+                "SUBOPTIMAL": {"action": "request_human"},
+            },
+        }
+    )
+
+    assert knowledge.status_codes() == ("SUCCESS", "LOW_CONTRAST", "NO_SIGNAL")
+    assert knowledge.next_actions["NO_SIGNAL"].task == "CheckChevron"
+    assert knowledge.next_action_problems() == [
+        "next_actions.SUBOPTIMAL: CheckRabi evaluation never reports SUBOPTIMAL "
+        "(it offers SUCCESS, LOW_CONTRAST, NO_SIGNAL)"
+    ]
+    # The frontmatter table never reaches the evaluation prompt.
+    assert "next_actions" not in knowledge.to_prompt()
+    assert "CheckChevron" not in knowledge.reference().background
+
+
+def test_tasks_without_common_failures_offer_only_success() -> None:
+    # The task's criteria replace the evaluator's built-in statuses, so a task.md
+    # without "## Common failures" can only ever be judged SUCCESS.
+    knowledge = tk.TaskKnowledge.model_validate(
+        {
+            "name": "CheckChevron",
+            "background": "Measure a Chevron pattern.",
+            "next_actions": {"NO_SIGNAL": {"action": "request_human"}},
+        }
+    )
+    assert knowledge.status_codes() == ("SUCCESS",)
+    assert knowledge.next_action_problems() == [
+        "next_actions.NO_SIGNAL: CheckChevron evaluation never reports NO_SIGNAL (it offers SUCCESS)"
+    ]
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"action": "run_task"},
+        {"action": "continue", "task": "CheckChevron"},
+        {"action": "request_human", "overrides": {"x": 1.0}},
+        {"action": "jump"},
+    ],
+)
+def test_malformed_next_actions_are_rejected(data: dict[str, object]) -> None:
+    with pytest.raises(ValueError):
+        tk.NextAction.model_validate(data)

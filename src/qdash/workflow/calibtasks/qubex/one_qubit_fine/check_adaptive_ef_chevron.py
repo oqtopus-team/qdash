@@ -93,7 +93,7 @@ class CheckAdaptiveEFChevron(QubexTask):
                 "control_frequency_ef",
             ),
         ),
-        "anharmonicity": OutputParameterSpec(
+        "qubit_anharmonicity": OutputParameterSpec(
             unit="GHz", description="Anharmonicity alpha = ef_frequency - control_frequency"
         ),
     }
@@ -112,7 +112,7 @@ class CheckAdaptiveEFChevron(QubexTask):
             threshold, "minimum_peak_background_rms_ratio", minimum=0
         )
         self.output_parameters["ef_frequency"].value = frequency
-        self.output_parameters["anharmonicity"].value = anharmonicity
+        self.output_parameters["qubit_anharmonicity"].value = anharmonicity
         # Keep the final chevron and its transform together at the front.
         final_keys = (f"{label}_measurement", f"{label}_transform")
         figures = [result.figures[key] for key in final_keys if key in result.figures]
@@ -122,7 +122,7 @@ class CheckAdaptiveEFChevron(QubexTask):
             figures=figures,
             validation_error=first_validation_error(
                 finite_value_error(frequency, "ef_frequency", minimum=0),
-                finite_value_error(anharmonicity, "anharmonicity", maximum=0),
+                finite_value_error(anharmonicity, "qubit_anharmonicity", maximum=0),
                 threshold_error,
                 finite_value_error(
                     result.data["peak_background_rms_ratios"].get(label),

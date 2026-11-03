@@ -118,8 +118,8 @@ test("local tools describe themselves to the model through their pi guidelines",
 });
 
 test("an installed package is trusted by its name under pi's node_modules", () => {
-  const packages = ["@orangekame3/pi-qcaleval"];
-  const installed = "/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval/extensions/qcaleval.ts";
+  const packages = ["@oqtopus-team/pi-qcaleval"];
+  const installed = "/app/.pi-agent/npm/node_modules/@oqtopus-team/pi-qcaleval/extensions/qcaleval.ts";
   assert.equal(isInstalledPackage(installed, packages), true);
   assert.equal(isInstalledPackage(installed, []), false);
   // The pinned pi-qdash package and look-alike names are not covered.
@@ -128,7 +128,7 @@ test("an installed package is trusted by its name under pi's node_modules", () =
     false,
   );
   assert.equal(
-    isInstalledPackage("/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval-fork/extensions/x.ts", packages),
+    isInstalledPackage("/app/.pi-agent/npm/node_modules/@oqtopus-team/pi-qcaleval-fork/extensions/x.ts", packages),
     false,
   );
   // A checkout root or a trusted package both qualify.
@@ -146,7 +146,7 @@ test("an installed package is trusted by its name under pi's node_modules", () =
 
 test("checkouts of allowlisted packages load but are not trusted as a whole", () => {
   const checkouts = [
-    { path: "/app/extensions/pi-qcaleval", name: "@orangekame3/pi-qcaleval" },
+    { path: "/app/extensions/pi-qcaleval", name: "@oqtopus-team/pi-qcaleval" },
     { path: "/app/extensions/pi-qdash", name: "@oqtopus-team/pi-qdash" },
     { path: "/app/extensions/anonymous", name: null },
   ];
@@ -159,7 +159,7 @@ test("checkouts of allowlisted packages load but are not trusted as a whole", ()
 
 test("an installed copy rejected in favour of a checkout is reported as a replacement", () => {
   const checkouts = ["/app/extensions/pi-qcaleval"];
-  const installed = "/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval/extensions/qcaleval.ts";
+  const installed = "/app/.pi-agent/npm/node_modules/@oqtopus-team/pi-qcaleval/extensions/qcaleval.ts";
   assert.deepEqual(
     describeExtensionError(
       installed,
@@ -186,7 +186,7 @@ test("an installed copy is dropped when a checkout of the same package is presen
   ];
   const checkout = { path: "/app/extensions/pi-qdash/extensions/qdash.ts" };
   const installed = { path: "/app/.pi-agent/npm/node_modules/@oqtopus-team/pi-qdash/extensions/qdash.ts" };
-  const other = { path: "/app/.pi-agent/npm/node_modules/@orangekame3/pi-qcaleval/extensions/qcaleval.ts" };
+  const other = { path: "/app/.pi-agent/npm/node_modules/@oqtopus-team/pi-qcaleval/extensions/qcaleval.ts" };
   // pi lists the checkout first and the rejected installed copy after it.
   assert.deepEqual(withoutReplacedInstalls([checkout, installed, other], checkouts), [checkout, other]);
   // Without a checkout of that package, the installed copy stays.
@@ -200,7 +200,7 @@ test("the package of an extension file is read from the nearest manifest, with a
     mkdirSync(join(checkout, "extensions"), { recursive: true });
     writeFileSync(
       join(checkout, "package.json"),
-      JSON.stringify({ name: "@orangekame3/pi-qcaleval", version: "0.0.1", pi: {} }),
+      JSON.stringify({ name: "@oqtopus-team/pi-qcaleval", version: "0.0.1", pi: {} }),
     );
     mkdirSync(join(checkout, ".git", "refs", "heads"), { recursive: true });
     writeFileSync(join(checkout, ".git", "HEAD"), "ref: refs/heads/main\n");
@@ -209,7 +209,7 @@ test("the package of an extension file is read from the nearest manifest, with a
     writeFileSync(file, "");
 
     assert.deepEqual(extensionPackage(file, [checkout]), {
-      name: "@orangekame3/pi-qcaleval",
+      name: "@oqtopus-team/pi-qcaleval",
       version: "0.0.1",
       source: "checkout",
       commit: "042e454323b2",
@@ -219,12 +219,12 @@ test("the package of an extension file is read from the nearest manifest, with a
     mkdirSync(join(installed, "extensions"), { recursive: true });
     writeFileSync(
       join(installed, "package.json"),
-      JSON.stringify({ name: "@orangekame3/pi-qcaleval", version: "0.0.2-beta.5", pi: {} }),
+      JSON.stringify({ name: "@oqtopus-team/pi-qcaleval", version: "0.0.2-beta.5", pi: {} }),
     );
     const installedFile = join(installed, "extensions", "qcaleval.ts");
     writeFileSync(installedFile, "");
     assert.deepEqual(extensionPackage(installedFile, [checkout]), {
-      name: "@orangekame3/pi-qcaleval",
+      name: "@oqtopus-team/pi-qcaleval",
       version: "0.0.2-beta.5",
       source: "package",
     });

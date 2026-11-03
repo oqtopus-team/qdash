@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import { pickColor } from "@/lib/utils/color-scale";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridDimension, cellFontSize } from "@/lib/utils/grid-layout";
 
@@ -183,57 +184,16 @@ export function CouplingMetricsGrid({
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
 
-  // Helper function to interpolate between two hex colors
-  const interpolateColor = (color1: string, color2: string, factor: number): string => {
-    const c1 = parseInt(color1.slice(1), 16);
-    const c2 = parseInt(color2.slice(1), 16);
-
-    const r1 = (c1 >> 16) & 0xff;
-    const g1 = (c1 >> 8) & 0xff;
-    const b1 = c1 & 0xff;
-
-    const r2 = (c2 >> 16) & 0xff;
-    const g2 = (c2 >> 8) & 0xff;
-    const b2 = c2 & 0xff;
-
-    const r = Math.round(r1 + (r2 - r1) * factor);
-    const g = Math.round(g1 + (g2 - g1) * factor);
-    const b = Math.round(b1 + (b2 - b1) * factor);
-
-    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-  };
-
-  // Calculate color for a value
+  // Calculate color for a value. A zero min and max means "fit the data".
   const getColor = (value: number | null, autoMin: number, autoMax: number): string | null => {
-    if (value === null || value === undefined) {
-      return null;
-    }
-
-    const { colors } = colorScale;
-    if (colors.length === 0) return null;
-
-    const effectiveMin = colorScale.min === 0 && colorScale.max === 0 ? autoMin : colorScale.min;
-    const effectiveMax = colorScale.min === 0 && colorScale.max === 0 ? autoMax : colorScale.max;
-
-    if (effectiveMin === effectiveMax) {
-      return colors[colors.length - 1];
-    }
-
-    const normalized = Math.max(
-      0,
-      Math.min(1, (value - effectiveMin) / (effectiveMax - effectiveMin)),
+    if (value === null || value === undefined) return null;
+    const useAuto = colorScale.min === 0 && colorScale.max === 0;
+    return pickColor(
+      value,
+      useAuto ? autoMin : colorScale.min,
+      useAuto ? autoMax : colorScale.max,
+      colorScale.colors,
     );
-
-    const position = normalized * (colors.length - 1);
-    const lowerIndex = Math.floor(position);
-    const upperIndex = Math.min(lowerIndex + 1, colors.length - 1);
-    const factor = position - lowerIndex;
-
-    if (factor === 0 || lowerIndex === upperIndex) {
-      return colors[lowerIndex];
-    }
-
-    return interpolateColor(colors[lowerIndex], colors[upperIndex], factor);
   };
 
   // Calculate statistics
@@ -403,7 +363,7 @@ export function CouplingMetricsGrid({
                 }}
               >
                 <div
-                  className="font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
+                  className="font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
                   style={{ fontSize: cellFontSize(displayCellSize, 0.13) }}
                 >
                   MUX{muxIndex}
@@ -476,14 +436,14 @@ export function CouplingMetricsGrid({
                   height: displayCellSize * 0.5,
                   backgroundColor: bgColor || undefined,
                 }}
-                className={`rounded-md shadow-md flex flex-col items-center justify-center transition-all hover:shadow-xl hover:scale-110 -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
+                className={`rounded-md shadow-md flex flex-col items-center justify-center transition-transform hover:shadow-xl -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
                   !bgColor ? "bg-base-300/50" : ""
                 }`}
               >
                 {/* Value Display - LOD controlled */}
                 {value !== null && value !== undefined && showValues && (
                   <div
-                    className="font-bold text-white drop-shadow-md leading-tight"
+                    className="font-medium text-white drop-shadow-md leading-tight"
                     style={{ fontSize: valueFontSizes.valueSize }}
                   >
                     {value.toFixed(showUnits ? 2 : 1)}
@@ -568,7 +528,7 @@ export function CouplingMetricsGrid({
                 }}
                 title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
               >
-                <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
                   {regionRow},{regionCol}
                 </span>
               </button>
@@ -714,10 +674,10 @@ export function CouplingMetricsGrid({
               {/* Modal Header */}
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
+                  <DialogTitle className="text-sm font-medium truncate">
                     {selectedCouplingInfo.couplingId} - {title}
                   </DialogTitle>
-                  <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+                  <DialogDescription className="text-sm text-base-content/70 mt-0.5 sm:mt-1">
                     {selectedCouplingInfo.metric.value !== null
                       ? `${selectedCouplingInfo.metric.value.toFixed(4)} ${unit}`
                       : "No data"}

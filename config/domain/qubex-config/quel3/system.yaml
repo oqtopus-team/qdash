@@ -1,0 +1,8 @@
+# TODO: Uncomment the backend settings and enter your hardware connection details.
+$chip_id:
+  chip_id: $chip_id
+  backend: quel3
+  # quel3:
+  #   endpoint: "<QuEL-3-server-host>"
+  #   port: 50051
+  #   transport: grpc

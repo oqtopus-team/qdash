@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { Api, Model } from "@earendil-works/pi-ai";
@@ -23,21 +24,24 @@ import {
   type ModelRef,
 } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import { createCodingTools } from "@earendil-works/pi-durable/tools";
 
 import { createQDashConnection, type QDashAuth, type QDashConnection } from "./auth.ts";
 import {
   ALLOWED_TOOL_NAMES,
   ALLOWLISTED_PACKAGES,
-  EXPERIMENTAL_WRITE_TOOL_NAMES,
+  REVIEWED_WRITE_TOOL_NAMES,
   TRUSTED_EXTENSION_PACKAGES,
-  isExperimentalWriteTool,
 } from "./allowed-tools.ts";
-import { compactionBudget } from "./budget.ts";
+import { compactionBudget, type CompactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
+import { ExecWorkspace, execConfigFromEnv, removeWorkspace, WORKSPACE_TOOL_NAMES } from "./exec-env.ts";
 import { askUserTool } from "./ask-tool.ts";
 import {
   buildLocalToolGuide,
+  bundledExtensionCheckouts,
+  withExtensionOverrides,
   localToolNames,
   describeExtensionError,
   extensionPackage,
@@ -69,10 +73,16 @@ import {
   type ToolRun,
 } from "./evaluate.ts";
 import { formatSettledDetail } from "./events.ts";
+import { logDurableReport } from "./durable-report.ts";
 import { fetchKnowledgeDraft, fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
-import { PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
+import { chatCompactionOverrides, PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
+import {
+  buildPageContextSection,
+  buildProposeCodeEditTool,
+  PAGE_SECTION,
+  type PageContext,
+} from "./page-context.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
-import { buildPythonTool } from "./python-tool.ts";
 import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
 import { extractToolGuide, TOOL_GUIDE_SKILL } from "./tool-guide.ts";
 
@@ -85,15 +95,17 @@ const EVALUATION_CONFIG_PATH =
   process.env.EVALUATION_CONFIG_PATH ?? "/app/config/copilot/evaluation.yaml";
 // One model request; a whole turn is bounded by the server's own timers.
 const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 180_000);
-const EXPERIMENTAL_WRITE_TOOLS_ENABLED = ["1", "true", "yes", "on"].includes(
-  (process.env.AGENT_RUNTIME_ENABLE_WRITE_TOOLS ?? "").trim().toLowerCase(),
-);
+// The Copilot workspace (agent-exec container); without it the chat has no
+// shell or files, only QDash tools.
+const EXEC_CONFIG = execConfigFromEnv();
 // Local extension checkouts: compose mounts agent-runtime/extensions/ here. It
 // is empty in production and in a clone without checkouts. Every checkout is
-// loaded (replacing an installed copy of the same package); only those outside
+// loaded (replacing the bundled or installed copy of the same package); only those outside
 // the allowlisted packages are trusted as a whole.
 const EXTENSIONS_DIR = "/app/extensions";
-const CHECKOUTS = discoverExtensionCheckouts(EXTENSIONS_DIR);
+const BUNDLED = bundledExtensionCheckouts(fileURLToPath(new URL("../../packages/", import.meta.url)));
+const BUNDLED_PATHS = BUNDLED.map(({ path }) => path);
+const CHECKOUTS = withExtensionOverrides(BUNDLED, discoverExtensionCheckouts(EXTENSIONS_DIR));
 const CHECKOUT_PATHS = CHECKOUTS.map((checkout) => checkout.path);
 const EXTENSION_PATHS = trustedCheckoutRoots(CHECKOUTS, ALLOWLISTED_PACKAGES);
 
@@ -110,6 +122,8 @@ export interface SessionRequest {
   images?: Array<{ type: "image"; data: string; mimeType: string }>;
   /** The user's own chat instructions from QDash; a chat only, never an evaluation. */
   userInstructions?: string;
+  /** What the user has open in QDash while chatting from the sidebar; rebuilt every turn. */
+  pageContext?: PageContext;
 }
 
 /** Section key of the user's preferences in the system prompt. */
@@ -147,6 +161,11 @@ export interface OpenDurableSession {
   close(): Promise<void>;
 }
 
+/** The file beside a session's store that says its workspace directory was created. */
+export function workspaceMarker(storePath: string): string {
+  return `${storePath}.workspace`;
+}
+
 /** Return a stable non-identifying filename for one user's QDash session. */
 export function sessionStorageName(ownerId: string, sessionId: string): string {
   return `${createHash("sha256").update(ownerId).update("\0").update(sessionId).digest("hex")}.sqlite`;
@@ -171,7 +190,11 @@ interface EnabledTool {
 export class SharedRuntime {
   private constructor(
     private readonly modelRuntime: ModelRuntime,
-    private readonly buildChatRegistry: (connection: QDashConnection, userInstructions?: string) => {
+    private readonly buildChatRegistry: (
+      connection: QDashConnection,
+      userInstructions?: string,
+      pageContext?: PageContext,
+    ) => {
       registry: ReturnType<typeof createRegistry>;
       writeTools: QDashWriteTools;
     },
@@ -180,6 +203,7 @@ export class SharedRuntime {
     private readonly enabledTools: ReadonlyMap<string, EnabledTool>,
     /** QDash's system prompt for chats, as built at startup. */
     private readonly systemPrompt: string,
+    private readonly modelCompactionOverrides: Readonly<Record<string, CompactionBudget>> = {},
   ) {}
 
   /**
@@ -194,8 +218,10 @@ export class SharedRuntime {
   /** Load the Pi model catalog and adapt the installed pi-qdash extension once. */
   static async create(): Promise<SharedRuntime> {
     mkdirSync(STATE_DIR, { recursive: true });
-    if (EXPERIMENTAL_WRITE_TOOLS_ENABLED) {
-      console.warn("[agent-runtime] experimental QDash write tools are enabled");
+    if (EXEC_CONFIG) {
+      console.log(`[agent-runtime] workspace tools: agent-exec at ${EXEC_CONFIG.socketPath}`);
+    } else {
+      console.warn("[agent-runtime] workspace tools disabled: AGENT_EXEC_SOCKET is not set");
     }
 
     const { responseLanguage, thinkingLanguage } = loadLanguageConfig(COPILOT_CONFIG_PATH);
@@ -240,11 +266,8 @@ export class SharedRuntime {
 
     const extensions = withoutReplacedInstalls(loader.getExtensions().extensions, CHECKOUTS);
     // Local checkouts and trusted installed packages are trusted as a whole
-    // (see buildQDashExtension); the experimental write opt-in still applies
-    // to their tool names.
-    const localTools = localToolNames(extensions, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES).filter(
-      (name) => EXPERIMENTAL_WRITE_TOOLS_ENABLED || !isExperimentalWriteTool(name),
-    );
+    // (see buildQDashExtension); reviewed write names still require approval.
+    const localTools = localToolNames(extensions, EXTENSION_PATHS, TRUSTED_EXTENSION_PACKAGES);
     if (CHECKOUT_PATHS.length || localTools.length) {
       console.log(
         `[agent-runtime] trusted extensions: packages=${TRUSTED_EXTENSION_PACKAGES.join(", ") || "none"}; local=${EXTENSION_PATHS.join(", ") || "none"} (tools: ${localTools.join(", ") || "none"}); allowlisted checkouts=${CHECKOUT_PATHS.filter((path) => !EXTENSION_PATHS.includes(path)).join(", ") || "none"}`,
@@ -252,7 +275,7 @@ export class SharedRuntime {
     }
     const allowed = new Set<string>([
       ...ALLOWED_TOOL_NAMES,
-      ...(EXPERIMENTAL_WRITE_TOOLS_ENABLED ? EXPERIMENTAL_WRITE_TOOL_NAMES : []),
+      ...REVIEWED_WRITE_TOOL_NAMES,
       ...localTools,
     ]);
     const qdashToolNames = [
@@ -278,24 +301,27 @@ export class SharedRuntime {
     const systemPrompt = buildSystemPrompt(
       responseLanguage,
       thinkingLanguage,
-      EXPERIMENTAL_WRITE_TOOLS_ENABLED,
       skills,
       toolGuide,
       localToolGuide,
+      EXEC_CONFIG !== undefined,
     );
     const copilotExtension = defineExtension({
       name: "qdash-copilot",
       sections: [section("qdash-copilot", () => systemPrompt, { tag: false })],
       tools: [chartTool, askUserTool, ...(skills.length ? [buildSkillTool(skills)] : [])],
     });
-    const buildChatRegistry = (connection: QDashConnection, userInstructions?: string) => {
+    const buildChatRegistry = (
+      connection: QDashConnection,
+      userInstructions?: string,
+      pageContext?: PageContext,
+    ) => {
       const registry = createRegistry();
       const qdash = buildQDashExtension(
         extensions,
         modelRuntime,
         WORK_DIR,
         connection,
-        EXPERIMENTAL_WRITE_TOOLS_ENABLED,
         EXTENSION_PATHS,
         TRUSTED_EXTENSION_PACKAGES,
       );
@@ -312,19 +338,28 @@ export class SharedRuntime {
           }),
         );
       }
-      registry.install(
-        defineExtension({
-          name: "qdash-python",
-          tools: [buildPythonTool(connection)],
-        }),
-      );
+      // The page the user has open, after their preferences; on the Workflow
+      // editor it brings the edit tool, which proposes and never saves.
+      const pageSection = buildPageContextSection(pageContext);
+      if (pageSection) {
+        registry.install(
+          defineExtension({
+            name: PAGE_SECTION,
+            sections: [section(PAGE_SECTION, () => pageSection)],
+            tools: pageContext?.flow ? [buildProposeCodeEditTool(pageContext.flow, pageContext.path)] : [],
+          }),
+        );
+      }
+      // The workspace's read/write/edit/bash, which run in the agent-exec
+      // container through the environment `openSession` gives the harness.
+      if (EXEC_CONFIG) registry.install(createCodingTools());
       return { registry, writeTools: qdash.writeTools };
     };
     const toolNames = [
       ...qdashToolNames,
       "render_chart",
-      "run_python",
       "ask_user",
+      ...(EXEC_CONFIG ? WORKSPACE_TOOL_NAMES : []),
       ...(skills.length ? ["read_skill"] : []),
     ];
     // Pinned definitions first so a trusted one replaces, as in buildQDashExtension.
@@ -337,7 +372,18 @@ export class SharedRuntime {
       }
     }
 
-    return new SharedRuntime(modelRuntime, buildChatRegistry, toolNames, enabledTools, systemPrompt);
+    const modelCompactionOverrides = chatCompactionOverrides(
+      readFileSync(CHAT_CONFIG_PATH, "utf8"),
+      (provider, modelId) => modelRuntime.getModel(provider, modelId),
+    );
+    return new SharedRuntime(
+      modelRuntime,
+      buildChatRegistry,
+      toolNames,
+      enabledTools,
+      systemPrompt,
+      modelCompactionOverrides,
+    );
   }
 
   /** A configured model named by the request, or none when the request names none. */
@@ -409,7 +455,7 @@ export class SharedRuntime {
           )) as ToolRun;
         },
         ...knowledgeSource(connection, request.knowledgeDraftId, signal),
-        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS, BUNDLED_PATHS) : undefined,
       });
     } finally {
       await connection.close();
@@ -556,7 +602,7 @@ export class SharedRuntime {
       return recordFromDetails(request.taskId, outcome.details, {
         mode: "planner",
         usage: outcome.usage,
-        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS) : undefined,
+        evaluator: evaluation.path ? extensionPackage(evaluation.path, CHECKOUT_PATHS, BUNDLED_PATHS) : undefined,
         planner: {
           model: `${providerId}/${request.modelName}`,
           answer,
@@ -568,7 +614,7 @@ export class SharedRuntime {
       try {
         await opened.close();
       } finally {
-        this.deleteSessionState(ownerId, sessionId);
+        await this.deleteSessionState(ownerId, sessionId);
       }
     }
   }
@@ -598,10 +644,22 @@ export class SharedRuntime {
     return [...new Set(this.toolNames)].sort();
   }
 
-  /** Delete the closed durable store for one deleted QDash session. */
-  deleteSessionState(ownerId: string, sessionId: string): void {
+  /** Delete the closed durable store and the workspace of one deleted QDash session. */
+  async deleteSessionState(ownerId: string, sessionId: string): Promise<void> {
     const path = join(STATE_DIR, sessionStorageName(ownerId, sessionId));
+    // Only a session that used its workspace has a directory to remove; for the
+    // others (most evaluations, chats that never ran code) no daemon is started.
+    const marker = workspaceMarker(path);
+    const hadWorkspace = existsSync(marker);
     for (const suffix of ["", "-wal", "-shm"]) rmSync(`${path}${suffix}`, { force: true });
+    rmSync(marker, { force: true });
+    if (!EXEC_CONFIG || !hadWorkspace) return;
+    try {
+      await removeWorkspace(EXEC_CONFIG, ownerId, sessionId);
+    } catch (error) {
+      // The store is gone either way; a workspace left behind is only disk.
+      console.warn(`[agent-runtime] could not remove the workspace of ${sessionId}:`, error);
+    }
   }
 
   /** Open or recover the SQLite-backed root conversation for one user/session. */
@@ -611,28 +669,56 @@ export class SharedRuntime {
       contextWindow,
       maxTokens,
     } = this.resolveModelWithLimits(request.provider, request.modelName);
-    const path = join(STATE_DIR, sessionStorageName(request.ownerId, request.sessionId));
+    const storageName = sessionStorageName(request.ownerId, request.sessionId);
+    const path = join(STATE_DIR, storageName);
     const connection = await createQDashConnection(auth);
+    const workspace = EXEC_CONFIG
+      ? new ExecWorkspace(EXEC_CONFIG, request.ownerId, request.sessionId)
+      : undefined;
+    // Remembered next to the store once the directory exists, so deleting the
+    // session later knows whether there is a workspace to remove.
+    const marker = workspaceMarker(path);
+    let marked = existsSync(marker);
+    const workspaceEnv = async (target: { cwd?: string }) => {
+      const env = await workspace!.env(target.cwd);
+      if (!marked) {
+        writeFileSync(marker, "");
+        marked = true;
+      }
+      return env;
+    };
     let harness: DurableHarness | undefined;
     const close = async () => {
       try {
         await harness?.close(BACKGROUND_CONTEXT);
       } finally {
+        workspace?.close();
         await connection.close();
       }
     };
     try {
-      const { registry, writeTools } = this.buildChatRegistry(connection, request.userInstructions);
+      const { registry, writeTools } = this.buildChatRegistry(
+        connection,
+        request.userInstructions,
+        request.pageContext,
+      );
+      const selectedBudget = compactionBudget(contextWindow, maxTokens);
       harness = await Harness.open(
         await openNodeSqliteStorage(path),
         {
           models: this.modelRuntime,
           registry,
+          ...(workspace ? { env: workspaceEnv } : {}),
+          onReport: (error, info) => logDurableReport(storageName, error, info),
           settings: {
             stream: { timeoutMs: MODEL_STREAM_TIMEOUT_MS },
             compaction: {
               enabled: true,
-              ...compactionBudget(contextWindow, maxTokens),
+              ...selectedBudget,
+              modelOverrides: {
+                ...this.modelCompactionOverrides,
+                [`${model.provider}/${model.modelId}`]: selectedBudget,
+              },
             },
           },
         },
@@ -641,7 +727,9 @@ export class SharedRuntime {
       const agent = {
         model,
         ...(request.thinkingLevel ? { thinkingLevel: request.thinkingLevel } : {}),
-        cwd: WORK_DIR,
+        // Where the harness builds the workspace environment: a directory of
+        // the agent-exec container, not of this one.
+        cwd: workspace?.cwd ?? WORK_DIR,
       };
       const conversation = await harness.root(BACKGROUND_CONTEXT, { agent });
       await conversation.configure(agent, BACKGROUND_CONTEXT);

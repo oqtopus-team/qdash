@@ -19,6 +19,25 @@ layer described in [Workflow Services](./services.md).
 `CalibOrchestrator` is useful in engine tests and low-level integrations, but callers then own
 initialization and terminal handling themselves.
 
+## Execution Identity
+
+Execution IDs use a daily sequence shared by every chip and user in a project.
+For example, allocations for two chips can produce `20261027-000` and
+`20261027-001`. Different projects and dates have independent sequences. This matches
+the `(project_id, execution_id)` identity used by execution history and task queries.
+
+`ProjectExecutionCounterDocument` in `src/qdash/dbmodel/project_execution_counter.py`
+allocates numbers atomically in `project_execution_counter`. On the first allocation
+for a project and date, it starts above the largest retained legacy counter or numeric
+execution ID in execution and task history. The legacy `execution_counter` collection
+remains available for chip date lookups; new counters track participating chips.
+
+Deploy all API services and workflow workers that allocate IDs together, with ID
+creation paused during the switch. Older processes still allocate chip-local IDs and
+cannot safely run alongside the shared allocator. The switch preserves existing
+records; it does not repair IDs that previously collided or reconstruct overwritten
+execution history.
+
 ## Execution Path
 
 ```mermaid
@@ -53,7 +72,9 @@ QDash keeps execution state and task state separate.
   data. `ExecutionService` persists state changes through `ExecutionRepository` and uses
   optimistic locking for concurrent note updates.
 - `TaskStateManager` is the source of truth for per-target task status, parameters, messages,
-  figures, and raw-data paths.
+  figures, and raw-data paths. Task results keep the raw output names; its in-memory `calib_data`
+  is keyed by the published parameter names declared through `publish_targets`, so it mirrors the
+  calibration database and the finish-time params YAML selection sees the same names.
 - `TaskHistoryRecorder` writes task-result history and optional provenance records.
 - `BackendSaver` decides which validated outputs update the backend and accepted calibration
   state. `persist_output_parameters=False` records the task without promoting its outputs.
@@ -108,8 +129,11 @@ exception or a process termination signal.
   `on_flow_cancellation` or `on_flow_crashed` hook finds executions by `flow_run_id`, assigns the
   correct terminal status, finalizes unfinished tasks, and releases the reservation.
 
-Top-level flows that own a reservation use the ordinary terminal hooks. Nested single-task flows
-use the `*_keep_lock` variants so they cannot release a reservation owned by the parent pipeline.
+Top-level flows that own a reservation, including `single-task-executor`, use the ordinary terminal
+hooks. The `*_keep_lock` variants are for nested flows configured with `use_lock=False` that borrow
+the parent pipeline's reservation. If `project_id` was resolved inside `CalibService`, terminal hooks
+recover it from the execution history recorded for the same `flow_run_id`. Initialization also
+releases its reservation on signals or cancellation before the caller receives the session.
 The shared flow helpers in `service/calib_service.py` implement the exception classification and
 terminal behavior; flow templates should not reproduce that policy independently.
 
@@ -129,6 +153,28 @@ engine.
 Implement `BaseBackend`, add construction logic to `engine/backend/factory.py`, and provide tests
 for connection lifecycle and the task operations it supports. Avoid branching on backend names in
 the orchestrator or executor.
+
+### Keep the fake backend in step with qubex
+
+The fake backend runs the qubex task classes against `FakeExperiment`
+(`engine/backend/fake_qubex/simulation.py`), a QUBEX-compatible simulator. Its task set is the
+`fake` section of `config/app/backend.yaml`: `calibtasks/fake/__init__.py` routes every listed
+name that the fake package does not implement to the qubex class of the same name, and
+`scripts/generate_task_catalog.py` publishes the qubex declarations under the fake backend. The
+only fake-only task is `FakeBringUp`, which seeds a fresh project with the simulator's device
+parameters in place of the hardware bring-up tasks. `BackendSaver` persists fake outputs through
+the same path as qubex outputs, so a routed task finds what the task before it published.
+
+To add a qubex task to the fake backend, list it in `backend.yaml` and run the fake template; a
+gap in the simulator shows up as an `AttributeError` on `FakeExperiment`, which is fixed in
+`simulation.py`, never by a fake copy of the task. Keep the fix at the measurement level: the
+simulator answers `sweep_parameter`, `repeat_sequence` and the coherence experiments with
+physically shaped IQ data, and qubex's own analysis and figures (for example the chevron matched
+transform in `qubex.contrib`) run on top of it unchanged. An emulator-side re-implementation of a
+qubex analysis is drift waiting to happen and is removed when found. `tests/qdash/workflow/calibtasks/
+test_fake_backend_sync.py` fails when the list names a task qubex no longer has, when a fake
+class shadows a qubex task, or when the template's default chain can no longer resolve a
+required input from the tasks before it.
 
 ### Add persistence behavior
 

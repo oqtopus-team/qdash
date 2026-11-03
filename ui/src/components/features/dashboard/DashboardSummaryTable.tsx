@@ -82,7 +82,7 @@ export function DashboardSummaryTable({ rows }: DashboardSummaryTableProps) {
           Metric coverage and distribution statistics for the selected data scope
         </caption>
         <thead>
-          <tr className="bg-base-200/70 text-xs uppercase tracking-wide text-base-content/60">
+          <tr className="bg-base-200/70 text-xs text-base-content/60">
             <th>Metric</th>
             <th>Type</th>
             <th>Unit</th>

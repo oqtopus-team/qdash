@@ -12,6 +12,7 @@ import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { DARK_THEMES } from "@/constants/themes";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { navigateTo } from "@/lib/navigation";
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, "User ID is required"),
@@ -54,11 +55,9 @@ export function LoginPageContent() {
 
   /** Logs in with the validated values and redirects, or records a submission error. */
   const submit = async (values: LoginFormData) => {
-    setError("");
-
     try {
       await authLogin(values.username, values.password);
-      window.location.href = "/execution";
+      navigateTo("/execution");
     } catch {
       setError("Login failed. Please check your user ID and password.");
     }
@@ -90,8 +89,9 @@ export function LoginPageContent() {
             <EnvironmentBadge className="badge-lg" />
           </div>
 
-          <p className="mx-auto mt-5 max-w-lg text-lg leading-relaxed text-base-content/70 sm:text-xl lg:mx-0">
-            Manage and monitor qubit calibration workflows from one focused dashboard.
+          <p className="mx-auto mt-5 max-w-lg text-sm leading-relaxed text-base-content/70 lg:mx-0">
+            Run calibration tasks, watch executions and read chip metrics for your superconducting
+            qubit chips
           </p>
 
           <nav
@@ -134,13 +134,12 @@ export function LoginPageContent() {
 
         <section
           aria-labelledby="sign-in-heading"
-          className="card mx-auto w-full max-w-sm border border-base-300 bg-base-100/95 shadow-2xl backdrop-blur-sm"
+          className="card mx-auto w-full max-w-sm border border-base-300 bg-base-100 shadow-sm"
         >
           <div className="card-body gap-0 p-6 sm:p-8">
-            <h2 id="sign-in-heading" className="text-2xl font-semibold tracking-tight">
-              Welcome back
+            <h2 id="sign-in-heading" className="text-xl font-medium tracking-tight">
+              Sign in
             </h2>
-            <p className="mt-1 text-sm text-base-content/60">Sign in to continue to QDash.</p>
 
             <form onSubmit={onSubmit} className="mt-6" aria-busy={loading} noValidate>
               <fieldset disabled={loading} className="contents">
@@ -156,7 +155,6 @@ export function LoginPageContent() {
                     spellCheck="false"
                     autoFocus
                     className={`input input-bordered w-full focus:input-primary ${errors.username ? "input-error" : ""}`}
-                    placeholder="Enter your user ID"
                     aria-invalid={Boolean(errors.username)}
                     aria-describedby={describedBy(errors.username?.message && "userName-error")}
                     {...register("username")}
@@ -178,7 +176,6 @@ export function LoginPageContent() {
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       className={`input input-bordered w-full pr-12 focus:input-primary ${errors.password ? "input-error" : ""}`}
-                      placeholder="Enter your password"
                       aria-invalid={Boolean(errors.password)}
                       aria-describedby={describedBy(
                         errors.password?.message && "password-error",
@@ -219,7 +216,7 @@ export function LoginPageContent() {
               <button
                 type="submit"
                 disabled={loading || isSubmitting}
-                className="btn btn-primary btn-glow mt-6 w-full"
+                className="btn btn-primary mt-6 w-full"
               >
                 {loading && <Loader2 size={18} className="animate-spin" aria-hidden="true" />}
                 {loading ? "Signing in…" : "Sign in"}
@@ -227,7 +224,7 @@ export function LoginPageContent() {
             </form>
 
             <p className="mt-5 text-center text-xs text-base-content/50">
-              Need access? Contact your QDash administrator.
+              Accounts are created by a QDash administrator
             </p>
           </div>
         </section>

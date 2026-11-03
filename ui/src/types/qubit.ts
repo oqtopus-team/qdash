@@ -5,7 +5,7 @@ export type ParameterKey =
   | "t2_echo"
   | "t2_star"
   | "frequency"
-  | "anharmonicity"
+  | "qubit_anharmonicity"
   | "fidelity"
   | "readout_fidelity"
   | "gate_fidelity"

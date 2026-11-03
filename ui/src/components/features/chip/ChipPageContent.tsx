@@ -447,8 +447,8 @@ export function ChipPageContent() {
         {/* Header Section */}
         <div className="flex flex-col gap-3 md:gap-4">
           <PageHeader
-            title="Chip Experiments"
-            description="View calibration tasks and qubit results"
+            title="Chip"
+            description="Calibration results per qubit and coupling"
             actions={
               canEdit && (
                 <div className="flex items-center gap-2 w-fit">
@@ -635,7 +635,7 @@ export function ChipPageContent() {
                 return (
                   <div
                     key={muxId}
-                    className={`bg-base-100 shadow-lg rounded-xl overflow-hidden transition-all duration-200 ${
+                    className={`bg-base-100 shadow-lg rounded-xl overflow-hidden transition-colors duration-200 ${
                       updateInfo.isRecent
                         ? "border-2 border-primary animate-pulse-light"
                         : "bg-base-200"
@@ -645,13 +645,10 @@ export function ChipPageContent() {
                       className="p-4 cursor-pointer flex flex-wrap justify-between gap-2 items-center hover:bg-base-200/50 transition-colors"
                       onClick={() => toggleMuxExpansion(muxId)}
                     >
-                      <div className="text-xl font-medium flex items-center gap-2">
+                      <div className="text-sm font-medium flex items-center gap-2">
                         <span className="whitespace-nowrap">MUX {muxDetail.mux_id}</span>
                         {updateInfo.isRecent && (
-                          <div className="badge badge-primary gap-2 rounded-lg">
-                            <div className="w-2 h-2 bg-primary-content rounded-full animate-ping" />
-                            New
-                          </div>
+                          <div className="badge badge-primary gap-2 rounded-lg">New</div>
                         )}
                         <div className="badge badge-ghost gap-2 rounded-lg whitespace-nowrap">
                           {Object.keys(taskGroups).length} Tasks
@@ -674,7 +671,7 @@ export function ChipPageContent() {
                               key={taskName}
                               className="border-t pt-4 first:border-t-0 first:pt-0"
                             >
-                              <h3 className="text-lg font-medium mb-3">{taskName}</h3>
+                              <h3 className="text-sm font-medium mb-3">{taskName}</h3>
                               <div className="grid grid-cols-1 min-[400px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                                 {qids.map((qid) => {
                                   const task = qidResults[qid];
@@ -715,7 +712,7 @@ export function ChipPageContent() {
                                             });
                                           }
                                         }}
-                                        className="card bg-base-100 shadow-sm rounded-xl overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full"
+                                        className="card bg-base-100 shadow-sm rounded-xl overflow-hidden transition-all duration-200 hover:shadow-sm relative w-full"
                                       >
                                         <div className="card-body p-2">
                                           <div className="text-sm font-medium mb-2">

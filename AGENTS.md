@@ -14,6 +14,7 @@ QDash is a web platform for managing and monitoring qubit calibration workflows.
 
 - Frontend: `ui/` uses Next.js, React, TypeScript, DaisyUI, TanStack Query, and Bun.
 - Backend API: `src/qdash/api/` uses FastAPI with MongoDB/PostgreSQL-related services.
+- Pi extensions: `packages/pi-qdash/` and `packages/pi-qcaleval/` share a root Bun workspace with `agent-runtime/` and `clients/typescript/`; install dependencies from the repository root. They remain independently published npm packages.
 - Workflow engine: `src/qdash/workflow/` uses Prefect 3 and qubex.
 - Shared data/model code lives under `src/qdash/common`, `src/qdash/datamodel`, `src/qdash/dbmodel`, and repository/service modules.
 
@@ -62,21 +63,24 @@ Run commands from the repository root unless a directory is specified.
 - API tests: `task test-api`
 - Workflow tests: `task test-workflow`
 - UI tests: `task test-ui`
+- Build the local TypeScript client: `task build-client-ts` (also runs before pi/runtime checks)
 - TypeScript client checks: `task test-client-ts`
+- Pi package tests and typecheck: `task ci-pi-packages`
 - Agent runtime tests and typecheck: `task ci-agent-runtime`
 - Python CI checks: `task ci`
-- Full local checks including UI: `task check-all`
+- Required before every push: `task check` (`task check-all` is an alias)
 - Python lint/format with fixes: `task lint-python`
 - UI lint/format with fixes: `task lint-ui`
 - UI production build: `task build` or `task ci-ui-build`
 - Docs dev server: `task docs`
 - Docs build: `task build-docs`
 
-Prefer focused tests for narrow changes, then broader checks when touching shared behavior, API contracts, generated clients, or UI routing.
+Use focused tests during development. Before every push, run the full `task check`
+regardless of change size, including documentation-only changes.
 
 ## Python Conventions
 
-- Python supports `>=3.10,<3.13`.
+- Python supports `>=3.11,<3.13`.
 - Use `uv run ...` for Python tooling when invoking commands directly.
 - Ruff line length is 100. The project uses Ruff for linting and formatting.
 - Mypy is strict for application code. Keep types explicit when adding public helpers or cross-module interfaces.
@@ -113,6 +117,16 @@ Prefer focused tests for narrow changes, then broader checks when touching share
 - Keep commit titles short, specific, English, no emoji, and no trailing period.
 - For PR text, follow `.github/pull_request_template.md` and `.github/instructions/pull-request-description-instructions.md`.
 - Branches usually start from `develop`; common prefixes are `feature/`, `bugfix/`, and `hotfix/`.
+- Before every push, including updates to an existing PR, run `task check` from the
+  repository root and require exit status 0. Focused tests, pre-commit hooks, and CI
+  do not replace this gate. Follow the [pre-push procedure](docs/developer-guide/development-flow.md#before-pushing).
+- Stage intended new files before checking so the leak scan includes them. Fetch the
+  PR target and use `LEAKS_BASE=origin/<target>` when it is not `develop`.
+- Review any auto-fix changes from `task check` and include intended fixes in the
+  commit. If you edit files afterward, rerun `task check` before pushing.
+- If the check fails or cannot run, resolve the failure before pushing. If blocked,
+  report the failed command and reason; do not push or claim validation succeeded.
+- Record the command and result in the PR description and final handoff.
 
 ## Agent Working Rules
 

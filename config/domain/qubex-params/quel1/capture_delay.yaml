@@ -1,0 +1,6 @@
+meta:
+  description: Capture Delay
+  unit: ndelay
+  default: 8
+  scope: mux
+data: {}

@@ -385,14 +385,26 @@ class QubexTask(BaseTask):
                 )
 
             for pulse_type in ("drag_hpi", "drag_pi"):
-                drag = self._resolved_input_values(
-                    (
-                        f"{prefix}{pulse_type}_amplitude",
-                        f"{prefix}{pulse_type}_duration",
-                        f"{prefix}{pulse_type}_beta",
-                    )
+                drag_names = (
+                    f"{prefix}{pulse_type}_amplitude",
+                    f"{prefix}{pulse_type}_duration",
+                    f"{prefix}{pulse_type}_beta",
                 )
+                drag = self._resolved_input_values(drag_names)
                 if drag is None:
+                    continue
+                drag_declarations = [self.__class__.input_spec.get(name) for name in drag_names]
+                optional_group = all(
+                    declaration is not None and declaration.resolution == "database_or_default"
+                    for declaration in drag_declarations
+                )
+                # Optional pulse groups use zero-valued fallbacks when no complete
+                # calibration exists. Leave the Qubex session untouched in that case.
+                if optional_group and (
+                    not all(math.isfinite(value) for value in drag.values())
+                    or drag[f"{prefix}{pulse_type}_amplitude"] <= 0
+                    or drag[f"{prefix}{pulse_type}_duration"] <= 0
+                ):
                     continue
                 getattr(exp.calib_note, f"update_{pulse_type}_param")(
                     label,
@@ -525,6 +537,7 @@ class QubexTask(BaseTask):
 
         Behavior for each parameter:
         - If resolution="database_required": Load from DB or raise an error
+        - If resolution="database_optional": Load from DB or leave the value as None
         - If resolution="database_or_default": Prefer DB, otherwise use default
         - If resolution="default_only": Do not use a DB value
         - If value is None: Deprecated compatibility behavior; create from DB data
@@ -970,24 +983,20 @@ class QubexTask(BaseTask):
         Example:
         -------
             ```python
-            # Single parameter override
-            task_details = {
-                "CheckFineChevron": {
-                    "input_parameters": {
-                        "readout_amplitude": {"value": 0.15}
+            # Overrides are declared per task in the workflow and applied to
+            # input_parameters by TaskExecutor after preprocess.
+            cal = CalibService(
+                username,
+                chip_id,
+                task_parameters={
+                    "CheckFineChevron": {
+                        "input": {
+                            "control_frequency": 5.2,
+                            "readout_amplitude": 0.15,
+                        }
                     }
-                }
-            }
-
-            # Multiple parameter overrides
-            task_details = {
-                "CheckFineChevron": {
-                    "input_parameters": {
-                        "control_frequency": {"value": 5.2},
-                        "readout_amplitude": {"value": 0.15}
-                    }
-                }
-            }
+                },
+            )
 
             # Usage in task run method:
             with self._apply_parameter_overrides(session, qid):
@@ -1053,7 +1062,7 @@ class QubexTask(BaseTask):
         DEPRECATED: Use _apply_parameter_overrides() instead for better flexibility.
 
         This method checks if the control_frequency was explicitly overridden
-        via task_details. If so, it uses exp.modified_frequencies() to
+        through a calibration input override. If so, it uses exp.modified_frequencies() to
         temporarily modify the qubit frequency during task execution.
 
         Args:

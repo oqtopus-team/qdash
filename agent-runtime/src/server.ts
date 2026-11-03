@@ -8,9 +8,10 @@ import {
 } from "@earendil-works/pi-durable";
 
 import { requestQDashAuth } from "./auth.ts";
+import { parsePageContext } from "./page-context.ts";
 import { WRAP_UP_MESSAGE } from "./budget.ts";
 import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
-import { hasBearerToken, readJsonBody, RequestError } from "./http.ts";
+import { hasBearerToken, readJsonBody, RequestError, runtimeToken } from "./http.ts";
 import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
 import { EvaluationError } from "./evaluate.ts";
 import {
@@ -33,7 +34,7 @@ const CHAT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 0);
 // proxies between here and the browser do not take silence for a dead stream.
 const CHAT_PING_MS = Number(process.env.CHAT_PING_MS ?? 15_000);
 const MAX_BODY_BYTES = Number(process.env.MAX_REQUEST_BODY_BYTES ?? 20 * 1024 * 1024);
-const RUNTIME_TOKEN = process.env.AGENT_RUNTIME_TOKEN;
+const RUNTIME_TOKEN = runtimeToken();
 
 interface ImageBody {
   data: string;
@@ -56,6 +57,8 @@ interface ChatBody {
   approval?: { id?: string; approve?: boolean };
   /** The user's own chat instructions, set in QDash's Settings. */
   user_instructions?: string;
+  /** What the user has open in QDash: the page, and on the Workflow editor the flow's current code. */
+  page_context?: unknown;
 }
 
 interface DeleteSessionBody {
@@ -195,6 +198,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     return;
   }
   running.set(runKey, null);
+  const pageContext = parsePageContext(body.page_context);
 
   let opened;
   try {
@@ -209,6 +213,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
         thinkingLevel: body.thinking_level,
         images: toImageContent(body.images),
         ...(typeof body.user_instructions === "string" ? { userInstructions: body.user_instructions } : {}),
+        ...(pageContext ? { pageContext } : {}),
       },
       auth,
     );
@@ -470,7 +475,7 @@ async function handleDeleteSession(req: IncomingMessage, res: ServerResponse): P
     sendJson(res, 409, { error: "conversation is still running" });
     return;
   }
-  runtime.deleteSessionState(body.owner_id, body.conversation_id);
+  await runtime.deleteSessionState(body.owner_id, body.conversation_id);
   sendJson(res, 200, { deleted: true });
 }
 

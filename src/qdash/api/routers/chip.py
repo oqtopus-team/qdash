@@ -13,6 +13,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from qdash.api.dependencies import (
+    get_chip_config_scaffolder,
     get_chip_service,
     get_reanalysis_service,
 )
@@ -22,12 +23,16 @@ from qdash.api.lib.project import (
     get_project_context_editor,
 )
 from qdash.api.schemas.chip import (
+    ChipConfigResult,
     ChipDatesResponse,
     ChipDeletionImpactResponse,
     ChipResponse,
+    ConfigSourceResponse,
     CouplingResponse,
     CreateChipRequest,
+    CreateChipResponse,
     ListChipsResponse,
+    ListConfigSourcesResponse,
     ListCouplingsResponse,
     ListMuxResponse,
     ListQubitsResponse,
@@ -44,7 +49,13 @@ from qdash.api.schemas.reanalysis import (
     ReanalyzeResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.api.services.chip import ChipInitializer, ChipService
+from qdash.api.services.chip import (
+    ChipConfigError,
+    ChipConfigScaffolder,
+    ChipInitializer,
+    ChipService,
+)
+from qdash.api.services.chip.initializer import ChipAlreadyExistsError
 from qdash.api.services.reanalysis_service import ReanalysisService
 from qdash.datamodel.note import NoteModel
 
@@ -78,48 +89,118 @@ def list_chips(
     return ListChipsResponse(chips=chips, total=len(chips))
 
 
+@router.get(
+    "/chips/config-sources",
+    response_model=ListConfigSourcesResponse,
+    summary="List systems a new chip can copy wiring from",
+    operation_id="listChipConfigSources",
+)
+def list_chip_config_sources(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    scaffolder: Annotated[ChipConfigScaffolder, Depends(get_chip_config_scaffolder)],
+) -> ListConfigSourcesResponse:
+    """List the systems in the Qubex configuration tree that have a wiring file.
+
+    QDash runs every chip with ``system_id == chip_id``, so each entry is also a
+    chip directory of the tree.
+    """
+    return ListConfigSourcesResponse(
+        available=scaffolder.available,
+        sources=[
+            ConfigSourceResponse(
+                system_id=source.system_id,
+                backend=source.backend,
+                mux_count=source.mux_count,
+                files=source.files,
+            )
+            for source in scaffolder.list_sources()
+        ],
+    )
+
+
 @router.post(
-    "/chips", response_model=ChipResponse, summary="Create a new chip", operation_id="createChip"
+    "/chips",
+    response_model=CreateChipResponse,
+    summary="Create a new chip",
+    operation_id="createChip",
 )
 def create_chip(
     request: CreateChipRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
-) -> ChipResponse:
+    scaffolder: Annotated[ChipConfigScaffolder, Depends(get_chip_config_scaffolder)],
+) -> CreateChipResponse:
     """Create a new chip in the current project.
+
+    Besides the database records, this creates ``<chip_id>/`` in the Qubex
+    configuration tree (``system_id == chip_id``) unless ``config.create`` is
+    false or the directory already exists. Wiring and hardware files are copied
+    from ``config.source_system_id`` when given; parameter files always start
+    from QDash's templates.
 
     Parameters
     ----------
     request : CreateChipRequest
-        Chip creation request containing chip_id and size
+        Chip creation request containing chip_id, size and configuration options
     ctx : ProjectContext
         Project context with editor permission
+    scaffolder : ChipConfigScaffolder
+        Writer of the chip's configuration directory
 
     Returns
     -------
-    ChipResponse
-        Created chip information
+    CreateChipResponse
+        Created chip information and the configuration outcome
 
     Raises
     ------
     HTTPException
-        If chip_id already exists or size is invalid
+        If chip_id already exists, size is invalid, or the configuration
+        source cannot be used
 
     """
     logger.debug(f"Creating chip {request.chip_id} for project: {ctx.project_id}")
+    options = request.config
+    create_config = options is None or options.create
 
     try:
-        # Use ChipInitializer service to create chip with full initialization
-        chip = ChipInitializer.create_chip(
-            username=ctx.user.username,
-            chip_id=request.chip_id,
-            size=request.size,
-            project_id=ctx.project_id,
-            topology_id=request.topology_id,
-        )
+        ChipInitializer.check_chip_available(request.chip_id, ctx.project_id)
+        _, topology = ChipInitializer._load_topology(request.topology_id, request.size)
+        config_result = None
+        if create_config:
+            outcome = scaffolder.scaffold(
+                chip_id=request.chip_id,
+                n_qubits=topology.num_qubits,
+                source_system_id=options.source_system_id if options else None,
+                backend=options.backend if options else None,
+            )
+            config_result = ChipConfigResult(
+                status=outcome.status,
+                path=outcome.path,
+                source_system_id=outcome.source_system_id,
+                backend=outcome.backend,
+                files=outcome.files,
+                message=outcome.message,
+            )
+
+        try:
+            chip = ChipInitializer.create_chip(
+                username=ctx.user.username,
+                chip_id=request.chip_id,
+                size=request.size,
+                project_id=ctx.project_id,
+                topology_id=request.topology_id,
+            )
+        except ChipAlreadyExistsError:
+            # A concurrent creator may already be using this configuration tree.
+            raise
+        except Exception:
+            if config_result is not None and config_result.status == "created":
+                scaffolder.remove(request.chip_id)
+            raise
 
         # qubit_count and coupling_count are derived from topology
         # For a new chip, this equals the topology's defined qubits/couplings
-        return ChipResponse(
+        return CreateChipResponse(
             chip_id=chip.chip_id,
             size=chip.size,
             topology_id=chip.topology_id,
@@ -127,9 +208,10 @@ def create_chip(
             coupling_count=0,  # Will be populated by ChipInitializer
             installed_at=chip.installed_at,
             activity_status=chip.activity_status,
+            config=config_result,
         )
-    except ValueError as e:
-        # Handle validation errors (duplicate chip, invalid size, etc.)
+    except (ValueError, ChipConfigError) as e:
+        # Handle validation errors (duplicate chip, invalid size, bad config source, etc.)
         logger.warning(f"Validation error creating chip {request.chip_id}: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
@@ -564,7 +646,7 @@ def reanalyze_qubit_spectroscopy(
     """Re-run the qubit-spectroscopy analysis on a previously stored figure.
 
     Returns the marked figure and the re-estimated `qubit_frequency`,
-    `f01_repr_db`, `f01_quality_level`, and `anharmonicity` for the requested
+    `f01_repr_db`, `f01_quality_level`, and `qubit_anharmonicity` for the requested
     qubit. The DB is **not** mutated; this is a preview only.
     """
     return reanalysis_service.reanalyze_qubit_spectroscopy(
@@ -718,9 +800,12 @@ def get_chip_metric_heatmap(
     Much more efficient than fetching full chip data (~300KB+).
 
     Supported metrics:
-    - Qubit: t1, t2_echo, t2_star, qubit_frequency, anharmonicity,
+    - Qubit: t1, t2_echo, t2_star, qubit_frequency, qubit_anharmonicity,
              average_readout_fidelity, x90_gate_fidelity, x180_gate_fidelity
-    - Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction
+    - Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction,
+                qubit_qubit_coupling_strength
+
+    Coupling strength is stored, returned, and displayed in MHz.
 
     Parameters
     ----------

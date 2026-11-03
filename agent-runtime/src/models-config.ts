@@ -2,6 +2,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { parse } from "yaml";
 
+import { compactionBudget, type CompactionBudget } from "./budget.ts";
+
 /**
  * Build pi's models.json from QDash's chat.yaml and evaluation.yaml.
  *
@@ -57,6 +59,7 @@ interface ProviderEntry {
   baseUrl?: string;
   api?: string;
   apiKey?: string;
+  headers?: Record<string, string>;
   compat?: Record<string, unknown>;
   models?: ModelEntry[];
   modelOverrides?: Record<string, ModelOverride>;
@@ -72,6 +75,31 @@ function readModels(yaml: string | undefined, key: string): ChatModel[] {
   const raw = parse(yaml) as Record<string, unknown> | null;
   const list = raw?.[key];
   return Array.isArray(list) ? (list as ChatModel[]) : [];
+}
+
+/** Give each configured chat model its own Pi durable compaction thresholds. */
+export function chatCompactionOverrides(
+  chatYaml: string,
+  resolveModel: (
+    provider: string,
+    modelId: string,
+  ) => { contextWindow: number; maxTokens: number } | undefined,
+): Record<string, CompactionBudget> {
+  const overrides: Record<string, CompactionBudget> = {};
+  for (const model of readModels(chatYaml, "chat_models")) {
+    const name = asString(model.name);
+    const provider = asString(model.provider);
+    if (!name || !provider) continue;
+    const providerId = PROVIDER_ALIASES[provider] ?? provider;
+    const resolved = resolveModel(providerId, name);
+    if (resolved) {
+      overrides[`${providerId}/${name}`] = compactionBudget(
+        resolved.contextWindow,
+        resolved.maxTokens,
+      );
+    }
+  }
+  return overrides;
 }
 
 /**
@@ -130,12 +158,17 @@ export function buildModelsConfig(
       continue;
     }
 
+    const headers = cloudflareAccessHeaders(baseUrlSetting, env);
+    const apiKeyEnv = asString(model.api_key_env);
     const entry = (providers[providerId] ??= {
       baseUrl,
       api: apiFromStyle(asString(model.api_style)),
       // Pi hides models whose provider has no credential, even when the server
       // ignores it, so keyless local endpoints still need a placeholder.
-      ...(asString(model.api_key_env) ? { apiKey: `$${asString(model.api_key_env)}` } : {}),
+      ...(headers && (!apiKeyEnv || !env[apiKeyEnv])
+        ? { apiKey: "openai-compatible" }
+        : apiKeyEnv ? { apiKey: `$${apiKeyEnv}` } : {}),
+      ...(headers ? { headers } : {}),
       // Local OpenAI-compatible servers generally implement neither.
       compat: {
         supportsDeveloperRole: false,
@@ -172,6 +205,24 @@ export function buildModelsConfig(
   }
 
   return { providers };
+}
+
+/** Share Access authentication across configured compatible endpoints without persisting secrets. */
+function cloudflareAccessHeaders(
+  baseUrlSetting: string,
+  env: NodeJS.ProcessEnv,
+): Record<string, string> | undefined {
+  if (!/^env:OPENAI_COMPATIBLE_BASE_URL_[A-Za-z0-9_]+$/.test(baseUrlSetting)) return undefined;
+  const clientId = "CF_ACCESS_CLIENT_ID";
+  const clientSecret = "CF_ACCESS_CLIENT_SECRET";
+  if (!env[clientId] && !env[clientSecret]) return undefined;
+  if (!env[clientId]?.trim() || !env[clientSecret]?.trim()) {
+    throw new Error(`Cloudflare Access requires both ${clientId} and ${clientSecret}`);
+  }
+  return {
+    "CF-Access-Client-Id": `$${clientId}`,
+    "CF-Access-Client-Secret": `$${clientSecret}`,
+  };
 }
 
 /** A suffix gives each OpenAI-compatible endpoint its own provider namespace. */

@@ -108,6 +108,47 @@ class TestTranslate:
         assert "evaluation" not in ends[1]
 
     @pytest.mark.asyncio
+    async def test_tool_end_carries_a_workspace_tools_answer(self) -> None:
+        events = await _collect(
+            {"type": "tool_start", "name": "bash", "id": "c9"},
+            {
+                "type": "tool_end",
+                "name": "bash",
+                "id": "c9",
+                "isError": True,
+                "output": "ls: no such file",
+                "exitCode": 2,
+            },
+            {"type": "tool_end", "name": "write", "isError": False, "output": ""},
+            {"type": "tool_end", "name": "read", "isError": False, "exitCode": True},
+            {"type": "done", "text": "ok"},
+        )
+        ends = [data for name, data in events if name == "tool_end"]
+        assert ends[0]["output"] == "ls: no such file"
+        assert ends[0]["exit_code"] == 2
+        assert "output" not in ends[1]
+        assert "exit_code" not in ends[2]
+
+    @pytest.mark.asyncio
+    async def test_a_tool_call_being_written_streams_as_draft_and_deltas(self) -> None:
+        events = await _collect(
+            {"type": "tool_draft", "name": "write", "index": 1, "id": "call_1"},
+            {"type": "tool_args_delta", "index": 1, "path": ["content"], "delta": "import numpy"},
+            {"type": "tool_start", "name": "write", "id": "call_1", "args": {"path": "fit.py"}},
+            {"type": "done", "text": "ok"},
+        )
+        named = [(name, data) for name, data in events if name.startswith("tool_")]
+        assert named[0] == (
+            "tool_draft",
+            {"index": 1, "id": "call_1", "tool": "write", "label": "Write"},
+        )
+        assert named[1] == (
+            "tool_args_delta",
+            {"index": 1, "path": ["content"], "delta": "import numpy"},
+        )
+        assert named[2][0] == "tool_start"
+
+    @pytest.mark.asyncio
     async def test_tool_events_become_status_updates(self) -> None:
         events = await _collect(
             {"type": "tool_start", "name": "qdash_get_timeseries"},
@@ -173,6 +214,22 @@ class TestTranslate:
         ]
 
     @pytest.mark.asyncio
+    async def test_a_proposed_edit_becomes_an_edit_block(self) -> None:
+        edit = {"summary": "Add T2", "code": "new code", "flowName": "t1"}
+        events = await _collect(
+            {"type": "edit", "edit": edit},
+            {"type": "tool_end", "name": "propose_code_edit", "isError": False},
+            {"type": "done", "text": "Here is the change."},
+        )
+        result = dict(events)["result"]
+        assert result["blocks"][-1] == {
+            "type": "edit",
+            "content": None,
+            "chart": None,
+            "edit": edit,
+        }
+
+    @pytest.mark.asyncio
     async def test_charts_precede_the_text_block_in_order(self) -> None:
         first = {"data": [{"y": [1]}], "layout": {}}
         second = {"data": [{"y": [2]}], "layout": {}}
@@ -235,11 +292,12 @@ class TestBuildBlocksResult:
         assert build_blocks_result("", []) == {"blocks": [], "assessment": None}
 
 
-def test_user_attachments_are_forwarded_as_turn_images() -> None:
+def test_user_attachments_are_forwarded_as_turn_images(monkeypatch: pytest.MonkeyPatch) -> None:
     from qdash.api.services import pi_chat_service
     from qdash.copilot.config import CopilotConfig, ModelConfig
     from qdash.copilot.contracts.models import ChatRequest
 
+    monkeypatch.setattr(pi_chat_service, "user_instructions", lambda _username: None)
     config = CopilotConfig(model=ModelConfig(provider="vllm", name="m"))
     request = ChatRequest.model_validate(
         {
@@ -516,7 +574,9 @@ class TestCompleteOnce:
             )
 
 
-def test_a_turns_thinking_level_overrides_the_models_configured_effort() -> None:
+def test_a_turns_thinking_level_overrides_the_models_configured_effort(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import pytest as _pytest
     from pydantic import ValidationError
 
@@ -524,6 +584,7 @@ def test_a_turns_thinking_level_overrides_the_models_configured_effort() -> None
     from qdash.copilot.config import CopilotConfig, ModelConfig
     from qdash.copilot.contracts.models import ChatRequest
 
+    monkeypatch.setattr(pi_chat_service, "user_instructions", lambda _username: None)
     config = CopilotConfig(model=ModelConfig(provider="vllm", name="m", reasoning_effort="high"))
     chosen = ChatRequest.model_validate(
         {"message": "hi", "session_id": "s1", "thinking_level": "off"}
@@ -535,3 +596,66 @@ def test_a_turns_thinking_level_overrides_the_models_configured_effort() -> None
     assert pi_chat_service._request_payload(auto, config, "alice")["thinking_level"] == "high"
     with _pytest.raises(ValidationError):
         ChatRequest.model_validate({"message": "hi", "session_id": "s1", "thinking_level": "max"})
+
+
+def test_the_open_page_travels_with_the_turn(monkeypatch: pytest.MonkeyPatch) -> None:
+    from qdash.api.services import pi_chat_service
+    from qdash.copilot.config import CopilotConfig, ModelConfig
+    from qdash.copilot.contracts.models import ChatRequest
+
+    # The user's stored preferences come from Mongo, which this test does not run.
+    monkeypatch.setattr(pi_chat_service, "user_instructions", lambda _username: None)
+    config = CopilotConfig(model=ModelConfig(provider="vllm", name="m"))
+    plain = ChatRequest.model_validate({"message": "hi", "session_id": "s1"})
+    assert "page_context" not in pi_chat_service._request_payload(plain, config, "alice")
+    on_editor = ChatRequest.model_validate(
+        {
+            "message": "add T2",
+            "session_id": "s1",
+            "page": {
+                "path": "/workflow/t1",
+                "title": "Workflow t1",
+                "flow": {"name": "t1", "chip_id": "64Qv3", "code": "x = 1\n", "dirty": True},
+            },
+        }
+    )
+    assert pi_chat_service._request_payload(on_editor, config, "alice")["page_context"] == {
+        "path": "/workflow/t1",
+        "title": "Workflow t1",
+        "flow": {"name": "t1", "chip_id": "64Qv3", "code": "x = 1\n", "dirty": True},
+    }
+
+
+@pytest.mark.parametrize("contents", ["runtime-secret\n", ""])
+def test_runtime_headers_from_file(monkeypatch, tmp_path, contents):
+    from qdash.api.services.pi_chat_service import _runtime_headers
+
+    token_file = tmp_path / "token"
+    token_file.write_text(contents)
+    monkeypatch.delenv("AGENT_RUNTIME_TOKEN", raising=False)
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN_FILE", str(token_file))
+    if contents:
+        assert _runtime_headers() == {"Authorization": "Bearer runtime-secret"}
+    else:
+        with pytest.raises(RuntimeError, match="credential is unavailable"):
+            _runtime_headers()
+
+
+def test_runtime_headers_explicit_token_takes_precedence(monkeypatch):
+    from qdash.api.services.pi_chat_service import _runtime_headers
+
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN", "explicit-secret")
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN_FILE", "/missing/credential")
+    assert _runtime_headers() == {"Authorization": "Bearer explicit-secret"}
+
+
+def test_runtime_headers_missing_credentials_fail_closed(monkeypatch, tmp_path):
+    from qdash.api.services.pi_chat_service import _runtime_headers
+
+    monkeypatch.delenv("AGENT_RUNTIME_TOKEN", raising=False)
+    monkeypatch.delenv("AGENT_RUNTIME_TOKEN_FILE", raising=False)
+    with pytest.raises(RuntimeError, match="credential is unavailable"):
+        _runtime_headers()
+    monkeypatch.setenv("AGENT_RUNTIME_TOKEN_FILE", str(tmp_path / "missing"))
+    with pytest.raises(FileNotFoundError):
+        _runtime_headers()

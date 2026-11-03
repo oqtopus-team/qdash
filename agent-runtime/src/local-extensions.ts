@@ -1,15 +1,12 @@
 /**
- * Extensions trusted as a whole, next to the allowlisted pi-qdash package.
- *
- * Two sources qualify. Local checkouts: package directories (the layout pi
- * installs: a package.json with a `pi` manifest) placed under
- * `agent-runtime/extensions/`, which compose mounts into the runtime container,
- * so an extension can be iterated on without publishing it and rebuilding the
- * image. Installed packages: `TRUSTED_EXTENSION_PACKAGES` names pi packages the
- * image installs at a pinned version, so the same extension runs in production.
+ * Bundled pi packages and optional development checkouts share the same loader.
+ * pi-qdash keeps a per-tool allowlist; pi-qcaleval and additional development
+ * checkouts are trusted by their explicit roots. Installed external packages
+ * remain supported for existing pi configurations.
  */
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
 /** A local checkout found under the extensions mount. */
@@ -45,6 +42,47 @@ export function discoverExtensionCheckouts(dir: string): ExtensionCheckout[] {
     }
   }
   return checkouts.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** Bundled packages are explicit; arbitrary directories in packages/ never become tools. */
+export function bundledExtensionCheckouts(packagesDir: string): ExtensionCheckout[] {
+  const expected = new Map([
+    ["pi-qdash", "@oqtopus-team/pi-qdash"],
+    ["pi-qcaleval", "@oqtopus-team/pi-qcaleval"],
+  ]);
+  return [...expected].map(([directory, name]) => {
+    const path = resolve(packagesDir, directory);
+    const manifest = JSON.parse(readFileSync(join(path, "package.json"), "utf8"));
+    if (manifest.name !== name || !manifest.pi?.extensions?.length) {
+      throw new Error(`Invalid bundled extension: ${path}`);
+    }
+    return { path, name };
+  });
+}
+
+/** A mounted checkout overrides the bundled package of the same name, including its skills. */
+export function withExtensionOverrides(
+  bundled: readonly ExtensionCheckout[],
+  overrides: readonly ExtensionCheckout[],
+): ExtensionCheckout[] {
+  const names = new Set(overrides.flatMap(({ name }) => name ? [name] : []));
+  return [...overrides, ...bundled.filter(({ name }) => name === null || !names.has(name))];
+}
+
+/** Identify the source and locked dependencies even in images without git metadata. */
+export function bundledSourceVersion(root: string, version: string): string {
+  const hash = createHash("sha256");
+  const add = (relative: string) => {
+    const path = join(root, relative);
+    if (!existsSync(path)) return;
+    if (statSync(path).isDirectory()) {
+      for (const name of readdirSync(path).sort()) add(`${relative}/${name}`);
+    } else {
+      hash.update(relative).update("\0").update(readFileSync(path)).update("\0");
+    }
+  };
+  for (const path of ["package.json", "extensions", "skills", "../../bun.lock"]) add(path);
+  return `${version}+source.${hash.digest("hex").slice(0, 16)}`;
 }
 
 /**
@@ -122,7 +160,7 @@ export function withoutReplacedInstalls<T extends { path: string }>(
 export interface ExtensionPackage {
   name: string;
   version: string;
-  /** Where the code came from: a mounted checkout or the image's pinned install. */
+  /** Where the code came from: a mounted checkout or a bundled or installed package. */
   source: "checkout" | "package";
   /** The checkout's HEAD commit, when it is a git checkout. */
   commit?: string;
@@ -135,6 +173,7 @@ export interface ExtensionPackage {
 export function extensionPackage(
   extensionPath: string,
   checkoutRoots: readonly string[],
+  bundledRoots: readonly string[] = [],
 ): ExtensionPackage | undefined {
   let dir = dirname(resolve(extensionPath));
   for (;;) {
@@ -146,11 +185,13 @@ export function extensionPackage(
           version?: unknown;
         };
         if (typeof parsed.name === "string") {
-          const source = isLocalExtension(extensionPath, checkoutRoots) ? "checkout" : "package";
+          const bundled = isLocalExtension(extensionPath, bundledRoots);
+          const source = !bundled && isLocalExtension(extensionPath, checkoutRoots) ? "checkout" : "package";
+          const version = typeof parsed.version === "string" ? parsed.version : "unknown";
           const commit = source === "checkout" ? gitHead(dir) : undefined;
           return {
             name: parsed.name,
-            version: typeof parsed.version === "string" ? parsed.version : "unknown",
+            version: bundled ? bundledSourceVersion(dir, version) : version,
             source,
             ...(commit ? { commit } : {}),
           };

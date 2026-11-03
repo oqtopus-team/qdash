@@ -28,6 +28,12 @@ Continue to **Qubit Metrics** and **Coupling Metrics** for topology and distribu
 metric shows its own coverage. Metrics without data stay grouped separately so missing data does
 not obscure the populated metrics.
 
+Drag the **Color range** handles above a metric topology to narrow the interval the colors span.
+Values outside the interval keep the end colors, so a single outlier no longer flattens the rest of
+the chip. Type exact bounds in the fields beside the slider. The range is remembered for the chip
+in this browser and also applies on **Metrics**; **Reset** returns to the default, which comes from
+the deployment's metric configuration or, without one, from the data's minimum and maximum.
+
 ## Investigate a Target
 
 Select a qubit or coupling in a metric to open its history. Use the history and selected task

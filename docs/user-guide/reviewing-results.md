@@ -73,8 +73,10 @@ figure, raw data, task knowledge, and current calibration context. See
 
 ## Follow Notifications
 
-Mentions, replies, and system events appear in **Inbox**. Open the linked record to recover its
-project and result context, then mark the notification read after reviewing the event.
+Mentions, replies, and system events arrive at the bell in the top bar, which shows the unread
+count. Select the bell to preview the five newest notifications and open one, or select **View
+all** to open **Inbox** with the full list. Opening a notification marks it read; **Mark all read**
+clears the rest. Open the linked record to recover its project and result context.
 
 ## Share and Hand Off a Result
 

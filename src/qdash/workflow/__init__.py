@@ -22,6 +22,7 @@ Example:
     ```
 """
 
+from qdash.workflow import sweep
 from qdash.workflow.service import (
     CalibService,
     ConfigFileType,
@@ -38,4 +39,5 @@ __all__ = [
     "GitHubIntegration",
     "GitHubPushConfig",
     "generate_execution_id",
+    "sweep",
 ]

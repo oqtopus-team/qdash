@@ -54,7 +54,7 @@ export function RecalibrationRecommendationsPanel({
     <div className="card bg-base-200">
       <div className="card-body p-4 sm:p-6">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="card-title text-base sm:text-lg">Suggested Next Actions</h3>
+          <h3 className="card-title">Suggested Next Actions</h3>
           <div className="flex items-center gap-2">
             <button
               className="btn btn-xs btn-ghost"

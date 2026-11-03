@@ -280,8 +280,16 @@ def test_execution_records_the_judging_models_context_window(test_client, servic
 
 
 def test_a_configured_evaluation_model_is_selected_and_an_unknown_one_is_rejected(
-    test_client, service
+    test_client, service, monkeypatch
 ):
+    from qdash.copilot.config.settings import CopilotConfig, ModelConfig
+
+    config = CopilotConfig(
+        evaluation_models=[
+            ModelConfig(provider="openai-compatible-chat", name="qwen3.8-flash-next")
+        ]
+    )
+    monkeypatch.setattr("qdash.api.services.evaluation_service.load_copilot_config", lambda: config)
     _task_result(task_id="task-q0-new", qid="0", end_at=datetime(2026, 1, 2, tzinfo=UTC))
     selected = {
         "provider": "openai-compatible-chat",

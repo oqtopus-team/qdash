@@ -21,6 +21,7 @@ Use the [Application Tour](./application-tour.md) to find each page and its task
 | Goal | Guide |
 | --- | --- |
 | Run a workflow or one task | [Running Calibrations](./running-calibrations.md) |
+| Create or change a workflow | [Creating Workflows](./creating-workflows.md) |
 | Control inputs and saved outputs | [Task Parameters](./task-parameters.md) |
 | Scan chip health | [Dashboard](./dashboard.md) |
 | Investigate state, history, or provenance | [Calibration Data and Provenance](./data-and-provenance.md) |

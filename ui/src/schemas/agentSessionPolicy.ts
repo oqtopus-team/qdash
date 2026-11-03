@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { AgentActionType } from './agentActionType';
+import type { AgentAutonomy } from './agentAutonomy';
 import type { AgentSessionPolicyAllowedOverrides } from './agentSessionPolicyAllowedOverrides';
 import type { AgentSessionPolicyQualityGates } from './agentSessionPolicyQualityGates';
 
@@ -27,4 +28,12 @@ export interface AgentSessionPolicy {
      * @maximum 10000
      */
   max_actions?: number;
+  /** auto lets a plan choose its next step from the evaluation without a person */
+  autonomy?: AgentAutonomy;
+  /**
+     * How many times an autonomous plan may run the same node on one target
+     * @minimum 1
+     * @maximum 20
+     */
+  max_rounds_per_target?: number;
 }

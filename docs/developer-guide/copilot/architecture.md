@@ -9,7 +9,7 @@ QDash Copilot is an AI-powered assistant that helps experimentalists interpret q
 
 Both are the same chat with the same planner; the first just opens with a task result as its context. The evaluation model's recorded judgements are a separate thing (see [Calibration Evaluation](./evaluation.md)). Forum AI replies are one planner turn each on the same runtime.
 
-Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a sandboxed Python tool served by the API, and SSE streaming for progress.
+Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a shell and files per conversation in a separate container (the [workspace](./workspace.md)), and SSE streaming for progress.
 
 ## Component Diagram
 
@@ -19,11 +19,11 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 
 | File | Responsibility |
 |------|---------------|
-| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/chat/stream` (general and task chats), `/sandbox/python`, chat sessions |
+| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/chat/stream` (general and task chats), chat sessions |
 | `src/qdash/copilot/runtime.py` | Data loading: `build_task_context()`, `build_images_sent_metadata()`, qubit/task/history queries |
 | `src/qdash/api/services/pi_chat_service.py` | Runtime bridge: request payloads, the task chat's opening message and figures, NDJSON to SSE translation, `thread_reply` / `complete_once` for forum reply turns |
 | `src/qdash/copilot/` | Shared Copilot runtime used outside the API process |
-| `src/qdash/copilot/tooling/sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
+| `agent-runtime/src/exec-env.ts` | The workspace: one `agent-exec` connection per conversation behind `bash`, `read`, `write`, `edit` |
 | `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`); request schemas |
 | `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter |
 | `src/qdash/copilot/config/settings.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `TaskChatConfig`; YAML loading with local override |
@@ -39,11 +39,58 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 
 ## Pi runtime authentication
 
-The API forwards the authenticated user's access token and selected `X-Project-Id` to the Pi runtime on each chat or analysis turn, including approval responses. When no project header is supplied, it uses the user's default project. The internal `AGENT_RUNTIME_TOKEN` still authenticates API-to-runtime requests; user credentials travel in separate internal headers and are never added to model input or durable conversation state.
+The API forwards the authenticated user's access token and selected `X-Project-Id` to the Pi runtime on each chat or analysis turn, including approval responses. When no project header is supplied, it uses the user's default project. An internal bearer secret authenticates API-to-runtime requests; user credentials travel in separate internal headers and are never added to model input or durable conversation state.
 
-Each open conversation gets its own tool registry and a private temporary pi-qdash profile. Read tools, approved writes, and the Python sandbox use that user's credentials. The runtime overrides connection arguments supplied by a model or an older stored tool call and never falls back to `QDASH_API_TOKEN` or an administrator login. QDash API endpoints enforce the user's permissions.
+Compose starts the runtime and workspace by default. The `agent-runtime-auth` initialization
+service generates a random secret once in a dedicated volume, mounted read-only by the API and
+runtime. Both read `AGENT_RUNTIME_TOKEN_FILE`; no manual secret or UI enable flag is needed.
+The file is owned by the runtime user (UID 1000) with mode `0400`; the API reads it as root.
+For standalone processes, provide the same credential file through `AGENT_RUNTIME_TOKEN_FILE`
+or set `AGENT_RUNTIME_TOKEN` on both processes. The explicit token takes precedence for existing
+deployments. Missing or empty credentials never permit unauthenticated runtime requests.
+
+Each open conversation gets its own tool registry and a private temporary pi-qdash profile. Read tools and approved writes use that user's credentials; the workspace container never sees them. The runtime overrides connection arguments supplied by a model or an older stored tool call and never falls back to `QDASH_API_TOKEN` or an administrator login. QDash API endpoints enforce the user's permissions.
 
 The pinned pi-qdash version accepts a configuration file rather than an injected client. The runtime creates the profile in a private directory with a mode-0600 file and removes it when the conversation closes, including failures. Docker Compose mounts `/tmp` as tmpfs so these credentials do not enter the container's persistent filesystem. Deployments outside Compose should provide an equivalent memory-backed temporary directory.
+
+## Durable conversations
+
+`agent-runtime/src/runtime.ts` opens one Pi SQLite store per user and session in the
+`agent-runtime-state` volume. Pi 1.4 upgrades existing stores to schema version 2 on first open;
+Pi 1.3 cannot reopen an upgraded store. Back up the stopped volume before upgrading, and restore
+that backup before a rollback to Pi 1.3. See [System Updates](../../user-guide/system-updates.md#deploy-the-release).
+
+Each chat model in `config/copilot/chat.yaml` gets compaction thresholds based on its own context
+window and output limit. `agent-runtime/src/models-config.ts` resolves those models at startup,
+and `agent-runtime/src/budget.ts` calculates their thresholds. The runtime gives Pi 1.4 a
+`modelOverrides` entry for each resolved model, so a resumed task uses the budget of the model it
+started with even if the next request selects another model. The selected request model also gets
+an entry when it is absent from the startup list.
+
+Pi reports session failures, faulted or parked tasks, migrations, and extension errors through
+`onReport`. `agent-runtime/src/durable-report.ts` logs the report type, task and extension names,
+and error type under the hashed session filename. It omits error messages, prompts, tool
+arguments, and user identifiers from these logs.
+
+## Page context and editor edits
+
+A chat from the sidebar or the floating window tells the assistant what the user has open.
+Every turn carries `ChatRequest.page` (`PageContext`: route, title, and on the Workflow editor
+the flow's name, chip, and the editor's current text, unsaved changes included); the runtime
+rebuilds a system prompt section from it each turn (`agent-runtime/src/page-context.ts`,
+`buildPageContextSection`). The chat page itself sends none.
+
+Pages register what they show with the chat dock (`ChatDockContext.registerPage`): the
+registration reads the page's state when a turn is sent, so an editor's buffer is current, and
+may accept code back (`applyCode`). Without a registration the dock sends the route and the
+document title.
+
+On the Workflow editor the runtime also offers `propose_code_edit`: the model passes the
+complete new file and a one-line summary, the call ends the turn, and the chat renders an
+`edit` block (`EditProposalCard`) with a diff against what the editor holds now. **Apply to
+editor** replaces the buffer and unlocks the editor; saving stays with the user and goes through
+the editor's Save, so `POST /flows` validation and deployment registration are unchanged. The
+runtime never writes the flow; `qdash_save_flow` stays for flows written from the chat alone.
 
 ## Configuration
 
@@ -108,6 +155,25 @@ as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be su
 through environment variables instead of committed template files. The Pi runtime
 builds its `models.json` from `chat_models` and `evaluation_models` at startup.
 
+### Cloudflare Access Authentication
+
+`agent-runtime/src/models-config.ts` maps the shared `CF_ACCESS_CLIENT_ID` and
+`CF_ACCESS_CLIENT_SECRET` environment variables to Pi provider headers. It applies them to
+endpoints whose `base_url` references `env:OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>`, for both chat
+and evaluation. Literal URLs and catalog providers are unaffected.
+
+The generated `models.json` stores environment references, not credential values. Pi 1.4.0
+resolves these headers when making requests through `ModelRuntime`, including evaluation calls
+through the model registry. Both Chat Completions and Responses preserve the origin server's
+Bearer authentication alongside the two Access headers. With Access configured and no origin
+API key, the runtime supplies Pi's required placeholder key automatically.
+
+Setting only one Access variable, or a whitespace-only value, fails configuration rather than
+sending partial authentication. Leaving both unset or empty preserves existing behavior.
+`agent-runtime/test/cloudflare-access.test.mjs` captures requests from the installed Pi runtime
+for both API styles and both model roles. Deployment steps are in
+[Configure AI](../../user-guide/setup.md#configure-ai).
+
 ### Environment Variables
 
 | Variable | Purpose |
@@ -115,6 +181,7 @@ builds its `models.json` from `chat_models` and `evaluation_models` at startup.
 | `OPENAI_API_KEY` | OpenAI API authentication |
 | `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` | OpenAI-compatible API base URL through `/v1`; the suffix is operator-defined |
 | `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` | API key for the endpoint with the matching suffix; it can be a placeholder for a keyless endpoint |
+| `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` | Shared Cloudflare Access service token for configured OpenAI-compatible endpoints; optional, set both |
 | `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
 
 Existing deployments must rename the earlier fixed variables and add `/v1` to each base URL:
@@ -134,50 +201,38 @@ the corresponding YAML model. Variable renaming does not transform the URL: for 
 
 ### Developing a pi extension against the runtime
 
-The Agent Runtime image installs `@oqtopus-team/pi-qdash` at a pinned version
-(`agent-runtime/Dockerfile`), so a published release is the only way an
-extension normally reaches it. While developing another extension (for example
-`pi-qcaleval`), clone it under `agent-runtime/extensions/` (gitignored) and start
-the runtime with the override:
+The Agent Runtime image includes `packages/pi-qdash/` and `packages/pi-qcaleval/`
+from the same QDash checkout. Edit those packages, run `task ci-pi-packages` and
+`task ci-agent-runtime`, then rebuild the runtime:
 
 ```bash
-git clone https://github.com/orangekame3/pi-qcaleval.git agent-runtime/extensions/pi-qcaleval
-docker compose up -d agent-runtime
+bun install --frozen-lockfile
+docker compose up -d --build agent-runtime
 ```
 
-`compose.yaml` always mounts `agent-runtime/extensions/` at `/app/extensions`
-(read-only); the directory is tracked through a `.gitkeep`, so the mount exists in
-every clone and is empty in production. At startup the runtime takes every
-subdirectory whose `package.json` carries a `pi` manifest as a checkout and
-passes it to pi's resource loader as an additional extension path. No override
-file or environment variable is involved, so `task deploy` and a plain
-`docker compose up -d` behave the same. A checkout of a package the image also
-installs (pi-qcaleval once pinned, or pi-qdash) replaces the installed copy; pi
-rejects the installed one as a tool-name conflict, which the runtime logs as
-"local checkout ... replaces installed ...". A pi-qdash checkout keeps the
-per-name allowlist (`ALLOWLISTED_PACKAGES`), so developing it in place never
-exposes a tool that production would filter; run `bun install` inside the
-checkout first, since pi-qdash has dependencies of its own. The checkout must use the pi package layout
-(`package.json` with a `pi.extensions` manifest, like pi-qdash) and may depend only
-on the packages the runtime already ships (`@earendil-works/pi-coding-agent`,
-`typebox`), because its imports resolve from the runtime's `node_modules`.
+The root Bun workspace locks the runtime, TypeScript client, and two pi packages
+together. The image builds the local client before loading the extensions.
+The runtime loads their tools and skills directly; npm publication is not needed
+for QDash development or deployment. [Pi packages](./packages.md) describes
+independent distribution and release validation.
 
-A checkout is trusted by its path, not by tool name: every tool it defines is
-offered to the model without the pi-qdash allowlist review
-(`agent-runtime/src/allowed-tools.ts`), with three limits. The same trust applies
-in production to the packages listed in `TRUSTED_EXTENSION_PACKAGES` (for example
-`@orangekame3/pi-qcaleval`), which the image installs at a pinned version next to
-pi-qdash in `agent-runtime/Dockerfile`; a package is added to that list only after
-review, and the version pin is the release gate.
+`compose.yaml` also mounts `agent-runtime/extensions/` at `/app/extensions`
+(read-only) for additional development extensions. At startup, each subdirectory
+with a `pi` manifest is loaded. A checkout whose package name matches a bundled
+package replaces that package's tools and skills. Install any extra dependencies
+inside the checkout before starting the container, and restart the runtime after
+editing it. The image does not copy this gitignored directory.
 
-- An experimental write name (`EXPERIMENTAL_WRITE_TOOL_NAMES`) still needs
-  `AGENT_RUNTIME_ENABLE_WRITE_TOOLS=true`, and then goes through the same
-  approval card as the pinned tool.
-- A checkout tool is rerun after an interrupted turn only when its pi
-  `annotations.readOnlyHint` is `true`; other local tools are reported to the
-  model as interrupted instead, so a side-effecting tool never runs twice.
-- A checkout tool that reuses a pinned tool's name replaces the pinned
-  implementation; the runtime logs the replacement at startup.
+The bundled pi-qdash package and overrides of it retain the per-name allowlist
+in `agent-runtime/src/allowed-tools.ts`. The bundled pi-qcaleval package is trusted
+as a whole. Additional checkouts are trusted by path, with these limits:
+
+- Reviewed write names (`REVIEWED_WRITE_TOOL_NAMES`) still require approval of
+  their arguments and execute with the requesting user's credentials.
+- A checkout tool is replayed after interruption only when its
+  `annotations.readOnlyHint` is `true`.
+- A trusted checkout that reuses a bundled tool's name replaces it, with a
+  replacement message in the startup log.
 
 Checkout tools receive the same extension context as pi-qdash tools, including
 `modelRegistry` for calling a model other than the conversation's. Their pi

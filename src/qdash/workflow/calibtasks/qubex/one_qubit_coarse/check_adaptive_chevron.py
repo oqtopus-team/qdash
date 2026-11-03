@@ -27,7 +27,7 @@ CONTROL_AMPLITUDE_MAX = 1.0
 
 
 class CheckAdaptiveChevron(QubexTask):
-    """Adaptive chevron task for coarse qubit-frequency estimation."""
+    """Estimate qubit frequency and control amplitude with an adaptive Chevron."""
 
     name: str = "CheckAdaptiveChevron"
     task_type: str = "qubit"
@@ -64,47 +64,90 @@ class CheckAdaptiveChevron(QubexTask):
             unit="a.u.",
             value_type="float",
             default=DEFAULT_MINIMUM_PEAK_BACKGROUND_RMS_RATIO,
-            description=("Minimum final peak/background RMS ratio required to accept the result"),
+            description="Minimum final peak/background RMS ratio required to accept the result",
         ),
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
         "qubit_frequency": OutputParameterSpec(
             unit="GHz",
-            description="Qubit bare frequency (coarse)",
+            description="Qubit bare frequency estimated by adaptive Chevron analysis",
             publish_targets=(
                 "qubit_frequency",
                 "control_frequency",
             ),
         ),
         "control_amplitude": OutputParameterSpec(
-            unit="a.u.", description="Control pulse amplitude estimated by adaptive chevron"
+            unit="a.u.", description="Control pulse amplitude estimated by adaptive Chevron"
         ),
     }
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
     ) -> PostProcessResult:
-        self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
+        if not isinstance(result, Mapping):
+            raise TypeError(
+                "estimate_qubit_frequency_from_chevron_adaptive returned "
+                f"unsupported data type: {type(result).__name__}"
+            )
 
-        resonant_freq = result["resonant_frequencies"][label]
-        target_amplitude = self._target_control_amplitude(result, label)
-        target_amplitude_error = finite_value_error(
-            target_amplitude,
-            f"CheckAdaptiveChevron target control amplitude for {label}",
+        resonant_frequency = self._target_value(result, "resonant_frequencies", label)
+        target_amplitude = self._target_value(result, "target_amplitudes", label)
+        peak_background_rms_ratio = self._target_value(result, "peak_background_rms_ratios", label)
+        threshold = self.run_parameters["minimum_peak_background_rms_ratio"].value
+
+        frequency_value_error = finite_value_error(
+            resonant_frequency,
+            f"CheckAdaptiveChevron qubit frequency for {label}",
         )
-        self.output_parameters["qubit_frequency"].value = resonant_freq
-        self.output_parameters["control_amplitude"].value = (
-            float(cast("int | float | str", target_amplitude))
+        frequency_error = finite_value_error(
+            resonant_frequency,
+            f"CheckAdaptiveChevron qubit frequency for {label}",
+            minimum=2.5,
+        )
+        target_amplitude_error = self._positive_value_error(
+            target_amplitude, f"CheckAdaptiveChevron target control amplitude for {label}"
+        )
+        threshold_error = finite_value_error(
+            threshold,
+            "minimum_peak_background_rms_ratio",
+            minimum=0.0,
+        )
+        ratio_error = finite_value_error(
+            peak_background_rms_ratio,
+            f"CheckAdaptiveChevron peak/background RMS ratio for {label}",
+            minimum=(
+                float(cast("int | float | str", threshold)) if threshold_error is None else None
+            ),
+        )
+
+        resonant_frequency_value = (
+            float(cast("int | float | str", resonant_frequency))
+            if frequency_value_error is None
+            else None
+        )
+        target_amplitude_value = (
+            min(
+                max(
+                    float(cast("int | float | str", target_amplitude)),
+                    CONTROL_AMPLITUDE_MIN,
+                ),
+                CONTROL_AMPLITUDE_MAX,
+            )
             if target_amplitude_error is None
             else None
         )
+        self.output_parameters["qubit_frequency"].value = resonant_frequency_value
+        self.output_parameters["control_amplitude"].value = target_amplitude_value
         output_parameters = self.attach_execution_id(execution_id)
 
-        figures = self._build_figures(result, label, resonant_freq)
-        validation_error = self._validation_error(
-            result, label, qid, resonant_freq, target_amplitude_error
+        figures = self._build_figures(result, label, resonant_frequency_value)
+        validation_error = first_validation_error(
+            frequency_error,
+            threshold_error,
+            ratio_error,
+            target_amplitude_error,
         )
         if validation_error is not None:
             print(f"[ERROR] {validation_error}")
@@ -112,37 +155,6 @@ class CheckAdaptiveChevron(QubexTask):
             output_parameters=output_parameters,
             figures=figures,
             validation_error=validation_error,
-        )
-
-    def _validation_error(
-        self,
-        result: Mapping[str, Any],
-        label: str,
-        qid: str,
-        resonant_freq: float,
-        target_amplitude_error: str | None,
-    ) -> str | None:
-        if resonant_freq < 2.5:
-            return f"Qubit frequency too low for qid={qid}: {resonant_freq:.6f} GHz < 2.5 GHz"
-
-        threshold = self.run_parameters["minimum_peak_background_rms_ratio"].value
-        ratios = result.get("peak_background_rms_ratios")
-        ratio = ratios.get(label) if isinstance(ratios, Mapping) else None
-        threshold_error = finite_value_error(
-            threshold,
-            "minimum_peak_background_rms_ratio",
-            minimum=0.0,
-        )
-        return first_validation_error(
-            threshold_error,
-            finite_value_error(
-                ratio,
-                f"CheckAdaptiveChevron peak/background RMS ratio for {label}",
-                minimum=(
-                    float(cast("int | float | str", threshold)) if threshold_error is None else None
-                ),
-            ),
-            target_amplitude_error,
         )
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
@@ -187,7 +199,7 @@ class CheckAdaptiveChevron(QubexTask):
                 exp=exp,
                 label=label,
                 qubit_frequency=control_freq,
-                control_amplitude=float(ctrl_amp_value),
+                control_amplitude=ctrl_amp_value,
             )
 
         self.save_calibration(backend)
@@ -226,14 +238,23 @@ class CheckAdaptiveChevron(QubexTask):
         return dict(data)
 
     @staticmethod
-    def _target_control_amplitude(result: Mapping[str, Any], label: str) -> Any:
-        target_amplitudes = result.get("target_amplitudes")
-        if not isinstance(target_amplitudes, Mapping):
+    def _target_value(result: Mapping[str, Any], key: str, label: str) -> Any:
+        values = result.get(key)
+        if not isinstance(values, Mapping):
             return None
-        return target_amplitudes.get(label)
+        return values.get(label)
+
+    @staticmethod
+    def _positive_value_error(value: Any, name: str) -> str | None:
+        error = finite_value_error(value, name, minimum=0.0)
+        if error is not None:
+            return error
+        if float(value) == 0.0:
+            return f"{name} must be positive: {value}"
+        return None
 
     def _build_figures(
-        self, result: Mapping[str, Any], label: str, resonant_freq: float
+        self, result: Mapping[str, Any], label: str, resonant_frequency: float | None
     ) -> list[go.Figure]:
         figures_map = result.get("figures")
         if isinstance(figures_map, Mapping):
@@ -254,14 +275,14 @@ class CheckAdaptiveChevron(QubexTask):
                 if figure is None:
                     continue
                 figures.append(figure)
-                if key == f"{label}_measurement":
+                if key == f"{label}_measurement" and resonant_frequency is not None:
                     marked_fig = go.Figure(figure)
                     marked_fig.add_vline(
-                        x=resonant_freq,
+                        x=resonant_frequency,
                         line_width=1,
                         line_color="red",
                         line_dash="dash",
-                        annotation_text=f"f = {resonant_freq:.6f} GHz",
+                        annotation_text=f"f = {resonant_frequency:.6f} GHz",
                         annotation_position="top",
                         annotation_font_color="red",
                     )
@@ -273,13 +294,15 @@ class CheckAdaptiveChevron(QubexTask):
         if isinstance(fig_dict, Mapping):
             base_fig = fig_dict.get(label)
             if base_fig is not None:
+                if resonant_frequency is None:
+                    return [base_fig]
                 marked_fig = go.Figure(base_fig)
                 marked_fig.add_vline(
-                    x=resonant_freq,
+                    x=resonant_frequency,
                     line_width=1,
                     line_color="red",
                     line_dash="dash",
-                    annotation_text=f"f = {resonant_freq:.6f} GHz",
+                    annotation_text=f"f = {resonant_frequency:.6f} GHz",
                     annotation_position="top",
                     annotation_font_color="red",
                 )

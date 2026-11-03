@@ -11,21 +11,14 @@
 #   - qubex: Production backend using real quantum hardware via qubex library
 #   - fake: Testing backend with simulated measurements (no hardware required)
 #
-# Both backends use IDENTICAL task names, enabling seamless switching:
-#   task_names = ["CheckFineChevron", "CheckRabi", "CheckT1"]
+# The fake backend runs the qubex task implementations on a simulator, so task names are
+# the same on both backends and a flow switches backend without changing its task list:
+#   task_names = ["CheckChevron", "CheckRabi", "CheckT1"]
+#   config = CalibConfig(backend_name="fake", ...)   # simulator
+#   config = CalibConfig(backend_name="qubex", ...)  # hardware
 #
-#   # For testing without hardware
-#   config = CalibConfig(backend_name="fake", ...)
-#
-#   # For production with real hardware
-#   config = CalibConfig(backend_name="qubex", ...)
-#
-# Fake backend available tasks (same names as qubex):
-#   - CheckFineChevron: Entry point, outputs qubit_frequency, readout_frequency
-#   - CheckRabi: Rabi oscillation measurement
-#   - CheckT1: T1 relaxation time measurement
-#   - CheckT2Echo: T2 echo (Hahn echo) measurement
-#   - RandomizedBenchmarking: Gate fidelity measurement
+# The one fake-only task, FakeBringUp, seeds a fresh project with the simulator's device
+# parameters. The fake task set is the `fake` section of backend.yaml.
 
 # =============================================================================
 # UI Settings

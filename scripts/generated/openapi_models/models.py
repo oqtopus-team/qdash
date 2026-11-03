@@ -72,9 +72,9 @@ class AgentActionType(StrEnum):
     complete_session = "complete_session"
 
 
-class AgentCampaignCandidateReference(BaseModel):
+class AgentCandidateReference(BaseModel):
     """
-    Identify one authoritative accepted candidate for campaign finalization.
+    Identify one authoritative accepted candidate for plan finalization.
     """
 
     action_id: Annotated[str, Field(max_length=200, min_length=1, title="Action Id")]
@@ -347,15 +347,15 @@ class ActivityStatus(StrEnum):
     inactive = "inactive"
 
 
-class CommitAgentCampaignRequest(BaseModel):
+class CommitAgentCandidateSetRequest(BaseModel):
     """
-    Commit the final accepted candidate set for one same-qubit campaign.
+    Commit the final accepted candidate set for one same-qubit plan.
     """
 
     idempotency_key: Annotated[str, Field(max_length=128, min_length=1, title="Idempotency Key")]
     expected_state_version: Annotated[int, Field(ge=0, title="Expected State Version")]
     candidates: Annotated[
-        list[AgentCampaignCandidateReference],
+        list[AgentCandidateReference],
         Field(max_length=100, min_length=1, title="Candidates"),
     ]
 
@@ -4323,9 +4323,9 @@ class AgentActionResponse(BaseModel):
     created_at: Annotated[AwareDatetime, Field(title="Created At")]
 
 
-class AgentCampaignCommitResponse(BaseModel):
+class AgentCandidateSetCommitResponse(BaseModel):
     """
-    Audited all-at-once QDash commit of final campaign candidates.
+    Audited all-at-once QDash commit of the final candidate set.
     """
 
     commit_id: Annotated[str, Field(title="Commit Id")]

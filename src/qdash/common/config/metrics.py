@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, Literal
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 from qdash.common.config.loader import ConfigLoader
 
@@ -31,6 +31,20 @@ class ThresholdConfig(BaseModel):
     range: ThresholdRange
 
 
+class ColorRange(BaseModel):
+    """Default heatmap color range for a metric, in raw (unscaled) units."""
+
+    min: float
+    max: float
+
+    @model_validator(mode="after")
+    def _check_order(self) -> ColorRange:
+        if not self.min < self.max:
+            msg = f"color_range.min ({self.min}) must be less than color_range.max ({self.max})"
+            raise ValueError(msg)
+        return self
+
+
 class MetricMetadata(BaseModel):
     """Metadata for a single metric."""
 
@@ -40,6 +54,13 @@ class MetricMetadata(BaseModel):
     description: str | None = None
     evaluation: EvaluationConfig
     threshold: ThresholdConfig | None = None
+    color_range: ColorRange | None = None
+
+
+class ColorScaleConfig(BaseModel):
+    """Ordered palette shared by every metric heatmap, low to high."""
+
+    colors: list[str] = Field(min_length=2)
 
 
 class CdfGroup(BaseModel):
@@ -63,7 +84,7 @@ class MetricsConfig(BaseModel):
 
     qubit_metrics: dict[str, MetricMetadata]
     coupling_metrics: dict[str, MetricMetadata]
-    color_scale: dict[str, Any]
+    color_scale: ColorScaleConfig
     cdf_groups: CdfGroupsConfig = CdfGroupsConfig()
 
 

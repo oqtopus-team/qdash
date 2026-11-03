@@ -181,6 +181,19 @@ def test_ef_chevron_is_enabled_with_calibration_and_sweep_metadata() -> None:
     assert task.run_parameters["shots"]["value"] == 256
 
 
+def test_cpmg_noise_spectroscopy_is_enabled_in_one_qubit_group() -> None:
+    clear_backend_config_cache()
+    task = next(
+        task
+        for task in TaskFileService().list_task_info("qubex", enabled_only=True).tasks
+        if task.name == "CheckCPMGNoiseSpectroscopy"
+    )
+
+    assert task.enabled
+    assert task.category == "One Qubit"
+    assert task.task_type == "qubit"
+
+
 def test_fh_chevron_is_enabled_with_transition_and_pulse_dependencies() -> None:
     clear_backend_config_cache()
     all_task_names = {task.name for task in TaskFileService().list_task_info("qubex").tasks}
@@ -236,14 +249,48 @@ def test_jazz_task_is_enabled_in_two_qubit_group() -> None:
     assert is_task_available("CheckJAZZ", "qubex")
 
 
+def test_coupling_strength_exposes_optional_database_anharmonicities() -> None:
+    clear_backend_config_cache()
+    task = next(
+        task
+        for task in TaskFileService().list_task_info("qubex", enabled_only=True).tasks
+        if task.name == "CheckCouplingStrength"
+    )
+
+    assert task.category == "Two Qubit"
+    for name in ("control_qubit_anharmonicity", "target_qubit_anharmonicity"):
+        parameter = task.input_parameters[name]
+        assert parameter["resolution"] == "database_optional"
+        assert parameter["user_override"] == "forbidden"
+        assert parameter["default_value"] is None
+        assert parameter["parameter_name"] == "qubit_anharmonicity"
+        assert parameter["parameter_aliases"] == ["anharmonicity"]
+
+
 def test_list_task_info_extracts_input_parameter_metadata() -> None:
     clear_backend_config_cache()
     service = TaskFileService()
 
-    tasks = service.list_task_info("fake").tasks
+    tasks = service.list_task_info("qubex").tasks
     task = next(t for t in tasks if t.name == "CheckRabi")
 
-    assert task.input_parameters["qubit_frequency"]["resolution"] == "default_only"
+    parameter = task.input_parameters["control_frequency"]
+    assert parameter["resolution"] == "database_required"
+    assert parameter["fallback_parameter_names"] == ["qubit_frequency"]
+
+
+def test_fake_backend_publishes_the_qubex_task_declarations() -> None:
+    """A qubex task routed to the fake backend keeps its qubex declaration in the catalog."""
+    clear_backend_config_cache()
+    service = TaskFileService()
+
+    fake = {t.name: t for t in service.list_task_info("fake").tasks}
+    qubex = {t.name: t for t in service.list_task_info("qubex").tasks}
+
+    assert fake["CheckRabi"].input_parameters == qubex["CheckRabi"].input_parameters
+    assert fake["CheckRabi"].run_parameters == qubex["CheckRabi"].run_parameters
+    assert fake["FakeBringUp"].input_parameters == {}
+    assert "FakeBringUp" not in qubex
 
 
 def test_coarse_readout_task_is_enabled_with_resolvable_input_metadata() -> None:
@@ -360,6 +407,16 @@ def test_list_task_info_includes_database_input_parameter_dependencies() -> None
     assert task.run_parameters["readout_duration"]["value"] == 1024
 
 
+def test_list_task_info_extracts_output_parameter_names() -> None:
+    clear_backend_config_cache()
+    service = TaskFileService()
+
+    tasks = {t.name: t for t in service.list_task_info("qubex").tasks}
+
+    assert "rabi_amplitude" in tasks["CheckRabi"].output_parameters
+    assert tasks["CreateHPIPulse"].output_parameters[:1] == ["hpi_amplitude"]
+
+
 def test_cross_resonance_catalog_groups_control_and_target_rabi_inputs() -> None:
     task = next(
         task
@@ -395,6 +452,11 @@ def test_extract_parameter_metadata_understands_named_spec_constructors() -> Non
                 greater_than_or_equal=0.0001,
                 less_than_or_equal=1.0,
             ),
+            "anharmonicity": InputParameterSpec.database_optional(
+                unit="GHz",
+                user_override="forbidden",
+                less_than=0,
+            ),
         }""",
         mode="eval",
     ).body
@@ -418,6 +480,13 @@ def test_extract_parameter_metadata_understands_named_spec_constructors() -> Non
             "default_value": 0.0625,
             "greater_than_or_equal": 0.0001,
             "less_than_or_equal": 1.0,
+        },
+        "anharmonicity": {
+            "resolution": "database_optional",
+            "user_override": "forbidden",
+            "default_value": None,
+            "unit": "GHz",
+            "less_than": 0,
         },
     }
 

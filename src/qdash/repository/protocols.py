@@ -1017,7 +1017,7 @@ class ExecutionCounterRepository(Protocol):
     """Protocol for execution counter operations.
 
     This repository provides atomic counter generation for execution IDs.
-    The counter is scoped by date, chip_id, and project_id.
+    The counter is scoped by date and project_id across all chips.
 
     Example
     -------

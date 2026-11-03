@@ -7,9 +7,10 @@ abstracting away the repository layer from the routers.
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any, NamedTuple
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from bunnet import SortDirection
 from fastapi import HTTPException
@@ -19,6 +20,8 @@ from prefect.states import Cancelling
 
 from qdash.api.schemas.execution import (
     CancelExecutionResponse,
+    ExecutionActivityDay,
+    ExecutionActivityResponse,
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ExecutionResponseSummary,
@@ -40,6 +43,38 @@ if TYPE_CHECKING:
     from qdash.repository.execution_lock import MongoExecutionLockRepository
 
 logger = logging.getLogger(__name__)
+
+# Execution statuses folded into the activity chart's buckets; anything else counts as "other".
+_ACTIVITY_BUCKET_BY_STATUS: dict[str, str] = {
+    "completed": "completed",
+    "failed": "failed",
+    "running": "running",
+    "cancelling": "running",
+    "scheduled": "scheduled",
+    "pending": "scheduled",
+    "cancelled": "cancelled",
+}
+
+
+def _resolve_zone(timezone: str) -> ZoneInfo:
+    """Return the IANA zone, or a 400 the client can act on."""
+    try:
+        return ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"Unknown time zone: {timezone}") from exc
+
+
+def _day_window(date: str, zone: ZoneInfo) -> tuple[datetime, datetime]:
+    """UTC bounds ``[start, end)`` of the calendar day ``date`` (YYYYMMDD) in ``zone``."""
+    try:
+        day = datetime.strptime(date, "%Y%m%d").date()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid date: {date}; expected YYYYMMDD"
+        ) from exc
+    start = datetime.combine(day, time.min, tzinfo=zone)
+    return start.astimezone(UTC), (start + timedelta(days=1)).astimezone(UTC)
+
 
 _OPEN_EXECUTION_STATUSES = ("running", "scheduled", "cancelling")
 _RECONCILE_TIMEOUT_SECONDS = 5.0
@@ -140,37 +175,75 @@ class ExecutionService:
         self._history_repo = execution_history_repository
         self._lock_repo = execution_lock_repository
 
+    def get_execution_activity(
+        self,
+        project_id: str,
+        chip_id: str,
+        days: int = 30,
+        timezone: str = "UTC",
+    ) -> ExecutionActivityResponse:
+        """Count executions per calendar day over the trailing ``days`` days.
+
+        Days are bucketed in ``timezone`` so the chart matches the dates the user sees;
+        every day of the window is present, empty days with zero counts. Only executions
+        with a start time are counted, since the day is taken from it.
+        """
+        zone = _resolve_zone(timezone)
+        today = datetime.now(tz=zone).date()
+        first_day = today - timedelta(days=days - 1)
+        since = datetime.combine(first_day, time.min, tzinfo=zone).astimezone(UTC)
+
+        buckets = {
+            first_day + timedelta(days=offset): ExecutionActivityDay(
+                date=(first_day + timedelta(days=offset)).isoformat()
+            )
+            for offset in range(days)
+        }
+        executions = self._history_repo.list_started_since(
+            project_id=project_id, chip_id=chip_id, since=since
+        )
+        for execution in executions:
+            if execution.start_at is None:
+                continue
+            started = execution.start_at
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=UTC)
+            bucket = buckets.get(started.astimezone(zone).date())
+            if bucket is None:
+                continue
+            field = _ACTIVITY_BUCKET_BY_STATUS.get(execution.status, "other")
+            setattr(bucket, field, getattr(bucket, field) + 1)
+            bucket.total += 1
+
+        return ExecutionActivityResponse(
+            chip_id=chip_id,
+            days=days,
+            timezone=timezone,
+            since=first_day.isoformat(),
+            until=today.isoformat(),
+            buckets=list(buckets.values()),
+        )
+
     def list_executions(
         self,
         project_id: str,
         chip_id: str,
         skip: int = 0,
         limit: int = 20,
+        date: str | None = None,
+        timezone: str = "UTC",
     ) -> list[ExecutionResponseSummary]:
-        """List executions for a chip with pagination.
+        """List a chip's executions, newest first, with pagination.
 
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-        skip : int
-            Number of items to skip
-        limit : int
-            Number of items to return
-
-        Returns
-        -------
-        list[ExecutionResponseSummary]
-            List of execution summaries
-
+        With ``date`` (YYYYMMDD) only executions started on that calendar day in
+        ``timezone`` are returned, using the same day rule as the activity chart.
         """
         executions = self._history_repo.list_by_chip(
             project_id=project_id,
             chip_id=chip_id,
             skip=skip,
             limit=limit,
+            started_between=_day_window(date, _resolve_zone(timezone)) if date else None,
         )
         return [
             ExecutionResponseSummary(
@@ -193,25 +266,14 @@ class ExecutionService:
         self,
         project_id: str,
         chip_id: str,
+        date: str | None = None,
+        timezone: str = "UTC",
     ) -> int:
-        """Count executions for a chip.
-
-        Parameters
-        ----------
-        project_id : str
-            The project identifier
-        chip_id : str
-            The chip identifier
-
-        Returns
-        -------
-        int
-            Total number of executions for the chip
-
-        """
+        """Count a chip's executions, with the same optional day filter as ``list_executions``."""
         return self._history_repo.count_by_chip(
             project_id=project_id,
             chip_id=chip_id,
+            started_between=_day_window(date, _resolve_zone(timezone)) if date else None,
         )
 
     def get_execution(
@@ -416,9 +478,10 @@ class ExecutionService:
     def get_lock_status(self, project_id: str) -> ExecutionLockStatusResponse:
         """Get the execution lock status.
 
-        A still ``scheduled`` execution is reconciled against Prefect first: a
-        run that died before its flow process started would otherwise hold the
-        lock with nothing left to release it.
+        ``scheduled`` and ``cancelling`` reservation owners are reconciled against
+        Prefect, even when a newer execution has started. The latest execution
+        is also checked for legacy reservations with no owner ID. Non-terminal
+        Prefect states retain reservations until termination is confirmed.
 
         Parameters
         ----------
@@ -432,8 +495,23 @@ class ExecutionService:
 
         """
         latest = self._history_repo.find_latest_by_project(project_id)
-        if latest is not None and latest.status == ExecutionStatusModel.SCHEDULED:
-            self._reconcile_with_prefect([latest])
+        candidates = {latest.execution_id: latest} if latest is not None else {}
+        for owner_id in self._lock_repo.list_owner_execution_ids(project_id):
+            if owner_id in candidates:
+                continue
+            if owner_id.startswith("flow:"):
+                owners = self._history_repo.list_by_flow_run_id(project_id, owner_id[5:])
+            else:
+                owner = self._history_repo.find_by_id(project_id, owner_id)
+                owners = [owner] if owner is not None else []
+            candidates.update({owner.execution_id: owner for owner in owners})
+        targets = [
+            doc
+            for doc in candidates.values()
+            if doc.status in (ExecutionStatusModel.SCHEDULED, ExecutionStatusModel.CANCELLING)
+        ]
+        if targets:
+            self._reconcile_with_prefect(targets)
 
         status = self._lock_repo.get_lock_status(project_id)
         if latest is None:

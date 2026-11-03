@@ -26,6 +26,13 @@ class AgentActionType(str, Enum):
     COMPLETE_SESSION = "complete_session"
 
 
+class AgentAutonomy(str, Enum):
+    """How much of a plan the agent may run without a person confirming each step."""
+
+    CONFIRM_EACH = "confirm_each"  # every measurement is confirmed by a person (default)
+    AUTO = "auto"  # the plan, bounds, and budget are confirmed once; steps follow the evaluation
+
+
 class AgentActionDecision(str, Enum):
     """Platform authorization decision for an action proposal."""
 
@@ -74,3 +81,13 @@ class AgentSessionPolicy(BaseModel):
     quality_gates: dict[str, NumericBounds] = Field(default_factory=dict)
     allow_reconfigure: bool = False
     max_actions: int = Field(default=100, ge=1, le=10_000)
+    autonomy: AgentAutonomy = Field(
+        default=AgentAutonomy.CONFIRM_EACH,
+        description="auto lets a plan choose its next step from the evaluation without a person",
+    )
+    max_rounds_per_target: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="How many times an autonomous plan may run the same node on one target",
+    )

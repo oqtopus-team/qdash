@@ -15,6 +15,7 @@ import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { GlobalCommandPalette } from "@/components/layout/GlobalCommandPalette";
 import { GlobalExecutionIndicator } from "@/components/layout/GlobalExecutionIndicator";
+import { NotificationsMenu } from "@/components/layout/NotificationsMenu";
 
 function HiddenIcon() {
   const { toggleMobileSidebar } = useSidebar();
@@ -109,8 +110,9 @@ export function Navbar() {
         <Suspense fallback={null}>
           <GlobalCommandPalette />
         </Suspense>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
           <GlobalExecutionIndicator />
+          <NotificationsMenu />
         </div>
       </div>
     </nav>

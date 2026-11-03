@@ -1,16 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ExecutionResponseDetail, SaveFlowRequest, ExecuteFlowResponse } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
+import { useChatDock } from "@/contexts/ChatDockContext";
 import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
 import { useToast } from "@/components/ui/Toast";
-import { PierreFileTree } from "@/components/ui/PierreFileTree";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import {
   Command,
@@ -69,11 +69,13 @@ import {
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
+import { FlowExplorer } from "@/components/features/flow/FlowExplorer";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
+import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -81,8 +83,7 @@ const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 const EDITOR_OPTIONS = {
   minimap: { enabled: true, renderCharacters: false, maxColumn: 80, scale: 2 },
   fontSize: 14,
-  fontFamily:
-    "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace",
+  fontFamily: monoFontFamily,
   fontLigatures: true,
   lineNumbers: "on" as const,
   automaticLayout: true,
@@ -116,6 +117,8 @@ type SidePanel = "explorer" | "properties";
 export function WorkflowEditorPageContent() {
   const router = useRouter();
   const params = useParams();
+  // `?space=<creator>`: the Workflow page opened this editor to browse that creator's tree.
+  const initialSpace = useSearchParams().get("space");
   const queryClient = useQueryClient();
   const toast = useToast();
   const name = params.name as string;
@@ -126,6 +129,7 @@ export function WorkflowEditorPageContent() {
   const [username, setUsername] = useState("");
   const [chipId, setChipId] = useState("");
   const [tags, setTags] = useState("");
+  const [folder, setFolder] = useState("");
   const [defaultInterval, setDefaultInterval] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
@@ -285,6 +289,7 @@ export function WorkflowEditorPageContent() {
       setChipId(flow.chip_id);
 
       setTags(flow.tags?.join(", ") || "");
+      setFolder(flow.folder ?? "");
       const runParams = flow.default_run_parameters as
         | Record<string, { value?: string | number }>
         | undefined;
@@ -316,6 +321,33 @@ export function WorkflowEditorPageContent() {
 
   const isDirty = code !== originalCode;
 
+  // Tell the chat sidebar what is open here: the flow and the editor's current
+  // text, read when a turn is sent; a proposed edit lands in the editor unlocked.
+  const { registerPage } = useChatDock();
+  const pageState = useRef({ name, chipId, code, isDirty });
+  // Written after each commit, never during render; the provider below reads it when a turn is sent.
+  useEffect(() => {
+    pageState.current = { name, chipId, code, isDirty };
+  });
+  useEffect(
+    () =>
+      registerPage({
+        current: () => {
+          const { name, chipId, code, isDirty } = pageState.current;
+          return {
+            path: `/workflow/${name}`,
+            title: `Workflow editor: ${name}`,
+            flow: { name, chipId: chipId || undefined, code, dirty: isDirty },
+          };
+        },
+        applyCode: (next) => {
+          setCode(next);
+          setIsEditorLocked(false);
+        },
+      }),
+    [registerPage],
+  );
+
   const handleSave = useCallback(() => {
     if (isEditorLocked) return;
     if (!username.trim()) {
@@ -333,6 +365,7 @@ export function WorkflowEditorPageContent() {
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
+      folder: folder.trim(),
       default_parameters: {
         username: username.trim(),
         chip_id: chipId.trim(),
@@ -358,6 +391,7 @@ export function WorkflowEditorPageContent() {
     flowFunctionName,
     chipId,
     tags,
+    folder,
     defaultInterval,
     saveMutation,
     toast,
@@ -581,13 +615,6 @@ export function WorkflowEditorPageContent() {
     cmd.action();
   };
 
-  const filteredFlows =
-    flowsData?.data?.flows
-      ?.filter((f) =>
-        sidebarSearch ? f.name.toLowerCase().includes(sidebarSearch.toLowerCase()) : true,
-      )
-      .sort((a, b) => a.name.localeCompare(b.name)) ?? [];
-
   const sidePanelItems = [
     {
       id: "explorer" as const,
@@ -611,6 +638,7 @@ export function WorkflowEditorPageContent() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleEditorMount = useCallback((editor: any, monaco: any) => {
     editorRef.current = editor;
+    remeasureMonacoFontsWhenLoaded(monaco);
     editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
       setCursorPosition({
         line: e.position.lineNumber,
@@ -660,7 +688,7 @@ export function WorkflowEditorPageContent() {
         <div className="alert alert-error">
           <AlertTriangle className="h-5 w-5" />
           <div>
-            <div className="font-semibold">Failed to load flow</div>
+            <div className="font-medium">Failed to load flow</div>
             <div className="text-sm">{(error as Error)?.message}</div>
           </div>
         </div>
@@ -908,7 +936,7 @@ export function WorkflowEditorPageContent() {
                   >
                     <Icon size={18} />
                     {item.count ? (
-                      <span className="absolute right-0 top-0 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-content">
+                      <span className="absolute right-0 top-0 min-w-4 rounded-full bg-primary px-1 text-xs leading-4 text-primary-content">
                         {item.count > 99 ? "99+" : item.count}
                       </span>
                     ) : null}
@@ -931,7 +959,7 @@ export function WorkflowEditorPageContent() {
 
           {/* Side Panel */}
           <div
-            className={`flex flex-col overflow-hidden bg-base-200 transition-all duration-200 ${
+            className={`flex flex-col overflow-hidden bg-base-200 transition-colors duration-200 ${
               isSidebarVisible
                 ? "w-56 min-w-56 border-r border-base-300 sm:w-72 sm:min-w-72"
                 : "w-0 min-w-0"
@@ -939,7 +967,7 @@ export function WorkflowEditorPageContent() {
           >
             <div className="flex h-full w-56 min-w-56 flex-col sm:w-72 sm:min-w-72">
               <div className="flex h-9 items-center justify-between border-b border-base-300 px-3">
-                <span className="text-xs font-semibold uppercase tracking-wider text-base-content/60">
+                <span className="text-xs font-medium text-base-content/60">
                   {sidePanelItems.find((item) => item.id === activeSidePanel)?.label}
                 </span>
                 <button
@@ -973,40 +1001,19 @@ export function WorkflowEditorPageContent() {
                     </div>
                   </div>
                   <div className="min-h-0 flex-1 py-1">
-                    {filteredFlows.length > 0 && (
-                      <PierreFileTree
-                        nodes={filteredFlows.map((flow) => ({
-                          decoration:
-                            flow.name === name && isDirty
-                              ? {
-                                  color: "var(--color-warning)",
-                                  text: "●",
-                                  title: "Unsaved changes",
-                                }
-                              : flow.file_exists === false
-                                ? {
-                                    color: "var(--color-warning)",
-                                    text: "missing",
-                                    title: "Missing source file",
-                                  }
-                                : undefined,
-                          path: `${flow.name}.py`,
-                          type: "file",
-                        }))}
-                        onSelectFile={(path) => {
-                          const flowName = path.replace(/\.py$/, "");
-                          if (flowName !== name) {
-                            router.push(`/workflow/${encodeURIComponent(flowName)}`);
-                          }
-                        }}
-                        selectedPath={`${name}.py`}
-                      />
-                    )}
-                    {filteredFlows.length === 0 && (
-                      <div className="px-3 py-6 text-center text-xs text-base-content/40">
-                        No flows match the filter.
-                      </div>
-                    )}
+                    <FlowExplorer
+                      flows={flowsData?.data?.flows ?? []}
+                      username={userData?.data?.username}
+                      currentName={name}
+                      isDirty={isDirty}
+                      filter={sidebarSearch}
+                      initialSpace={initialSpace}
+                      onOpen={(flowName) => {
+                        if (flowName !== name) {
+                          router.push(`/workflow/${encodeURIComponent(flowName)}`);
+                        }
+                      }}
+                    />
                   </div>
                   <div className="border-t border-base-300 p-2">
                     <button
@@ -1027,7 +1034,7 @@ export function WorkflowEditorPageContent() {
                     <div className="flex items-center gap-2">
                       <FileCode size={16} className="text-primary" />
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold">{name}.py</div>
+                        <div className="truncate text-sm font-medium">{name}.py</div>
                         <div className="truncate text-xs text-base-content/50">
                           {flowFunctionName ? `${flowFunctionName}()` : "No entrypoint set"}
                         </div>
@@ -1114,6 +1121,20 @@ export function WorkflowEditorPageContent() {
                         className="input input-bordered input-sm"
                         value={tags}
                         onChange={(e) => setTags(e.target.value)}
+                      />
+                    </label>
+                    <label className="form-control flex flex-col gap-1">
+                      <span className="label py-1">
+                        <span className="label-text text-xs">Folder</span>
+                      </span>
+                      <input
+                        id="flow-side-folder"
+                        name="flowFolder"
+                        type="text"
+                        placeholder="daily/t1"
+                        className="input input-bordered input-sm"
+                        value={folder}
+                        onChange={(e) => setFolder(e.target.value)}
                       />
                     </label>
                     <label className="form-control flex flex-col gap-1">
@@ -1659,6 +1680,25 @@ export function WorkflowEditorPageContent() {
                   />
                   <label className="label">
                     <span className="label-text-alt text-xs">Comma-separated</span>
+                  </label>
+                </div>
+
+                <div className="form-control flex flex-col gap-1">
+                  <label htmlFor="flow-folder" className="label">
+                    <span className="label-text text-xs">Folder</span>
+                  </label>
+                  <input
+                    id="flow-folder"
+                    type="text"
+                    placeholder="daily/t1"
+                    className="input input-bordered input-sm"
+                    value={folder}
+                    onChange={(e) => setFolder(e.target.value)}
+                  />
+                  <label className="label">
+                    <span className="label-text-alt text-xs">
+                      Where it sits in your space on the Workflow page; "/" nests
+                    </span>
                   </label>
                 </div>
 

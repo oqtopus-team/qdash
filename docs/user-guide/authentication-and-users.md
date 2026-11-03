@@ -31,14 +31,20 @@ Only a system administrator can create an account. Open **Admin**, create the us
 the credentials through an appropriate secret-sharing channel. QDash creates a default project
 for the new account and makes that user its owner.
 
+![Creating a user from the Admin page](/images/guides/create-user.gif)
+
 Administrators can also reset a user's password from **Admin**. A reset replaces the current
 password and should be followed by a user-initiated password change.
+
+![Resetting a user's password from the Admin page](/images/guides/reset-password.gif)
 
 ## Change a Password
 
 An authenticated user can change their own password from **Settings** by supplying the current
 password and a new password. A user who cannot authenticate must ask an administrator for a
 reset.
+
+![Changing your password from Settings](/images/guides/change-password.gif)
 
 ## API Authentication
 

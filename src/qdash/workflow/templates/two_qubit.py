@@ -189,17 +189,19 @@ def two_qubit(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
+        task_parameters={
             # Per-task overrides — uncomment to tune the CR parameter search.
             # "CheckCrossResonance": {
-            #     "adiabatic_safe_factor": {"value": 0.65, "value_type": "float"},
-            #     "max_amplitude": {"value": 0.85, "value_type": "float"},
-            #     "max_time_range": {"value": 8192, "value_type": "int"},
+            #     "run": {
+            #         "adiabatic_safe_factor": 0.65,
+            #         "max_amplitude": 0.85,
+            #         "max_time_range": 8192,
+            #     },
             # },
         },
         default_run_parameters={
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

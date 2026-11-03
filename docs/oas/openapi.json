@@ -1874,7 +1874,7 @@
           "execution"
         ],
         "summary": "List executions",
-        "description": "List executions for a given chip with pagination.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
+        "description": "List executions for a given chip with pagination, optionally for one calendar day.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
         "operationId": "listExecutions",
         "security": [
           {
@@ -1921,6 +1921,37 @@
             "description": "Number of items to return"
           },
           {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{8}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only executions started on this day, YYYYMMDD",
+              "title": "Date"
+            },
+            "description": "Only executions started on this day, YYYYMMDD"
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "IANA time zone that defines the day for ``date``",
+              "default": "UTC",
+              "title": "Timezone"
+            },
+            "description": "IANA time zone that defines the day for ``date``"
+          },
+          {
             "name": "X-Project-Id",
             "in": "header",
             "required": false,
@@ -1944,6 +1975,98 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ListExecutionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/executions/activity": {
+      "get": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Count executions per day",
+        "description": "Count a chip's executions per calendar day, by status, over a trailing window.\n\nEvery day of the window is returned, empty days included, so a chart can draw a\ncontinuous axis. Days follow ``timezone`` so they match what the user sees.",
+        "operationId": "getExecutionActivity",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Chip ID to count executions for",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID to count executions for"
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "description": "Trailing window in calendar days",
+              "default": 30,
+              "title": "Days"
+            },
+            "description": "Trailing window in calendar days"
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "IANA time zone used to assign executions to days",
+              "default": "UTC",
+              "title": "Timezone"
+            },
+            "description": "IANA time zone used to assign executions to days"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionActivityResponse"
                 }
               }
             }
@@ -3002,14 +3125,14 @@
         }
       }
     },
-    "/agent-sessions/{session_id}/campaign-commits": {
+    "/agent-sessions/{session_id}/candidate-set-commits": {
       "post": {
         "tags": [
           "agent-session"
         ],
-        "summary": "Commit final agent campaign candidates",
+        "summary": "Commit the final agent candidate set",
         "description": "Validate a final candidate set and persist it with one Qubit save.",
-        "operationId": "commitAgentCampaignCandidates",
+        "operationId": "commitAgentCandidateSet",
         "security": [
           {
             "HTTPBearer": []
@@ -3047,7 +3170,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CommitAgentCampaignRequest"
+                "$ref": "#/components/schemas/CommitAgentCandidateSetRequest"
               }
             }
           }
@@ -3058,7 +3181,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AgentCampaignCommitResponse"
+                  "$ref": "#/components/schemas/AgentCandidateSetCommitResponse"
                 }
               }
             }
@@ -3076,14 +3199,14 @@
         }
       }
     },
-    "/agent-sessions/{session_id}/campaign-commits/{commit_id}": {
+    "/agent-sessions/{session_id}/candidate-set-commits/{commit_id}": {
       "get": {
         "tags": [
           "agent-session"
         ],
-        "summary": "Get an agent campaign commit",
-        "description": "Get one audited final campaign candidate-set commit.",
-        "operationId": "getAgentCampaignCommit",
+        "summary": "Get an agent candidate set commit",
+        "description": "Get one audited final candidate-set commit.",
+        "operationId": "getAgentCandidateSetCommit",
         "security": [
           {
             "HTTPBearer": []
@@ -3131,7 +3254,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AgentCampaignCommitResponse"
+                  "$ref": "#/components/schemas/AgentCandidateSetCommitResponse"
                 }
               }
             }
@@ -4647,7 +4770,7 @@
           "chip"
         ],
         "summary": "Create a new chip",
-        "description": "Create a new chip in the current project.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\nctx : ProjectContext\n    Project context with editor permission\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
+        "description": "Create a new chip in the current project.\n\nBesides the database records, this creates ``<chip_id>/`` in the Qubex\nconfiguration tree (``system_id == chip_id``) unless ``config.create`` is\nfalse or the directory already exists. Wiring and hardware files are copied\nfrom ``config.source_system_id`` when given; parameter files always start\nfrom QDash's templates.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id, size and configuration options\nctx : ProjectContext\n    Project context with editor permission\nscaffolder : ChipConfigScaffolder\n    Writer of the chip's configuration directory\n\nReturns\n-------\nCreateChipResponse\n    Created chip information and the configuration outcome\n\nRaises\n------\nHTTPException\n    If chip_id already exists, size is invalid, or the configuration\n    source cannot be used",
         "operationId": "createChip",
         "security": [
           {
@@ -4688,7 +4811,62 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ChipResponse"
+                  "$ref": "#/components/schemas/CreateChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/config-sources": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "List systems a new chip can copy wiring from",
+        "description": "List the systems in the Qubex configuration tree that have a wiring file.\n\nQDash runs every chip with ``system_id == chip_id``, so each entry is also a\nchip directory of the tree.",
+        "operationId": "listChipConfigSources",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListConfigSourcesResponse"
                 }
               }
             }
@@ -5791,7 +5969,7 @@
           "chip"
         ],
         "summary": "Re-run qubit spectroscopy analysis on a stored task result (preview)",
-        "description": "Re-run the qubit-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `qubit_frequency`,\n`f01_repr_db`, `f01_quality_level`, and `anharmonicity` for the requested\nqubit. The DB is **not** mutated; this is a preview only.",
+        "description": "Re-run the qubit-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `qubit_frequency`,\n`f01_repr_db`, `f01_quality_level`, and `qubit_anharmonicity` for the requested\nqubit. The DB is **not** mutated; this is a preview only.",
         "operationId": "reanalyzeQubitSpectroscopy",
         "security": [
           {
@@ -6098,7 +6276,7 @@
           "chip"
         ],
         "summary": "Get heatmap data for a single metric",
-        "description": "Get heatmap data for a single metric.\n\nReturns only the values needed for heatmap visualization (~5KB).\nMuch more efficient than fetching full chip data (~300KB+).\n\nSupported metrics:\n- Qubit: t1, t2_echo, t2_star, qubit_frequency, anharmonicity,\n         average_readout_fidelity, x90_gate_fidelity, x180_gate_fidelity\n- Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmetric : str\n    Name of the metric to retrieve\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nMetricHeatmapResponse\n    Metric values keyed by qubit/coupling ID",
+        "description": "Get heatmap data for a single metric.\n\nReturns only the values needed for heatmap visualization (~5KB).\nMuch more efficient than fetching full chip data (~300KB+).\n\nSupported metrics:\n- Qubit: t1, t2_echo, t2_star, qubit_frequency, qubit_anharmonicity,\n         average_readout_fidelity, x90_gate_fidelity, x180_gate_fidelity\n- Coupling: zx90_gate_fidelity, bell_state_fidelity, static_zz_interaction,\n            qubit_qubit_coupling_strength\n\nCoupling strength is stored, returned, and displayed in MHz.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nmetric : str\n    Name of the metric to retrieve\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nMetricHeatmapResponse\n    Metric values keyed by qubit/coupling ID",
         "operationId": "getChipMetricHeatmap",
         "security": [
           {
@@ -10507,29 +10685,59 @@
           "flow"
         ],
         "summary": "List all flow templates",
-        "description": "List all available flow templates.",
+        "description": "List the flow templates, optionally filtered to one backend.",
         "operationId": "listFlowTemplates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only templates written for this backend, e.g. qubex or fake",
+              "title": "Backend"
+            },
+            "description": "Only templates written for this backend, e.g. qubex or fake"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/FlowTemplate"
                   },
-                  "type": "array",
                   "title": "Response Listflowtemplates"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/flows/templates/{template_id}": {
@@ -11075,6 +11283,80 @@
         }
       }
     },
+    "/flows/{name}/folder": {
+      "patch": {
+        "tags": [
+          "flow"
+        ],
+        "summary": "Move a flow to another folder",
+        "description": "Change the folder a Flow is filed under; its code and deployment are untouched.",
+        "operationId": "moveFlow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveFlowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/{name}/schedule": {
       "post": {
         "tags": [
@@ -11268,7 +11550,7 @@
           "metrics"
         ],
         "summary": "Get Chip Metrics",
-        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    ctx: Project context with user and project information\n    metrics_service: Injected metrics service\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n    start_at: Optional absolute lower bound (ISO8601 or date)\n    end_at: Optional absolute upper bound (ISO8601 or date)\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
+        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, qubit anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    ctx: Project context with user and project information\n    metrics_service: Injected metrics service\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n    start_at: Optional absolute lower bound (ISO8601 or date)\n    end_at: Optional absolute upper bound (ISO8601 or date)\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
         "operationId": "getChipMetrics",
         "security": [
           {
@@ -16682,130 +16964,14 @@
         "title": "AgentActionType",
         "description": "Actions that a local agent may propose to QDash."
       },
-      "AgentCampaignCandidateReference": {
-        "properties": {
-          "action_id": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Action Id"
-          },
-          "parameter_name": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Parameter Name"
-          },
-          "task_id": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Task Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "action_id",
-          "parameter_name",
-          "task_id"
+      "AgentAutonomy": {
+        "type": "string",
+        "enum": [
+          "confirm_each",
+          "auto"
         ],
-        "title": "AgentCampaignCandidateReference",
-        "description": "Identify one authoritative accepted candidate for campaign finalization."
-      },
-      "AgentCampaignCommitResponse": {
-        "properties": {
-          "commit_id": {
-            "type": "string",
-            "title": "Commit Id"
-          },
-          "session_id": {
-            "type": "string",
-            "title": "Session Id"
-          },
-          "idempotency_key": {
-            "type": "string",
-            "title": "Idempotency Key"
-          },
-          "chip_id": {
-            "type": "string",
-            "title": "Chip Id"
-          },
-          "qid": {
-            "type": "string",
-            "title": "Qid"
-          },
-          "candidates": {
-            "items": {
-              "$ref": "#/components/schemas/AgentCandidateResponse"
-            },
-            "type": "array",
-            "title": "Candidates"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "reason": {
-            "type": "string",
-            "title": "Reason"
-          },
-          "before_snapshot": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Before Snapshot"
-          },
-          "after_snapshot": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "After Snapshot"
-          },
-          "committed_by": {
-            "type": "string",
-            "title": "Committed By"
-          },
-          "state_version_before": {
-            "type": "integer",
-            "title": "State Version Before"
-          },
-          "state_version_after": {
-            "type": "integer",
-            "title": "State Version After"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "committed_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Committed At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "commit_id",
-          "session_id",
-          "idempotency_key",
-          "chip_id",
-          "qid",
-          "candidates",
-          "status",
-          "reason",
-          "committed_by",
-          "state_version_before",
-          "state_version_after",
-          "created_at"
-        ],
-        "title": "AgentCampaignCommitResponse",
-        "description": "Audited all-at-once QDash commit of final campaign candidates."
+        "title": "AgentAutonomy",
+        "description": "How much of a plan the agent may run without a person confirming each step."
       },
       "AgentCandidateCommitResponse": {
         "properties": {
@@ -17024,6 +17190,36 @@
         "title": "AgentCandidateCommitResponse",
         "description": "Audited result of committing a gated candidate."
       },
+      "AgentCandidateReference": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Action Id"
+          },
+          "parameter_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Parameter Name"
+          },
+          "task_id": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Task Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_id",
+          "parameter_name",
+          "task_id"
+        ],
+        "title": "AgentCandidateReference",
+        "description": "Identify one authoritative accepted candidate for plan finalization."
+      },
       "AgentCandidateResponse": {
         "properties": {
           "session_id": {
@@ -17132,6 +17328,101 @@
         "title": "AgentCandidateResponse",
         "description": "A numeric candidate derived from an authoritative task result."
       },
+      "AgentCandidateSetCommitResponse": {
+        "properties": {
+          "commit_id": {
+            "type": "string",
+            "title": "Commit Id"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "title": "Idempotency Key"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCandidateResponse"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "before_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Before Snapshot"
+          },
+          "after_snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "After Snapshot"
+          },
+          "committed_by": {
+            "type": "string",
+            "title": "Committed By"
+          },
+          "state_version_before": {
+            "type": "integer",
+            "title": "State Version Before"
+          },
+          "state_version_after": {
+            "type": "integer",
+            "title": "State Version After"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "commit_id",
+          "session_id",
+          "idempotency_key",
+          "chip_id",
+          "qid",
+          "candidates",
+          "status",
+          "reason",
+          "committed_by",
+          "state_version_before",
+          "state_version_after",
+          "created_at"
+        ],
+        "title": "AgentCandidateSetCommitResponse",
+        "description": "Audited all-at-once QDash commit of the final candidate set."
+      },
       "AgentSessionPolicy": {
         "properties": {
           "qids": {
@@ -17183,6 +17474,19 @@
             "minimum": 1.0,
             "title": "Max Actions",
             "default": 100
+          },
+          "autonomy": {
+            "$ref": "#/components/schemas/AgentAutonomy",
+            "description": "auto lets a plan choose its next step from the evaluation without a person",
+            "default": "confirm_each"
+          },
+          "max_rounds_per_target": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Rounds Per Target",
+            "description": "How many times an autonomous plan may run the same node on one target",
+            "default": 3
           }
         },
         "type": "object",
@@ -17891,6 +18195,105 @@
         "title": "CandidateGateResponse",
         "description": "Side-effect-free deterministic decision for one candidate value."
       },
+      "ChipConfigOptions": {
+        "properties": {
+          "create": {
+            "type": "boolean",
+            "title": "Create",
+            "description": "Create the directory when it does not exist yet",
+            "default": true
+          },
+          "source_system_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source System Id",
+            "description": "Existing system whose wiring and hardware files are copied; empty wiring when omitted"
+          },
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "quel1",
+                  "quel3"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend",
+            "description": "Backend of the new system; taken from the source system when one is given"
+          }
+        },
+        "type": "object",
+        "title": "ChipConfigOptions",
+        "description": "How to create ``<chip_id>/`` in the Qubex configuration tree (system_id == chip_id)."
+      },
+      "ChipConfigResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "existing",
+              "skipped"
+            ],
+            "title": "Status"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "source_system_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source System Id"
+          },
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "path"
+        ],
+        "title": "ChipConfigResult",
+        "description": "Outcome of creating the chip's configuration directory."
+      },
       "ChipDatesResponse": {
         "properties": {
           "data": {
@@ -18158,38 +18561,6 @@
         "title": "ChipResponse",
         "description": "Chip response model.\n\nQubit and coupling data are stored in separate collections for scalability\nand should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubit_count (int): Number of qubits in the chip.\n    coupling_count (int): Number of couplings in the chip.\n    installed_at (datetime | None): Installation timestamp."
       },
-      "CommitAgentCampaignRequest": {
-        "properties": {
-          "idempotency_key": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 1,
-            "title": "Idempotency Key"
-          },
-          "expected_state_version": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Expected State Version"
-          },
-          "candidates": {
-            "items": {
-              "$ref": "#/components/schemas/AgentCampaignCandidateReference"
-            },
-            "type": "array",
-            "maxItems": 100,
-            "minItems": 1,
-            "title": "Candidates"
-          }
-        },
-        "type": "object",
-        "required": [
-          "idempotency_key",
-          "expected_state_version",
-          "candidates"
-        ],
-        "title": "CommitAgentCampaignRequest",
-        "description": "Commit the final accepted candidate set for one same-qubit campaign."
-      },
       "CommitAgentCandidateRequest": {
         "properties": {
           "idempotency_key": {
@@ -18218,6 +18589,38 @@
         ],
         "title": "CommitAgentCandidateRequest",
         "description": "Commit one server-derived candidate into authoritative calibration state."
+      },
+      "CommitAgentCandidateSetRequest": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key"
+          },
+          "expected_state_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected State Version"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AgentCandidateReference"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_state_version",
+          "candidates"
+        ],
+        "title": "CommitAgentCandidateSetRequest",
+        "description": "Commit the final accepted candidate set for one same-qubit plan."
       },
       "Condition": {
         "properties": {
@@ -18277,6 +18680,38 @@
         "type": "object",
         "title": "ConfigReloadResponse",
         "description": "Response model for config cache reload."
+      },
+      "ConfigSourceResponse": {
+        "properties": {
+          "system_id": {
+            "type": "string",
+            "title": "System Id"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend"
+          },
+          "mux_count": {
+            "type": "integer",
+            "title": "Mux Count"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "system_id",
+          "backend",
+          "mux_count",
+          "files"
+        ],
+        "title": "ConfigSourceResponse",
+        "description": "An existing system whose wiring a new chip can copy."
       },
       "CooldownCreateRequest": {
         "properties": {
@@ -18898,6 +19333,48 @@
         "properties": {
           "chip_id": {
             "type": "string",
+            "title": "Chip Id",
+            "description": "Chip ID: starts with a letter or digit; contains only letters, digits, '.', '-' and '_'. Reserved names template, archive, schemas and scripts are not allowed."
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "default": 64
+          },
+          "topology_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topology Id"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChipConfigOptions"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Qubex configuration directory to create; defaults to creating one"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id"
+        ],
+        "title": "CreateChipRequest",
+        "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024).\n    topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'."
+      },
+      "CreateChipResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
             "title": "Chip Id"
           },
           "size": {
@@ -18915,14 +19392,69 @@
               }
             ],
             "title": "Topology Id"
+          },
+          "qubit_count": {
+            "type": "integer",
+            "title": "Qubit Count",
+            "default": 0
+          },
+          "coupling_count": {
+            "type": "integer",
+            "title": "Coupling Count",
+            "default": 0
+          },
+          "installed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed At"
+          },
+          "activity_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "title": "Activity Status",
+            "default": "active"
+          },
+          "current_cooldown_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Cooldown Id"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChipConfigResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
           "chip_id"
         ],
-        "title": "CreateChipRequest",
-        "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024).\n    topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'."
+        "title": "CreateChipResponse",
+        "description": "A created chip plus what happened to its configuration directory."
       },
       "CreateCopilotChatSessionRequest": {
         "properties": {
@@ -20995,6 +21527,106 @@
         "title": "ExecutePipelineResponse",
         "description": "Dispatch result plus the resolved plan that was started."
       },
+      "ExecutionActivityDay": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "title": "Date",
+            "description": "Calendar day in the requested time zone, YYYY-MM-DD"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "default": 0
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running",
+            "description": "Executions still in progress (running, cancelling)",
+            "default": 0
+          },
+          "scheduled": {
+            "type": "integer",
+            "title": "Scheduled",
+            "description": "Executions not started yet (scheduled, pending)",
+            "default": 0
+          },
+          "cancelled": {
+            "type": "integer",
+            "title": "Cancelled",
+            "default": 0
+          },
+          "other": {
+            "type": "integer",
+            "title": "Other",
+            "description": "Any status not covered by the named buckets",
+            "default": 0
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "date"
+        ],
+        "title": "ExecutionActivityDay",
+        "description": "Executions started on one calendar day, counted by status."
+      },
+      "ExecutionActivityResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days",
+            "description": "Length of the window in calendar days"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "description": "IANA time zone the days are bucketed in"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since",
+            "description": "First day of the window, YYYY-MM-DD"
+          },
+          "until": {
+            "type": "string",
+            "title": "Until",
+            "description": "Last day of the window (today), YYYY-MM-DD"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionActivityDay"
+            },
+            "type": "array",
+            "title": "Buckets",
+            "description": "One entry per calendar day, oldest first, including empty days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "days",
+          "timezone",
+          "since",
+          "until",
+          "buckets"
+        ],
+        "title": "ExecutionActivityResponse",
+        "description": "Daily execution counts for a chip over a trailing window of days."
+      },
       "ExecutionAvailabilityRequest": {
         "properties": {
           "flow_name": {
@@ -21576,6 +22208,12 @@
             "title": "Tags",
             "description": "Tags"
           },
+          "folder": {
+            "type": "string",
+            "title": "Folder",
+            "description": "Folder path inside the creator's space, e.g. \"daily/t1\" (empty = root)",
+            "default": ""
+          },
           "file_exists": {
             "type": "boolean",
             "title": "File Exists",
@@ -21619,6 +22257,11 @@
             "title": "Category",
             "description": "Template category"
           },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "description": "Backend the template's tasks run on, e.g. qubex or fake"
+          },
           "filename": {
             "type": "string",
             "title": "Filename",
@@ -21636,6 +22279,7 @@
           "name",
           "description",
           "category",
+          "backend",
           "filename",
           "function_name"
         ],
@@ -21664,6 +22308,11 @@
             "title": "Category",
             "description": "Template category"
           },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "description": "Backend the template's tasks run on, e.g. qubex or fake"
+          },
           "filename": {
             "type": "string",
             "title": "Filename",
@@ -21686,6 +22335,7 @@
           "name",
           "description",
           "category",
+          "backend",
           "filename",
           "function_name",
           "code"
@@ -22725,6 +23375,12 @@
             "type": "array",
             "title": "Tags",
             "description": "Tags"
+          },
+          "folder": {
+            "type": "string",
+            "title": "Folder",
+            "description": "Folder path inside the creator's space, e.g. \"daily/t1\" (empty = root)",
+            "default": ""
           }
         },
         "type": "object",
@@ -23251,6 +23907,29 @@
         ],
         "title": "ListChipsResponse",
         "description": "Response model for listing chips."
+      },
+      "ListConfigSourcesResponse": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "Whether a Qubex configuration tree is mounted"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigSourceResponse"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "sources"
+        ],
+        "title": "ListConfigSourcesResponse",
+        "description": "Systems available as wiring sources for a new chip."
       },
       "ListCooldownWiringEventsResponse": {
         "properties": {
@@ -24644,6 +25323,48 @@
         "title": "MetricsSummaryResponse",
         "description": "Response model for aggregated metrics summary.\n\nReturns statistical summary computed by the database.\nMinimal data transfer (~0.1KB).\nMetrics are loaded dynamically from metrics.yaml config."
       },
+      "MoveFlowRequest": {
+        "properties": {
+          "folder": {
+            "type": "string",
+            "title": "Folder",
+            "description": "Target folder path, e.g. \"daily/t1\"; \"\" moves the flow to the root"
+          }
+        },
+        "type": "object",
+        "required": [
+          "folder"
+        ],
+        "title": "MoveFlowRequest",
+        "description": "Request to move a Flow to another folder of its creator's space."
+      },
+      "MoveFlowResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Flow name"
+          },
+          "folder": {
+            "type": "string",
+            "title": "Folder",
+            "description": "The folder the flow now sits in"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Success message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "folder",
+          "message"
+        ],
+        "title": "MoveFlowResponse",
+        "description": "Response after moving a flow."
+      },
       "MuxDetailResponse": {
         "properties": {
           "mux_id": {
@@ -25113,6 +25834,57 @@
         "type": "object",
         "title": "MuxTask",
         "description": "Task information for mux display."
+      },
+      "NextActionResponse": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "description": "continue, retry, run_task, or request_human"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task",
+            "description": "The task to run next, for run_task"
+          },
+          "overrides": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Overrides"
+          },
+          "suggested_range_parameter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Range Parameter",
+            "description": "Input set from the midpoint of the evaluation's suggested range, for retry"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "NextActionResponse",
+        "description": "One autonomous-plan step, keyed by the evaluation status that triggers it."
       },
       "NoteCommentModel": {
         "properties": {
@@ -26648,7 +27420,8 @@
           "run_parameter_overrides": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Run Parameter Overrides"
+            "title": "Run Parameter Overrides",
+            "description": "Run parameter values keyed by name. A bare value takes the task's declared type. A parameter that declares a generated range also takes {\"value\": [...], \"value_type\": ...} with np.linspace, np.logspace, np.arange, range, or list to run the sweep in another form."
           },
           "reconfigure": {
             "type": "boolean",
@@ -27318,6 +28091,18 @@
             "type": "array",
             "title": "Tags",
             "description": "Tags for categorization"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder",
+            "description": "Folder path inside the creator's space, e.g. \"daily/t1\"; \"\" is the root. Omitted keeps an existing flow's folder (a new flow goes to the root)."
           }
         },
         "type": "object",
@@ -27340,6 +28125,7 @@
             },
             "description": "Adaptive calibration with convergence check",
             "flow_function_name": "my_adaptive_calibration",
+            "folder": "adaptive",
             "name": "my_adaptive_calibration",
             "tags": [
               "adaptive",
@@ -28612,6 +29398,14 @@
             },
             "type": "object",
             "title": "Run Parameters"
+          },
+          "output_parameters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output Parameters",
+            "description": "Names of the calibration parameters the task writes when it completes."
           }
         },
         "type": "object",
@@ -28660,6 +29454,14 @@
             "type": "string",
             "title": "Prompt Text",
             "description": "The background as Markdown, headed by the experiment name"
+          },
+          "next_actions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/NextActionResponse"
+            },
+            "type": "object",
+            "title": "Next Actions",
+            "description": "Autonomous-plan step per evaluation status code, from task.md's frontmatter. A status without an entry stops the plan for human review."
           },
           "reference": {
             "$ref": "#/components/schemas/TaskReferenceResponse",

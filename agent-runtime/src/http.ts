@@ -1,4 +1,14 @@
 import { timingSafeEqual } from "node:crypto";
+import { readFileSync } from "node:fs";
+
+/** Load the deployment secret; explicit credentials support standalone runtimes. */
+export function runtimeToken(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  return env.AGENT_RUNTIME_TOKEN ||
+    (env.AGENT_RUNTIME_TOKEN_FILE
+      ? readFileSync(env.AGENT_RUNTIME_TOKEN_FILE, "utf8").trim()
+      : undefined);
+}
+
 
 /** Safe client-facing failure raised while validating an HTTP request. */
 export class RequestError extends Error {

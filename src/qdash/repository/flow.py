@@ -114,6 +114,7 @@ class MongoFlowRepository:
         deployment_id: str,
         tags: list[str],
         default_run_parameters: dict[str, Any] | None = None,
+        folder: str = "",
     ) -> FlowDocument:
         """Create a new flow document.
 
@@ -129,6 +130,7 @@ class MongoFlowRepository:
             deployment_id: Prefect deployment ID
             tags: Tags for categorization
             default_run_parameters: Default run parameters for all tasks
+            folder: Folder path inside the creator's space (empty = root)
 
         Returns:
             Created FlowDocument
@@ -146,6 +148,7 @@ class MongoFlowRepository:
             file_path=file_path,
             deployment_id=deployment_id,
             tags=tags,
+            folder=folder,
         )
         flow_doc.insert()
         return flow_doc
@@ -161,6 +164,7 @@ class MongoFlowRepository:
         file_path: str | None = None,
         deployment_id: str | None = None,
         tags: list[str] | None = None,
+        folder: str | None = None,
     ) -> FlowDocument:
         """Update an existing flow document.
 
@@ -174,6 +178,7 @@ class MongoFlowRepository:
             file_path: New file path (optional)
             deployment_id: New deployment ID (optional)
             tags: New tags (optional)
+            folder: New folder path (optional)
 
         Returns:
             Updated FlowDocument
@@ -194,6 +199,8 @@ class MongoFlowRepository:
             flow.deployment_id = deployment_id
         if tags is not None:
             flow.tags = tags
+        if folder is not None:
+            flow.folder = folder
         flow.updated_at = now()
         flow.save()
         return flow

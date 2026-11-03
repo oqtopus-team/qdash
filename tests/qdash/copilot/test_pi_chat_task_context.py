@@ -20,6 +20,12 @@ _IMAGES_SENT = {
 }
 
 
+@pytest.fixture(autouse=True)
+def no_stored_user_instructions(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task-context tests run without the user-settings database."""
+    monkeypatch.setattr(pi_chat_service, "user_instructions", lambda _username: None)
+
+
 def _config() -> CopilotConfig:
     return CopilotConfig(
         enabled=True,

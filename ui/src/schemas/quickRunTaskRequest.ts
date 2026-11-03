@@ -20,6 +20,7 @@ export interface QuickRunTaskRequest {
   /** Source result for provenance only; execution uses current task definitions */
   source_task_id?: QuickRunTaskRequestSourceTaskId;
   input_parameter_overrides?: QuickRunTaskRequestInputParameterOverrides;
+  /** Run parameter values keyed by name. A bare value takes the task's declared type. A parameter that declares a generated range also takes {"value": [...], "value_type": ...} with np.linspace, np.logspace, np.arange, range, or list to run the sweep in another form. */
   run_parameter_overrides?: QuickRunTaskRequestRunParameterOverrides;
   reconfigure?: boolean;
   persist_output_parameters?: boolean;

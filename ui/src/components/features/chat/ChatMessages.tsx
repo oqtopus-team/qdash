@@ -21,8 +21,11 @@ import { FigureStrip, figuresInSteps } from "@/components/features/chat/ChatFigu
 import {
   ApprovalCard,
   AskCard,
+  EditProposalCard,
   type InteractionState,
 } from "@/components/features/chat/ChatInteractionCards";
+import { useOptionalChatDock } from "@/contexts/ChatDockContext";
+import { matchesEditTarget } from "@/lib/copilotEditTarget";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
 import { Loader } from "@/components/ui/Loader";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
@@ -150,7 +153,7 @@ function AssessmentBadge({ assessment }: { assessment: string | null }) {
   const { cls, Icon, label } = style;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${cls}`}
+      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${cls}`}
     >
       <Icon className="w-3.5 h-3.5" />
       {label}
@@ -197,7 +200,7 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
             key={key}
             type="button"
             onClick={() => setPreviewSrc(src)}
-            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-colors cursor-pointer"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- runtime-generated API preview */}
             <img
@@ -222,6 +225,18 @@ function BlocksContent({
   interaction: InteractionState;
 }) {
   const figures = blocks.trace ? figuresInSteps(blocks.trace.steps) : [];
+  // Preview only the proposal's target; the dock checks again when applying it.
+  const dock = useOptionalChatDock();
+  const state: InteractionState = dock?.canApplyCode
+    ? {
+        ...interaction,
+        applyCode: dock.applyCode,
+        currentCode: (edit) => {
+          const page = dock.currentPage();
+          return matchesEditTarget(edit, page) ? (page?.flow?.code ?? null) : null;
+        },
+      }
+    : interaction;
   return (
     <>
       {blocks.trace && <ChatTraceSummary trace={blocks.trace} />}
@@ -241,6 +256,9 @@ function BlocksContent({
         }
         if (block.type === "approval" && block.approval) {
           return <ApprovalCard key={i} approval={block.approval} state={interaction} />;
+        }
+        if (block.type === "edit" && block.edit) {
+          return <EditProposalCard key={i} edit={block.edit} state={state} />;
         }
         if (block.type === "chart" && block.chart) {
           return (
@@ -325,7 +343,7 @@ export const UserMessage = memo(function UserMessage({
           }}
           rows={1}
           aria-label="Edit message"
-          className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-[15px] leading-6"
+          className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-sm leading-6"
         />
         <div className="flex items-center justify-end gap-2 mt-2">
           <button type="button" onClick={cancelEdit} className="btn btn-ghost btn-sm rounded-full">
@@ -360,13 +378,13 @@ export const UserMessage = memo(function UserMessage({
         </div>
       ) : (
         message.attachedImage && (
-          <span className="inline-flex items-center gap-1 text-[11px] text-base-content/45">
+          <span className="inline-flex items-center gap-1 text-xs text-base-content/45">
             <ImageIcon className="w-3 h-3" />
             Figures attached
           </span>
         )
       )}
-      <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] text-[15px] leading-relaxed whitespace-pre-wrap break-words">
+      <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap break-words">
         {message.content}
       </div>
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
@@ -484,7 +502,7 @@ export function LiveAssistantMessage({
     .join("");
   const busy = turn.steps.some(
     (s) =>
-      (s.kind === "tool" && s.status === "running") ||
+      (s.kind === "tool" && (s.status === "running" || s.status === "drafting")) ||
       (s.kind === "thinking" && s.endedAt === undefined),
   );
 

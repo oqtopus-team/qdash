@@ -12,8 +12,10 @@ import React, {
 import type { ChatThinkingLevel } from "@/lib/chatThinking";
 import type { ModelOverride } from "@/lib/copilotModels";
 import {
+  appendArgsDelta,
   appendDelta,
   endTool,
+  startDraft,
   startTool,
   streamedAnswer,
   toPersistedTrace,
@@ -26,6 +28,7 @@ import type {
   ChatMessage,
   CopilotBlocksResult,
   LiveTurn,
+  PageContext,
 } from "@/types/copilotChat";
 
 // ---------------------------------------------------------------------------
@@ -62,6 +65,8 @@ export interface SendOptions {
   images?: ChatImageAttachment[];
   /** The user's decision on the write operation the last answer asked approval for. */
   approval?: { id: string; approve: boolean };
+  /** The page the user has open, from the chat dock; the assistant is told every turn. */
+  page?: PageContext | null;
 }
 
 interface CopilotChatSessionContextValue {
@@ -250,6 +255,7 @@ function buildTurnRequest(
   approval: SendOptions["approval"],
   images: ChatImageAttachment[] = [],
   thinkingLevel?: ChatThinkingLevel,
+  page?: PageContext | null,
 ): { url: string; body: Record<string, unknown> } {
   const context = session?.context;
   return {
@@ -257,6 +263,24 @@ function buildTurnRequest(
     body: {
       ...(approval ? { approval } : {}),
       ...(images.length ? { images } : {}),
+      ...(page
+        ? {
+            page: {
+              path: page.path,
+              title: page.title,
+              ...(page.flow
+                ? {
+                    flow: {
+                      name: page.flow.name,
+                      chip_id: page.flow.chipId ?? null,
+                      code: page.flow.code,
+                      dirty: page.flow.dirty,
+                    },
+                  }
+                : {}),
+            },
+          }
+        : {}),
       ...(context
         ? {
             task: {
@@ -594,6 +618,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
             options?.approval,
             images,
             options?.thinkingLevel,
+            options?.page,
           );
           const response = await fetch(url, {
             method: "POST",
@@ -624,6 +649,10 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
                   ...t,
                   steps: appendDelta(t.steps, "thinking", payload.text),
                 }));
+              } else if (evt.event === "tool_draft") {
+                updateTurn((t) => ({ ...t, steps: startDraft(t.steps, payload) }));
+              } else if (evt.event === "tool_args_delta") {
+                updateTurn((t) => ({ ...t, steps: appendArgsDelta(t.steps, payload) }));
               } else if (evt.event === "tool_start") {
                 updateTurn((t) => ({ ...t, steps: startTool(t.steps, payload) }));
               } else if (evt.event === "tool_end") {

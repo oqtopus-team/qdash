@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 630" role="img" aria-label="Agentic calibration closed loop. On the agent side, qdash-agent run-plan holds the approved plan, a step runner, and an evaluation planner. The step runner proposes an action to the session, QDash authorises or rejects it, runs the task through the system-single-task deployment without writing parameters, writes the task result, and gates the staged candidate against the session bounds and quality gates. The planner asks QDash to evaluate the task result's figure against the task knowledge reference, reads the status, suggested range, and fit assessment, looks the status up in the task knowledge's next_actions table, and returns the next node, one-shot overrides, or an escalation to the plan. A plan that ends in pass commits the accepted candidate set with one Qubit save and one audit record.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-dash { stroke-dasharray: 5 4; }
+    .qd-api { fill: rgba(219, 109, 40, 0.12); stroke: #db6d28; stroke-width: 1.5; }
+    .qd-wf { fill: rgba(130, 80, 223, 0.12); stroke: #8250df; stroke-width: 1.5; }
+    .qd-data { fill: rgba(9, 105, 218, 0.10); stroke: #0969da; stroke-width: 1.5; }
+    .qd-client { fill: rgba(46, 160, 67, 0.12); stroke: #2ea043; stroke-width: 1.5; }
+    .qd-ext { fill: none; stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; stroke-dasharray: 5 4; }
+    .qd-reject { stroke: #e5484d; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+    .qd-reject-head { fill: #e5484d; }
+    .qd-reject-text { fill: #e5484d; font-size: 11.5px; text-anchor: middle; }
+  </style>
+  <defs>
+    <marker id="qd-agcal-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+    <marker id="qd-agcal-reject" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-reject-head"/>
+    </marker>
+  </defs>
+
+  <g class="qd-root">
+    <!-- Agent side -->
+    <rect x="25" y="20" width="990" height="140" rx="8" class="qd-ext"/>
+    <text x="520" y="42" class="qd-title">qdash-agent run-plan (runs outside QDash, under one approved session)</text>
+
+    <path d="M865,80 v-12 h-690 v12" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="520" y="62" class="qd-sub">$default · node id + one-shot overrides · $complete · $escalate</text>
+
+    <rect x="50" y="80" width="250" height="60" rx="8" class="qd-client"/>
+    <text x="175" y="105" class="qd-title">Plan</text>
+    <text x="175" y="123" class="qd-sub">nodes · on_pass · on_rollback · budget</text>
+
+    <rect x="395" y="80" width="250" height="60" rx="8" class="qd-client"/>
+    <text x="520" y="105" class="qd-title">Step runner</text>
+    <text x="520" y="123" class="qd-sub">propose · execute · wait · gate</text>
+
+    <rect x="740" y="80" width="250" height="60" rx="8" class="qd-client"/>
+    <text x="865" y="105" class="qd-title">Evaluation planner</text>
+    <text x="865" y="123" class="qd-sub">status → next_actions → bounds</text>
+
+    <line x1="300" y1="110" x2="393" y2="110" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="347" y="102" class="qd-label" text-anchor="middle">next node</text>
+    <line x1="645" y1="110" x2="738" y2="110" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="692" y="102" class="qd-label" text-anchor="middle">outcome</text>
+
+    <!-- Boundary -->
+    <line x1="25" y1="200" x2="1015" y2="200" class="qd-edge qd-dash"/>
+    <text x="105" y="192" class="qd-label" text-anchor="middle">agent side</text>
+    <text x="105" y="216" class="qd-label" text-anchor="middle">QDash side</text>
+
+    <!-- Agent requests -->
+    <line x1="312" y1="160" x2="312" y2="258" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="320" y="240" class="qd-label">propose · execute</text>
+    <line x1="728" y1="258" x2="728" y2="162" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="720" y="240" class="qd-label" text-anchor="end">accepted or rejected</text>
+    <line x1="915" y1="160" x2="915" y2="258" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="907" y="240" class="qd-label" text-anchor="end">commit on pass</text>
+
+    <!-- Row 1 -->
+    <rect x="25" y="260" width="160" height="60" rx="8" class="qd-api"/>
+    <text x="105" y="285" class="qd-title">Session</text>
+    <text x="105" y="303" class="qd-sub">grant · autonomy · version</text>
+
+    <rect x="232" y="260" width="160" height="60" rx="8" class="qd-api"/>
+    <text x="312" y="285" class="qd-title">Action</text>
+    <text x="312" y="303" class="qd-sub">authorized · rejected</text>
+
+    <rect x="440" y="260" width="160" height="60" rx="8" class="qd-wf"/>
+    <text x="520" y="285" class="qd-title">system-single-task</text>
+    <text x="520" y="303" class="qd-sub">update_params=false</text>
+
+    <rect x="648" y="260" width="160" height="60" rx="8" class="qd-api"/>
+    <text x="728" y="285" class="qd-title">Candidate gate</text>
+    <text x="728" y="303" class="qd-sub">bounds · quality gates</text>
+
+    <rect x="855" y="260" width="120" height="60" rx="8" class="qd-api"/>
+    <text x="915" y="285" class="qd-title">Candidate set</text>
+    <text x="915" y="303" class="qd-sub">one save + audit</text>
+
+    <line x1="185" y1="290" x2="230" y2="290" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="208" y="282" class="qd-label" text-anchor="middle">grant</text>
+    <line x1="392" y1="290" x2="438" y2="290" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="416" y="282" class="qd-label" text-anchor="middle">run</text>
+
+    <!-- Rejections -->
+    <line x1="312" y1="320" x2="312" y2="352" class="qd-reject" marker-end="url(#qd-agcal-reject)"/>
+    <text x="312" y="370" class="qd-reject-text">outside grant or stale version:</text>
+    <text x="312" y="386" class="qd-reject-text">rejected, the plan escalates</text>
+
+    <line x1="790" y1="320" x2="790" y2="352" class="qd-reject" marker-end="url(#qd-agcal-reject)"/>
+    <text x="790" y="370" class="qd-reject-text">out of bounds or missing</text>
+    <text x="790" y="386" class="qd-reject-text">metric: rollback, not written</text>
+
+    <!-- Row 2: task result and evaluation -->
+    <path d="M440,410 v40 a80,8 0 0,0 160,0 v-40" class="qd-data"/>
+    <ellipse cx="520" cy="410" rx="80" ry="8" class="qd-data"/>
+    <text x="520" y="433" class="qd-title">Task result</text>
+    <text x="520" y="449" class="qd-sub">outputs · figure · r2</text>
+
+    <line x1="520" y1="320" x2="520" y2="400" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="512" y="364" class="qd-label" text-anchor="end">writes</text>
+    <line x1="600" y1="425" x2="690" y2="322" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="628" y="380" class="qd-label">reads</text>
+
+    <rect x="638" y="410" width="180" height="60" rx="8" class="qd-api"/>
+    <text x="728" y="435" class="qd-title">Evaluation run</text>
+    <text x="728" y="453" class="qd-sub">qcal_evaluate · trigger single</text>
+    <line x1="600" y1="440" x2="636" y2="440" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="618" y="432" class="qd-label" text-anchor="middle">figure</text>
+
+    <!-- Row 3: task knowledge -->
+    <path d="M638,526 h90 l8,-6 h78 a4,4 0 0,1 4,4 v52 h-180 z" class="qd-data"/>
+    <text x="728" y="550" class="qd-title">Task knowledge</text>
+    <text x="728" y="566" class="qd-sub">task.md · next_actions</text>
+    <line x1="728" y1="520" x2="728" y2="472" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="736" y="500" class="qd-label">reference</text>
+
+    <!-- Planner edges -->
+    <path d="M990,162 V440 H820" class="qd-edge" marker-start="url(#qd-agcal-arrow)" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="982" y="352" class="qd-label" text-anchor="end">evaluate task_id</text>
+    <text x="982" y="368" class="qd-label" text-anchor="end">status · range · fit</text>
+    <path d="M818,560 H1010 V162" class="qd-edge" marker-end="url(#qd-agcal-arrow)"/>
+    <text x="1002" y="504" class="qd-label" text-anchor="end">next_actions</text>
+
+    <!-- Legend -->
+    <g transform="translate(25,598)">
+      <rect x="0" y="0" width="22" height="14" rx="3" class="qd-client"/>
+      <text x="30" y="11" class="qd-label">Python client</text>
+      <rect x="125" y="0" width="22" height="14" rx="3" class="qd-api"/>
+      <text x="155" y="11" class="qd-label">API</text>
+      <rect x="210" y="0" width="22" height="14" rx="3" class="qd-wf"/>
+      <text x="240" y="11" class="qd-label">Prefect deployment</text>
+      <rect x="375" y="0" width="22" height="14" rx="3" class="qd-data"/>
+      <text x="405" y="11" class="qd-label">Data</text>
+      <rect x="460" y="0" width="22" height="14" rx="3" class="qd-ext"/>
+      <text x="490" y="11" class="qd-label">Outside QDash</text>
+      <line x1="600" y1="7" x2="622" y2="7" class="qd-reject"/>
+      <text x="630" y="11" class="qd-label">Rejected</text>
+    </g>
+  </g>
+</svg>

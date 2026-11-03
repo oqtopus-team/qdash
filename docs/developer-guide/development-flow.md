@@ -83,11 +83,15 @@ Betterleaks runs on every commit via a Lefthook-managed pre-commit hook and bloc
 | Command                  | Description                                              |
 | ------------------------ | -------------------------------------------------------- |
 | `task scan-leaks`        | Scan the entire repository with Betterleaks              |
+| `task scan-leaks-local` | Scan tracked working files and commits absent from the target branch |
 | `task scan-leaks-staged` | Scan staged files only                                   |
 | `task scan-secrets`      | Scan git history with Trufflehog (verified secrets only) |
 | `task scan-secrets-all`  | Scan git history with Trufflehog (all findings)          |
 
-`task check` includes `scan-leaks`.
+`task check` includes `scan-leaks-local`. The default target is `origin/develop`;
+use `task check LEAKS_BASE=origin/main` for another target. See the
+[local scan boundaries](./conventions/credential-scan.md#running-locally) for prerequisites
+and excluded files.
 
 ## Pull Requests
 
@@ -95,8 +99,30 @@ Open pull requests against `develop` unless the release process requires another
 Use the repository pull request template and keep the description focused on the behavior change,
 important implementation notes, and verification performed.
 
-Before opening a PR, run focused checks for the files you changed. For broad changes, prefer:
+### Before Pushing
+
+Every push requires a successful `task check` on the content being pushed, including
+documentation-only changes and updates to existing PRs. Focused tests during development,
+pre-commit hooks, and CI supplement this gate.
+
+Stage intended new files so the leak scan includes them. Fetch the PR target branch
+to refresh its local reference, then run the check from the repository root:
 
 ```bash
+git fetch origin develop
 task check
 ```
+
+For a different PR target, fetch that branch and set `LEAKS_BASE`, for example:
+
+```bash
+git fetch origin main
+task check LEAKS_BASE=origin/main
+```
+
+`task check` runs auto-fixing linters. Review the resulting diff and include intended
+fixes in the commit. If you edit files after the check, rerun it before pushing.
+Require exit status 0; if the check fails or cannot run, resolve the failure before
+pushing. Report the failed command and reason if blocked, and do not push.
+
+Record the check command and result in the PR description and the agent's final handoff.

@@ -7,7 +7,7 @@ QDash runs three tools to keep secrets out of the repository: Lefthook orchestra
 | Tool        | Where it runs                          | What it scans                                   | Configuration                    |
 | ----------- | -------------------------------------- | ----------------------------------------------- | -------------------------------- |
 | Lefthook    | Local pre-commit                       | Triggers Betterleaks against staged files       | `lefthook.yml`                   |
-| Betterleaks | Local pre-commit                       | Pattern match for secrets in working tree       | `.betterleaks.toml`              |
+| Betterleaks | Local pre-commit and `task check` | Staged files, or tracked working files and branch commits | `.betterleaks.toml` |
 | Trufflehog  | CI only (push, PR to `main`/`develop`) | Git history; only verified secrets are reported | `.trufflehog-exclude-paths.txt`  |
 
 CI definitions live in `.github/workflows/secret-scan.yml`. Installation instructions are in [Setup](../setup.md#secret-scanning-tools).
@@ -113,11 +113,28 @@ The repository ships task targets that mirror the CI commands.
 | Command                  | What it does                                                |
 | ------------------------ | ----------------------------------------------------------- |
 | `task scan-leaks`        | Betterleaks over the full git history                       |
+| `task scan-leaks-local` | Betterleaks over tracked working files and commits absent from the target branch |
 | `task scan-leaks-staged` | Betterleaks against staged files only (same as pre-commit)  |
 | `task scan-secrets`      | Trufflehog against git history, verified findings only      |
 | `task scan-secrets-all`  | Trufflehog against git history, including unverified hits   |
 
-`task check` (the standard pre-push gate) includes `scan-leaks`.
+`task check` (the standard pre-push gate) includes `scan-leaks-local`.
+`scripts/scan_local_leaks.sh` copies regular files listed by `git ls-files` from the
+working tree into a temporary directory, then scans commits in `origin/develop..HEAD`.
+This detects secrets added and removed in separate branch commits without scanning
+unrelated branches or commits already reachable from the target.
+
+Fetch the target branch before checking so the local reference is current. Override
+the target with `task check LEAKS_BASE=origin/main` or
+`task scan-leaks-local LEAKS_BASE=origin/main`. A missing target, shallow clone,
+unrelated target history, or missing Betterleaks executable causes the local scan to fail.
+
+New files must be staged with `git add` to enter the working-file scan. Untracked files,
+deleted files, symlinks, and submodule directories are excluded from that scan.
+The pre-commit hook separately checks staged contents; the local scan reads current
+working contents, including unstaged edits. Findings are redacted in local scan output.
+Use `task scan-leaks` explicitly for an audit across all local Git history, including
+other fetched branches.
 
 ## Reading Output
 

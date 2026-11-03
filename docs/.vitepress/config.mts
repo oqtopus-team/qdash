@@ -17,6 +17,12 @@ export default withMermaid(
       build: {
         target: "es2022",
       },
+      optimizeDeps: {
+        esbuildOptions: {
+          // Keep dev pre-bundling aligned with the production target.
+          target: "es2022",
+        },
+      },
     },
     base: "/qdash/",
     title: "QDash",
@@ -114,6 +120,7 @@ export default withMermaid(
                 },
                 { text: "Dashboard", link: "/user-guide/dashboard" },
                 { text: "Running Calibrations", link: "/user-guide/running-calibrations" },
+                { text: "Creating Workflows", link: "/user-guide/creating-workflows" },
                 { text: "Task Parameters", link: "/user-guide/task-parameters" },
                 { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
                 { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
@@ -188,10 +195,13 @@ export default withMermaid(
               collapsed: true,
               items: [
                 { text: "Architecture", link: "/developer-guide/copilot/architecture" },
+                { text: "Pi Packages", link: "/developer-guide/copilot/packages" },
+                { text: "Pi Extension Design", link: "/developer-guide/copilot/extensions" },
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },
+                { text: "Agentic Calibration", link: "/developer-guide/copilot/agentic-calibration" },
                 { text: "Knowledge Layout", link: "/developer-guide/copilot/knowledge-layout" },
                 { text: "Calibration Evaluation", link: "/developer-guide/copilot/evaluation" },
-                { text: "Python Sandbox", link: "/developer-guide/copilot/python-sandbox" },
+                { text: "Workspace", link: "/developer-guide/copilot/workspace" },
                 { text: "Chat Streaming", link: "/developer-guide/copilot/chat-streaming" },
               ],
             },
@@ -216,6 +226,8 @@ export default withMermaid(
                 { text: "OpenAPI", link: "/reference/openapi" },
                 { text: "Python Client", link: "/reference/clients/python" },
                 { text: "TypeScript Client", link: "/reference/clients/typescript" },
+                { text: "pi-qdash", link: "/reference/pi-qdash" },
+                { text: "pi-qcaleval", link: "/reference/pi-qcaleval" },
               ],
             },
             {

@@ -59,7 +59,7 @@ _MANUALLY_CORRECTABLE_TASKS = {
 _FAILED_TASK_CORRECTABLE_PARAMETERS = {
     "CheckQubitSpectroscopy": {
         "coarse_qubit_frequency",
-        "anharmonicity",
+        "qubit_anharmonicity",
         "f01_repr_db",
         "f01_quality_level",
         "coarse_control_amplitude",
@@ -401,6 +401,8 @@ class ManualUpdateService:
             )
 
         allowed_names = set(source_doc.output_parameter_names)
+        if "anharmonicity" in allowed_names:
+            allowed_names.add("qubit_anharmonicity")
         if source_doc.status == "failed":
             allowed_names.update(_FAILED_TASK_CORRECTABLE_PARAMETERS.get(source_doc.name, set()))
         unknown_names = sorted(set(request.parameters) - allowed_names)

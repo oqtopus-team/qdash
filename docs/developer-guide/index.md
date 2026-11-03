@@ -19,7 +19,7 @@ product are in the [User Guide](../user-guide/index.md).
 | API | Authentication, project access, persistence, and HTTP contracts | [API Design Guidelines](./api/design.md) |
 | UI | Routes, interaction, server state, and presentation | [UI Architecture](./ui/architecture.md) |
 | Workflow | Calibration execution, scheduling, parameters, and Prefect integration | [Workflow Engine Architecture](./workflow/engine-architecture.md) |
-| Copilot | Chat, evaluation, agent execution, and sandboxing | [Copilot Architecture](./copilot/architecture.md) |
+| Copilot | Chat, evaluation, agent execution, and the workspace | [Copilot Architecture](./copilot/architecture.md) |
 | Cross-component design | Data flow, schedulers, topology, notes, and provenance | [Architecture](./architecture.md) |
 
 Use the component groups in the sidebar to open implementation rules and focused test guides. Use

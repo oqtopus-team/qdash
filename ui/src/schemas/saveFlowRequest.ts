@@ -8,6 +8,7 @@
 import type { SaveFlowRequestDefaultParameters } from './saveFlowRequestDefaultParameters';
 import type { SaveFlowRequestDefaultRunParameters } from './saveFlowRequestDefaultRunParameters';
 import type { SaveFlowRequestFlowFunctionName } from './saveFlowRequestFlowFunctionName';
+import type { SaveFlowRequestFolder } from './saveFlowRequestFolder';
 
 /**
  * Request to save a Flow.
@@ -29,4 +30,6 @@ export interface SaveFlowRequest {
   default_run_parameters?: SaveFlowRequestDefaultRunParameters;
   /** Tags for categorization */
   tags?: string[];
+  /** Folder path inside the creator's space, e.g. "daily/t1"; "" is the root. Omitted keeps an existing flow's folder (a new flow goes to the root). */
+  folder?: SaveFlowRequestFolder;
 }

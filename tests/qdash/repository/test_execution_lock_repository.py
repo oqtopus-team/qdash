@@ -303,3 +303,21 @@ def test_availability_does_not_create_lock_and_respects_legacy_lock(init_db: obj
     assert repo.has_conflict(PROJECT_ID, scope)
     repo.unlock(PROJECT_ID, "legacy")
     assert not repo.has_conflict(PROJECT_ID, scope)
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_list_reservation_owners_is_project_scoped(init_db: object, legacy: bool) -> None:
+    """Polling discovers all owners for its project without including another project's claims."""
+    repo = MongoExecutionLockRepository()
+    assert repo.list_owner_execution_ids(PROJECT_ID) == []
+    if legacy:
+        repo.lock(PROJECT_ID, "exec-1")
+        expected = ["exec-1"]
+    else:
+        assert repo.try_lock(PROJECT_ID, "exec-1", "chip-1", ("mux:20",), False)
+        assert repo.try_lock(PROJECT_ID, "exec-2", "chip-1", ("mux:21",), False)
+        expected = ["exec-1", "exec-2"]
+    repo.lock("other-project", "other-execution")
+    assert repo.list_owner_execution_ids(PROJECT_ID) == expected
+    repo.unlock(PROJECT_ID)
+    assert repo.list_owner_execution_ids(PROJECT_ID) == []

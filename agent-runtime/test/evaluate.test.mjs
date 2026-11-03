@@ -85,7 +85,7 @@ function deps(results, knowledge = REFERENCE) {
         { id: "e1", title: "Short T1", outcome: "suboptimal", status: "SHORT_T1", suggested_range: "", parameters: '{"t1": 14}', analysis: "Short.", images: [{ data: PNG, mimeType: "image/png" }], paths: ["examples/figures/t1.png"] },
       ];
     },
-    evaluator: { name: "@orangekame3/pi-qcaleval", version: "0.0.2-beta.5", source: "checkout", commit: "042e454323b2" },
+    evaluator: { name: "@oqtopus-team/pi-qcaleval", version: "0.0.2-beta.5", source: "checkout", commit: "042e454323b2" },
   };
 }
 
@@ -365,7 +365,7 @@ test("a planner turn's qcal_evaluate result yields the same record as a direct e
   };
   const record = recordFromDetails("task-1", details, {
     mode: "planner",
-    evaluator: { name: "@orangekame3/pi-qcaleval", version: "0.0.1", source: "checkout" },
+    evaluator: { name: "@oqtopus-team/pi-qcaleval", version: "0.0.1", source: "checkout" },
     planner: { model: "openai-compatible/qwen", answer: "Looks good.", tool_calls: [EVIDENCE_TOOL, EVALUATION_TOOL], duration_ms: 40000 },
   });
   assert.equal(record.mode, "planner");

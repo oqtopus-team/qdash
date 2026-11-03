@@ -24,7 +24,9 @@ what these pages show. Include that scope when sharing an observation.
 3. Review coverage and distributions, then select a metric or target that needs investigation.
 
 Open **Metrics** when one parameter across many targets is the focus. For coupling data, confirm
-the displayed direction before comparing values.
+the displayed direction before comparing values. Narrow the **Color range** above the topology when
+an outlier flattens the other colors; the range is shared with **Dashboard** and described in
+[Dashboard](./dashboard.md#scan-chip-health).
 
 ## Inspect Measurements
 

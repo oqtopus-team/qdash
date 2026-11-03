@@ -160,7 +160,7 @@ export function ExecutionTaskProgress({ status, note }: ExecutionTaskProgressPro
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-medium">{progressLabel}</span>
         {displayedPercentage !== null && (
-          <span className="shrink-0 text-lg font-semibold tabular-nums text-primary">
+          <span className="shrink-0 text-sm font-medium tabular-nums text-primary">
             {displayedPercentage < 100 ? Math.min(Math.round(displayedPercentage), 99) : 100}%
           </span>
         )}

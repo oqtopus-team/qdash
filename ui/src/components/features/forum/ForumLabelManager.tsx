@@ -149,10 +149,10 @@ export function ForumLabelManager({ labels }: ForumLabelManagerProps) {
   };
 
   return (
-    <div className="card bg-base-200 shadow-lg mb-4">
+    <div className="card bg-base-200 shadow-sm mb-4">
       <div className="card-body">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="card-title text-sm">Forum Labels</h2>
+          <h2 className="card-title">Forum Labels</h2>
         </div>
         <div className="mb-4 grid gap-2 sm:grid-cols-[150px_1fr_96px_80px]">
           <input

@@ -1,0 +1,6 @@
+meta:
+  description: Control frequency for the e-f transition
+  unit: GHz
+  default: null
+  scope: qubit
+data: {}

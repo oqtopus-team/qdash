@@ -232,6 +232,7 @@ config/qubex/*
 !config/qubex/qubex.example/
 config/qubex-config/*
 config/task-knowledge/
+config/quelware-client/*
 src/tools/schedule/*
 .serena/
 .mcp.json
@@ -248,3 +249,8 @@ scripts/estimate_qubit_frequency
 scripts/estimate-resonator-frequency
 .direnv
 tmp
+/notes
+
+# Compiled pi package tests and release tarballs.
+packages/*/.test-dist/
+*.tgz

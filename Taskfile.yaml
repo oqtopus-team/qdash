@@ -263,6 +263,11 @@ tasks:
     cmds:
       - uv run pytest clients/python/tests/ -v
 
+  build-client-ts:
+    desc: Build the local TypeScript client for pi packages and the runtime
+    cmds:
+      - bun run build:client
+
   test-client-ts:
     desc: Run TypeScript client checks
     dir: clients/typescript
@@ -408,6 +413,13 @@ tasks:
     cmds:
       - bash scripts/scan_staged_leaks.sh --verbose
 
+  scan-leaks-local:
+    desc: Scan tracked working files and commits not in LEAKS_BASE (default origin/develop)
+    env:
+      LEAKS_BASE: '{{.LEAKS_BASE | default "origin/develop"}}'
+    cmds:
+      - bash scripts/scan_local_leaks.sh
+
   # =============================================================================
   # Local Check (run before push)
   # =============================================================================
@@ -420,7 +432,10 @@ tasks:
       - task: ci-typecheck
       - task: ci-test
       - task: ci-ui
-      - task: scan-leaks
+      - task: test-client-ts
+      - task: ci-pi-packages
+      - task: ci-agent-runtime
+      - task: scan-leaks-local
 
   check-all:
     desc: Run the full local check suite
@@ -480,8 +495,19 @@ tasks:
       # Bun <1.4 cannot read the current lockfile format, even when other UI commands succeed.
       - bunx bun@1.4.0 audit
 
+  ci-pi-packages:
+    desc: Typecheck and test the independently published pi packages
+    deps: [build-client-ts]
+    cmds:
+      - bun run --filter '@oqtopus-team/pi-qdash' check
+      - bun run --filter '@oqtopus-team/pi-qdash' test
+      - bun run --filter '@oqtopus-team/pi-qcaleval' check
+      - bun run --filter '@oqtopus-team/pi-qcaleval' test
+      - node --test .github/scripts/pi-package-release.test.mjs .github/scripts/client-release.test.mjs
+
   ci-agent-runtime:
     desc: Run all agent-runtime CI checks
+    deps: [build-client-ts]
     dir: agent-runtime
     cmds:
       - bun test

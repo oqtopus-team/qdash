@@ -1,10 +1,10 @@
-Copilot package: what the API needs to open a chat about a task result, and
-the sandbox behind the chat's Python tool.
+Copilot package: what the API needs to open a chat about a task result.
 
 The planner itself runs in the Pi Agent Runtime (`agent-runtime/`) with the
-pi-qdash tools; the calibration evaluation model is pi-qcaleval's. This
-package no longer runs a model: it loads data, renders prompts, and holds the
-shared contracts.
+pi-qdash tools; the calibration evaluation model is pi-qcaleval's; the chat's
+shell and files are the Copilot workspace (`agent-runtime/exec/`). This
+package runs neither a model nor model-written code: it loads data, renders
+prompts, and holds the shared contracts.
 
 ## Package Layout
 
@@ -19,9 +19,6 @@ shared contracts.
   The opening message of a task chat and the knowledge extraction prompt.
 - [services/](services/__init__.py)
   Data loaders: task result, task history, neighbour and coupling parameters, figures.
-- [tooling/](tooling/__init__.py)
-  The restricted Python sandbox (`execute_python_analysis`), served to the runtime
-  through `POST /copilot/sandbox/python`.
 - [blocks.py](blocks.py)
   Renders the chat's blocks answer as markdown for issue and forum replies.
 

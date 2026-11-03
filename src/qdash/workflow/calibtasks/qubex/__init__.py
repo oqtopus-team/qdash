@@ -20,6 +20,7 @@ from qdash.workflow.calibtasks.qubex.box_setup.check_noise import CheckNoise
 from qdash.workflow.calibtasks.qubex.box_setup.check_status import CheckStatus
 from qdash.workflow.calibtasks.qubex.box_setup.configure import Configure, ConfigureEF
 from qdash.workflow.calibtasks.qubex.box_setup.configure_all import ConfigureAll
+from qdash.workflow.calibtasks.qubex.box_setup.correct_capture_delay import CorrectCaptureDelay
 from qdash.workflow.calibtasks.qubex.box_setup.dump_box import DumpBox
 from qdash.workflow.calibtasks.qubex.box_setup.link_up import LinkUp
 from qdash.workflow.calibtasks.qubex.box_setup.readout_configure import ReadoutConfigure
@@ -30,6 +31,16 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
 )
 from qdash.workflow.calibtasks.qubex.cw.check_waveform import CheckWaveform
 from qdash.workflow.calibtasks.qubex.measurement.check_ckp import CheckCKP
+from qdash.workflow.calibtasks.qubex.measurement.check_cpmg_noise_spectroscopy import (
+    CheckCPMGNoiseSpectroscopy,
+)
+from qdash.workflow.calibtasks.qubex.measurement.check_quantum_efficiency import (
+    CheckQuantumEfficiency,
+)
+from qdash.workflow.calibtasks.qubex.measurement.check_readout_mist import CheckReadoutMIST
+from qdash.workflow.calibtasks.qubex.measurement.check_spin_lock_spectroscopy import (
+    CheckSpinLockSpectroscopy,
+)
 from qdash.workflow.calibtasks.qubex.measurement.check_thermal_excitation import (
     CheckThermalExcitation,
 )
@@ -79,6 +90,7 @@ from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state import CheckBell
 from qdash.workflow.calibtasks.qubex.two_qubit.check_bell_state_tomography import (
     CheckBellStateTomography,
 )
+from qdash.workflow.calibtasks.qubex.two_qubit.check_coupling_strength import CheckCouplingStrength
 from qdash.workflow.calibtasks.qubex.two_qubit.check_cross_resonance import CheckCrossResonance
 from qdash.workflow.calibtasks.qubex.two_qubit.check_jazz import CheckJAZZ
 from qdash.workflow.calibtasks.qubex.two_qubit.check_zx90 import CheckZX90
@@ -93,9 +105,11 @@ __all__ = [
     "CheckBellState",
     "CheckBellStateTomography",
     "CheckCKP",
+    "CheckCPMGNoiseSpectroscopy",
     "CheckChevron",
     "CheckCoarseReadoutParams",
     "CheckControlAmplitude",
+    "CheckCouplingStrength",
     "CheckCrossResonance",
     "CheckDRAGHPIPulse",
     "CheckDRAGPIPulse",
@@ -106,10 +120,13 @@ __all__ = [
     "CheckOptimalReadoutAmplitude",
     "CheckOptimalReadoutFrequency",
     "CheckPIPulse",
+    "CheckQuantumEfficiency",
     "CheckQubitSpectroscopy",
     "CheckRabi",
     "CheckRamsey",
+    "CheckReadoutMIST",
     "CheckResonatorSpectroscopy",
+    "CheckSpinLockSpectroscopy",
     "CheckStatus",
     "CheckT1",
     "CheckT1Average",
@@ -121,6 +138,7 @@ __all__ = [
     "Configure",
     "ConfigureAll",
     "ConfigureEF",
+    "CorrectCaptureDelay",
     "CreateDRAGHPIPulse",
     "CreateDRAGPIPulse",
     "CreateEFHPIPulse",

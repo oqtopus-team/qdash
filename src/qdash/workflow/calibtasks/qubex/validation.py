@@ -18,8 +18,9 @@ def require_ef_configuration(exp: Experiment, label: str) -> None:
         exp.targets[exp.ctx.resolve_ef_label(label)]
     except (KeyError, ValueError) as exc:
         raise ValueError(
-            f"GE/EF targets are not configured for {label}. Run ConfigureEF in the same "
-            "session before running an EF-dependent task."
+            f"GE/EF targets are not configured for {label}. Start the session with an "
+            "EF-capable configuration_mode, or run ConfigureEF in the same session, before "
+            "running an EF-dependent task."
         ) from exc
 
 
@@ -31,9 +32,9 @@ def require_fh_configuration(exp: Experiment, label: str) -> None:
         exp.targets[exp.ctx.resolve_fh_label(label)]
     except (KeyError, ValueError) as exc:
         raise ValueError(
-            f"GE/EF/FH targets are not configured for {label}. Run ConfigureEF with "
-            "configuration_mode='ge-ef-fh' in the same session before running an "
-            "FH-dependent task."
+            f"GE/EF/FH targets are not configured for {label}. Start the session with "
+            "configuration_mode='ge-ef-fh', or run ConfigureEF with that mode in the same "
+            "session, before running an FH-dependent task."
         ) from exc
 
 

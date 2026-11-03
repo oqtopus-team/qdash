@@ -1,0 +1,6 @@
+meta:
+  description: Coupling strength between the readout resonator and the Purcell filter
+  unit: MHz
+  default: null
+  scope: qubit
+data: {}

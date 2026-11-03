@@ -34,7 +34,7 @@ export function SaveStatus({ state, savedAt }: { state: SaveState; savedAt: Date
   const now = useNow(15_000, state === "saved" && savedAt !== null);
   if (state === "saving") {
     return (
-      <span className="flex items-center gap-1 text-[11px] text-base-content/50">
+      <span className="flex items-center gap-1 text-xs text-base-content/50">
         <Loader2 className="h-3 w-3 animate-spin" />
         Saving…
       </span>
@@ -42,7 +42,7 @@ export function SaveStatus({ state, savedAt }: { state: SaveState; savedAt: Date
   }
   if (state === "error") {
     return (
-      <span className="flex items-center gap-1 text-[11px] text-error">
+      <span className="flex items-center gap-1 text-xs text-error">
         <AlertCircle className="h-3 w-3" />
         Save failed — retrying on next edit
       </span>
@@ -50,7 +50,7 @@ export function SaveStatus({ state, savedAt }: { state: SaveState; savedAt: Date
   }
   if (state === "saved" && savedAt) {
     return (
-      <span className="flex items-center gap-1 text-[11px] text-base-content/50">
+      <span className="flex items-center gap-1 text-xs text-base-content/50">
         <Check className="h-3 w-3" />
         Saved · {formatAgo(savedAt, now)}
       </span>

@@ -1,0 +1,6 @@
+meta:
+  description: Resonance frequency of the qubit
+  unit: GHz
+  default: 4.2
+  scope: qubit
+data: {}

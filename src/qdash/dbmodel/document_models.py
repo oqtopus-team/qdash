@@ -2,8 +2,8 @@ from typing import Any
 
 from qdash.dbmodel.agent_session import (
     AgentActionDocument,
-    AgentCampaignCommitDocument,
     AgentCandidateCommitDocument,
+    AgentCandidateSetCommitDocument,
     AgentSessionDocument,
 )
 from qdash.dbmodel.backend import BackendDocument
@@ -34,6 +34,7 @@ from qdash.dbmodel.metric_note import MetricNoteDocument
 from qdash.dbmodel.note_event import NoteEventDocument
 from qdash.dbmodel.notification import NotificationDocument
 from qdash.dbmodel.project import ProjectDocument
+from qdash.dbmodel.project_execution_counter import ProjectExecutionCounterDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.provenance import (
     ActivityDocument,
@@ -56,7 +57,7 @@ def document_models() -> list[Any]:
         AgentSessionDocument,
         AgentActionDocument,
         AgentCandidateCommitDocument,
-        AgentCampaignCommitDocument,
+        AgentCandidateSetCommitDocument,
         ExecutionHistoryDocument,
         TaskResultHistoryDocument,
         QubitDocument,
@@ -69,6 +70,7 @@ def document_models() -> list[Any]:
         SlackForumThreadDocument,
         UserDocument,
         ExecutionCounterDocument,
+        ProjectExecutionCounterDocument,
         ExecutionLockDocument,
         TagDocument,
         CalibrationNoteDocument,

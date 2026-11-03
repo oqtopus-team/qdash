@@ -16,9 +16,9 @@ import type { TSchema } from "typebox";
 
 import {
   ALLOWED_TOOL_NAMES,
-  EXPERIMENTAL_WRITE_TOOL_NAMES,
+  REVIEWED_WRITE_TOOL_NAMES,
   TRUSTED_EXTENSION_PACKAGES,
-  isExperimentalWriteTool,
+  isReviewedWriteTool,
 } from "./allowed-tools.ts";
 import type { QDashConnection } from "./auth.ts";
 import {
@@ -133,23 +133,56 @@ export async function runCodingAgentTool(
     isProjectTrusted: () => true,
     hasPendingMessages: () => false,
   };
-  return tool.execute(
+  const run = tool.execute(
     callId,
     {
       ...approvalArgs(args),
       ...connection.toolArgs,
-      ...(isExperimentalWriteTool(tool.name) ? { confirmWrite: true } : {}),
+      ...(isReviewedWriteTool(tool.name) ? { confirmWrite: true } : {}),
     } as never,
     signal,
     undefined,
     extensionContext as never,
   );
+  return untilAborted(run, signal, tool.name);
+}
+
+/** Thrown when a tool call is cancelled while the tool itself is still running. */
+export class ToolCancelled extends Error {
+  override readonly name = "AbortError";
+  constructor(toolName: string) {
+    super(`${toolName} was cancelled; whatever it waited on keeps running in QDash.`);
+  }
+}
+
+/**
+ * Settle a tool call as soon as the turn is cancelled. A pi-qdash tool that
+ * polls (waiting on an execution) may not watch the signal; letting it run on
+ * would keep the conversation busy, and the chat would refuse the user's next
+ * message. The tool's own promise is left to finish or time out on its own.
+ */
+export function untilAborted<T>(run: Promise<T>, signal: AbortSignal | undefined, toolName: string): Promise<T> {
+  if (!signal) return run;
+  if (signal.aborted) {
+    // The call already started; its later rejection must not go unhandled.
+    run.catch(() => undefined);
+    return Promise.reject(new ToolCancelled(toolName));
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      console.warn(`[agent-runtime] ${toolName} cancelled while running; its result is dropped`);
+      reject(new ToolCancelled(toolName));
+      run.catch(() => undefined);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    run.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
 }
 
 /**
  * Adapt one pi-coding-agent tool to pi-durable's execution contract.
  *
- * Read-only calls may be replayed after interruption. Experimental writes
+ * Read-only calls may be replayed after interruption. Reviewed writes
  * never run from the model's call: the call ends the turn with an approval
  * request, and the runtime runs it only after the user approves it in the UI
  * (see `QDashWriteTools.runApproved`).
@@ -167,7 +200,7 @@ export function adaptCodingAgentTool(
     fillKnowledge?: boolean;
   } = {},
 ): ToolRegistration {
-  const writesQDash = isExperimentalWriteTool(tool.name);
+  const writesQDash = isReviewedWriteTool(tool.name);
   const parameters = withParameterOverrides(tool.name, tool.parameters);
   return defineTool({
     name: tool.name,
@@ -267,7 +300,7 @@ export function adaptCodingAgentTool(
             }
           : result.details;
       return {
-        output: result.content,
+        output: boundOutput(result.content, tool.name),
         ...(details === undefined ? {} : { details: asJson(details) }),
         ...(result.isError === undefined ? {} : { isError: result.isError }),
         ...(result.usage === undefined ? {} : { usage: result.usage }),
@@ -278,6 +311,31 @@ export function adaptCodingAgentTool(
 }
 
 const MAX_RESULT_CHARS = 8_000;
+
+/**
+ * Longest text one tool result puts into the transcript. A qwen-class chat
+ * model has a 64k-token window shared with a 13k-token system prompt; two
+ * 90k-character results in one turn (task knowledge with inline figures) once
+ * pushed a prompt past it, and compaction only runs between turns.
+ */
+export const MAX_TOOL_TEXT_CHARS = 24_000;
+const DATA_URI = /data:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]{64,}/g;
+
+/** A tool's text blocks as the model gets them: no inline base64, and no block longer than the budget. */
+export function boundToolText(text: string, toolName: string): string {
+  const stripped = text.replace(DATA_URI, "data:… (inline image omitted; QDash shows it)");
+  if (stripped.length <= MAX_TOOL_TEXT_CHARS) return stripped;
+  return `${stripped.slice(0, MAX_TOOL_TEXT_CHARS)}\n\n[QDash runtime] ${toolName}: output truncated to ${MAX_TOOL_TEXT_CHARS} characters; ask for a narrower query if you need the rest.`;
+}
+
+function boundOutput<T>(content: ReadonlyArray<T>, toolName: string): T[] {
+  return content.map((block) => {
+    const text = (block as { type?: unknown; text?: unknown }) ?? {};
+    if (text.type !== "text" || typeof text.text !== "string") return block;
+    const bounded = boundToolText(text.text, toolName);
+    return bounded === text.text ? block : ({ ...(block as object), text: bounded } as T);
+  });
+}
 
 /** What the model is told after the user decided on a write call. */
 export function decisionMessage(
@@ -339,8 +397,8 @@ export class QDashWriteTools {
  * An extension trusted as a whole, because its file lies under one of
  * `localExtensionRoots` (`AGENT_RUNTIME_EXTENSION_PATHS`, development only)
  * or it belongs to one of `trustedPackages` (installed at a pinned version),
- * offers every tool it defines, except that an experimental write name still
- * needs the opt-in, and a tool is replayed on recovery only when its
+ * offers every tool it defines. Reviewed write names still require approval,
+ * and a tool is replayed on recovery only when its
  * annotations say it is read-only. A trusted tool that reuses a pinned name
  * replaces the pinned implementation.
  */
@@ -352,13 +410,12 @@ export function buildQDashExtension(
   modelRuntime: ModelRuntime,
   cwd: string,
   connection: QDashConnection,
-  enableExperimentalWriteTools = false,
   localExtensionRoots: readonly string[] = [],
   trustedPackages: readonly string[] = TRUSTED_EXTENSION_PACKAGES,
 ): { extension: Extension; writeTools: QDashWriteTools } {
   const allowed = new Set<string>([
     ...ALLOWED_TOOL_NAMES,
-    ...(enableExperimentalWriteTools ? EXPERIMENTAL_WRITE_TOOL_NAMES : []),
+    ...REVIEWED_WRITE_TOOL_NAMES,
   ]);
   const tools = new Map<string, ToolRegistration>();
   const writes = new Map<string, CodingAgentTool>();
@@ -369,8 +426,8 @@ export function buildQDashExtension(
   for (const extension of ordered) {
     const local = trusted(extension);
     for (const [name, registered] of extension.tools ?? []) {
-      const writeName = isExperimentalWriteTool(name);
-      if (local ? writeName && !enableExperimentalWriteTools : !allowed.has(name)) continue;
+      const writeName = isReviewedWriteTool(name);
+      if (!local && !allowed.has(name)) continue;
       if (local && tools.has(name)) {
         console.warn(`[agent-runtime] trusted extension ${extension.path} replaces tool ${name}`);
       }
