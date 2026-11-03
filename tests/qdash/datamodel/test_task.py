@@ -43,6 +43,22 @@ def test_calibration_input_validates_effective_numeric_bounds_without_fallback()
         declaration.validate_effective_value("amplitude", float("nan"))
 
 
+def test_optional_database_input_allows_missing_value_and_validates_present_value() -> None:
+    declaration = InputParameterSpec.database_optional(
+        unit="GHz",
+        less_than=0,
+        user_override="forbidden",
+    )
+
+    declaration.validate_effective_value("anharmonicity", None)
+    declaration.validate_effective_value("anharmonicity", -0.3)
+
+    with pytest.raises(ValueError, match="must be less than"):
+        declaration.validate_effective_value("anharmonicity", 0.0)
+    with pytest.raises(ValueError, match="does not allow user overrides"):
+        declaration.coerce_override("anharmonicity", -0.3)
+
+
 def test_calibration_input_rejects_inverted_numeric_bounds() -> None:
     with pytest.raises(ValidationError, match="Numeric bounds must define a non-empty interval"):
         InputParameterSpec(

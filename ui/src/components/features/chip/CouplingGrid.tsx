@@ -526,7 +526,7 @@ export function CouplingGrid({
                   transform: "translate(-50%, -50%)",
                 }}
               >
-                <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
+                <div className="text-[0.45rem] md:text-[0.6rem] font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
                   MUX{muxIndex}
                 </div>
               </div>
@@ -628,7 +628,7 @@ export function CouplingGrid({
                 width: displayCellSize * 0.6,
                 height: displayCellSize * 0.6,
               }}
-              className={`rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
+              className={`rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-transform duration-200 hover:shadow-xl hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
                 downloadSelectionEnabled && isSelectedForDownload
                   ? "ring-2 ring-primary ring-offset-2"
                   : ""
@@ -704,7 +704,7 @@ export function CouplingGrid({
                 }}
                 title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
               >
-                <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
                   {regionRow},{regionCol}
                 </span>
               </button>

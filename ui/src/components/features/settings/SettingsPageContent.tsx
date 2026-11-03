@@ -61,9 +61,9 @@ function CopilotSettingsPanel() {
   };
 
   return (
-    <div className="card bg-base-200 shadow-lg" key="copilot">
+    <div className="card bg-base-200 shadow-sm" key="copilot">
       <div className="card-body">
-        <h2 className="card-title text-xl mb-4">Copilot Settings</h2>
+        <h2 className="card-title mb-4">Copilot Settings</h2>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
             <label className="text-sm font-medium">Default chat model</label>
@@ -93,7 +93,7 @@ function CopilotSettingsPanel() {
           </div>
 
           <div className="bg-base-100 rounded-lg p-4">
-            <div className="text-xs font-semibold text-base-content/50 mb-2">
+            <div className="text-xs font-medium text-base-content/50 mb-2">
               Current effective model
             </div>
             <div className="font-mono text-sm break-all">
@@ -210,11 +210,11 @@ function ProjectMembersPanel() {
 
   return (
     <div className="space-y-4" key="project">
-      <div className="card bg-base-200 shadow-lg">
+      <div className="card bg-base-200 shadow-sm">
         <div className="card-body">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="card-title text-xl">Project Members</h2>
+              <h2 className="card-title">Project Members</h2>
               <p className="text-sm text-base-content/60">
                 {currentProject?.name ?? "Current project"}
               </p>
@@ -226,9 +226,7 @@ function ProjectMembersPanel() {
 
           <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
             <div className="rounded-lg bg-base-100 p-4">
-              <div className="text-xs font-semibold uppercase text-base-content/50">
-                Current project ID
-              </div>
+              <div className="text-xs font-medium text-base-content/50">Current project ID</div>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <code className="min-w-0 flex-1 rounded bg-base-300 px-3 py-2 text-sm break-all">
                   {projectId ?? "No project selected"}
@@ -250,9 +248,7 @@ function ProjectMembersPanel() {
             </div>
 
             <div className="rounded-lg bg-base-100 p-4">
-              <div className="text-xs font-semibold uppercase text-base-content/50">
-                Your projects
-              </div>
+              <div className="text-xs font-medium text-base-content/50">Your projects</div>
               <div className="mt-2 flex max-h-48 flex-col gap-2 overflow-y-auto">
                 {projects.length === 0 ? (
                   <span className="text-sm text-base-content/60">No projects available</span>
@@ -457,7 +453,10 @@ export function SettingsPageContent() {
 
   return (
     <PageContainer>
-      <PageHeader title="Settings" description="Customize your experience and manage account" />
+      <PageHeader
+        title="Settings"
+        description="Appearance, project, Copilot, account and API tokens"
+      />
       <div className="w-full gap-8">
         <div className="tabs tabs-boxed mb-4 sm:mb-6 w-full sm:w-fit overflow-x-auto flex-nowrap">
           <a

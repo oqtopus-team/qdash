@@ -190,7 +190,7 @@ export function MiniChatWindow() {
       >
         <GripHorizontal className="w-3.5 h-3.5 mt-1 text-base-content/30 flex-shrink-0" />
         {minimized ? (
-          <span className="flex-1 min-w-0 truncate text-sm font-semibold">
+          <span className="flex-1 min-w-0 truncate text-sm font-medium">
             {activeSession?.title ?? "Ask AI"}
           </span>
         ) : (

@@ -102,7 +102,7 @@ function TaskResultPreview({ taskId }: { taskId: string }) {
   const params = Object.entries(result.output_parameters ?? {}).slice(0, PARAMETER_LIMIT);
   return (
     <div className="space-y-3">
-      <DialogTitle className="text-base">
+      <DialogTitle className="text-sm">
         {result.task_name}
         <span className="ml-2 font-normal text-base-content/50">· {result.qid}</span>
       </DialogTitle>
@@ -135,9 +135,7 @@ function ExecutionPreview({ executionId, chipId }: { executionId: string; chipId
   const resolvedChip = chipId ?? execution?.chip_id ?? null;
   return (
     <div className="space-y-3">
-      <DialogTitle className="text-base">
-        {execution?.name ?? `Execution ${executionId}`}
-      </DialogTitle>
+      <DialogTitle className="text-sm">{execution?.name ?? `Execution ${executionId}`}</DialogTitle>
       <DialogDescription className="sr-only">Execution status and tasks</DialogDescription>
       <ExecutionProgress executionId={executionId} />
       <div className="flex justify-end">
@@ -165,7 +163,7 @@ function ForumPostPreview({ postId }: { postId: string }) {
     post.content.length > CONTENT_LIMIT ? `${post.content.slice(0, CONTENT_LIMIT)}…` : post.content;
   return (
     <div className="space-y-3">
-      <DialogTitle className="text-base">{post.title || "Forum post"}</DialogTitle>
+      <DialogTitle className="text-sm">{post.title || "Forum post"}</DialogTitle>
       <DialogDescription className="text-xs text-base-content/50">
         {post.username}
         {post.category ? ` · ${post.category}` : ""}

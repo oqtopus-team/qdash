@@ -71,7 +71,7 @@ export const DropdownMenuLabel = forwardRef<
 >(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Label
     ref={ref}
-    className={twMerge("px-2.5 py-1.5 text-xs font-semibold text-base-content/60", className)}
+    className={twMerge("px-2.5 py-1.5 text-xs font-medium text-base-content/60", className)}
     {...props}
   />
 ));

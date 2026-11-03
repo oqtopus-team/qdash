@@ -173,7 +173,12 @@ class RunParameterSpec(ParameterSpec):
 class InputParameterSpec(ParameterSpec):
     """Declaration describing how a task calibration input is resolved."""
 
-    resolution: Literal["database_required", "database_or_default", "default_only"]
+    resolution: Literal[
+        "database_required",
+        "database_optional",
+        "database_or_default",
+        "default_only",
+    ]
     user_override: Literal["allowed", "forbidden"]
     default: float | int | None
     parameter_name: str = ""
@@ -217,6 +222,21 @@ class InputParameterSpec(ParameterSpec):
         )
 
     @classmethod
+    def database_optional(
+        cls,
+        *,
+        user_override: Literal["allowed", "forbidden"] = "allowed",
+        **metadata: Any,
+    ) -> Self:
+        """Declare a calibration input that remains ``None`` when absent from the database."""
+        return cls(
+            resolution="database_optional",
+            user_override=user_override,
+            default=None,
+            **metadata,
+        )
+
+    @classmethod
     def default_only(
         cls,
         *,
@@ -235,9 +255,10 @@ class InputParameterSpec(ParameterSpec):
     @model_validator(mode="after")
     def validate_resolution_default(self) -> "InputParameterSpec":
         """Reject contradictory resolution and default declarations."""
-        if self.resolution == "database_required" and self.default is not None:
-            raise ValueError("database_required must not declare a default")
-        if self.resolution != "database_required" and self.default is None:
+        if self.resolution in {"database_required", "database_optional"}:
+            if self.default is not None:
+                raise ValueError(f"{self.resolution} must not declare a default")
+        elif self.default is None:
             raise ValueError(f"{self.resolution} requires a default")
         lower_bounds = [(self.greater_than, False), (self.greater_than_or_equal, True)]
         upper_bounds = [(self.less_than, False), (self.less_than_or_equal, True)]
@@ -267,6 +288,8 @@ class InputParameterSpec(ParameterSpec):
     def validate_effective_value(self, name: str, value: Any) -> None:
         """Validate a resolved value without changing it or applying a fallback."""
         if value is None:
+            if self.resolution == "database_optional":
+                return
             raise ValueError(f"Input parameter '{name}' was not resolved")
         if all(
             bound is None

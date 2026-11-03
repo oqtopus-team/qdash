@@ -50,6 +50,11 @@ class FakeBackend(BaseBackend):
             classifier_dir=self._config.get("classifier_dir", "."),
             readout_duration=self._config.get("readout_duration"),
             calib_note_path=self._config.get("note_path", str(qubex_paths.default_calib_note_path)),
+            **(
+                {"configuration_mode": self._config["configuration_mode"]}
+                if "configuration_mode" in self._config
+                else {}
+            ),
         )
         self._exp.connect()
 

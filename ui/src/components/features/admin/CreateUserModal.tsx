@@ -87,7 +87,7 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
           <div className="space-y-4">
             <div className="alert alert-success">
               <span>
-                User <span className="font-mono font-semibold">{createdUsername}</span> was created.
+                User <span className="font-mono font-medium">{createdUsername}</span> was created.
                 Share this temporary password securely.
               </span>
             </div>

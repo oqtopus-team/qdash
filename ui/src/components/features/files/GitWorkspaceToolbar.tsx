@@ -138,7 +138,7 @@ export function PullRequestBanner({
   return (
     <div className="px-4 py-2 bg-secondary/20 border-b border-secondary/30 flex items-center justify-between">
       <div className="flex items-center gap-2 text-sm">
-        <GitPullRequestArrow size={16} className="text-secondary" />
+        <GitPullRequestArrow size={16} className="text-base-content/60" />
         <span>
           Pull request <strong>#{pr.pr_number}</strong> created on branch{" "}
           <strong>{pr.branch}</strong>

@@ -154,7 +154,7 @@ function AssessmentBadge({ assessment }: { assessment: string | null }) {
   const { cls, Icon, label } = style;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${cls}`}
+      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${cls}`}
     >
       <Icon className="w-3.5 h-3.5" />
       {label}
@@ -201,7 +201,7 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
             key={key}
             type="button"
             onClick={() => setPreviewSrc(src)}
-            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+            className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-colors cursor-pointer"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- runtime-generated API preview */}
             <img
@@ -344,7 +344,7 @@ export const UserMessage = memo(function UserMessage({
           }}
           rows={1}
           aria-label="Edit message"
-          className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-[15px] leading-6"
+          className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-sm leading-6"
         />
         <div className="flex items-center justify-end gap-2 mt-2">
           <button type="button" onClick={cancelEdit} className="btn btn-ghost btn-sm rounded-full">
@@ -379,13 +379,13 @@ export const UserMessage = memo(function UserMessage({
         </div>
       ) : (
         message.attachedImage && (
-          <span className="inline-flex items-center gap-1 text-[11px] text-base-content/45">
+          <span className="inline-flex items-center gap-1 text-xs text-base-content/45">
             <ImageIcon className="w-3 h-3" />
             Figures attached
           </span>
         )
       )}
-      <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] text-[15px] leading-relaxed whitespace-pre-wrap break-words">
+      <div className="chat-bubble-user-soft rounded-3xl px-4 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap break-words">
         {message.content}
       </div>
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">

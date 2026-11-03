@@ -174,7 +174,7 @@ class ReanalysisService:
         if freq_result.anharmonicity is not None:
             outputs.append(
                 ReanalyzeOutputParameter(
-                    name="anharmonicity",
+                    name="qubit_anharmonicity",
                     value=float(freq_result.anharmonicity),
                     unit="GHz",
                 )

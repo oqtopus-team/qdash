@@ -87,8 +87,8 @@ export function CryoPageContent() {
       <div className="flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <PageHeader
-            title="Cryostats & Cool-downs"
-            description="Manage cryostats and their cool-down cycles. Assign chips to a cool-down so calibration data gets tagged at write time."
+            title="Cryo"
+            description="Cryostats and cool-down cycles; chips assigned to a cool-down tag their calibration data"
             className="mb-0"
           />
           {showNewCryostatHeaderBtn && (
@@ -108,7 +108,7 @@ export function CryoPageContent() {
           <div className="alert alert-error" role="alert">
             <AlertCircle className="h-5 w-5" aria-hidden="true" />
             <div className="min-w-0 flex-1">
-              <div className="font-semibold">Failed to load cryogenic operations</div>
+              <div className="font-medium">Failed to load cryogenic operations</div>
               <div className="text-sm opacity-80">
                 Cryostats or cool-down history could not be retrieved. Existing data has not been
                 changed.
@@ -216,7 +216,7 @@ function CryoOverview({
               aria-hidden="true"
             />
           </div>
-          <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
+          <div className="mt-1 text-2xl font-medium tabular-nums">{value}</div>
         </div>
       ))}
     </section>

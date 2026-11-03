@@ -225,7 +225,7 @@ export function ChatSidebar({
         )}
         {groups.map(([label, items]) => (
           <section key={label} className="mt-3 first:mt-1">
-            <h3 className="px-2.5 pb-1 text-[11px] font-semibold text-base-content/45">{label}</h3>
+            <h3 className="px-2.5 pb-1 text-xs font-medium text-base-content/45">{label}</h3>
             <ul className="space-y-px">
               {items.map((session) => {
                 const active = session.id === activeSessionId;

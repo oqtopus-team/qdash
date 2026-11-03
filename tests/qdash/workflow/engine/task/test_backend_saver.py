@@ -64,7 +64,7 @@ def test_save_mux_qid_syncs_backend_params_for_distributed_outputs() -> None:
     assert task_model.output_parameters["readout_amplitude"]["database_updated"] is True
 
 
-def test_save_qubex_stages_outputs_when_persistence_is_disabled() -> None:
+def test_save_calibration_stages_outputs_when_persistence_is_disabled() -> None:
     output_parameters = {
         "drive_amplitude": ParameterModel(value=0.12, unit="a.u."),
     }
@@ -148,7 +148,7 @@ def test_save_mux_qid_marks_outputs_when_persistence_is_disabled() -> None:
     assert task_model.output_parameters["readout_frequency"]["database_updated"] is False
 
 
-def test_save_qubex_records_previous_database_value_for_persisted_output() -> None:
+def test_save_calibration_records_previous_database_value_for_persisted_output() -> None:
     output_parameters = {
         "drive_amplitude": ParameterModel(value=0.12, unit="a.u."),
     }
@@ -201,7 +201,7 @@ def test_save_qubex_records_previous_database_value_for_persisted_output() -> No
     assert task_model.output_parameters["drive_amplitude"]["database_updated"] is True
 
 
-def test_save_qubex_records_previous_database_value_for_coupling() -> None:
+def test_save_calibration_records_previous_database_value_for_coupling() -> None:
     output_parameters = {"coupling_strength": ParameterModel(value=0.03, unit="GHz")}
     task_model = SimpleNamespace(output_parameters=output_parameters)
     state_manager = MagicMock()
@@ -255,7 +255,7 @@ def test_resolve_publish_targets_defaults_to_output_name() -> None:
     }
 
 
-def test_save_qubex_publishes_measurement_and_operational_frequency() -> None:
+def test_save_calibration_publishes_measurement_and_operational_frequency() -> None:
     class FrequencyTask:
         backend = "qubex"
         output_spec = {
@@ -340,3 +340,52 @@ def test_save_qubex_publishes_measurement_and_operational_frequency() -> None:
             "updated": True,
         },
     ]
+
+
+def test_save_persists_fake_task_outputs_like_qubex() -> None:
+    """A fake-backend task's outputs reach the calibration database, so the qubex tasks
+    that run after it on the fake backend can resolve their inputs."""
+    output_parameters = {
+        "qubit_frequency": ParameterModel(value=7.15, unit="GHz"),
+    }
+    state_manager = MagicMock()
+    task_model = SimpleNamespace(output_parameters=output_parameters)
+    state_manager.get_task.return_value = task_model
+    execution_service = cast(
+        "ExecutionService",
+        SimpleNamespace(execution_id="exec-1", chip_id="chip-1", project_id="proj-1"),
+    )
+    task = MagicMock()
+    task.backend = "fake"
+    task.get_name.return_value = "FakeBringUp"
+    task.get_task_type.return_value = "qubit"
+    task.is_qubit_task.return_value = True
+    task.is_coupling_task.return_value = False
+    task.__class__.output_spec = {}
+    backend = MagicMock()
+    backend.name = "fake"
+    updater = MagicMock()
+
+    saver = BackendSaver(
+        state_manager=state_manager,
+        username="alice",
+        calib_dir="/tmp/calib",
+        task_manager_id="tm-1",
+    )
+
+    with (
+        patch("qdash.repository.MongoQubitCalibrationRepository") as qubit_repo_cls,
+        patch("qdash.repository.MongoCouplingCalibrationRepository"),
+        patch(
+            "qdash.workflow.engine.task.backend_saver.get_params_updater",
+            return_value=updater,
+        ),
+    ):
+        qubit_repo_cls.return_value.get_qubit_data.return_value = {}
+        saver.save(task, execution_service, "1", backend, success=True)
+
+    backend.update_note.assert_not_called()
+    qubit_repo_cls.return_value.update_calib_data.assert_called_once()
+    persisted = qubit_repo_cls.return_value.update_calib_data.call_args.kwargs["output_parameters"]
+    assert "qubit_frequency" in persisted
+    updater.update.assert_called_once()

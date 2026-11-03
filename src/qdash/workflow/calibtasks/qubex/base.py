@@ -537,6 +537,7 @@ class QubexTask(BaseTask):
 
         Behavior for each parameter:
         - If resolution="database_required": Load from DB or raise an error
+        - If resolution="database_optional": Load from DB or leave the value as None
         - If resolution="database_or_default": Prefer DB, otherwise use default
         - If resolution="default_only": Do not use a DB value
         - If value is None: Deprecated compatibility behavior; create from DB data

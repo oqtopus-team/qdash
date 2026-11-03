@@ -52,8 +52,6 @@ export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
     autosize: true,
     height: 300,
     margin: { l: 50, r: 20, t: 40, b: 40 },
-    paper_bgcolor: "transparent",
-    plot_bgcolor: "transparent",
     font: { size: 11 },
     ...layout,
   };
@@ -61,8 +59,6 @@ export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
   const expandedLayout = {
     autosize: true,
     margin: { l: 60, r: 30, t: 50, b: 50 },
-    paper_bgcolor: "transparent",
-    plot_bgcolor: "transparent",
     font: { size: 13 },
     ...layout,
     height: undefined,

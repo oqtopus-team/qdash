@@ -42,7 +42,7 @@ export function FlowExecuteConfirmModal({
       >
         <div className="px-6 py-4 border-b border-base-300 flex items-center justify-between bg-base-100/80 backdrop-blur supports-[backdrop-filter]:bg-base-100/60">
           <div>
-            <h2 className="text-2xl font-bold">Execute Flow</h2>
+            <h2 className="text-sm font-medium">Execute Flow</h2>
             <p className="text-base-content/70 mt-1">
               Review and confirm the flow execution settings
             </p>

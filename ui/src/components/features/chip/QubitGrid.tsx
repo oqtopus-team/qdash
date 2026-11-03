@@ -143,7 +143,7 @@ const GridCell = memo(function GridCell({
         } ${isDownloadMode && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""}`}
       >
         {showLabels && (
-          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-bold">
+          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-medium">
             {qid}
           </div>
         )}
@@ -176,7 +176,7 @@ const GridCell = memo(function GridCell({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={handleKeyDown}
-      className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${muxBgClass} ${
+      className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 relative w-full ${muxBgClass} ${
         isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-2" : ""
       } ${isDownloadMode && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""}`}
     >
@@ -626,7 +626,7 @@ export function QubitGrid({
                     gridRow: `${startRow} / span ${spanRows}`,
                   }}
                 >
-                  <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
+                  <div className="text-[0.45rem] md:text-[0.6rem] font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
                     MUX{muxIndex}
                   </div>
                 </div>
@@ -679,7 +679,7 @@ export function QubitGrid({
                   }}
                   title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
                 >
-                  <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                  <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
                     {regionRow},{regionCol}
                   </span>
                 </button>

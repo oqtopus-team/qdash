@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 import re
 from collections.abc import Collection, Mapping
@@ -296,6 +297,54 @@ def _plot_fit_series(
         return figure
     _show_figure(figure, filename=f"{filename}_{target}", width=width, height=height)
     return None
+
+
+def _plot_amplitude_fit(
+    *,
+    target: str,
+    x: Any,
+    y: Any,
+    fit_y: Any,
+    title: str,
+    annotation: str,
+    calibrated: float,
+) -> Any:
+    """Measured points, the fitted curve and the chosen amplitude of a pulse calibration."""
+    try:
+        import numpy as np
+        import plotly.graph_objects as go
+    except Exception:
+        return None
+
+    figure = _make_figure(width=None, height=None)
+    if figure is None:
+        return None
+    x_values = np.asarray(x, dtype=float)
+    figure.add_trace(
+        go.Scatter(x=x_values, y=np.asarray(fit_y, dtype=float), mode="lines", name="Fit")
+    )
+    figure.add_trace(
+        go.Scatter(x=x_values, y=np.asarray(y, dtype=float), mode="markers", name="Data")
+    )
+    figure.add_vline(x=calibrated, line_dash="dash", line_color="gray")
+    # The signal peaks at the top centre and sits at -1 in both bottom corners, so the
+    # top-left corner is the one place the label does not cover data.
+    figure.add_annotation(
+        xref="paper",
+        yref="paper",
+        x=0.02,
+        y=0.95,
+        xanchor="left",
+        text=annotation,
+        bgcolor="rgba(255, 255, 255, 0.8)",
+        showarrow=False,
+    )
+    figure.update_layout(
+        title=f"{title} : {target}",
+        xaxis_title="Drive amplitude (a.u.)",
+        yaxis_title="Normalized signal",
+    )
+    return figure
 
 
 def _plot_normalized_series(
@@ -616,6 +665,66 @@ class _NormalizedRabiData:
         return self._base.fit(*args, **kwargs)
 
 
+class _FakeCalibNote:
+    """In-memory stand-in for qubex's CalibrationNote.
+
+    The qubex task base restores pulse and CR parameters into the note before an experiment
+    runs; the simulator only has to accept and return them.
+    """
+
+    def __init__(self) -> None:
+        self.hpi_params: dict[str, dict[str, Any]] = {}
+        self.pi_params: dict[str, dict[str, Any]] = {}
+        self.drag_hpi_params: dict[str, dict[str, Any]] = {}
+        self.drag_pi_params: dict[str, dict[str, Any]] = {}
+        self.cr_params: dict[str, dict[str, Any]] = {}
+
+    def update_hpi_param(self, target: str, params: dict[str, Any]) -> None:
+        self.hpi_params[target] = dict(params)
+
+    def update_pi_param(self, target: str, params: dict[str, Any]) -> None:
+        self.pi_params[target] = dict(params)
+
+    def update_drag_hpi_param(self, target: str, params: dict[str, Any]) -> None:
+        self.drag_hpi_params[target] = dict(params)
+
+    def update_drag_pi_param(self, target: str, params: dict[str, Any]) -> None:
+        self.drag_pi_params[target] = dict(params)
+
+    def update_cr_param(self, target: str, params: dict[str, Any]) -> None:
+        self.cr_params[target] = dict(params)
+
+    def get_hpi_param(self, target: str) -> dict[str, Any] | None:
+        return self.hpi_params.get(target)
+
+    def get_pi_param(self, target: str) -> dict[str, Any] | None:
+        return self.pi_params.get(target)
+
+    def get_drag_hpi_param(self, target: str) -> dict[str, Any] | None:
+        return self.drag_hpi_params.get(target)
+
+    def get_drag_pi_param(self, target: str) -> dict[str, Any] | None:
+        return self.drag_pi_params.get(target)
+
+    def get_cr_param(self, target: str) -> dict[str, Any] | None:
+        return self.cr_params.get(target)
+
+    def items(self) -> list[tuple[str, dict[str, dict[str, Any]]]]:
+        return list(self.json().items())
+
+    def json(self) -> dict[str, dict[str, dict[str, Any]]]:
+        return {
+            "hpi_params": dict(self.hpi_params),
+            "pi_params": dict(self.pi_params),
+            "drag_hpi_params": dict(self.drag_hpi_params),
+            "drag_pi_params": dict(self.drag_pi_params),
+            "cr_params": dict(self.cr_params),
+        }
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        del args, kwargs
+
+
 class _FakeControlParams:
     def __init__(self, experiment: "FakeExperiment") -> None:
         self._experiment = experiment
@@ -624,7 +733,11 @@ class _FakeControlParams:
         return float(self._experiment.params.readout_amplitude.get(target, 0.2))
 
     def get_control_amplitude(self, target: str) -> float:
-        return float(self._experiment.params.control_amplitude.get(target, 0.0125))
+        return float(
+            self._experiment.params.control_amplitude.get(
+                target, self._experiment.CONTROL_AMPLITUDE_SCALE
+            )
+        )
 
 
 @dataclass
@@ -794,9 +907,10 @@ class FakeExperiment:
         self.properties = {}
         self._params = SimpleNamespace(
             readout_amplitude={label: 0.2 for label in labels},
-            control_amplitude={label: 0.0125 for label in labels},
+            control_amplitude={label: self.CONTROL_AMPLITUDE_SCALE for label in labels},
         )
         self._control_params = _FakeControlParams(self)
+        self._calib_note = _FakeCalibNote()
         self._rabi_params = {}
         self._connected = False
         self._clifford_generator = None
@@ -853,6 +967,12 @@ class FakeExperiment:
     def modified_backend_settings(self, *args: Any, **kwargs: Any) -> Any:
         del args, kwargs
         yield self
+
+    @contextmanager
+    def no_output(self, *args: Any, **kwargs: Any) -> Any:
+        """qubex's ``exp.ctx.util.no_output()``; the simulator prints nothing to silence."""
+        del args, kwargs
+        yield
 
     @property
     def session_service(self) -> "FakeExperiment":
@@ -1017,8 +1137,8 @@ class FakeExperiment:
         return []
 
     @property
-    def calib_note(self) -> Any:
-        return SimpleNamespace(save=lambda *args, **kwargs: None)
+    def calib_note(self) -> _FakeCalibNote:
+        return self._calib_note
 
     @property
     def note(self) -> dict[str, Any]:
@@ -1330,14 +1450,50 @@ class FakeExperiment:
             for target in self._target_labels(targets)
         }
 
-    def calc_rabi_rate(self, target: str, amplitude: float = 1.0, **_: Any) -> float:
-        del target
-        return float(amplitude) / (2.0 * self.pi_duration)
+    # Control amplitude that drives a pi rotation in ``pi_duration``; it is also the default
+    # control amplitude the simulator reports, so the seeded device is self-consistent.
+    CONTROL_AMPLITUDE_SCALE: ClassVar[float] = 0.0125
+    # Decay time of the driven (Rabi) oscillation, shorter than T2 as on hardware.
+    RABI_DECAY_NS: ClassVar[float] = 2000.0
+
+    def _default_amplitude(self, target: str) -> float:
+        return float(self.control_params.get_control_amplitude(self._ge_label(target)))
+
+    def _noise_rng(self, *parts: Any) -> Any:
+        """Deterministic generator per target and experiment, so reruns reproduce a figure."""
+        import zlib
+
+        import numpy as np
+
+        key = ":".join(str(part) for part in (self.device_id, *parts))
+        return np.random.default_rng(zlib.crc32(key.encode("utf-8")))
+
+    @staticmethod
+    def _shot_sigma(shots: int | None) -> float:
+        """Standard deviation of a normalised (-1..1) signal from projective readout."""
+        n = 1024 if shots is None else max(int(shots), 1)
+        return 1.0 / (n**0.5)
+
+    @staticmethod
+    def _r_squared(measured: Any, model: Any) -> float:
+        import numpy as np
+
+        y = np.asarray(measured, dtype=float)
+        f = np.asarray(model, dtype=float)
+        ss_tot = float(np.sum((y - np.mean(y)) ** 2))
+        if ss_tot <= 0.0:
+            return 1.0
+        return float(1.0 - np.sum((y - f) ** 2) / ss_tot)
+
+    def calc_rabi_rate(self, target: str, amplitude: float | None = None, **_: Any) -> float:
+        if amplitude is None:
+            amplitude = self._default_amplitude(target)
+        return float(amplitude) / (self.CONTROL_AMPLITUDE_SCALE * 2.0 * self.pi_duration)
 
     def calc_rabi_rates(
         self,
         targets: Collection[str] | str | None = None,
-        amplitude: float = 1.0,
+        amplitude: float | None = None,
         **kwargs: Any,
     ) -> dict[str, float]:
         return {
@@ -1902,28 +2058,37 @@ class FakeExperiment:
 
         data: dict[str, Any] = {}
         figures: dict[str, Any] = {}
-        duration = self.hpi_duration if angle < np.pi else self.pi_duration
-        amplitude = 0.5 if angle < np.pi else 1.0
-        x = np.linspace(0.0, 2.0 * duration, 25)
-        y = np.sin(np.pi * x / max(2.0 * duration, 1.0))
+        is_hpi = angle < np.pi
+        duration = self.hpi_duration if is_hpi else self.pi_duration
+        # Amplitude that rotates by ``angle`` within ``duration`` at the device's Rabi rate.
+        amplitude = self.CONTROL_AMPLITUDE_SCALE * (angle / np.pi) * (self.pi_duration / duration)
+        title = "HPI pulse calibration" if is_hpi else "PI pulse calibration"
+        sweep = np.linspace(0.0, 2.0 * amplitude, 25)
+        # The calibration repeats the pulse until the calibrated amplitude flips the qubit
+        # (twice for a pi/2 pulse, once for a pi pulse), so the sweep shows one peak at the
+        # calibrated amplitude and returns to the ground state at twice that amplitude.
+        model = -np.cos(np.pi * sweep / amplitude)
+        sigma = self._shot_sigma(None)
         for target in self._target_labels(targets):
-            if angle < np.pi:
+            if is_hpi:
                 self.drag_hpi_pulses[target] = self._default_drag_pulse(target, angle=angle)
             else:
                 self.drag_pi_pulses[target] = self._default_drag_pulse(target, angle=angle)
-            figure = _plot_normalized_series(
+            rng = self._noise_rng("pulse", title, target)
+            measured = model + sigma * rng.normal(size=model.shape)
+            r2 = self._r_squared(measured, model)
+            figure = _plot_amplitude_fit(
                 target=target,
-                x=x,
-                y=y,
-                title=("HPI pulse calibration" if angle < np.pi else "PI pulse calibration"),
-                xlabel="Drive duration (ns)",
-                ylabel="Normalized signal",
-                filename="pulse_calibration",
-                return_figure=True,
+                x=sweep,
+                y=measured,
+                fit_y=model,
+                title=title,
+                annotation=f"amplitude = {amplitude:.4g}, R² = {r2:.3f}",
+                calibrated=amplitude,
             )
             figures[target] = figure
             data[target] = _FakePulseCalibrationData(
-                target=target, calib_value=amplitude, r2=1.0, figure=figure
+                target=target, calib_value=amplitude, r2=r2, figure=figure
             )
         return self._result(data=data, figures=figures, figure=next(iter(figures.values()), None))
 
@@ -2454,6 +2619,12 @@ class FakeExperiment:
             kwargs["use_simulator"] = False
         simulate = kwargs.get("simulate")
         use_simulator = kwargs.get("use_simulator")
+        if simulate is not True and use_simulator is not True:
+            analytic = self._analytic_drive_sweep(sequence, values_list, **kwargs)
+            if analytic is not None:
+                if plot:
+                    analytic.plot()
+                return analytic
         results = []
         used_simulated_measurements = False
         for value in values_list:
@@ -2487,6 +2658,94 @@ class FakeExperiment:
         if plot:
             result.plot()
         return result
+
+    def _drive_response(
+        self,
+        schedule: Any,
+        frequencies: Mapping[str, float] | None,
+    ) -> dict[str, complex] | None:
+        """Analytic readout of a schedule made of one plain drive pulse per target.
+
+        qubex sweeps such schedules for Rabi and chevron measurements. The response is the
+        Rabi formula: a drive detuned by ``delta`` from the qubit rotates at
+        ``sqrt(omega**2 + delta**2)`` and reaches at most ``omega**2 / (omega**2 + delta**2)``
+        of the excited state. Anything richer than a single pulse per target is left to the
+        pulse simulator.
+        """
+        import math
+
+        if not isinstance(schedule, Mapping) or not schedule:
+            return None
+        response: dict[str, complex] = {}
+        for label, pulse in schedule.items():
+            duration = getattr(pulse, "duration", None)
+            amplitude = getattr(pulse, "amplitude", None)
+            if duration is None or amplitude is None or isinstance(amplitude, Mapping):
+                return None
+            ge_label = self._ge_label(str(label))
+            if ge_label not in self.qubit_labels:
+                return None
+            index = self.qubit_labels.index(ge_label)
+            carrier = float((frequencies or {}).get(label, self.qubit_frequencies[index]))
+            delta = carrier + float(getattr(pulse, "detuning", 0.0)) - self.qubit_frequencies[index]
+            omega = self.calc_rabi_rate(str(label), amplitude=abs(float(amplitude)))
+            omega_eff = math.hypot(omega, delta)
+            contrast = (omega / omega_eff) ** 2 if omega_eff > 0.0 else 0.0
+            decay = math.exp(-float(duration) / self.RABI_DECAY_NS)
+            population = (
+                contrast * 0.5 * (1.0 - math.cos(2.0 * math.pi * omega_eff * duration) * decay)
+            )
+            centers = self.state_centers.get(
+                ge_label, {0: complex(-1.0, 0.0), 1: complex(1.0, 0.0)}
+            )
+            response[str(label)] = centers[0] + (centers[1] - centers[0]) * population
+        return response
+
+    def _analytic_drive_sweep(
+        self,
+        sequence: Any,
+        values_list: list[Any],
+        **kwargs: Any,
+    ) -> _FakeSweepResult | None:
+        """Sweep result for plain drive-pulse schedules, or None when the model does not apply."""
+        import numpy as np
+
+        frequencies = kwargs.get("frequencies")
+        responses: list[dict[str, complex]] = []
+        for value in values_list:
+            schedule = sequence(value) if callable(sequence) else sequence
+            response = self._drive_response(schedule, frequencies)
+            if response is None:
+                return None
+            responses.append(response)
+        if not responses:
+            return None
+
+        requested = kwargs.get("targets")
+        labels = self._target_labels(requested) if requested is not None else list(responses[0])
+        shots = kwargs.get("n_shots") or kwargs.get("shots") or 1024
+        sigma = self._shot_sigma(shots) / math.sqrt(2.0)
+        values = np.asarray(values_list)
+        data = {}
+        for target in labels:
+            clean = np.asarray(
+                [response.get(target, complex(np.nan, np.nan)) for response in responses]
+            )
+            rng = self._noise_rng("sweep", target, len(values_list), float(np.real(clean[0])))
+            noisy = clean + sigma * (
+                rng.normal(size=clean.shape) + 1j * rng.normal(size=clean.shape)
+            )
+            data[target] = _FakeSweepTargetData(
+                target,
+                values,
+                noisy,
+                title=kwargs.get("title", "Sweep result"),
+                xlabel=kwargs.get("xlabel", "Sweep value"),
+                ylabel=kwargs.get("ylabel", "Measured signal"),
+                xaxis_type=kwargs.get("xaxis_type", "linear"),
+                yaxis_type=kwargs.get("yaxis_type", "linear"),
+            )
+        return _FakeSweepResult(data=data, sweep_values=values, results=[])
 
     def _fake_measure_result(
         self,
@@ -2780,6 +3039,11 @@ class FakeExperiment:
     def resolve_read_label(self, target: str, allow_legacy: bool = False) -> str:
         return f"R{target}"
 
+    def resolve_ef_label(self, target: str, allow_legacy: bool = False) -> str:
+        """Return the EF-transition label of a qubit, as qubex's ``ctx.resolve_ef_label`` does."""
+        del allow_legacy
+        return f"{self._ge_label(target)}/ef"
+
     def get_target(self, label: str) -> Any:
         from types import SimpleNamespace
 
@@ -2839,6 +3103,7 @@ class FakeExperiment:
                 target_labels=target_labels,
                 repetitions=repetitions,
                 initial_state=initial,
+                shots=n_shots,
             )
             if plot:
                 result.plot(normalize=True)
@@ -2882,15 +3147,28 @@ class FakeExperiment:
         target_labels: Collection[str],
         repetitions: int,
         initial_state: Mapping[str, str],
+        shots: int | None = None,
     ) -> _FakeSweepResult:
         import numpy as np
 
         values = np.arange(repetitions + 1)
         data = {}
+        sigma = self._shot_sigma(shots)
         for target in target_labels:
             angle = self._repeat_sequence_rotation_angle(sequence, target)
+            # A calibrated pulse is never exact: a fixed per-qubit rotation error of up to
+            # one percent makes the pattern drift over many repetitions, and the qubit
+            # dephases a little during each pulse.
+            rng = self._noise_rng("repeat", target, repetitions)
+            rotation_error = 0.01 * float(rng.uniform(-1.0, 1.0))
+            pulse = sequence.get(target) if isinstance(sequence, Mapping) else sequence
+            pulse_duration = float(getattr(pulse, "duration", self.hpi_duration) or 0.0)
+            index = self.qubit_labels.index(self._ge_label(target))
+            t2_ns = float(self._qubit_lifetime(index)[1]) * 1000.0
+            envelope = np.exp(-values * pulse_duration / max(t2_ns, 1.0))
             sign = -1.0 if str(initial_state.get(target, "0")) in {"1", "e"} else 1.0
-            normalized = sign * np.cos(values * angle)
+            normalized = sign * np.cos(values * angle * (1.0 + rotation_error)) * envelope
+            normalized = normalized + sigma * rng.normal(size=normalized.shape)
             response = 0.5 + 0.5j * normalized
             data[target] = _FakeSweepTargetData(
                 target,
@@ -3544,7 +3822,7 @@ class FakeExperiment:
         if rabi_level is None:
             rabi_level = "ge"
         labels = self._target_labels(targets)
-        amplitudes = {target: 1.0 for target in labels}
+        amplitudes = {target: self._default_amplitude(target) for target in labels}
         if rabi_level == "ef":
             return self.ef_rabi_experiment(
                 amplitudes=amplitudes,
@@ -3577,7 +3855,7 @@ class FakeExperiment:
     ) -> Any:
         del frequencies, is_damped, fit_threshold, simultaneous
         labels = self._target_labels(targets)
-        amplitudes = amplitudes or {target: 1.0 for target in labels}
+        amplitudes = amplitudes or {target: self._default_amplitude(target) for target in labels}
         return self.rabi_experiment(
             amplitudes=amplitudes,
             time_range=time_range,
@@ -3612,17 +3890,18 @@ class FakeExperiment:
         store_params: bool | None = None,
         **_: Any,
     ) -> Any:
-        del frequencies, detuning, is_damped, fit_threshold, n_shots, shot_interval
+        del frequencies, detuning, is_damped, fit_threshold, shot_interval
         if plot is None:
             plot = True
         labels = self._target_labels(targets) if amplitudes is None else list(amplitudes)
-        amplitudes = amplitudes or {target: 1.0 for target in labels}
+        amplitudes = amplitudes or {target: self._default_amplitude(target) for target in labels}
         result = self._rabi_result(
             amplitudes=amplitudes,
             time_range=time_range,
             ramptime=ramptime,
             store_params=bool(store_params),
             transition="ge",
+            shots=n_shots,
         )
         if plot:
             result.plot()
@@ -3648,7 +3927,7 @@ class FakeExperiment:
         if plot is None:
             plot = True
         labels = self._target_labels(targets) if amplitudes is None else list(amplitudes)
-        amplitudes = amplitudes or {target: 1.0 for target in labels}
+        amplitudes = amplitudes or {target: self._default_amplitude(target) for target in labels}
         result = self._rabi_result(
             amplitudes=amplitudes,
             time_range=time_range,
@@ -3688,9 +3967,6 @@ class FakeExperiment:
 
     def sweep_readout_duration(self, *args: Any, **kwargs: Any) -> Any:
         return self._sweep_stub("readout_duration", *args, **kwargs)
-
-    def chevron_pattern(self, *args: Any, **kwargs: Any) -> Any:
-        return self._chevron_pattern_result(*args, **kwargs)
 
     def obtain_freq_rabi_relation(self, *args: Any, **kwargs: Any) -> Any:
         return self._result(data={"slope": 1.0, "intercept": 0.0})
@@ -4649,6 +4925,9 @@ class FakeExperiment:
                 yaxis_type=yaxis,
                 **fields,
             )
+            if not hasattr(value, "normalized"):
+                # qubex exposes the rotated, normalised signal; tasks plot it directly.
+                value.normalized = 2.0 * np.asarray(data, dtype=complex).imag
 
             def _plot(*_: Any, return_figure: bool = False, **plot_kwargs: Any) -> Any:
                 if title in {"T1 decay", "T2 echo", "Ramsey"}:
@@ -4679,6 +4958,7 @@ class FakeExperiment:
                         y_values = normalized
                         fit_values = np.exp(-x_values / max(tau, 1.0)) * np.cos(
                             2.0 * np.pi * ramsey_freq * x_values
+                            + float(fields.get("fit_phase", 0.0))
                         )
                         fit_title = "Ramsey fringe"
                         ylabel_fit = "Signal (arb. units)"
@@ -4751,9 +5031,14 @@ class FakeExperiment:
                 )
                 rabi_param = self._rabi_params.get(target) or self._synthetic_rabi_param(target)
 
+                sigma = self._shot_sigma(shots)
+                rng = self._noise_rng(experiment, target)
+
                 if experiment == "t1":
                     population = np.exp(-target_time_values / max(t1_ns, 1.0))
-                    signal = 0.5 + 0.5j * (1.0 - 2.0 * population)
+                    clean = 1.0 - 2.0 * population
+                    measured = clean + sigma * rng.normal(size=clean.shape)
+                    signal = 0.5 + 0.5j * measured
                     data[target] = make_value(
                         target=target,
                         data=signal,
@@ -4766,11 +5051,13 @@ class FakeExperiment:
                         state_centers=self.state_centers.get(ge_target),
                         t1=t1_ns,
                         t1_err=0.0,
-                        r2=1.0,
+                        r2=self._r_squared(measured, clean),
                     )
                 elif experiment == "t2":
                     envelope = np.exp(-target_time_values / max(t2_ns, 1.0))
-                    signal = 0.5 + 0.5j * (2.0 * envelope - 1.0)
+                    clean = 2.0 * envelope - 1.0
+                    measured = clean + sigma * rng.normal(size=clean.shape)
+                    signal = 0.5 + 0.5j * measured
                     data[target] = make_value(
                         target=target,
                         data=signal,
@@ -4783,12 +5070,21 @@ class FakeExperiment:
                         state_centers=self.state_centers.get(ge_target),
                         t2=t2_ns,
                         t2_err=0.0,
-                        r2=1.0,
+                        r2=self._r_squared(measured, clean),
                     )
                 else:
                     envelope = np.exp(-time_values / max(t2_ns, 1.0))
                     ramsey_freq = abs(detuning)
-                    signal = 0.5 + 0.5j * envelope * np.cos(2.0 * np.pi * ramsey_freq * time_values)
+                    # The Bloch vector precesses at the detuning; a second pi/2 pulse about Y
+                    # reads its X component (cos) and one about X reads -Y (sin with the
+                    # opposite sign), so the (X-axis, Y-axis) pair traces a counter-clockwise
+                    # spiral for positive detuning.
+                    direction = -1.0 if detuning < 0 else 1.0
+                    fit_phase = 0.5 * np.pi * direction if second_rotation_axis == "X" else 0.0
+                    clean = envelope * np.cos(2.0 * np.pi * ramsey_freq * time_values + fit_phase)
+                    rng = self._noise_rng(experiment, target, second_rotation_axis)
+                    measured = clean + sigma * rng.normal(size=clean.shape)
+                    signal = 0.5 + 0.5j * measured
                     bare_freq = self.qubit_frequencies[index]
                     data[target] = make_value(
                         target=target,
@@ -4802,8 +5098,9 @@ class FakeExperiment:
                         state_centers=self.state_centers.get(ge_target),
                         t2=t2_ns,
                         ramsey_freq=ramsey_freq,
+                        fit_phase=fit_phase,
                         bare_freq=bare_freq,
-                        r2=1.0,
+                        r2=self._r_squared(measured, clean),
                     )
                     print(f"Bare frequency with |{spectator_state}>:")
                     print(f"  {target}: {bare_freq:.6f}")
@@ -5028,245 +5325,6 @@ class FakeExperiment:
             result.plot()
         return result
 
-    def _chevron_pattern_result(
-        self,
-        targets: Collection[str] | str | None = None,
-        *,
-        detuning_range: Any | None = None,
-        time_range: Any | None = None,
-        frequencies: dict[str, float] | None = None,
-        amplitudes: dict[str, float] | None = None,
-        plot: bool | None = None,
-        **kwargs: Any,
-    ) -> Any:
-        import numpy as np
-
-        if plot is None:
-            plot = True
-        use_simulator = bool(kwargs.get("use_simulator", False))
-        labels = self._target_labels(targets)
-        detunings = (
-            np.linspace(-0.05, 0.05, 51)
-            if detuning_range is None
-            else np.asarray(detuning_range, dtype=float)
-        )
-        times = (
-            np.linspace(0.0, 2.0 * self.pi_duration, 41)
-            if time_range is None
-            else np.asarray(time_range, dtype=float)
-        )
-        times = self.discretize_time_range(times, sampling_period=float(self.dt * 1e9))
-        frequencies = frequencies or {
-            target: self.qubit_frequencies[self.qubit_labels.index(self._ge_label(target))]
-            for target in labels
-        }
-        amplitudes = amplitudes or {target: 1.0 for target in labels}
-
-        chevron_data = {}
-        rabi_rates = {}
-        rabi_fit_r2 = {}
-        resonant_frequencies = {}
-        figures = {}
-
-        if not use_simulator:
-            for target in labels:
-                ge_target = self._ge_label(target)
-                base_rate = self.calc_rabi_rate(target, amplitude=amplitudes.get(target, 1.0))
-                rates = np.sqrt(base_rate**2 + detunings**2)
-                phase = 2.0 * np.pi * np.outer(times, rates)
-                lifetime_ns = self._qubit_lifetime(self.qubit_labels.index(ge_target))[1] * 1000.0
-                envelope = np.exp(-times[:, None] / max(lifetime_ns, 1.0))
-                response = 0.5 * (1.0 - np.cos(phase) * envelope)
-
-                chevron_data[target] = response
-                rabi_rates[target] = rates
-                rabi_fit_r2[target] = np.ones_like(rates)
-                resonant_frequencies[target] = float(frequencies[target])
-
-                figure = self._chevron_figure(
-                    target=target,
-                    control_frequencies=frequencies[target] + detunings,
-                    time_range=times,
-                    data=response,
-                    amplitude=amplitudes.get(target, 1.0),
-                )
-                if figure is not None:
-                    figures[target] = figure
-                    if plot:
-                        _show_figure(
-                            figure,
-                            filename=f"chevron_pattern_{target}",
-                            width=600,
-                            height=400,
-                        )
-
-            return self._result(
-                data={
-                    "time_range": times,
-                    "detuning_range": detunings,
-                    "frequencies": frequencies,
-                    "chevron_data": chevron_data,
-                    "rabi_rates": rabi_rates,
-                    "rabi_fit_r2": rabi_fit_r2,
-                    "resonant_frequencies": resonant_frequencies,
-                    "fig": figures,
-                },
-                figures=figures,
-            )
-
-        from qxpulse import PulseSchedule, Rect
-
-        print(f"Targets : {labels}")
-        subgroups = [labels]
-        for idx, subgroup in enumerate(subgroups):
-            if not subgroup:
-                continue
-
-            print(f"Subgroup ({idx + 1}/{len(subgroups)}) : {subgroup}")
-            chevron_data_buffer: dict[str, list[np.ndarray]] = {target: [] for target in subgroup}
-            rabi_rates_buffer: dict[str, list[float]] = {target: [] for target in subgroup}
-            rabi_fit_r2_buffer: dict[str, list[float]] = {target: [] for target in subgroup}
-
-            for detuning in detunings:
-
-                def sequence(T: float, subgroup: list[str] = subgroup) -> Any:
-                    with PulseSchedule(subgroup) as ps:
-                        for target in subgroup:
-                            ps.set_frequency(target, frequencies[target] + float(detuning))
-                            ps.add(
-                                target,
-                                Rect(
-                                    duration=float(T),
-                                    amplitude=float(amplitudes.get(target, 1.0)),
-                                ),
-                            )
-                    return ps
-
-                sweep_result = self.sweep_parameter(
-                    sequence=sequence,
-                    sweep_range=times,
-                    targets=subgroup,
-                    shots=1024,
-                    interval=0.0,
-                    plot=False,
-                    use_simulator=True,
-                    frequencies={
-                        target: frequencies[target] + float(detuning) for target in subgroup
-                    },
-                )
-                for target, sweep_data in sweep_result.data.items():
-                    values = np.asarray(sweep_data.normalized, dtype=float)
-                    chevron_data_buffer[target].append(values)
-                    if len(times) > 1:
-                        centered = values - float(np.mean(values))
-                        if np.allclose(centered, 0.0):
-                            rate = 0.0
-                            r2 = 0.0
-                        else:
-                            dt = float(np.median(np.diff(times)))
-                            spectrum = np.fft.rfft(centered)
-                            freqs = np.fft.rfftfreq(len(centered), d=dt)
-                            if len(freqs) > 1:
-                                best = 1 + int(np.argmax(np.abs(spectrum[1:])))
-                                rate = float(freqs[best])
-                                total_power = float(np.sum(np.abs(spectrum[1:]) ** 2))
-                                peak_power = float(np.abs(spectrum[best]) ** 2)
-                                r2 = peak_power / total_power if total_power > 0 else 0.0
-                            else:
-                                rate = 0.0
-                                r2 = 0.0
-                    else:
-                        rate = 0.0
-                        r2 = 0.0
-                    rabi_rates_buffer[target].append(rate)
-                    rabi_fit_r2_buffer[target].append(r2)
-
-            for target in subgroup:
-                response = np.asarray(chevron_data_buffer[target], dtype=float).T
-                chevron_data[target] = response
-                rabi_rates[target] = np.asarray(rabi_rates_buffer[target], dtype=float)
-                rabi_fit_r2[target] = np.asarray(rabi_fit_r2_buffer[target], dtype=float)
-                resonant_frequencies[target] = float(
-                    frequencies[target] + detunings[int(np.argmax(np.mean(response, axis=0)))]
-                )
-
-                figure = self._chevron_figure(
-                    target=target,
-                    control_frequencies=frequencies[target] + detunings,
-                    time_range=times,
-                    data=response,
-                    amplitude=amplitudes.get(target, 1.0),
-                )
-                if figure is not None:
-                    figures[target] = figure
-                    if plot:
-                        _show_figure(
-                            figure,
-                            filename=f"chevron_pattern_{target}",
-                            width=600,
-                            height=400,
-                        )
-
-        return self._result(
-            data={
-                "time_range": times,
-                "detuning_range": detunings,
-                "frequencies": frequencies,
-                "chevron_data": chevron_data,
-                "rabi_rates": rabi_rates,
-                "rabi_fit_r2": rabi_fit_r2,
-                "resonant_frequencies": resonant_frequencies,
-                "fig": figures,
-            },
-            figures=figures,
-        )
-
-    def _chevron_figure(
-        self,
-        *,
-        target: str,
-        control_frequencies: Any,
-        time_range: Any,
-        data: Any,
-        amplitude: float,
-    ) -> Any:
-        try:
-            import plotly.graph_objects as go
-        except Exception:
-            return None
-
-        figure = _make_figure(width=600, height=400)
-        if figure is None:
-            return None
-        figure.add_trace(
-            go.Heatmap(
-                x=control_frequencies,
-                y=time_range,
-                z=data,
-                colorscale="Viridis",
-            )
-        )
-        figure.update_layout(
-            title=f"Chevron pattern : {target}",
-            xaxis_title="Drive frequency (GHz)",
-            yaxis_title="Time (ns)",
-            width=600,
-            height=400,
-            margin={"t": 80},
-            annotations=[
-                {
-                    "text": f"control_amplitude={amplitude:.6g}",
-                    "xref": "paper",
-                    "yref": "paper",
-                    "x": 0.0,
-                    "y": 1.08,
-                    "showarrow": False,
-                    "font": {"size": 13, "family": "monospace"},
-                }
-            ],
-        )
-        return figure
-
     def _rabi_result(
         self,
         *,
@@ -5275,6 +5333,7 @@ class FakeExperiment:
         ramptime: float | None,
         store_params: bool,
         transition: str,
+        shots: int | None = None,
     ) -> Any:
         import numpy as np
 
@@ -5301,8 +5360,14 @@ class FakeExperiment:
             target = self._resolve_rabi_label(input_label, transition=transition)
             frequency = self.calc_rabi_rate(target, amplitude=float(amplitude))
             phase = 0.0
-            oscillation = np.cos(2.0 * np.pi * frequency * effective_time_range + phase)
+            model = np.cos(2.0 * np.pi * frequency * effective_time_range + phase) * np.exp(
+                -effective_time_range / self.RABI_DECAY_NS
+            )
+            sigma = self._shot_sigma(shots)
+            rng = self._noise_rng("rabi", transition, target, float(amplitude))
+            oscillation = model + sigma * rng.normal(size=model.shape)
             data = 0.5 + 0.5j * oscillation
+            r2 = self._r_squared(oscillation, model)
 
             if RabiParam is None:
                 rabi_param = SimpleNamespace(
@@ -5311,10 +5376,10 @@ class FakeExperiment:
                     frequency=frequency,
                     phase=phase,
                     offset=0.0,
-                    noise=0.0,
+                    noise=sigma,
                     angle=0.0,
                     distance=0.5,
-                    r2=1.0,
+                    r2=r2,
                     reference_phase=0.0,
                 )
             else:
@@ -5324,10 +5389,10 @@ class FakeExperiment:
                     frequency=frequency,
                     phase=phase,
                     offset=0.0,
-                    noise=0.0,
+                    noise=sigma,
                     angle=0.0,
                     distance=0.5,
-                    r2=1.0,
+                    r2=r2,
                     reference_phase=0.0,
                 )
             rabi_params[target] = rabi_param
@@ -5708,7 +5773,9 @@ def build_qxsimulator_system(
                 label=label,
                 dimension=qubit_dimension,
                 frequency=frequency,
-                anharmonicity=_optional_float(qubit.get("anharmonicity")),
+                anharmonicity=_optional_float(
+                    qubit.get("qubit_anharmonicity", qubit.get("anharmonicity"))
+                ),
                 relaxation_rate=relaxation_rate,
                 dephasing_rate=dephasing_rate,
             )
@@ -5877,4 +5944,7 @@ _UNSUPPORTED_EXPERIMENT_METHODS = {
     "ckp_sequence",
     "ckp_measurement",
     "ckp_experiment",
+    # Chevron measurement and analysis live in qubex (contrib chevron_matched_transform),
+    # which drives the emulator through sweep_parameter; there is no emulator-side copy.
+    "chevron_pattern",
 }

@@ -119,10 +119,10 @@ class TestTaskValidationWithBackendConfig:
 
         # Tasks available in fake backend (from backend.yaml)
         result = validate_task_name(
-            task_names=["CheckFineChevron", "CheckRabi", "CheckT1"],
+            task_names=["FakeBringUp", "CheckRabi", "CheckT1"],
             backend="fake",
         )
-        assert result == ["CheckFineChevron", "CheckRabi", "CheckT1"]
+        assert result == ["FakeBringUp", "CheckRabi", "CheckT1"]
 
     def test_validate_task_name_success_qubex_backend(self):
         """Test successful task name validation for qubex backend."""

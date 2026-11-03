@@ -48,7 +48,7 @@ function useNow(active: boolean): number {
 /** Which model judged a plot and, on request, exactly what it was sent. */
 function EvaluationPanel({ evaluation }: { evaluation: ToolEvaluation }) {
   return (
-    <div className="mt-1.5 text-[11px] text-base-content/60">
+    <div className="mt-1.5 text-xs text-base-content/60">
       <div>
         Judged by{" "}
         <span className="font-mono text-base-content/75">
@@ -70,7 +70,7 @@ function EvaluationPanel({ evaluation }: { evaluation: ToolEvaluation }) {
         <summary className="cursor-pointer select-none text-base-content/50 hover:text-base-content/80">
           What the model saw
         </summary>
-        <pre className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-base-200/60 p-2 font-mono text-[11px] leading-relaxed text-base-content/70">
+        <pre className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-base-200/60 p-2 font-mono text-xs leading-relaxed text-base-content/70">
           {evaluation.prompt}
         </pre>
       </details>
@@ -136,9 +136,9 @@ function ToolStepRow({
           {stepTitle(step)}
         </span>
         {preview && (
-          <span className="truncate font-mono text-[11px] text-base-content/40">{preview}</span>
+          <span className="truncate font-mono text-xs text-base-content/40">{preview}</span>
         )}
-        <span className="ml-auto shrink-0 tabular-nums text-[11px] text-base-content/35">
+        <span className="ml-auto shrink-0 tabular-nums text-xs text-base-content/35">
           {step.status === "error" ? "failed · " : step.status === "cancelled" ? "not run · " : ""}
           {formatDuration(elapsed)}
         </span>
@@ -213,7 +213,7 @@ function TraceSteps({ steps, live }: { steps: TraceStep[]; live: boolean }) {
         }
         return (
           <ChainOfThoughtStep key={`text-${i}`} marker={null} defaultOpen>
-            <ChatMarkdown className="text-[13px] text-base-content/70">{step.text}</ChatMarkdown>
+            <ChatMarkdown className="text-xs text-base-content/70">{step.text}</ChatMarkdown>
           </ChainOfThoughtStep>
         );
       })}

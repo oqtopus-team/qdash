@@ -36,8 +36,12 @@ class TemplateCatalog:
         """Path of the template index describing each template file."""
         return self._templates_dir / "templates.json"
 
-    def list_templates(self) -> list[FlowTemplate]:
-        """List template metadata, or an empty list when no index exists."""
+    def list_templates(self, backend: str | None = None) -> list[FlowTemplate]:
+        """List template metadata, or an empty list when no index exists.
+
+        With ``backend`` only the templates written for that backend are returned, so a
+        deployment on the fake backend never offers hardware templates and vice versa.
+        """
         try:
             if not self.metadata_file.exists():
                 logger.error(f"Templates metadata file not found: {self.metadata_file}")
@@ -45,7 +49,9 @@ class TemplateCatalog:
 
             templates_data = json.loads(self.metadata_file.read_text(encoding="utf-8"))
             templates = [FlowTemplate(**template) for template in templates_data]
-            logger.info(f"Listed {len(templates)} flow templates")
+            if backend is not None:
+                templates = [template for template in templates if template.backend == backend]
+            logger.info(f"Listed {len(templates)} flow templates (backend={backend or 'all'})")
             return templates
         except Exception as exc:
             logger.error(f"Failed to list flow templates: {exc}")

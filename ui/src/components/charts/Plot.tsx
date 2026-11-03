@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { CSSProperties } from "react";
 
 import type {
@@ -12,6 +12,8 @@ import type {
   PlotSelectionEvent,
 } from "plotly.js";
 import Plotly from "plotly.js-dist-min";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
+import { chartTheme, themedLayout } from "@/lib/chartTheme";
 
 interface PlotFigure {
   data: Plotly.Data[];
@@ -49,7 +51,7 @@ const typedPlotly = Plotly as unknown as {
 
 export default function Plot({
   data,
-  layout,
+  layout: layoutProp,
   config,
   style,
   className,
@@ -65,6 +67,11 @@ export default function Plot({
 }: PlotProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitializedRef = useRef(false);
+  const isDark = useIsDarkTheme();
+  const layout = useMemo<Partial<Layout>>(
+    () => themedLayout(layoutProp, chartTheme(isDark)),
+    [layoutProp, isDark],
+  );
 
   useEffect(() => {
     const container = containerRef.current;

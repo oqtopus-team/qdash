@@ -362,6 +362,7 @@ class CalibService:
         persist_output_parameters: bool = True,
         *,
         task_parameters: dict[str, dict[str, Any]] | None = None,
+        configuration_mode: str | None = None,
         user_repo: UserRepository | None = None,
         lock_repo: ExecutionLockRepository | None = None,
         counter_repo: ExecutionCounterRepository | None = None,
@@ -418,6 +419,8 @@ class CalibService:
                 For example: ``{"CheckAdaptiveChevron": {"run": {"shots": 256},
                 "input": {"coarse_control_amplitude": 0.05}}}``. An input override
                 applies to every qid the task runs on.
+            configuration_mode: Qubex control layout inherited by parent and isolated
+                worker sessions. If omitted, the backend default is used.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
@@ -435,6 +438,7 @@ class CalibService:
         self.skip_execution = skip_execution
         self.default_run_parameters = normalize_default_run_parameters(default_run_parameters)
         self.task_parameters = resolve_task_parameters(task_parameters, task_run_parameters)
+        self.configuration_mode = configuration_mode
         validate_task_names(self.task_parameters, self.backend_name)
         self._lock_acquired = False
         self._lock_execution_id: str | None = None
@@ -735,6 +739,12 @@ class CalibService:
                 force_update_params=self._force_update_params,
                 persist_output_parameters=self._persist_output_parameters,
             )
+            if self.configuration_mode is not None:
+                config.configuration_mode = self.configuration_mode
+            else:
+                # Preserve CalibConfig's environment-backed default and expose the
+                # resolved value to isolated workers created by this service.
+                self.configuration_mode = config.configuration_mode
 
             # Create a parameter loader for snapshot re-execution. Explicit
             # overrides travel with each task through task_parameters.

@@ -88,7 +88,7 @@ export function AdminUsersPanel({
       <div className="card-body gap-5 p-5 sm:p-6">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
           <div>
-            <h2 className="card-title text-lg">User management</h2>
+            <h2 className="card-title">User management</h2>
             <p className="mt-1 text-sm text-base-content/60">
               Create accounts, manage access, and assign projects.
             </p>

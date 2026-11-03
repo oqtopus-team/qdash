@@ -223,6 +223,32 @@ class CancelExecutionResponse(BaseModel):
     message: str
 
 
+class ExecutionActivityDay(BaseModel):
+    """Executions started on one calendar day, counted by status."""
+
+    date: str = Field(..., description="Calendar day in the requested time zone, YYYY-MM-DD")
+    completed: int = 0
+    failed: int = 0
+    running: int = Field(0, description="Executions still in progress (running, cancelling)")
+    scheduled: int = Field(0, description="Executions not started yet (scheduled, pending)")
+    cancelled: int = 0
+    other: int = Field(0, description="Any status not covered by the named buckets")
+    total: int = 0
+
+
+class ExecutionActivityResponse(BaseModel):
+    """Daily execution counts for a chip over a trailing window of days."""
+
+    chip_id: str
+    days: int = Field(..., description="Length of the window in calendar days")
+    timezone: str = Field(..., description="IANA time zone the days are bucketed in")
+    since: str = Field(..., description="First day of the window, YYYY-MM-DD")
+    until: str = Field(..., description="Last day of the window (today), YYYY-MM-DD")
+    buckets: list[ExecutionActivityDay] = Field(
+        ..., description="One entry per calendar day, oldest first, including empty days"
+    )
+
+
 class ListExecutionsResponse(BaseModel):
     """Response model for listing executions.
 

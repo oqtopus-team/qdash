@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 class QubitProperties(BaseModel):
     resonator_frequency: float | None = None
     qubit_frequency: float | None = None
-    anharmonicity: float | None = None
+    qubit_anharmonicity: float | None = None
     external_loss_rate: float | None = None
     internal_loss_rate: float | None = None
     t1: float | None = None

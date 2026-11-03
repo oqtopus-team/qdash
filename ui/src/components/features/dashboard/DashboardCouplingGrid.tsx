@@ -207,7 +207,7 @@ export function DashboardCouplingGrid({
                 height: cellSize,
               }}
             >
-              <span className="text-[10px] font-semibold px-1 leading-tight">{qid}</span>
+              <span className="text-xs font-medium px-1 leading-tight">{qid}</span>
             </div>
           );
         })}
@@ -268,11 +268,11 @@ export function DashboardCouplingGrid({
                 });
               }}
               onMouseLeave={() => setHover(null)}
-              className={`absolute flex items-center justify-center transition-all ${
+              className={`absolute flex items-center justify-center transition-colors ${
                 isSummaryPresentation
                   ? "rounded-full"
                   : "rounded-md shadow-sm flex-col -translate-x-1/2 -translate-y-1/2"
-              } ${onCouplingClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60 hover:scale-105" : ""} ${
+              } ${onCouplingClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""} ${
                 isSummaryPresentation ? `border ${summaryChipClass}` : !bg ? "bg-base-300/60" : ""
               }`}
               style={{
@@ -292,11 +292,11 @@ export function DashboardCouplingGrid({
                   Q{qid1}→Q{qid2}
                 </span>
               ) : value !== null ? (
-                <span className="text-[10px] font-bold text-white drop-shadow leading-none">
+                <span className="text-xs font-medium text-white drop-shadow leading-none">
                   {value.toFixed(2)}
                 </span>
               ) : (
-                <span className="text-[9px] text-base-content/50 leading-none">—</span>
+                <span className="text-xs text-base-content/50 leading-none">—</span>
               )}
               {!isSummaryPresentation && (
                 <svg

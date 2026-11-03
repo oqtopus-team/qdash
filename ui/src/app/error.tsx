@@ -53,7 +53,7 @@ export default function Error({
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 mt-8">
-          <button onClick={reset} className="btn btn-primary btn-glow px-8">
+          <button onClick={reset} className="btn btn-primary px-8">
             Try Again
           </button>
           <Link href="/" className="btn btn-outline btn-primary px-8">

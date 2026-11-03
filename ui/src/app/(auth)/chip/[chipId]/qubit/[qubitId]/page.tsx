@@ -97,7 +97,7 @@ function QubitDetailPageContent() {
         {/* Header Section */}
         <div className="flex flex-col gap-6">
           <div className="flex flex-col sm:flex-row sm:justify-between items-start gap-4">
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-xl font-medium">
               Qubit {qubitId} Analysis - {chipData?.data?.chip_id || chipId}
             </h1>
             <div className="join rounded-lg overflow-hidden">
@@ -192,7 +192,7 @@ function QubitDetailPageContent() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-primary px-2 py-1 text-sm font-semibold text-primary-content">
+                      <span className="rounded-md bg-primary px-2 py-1 text-sm font-medium text-primary-content">
                         Q{qubitId}
                       </span>
                       <span className="truncate text-sm font-medium text-base-content">
