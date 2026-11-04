@@ -155,6 +155,7 @@ export function LoginPageContent() {
                     spellCheck="false"
                     autoFocus
                     className={`input input-bordered w-full focus:input-primary ${errors.username ? "input-error" : ""}`}
+                    aria-required="true"
                     aria-invalid={Boolean(errors.username)}
                     aria-describedby={describedBy(errors.username?.message && "userName-error")}
                     {...register("username")}
@@ -176,6 +177,7 @@ export function LoginPageContent() {
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       className={`input input-bordered w-full pr-12 focus:input-primary ${errors.password ? "input-error" : ""}`}
+                      aria-required="true"
                       aria-invalid={Boolean(errors.password)}
                       aria-describedby={describedBy(
                         errors.password?.message && "password-error",

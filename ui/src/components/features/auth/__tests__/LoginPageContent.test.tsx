@@ -50,6 +50,13 @@ describe("LoginPageContent", () => {
     vi.clearAllMocks();
   });
 
+  it("marks both fields as required for assistive technology", () => {
+    render(<LoginPageContent />);
+
+    expect(screen.getByLabelText("User ID").getAttribute("aria-required")).toBe("true");
+    expect(screen.getByLabelText("Password").getAttribute("aria-required")).toBe("true");
+  });
+
   it("shows required errors and does not log in when submitted empty", async () => {
     render(<LoginPageContent />);
     submitForm();
