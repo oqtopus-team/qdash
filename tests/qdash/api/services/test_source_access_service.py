@@ -119,6 +119,25 @@ def test_read_maps_traceback_paths_onto_roots(roots):
     assert exc.value.status == 404
 
 
+def test_traceback_paths_through_qdash_dirs_named_after_dependencies_stay_in_qdash(roots):
+    # QDash's calibration tasks live in workflow/calibtasks/qubex/, so a task
+    # traceback names a "qubex" segment that is not the qubex package.
+    tasks = roots[0].path / "workflow" / "calibtasks" / "qubex"
+    tasks.mkdir(parents=True)
+    (tasks / "base.py").write_text("class QubexTask:\n    raise RuntimeError('fit failed')\n")
+    service = SourceAccessService(roots)
+    task = service.read(None, "/app/qdash/workflow/calibtasks/qubex/base.py")
+    assert (task.root, task.path) == ("qdash", "workflow/calibtasks/qubex/base.py")
+    assert "fit failed" in task.content
+    # A dependency installed under a checkout named qdash is still the dependency.
+    installed = service.read(
+        None, "/home/u/qdash/.venv/lib/python3.11/site-packages/qubex/measurement.py"
+    )
+    assert (installed.root, installed.path) == ("qubex", "measurement.py")
+    # Another installed package is not mapped onto a root that happens to be in its path.
+    assert service.locate("/home/u/qdash/.venv/lib/python3.11/site-packages/numpy/core.py") is None
+
+
 def test_missing_dependencies_are_reported(roots, monkeypatch):
     monkeypatch.setenv("QDASH_SOURCE_DEPENDENCIES", "qubex,qubecalib")
     assert SourceAccessService(roots).missing_dependencies() == ["qubecalib"]

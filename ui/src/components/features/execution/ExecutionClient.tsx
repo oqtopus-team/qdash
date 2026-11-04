@@ -22,6 +22,7 @@ import { CancelExecutionModal } from "@/components/features/execution/CancelExec
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
@@ -269,14 +270,17 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           </div>
           <ExecutionRunSummary status={execution.status} tasks={execution.task ?? []} />
           {execution.status === "failed" && (
-            <div role="alert" className="alert alert-error items-start">
-              <span className="flex-1 break-words whitespace-pre-wrap">
-                {execution.message || "The execution failed without an error message."}
-              </span>
-              <InvestigateWithAiButton
-                target={{ executionId, chipId: execution.chip_id || chipId }}
-              />
-            </div>
+            <TaskMessagePanel
+              status="failed"
+              message={execution.message}
+              showEmptyFallback
+              action={
+                <InvestigateWithAiButton
+                  target={{ executionId, chipId: execution.chip_id || chipId }}
+                  surface="mini"
+                />
+              }
+            />
           )}
         </div>
 

@@ -102,12 +102,16 @@ and, optionally, the task ID, task name, qid, and chip. `chat_stream` checks pro
 with `get_project_context` before it streams. `CopilotInvestigationService.build`
 (`src/qdash/api/services/copilot_investigation_service.py`) then loads the execution and task
 result from that project. It builds the opening message from the error message and stack trace,
-the source roots and their revisions, and the answer structure. A task without a result uses the
-execution's own task record. Long logs are clipped to their start and end. `pi_chat_service.stream`
+the source roots and their revisions, and the instructions: start at the raising frame, stop
+once the evidence explains the error, and answer with a likely cause, evidence, and one next
+step. A task without a result uses the execution's own task record. Long logs are clipped to their start and end. `pi_chat_service.stream`
 sends the opening as `initial_message`, which the runtime uses only for a new conversation. An
 unknown execution answers 404; `task` and `investigation` together answer 400.
 
-The UI starts it with `ChatDockContext.investigate`: the click handler creates the session, with
+The UI starts it with `ChatDockContext.investigate(target, surface)`. Execution pages, task
+details, and the task result preview pass `"mini"`, the floating window, because they already
+sit in a drawer or modal; the task result page uses the sidebar. The dock shows one surface at a
+time: opening either closes the other. The click handler creates the session, with
 `context: {investigation}` stored server-side, and sends the first turn once. A second click for
 the same failure resumes that session, including after a reload. The first turn and retries of that turn
 carry `investigation`. Follow-ups use the existing conversation without reloading the execution,
@@ -129,6 +133,12 @@ refused. Only text source suffixes (`.py`, `.toml`, `.yaml`, `.md`, and similar)
 search is literal, capped at 200 matches and 20,000 files; a read returns at most 400 lines of a
 file under 1 MB. The routes require a signed-in user; source is the same for every project.
 
+`SourceAccessService.locate` maps a traceback path when `qdash_read_source` gets no root. Under
+`site-packages` or `dist-packages`, the next segment names the package, and a package that is not
+a root is not mapped. Elsewhere the `qdash` root is tried before dependencies, using its last
+segment in the path: `/app/qdash/workflow/calibtasks/qubex/base.py` is
+`qdash:workflow/calibtasks/qubex/base.py`, not a file of the qubex package.
+
 QDash does not record the revision an execution ran with. The opening message and
 `qdash_list_source_roots` say so, and the prompt tells the model not to claim that served source
 matches the failed run. Compose mounts `./src/qdash` read-only at `/app/source/qdash` on the API,
@@ -138,8 +148,9 @@ image does not install qubex, so in Compose qubex source is reported unavailable
 
 Tests: `tests/qdash/api/services/test_source_access_service.py`,
 `test_copilot_investigation_service.py`, `tests/qdash/api/routers/test_copilot_investigation.py`,
-`packages/pi-qdash/tests/source-code-tool.test.mjs`, and
-`ui/src/contexts/__tests__/ChatDockInvestigation.test.tsx`.
+`packages/pi-qdash/tests/source-code-tool.test.mjs`,
+`ui/src/contexts/__tests__/ChatDockInvestigation.test.tsx`, and the execution page tests
+`ExecutionPageContent.test.tsx` and `ExecutionClient.test.tsx`.
 
 ## Configuration
 

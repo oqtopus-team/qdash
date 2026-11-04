@@ -46,6 +46,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useToast } from "@/components/ui/Toast";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
@@ -579,19 +580,23 @@ export function ExecutionPageContent() {
               )}
               {isDetailError && <div>Error loading details.</div>}
               {executionDetailData?.data.status === "failed" && selectedExecutionId && (
-                <div role="alert" className="alert alert-error mb-4 items-start text-sm">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span className="flex-1 break-words whitespace-pre-wrap">
-                    {executionDetailData.data.message ||
-                      "The execution failed without an error message."}
-                  </span>
-                  <InvestigateWithAiButton
-                    target={{
-                      executionId: selectedExecutionId,
-                      chipId: executionDetailData.data.chip_id || null,
-                    }}
-                  />
-                </div>
+                // This panel is already a right-hand drawer, so the investigation
+                // opens in the floating window instead of a second docked sidebar.
+                <TaskMessagePanel
+                  status="failed"
+                  message={executionDetailData.data.message}
+                  showEmptyFallback
+                  className="mb-4"
+                  action={
+                    <InvestigateWithAiButton
+                      target={{
+                        executionId: selectedExecutionId,
+                        chipId: executionDetailData.data.chip_id || null,
+                      }}
+                      surface="mini"
+                    />
+                  }
+                />
               )}
               {executionDetailData &&
                 executionDetailData.data.task &&

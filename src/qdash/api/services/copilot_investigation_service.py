@@ -110,25 +110,29 @@ def _source_section(source: SourceAccessService) -> str:
 _INSTRUCTIONS = """\
 ## What to do
 
-Investigate why this failed. Read the code the traceback and the error name: \
-find the raising frame and its callers in QDash (`workflow/`, `common/`, \
-`datamodel/`) and in dependency source when it is available. Keep tool calls \
-targeted. Do not change parameters, re-run anything, or apply a fix: this is a \
-diagnosis.
+Diagnose why this failed. This is read-only: do not change parameters, re-run \
+anything, or apply a fix.
 
-Answer with these sections:
+Start with the frame that raised the error in the traceback and the source \
+it points to. Stop reading once the logs and that code explain the error; do \
+not scan the repository or list callers and alternatives that the evidence \
+does not call for. Read further only when the evidence is ambiguous or \
+contradictory, or when the user asks for more.
 
-1. **Likely cause**: one or two sentences, with your confidence.
-2. **Evidence from the logs**: quote the exact lines that support it.
-3. **Code**: each relevant location as `root:path:line` with what it does, \
-and the revision caveat above.
-4. **Facts and hypotheses**: label what the logs or code show as a fact and \
-what you infer as a hypothesis.
-5. **Next checks**: concrete steps that would confirm or rule out the cause.
-6. **Suggested fixes**: proposals for the user to review; never apply them.
+Keep the answer short: these three labeled items in a few sentences or \
+bullets, with no other sections and no repeated caveats.
 
-When the logs are missing or clipped, say what is missing and what that \
-prevents you from concluding."""
+- **Likely cause**: one or two sentences. Mark it as a hypothesis, with your \
+confidence, only when the evidence does not establish it.
+- **Evidence**: a short quote of the decisive log line and one or a few \
+`root:path:line` citations. Quote and cite only what you read.
+- **Next step**: the single most useful check, or a proposed fix for the user \
+to review; never apply it. Give two only when one is not enough.
+
+Mention the source revision caveat in one short clause when you cite code. \
+When the logs are missing or clipped, or the source you need is unavailable, \
+say so in one sentence and what that prevents you from concluding. The user \
+can ask a follow-up for more detail."""
 
 
 class CopilotInvestigationService:
