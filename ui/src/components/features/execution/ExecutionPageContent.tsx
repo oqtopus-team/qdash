@@ -127,7 +127,7 @@ export function ExecutionPageContent() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [activityDays, setActivityDays] = useState<ActivityWindow>(30);
+  const [activityDays, setActivityDays] = useState<ActivityWindow>(90);
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const executionCards = useRef(new Map<string, HTMLDivElement>());

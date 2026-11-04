@@ -16,7 +16,7 @@ import { chartTheme } from "@/lib/chartTheme";
 import { DEFAULT_TIMEZONE } from "@/lib/utils/datetime";
 import type { ExecutionActivityDay } from "@/schemas";
 
-const ACTIVITY_WINDOWS = [7, 30, 90] as const;
+const ACTIVITY_WINDOWS = [30, 90, 180] as const;
 export type ActivityWindow = (typeof ACTIVITY_WINDOWS)[number];
 
 type StatusKey = Exclude<keyof ExecutionActivityDay, "date" | "total">;
@@ -135,7 +135,7 @@ interface ExecutionActivityChartProps {
 }
 
 /**
- * Executions per day for the selected chip over the last 7, 30 or 90 days, drawn as a column
+ * Executions per day for the selected chip over the last 30, 90 or 180 days, drawn as a column
  * of small blocks per day stacked by status. One block is one execution until the busiest day
  * no longer fits, after which each block stands for a labeled number of executions.
  * Selecting a day filters the execution list to that day; selecting it again clears the filter.
