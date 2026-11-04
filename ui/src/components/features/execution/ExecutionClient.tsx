@@ -11,6 +11,7 @@ import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
 import { ExecutionDAG } from "./ExecutionDAG";
+import { ExecutionRunSummary } from "./ExecutionRunSummary";
 
 import type { ExecutionResponseDetail } from "@/schemas";
 
@@ -264,6 +265,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               <span className="truncate">{formatActorLabel(execution)}</span>
             </div>
           </div>
+          <ExecutionRunSummary status={execution.status} tasks={execution.task ?? []} />
           {execution.status === "failed" && execution.message && (
             <div className="alert alert-error items-start">
               <span className="break-words whitespace-pre-wrap">{execution.message}</span>
