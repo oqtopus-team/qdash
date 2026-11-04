@@ -214,17 +214,54 @@ describe("Sidebar", () => {
     const { mobile } = getAsides(container);
     const header = within(mobile.firstElementChild as HTMLElement);
 
-    expect(header.getByRole("link", { name: "QDash home" })).toBeTruthy();
+    expect(header.getByRole("link", { name: "QDash home" }).textContent).toBe("QDash");
     expect(header.getByRole("button", { name: "Close menu" })).toBeTruthy();
   });
 
-  it("keeps the in-nav logo out of the mobile drawer", () => {
+  it("pairs the logo and product name with the collapse button on the expanded rail", () => {
+    const { container } = render(<Sidebar />);
+
+    const { desktop } = getAsides(container);
+    const header = desktop.querySelector('[data-testid="sidebar-desktop-header"]') as HTMLElement;
+    const home = within(header).getByRole("link", { name: "QDash home" });
+
+    expect(header.className).toContain("h-16");
+    expect(home.textContent).toBe("QDash");
+    expect(home.querySelector("img")?.getAttribute("alt")).toBe("");
+    expect(within(header).getByRole("button", { name: "Collapse sidebar" })).toBeTruthy();
+  });
+
+  it("shows only the expand button in the collapsed rail header", () => {
+    sidebarState.isOpen = false;
+    const { container } = render(<Sidebar />);
+
+    const { desktop } = getAsides(container);
+    const header = desktop.querySelector('[data-testid="sidebar-desktop-header"]') as HTMLElement;
+
+    expect(header.className).toContain("h-16");
+    expect(within(header).queryByRole("link", { name: "QDash home" })).toBeNull();
+    expect(within(header).getByRole("button", { name: "Expand sidebar" })).toBeTruthy();
+  });
+
+  it("renders exactly one home logo per sidebar and none inside the nav", () => {
+    const { container } = render(<Sidebar />);
+
+    const { desktop, mobile } = getAsides(container);
+
+    for (const aside of [desktop, mobile]) {
+      expect(aside.querySelectorAll('a[aria-label="QDash home"]')).toHaveLength(1);
+      expect(aside.querySelector('nav a[aria-label="QDash home"]')).toBeNull();
+    }
+  });
+
+  it("closes the mobile drawer when the home logo is clicked", () => {
+    sidebarState.isMobileOpen = true;
     const { container } = render(<Sidebar />);
 
     const { mobile } = getAsides(container);
-    const navLogo = mobile.querySelector('nav a[aria-label="QDash home"]');
+    fireEvent.click(within(mobile as HTMLElement).getByRole("link", { name: "QDash home" }));
 
-    expect(navLogo?.closest("li")?.className).toContain("hidden lg:block");
+    expect(setMobileSidebarOpen).toHaveBeenCalledWith(false);
   });
 
   it("closes the mobile drawer when a nav link is clicked", () => {

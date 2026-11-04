@@ -40,28 +40,27 @@ type ExternalNavItem = {
 };
 
 /**
- * QDash home link shared by both sidebars.
- * `lg` is the in-nav logo on the expanded desktop rail; `sm` is the compact one
- * that sits beside the close button in the mobile drawer header.
+ * QDash home link shared by the expanded desktop rail and the mobile drawer
+ * header: the OQTOPUS mark beside the product name. Its left inset matches the
+ * nav rows below so the mark lines up with their icons.
  */
-function SidebarLogo({ size, onClick }: { size: "sm" | "lg"; onClick: () => void }) {
-  const isLarge = size === "lg";
-
+function SidebarLogo({ onClick }: { onClick: () => void }) {
   return (
     <Link
       href="/"
-      className={`flex items-center justify-center rounded-xl ${isLarge ? "min-h-16" : ""}`}
+      className="mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-1"
       aria-label="QDash home"
       onClick={onClick}
     >
       <Image
         src="/oqtopus_logo.png"
-        alt="Oqtopus Logo"
-        width={72}
-        height={72}
-        className={`object-contain ${isLarge ? "h-16 w-16" : "h-10 w-10"}`}
+        alt=""
+        width={36}
+        height={36}
+        className="h-9 w-9 shrink-0 object-contain"
         priority
       />
+      <span className="truncate text-lg font-semibold tracking-tight text-base-content">QDash</span>
     </Link>
   );
 }
@@ -378,14 +377,6 @@ export function Sidebar() {
   // the single fit-content menu they replaced; the drawer stretches them instead.
   const sidebarContent = (
     <div className="flex w-fit flex-col max-lg:w-full">
-      {isOpen && (
-        <ul className={MENU_CLASS}>
-          <li className="mb-1 hidden lg:block">
-            <SidebarLogo size="lg" onClick={handleLinkClick} />
-          </li>
-        </ul>
-      )}
-
       {navSections.map((section) => {
         const visibleItems = section.items.filter((item) => item.visible !== false);
         if (visibleItems.length === 0) return null;
@@ -550,7 +541,13 @@ export function Sidebar() {
           isOpen ? "w-48" : "w-16"
         }`}
       >
-        <div className="flex flex-shrink-0 justify-end p-2 pb-0">
+        <div
+          data-testid="sidebar-desktop-header"
+          className={`flex h-16 flex-shrink-0 items-center px-2 ${
+            isOpen ? "gap-1" : "justify-center"
+          }`}
+        >
+          {isOpen && <SidebarLogo onClick={handleLinkClick} />}
           <button
             onClick={toggleSidebar}
             className="btn btn-ghost btn-sm btn-square"
@@ -582,8 +579,8 @@ export function Sidebar() {
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex flex-shrink-0 items-center justify-between gap-2 p-2">
-          <SidebarLogo size="sm" onClick={handleLinkClick} />
+        <div className="flex h-16 flex-shrink-0 items-center gap-1 px-2">
+          <SidebarLogo onClick={handleLinkClick} />
           <button
             onClick={() => setMobileSidebarOpen(false)}
             className="btn btn-ghost btn-sm btn-square"
