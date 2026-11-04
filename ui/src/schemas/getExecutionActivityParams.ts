@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { GetExecutionActivityGranularity } from './getExecutionActivityGranularity';
 
 export type GetExecutionActivityParams = {
 /**
@@ -18,7 +19,11 @@ chip_id?: string | null;
  */
 days?: number;
 /**
- * IANA time zone used to assign executions to days
+ * IANA time zone used to assign executions to buckets
  */
 timezone?: string;
+/**
+ * Bucket length: `day` (default) or `6h`. `6h` returns `days` x 4 buckets and accepts at most 31 days
+ */
+granularity?: GetExecutionActivityGranularity;
 };

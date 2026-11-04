@@ -98,7 +98,7 @@ describe("HomeExecutionActivity", () => {
     expect(screen.getByTestId("home-activity-scale")).toHaveTextContent("1 block = 1 execution");
   });
 
-  it("bounds a busy day to 12 blocks with a labeled 1-2-5 scale and lighter remainders", () => {
+  it("bounds a busy day to 12 blocks with a labeled 1-2-5 scale and partly filled remainders", () => {
     mocks.activity = month({
       "2026-11-02": { completed: 20, failed: 3 },
       "2026-11-01": { failed: 1 },
@@ -112,10 +112,12 @@ describe("HomeExecutionActivity", () => {
       { status: "failed", executions: 1, partial: true },
     ]);
     expect(blocks.reduce((acc, block) => acc + block.executions, 0)).toBe(23);
-    // A single execution on a quiet day is still drawn, as a lighter block.
+    // A single execution on a quiet day is still drawn, as a half-filled block.
     expect(blocksOf("2026-11-01")).toEqual([{ status: "failed", executions: 1, partial: true }]);
+    const half = dayLink("2026-11-01").querySelector<HTMLElement>("[data-status]");
+    expect(half?.style.height).toBe("50%");
     expect(screen.getByTestId("home-activity-scale")).toHaveTextContent(
-      "1 block = 2 executions, a lighter block holds fewer",
+      "1 block = 2 executions, a partly filled block holds fewer",
     );
   });
 

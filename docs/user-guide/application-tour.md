@@ -33,8 +33,8 @@ Use **Dashboard** for broad health checks, **Metrics** for a parameter-focused i
 
 **Executions** on Home counts the runs started on every chip of the active project in the last 30
 days, one column of blocks per day colored by status. Each block represents one execution; on
-busy days the card labels how many executions a full block represents, and lighter blocks contain
-fewer. Hover over or focus a day to see its exact counts, and select the chart or
+busy days the card labels how many executions a full block represents, and the top block of a
+day is only partly filled when it holds fewer. Hover over or focus a day to see its exact counts, and select the chart or
 **All executions** to open the **Execution** page. A run in progress appears as a badge in the top
 bar with its name and status; select the badge to open the run.
 

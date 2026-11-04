@@ -27,6 +27,7 @@ from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
     ArtifactPreviewResponse,
     CancelExecutionResponse,
+    ExecutionActivityGranularity,
     ExecutionActivityResponse,
     ExecutionAvailabilityRequest,
     ExecutionAvailabilityResponse,
@@ -35,7 +36,10 @@ from qdash.api.schemas.execution import (
     ListExecutionsResponse,
 )
 from qdash.api.services.artifact_preview_service import preview_netcdf
-from qdash.api.services.execution_service import ExecutionService
+from qdash.api.services.execution_service import (
+    MAX_SIX_HOUR_ACTIVITY_DAYS,
+    ExecutionService,
+)
 from qdash.api.services.flow_service import FlowService
 from qdash.common.config.path_resolver import (
     PathOutsideCalibData,
@@ -303,7 +307,7 @@ def list_executions(
 @router.get(
     "/executions/activity",
     response_model=ExecutionActivityResponse,
-    summary="Count executions per day",
+    summary="Count executions per day or per 6-hour slot",
     operation_id="getExecutionActivity",
 )
 def get_execution_activity(
@@ -317,21 +321,34 @@ def get_execution_activity(
     ] = None,
     days: Annotated[int, Query(ge=1, le=365, description="Trailing window in calendar days")] = 30,
     timezone: Annotated[
-        str, Query(description="IANA time zone used to assign executions to days")
+        str, Query(description="IANA time zone used to assign executions to buckets")
     ] = "UTC",
+    granularity: Annotated[
+        ExecutionActivityGranularity,
+        Query(
+            description=(
+                "Bucket length: `day` (default) or `6h`. `6h` returns `days` x 4 buckets "
+                f"and accepts at most {MAX_SIX_HOUR_ACTIVITY_DAYS} days"
+            )
+        ),
+    ] = "day",
 ) -> ExecutionActivityResponse:
-    """Count executions per calendar day, by status, over a trailing window.
+    """Count executions per bucket, by status, over a trailing window.
 
     With ``chip_id`` only that chip's executions count; without it, every execution in the
     caller's current project counts. Executions of other projects are never included.
-    Every day of the window is returned, empty days included, so a chart can draw a
-    continuous axis. Days follow ``timezone`` so they match what the user sees.
+    Every bucket of the window is returned, empty ones included, so a chart can draw a
+    continuous axis. Buckets follow wall-clock time in ``timezone`` so they match what the
+    user sees: one per calendar day ending today, or with ``granularity=6h`` four per day
+    (local 00:00, 06:00, 12:00, 18:00) ending with the slot that contains the current time.
+    Each bucket carries its ``start`` and exclusive ``end``.
     """
     return execution_service.get_execution_activity(
         project_id=ctx.project_id,
         chip_id=chip_id,
         days=days,
         timezone=timezone,
+        granularity=granularity,
     )
 
 
