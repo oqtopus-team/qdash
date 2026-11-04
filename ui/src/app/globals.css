@@ -1125,11 +1125,6 @@ html[data-theme="dark"],
    Chat UI Styles
    ======================================== */
 
-/* The QDash bot mark (OQTOPUS logo) on the empty chat. */
-.chat-avatar-hero {
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-base-content) 8%, transparent);
-}
-
 /*
  * First-message transition on the chat page (lib/viewTransition.ts): the mark
  * and the composer keep their names across the layout change, so the browser

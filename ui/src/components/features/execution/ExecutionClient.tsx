@@ -11,6 +11,8 @@ import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
 import { ExecutionDAG } from "./ExecutionDAG";
+import { ExecutionParameterChanges } from "./ExecutionParameterChanges";
+import { ExecutionRunSummary } from "./ExecutionRunSummary";
 
 import type { ExecutionResponseDetail } from "@/schemas";
 
@@ -265,6 +267,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               <span className="truncate">{formatActorLabel(execution)}</span>
             </div>
           </div>
+          <ExecutionRunSummary status={execution.status} tasks={execution.task ?? []} />
           {execution.status === "failed" && (
             <div role="alert" className="alert alert-error items-start">
               <span className="flex-1 break-words whitespace-pre-wrap">
@@ -280,6 +283,14 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
         <div className="bg-base-100 rounded-lg shadow-md p-6">
           <h2 className="text-sm font-medium mb-4">Execution Flow</h2>
           <ExecutionDAG tasks={validTasks} />
+        </div>
+
+        <div id="parameter-changes" className="bg-base-100 rounded-lg shadow-md p-6">
+          <h2 className="text-sm font-medium mb-1">Parameter changes</h2>
+          <p className="text-xs text-base-content/60 mb-3">
+            Values this run wrote to the calibration database, against the previous run.
+          </p>
+          <ExecutionParameterChanges chipId={chipId} executionId={executionId} />
         </div>
 
         {/* Execution Note (if available) */}

@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 
@@ -371,9 +370,6 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Link href="/provenance" className="btn btn-xs btn-ghost">
-                View in Provenance →
-              </Link>
               <button onClick={() => setImportResult(null)} className="btn btn-xs btn-ghost">
                 ✕
               </button>

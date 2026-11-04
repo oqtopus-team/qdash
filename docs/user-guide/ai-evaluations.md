@@ -27,7 +27,8 @@ Use either entry point:
   topology. Under **Targets**, clear any qubits or couplings you do not want to include.
 - On a task result, select **Ask AI**, then **Evaluate the figure** to judge that one result.
 
-A result that is still running or has no figure cannot be selected.
+A result that is still running or has no figure cannot be selected. After you confirm, the
+result's **AI evaluation** section says an evaluation is on its way until its record appears.
 
 Choose the evaluation settings before confirming:
 

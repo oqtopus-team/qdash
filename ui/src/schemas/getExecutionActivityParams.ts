@@ -8,9 +8,9 @@
 
 export type GetExecutionActivityParams = {
 /**
- * Chip ID to count executions for
+ * Chip ID to count executions for; omit to count every chip in the project
  */
-chip_id: string;
+chip_id?: string | null;
 /**
  * Trailing window in calendar days
  * @minimum 1

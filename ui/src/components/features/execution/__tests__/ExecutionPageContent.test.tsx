@@ -217,7 +217,7 @@ describe("ExecutionPageContent cancel confirmation", () => {
   it("shows the activity chart and lets it pick the day filter", () => {
     render(<ExecutionPageContent />);
 
-    expect(screen.getByText("ActivityChart 30d")).toBeTruthy();
+    expect(screen.getByText("ActivityChart 90d")).toBeTruthy();
     expect(screen.getByText("selected:latest")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "pick-day" }));

@@ -725,7 +725,7 @@ const deleteProject = (
     }
 
 /**
- * List all members of a project.
+ * List active members of a project.
  * @summary List project members
  */
 const listProjectMembers = (
@@ -951,14 +951,16 @@ const listExecutions = (
     }
 
 /**
- * Count a chip's executions per calendar day, by status, over a trailing window.
+ * Count executions per calendar day, by status, over a trailing window.
  *
+ * With ``chip_id`` only that chip's executions count; without it, every execution in the
+ * caller's current project counts. Executions of other projects are never included.
  * Every day of the window is returned, empty days included, so a chart can draw a
  * continuous axis. Days follow ``timezone`` so they match what the user sees.
  * @summary Count executions per day
  */
 const getExecutionActivity = (
-    params: GetExecutionActivityParams,
+    params?: GetExecutionActivityParams,
  options?: SecondParameter<typeof qdashRequest<ExecutionActivityResponse>>,) => {
       return qdashRequest<ExecutionActivityResponse>(
       {url: `/executions/activity`, method: 'GET',

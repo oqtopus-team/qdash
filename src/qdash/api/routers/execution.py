@@ -309,14 +309,21 @@ def list_executions(
 def get_execution_activity(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     execution_service: Annotated[ExecutionService, Depends(get_execution_service)],
-    chip_id: Annotated[str, Query(description="Chip ID to count executions for")],
+    chip_id: Annotated[
+        str | None,
+        Query(
+            description="Chip ID to count executions for; omit to count every chip in the project"
+        ),
+    ] = None,
     days: Annotated[int, Query(ge=1, le=365, description="Trailing window in calendar days")] = 30,
     timezone: Annotated[
         str, Query(description="IANA time zone used to assign executions to days")
     ] = "UTC",
 ) -> ExecutionActivityResponse:
-    """Count a chip's executions per calendar day, by status, over a trailing window.
+    """Count executions per calendar day, by status, over a trailing window.
 
+    With ``chip_id`` only that chip's executions count; without it, every execution in the
+    caller's current project counts. Executions of other projects are never included.
     Every day of the window is returned, empty days included, so a chart can draw a
     continuous axis. Days follow ``timezone`` so they match what the user sees.
     """

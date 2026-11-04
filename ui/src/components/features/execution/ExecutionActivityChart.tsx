@@ -1,47 +1,52 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-
-import type { Layout, PlotMouseEvent } from "plotly.js";
+import { type KeyboardEvent, useCallback, useMemo, useRef, useState } from "react";
 
 import { useGetExecutionActivity } from "@/client/execution/execution";
-import Plot from "@/components/charts/Plot";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useIsDarkTheme } from "@/contexts/ThemeContext";
 import { chartTheme } from "@/lib/chartTheme";
 import { DEFAULT_TIMEZONE } from "@/lib/utils/datetime";
-import type { ExecutionActivityDay } from "@/schemas";
 
-const ACTIVITY_WINDOWS = [7, 30, 90] as const;
+import {
+  type ActivityDayColumn,
+  activityBlockScale,
+  activityBlockStyler,
+  activityStatusTotals,
+  describeActivityDay,
+  longActivityDate,
+  parseActivityDay,
+  pluralize,
+  shortActivityDate,
+  toActivityColumn,
+} from "./executionActivityBlocks";
+
+const ACTIVITY_WINDOWS = [30, 90, 180] as const;
 export type ActivityWindow = (typeof ACTIVITY_WINDOWS)[number];
 
-const SERIES: ReadonlyArray<{
-  key: Exclude<keyof ExecutionActivityDay, "date" | "total">;
-  label: string;
-}> = [
-  { key: "completed", label: "Completed" },
-  { key: "failed", label: "Failed" },
-  { key: "running", label: "Running" },
-  { key: "scheduled", label: "Scheduled" },
-  { key: "cancelled", label: "Cancelled" },
-  { key: "other", label: "Other" },
-];
+/** Tallest column in blocks; denser days are drawn with one block per several executions. */
+const MAX_BLOCKS = 20;
+/** Shortest grid, so a quiet window still reads as a grid of small blocks. */
+const MIN_ROWS = 10;
+
+/** Every `step`-th column from the latest backwards carries a date under it. */
+const labelStep = (columns: number) => (columns <= 7 ? 1 : columns <= 31 ? 5 : 15);
 
 interface ExecutionActivityChartProps {
   chipId: string;
   days: ActivityWindow;
   onDaysChange: (days: ActivityWindow) => void;
-  /** Date filter of the list below, `latest` or YYYYMMDD; the matching bar is highlighted. */
+  /** Date filter of the list below, `latest` or YYYYMMDD; the matching day is highlighted. */
   selectedDate: string;
-  /** Called with YYYYMMDD when a bar is selected, so the list can show that day. */
+  /** Called with YYYYMMDD when a day is selected, or `latest` when the selection is cleared. */
   onDateSelect: (date: string) => void;
 }
 
-/** Plotly options shared by every render, so the plot is not rebuilt for a new object. */
-const PLOT_CONFIG = { displayModeBar: false, responsive: true } as const;
-
 /**
- * Executions per day for the selected chip, stacked by status, over the last 7, 30 or 90 days.
- * Selecting a bar filters the execution list to that day.
+ * Executions per day for the selected chip over the last 30, 90 or 180 days, drawn as a column
+ * of small blocks per day stacked by status. One block is one execution until the busiest day
+ * no longer fits, after which each block stands for a labeled number of executions.
+ * Selecting a day filters the execution list to that day; selecting it again clears the filter.
  */
 export function ExecutionActivityChart({
   chipId,
@@ -58,94 +63,70 @@ export function ExecutionActivityChart({
   const activity = data?.data;
   const buckets = useMemo(() => activity?.buckets ?? [], [activity]);
 
-  const totals = useMemo(() => {
-    const sum = (key: keyof ExecutionActivityDay) =>
-      buckets.reduce((acc, bucket) => acc + ((bucket[key] as number | undefined) ?? 0), 0);
-    return { total: sum("total"), failed: sum("failed"), running: sum("running") };
+  const { scale, columns, rows, totals } = useMemo(() => {
+    const blockSize = activityBlockScale(buckets, MAX_BLOCKS);
+    const dayColumns = buckets.map((bucket) => toActivityColumn(bucket, blockSize));
+    const tallest = dayColumns.reduce((acc, column) => Math.max(acc, column.blocks.length), 0);
+    return {
+      scale: blockSize,
+      columns: dayColumns,
+      rows: Math.max(MIN_ROWS, tallest),
+      totals: activityStatusTotals(buckets),
+    };
   }, [buckets]);
 
-  // Keyed on the palette strings, not the palette object, so the memo survives re-renders.
-  const colors = useMemo<Record<(typeof SERIES)[number]["key"], string>>(
-    () => ({
-      completed: palette.pass,
-      failed: palette.fail,
-      running: palette.accent,
-      scheduled: palette.warn,
-      cancelled: palette.muted,
-      other: palette.grid,
-    }),
-    [palette.pass, palette.fail, palette.accent, palette.warn, palette.muted, palette.grid],
-  );
+  const total = totals.reduce((acc, item) => acc + item.count, 0);
+  const failed = totals.find((item) => item.key === "failed")?.count ?? 0;
+  const running = totals.find((item) => item.key === "running")?.count ?? 0;
 
-  const selectedIso =
-    selectedDate.length === 8
-      ? `${selectedDate.slice(0, 4)}-${selectedDate.slice(4, 6)}-${selectedDate.slice(6, 8)}`
-      : null;
+  const blockStyle = activityBlockStyler(palette);
 
-  // Stable between renders: Plot purges and redraws whenever it receives a new data array.
-  const traces = useMemo(
-    () =>
-      SERIES.filter((series) => buckets.some((bucket) => (bucket[series.key] ?? 0) > 0)).map(
-        (series) => ({
-          type: "bar" as const,
-          name: series.label,
-          x: buckets.map((bucket) => bucket.date),
-          y: buckets.map((bucket) => bucket[series.key] ?? 0),
-          marker: { color: colors[series.key] },
-          hovertemplate: `%{x}<br>${series.label}: %{y}<extra></extra>`,
-        }),
-      ),
-    [buckets, colors],
-  );
+  const selectedIndex = columns.findIndex((column) => column.compact === selectedDate);
+  const selectedColumn = selectedIndex >= 0 ? columns[selectedIndex] : null;
 
-  const layout = useMemo<Partial<Layout>>(
-    () => ({
-      barmode: "stack",
-      bargap: 0.25,
-      height: 220,
-      margin: { l: 36, r: 12, t: 8, b: 36 },
-      showlegend: true,
-      legend: { orientation: "h", y: -0.25, x: 0 },
-      xaxis: { type: "category", tickangle: days > 30 ? -45 : 0, nticks: 12, fixedrange: true },
-      yaxis: { rangemode: "tozero", tickformat: "d", fixedrange: true },
-      hovermode: "x unified",
-      shapes: selectedIso
-        ? [
-            {
-              type: "rect",
-              xref: "x",
-              yref: "paper",
-              x0: selectedIso,
-              x1: selectedIso,
-              y0: 0,
-              y1: 1,
-              line: { width: 0 },
-              fillcolor: palette.accent,
-              opacity: 0.12,
-              layer: "below",
-            },
-          ]
-        : [],
-    }),
-    [days, palette.accent, selectedIso],
-  );
+  // Roving focus: the day grid is one tab stop, arrow keys move between days.
+  const [focusIndex, setFocusIndex] = useState<number | null>(null);
+  const activeIndex =
+    focusIndex !== null && focusIndex < columns.length
+      ? focusIndex
+      : selectedIndex >= 0
+        ? selectedIndex
+        : columns.length - 1;
+  const columnRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const handleClick = useCallback(
-    (event: PlotMouseEvent) => {
-      const date = event.points?.[0]?.x;
-      if (typeof date !== "string") return;
-      const compact = date.replace(/-/g, "");
-      onDateSelect(compact === selectedDate ? "latest" : compact);
+  const moveFocus = useCallback(
+    (index: number) => {
+      const next = Math.min(Math.max(index, 0), columns.length - 1);
+      setFocusIndex(next);
+      columnRefs.current[next]?.focus();
     },
-    [onDateSelect, selectedDate],
+    [columns.length],
   );
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const targets: Record<string, number> = {
+      ArrowLeft: index - 1,
+      ArrowRight: index + 1,
+      Home: 0,
+      End: columns.length - 1,
+    };
+    if (!(event.key in targets)) return;
+    event.preventDefault();
+    moveFocus(targets[event.key]);
+  };
+
+  const toggleDay = (column: ActivityDayColumn) =>
+    onDateSelect(column.compact === selectedDate ? "latest" : column.compact);
+
+  const step = labelStep(columns.length);
+  const showChart = !isError && !isLoading && total > 0;
 
   return (
     <section
       aria-labelledby="execution-activity-heading"
       className="mb-6 rounded-box border border-base-300 bg-base-100 p-4"
     >
-      <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 id="execution-activity-heading" className="text-sm font-medium">
             Executions per day
@@ -153,13 +134,19 @@ export function ExecutionActivityChart({
           <p className="text-sm text-base-content/60">
             {isLoading
               ? "Loading"
-              : `${totals.total} in the last ${days} days` +
-                (totals.failed > 0 ? `, ${totals.failed} failed` : "") +
-                (totals.running > 0 ? `, ${totals.running} in progress` : "") +
-                ". Select a bar to show that day."}
+              : isError
+                ? `Last ${days} days`
+                : `${total} in the last ${days} days` +
+                  (failed > 0 ? `, ${failed} failed` : "") +
+                  (running > 0 ? `, ${running} in progress` : "") +
+                  "."}
           </p>
         </div>
-        <div className="tabs tabs-boxed bg-base-200" role="tablist" aria-label="Activity window">
+        <div
+          className="tabs tabs-boxed w-fit bg-base-200"
+          role="tablist"
+          aria-label="Activity window"
+        >
           {ACTIVITY_WINDOWS.map((window) => (
             <button
               key={window}
@@ -178,23 +165,147 @@ export function ExecutionActivityChart({
         <p role="alert" className="py-8 text-center text-sm text-base-content/60">
           Execution activity could not be loaded.
         </p>
-      ) : !isLoading && totals.total === 0 ? (
+      ) : isLoading ? (
+        <div className="skeleton h-52 w-full" aria-hidden="true" />
+      ) : !showChart ? (
         <p className="py-8 text-center text-sm text-base-content/60">
           No executions in the last {days} days
         </p>
       ) : (
-        <div className={isLoading ? "skeleton h-[220px] w-full" : ""}>
-          {!isLoading && (
-            <Plot
-              data={traces}
-              layout={layout}
-              config={PLOT_CONFIG}
-              useResizeHandler
-              style={{ width: "100%", height: "220px" }}
-              onClick={handleClick}
-            />
-          )}
-        </div>
+        <>
+          <div className="overflow-x-auto pb-1">
+            <div
+              role="toolbar"
+              aria-label="Executions per day. Select a day to show it in the list"
+              className={`flex min-w-full ${columns.length > 31 ? "gap-px" : "gap-0.5 sm:gap-1"}`}
+            >
+              {columns.map((column, index) => {
+                const selected = index === selectedIndex;
+                const empties = rows - column.blocks.length;
+                return (
+                  <Tooltip key={column.date}>
+                    <TooltipTrigger asChild>
+                      <button
+                        ref={(node) => {
+                          columnRefs.current[index] = node;
+                        }}
+                        type="button"
+                        tabIndex={index === activeIndex ? 0 : -1}
+                        aria-pressed={selected}
+                        aria-label={describeActivityDay(column)}
+                        data-date={column.date}
+                        onClick={() => toggleDay(column)}
+                        onFocus={() => setFocusIndex(index)}
+                        onKeyDown={(event) => handleKeyDown(event, index)}
+                        className={`flex h-40 min-w-1.5 flex-1 cursor-pointer justify-center rounded-sm px-px py-1 transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+                          selected ? "bg-primary/12" : "hover:bg-base-200"
+                        }`}
+                      >
+                        <span className="flex h-full w-full max-w-4 flex-col-reverse gap-px">
+                          {column.blocks.map((block, blockIndex) => (
+                            <span
+                              key={blockIndex}
+                              data-status={block.status}
+                              data-executions={block.executions}
+                              data-partial={block.partial || undefined}
+                              className="min-h-0 flex-1 rounded-xs"
+                              style={blockStyle(block.status, block.partial)}
+                            />
+                          ))}
+                          {Array.from({ length: empties }, (_, emptyIndex) => (
+                            <span
+                              key={`empty-${emptyIndex}`}
+                              className="min-h-0 flex-1 rounded-xs bg-base-content/5"
+                            />
+                          ))}
+                        </span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="font-medium">
+                        {longActivityDate.format(parseActivityDay(column.date))}
+                      </p>
+                      <p className="text-base-content/60">{pluralize(column.total, "execution")}</p>
+                      {column.total > 0 && (
+                        <ul className="mt-1 space-y-0.5">
+                          {column.counts
+                            .filter((item) => item.count > 0)
+                            .map((item) => (
+                              <li key={item.key} className="flex items-center gap-1.5">
+                                <span
+                                  aria-hidden="true"
+                                  className="size-2 rounded-xs"
+                                  style={blockStyle(item.key, false)}
+                                />
+                                <span>{item.label}</span>
+                                <span className="ml-auto pl-3 font-mono">{item.count}</span>
+                              </li>
+                            ))}
+                        </ul>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+            <div
+              aria-hidden="true"
+              className={`mt-1 flex min-w-full text-xs text-base-content/60 ${
+                columns.length > 31 ? "gap-px" : "gap-0.5 sm:gap-1"
+              }`}
+            >
+              {columns.map((column, index) => {
+                const fromEnd = columns.length - 1 - index;
+                const selected = index === selectedIndex;
+                const labeled = selected || fromEnd % step === 0;
+                // Keep edge labels inside the chart instead of centering them past its border.
+                const align =
+                  index === 0 ? "left-0" : fromEnd === 0 ? "right-0" : "left-1/2 -translate-x-1/2";
+                return (
+                  <span key={column.date} className="relative h-4 min-w-1.5 flex-1">
+                    {labeled && (
+                      <span
+                        className={`absolute top-0 whitespace-nowrap ${align} ${
+                          selected ? "z-10 rounded-sm bg-base-100 px-0.5 text-primary" : ""
+                        }`}
+                      >
+                        {shortActivityDate.format(parseActivityDay(column.date))}
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+          <div className="mt-3 flex flex-col gap-2 text-xs text-base-content/60 sm:flex-row sm:items-center sm:justify-between">
+            <ul className="flex flex-wrap gap-x-3 gap-y-1" aria-label="Executions by status">
+              {totals
+                .filter((item) => item.count > 0)
+                .map((item) => (
+                  <li key={item.key} className="flex items-center gap-1.5">
+                    <span
+                      aria-hidden="true"
+                      className="size-2 rounded-xs"
+                      style={blockStyle(item.key, false)}
+                    />
+                    <span>
+                      {item.label} <span className="font-mono">{item.count}</span>
+                    </span>
+                  </li>
+                ))}
+            </ul>
+            <p data-testid="activity-scale">
+              {scale === 1
+                ? "1 block = 1 execution"
+                : `1 block = ${scale} executions, a lighter block holds fewer`}
+            </p>
+          </div>
+          <p className="mt-2 text-xs text-base-content/60" aria-live="polite">
+            {selectedColumn
+              ? `Showing ${longActivityDate.format(parseActivityDay(selectedColumn.date))} in the list. Select it again to show the latest executions.`
+              : "Select a day to show its executions in the list."}
+          </p>
+        </>
       )}
     </section>
   );

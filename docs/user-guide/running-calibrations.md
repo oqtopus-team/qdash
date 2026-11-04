@@ -23,7 +23,19 @@ Running a workflow or task requires project edit permission.
 2. Select **Edit** before changing the source, then select **Save**.
 3. Select **Execute**.
 4. Review the flow name, username, chip, and tags in the confirmation dialog.
-5. Confirm the run, then open **Execution** to follow its progress.
+5. Under **Calibration targets**, review the defaults from the saved workflow. To change them
+   for this run, select **MUX IDs** or **Qubit IDs** and enter IDs separated by commas or spaces.
+   For MUX targets, use **Excluded qubit IDs** to omit individual qubits.
+6. Confirm the run, then open **Execution** to follow its progress.
+
+Leaving the target fields unchanged preserves the workflow's code settings. **Use code defaults**
+discards target edits. An explicit change replaces the initial calibration targets throughout the
+current flow run; later filtering steps still apply. The saved workflow and schedules are unchanged.
+A workflow that targets all MUXes or couplings stops with an error when you change its targets.
+
+If targets depend on runtime calculations or differ within the workflow, the dialog cannot show a
+single default. Leave the fields unchanged to use the code, or enter an explicit selection for the
+run. Separate nested workflow runs retain their own targets.
 
 Use the workflow schedule panel when the same flow must run automatically. Manage schedules in
 QDash so the workflow and its Prefect deployment remain aligned.
@@ -57,14 +69,17 @@ or saving outputs.
 Open **Execution** to inspect a run's status, task topology, timing, parameters, output, and
 artifacts. Select a task in the topology to open its details, or select a node in the execution
 flow to preview its result in the same side panel that **Task Results** uses; open the full
-result from there.
+result from there. While a run is in progress, its details and its page show how many tasks have
+finished and which one is being measured, and the running task shows its measurement progress.
 
 Cancelling a run sends a cancellation request to the worker. A task that is inside an operation
 that cannot be interrupted can take time to stop.
 
-**Executions per day** at the top of the page counts the chip's runs for the last 7, 30 or 90
-days, stacked by status. Select a bar to limit the list below to that day; select it again to
-return to the latest runs.
+**Executions per day** at the top of the page counts the chip's runs for the last 30, 90 or 180
+days as blocks stacked by status; it opens on 90 days. Each block represents one execution. For busy periods,
+the chart labels how many executions a full block represents; lighter blocks contain fewer.
+Hover over or focus a day to see its exact counts. Select a day to limit the list below to
+that day; select it again to return to the latest runs.
 
 ## Inspect a Result
 
