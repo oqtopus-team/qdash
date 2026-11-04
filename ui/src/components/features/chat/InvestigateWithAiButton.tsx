@@ -31,7 +31,7 @@ export function InvestigateWithAiButton({
   return (
     <button
       type="button"
-      className={`btn btn-${size} gap-1 ${className}`}
+      className={`btn btn-${size} shrink-0 gap-1 whitespace-nowrap ${className}`}
       onClick={(event) => {
         // Inside a clickable card, the click must not also select the card.
         event.stopPropagation();

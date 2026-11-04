@@ -135,6 +135,8 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
     if (!activeSession || activeSession.context || activeSession.investigation) {
       createNewSession(null);
     }
+    // One surface at a time: the sidebar replaces the floating window.
+    setMiniOpen(false);
     setIsOpen(true);
   }, [activeSession, createNewSession]);
 
@@ -148,6 +150,7 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const openMiniChat = useCallback(
     (context: TaskChatContext) => {
       focusContext(context);
+      setIsOpen(false);
       setMiniOpen(true);
     },
     [focusContext],

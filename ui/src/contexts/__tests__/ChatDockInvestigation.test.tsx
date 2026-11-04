@@ -186,4 +186,26 @@ describe("ChatDock investigations", () => {
     expect(streamBodies()).toHaveLength(0);
     expect(calls("/copilot/chat/sessions", "POST")).toHaveLength(0);
   });
+
+  it("never shows the docked sidebar and the floating window at once", async () => {
+    const { result } = await renderDock();
+    const surfaces = () => [result.current.dock.isOpen, result.current.dock.miniChat.isOpen];
+
+    act(() => result.current.dock.investigate(EXECUTION_ONLY, "sidebar"));
+    expect(surfaces()).toEqual([true, false]);
+    act(() => result.current.dock.investigate(EXECUTION_ONLY, "mini"));
+    expect(surfaces()).toEqual([false, true]);
+    act(() => result.current.dock.openGeneralChat());
+    expect(surfaces()).toEqual([true, false]);
+    act(() =>
+      result.current.dock.openMiniChat({
+        taskName: "CheckRabi",
+        chipId: "64Q",
+        qid: "3",
+        executionId: "exec-1",
+        taskId: "task-9",
+      }),
+    );
+    expect(surfaces()).toEqual([false, true]);
+  });
 });

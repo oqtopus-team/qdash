@@ -147,9 +147,29 @@ def test_revisions_are_disclosed_without_claiming_a_match():
     assert "revision `abc123` (from git) with uncommitted local changes" in message
     assert "does not record which source revision an execution ran with" in message
     assert "cannot establish" in message.lower()
-    for section in ("Likely cause", "Evidence from the logs", "Next checks", "Suggested fixes"):
-        assert section in message
-    assert "never apply them" in message
+
+
+def test_instructions_ask_for_a_concise_grounded_diagnosis():
+    message = _build(_execution())[0].opening_message
+    instructions = message[message.index("## What to do") :]
+    # Three compact items replace the former six-section report.
+    for item in ("**Likely cause**", "**Evidence**", "**Next step**"):
+        assert item in instructions
+    for removed in ("Facts and hypotheses", "Suggested fixes", "Next checks", "callers in QDash"):
+        assert removed not in instructions
+    # Reading starts at the raising frame and stops once the error is explained.
+    assert "frame that raised the error" in instructions
+    assert "Stop reading once the logs and that code explain the error" in instructions
+    assert "ambiguous or contradictory" in instructions
+    assert "single most useful check" in instructions
+    # Concise does not weaken grounding or the read-only boundary.
+    assert "read-only" in instructions
+    assert "never apply it" in instructions
+    assert "Quote and cite only what you read" in instructions
+    assert "`root:path:line`" in instructions
+    assert "revision caveat" in instructions
+    assert "missing or clipped" in instructions
+    assert "unavailable" in instructions
 
 
 def test_unknown_execution_is_refused():

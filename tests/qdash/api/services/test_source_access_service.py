@@ -119,6 +119,25 @@ def test_read_maps_traceback_paths_onto_roots(roots):
     assert exc.value.status == 404
 
 
+def test_traceback_paths_through_qdash_dirs_named_after_dependencies_stay_in_qdash(roots):
+    # QDash's calibration tasks live in workflow/calibtasks/qubex/, so a task
+    # traceback names a "qubex" segment that is not the qubex package.
+    tasks = roots[0].path / "workflow" / "calibtasks" / "qubex"
+    tasks.mkdir(parents=True)
+    (tasks / "base.py").write_text("class QubexTask:\n    raise RuntimeError('fit failed')\n")
+    service = SourceAccessService(roots)
+    task = service.read(None, "/app/qdash/workflow/calibtasks/qubex/base.py")
+    assert (task.root, task.path) == ("qdash", "workflow/calibtasks/qubex/base.py")
+    assert "fit failed" in task.content
+    # A dependency installed under a checkout named qdash is still the dependency.
+    installed = service.read(
+        None, "/home/u/qdash/.venv/lib/python3.11/site-packages/qubex/measurement.py"
+    )
+    assert (installed.root, installed.path) == ("qubex", "measurement.py")
+    # Another installed package is not mapped onto a root that happens to be in its path.
+    assert service.locate("/home/u/qdash/.venv/lib/python3.11/site-packages/numpy/core.py") is None
+
+
 def test_missing_dependencies_are_reported(roots, monkeypatch):
     monkeypatch.setenv("QDASH_SOURCE_DEPENDENCIES", "qubex,qubecalib")
     assert SourceAccessService(roots).missing_dependencies() == ["qubecalib"]
@@ -151,3 +170,29 @@ def test_search_cannot_read_excluded_targets_through_aliases(roots):
     assert service.search("SECRET_FLOW", path_prefix="alias.py")[0] == []
     matches, _ = service.search("bad readout")
     assert [match.path for match in matches] == ["workflow/engine/runner.py"]
+
+
+def test_editable_dependency_beneath_qdash_uses_its_configured_root(tmp_path):
+    """Prefer the most specific configured directory over package-name segments."""
+    checkout = tmp_path / "qdash"
+    dependency = checkout / "vendor" / "qubex" / "qubex"
+    dependency.mkdir(parents=True)
+    source = dependency / "measurement.py"
+    source.write_text("class Measurement: pass\n")
+    service = SourceAccessService(
+        (
+            SourceRoot(name="qdash", path=checkout, kind="qdash"),
+            SourceRoot(name="qubex", path=dependency, kind="dependency"),
+        )
+    )
+    result = service.read(None, str(source))
+    assert (result.root, result.path) == ("qubex", "measurement.py")
+    assert "class Measurement" in result.content
+
+
+def test_configured_traceback_paths_still_enforce_exclusions(roots):
+    """An exact root match must still reject private files and escaping links."""
+    service = SourceAccessService(roots)
+    for relative in ("workflow/user_flows/alice/flow.py", "escape.py"):
+        with pytest.raises(SourceAccessError):
+            service.read(None, str(roots[0].path / relative))

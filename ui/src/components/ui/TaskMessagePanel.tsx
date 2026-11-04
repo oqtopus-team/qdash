@@ -85,10 +85,10 @@ export function TaskMessagePanel({
     if (showEmptyFallback && status === "failed") {
       return (
         <div
-          className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border border-base-300 p-3 text-sm text-base-content/60 ${className}`}
+          className={`flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-base-300 p-3 text-sm text-base-content/60 ${className}`}
         >
           No error message recorded.
-          {action}
+          {action && <div className="shrink-0">{action}</div>}
         </div>
       );
     }
@@ -108,15 +108,19 @@ export function TaskMessagePanel({
   };
 
   return (
-    <div className={`overflow-hidden rounded-lg border ${tone.frameClass} ${className}`}>
-      <div className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${tone.headerClass}`}>
+    <div className={`min-w-0 overflow-hidden rounded-lg border ${tone.frameClass} ${className}`}>
+      {/* The action wraps under the title on a narrow panel instead of squeezing it. */}
+      <div
+        className={`flex flex-wrap items-center gap-2 px-3 py-2 text-sm font-medium ${tone.headerClass}`}
+      >
         <Icon className="h-3.5 w-3.5 shrink-0" />
-        <span className="flex-1">{tone.title}</span>
-        {action}
+        <span className="min-w-0 flex-1">{tone.title}</span>
+        {action && <div className="shrink-0">{action}</div>}
       </div>
       {trimmedMessage && (
+        // A long log scrolls inside the panel, so the header's action stays in view.
         <pre
-          className={`whitespace-pre-wrap break-all px-3 py-3 font-mono text-xs ${tone.bodyClass}`}
+          className={`max-h-96 overflow-auto whitespace-pre-wrap break-all px-3 py-3 font-mono text-xs ${tone.bodyClass}`}
         >
           {trimmedMessage}
         </pre>
