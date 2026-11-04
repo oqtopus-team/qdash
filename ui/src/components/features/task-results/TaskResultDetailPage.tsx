@@ -19,6 +19,8 @@ import type { CalibrationGitHubSync } from "@/schemas";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
+import { failedTaskInvestigation } from "@/lib/copilotInvestigation";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import { QubitTile } from "@/components/ui/QubitTile";
@@ -375,6 +377,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           status={taskResult.status}
           message={taskResult.message}
           stackTrace={taskResult.stack_trace}
+          showEmptyFallback
+          action={<InvestigateWithAiButton target={failedTaskInvestigation(taskResult)} />}
         />
       </div>
 

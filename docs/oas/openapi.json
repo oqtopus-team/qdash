@@ -4608,6 +4608,245 @@
         }
       }
     },
+    "/copilot/source/roots": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "List the source trees the Copilot can read",
+        "description": "QDash and allowlisted dependency source served read-only, with known revisions.",
+        "operationId": "listCopilotSourceRoots",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSourceRootsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/copilot/source/search": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Search the source the Copilot can read",
+        "description": "Literal search in file contents or file paths; read-only and size-limited.",
+        "operationId": "searchCopilotSource",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Query"
+            }
+          },
+          {
+            "name": "root",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Root"
+            }
+          },
+          {
+            "name": "path_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path Prefix"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(content|path)$",
+              "default": "content",
+              "title": "Mode"
+            }
+          },
+          {
+            "name": "case_sensitive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Case Sensitive"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchSourceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/copilot/source/file": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Read a line range of a source file",
+        "description": "Read up to 400 numbered lines; without ``root`` the path is matched as a traceback prints it.",
+        "operationId": "getCopilotSourceFile",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "title": "Path"
+            }
+          },
+          {
+            "name": "root",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Root"
+            }
+          },
+          {
+            "name": "start_line",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Start Line"
+            }
+          },
+          {
+            "name": "end_line",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Line"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceFileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/copilot/preferences": {
       "get": {
         "tags": [
@@ -24458,6 +24697,37 @@
         "title": "ListQubitsResponse",
         "description": "Response model for listing qubits with pagination."
       },
+      "ListSourceRootsResponse": {
+        "properties": {
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRootResponse"
+            },
+            "type": "array",
+            "title": "Roots"
+          },
+          "missing_dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Dependencies",
+            "description": "Allowlisted dependencies whose source is not installed here"
+          },
+          "execution_revision_recorded": {
+            "type": "boolean",
+            "title": "Execution Revision Recorded",
+            "description": "Whether executions record the source revision they ran with. QDash does not record it, so a match between served source and an execution cannot be established.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "roots"
+        ],
+        "title": "ListSourceRootsResponse",
+        "description": "The source trees available to this QDash API."
+      },
       "ListTagResponse": {
         "properties": {
           "tags": {
@@ -28431,6 +28701,39 @@
         "title": "ScheduleFlowResponse",
         "description": "Response after scheduling a flow."
       },
+      "SearchSourceResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSearchMatch"
+            },
+            "type": "array",
+            "title": "Matches"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "The search stopped at the result or file limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "mode",
+          "matches",
+          "truncated"
+        ],
+        "title": "SearchSourceResponse",
+        "description": "Matches of a literal source search."
+      },
       "SeedImportRequest": {
         "properties": {
           "chip_id": {
@@ -28776,6 +29079,172 @@
         ],
         "title": "SettingsResponse",
         "description": "Settings for the QDash application."
+      },
+      "SourceFileResponse": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "title": "Root"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "start_line": {
+            "type": "integer",
+            "title": "Start Line"
+          },
+          "end_line": {
+            "type": "integer",
+            "title": "End Line"
+          },
+          "total_lines": {
+            "type": "integer",
+            "title": "Total Lines"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "More lines follow the returned range"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root",
+          "path",
+          "start_line",
+          "end_line",
+          "total_lines",
+          "content",
+          "truncated"
+        ],
+        "title": "SourceFileResponse",
+        "description": "A line range of one source file, each line prefixed with its number."
+      },
+      "SourceRootResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Root name used by search and read, such as qdash or qubex"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "qdash or dependency"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Installed package version, if known"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision",
+            "description": "Commit of the served source, when it can be established"
+          },
+          "revision_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Source",
+            "description": "Where the revision came from: git, direct_url.json or QDASH_SOURCE_REVISION"
+          },
+          "dirty": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dirty",
+            "description": "The git checkout has uncommitted changes (git revisions only)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "SourceRootResponse",
+        "description": "One source tree the Copilot can search and read."
+      },
+      "SourceSearchMatch": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "title": "Root"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root",
+          "path"
+        ],
+        "title": "SourceSearchMatch",
+        "description": "One search hit; ``line`` and ``text`` are null for a path search."
       },
       "SubmitAgentActionRequest": {
         "properties": {

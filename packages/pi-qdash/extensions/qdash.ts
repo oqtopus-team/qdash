@@ -29,6 +29,7 @@ import { withAbort } from "./lib/abort.js";
 import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
 import { registerCalibrationPipelineTools } from "./tools/calibration-pipeline.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
+import { registerSourceCodeTools } from "./tools/source-code.js";
 import { registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
 import { registerTimeseriesComparisonTool } from "./tools/timeseries.js";
 import { analyzeWiringMarkdown, wiringInsightLines, type WiringInsights } from "./lib/wiring-analysis.js";
@@ -1482,6 +1483,7 @@ async function executeQuery(params: QDashQueryParams) {
 export default function qdashExtension(pi: ExtensionAPI) {
   installQDashWriteGate(pi);
   registerTaskKnowledgeTool(pi, { makeClient });
+  registerSourceCodeTools(pi, { makeClient });
   registerCalibrationPipelineTools(pi, {
     makeClient,
     resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),

@@ -25,6 +25,9 @@ import type {
   ListFlowsResponse,
   ListForumPostsResponse,
   ListQubitsResponse,
+  ListSourceRootsResponse,
+  SearchSourceResponse,
+  SourceFileResponse,
   ProvenanceStatsResponse,
   QdashApiSchemasProjectProjectListResponse,
   SaveFlowRequest,
@@ -73,6 +76,22 @@ export interface TaskResultsTimeseriesOptions {
   endAt: string;
   tag?: string;
   qid?: string;
+}
+
+export interface SearchSourceOptions {
+  query: string;
+  root?: string;
+  pathPrefix?: string;
+  mode?: "content" | "path";
+  caseSensitive?: boolean;
+  limit?: number;
+}
+
+export interface GetSourceFileOptions {
+  path: string;
+  root?: string;
+  startLine?: number;
+  endLine?: number;
 }
 
 export interface ListTaskResultsOptions {
@@ -300,6 +319,39 @@ export class QDashClient {
 
   async getTaskKnowledgeMarkdown(taskName: string): Promise<string> {
     return this.get(`/tasks/${pathPart(taskName)}/knowledge/markdown`);
+  }
+
+  /** Source trees the Copilot may read, with the revision of each when it is known. */
+  async listSourceRoots(): Promise<ListSourceRootsResponse> {
+    return this.get("/copilot/source/roots");
+  }
+
+  /** Literal search in source contents (`content`) or file paths (`path`). */
+  async searchSource(options: SearchSourceOptions): Promise<SearchSourceResponse> {
+    return this.get(
+      "/copilot/source/search",
+      query({
+        query: options.query,
+        root: options.root,
+        path_prefix: options.pathPrefix,
+        mode: options.mode,
+        case_sensitive: options.caseSensitive,
+        limit: options.limit,
+      }),
+    );
+  }
+
+  /** A numbered line range of one source file; without `root`, a traceback path is mapped. */
+  async getSourceFile(options: GetSourceFileOptions): Promise<SourceFileResponse> {
+    return this.get(
+      "/copilot/source/file",
+      query({
+        path: options.path,
+        root: options.root,
+        start_line: options.startLine,
+        end_line: options.endLine,
+      }),
+    );
   }
 
   async listProjects(): Promise<QdashApiSchemasProjectProjectListResponse> {

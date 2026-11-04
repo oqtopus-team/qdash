@@ -25,6 +25,7 @@ session profile/chip context when their parameters are omitted.
 | `qdash_get_provenance_stats` | Provenance statistics. |
 | `qdash_list_forum_posts`, `qdash_get_forum_post`, `qdash_list_forum_replies` | Forum posts and replies. |
 | `qdash_preview_forum_evidence_reply`, `qdash_preview_forum_image_reply` | Read-only Forum reply previews. |
+| `qdash_list_source_roots`, `qdash_search_source`, `qdash_read_source` | Source trees the server serves with their revisions, literal search of contents or paths, and up to 400 numbered lines of one file. A traceback path such as `/app/qdash/workflow/x.py` is mapped onto its root. |
 | `qdash_get_figure`, `qdash_get_task_figures`, `qdash_recent_calibration_figure`, `qdash_analyze_figure_json`, `qdash_build_qcal_evidence` | Figure retrieval, analysis, and evaluation evidence. |
 
 | Tool | Return or limit |

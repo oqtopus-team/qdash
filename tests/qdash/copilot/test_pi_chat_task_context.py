@@ -282,3 +282,44 @@ async def test_task_chat_forwards_turn_attachments_separately(
     captured, _, _ = await _collect(monkeypatch, stored=[{"role": "user"}], request=request)
     assert captured["payload"]["images"] == [{"data": "iVBORw0KGgo=", "mimeType": "image/png"}]
     assert len(captured["payload"]["initial_images"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_investigation_opening_replaces_only_the_first_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An investigation's logs open a new conversation; the typed message stays the turn."""
+    captured: dict[str, Any] = {}
+    ensured: list[str] = []
+
+    async def ensure_agent_session(_username: str, session_id: str) -> None:
+        ensured.append(session_id)
+
+    async def fake_stream_payload(payload, *, step, auth, extra_result=None, recorder=None):
+        captured["payload"] = payload
+        captured["extra_result"] = extra_result
+        yield "event: result\ndata: {}\n\n"
+
+    monkeypatch.setattr(pi_chat_service, "ensure_agent_session", ensure_agent_session)
+    monkeypatch.setattr(pi_chat_service, "stream_payload", fake_stream_payload)
+    request = ChatRequest(
+        message="Investigate why execution e1 failed.",
+        session_id="session-1",
+        request_id="request-1",
+    )
+    _ = [
+        event
+        async for event in pi_chat_service.stream(
+            request,
+            _config(),
+            username="alice",
+            auth=pi_chat_service.QDashAuth("alice-token", "alice-project"),
+            opening_message="# Investigate a failure\n...",
+        )
+    ]
+    payload = captured["payload"]
+    assert ensured == ["session-1"]
+    assert payload["initial_message"] == "# Investigate a failure\n..."
+    assert payload["message"] == "Investigate why execution e1 failed."
+    assert "initial_images" not in payload
+    assert captured["extra_result"] is None
