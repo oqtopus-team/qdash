@@ -143,14 +143,31 @@ segment in the path: `/app/qdash/workflow/calibtasks/qubex/base.py` is
 
 QDash does not record the revision an execution ran with. The opening message and
 `qdash_list_source_roots` say so, and the prompt tells the model not to claim that served source
-matches the failed run. Compose mounts `./src/qdash` read-only at `/app/source/qdash` on the API,
+matches the failed run.
+
+The `qdash_query` actions `files_tree` and `file_content` read the calibration config directory
+through `FileService`, not source. The opening message and the `qdash_query` description say so.
+`qdash_query` does not read source for these actions; it returns the source tool call to use:
+
+- `files_tree` with a `path` lists nothing. The result names `qdash_list_source_roots` and
+  `qdash_search_source`.
+- `file_content` returns matching `qdash_read_source` arguments after HTTP 400 or 404
+  only for source-looking paths: Python files, installed-package paths, paths starting with
+  a source root name, or absolute paths containing a source root name.
+  Config files, other misses, 403, and server errors behave as before.
+
+When a source endpoint returns a generic 404, `qdash_read_source` reports that the endpoint
+may be unavailable and suggests checking API routing, proxy configuration, and the API image
+version.
+
+Compose mounts `./src/qdash` read-only at `/app/source/qdash` on the API,
 with `CALIBTASKS_PATH` over its `workflow/calibtasks`, and sets `QDASH_SOURCE_ROOT`. The API
 image does not install qubex, so in Compose qubex source is reported unavailable. Set
 `QDASH_SOURCE_REVISION` in `.env` to report the deployed commit, because the mount has no `.git`.
 
 Tests: `tests/qdash/api/services/test_source_access_service.py`,
 `test_copilot_investigation_service.py`, `tests/qdash/api/routers/test_copilot_investigation.py`,
-`packages/pi-qdash/tests/source-code-tool.test.mjs`,
+`packages/pi-qdash/tests/source-code-tool.test.mjs`, `query-source-guidance.test.mjs`,
 `ui/src/contexts/__tests__/ChatDockInvestigation.test.tsx`, and the execution page tests
 `ExecutionPageContent.test.tsx` and `ExecutionClient.test.tsx`.
 

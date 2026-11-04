@@ -149,6 +149,16 @@ def test_revisions_are_disclosed_without_claiming_a_match():
     assert "cannot establish" in message.lower()
 
 
+def test_source_section_names_the_source_tool_and_not_the_config_file_api():
+    message = _build(_execution())[0].opening_message
+    section = message[message.index("## Source you can read") :]
+    assert '`qdash_read_source {"path": "qdash/workflow/engine/task/executor.py"}`' in section
+    assert '`{"root": "qdash", "path": "workflow/engine/task/executor.py"}`' in section
+    # The config file actions are named as off limits for source code.
+    assert "`files_tree` and `file_content` cover only the calibration config" in section
+    assert "never use them for source" in section
+
+
 def test_instructions_ask_for_a_concise_grounded_diagnosis():
     message = _build(_execution())[0].opening_message
     instructions = message[message.index("## What to do") :]
