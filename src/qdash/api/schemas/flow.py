@@ -217,6 +217,7 @@ class FlowScheduleSummary(BaseModel):
     next_run: datetime | None = Field(None, description="Next scheduled run time")
     active: bool = Field(..., description="Whether the schedule is active")
     created_at: datetime = Field(..., description="Schedule creation time")
+    chip_id: str | None = Field(None, description="Target chip ID of the schedule, when known")
 
 
 class ListFlowSchedulesResponse(BaseModel):

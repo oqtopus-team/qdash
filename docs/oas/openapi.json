@@ -22174,6 +22174,18 @@
             "format": "date-time",
             "title": "Created At",
             "description": "Schedule creation time"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id",
+            "description": "Target chip ID of the schedule, when known"
           }
         },
         "type": "object",

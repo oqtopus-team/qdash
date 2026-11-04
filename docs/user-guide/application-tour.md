@@ -21,7 +21,7 @@ for the role to assign.
 
 | Page | Purpose | Guide |
 | --- | --- | --- |
-| **Home** | Start common work and review recent executions, failed tasks, and recent notifications. | This page |
+| **Home** | Start common work and review recent executions, upcoming scheduled workflow runs, and recent failed tasks. | This page |
 | **Dashboard** | Scan all configured chip metrics, coverage, distributions, and scoped notes. | [Dashboard](./dashboard.md) |
 | **Metrics** | Inspect one metric across qubits or couplings and compare its history. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Chip** | Browse calibration tasks and the latest results on the chip topology. | [Calibration Data and Provenance](./data-and-provenance.md) |

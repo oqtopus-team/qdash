@@ -6,6 +6,7 @@ import {
   dateToDateKey,
   dateToDateTimeLocal,
   formatDateTime,
+  formatRelativeFutureTime,
   formatRelativeTime,
   getTimezoneOffsetString,
   toIsoSeconds,
@@ -69,6 +70,24 @@ describe("formatRelativeTime", () => {
 
     try {
       expect(formatRelativeTime("2024-06-15T03:00:00", "Asia/Tokyo")).toBe("5m ago");
+    } finally {
+      Date.now = originalNow;
+    }
+  });
+});
+
+describe("formatRelativeFutureTime", () => {
+  it("formats future times relative to now", () => {
+    const now = new Date("2024-06-15T03:00:00Z").getTime();
+    const originalNow = Date.now;
+    Date.now = () => now;
+
+    try {
+      expect(formatRelativeFutureTime("2024-06-15T03:30:00Z")).toBe("in 30m");
+      expect(formatRelativeFutureTime("2024-06-15T06:00:00Z")).toBe("in 3h");
+      expect(formatRelativeFutureTime("2024-06-17T03:00:00Z")).toBe("in 2d");
+      expect(formatRelativeFutureTime("2024-06-15T02:00:00Z")).toBe("now");
+      expect(formatRelativeFutureTime(null)).toBe("");
     } finally {
       Date.now = originalNow;
     }

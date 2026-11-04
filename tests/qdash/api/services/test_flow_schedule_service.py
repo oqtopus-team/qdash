@@ -1,12 +1,14 @@
 """Tests for FlowScheduleService per-schedule cron resolution and mutation (#795)."""
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import HTTPException
+from prefect.client.schemas.sorting import FlowRunSort
 
 from qdash.api.schemas.flow import ScheduleFlowRequest, UpdateScheduleRequest
 from qdash.api.services import flow_schedule_service
@@ -385,6 +387,97 @@ async def test_list_flow_schedules_returns_cron_schedules(
 
     assert [s.schedule_id for s in response.schedules] == [str(schedule_id)]
     assert response.schedules[0].schedule_type == "cron"
+
+
+@pytest.mark.asyncio
+async def test_list_all_schedules_returns_upcoming_runs_with_target_chip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Scheduled runs are read soonest first and carry their target chip."""
+    deployment_id = uuid.uuid4()
+    flow = SimpleNamespace(
+        name="myflow", deployment_id=str(deployment_id), project_id="proj-1", chip_id="chip-default"
+    )
+    now = datetime.now(timezone.utc)
+    later_run = SimpleNamespace(
+        id=uuid.uuid4(),
+        next_scheduled_start_time=now + timedelta(hours=2),
+        created=now,
+        parameters={},
+    )
+    sooner_run = SimpleNamespace(
+        id=uuid.uuid4(),
+        next_scheduled_start_time=now + timedelta(hours=1),
+        created=now,
+        parameters={"chip_id": "chip-override"},
+    )
+    past_run = SimpleNamespace(
+        id=uuid.uuid4(),
+        next_scheduled_start_time=now - timedelta(minutes=5),
+        created=now,
+        parameters={},
+    )
+    client = SimpleNamespace(
+        read_deployment=AsyncMock(return_value=SimpleNamespace(schedules=[], created=None)),
+        read_flow_runs=AsyncMock(return_value=[later_run, past_run, sooner_run]),
+    )
+    monkeypatch.setattr(flow_schedule_service, "get_client", lambda: _ClientCtx(client))
+    service = _service([flow])
+
+    response = await service.list_all_schedules("user", "proj-1")
+
+    assert client.read_flow_runs.await_args is not None
+    assert (
+        client.read_flow_runs.await_args.kwargs["sort"] == FlowRunSort.NEXT_SCHEDULED_START_TIME_ASC
+    )
+    assert [s.schedule_id for s in response.schedules] == [str(sooner_run.id), str(later_run.id)]
+    assert [s.chip_id for s in response.schedules] == ["chip-override", "chip-default"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("all_flows", [True, False])
+async def test_upcoming_runs_are_filtered_before_prefect_limit(
+    monkeypatch: pytest.MonkeyPatch, all_flows: bool
+) -> None:
+    """Overdue scheduled runs must not consume the upcoming query's limit."""
+    now = datetime.now(timezone.utc)
+    flow = SimpleNamespace(
+        name="myflow", deployment_id=str(uuid.uuid4()), project_id="proj-1", chip_id=None
+    )
+    runs = [
+        SimpleNamespace(
+            id=uuid.uuid4(),
+            next_scheduled_start_time=now + timedelta(minutes=minute),
+            created=now,
+            parameters={},
+        )
+        for minute in [*range(-60, 0), 60]
+    ]
+    monkeypatch.setattr(flow_schedule_service, "FlowRunFilter", SimpleNamespace)
+    monkeypatch.setattr(
+        flow_schedule_service,
+        "FlowRunFilterNextScheduledStartTime",
+        SimpleNamespace(model_validate=lambda values: SimpleNamespace(**values)),
+    )
+
+    async def read_runs(**kwargs):
+        query = kwargs["flow_run_filter"]
+        cutoff = query.next_scheduled_start_time.after_
+        assert now <= cutoff <= datetime.now(timezone.utc)
+        matching = [run for run in runs if run.next_scheduled_start_time >= cutoff]
+        return matching[: kwargs["limit"]]
+
+    client = SimpleNamespace(
+        read_deployment=AsyncMock(return_value=SimpleNamespace(schedules=[])),
+        read_flow_runs=AsyncMock(side_effect=read_runs),
+    )
+    monkeypatch.setattr(flow_schedule_service, "get_client", lambda: _ClientCtx(client))
+    service = _service([flow])
+    if all_flows:
+        response = await service.list_all_schedules("user", "proj-1")
+    else:
+        response = await service.list_flow_schedules("myflow", "user", "proj-1")
+    assert [entry.schedule_id for entry in response.schedules] == [str(runs[-1].id)]
 
 
 # --- _schedule_cron ---

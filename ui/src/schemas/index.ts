@@ -319,6 +319,7 @@ export * from './fidelityConditionMetric';
 export * from './fileTreeNode';
 export * from './fileTreeNodeChildren';
 export * from './flowScheduleSummary';
+export * from './flowScheduleSummaryChipId';
 export * from './flowScheduleSummaryCron';
 export * from './flowScheduleSummaryNextRun';
 export * from './flowSummary';
