@@ -720,7 +720,7 @@ const deleteProject = (
     }
 
 /**
- * List all members of a project.
+ * List active members of a project.
  * @summary List project members
  */
 const listProjectMembers = (

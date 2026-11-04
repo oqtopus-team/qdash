@@ -429,6 +429,15 @@ class CalibService:
             RuntimeError: If use_lock=True and another calibration is already running
 
         """
+        from qdash.workflow.service.flow_targets import read_target_override, target_from_override
+
+        # Isolated workers already receive their scheduled subset from the parent.
+        self._target_override = None if skip_execution and not use_lock else read_target_override()
+        if self._target_override is not None and (qids is not None or muxes is not None):
+            if qids is not None:
+                qids = target_from_override(self._target_override).to_qids(chip_id)
+            muxes = self._target_override.mux_ids
+
         self.username = username
         self.chip_id = chip_id
         self.qids = qids
@@ -1616,7 +1625,9 @@ class CalibService:
             ])
             ```
         """
-        return self._run_pipeline(targets, steps)
+        from qdash.workflow.service.flow_targets import override_target
+
+        return self._run_pipeline(override_target(targets, self._target_override), steps)
 
     def _run_pipeline(
         self,

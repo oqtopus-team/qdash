@@ -15,6 +15,12 @@ import {
 } from "@/components/features/execution/executionTopologyTasks";
 import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
+import {
+  TaskTileStatusMark,
+  taskTileLabel,
+  taskTileStatusFill,
+} from "@/components/ui/TaskTileStatus";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
@@ -29,17 +35,6 @@ interface ExecutionTopologyViewProps {
   filterTaskName: string;
   isFullscreen?: boolean;
   onToggleFullscreen: () => void;
-}
-
-function getStatusColor(status: string | undefined): string {
-  switch (status) {
-    case "completed":
-      return "bg-success";
-    case "failed":
-      return "bg-error";
-    default:
-      return "bg-warning";
-  }
 }
 
 // Aggregate status: worst status wins
@@ -92,59 +87,80 @@ const TopologyCell = memo(function TopologyCell({
   }
 
   const status = tasks.length === 1 ? tasks[0].status : aggregateStatus(tasks);
+  const label = taskTileLabel("Qubit", qid, status, tasks.length);
 
   // Zoomed-out: status-colored tile
   if (!showFigures) {
     return (
-      <button
-        onClick={onClick}
-        className={`aspect-square rounded-lg shadow-sm relative group cursor-pointer ${getStatusColor(status)} ${muxBgClass}`}
-      >
-        {showLabels && (
-          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-medium">
-            {qid}
-          </div>
-        )}
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-          {qid}: {status}
-          {tasks.length > 1 && ` (${tasks.length} tasks)`}
-        </div>
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={onClick}
+            aria-label={label}
+            className={`aspect-square rounded-lg shadow-sm relative cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content ${taskTileStatusFill(status)} ${muxBgClass}`}
+          >
+            {showLabels && (
+              <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-medium">
+                {qid}
+              </div>
+            )}
+            {showLabels && (
+              <TaskTileStatusMark
+                status={status}
+                variant="tile"
+                className="absolute bottom-0.5 right-0.5"
+              />
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
     );
   }
 
   // Zoomed-in: show figure
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(event) => handleActivationKey(event, onClick)}
-      className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 relative w-full ${muxBgClass}`}
-    >
-      {figurePath && (
-        <div className="absolute inset-1">
-          <TaskFigure
-            path={figurePath}
-            jsonFigurePath={jsonFigurePath || undefined}
-            qid={qid}
-            className="w-full h-full object-contain"
-            hideExpandButton
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onClick}
+          onKeyDown={(event) => handleActivationKey(event, onClick)}
+          aria-label={label}
+          className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary relative w-full ${muxBgClass}`}
+        >
+          {figurePath && (
+            <div className="absolute inset-1">
+              <TaskFigure
+                path={figurePath}
+                jsonFigurePath={jsonFigurePath || undefined}
+                qid={qid}
+                className="w-full h-full object-contain"
+                hideExpandButton
+              />
+            </div>
+          )}
+          {showLabels && (
+            <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
+              {qid}
+            </div>
+          )}
+          <TaskTileStatusMark
+            status={status}
+            variant="figure"
+            className="absolute bottom-1 right-1"
           />
+          {tasks.length > 1 && (
+            <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-medium">
+              {tasks.length}
+            </div>
+          )}
         </div>
-      )}
-      {showLabels && (
-        <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
-          {qid}
-        </div>
-      )}
-      <div className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(status)}`} />
-      {tasks.length > 1 && (
-        <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-medium">
-          {tasks.length}
-        </div>
-      )}
-    </div>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 });
 
@@ -172,63 +188,77 @@ const CouplingMarker = memo(function CouplingMarker({
   onClick,
 }: CouplingMarkerProps) {
   const status = tasks.length === 1 ? tasks[0].status : aggregateStatus(tasks);
+  const label = taskTileLabel("Coupling", couplingId, status, tasks.length);
 
   if (!showFigures) {
     return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={`absolute z-20 rounded-md shadow-sm group cursor-pointer border border-base-100/70 -translate-x-1/2 -translate-y-1/2 ${getStatusColor(status)}`}
-        style={{
-          left,
-          top,
-          width: Math.max(24, cellSize * 0.44),
-          height: Math.max(24, cellSize * 0.44),
-        }}
-      >
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-30">
-          {couplingId}: {status}
-          {tasks.length > 1 && ` (${tasks.length} tasks)`}
-        </div>
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={onClick}
+            aria-label={label}
+            className={`absolute z-20 flex items-center justify-center rounded-md shadow-sm cursor-pointer border border-base-100/70 -translate-x-1/2 -translate-y-1/2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content ${taskTileStatusFill(status)}`}
+            style={{
+              left,
+              top,
+              width: Math.max(24, cellSize * 0.44),
+              height: Math.max(24, cellSize * 0.44),
+            }}
+          >
+            <TaskTileStatusMark status={status} variant="tile" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
     );
   }
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(event) => handleActivationKey(event, onClick)}
-      className="absolute z-20 rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-transform duration-200 hover:shadow-xl hover:border-primary/40 -translate-x-1/2 -translate-y-1/2"
-      style={{
-        left,
-        top,
-        width: Math.max(48, cellSize * 0.7),
-        height: Math.max(48, cellSize * 0.7),
-      }}
-    >
-      {figurePath && (
-        <div className="absolute inset-1">
-          <TaskFigure
-            path={figurePath}
-            jsonFigurePath={jsonFigurePath || undefined}
-            qid={couplingId}
-            className="w-full h-full object-contain"
-            hideExpandButton
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onClick}
+          onKeyDown={(event) => handleActivationKey(event, onClick)}
+          aria-label={label}
+          className="absolute z-20 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary bg-white shadow-md border border-base-300/60 overflow-hidden transition-transform duration-200 hover:shadow-xl hover:border-primary/40 -translate-x-1/2 -translate-y-1/2"
+          style={{
+            left,
+            top,
+            width: Math.max(48, cellSize * 0.7),
+            height: Math.max(48, cellSize * 0.7),
+          }}
+        >
+          {figurePath && (
+            <div className="absolute inset-1">
+              <TaskFigure
+                path={figurePath}
+                jsonFigurePath={jsonFigurePath || undefined}
+                qid={couplingId}
+                className="w-full h-full object-contain"
+                hideExpandButton
+              />
+            </div>
+          )}
+          <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
+            {couplingId}
+          </div>
+          <TaskTileStatusMark
+            status={status}
+            variant="figure"
+            className="absolute bottom-1 right-1"
           />
+          {tasks.length > 1 && (
+            <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-medium">
+              {tasks.length}
+            </div>
+          )}
         </div>
-      )}
-      <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium">
-        {couplingId}
-      </div>
-      <div className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(status)}`} />
-      {tasks.length > 1 && (
-        <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-medium">
-          {tasks.length}
-        </div>
-      )}
-    </div>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 });
 

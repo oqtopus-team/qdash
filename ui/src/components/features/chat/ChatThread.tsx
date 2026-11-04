@@ -7,6 +7,8 @@ import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
 import { useCopilotChat } from "@/hooks/useCopilotChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
+import { useChatGreeting } from "@/hooks/useChatGreeting";
+import { useAuth } from "@/contexts/AuthContext";
 import { withViewTransition } from "@/lib/viewTransition";
 import { ChatComposer, type ChatComposerHandle } from "@/components/features/chat/ChatComposer";
 import { ChatLinkPreviewProvider } from "@/components/features/chat/ChatLinkPreview";
@@ -67,48 +69,57 @@ function EmptyState({
   onPick: (text: string) => void;
 }) {
   const large = variant === "page";
-  const title = context
-    ? "Ask about this result"
-    : large
-      ? "Ask about calibration data"
-      : "Ask anything about calibration";
+  const { user, username } = useAuth();
+  const greeting = useChatGreeting(user?.display_name?.trim() || username);
+  const title = context ? "Ask about this result" : greeting;
 
   if (large) {
     return (
       <div className="w-full text-center px-4">
-        <QdashBotAvatar size={48} className="mx-auto mb-5 chat-avatar-hero" />
+        <QdashBotAvatar size={64} unframed className="mx-auto mb-5 chat-avatar-hero" />
         {context && (
           <div className="mb-3">
             <ContextChip context={context} />
           </div>
         )}
-        <h2 className="text-xl font-medium tracking-tight">{title}</h2>
+        <h2 className="text-xl font-medium break-words">{title}</h2>
       </div>
     );
   }
 
   return (
-    <div className="w-full mx-auto px-1">
+    <div className={`w-full mx-auto px-1 ${variant === "panel" ? "text-center" : ""}`}>
+      {variant === "panel" && <QdashBotAvatar size={80} unframed className="mb-4" />}
       {context && (
         <div className="mb-2">
           <ContextChip context={context} />
         </div>
       )}
-      <h2 className="text-sm font-medium mb-1">{title}</h2>
-      <p className="text-xs text-base-content/50 mb-4">
+      <h2 className="text-sm font-medium mb-1 break-words">{title}</h2>
+      <p className="text-xs text-base-content/50 mb-4 mx-auto max-w-64">
         {context
           ? "The result figures are attached to your first question."
           : "I can fetch parameters, analyze trends, run Python and plot charts."}
       </p>
-      <div className="flex flex-wrap gap-1.5">
+      <div
+        className={
+          variant === "panel" ? "flex flex-col items-center gap-2 mt-5" : "flex flex-wrap gap-1.5"
+        }
+      >
         {(variant === "compact" ? suggestions.slice(0, 3) : suggestions).map(({ text, Icon }) => (
           <button
             key={text}
             type="button"
             onClick={() => onPick(text)}
-            className="chat-suggestion-pill group"
+            className={
+              variant === "panel"
+                ? "btn btn-ghost btn-sm h-auto min-h-8 max-w-full rounded-full bg-base-200/60 px-3 py-1.5 text-base-content/60 font-normal"
+                : "chat-suggestion-pill group"
+            }
           >
-            <Icon className="w-3.5 h-3.5 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
+            {variant !== "panel" && (
+              <Icon className="w-3.5 h-3.5 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
+            )}
             <span className="text-xs leading-snug">{text}</span>
           </button>
         ))}
