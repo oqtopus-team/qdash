@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { Target } from "lucide-react";
 
 interface LinearGaugeProps {
   value: number; // 0-100
   current: number;
   total: number;
-  duration?: number;
   className?: string;
   label?: string;
 }
@@ -16,41 +14,18 @@ export function LinearGauge({
   value,
   current,
   total,
-  duration = 800,
   className = "",
   label = "Data Coverage",
 }: LinearGaugeProps) {
-  const [animatedValue, setAnimatedValue] = useState(0);
-  const animatedValueRef = useRef(0);
-  animatedValueRef.current = animatedValue;
-
-  useEffect(() => {
-    const startValue = animatedValueRef.current;
-    const endValue = Math.min(100, Math.max(0, value));
-    const startTime = performance.now();
-
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const currentVal = startValue + (endValue - startValue) * eased;
-
-      setAnimatedValue(currentVal);
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  }, [value, duration]);
+  // Coverage is measured data: show the actual value without counting through false states.
+  const coverage = Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
 
   // Color based on value
   const getBarColor = (val: number) => {
-    if (val >= 95) return "bg-success";
-    if (val >= 80) return "bg-info";
-    if (val >= 50) return "bg-warning";
-    return "bg-error";
+    if (val >= 95) return "progress-success";
+    if (val >= 80) return "progress-info";
+    if (val >= 50) return "progress-warning";
+    return "progress-error";
   };
 
   const getTextColor = (val: number) => {
@@ -68,26 +43,29 @@ export function LinearGauge({
     return null;
   };
 
-  const badge = getBadge(animatedValue);
+  const badge = getBadge(coverage);
   const remaining = total - current;
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 ${className}`}>
       <span className="text-xs text-base-content/60 whitespace-nowrap">{label}</span>
 
       {/* Gauge bar */}
-      <div className="flex-1 h-2 bg-base-300 rounded-full overflow-hidden min-w-24 max-w-32">
-        <div
-          className={`h-full rounded-full transition-colors duration-100 ${getBarColor(animatedValue)}`}
-          style={{ width: `${animatedValue}%` }}
-        />
-      </div>
+      <progress
+        className={`progress h-2 min-w-24 max-w-32 flex-1 ${getBarColor(coverage)}`}
+        value={coverage}
+        max={100}
+        aria-label={label}
+        aria-valuetext={`${coverage.toFixed(1)}%, ${current} of ${total}`}
+      />
 
       {/* Percentage and count */}
-      <span className={`text-sm font-medium whitespace-nowrap ${getTextColor(animatedValue)}`}>
-        {animatedValue.toFixed(1)}%
+      <span
+        className={`text-sm font-medium tabular-nums whitespace-nowrap ${getTextColor(coverage)}`}
+      >
+        {coverage.toFixed(1)}%
       </span>
-      <span className="text-xs text-base-content/50 whitespace-nowrap">
+      <span className="text-xs text-base-content/50 tabular-nums whitespace-nowrap">
         ({current}/{total})
       </span>
 
@@ -97,7 +75,7 @@ export function LinearGauge({
       ) : badge ? (
         <span className="text-xs text-base-content/60 whitespace-nowrap">{badge.text}</span>
       ) : (
-        <span className="flex items-center gap-1 text-xs text-base-content/50 whitespace-nowrap">
+        <span className="flex items-center gap-1 text-xs text-base-content/50 tabular-nums whitespace-nowrap">
           <Target className="h-3.5 w-3.5" aria-hidden="true" />
           {remaining} to go
         </span>
