@@ -13,7 +13,7 @@ const SOURCE_ROOT_NAMES = new Set(["qdash", "qubex", "qubecalib"]);
 const SOURCE_SUFFIXES = /\.(py|pyi)$/;
 
 function normalize(path: string): string {
-  return path.trim().replace(/\\/g, "/");
+  return path.trim().replace(/\\/g, "/").replace(/^(?:\.\/)+/, "");
 }
 
 /** Whether a path names QDash or dependency source rather than a config file. */
@@ -42,11 +42,14 @@ export function readSourceArguments(path: string): { path: string; root?: string
 
 /** The qdash_search_source arguments that list files under a source directory. */
 export function searchSourceArguments(path: string): { root?: string; pathPrefix?: string; mode: "path"; query: string } {
-  const segments = normalize(path).split("/").filter(Boolean);
+  const value = normalize(path);
+  const segments = value.split("/").filter(Boolean);
+  const filename = segments.at(-1) ?? "";
+  const query = !value.endsWith("/") && /\.[a-z0-9]+$/i.test(filename) ? filename : ".py";
   const rootIndex = segments.findIndex((segment) => SOURCE_ROOT_NAMES.has(segment));
-  if (rootIndex < 0) return { mode: "path", query: ".py" };
+  if (rootIndex < 0) return { mode: "path", query };
   const pathPrefix = segments.slice(rootIndex + 1).join("/");
-  return { root: segments[rootIndex], ...(pathPrefix ? { pathPrefix } : {}), mode: "path", query: ".py" };
+  return { root: segments[rootIndex], ...(pathPrefix ? { pathPrefix } : {}), mode: "path", query };
 }
 
 const CONFIG_SCOPE = "qdash_query files_tree and file_content serve only the calibration config directory (the qubex config files), not QDash or qubex source code.";

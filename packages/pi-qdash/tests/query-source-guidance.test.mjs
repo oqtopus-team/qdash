@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import test from "node:test";
 
 import qdashExtension from "../.test-dist/qdash.js";
-import { looksLikeSourcePath, readSourceArguments } from "../.test-dist/lib/source-guidance.js";
+import { looksLikeSourcePath, readSourceArguments, searchSourceArguments } from "../.test-dist/lib/source-guidance.js";
 
 const EXECUTOR = "qdash/workflow/engine/task/executor.py";
 
@@ -58,22 +58,24 @@ async function fakeQDash(t, { fileContentStatus } = {}) {
   return { tools, requests, run };
 }
 
-test("the user's file_content request for source names the qdash_read_source call to make", async (t) => {
-  const { run, requests } = await fakeQDash(t);
-  const result = await run("qdash_query", { action: "file_content", path: EXECUTOR });
-  const text = result.content[0].text;
-  assert.deepEqual(requests, [`/files/content?path=${encodeURIComponent(EXECUTOR)}`]);
-  assert.match(text, /not a config file \(config file API: 404 \/files\/content: File not found/);
-  assert.match(text, /serve only the calibration config directory/);
-  assert.match(text, /Do not retry file_content for source/);
-  assert.ok(text.includes(`qdash_read_source {"path":"${EXECUTOR}"}`));
-  assert.equal(result.details.misdirected, true);
+for (const prefix of ["", "./", "././"]) {
+  test(`source file_content with prefix '${prefix}' suggests a working read`, async (t) => {
+    const { run, requests } = await fakeQDash(t);
+    const result = await run("qdash_query", { action: "file_content", path: prefix + EXECUTOR });
+    const text = result.content[0].text;
+    assert.deepEqual(requests, [`/files/content?path=${encodeURIComponent(prefix + EXECUTOR)}`]);
+    assert.match(text, /not a config file \(config file API: 404 \/files\/content: File not found/);
+    assert.match(text, /serve only the calibration config directory/);
+    assert.match(text, /Do not retry file_content for source/);
+    assert.ok(text.includes(`qdash_read_source {"path":"${EXECUTOR}"}`));
+    assert.equal(result.details.misdirected, true);
 
-  // Following the guidance through the registered source tool reads the file.
-  const read = await run("qdash_read_source", JSON.parse(text.match(/qdash_read_source (\{.*\})/)[1]));
-  assert.match(read.content[0].text, /^qdash:workflow\/engine\/task\/executor\.py lines 1-2 of 900 \(revision unknown\)/);
-  assert.match(read.content[0].text, /Task executor/);
-});
+    // Following the guidance through the registered source tool reads the file.
+    const read = await run("qdash_read_source", JSON.parse(text.match(/qdash_read_source (\{.*\})/)[1]));
+    assert.match(read.content[0].text, /^qdash:workflow\/engine\/task\/executor\.py lines 1-2 of 900 \(revision unknown\)/);
+    assert.match(read.content[0].text, /Task executor/);
+  });
+}
 
 test("a traceback path rejected by the config API also gets source guidance", async (t) => {
   const { run } = await fakeQDash(t);
@@ -138,4 +140,20 @@ test("source path recognition and read arguments", () => {
   for (const path of ["qubex-config.yaml", "64Qv3/params/qubit.yaml", "", undefined]) assert.ok(!looksLikeSourcePath(path), String(path));
   assert.deepEqual(readSourceArguments(EXECUTOR), { path: EXECUTOR });
   assert.deepEqual(readSourceArguments("workflow/engine/x.py"), { root: "qdash", path: "workflow/engine/x.py" });
+});
+
+test("package-qualified non-Python paths normalize before root recognition", () => {
+  assert.ok(looksLikeSourcePath("./qubex/schema.yaml"));
+  assert.deepEqual(readSourceArguments("./qubex/schema.yaml"), { path: "qubex/schema.yaml" });
+});
+
+test("source search guidance queries the requested filename", () => {
+  for (const filename of ["schema.yaml", "executor.py", "config.toml"]) {
+    assert.deepEqual(searchSourceArguments(`/app/qdash/workflow/${filename}`), {
+      root: "qdash", pathPrefix: `workflow/${filename}`, mode: "path", query: filename,
+    });
+  }
+  assert.deepEqual(searchSourceArguments("/app/qdash/workflow/"), {
+    root: "qdash", pathPrefix: "workflow", mode: "path", query: ".py",
+  });
 });
