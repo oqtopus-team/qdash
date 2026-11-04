@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HomePageContent } from "@/components/features/home/HomePageContent";
@@ -158,6 +158,58 @@ describe("HomePageContent", () => {
       "/chip?tutorial=create-chip",
     );
     expect(screen.queryByRole("link", { name: "Setup tour" })).toBeNull();
+  });
+
+  it("distinguishes an unavailable execution status from an idle calibration and retries", async () => {
+    let finishRefetch: () => void = () => {};
+    const refetch = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRefetch = resolve;
+        }),
+    );
+    mockExecutionLock.mockReturnValue({
+      data: undefined,
+      error: new Error("Network unavailable"),
+      isLoading: false,
+      isFetching: false,
+      refetch,
+    });
+    render(<HomePageContent />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Execution status unavailable");
+    expect(screen.queryByText("No calibration is running")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+
+    await act(async () => finishRefetch());
+    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+  });
+
+  it("keeps retry available while background polling is in flight", () => {
+    mockExecutionLock.mockReturnValue({
+      data: undefined,
+      error: new Error("Network unavailable"),
+      isLoading: false,
+      isFetching: true,
+      refetch: vi.fn(),
+    });
+    render(<HomePageContent />);
+    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+  });
+
+  it("does not report cached execution status as current after a failed refresh", () => {
+    mockExecutionLock.mockReturnValue({
+      data: { data: { lock: false } },
+      error: new Error("Network unavailable"),
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+    render(<HomePageContent />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Execution status unavailable");
+    expect(screen.queryByText("No calibration is running")).not.toBeInTheDocument();
   });
 
   it("shows task progress for the running execution", () => {

@@ -664,12 +664,7 @@ function CdfWithCoverage({
     <div className="space-y-2">
       {/* Linear Gauge for Coverage */}
       <Card variant="compact" padding="sm">
-        <LinearGauge
-          value={stats.coverage}
-          current={stats.withData}
-          total={stats.total}
-          duration={800}
-        />
+        <LinearGauge value={stats.coverage} current={stats.withData} total={stats.total} />
       </Card>
 
       {/* CDF Chart */}

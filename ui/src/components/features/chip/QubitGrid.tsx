@@ -20,6 +20,12 @@ import {
 } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import {
+  TaskTileStatusMark,
+  taskTileLabel,
+  taskTileStatusFill,
+} from "@/components/ui/TaskTileStatus";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
@@ -53,18 +59,6 @@ const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
 const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }) {
   return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
 });
-
-// Status color helper
-function getStatusColor(status: string | undefined): string {
-  switch (status) {
-    case "completed":
-      return "bg-success";
-    case "failed":
-      return "bg-error";
-    default:
-      return "bg-warning";
-  }
-}
 
 function toPathList(paths: string[] | string | null | undefined): string[] {
   if (!paths) return [];
@@ -133,32 +127,54 @@ const GridCell = memo(function GridCell({
     );
   }
 
+  const label = taskTileLabel("Qubit", qid, task.status);
+  const downloadState = !isDownloadMode
+    ? ""
+    : !canBeDownloaded
+      ? ", no figures to download"
+      : isSelectedForDownload
+        ? ", selected for download"
+        : "";
+  const accessibleName = `${label}${downloadState}`;
+  const isUnavailable = isDownloadMode && !canBeDownloaded;
+
   // Zoomed-out: show status-colored tile (heatmap style)
   if (!showFigures) {
     return (
-      <button
-        onClick={onClick}
-        className={`aspect-square rounded-lg shadow-sm relative group cursor-pointer ${getStatusColor(task.status)} ${muxBgClass} ${
-          isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-1" : ""
-        } ${isDownloadMode && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""}`}
-      >
-        {showLabels && (
-          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-medium">
-            {qid}
-          </div>
-        )}
-        {/* Hover tooltip */}
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-          {qid}: {task.status}
-        </div>
-        {isDownloadMode && canBeDownloaded && isSelectedForDownload && (
-          <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
-            <div className="bg-primary text-primary-content rounded-full p-0.5">
-              <Check size={10} />
-            </div>
-          </div>
-        )}
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={onClick}
+            aria-label={accessibleName}
+            aria-disabled={isUnavailable || undefined}
+            className={`aspect-square rounded-lg shadow-sm relative cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-base-content ${taskTileStatusFill(task.status)} ${muxBgClass} ${
+              isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-1" : ""
+            } ${isUnavailable ? "opacity-40 cursor-not-allowed" : ""}`}
+          >
+            {showLabels && (
+              <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-medium">
+                {qid}
+              </div>
+            )}
+            {showLabels && (
+              <TaskTileStatusMark
+                status={task.status}
+                variant="tile"
+                className="absolute bottom-0.5 right-0.5"
+              />
+            )}
+            {isDownloadMode && canBeDownloaded && isSelectedForDownload && (
+              <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+                <div className="bg-primary text-primary-content rounded-full p-0.5">
+                  <Check size={10} />
+                </div>
+              </div>
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{accessibleName}</TooltipContent>
+      </Tooltip>
     );
   }
 
@@ -171,52 +187,61 @@ const GridCell = memo(function GridCell({
   };
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 relative w-full ${muxBgClass} ${
-        isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-2" : ""
-      } ${isDownloadMode && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""}`}
-    >
-      {task.figure_path && figurePath && (
-        <div className="absolute inset-1">
-          <TaskFigure
-            path={figurePath}
-            qid={qid}
-            className="w-full h-full object-contain"
-            hideExpandButton
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onClick}
+          onKeyDown={handleKeyDown}
+          aria-label={accessibleName}
+          aria-disabled={isUnavailable || undefined}
+          className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary relative w-full ${muxBgClass} ${
+            isDownloadMode && isSelectedForDownload ? "ring-2 ring-primary ring-offset-2" : ""
+          } ${isUnavailable ? "opacity-40 cursor-not-allowed" : ""}`}
+        >
+          {task.figure_path && figurePath && (
+            <div className="absolute inset-1">
+              <TaskFigure
+                path={figurePath}
+                qid={qid}
+                className="w-full h-full object-contain"
+                hideExpandButton
+              />
+            </div>
+          )}
+          {showLabels && (
+            <div
+              className={`absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium ${
+                zoomMode === "full" ? "hidden md:block" : ""
+              }`}
+            >
+              {qid}
+            </div>
+          )}
+          <TaskTileStatusMark
+            status={task.status}
+            variant="figure"
+            className="absolute bottom-1 right-1"
           />
-        </div>
-      )}
-      {showLabels && (
-        <div
-          className={`absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-xs font-medium ${
-            zoomMode === "full" ? "hidden md:block" : ""
-          }`}
-        >
-          {qid}
-        </div>
-      )}
-      <div
-        className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(task.status)}`}
-      />
-      {/* Download selection overlay */}
-      {isDownloadMode && canBeDownloaded && (
-        <div
-          className={`absolute inset-0 flex items-center justify-center transition-colors ${
-            isSelectedForDownload ? "bg-primary/20" : "bg-transparent hover:bg-base-content/10"
-          }`}
-        >
-          {isSelectedForDownload && (
-            <div className="bg-primary text-primary-content rounded-full p-1">
-              <Check size={16} />
+          {/* Download selection overlay */}
+          {isDownloadMode && canBeDownloaded && (
+            <div
+              className={`absolute inset-0 flex items-center justify-center transition-colors ${
+                isSelectedForDownload ? "bg-primary/20" : "bg-transparent hover:bg-base-content/10"
+              }`}
+            >
+              {isSelectedForDownload && (
+                <div className="bg-primary text-primary-content rounded-full p-1">
+                  <Check size={16} />
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
-    </div>
+      </TooltipTrigger>
+      <TooltipContent>{accessibleName}</TooltipContent>
+    </Tooltip>
   );
 });
 
