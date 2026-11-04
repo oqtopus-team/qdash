@@ -27,6 +27,7 @@ from qdash.api.services.config_service import ConfigService
 from qdash.api.services.cooldown_service import CooldownService
 from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEventService
 from qdash.api.services.copilot_chat_session_service import CopilotChatSessionService
+from qdash.api.services.copilot_investigation_service import CopilotInvestigationService
 from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.evaluation_service import EvaluationService
@@ -43,6 +44,7 @@ from qdash.api.services.provenance_service import ProvenanceService
 from qdash.api.services.reanalysis_service import ReanalysisService
 from qdash.api.services.seed_import_service import SeedImportService
 from qdash.api.services.slack_notification_service import SlackNotificationService
+from qdash.api.services.source_access_service import SourceAccessService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
@@ -382,6 +384,22 @@ def get_slack_notification_service() -> SlackNotificationService:
 def get_copilot_runtime() -> CopilotRuntime:
     """Get the copilot runtime instance."""
     return CopilotRuntime()
+
+
+@cached_dependency_provider
+def get_source_access_service() -> SourceAccessService:
+    """Get the read-only source access service for Copilot investigations."""
+    return SourceAccessService()
+
+
+@cached_dependency_provider
+def get_copilot_investigation_service() -> CopilotInvestigationService:
+    """Get the service that opens a chat investigating a failed execution."""
+    return CopilotInvestigationService(
+        execution_service=get_execution_service(),
+        task_service=get_task_service(),
+        source_service=get_source_access_service(),
+    )
 
 
 @cached_dependency_provider

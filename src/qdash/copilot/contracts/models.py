@@ -153,6 +153,21 @@ class TaskChatTarget(BaseModel):
     task_id: str
 
 
+class InvestigationTarget(BaseModel):
+    """A failed execution, or one task of it, that a chat opens to investigate.
+
+    The API loads the logs itself, scoped to the user's project; the client only
+    names the target. ``task_id``, ``task_name`` and ``qid`` narrow it to one
+    task and are optional: an execution can fail before any task result exists.
+    """
+
+    execution_id: str = Field(min_length=1, max_length=200)
+    task_id: str | None = Field(default=None, max_length=200)
+    task_name: str | None = Field(default=None, max_length=200)
+    qid: str | None = Field(default=None, max_length=100)
+    chip_id: str | None = Field(default=None, max_length=200)
+
+
 class FlowEditorContext(BaseModel):
     """The flow open in the Workflow editor, with the editor's current text."""
 
@@ -191,6 +206,14 @@ class ChatRequest(ImageAttachmentsRequest):
         description=(
             "The task result this chat is about. When set, a new conversation opens "
             "with the result's context and figures; later turns carry it for scoping."
+        ),
+    )
+    investigation: InvestigationTarget | None = Field(
+        default=None,
+        description=(
+            "A failed execution or task to investigate. When set on a new "
+            "conversation, its first turn opens with the failure's logs, identifiers "
+            "and the source the assistant can read."
         ),
     )
     session_id: str | None = Field(

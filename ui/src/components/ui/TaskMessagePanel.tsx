@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { AlertCircle, Info } from "lucide-react";
 
@@ -11,6 +12,8 @@ interface TaskMessagePanelProps {
   stackTrace?: string | null;
   /** Render "No error message recorded." instead of nothing when a failed task has no message. */
   showEmptyFallback?: boolean;
+  /** An action for the message, such as investigating a failure; shown in the header. */
+  action?: ReactNode;
   className?: string;
 }
 
@@ -71,6 +74,7 @@ export function TaskMessagePanel({
   message,
   stackTrace,
   showEmptyFallback = false,
+  action,
   className = "",
 }: TaskMessagePanelProps) {
   const toast = useToast();
@@ -81,9 +85,10 @@ export function TaskMessagePanel({
     if (showEmptyFallback && status === "failed") {
       return (
         <div
-          className={`rounded-lg border border-base-300 p-3 text-sm text-base-content/60 ${className}`}
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border border-base-300 p-3 text-sm text-base-content/60 ${className}`}
         >
           No error message recorded.
+          {action}
         </div>
       );
     }
@@ -106,7 +111,8 @@ export function TaskMessagePanel({
     <div className={`overflow-hidden rounded-lg border ${tone.frameClass} ${className}`}>
       <div className={`flex items-center gap-2 px-3 py-2 text-sm font-medium ${tone.headerClass}`}>
         <Icon className="h-3.5 w-3.5 shrink-0" />
-        {tone.title}
+        <span className="flex-1">{tone.title}</span>
+        {action}
       </div>
       {trimmedMessage && (
         <pre

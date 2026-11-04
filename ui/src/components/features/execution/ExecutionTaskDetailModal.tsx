@@ -17,9 +17,11 @@ import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useChatDock } from "@/contexts/ChatDockContext";
-import type { TaskChatContext } from "@/types/copilotChat";
+import type { InvestigationTarget, TaskChatContext } from "@/types/copilotChat";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 interface ExecutionTaskDetailModalProps {
@@ -99,6 +101,18 @@ export function ExecutionTaskDetailModal({
       taskId: selectedTask.task_id,
     };
   }, [selectedTask, chipId, qid, executionId]);
+
+  // A failed task is investigated with or without a task result.
+  const investigation: InvestigationTarget | null = useMemo(() => {
+    if (selectedTask?.status !== "failed" || !executionId) return null;
+    return {
+      executionId,
+      taskId: selectedTask.task_id ?? null,
+      taskName: selectedTask.name ?? null,
+      qid: selectedTask.qid ?? qid,
+      chipId,
+    };
+  }, [selectedTask, executionId, qid, chipId]);
 
   const handleSelectTask = (idx: number) => {
     setSelectedTaskIndex(idx);
@@ -326,6 +340,16 @@ export function ExecutionTaskDetailModal({
             )}
           </div>
         </div>
+      )}
+
+      {investigation && (
+        <TaskMessagePanel
+          status={selectedTask?.status}
+          message={selectedTask?.message}
+          showEmptyFallback
+          className="mt-2"
+          action={<InvestigateWithAiButton target={investigation} surface="mini" />}
+        />
       )}
 
       {selectedTask?.task_id && (

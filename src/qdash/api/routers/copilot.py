@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 from fastapi.security import (
     HTTPAuthorizationCredentials,  # noqa: TC002 - FastAPI resolves annotations
@@ -17,11 +17,17 @@ if TYPE_CHECKING:
 
 from qdash.api.dependencies import (
     get_copilot_chat_session_service,
+    get_copilot_investigation_service,
     get_copilot_runtime,
     get_evaluation_service,
+    get_source_access_service,
 )
 from qdash.api.lib.auth import bearer_scheme, get_current_active_user
-from qdash.api.lib.project import get_project_id_from_header
+from qdash.api.lib.project import (
+    ProjectContext,
+    get_project_context,
+    get_project_id_from_header,
+)
 from qdash.api.lib.sse import sse_event
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.copilot_chat_session import (
@@ -35,11 +41,23 @@ from qdash.api.schemas.copilot_preferences import (
     CopilotPreferencesUpdate,
     CopilotSystemPrompt,
 )
+from qdash.api.schemas.copilot_source import (
+    ListSourceRootsResponse,
+    SearchSourceResponse,
+    SourceFileResponse,
+    SourceRootResponse,
+    SourceSearchMatch,
+)
 from qdash.api.services import pi_chat_service
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
+from qdash.api.services.copilot_investigation_service import (
+    CopilotInvestigationService,
+    InvestigationNotFoundError,
+)
 from qdash.api.services.evaluation_service import EvaluationService
+from qdash.api.services.source_access_service import SourceAccessError, SourceAccessService
 from qdash.copilot.config import (
     CopilotConfig,
     load_copilot_config,
@@ -51,6 +69,7 @@ from qdash.copilot.contracts import (
     ChatStopResponse,
     TaskContextBundle,
 )
+from qdash.copilot.prompts.task_chat import build_language_instruction
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
@@ -137,13 +156,39 @@ async def chat_stream(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     project_id: Annotated[str | None, Depends(get_project_id_from_header)],
     evaluation_service: Annotated[EvaluationService, Depends(get_evaluation_service)],
+    investigation_service: Annotated[
+        CopilotInvestigationService, Depends(get_copilot_investigation_service)
+    ],
 ) -> StreamingResponse:
     """SSE streaming chat endpoint.
 
     A chat is about one task result when ``task`` is set: its first turn then
-    opens with the result's context and figures. Otherwise it is a general
+    opens with the result's context and figures. With ``investigation`` its
+    first turn opens with a failed execution's logs, loaded from the user's
+    project, and the source the assistant can read. Otherwise it is a general
     chat, optionally scoped by chip_id/qid.
     """
+    investigation_message: str | None = None
+    if request.investigation is not None:
+        if request.task is not None:
+            raise HTTPException(
+                status_code=400, detail="A chat cannot set both task and investigation"
+            )
+        # The logs come from the project the user may read, checked before streaming.
+        ctx: ProjectContext = get_project_context(current_user, project_id)
+        try:
+            investigation = await asyncio.to_thread(
+                investigation_service.build,
+                project_id=ctx.project_id,
+                target=request.investigation,
+                user_message=request.message,
+                language_instruction=build_language_instruction(load_copilot_config()),
+            )
+        except InvestigationNotFoundError as exc:
+            raise HTTPException(
+                status_code=404, detail=f"Execution {exc} not found in this project"
+            ) from exc
+        investigation_message = investigation.opening_message
 
     async def event_generator() -> AsyncGenerator[str, None]:
         config = load_copilot_config()
@@ -205,6 +250,7 @@ async def chat_stream(
             task=task_bundle,
             images_sent=images_sent,
             recorder=recorder,
+            opening_message=investigation_message,
         ):
             yield event
 
@@ -294,6 +340,108 @@ async def delete_copilot_chat_session(
     service.delete_session(username=current_user.username, session_id=session_id)
     await pi_chat_service.delete_runtime_session_state(current_user.username, session_id)
     return {"deleted": True}
+
+
+def _source_error(exc: SourceAccessError) -> HTTPException:
+    return HTTPException(status_code=exc.status, detail=str(exc))
+
+
+@router.get(
+    "/source/roots",
+    response_model=ListSourceRootsResponse,
+    summary="List the source trees the Copilot can read",
+    operation_id="listCopilotSourceRoots",
+)
+def list_copilot_source_roots(
+    _user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[SourceAccessService, Depends(get_source_access_service)],
+) -> ListSourceRootsResponse:
+    """QDash and allowlisted dependency source served read-only, with known revisions."""
+    return ListSourceRootsResponse(
+        roots=[
+            SourceRootResponse(
+                name=root.name,
+                kind=root.kind,
+                version=root.version,
+                revision=root.revision,
+                revision_source=root.revision_source,
+                dirty=root.dirty,
+            )
+            for root in service.roots
+        ],
+        missing_dependencies=service.missing_dependencies(),
+        execution_revision_recorded=False,
+    )
+
+
+@router.get(
+    "/source/search",
+    response_model=SearchSourceResponse,
+    summary="Search the source the Copilot can read",
+    operation_id="searchCopilotSource",
+)
+def search_copilot_source(
+    _user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[SourceAccessService, Depends(get_source_access_service)],
+    query: Annotated[str, Query(min_length=1, max_length=200)],
+    root: Annotated[str | None, Query(max_length=100)] = None,
+    path_prefix: Annotated[str | None, Query(max_length=300)] = None,
+    mode: Annotated[str, Query(pattern="^(content|path)$")] = "content",
+    case_sensitive: bool = False,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> SearchSourceResponse:
+    """Literal search in file contents or file paths; read-only and size-limited."""
+    try:
+        matches, truncated = service.search(
+            query,
+            root_name=root,
+            path_prefix=path_prefix,
+            mode=mode,
+            case_sensitive=case_sensitive,
+            limit=limit,
+        )
+    except SourceAccessError as exc:
+        raise _source_error(exc) from exc
+    return SearchSourceResponse(
+        query=query,
+        mode=mode,
+        matches=[
+            SourceSearchMatch(root=m.root, path=m.path, line=m.line, text=m.text) for m in matches
+        ],
+        truncated=truncated,
+    )
+
+
+@router.get(
+    "/source/file",
+    response_model=SourceFileResponse,
+    summary="Read a line range of a source file",
+    operation_id="getCopilotSourceFile",
+)
+def get_copilot_source_file(
+    _user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[SourceAccessService, Depends(get_source_access_service)],
+    path: Annotated[str, Query(min_length=1, max_length=500)],
+    root: Annotated[str | None, Query(max_length=100)] = None,
+    start_line: Annotated[int, Query(ge=1)] = 1,
+    end_line: Annotated[int | None, Query(ge=1)] = None,
+) -> SourceFileResponse:
+    """Read up to 400 numbered lines; without ``root`` the path is matched as a traceback prints it."""
+    try:
+        source = service.read(root, path, start_line=start_line, end_line=end_line)
+    except SourceAccessError as exc:
+        raise _source_error(exc) from exc
+    revision = next((r.revision for r in service.roots if r.name == source.root), None)
+    return SourceFileResponse(
+        root=source.root,
+        path=source.path,
+        start_line=source.start_line,
+        end_line=source.end_line,
+        total_lines=source.total_lines,
+        content=source.content,
+        truncated=source.truncated,
+        revision=revision,
+    )
 
 
 @router.get(

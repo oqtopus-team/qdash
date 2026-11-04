@@ -15,6 +15,7 @@ import { ExecutionDAG } from "./ExecutionDAG";
 import type { ExecutionResponseDetail } from "@/schemas";
 
 import { useGetExecution, useCancelExecution } from "@/client/execution/execution";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
@@ -264,9 +265,14 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               <span className="truncate">{formatActorLabel(execution)}</span>
             </div>
           </div>
-          {execution.status === "failed" && execution.message && (
-            <div className="alert alert-error items-start">
-              <span className="break-words whitespace-pre-wrap">{execution.message}</span>
+          {execution.status === "failed" && (
+            <div role="alert" className="alert alert-error items-start">
+              <span className="flex-1 break-words whitespace-pre-wrap">
+                {execution.message || "The execution failed without an error message."}
+              </span>
+              <InvestigateWithAiButton
+                target={{ executionId, chipId: execution.chip_id || chipId }}
+              />
             </div>
           )}
         </div>

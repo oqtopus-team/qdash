@@ -32,6 +32,7 @@ import {
   getGetExecutionQueryKey,
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
@@ -565,15 +566,21 @@ export function ExecutionPageContent() {
                 </div>
               )}
               {isDetailError && <div>Error loading details.</div>}
-              {executionDetailData?.data.status === "failed" &&
-                executionDetailData.data.message && (
-                  <div className="alert alert-error mb-4 items-start text-sm">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span className="break-words whitespace-pre-wrap">
-                      {executionDetailData.data.message}
-                    </span>
-                  </div>
-                )}
+              {executionDetailData?.data.status === "failed" && selectedExecutionId && (
+                <div role="alert" className="alert alert-error mb-4 items-start text-sm">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span className="flex-1 break-words whitespace-pre-wrap">
+                    {executionDetailData.data.message ||
+                      "The execution failed without an error message."}
+                  </span>
+                  <InvestigateWithAiButton
+                    target={{
+                      executionId: selectedExecutionId,
+                      chipId: executionDetailData.data.chip_id || null,
+                    }}
+                  />
+                </div>
+              )}
               {executionDetailData &&
                 executionDetailData.data.task &&
                 executionDetailData.data.task.map((detailTask, idx) => {

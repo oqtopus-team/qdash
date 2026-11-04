@@ -3,8 +3,19 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
-import type { EditProposal, PageContext, TaskChatContext } from "@/types/copilotChat";
+import type {
+  EditProposal,
+  InvestigationTarget,
+  PageContext,
+  TaskChatContext,
+} from "@/types/copilotChat";
 import { matchesEditTarget } from "@/lib/copilotEditTarget";
+import {
+  investigationKey,
+  investigationPrompt,
+  investigationTitle,
+  sameInvestigation,
+} from "@/lib/copilotInvestigation";
 
 /**
  * What a page tells the chat about itself. A page registers one while it is
@@ -23,6 +34,9 @@ export interface PageContextProvider {
  * the floating window that sits above modals. Both render the active session
  * of CopilotChatSessionProvider, so a chat moves between them mid-stream.
  */
+/** Where an investigation opens: the docked sidebar on a page, the floating window above a modal. */
+export type InvestigationSurface = "sidebar" | "mini";
+
 interface ChatDockValue {
   /** Resume the chat about this result, or start one, without opening a surface. */
   focusTaskChat: (context: TaskChatContext) => void;
@@ -39,6 +53,12 @@ interface ChatDockValue {
   openMiniChatForSession: (sessionId: string) => void;
   closeMiniChat: () => void;
 
+  /**
+   * Start an AI investigation of a failure, or resume the one already started
+   * for it. The first turn is sent once, here; a rerender sends nothing.
+   */
+  investigate: (target: InvestigationTarget, surface?: InvestigationSurface) => void;
+
   /** Tell the chat what this page shows; returns the unregister function for unmount. */
   registerPage: (provider: PageContextProvider) => () => void;
   /** The page a turn sent now would describe; null on the chat page itself. */
@@ -51,8 +71,15 @@ interface ChatDockValue {
 const ChatDockCtx = createContext<ChatDockValue | null>(null);
 
 export function ChatDockProvider({ children }: { children: React.ReactNode }) {
-  const { activeSession, findSessionByContext, switchSession, createNewSession } =
-    useCopilotChatSessionContext();
+  const {
+    activeSession,
+    sessions,
+    findSessionByContext,
+    switchSession,
+    createNewSession,
+    hasSession,
+    sendMessage,
+  } = useCopilotChatSessionContext();
   const [isOpen, setIsOpen] = useState(false);
   const [miniOpen, setMiniOpen] = useState(false);
   const pathname = usePathname();
@@ -106,7 +133,9 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const openGeneralChat = useCallback(() => {
     // Keep the chat the user was in; start fresh only when there is none or it
     // is about a specific result.
-    if (!activeSession || activeSession.context) createNewSession(null);
+    if (!activeSession || activeSession.context || activeSession.investigation) {
+      createNewSession(null);
+    }
     setIsOpen(true);
   }, [activeSession, createNewSession]);
 
@@ -136,6 +165,42 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
 
   const closeMiniChat = useCallback(() => setMiniOpen(false), []);
 
+  // Investigations started in this tab, by failure. Written in the click handler
+  // itself, so a double click resumes the session the first click created.
+  const investigations = useRef<Map<string, string>>(new Map());
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+
+  const investigate = useCallback(
+    (target: InvestigationTarget, surface: InvestigationSurface = "sidebar") => {
+      const key = investigationKey(target);
+      const known = investigations.current.get(key);
+      const resumed =
+        known && hasSession(known)
+          ? known
+          : sessionsRef.current?.find((s) => sameInvestigation(s.investigation, target))?.id;
+      if (resumed) {
+        investigations.current.set(key, resumed);
+        switchSession(resumed);
+      } else {
+        const sessionId = createNewSession(null, {
+          title: investigationTitle(target),
+          investigation: target,
+        });
+        investigations.current.set(key, sessionId);
+        sendMessage(investigationPrompt(target), { sessionId, page: currentPage() });
+      }
+      if (surface === "mini") {
+        setIsOpen(false);
+        setMiniOpen(true);
+      } else {
+        setMiniOpen(false);
+        setIsOpen(true);
+      }
+    },
+    [createNewSession, currentPage, hasSession, sendMessage, switchSession],
+  );
+
   const value = useMemo(
     () => ({
       focusTaskChat: focusContext,
@@ -148,6 +213,7 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
       openMiniChat,
       openMiniChatForSession,
       closeMiniChat,
+      investigate,
       registerPage,
       currentPage,
       applyCode,
@@ -164,6 +230,7 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
       openMiniChat,
       openMiniChatForSession,
       closeMiniChat,
+      investigate,
       registerPage,
       currentPage,
       applyCode,

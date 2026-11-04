@@ -9,6 +9,8 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { QubitTile } from "@/components/ui/QubitTile";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
+import { failedTaskInvestigation } from "@/lib/copilotInvestigation";
 import { useEscapeLayer } from "@/hooks/useFullscreenPanel";
 import { formatDateTime } from "@/lib/utils/datetime";
 import { getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
@@ -300,6 +302,12 @@ export function TaskResultPreviewSidebar({
                 message={taskResult.message}
                 stackTrace={taskResult.stack_trace}
                 showEmptyFallback
+                action={
+                  <InvestigateWithAiButton
+                    target={failedTaskInvestigation(taskResult)}
+                    surface="mini"
+                  />
+                }
               />
 
               <ParameterPreview

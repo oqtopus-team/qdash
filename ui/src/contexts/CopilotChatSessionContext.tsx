@@ -21,12 +21,14 @@ import {
   toPersistedTrace,
 } from "@/lib/copilotChatStream";
 import { buildHeaders, consumeSSEEvents, readErrorResponse } from "@/lib/sse-utils";
+import { investigationFromStored, toInvestigationRequest } from "@/lib/copilotInvestigation";
 import type {
   TaskChatContext,
   AnswerFeedback,
   ChatImageAttachment,
   ChatMessage,
   CopilotBlocksResult,
+  InvestigationTarget,
   LiveTurn,
   PageContext,
 } from "@/types/copilotChat";
@@ -40,6 +42,11 @@ export interface CopilotChatSession {
   title: string;
   /** Set when the chat is about one calibration result. */
   context: TaskChatContext | null;
+  /**
+   * Set when the chat investigates a failed execution or task. Every turn
+   * names it, so a retried first turn still opens with the failure's logs.
+   */
+  investigation?: InvestigationTarget | null;
   messages: ChatMessage[];
   createdAt: number;
   updatedAt: number;
@@ -69,6 +76,11 @@ export interface SendOptions {
   page?: PageContext | null;
 }
 
+export interface NewSessionOptions {
+  title?: string;
+  investigation?: InvestigationTarget | null;
+}
+
 interface CopilotChatSessionContextValue {
   sessions: CopilotChatSession[];
   isLoadingSessions: boolean;
@@ -77,7 +89,9 @@ interface CopilotChatSessionContextValue {
   runs: Record<string, SessionRun>;
 
   switchSession: (sessionId: string | null) => void;
-  createNewSession: (context?: TaskChatContext | null) => string;
+  createNewSession: (context?: TaskChatContext | null, options?: NewSessionOptions) => string;
+  /** Whether the session exists now, including one created in this same event handler. */
+  hasSession: (sessionId: string) => boolean;
   deleteSession: (sessionId: string) => void;
   renameSession: (sessionId: string, title: string) => void;
   /** Rate the assistant message at `index`; null clears the rating. */
@@ -129,7 +143,8 @@ interface ServerMessage {
 interface ServerSessionSummary {
   session_id: string;
   title: string;
-  context?: TaskChatContext | null;
+  /** A task chat's context, or `{ investigation }` for an investigation. */
+  context?: TaskChatContext | { investigation: InvestigationTarget } | null;
   message_count: number;
   created_at: string;
   updated_at: string;
@@ -178,11 +193,25 @@ function localMessageToServer(m: ChatMessage): ServerMessage {
   };
 }
 
+/** Split a stored context into the task chat context and the investigation target. */
+function fromServerContext(raw: ServerSessionSummary["context"]): {
+  context: TaskChatContext | null;
+  investigation: InvestigationTarget | null;
+} {
+  const investigation = investigationFromStored(raw);
+  if (investigation || (raw && "investigation" in raw)) return { context: null, investigation };
+  return { context: (raw as TaskChatContext | null | undefined) ?? null, investigation: null };
+}
+
+function toServerContext(session: CopilotChatSession): ServerSessionSummary["context"] {
+  return session.investigation ? { investigation: session.investigation } : session.context;
+}
+
 function summaryToSession(s: ServerSessionSummary): CopilotChatSession {
   return {
     id: s.session_id,
     title: s.title,
-    context: s.context ?? null,
+    ...fromServerContext(s.context),
     messages: [],
     createdAt: toTimestamp(s.created_at),
     updatedAt: toTimestamp(s.updated_at),
@@ -216,7 +245,7 @@ async function apiCreateSession(session: CopilotChatSession): Promise<void> {
     body: JSON.stringify({
       session_id: session.id,
       title: session.title,
-      context: session.context,
+      context: toServerContext(session),
       messages: [],
     }),
   });
@@ -258,9 +287,11 @@ function buildTurnRequest(
   page?: PageContext | null,
 ): { url: string; body: Record<string, unknown> } {
   const context = session?.context;
+  const investigation = session?.investigation;
   return {
     url: `${BASE_URL}/copilot/chat/stream`,
     body: {
+      ...(investigation ? { investigation: toInvestigationRequest(investigation) } : {}),
       ...(approval ? { approval } : {}),
       ...(images.length ? { images } : {}),
       ...(page
@@ -386,7 +417,9 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
               ? {
                   ...s,
                   title: detail.title,
-                  context: detail.context ?? s.context,
+                  ...(detail.context
+                    ? fromServerContext(detail.context)
+                    : { context: s.context, investigation: s.investigation ?? null }),
                   messages: detail.messages.map(serverMessageToLocal),
                   updatedAt: toTimestamp(detail.updated_at),
                   messagesLoaded: true,
@@ -414,37 +447,46 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
     setActiveSessionId(sessionId);
   }, []);
 
-  const createNewSession = useCallback((context: TaskChatContext | null = null): string => {
-    const id = generateId();
-    const ts = Date.now();
-    const local: CopilotChatSession = {
-      id,
-      title: context ? contextTitle(context) : DEFAULT_TITLE,
-      context,
-      messages: [],
-      createdAt: ts,
-      updatedAt: ts,
-      messagesLoaded: true,
-    };
-    messagesFetched.current.add(id);
-    sessionsRef.current = [local, ...sessionsRef.current];
-    setSessions((prev) => [local, ...prev]);
-    setActiveSessionId(id);
-    const createPromise = apiCreateSession(local)
-      .then(() => {
-        pendingCreates.current.delete(id);
-      })
-      .catch((err) => {
-        pendingCreates.current.delete(id);
-        // Roll back if the server refused (e.g. duplicate id).
-        setSessions((prev) => prev.filter((s) => s.id !== id));
-        messagesFetched.current.delete(id);
-        setActiveSessionId((current) => (current === id ? null : current));
-        throw err;
-      });
-    pendingCreates.current.set(id, createPromise);
-    return id;
-  }, []);
+  const createNewSession = useCallback(
+    (context: TaskChatContext | null = null, options: NewSessionOptions = {}): string => {
+      const id = generateId();
+      const ts = Date.now();
+      const local: CopilotChatSession = {
+        id,
+        title: options.title ?? (context ? contextTitle(context) : DEFAULT_TITLE),
+        context,
+        investigation: options.investigation ?? null,
+        messages: [],
+        createdAt: ts,
+        updatedAt: ts,
+        messagesLoaded: true,
+      };
+      messagesFetched.current.add(id);
+      sessionsRef.current = [local, ...sessionsRef.current];
+      setSessions((prev) => [local, ...prev]);
+      setActiveSessionId(id);
+      const createPromise = apiCreateSession(local)
+        .then(() => {
+          pendingCreates.current.delete(id);
+        })
+        .catch((err) => {
+          pendingCreates.current.delete(id);
+          // Roll back if the server refused (e.g. duplicate id).
+          setSessions((prev) => prev.filter((s) => s.id !== id));
+          messagesFetched.current.delete(id);
+          setActiveSessionId((current) => (current === id ? null : current));
+          throw err;
+        });
+      pendingCreates.current.set(id, createPromise);
+      return id;
+    },
+    [],
+  );
+
+  const hasSession = useCallback(
+    (sessionId: string) => sessionsRef.current.some((s) => s.id === sessionId),
+    [],
+  );
 
   const findSessionByContext = useCallback(
     (context: TaskChatContext) => sessions.find((s) => sameContext(s.context, context)) ?? null,
@@ -731,6 +773,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
       runs,
       switchSession,
       createNewSession,
+      hasSession,
       deleteSession,
       renameSession,
       setMessageFeedback,
@@ -746,6 +789,7 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
       runs,
       switchSession,
       createNewSession,
+      hasSession,
       deleteSession,
       renameSession,
       setMessageFeedback,
