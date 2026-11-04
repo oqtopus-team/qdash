@@ -151,12 +151,16 @@ through `FileService`, not source. The opening message and the `qdash_query` des
 
 - `files_tree` with a `path` lists nothing. The result names `qdash_list_source_roots` and
   `qdash_search_source`.
-- `file_content` on a source-looking path (`.py`, absolute, or starting with a root name) that the
-  config API answers with 400 or 404 returns the matching `qdash_read_source` arguments.
+- `file_content` returns matching `qdash_read_source` arguments after HTTP 400 or 404
+  only for source-looking paths: Python files, installed-package paths, paths starting with
+  a source root name, or absolute paths containing a source root name.
   Config files, other misses, 403, and server errors behave as before.
 
-On an API image without the `/copilot/source` routes, `qdash_read_source` reports that the endpoint may be unavailable and suggests checking API routing, proxy
-configuration, and the API image version. Compose mounts `./src/qdash` read-only at `/app/source/qdash` on the API,
+When a source endpoint returns a generic 404, `qdash_read_source` reports that the endpoint
+may be unavailable and suggests checking API routing, proxy configuration, and the API image
+version.
+
+Compose mounts `./src/qdash` read-only at `/app/source/qdash` on the API,
 with `CALIBTASKS_PATH` over its `workflow/calibtasks`, and sets `QDASH_SOURCE_ROOT`. The API
 image does not install qubex, so in Compose qubex source is reported unavailable. Set
 `QDASH_SOURCE_REVISION` in `.env` to report the deployed commit, because the mount has no `.git`.

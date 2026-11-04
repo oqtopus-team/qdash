@@ -22,11 +22,11 @@ export function looksLikeSourcePath(path: string | undefined): boolean {
   const value = normalize(path);
   if (!value) return false;
   const segments = value.split("/").filter(Boolean);
-  return value.startsWith("/")
-    || SOURCE_SUFFIXES.test(value)
+  return SOURCE_SUFFIXES.test(value)
     || segments.includes("site-packages")
     || segments.includes("dist-packages")
-    || SOURCE_ROOT_NAMES.has(segments[0] ?? "");
+    || SOURCE_ROOT_NAMES.has(segments[0] ?? "")
+    || (value.startsWith("/") && segments.some((segment) => SOURCE_ROOT_NAMES.has(segment)));
 }
 
 /** The qdash_read_source arguments for a source path. */

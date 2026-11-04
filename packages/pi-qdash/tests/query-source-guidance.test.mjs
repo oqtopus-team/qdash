@@ -157,3 +157,15 @@ test("source search guidance queries the requested filename", () => {
     root: "qdash", pathPrefix: "workflow", mode: "path", query: ".py",
   });
 });
+
+
+test("absolute config paths keep the config API error instead of source guidance", async (t) => {
+  const { run } = await fakeQDash(t);
+  for (const path of ["/data/calibtasks/64Qv3/params/qubit.yaml", "/tmp/settings.json"]) {
+    assert.equal(looksLikeSourcePath(path), false);
+    await assert.rejects(run("qdash_query", { action: "file_content", path }),
+      /400 \/files\/content: Path outside allowed directory/);
+  }
+  assert.equal(looksLikeSourcePath("/app/qdash"), true);
+  assert.equal(looksLikeSourcePath("/app/qdash/workflow/engine/task/executor.py"), true);
+});
