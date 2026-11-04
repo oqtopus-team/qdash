@@ -64,8 +64,15 @@ Value exemptions (in `filter`):
 | `mongodb://root:example@mongo:27017` | `finding["secret"]` | Local-dev compose default. The hostname `mongo` resolves only inside the compose network and the password is literally the word `example` — it is not a secret in any environment, just an example value. (Gitleaks used `regexTarget = "match"`; Betterleaks captures the clean URI in `finding["secret"]`, so the filter matches there.) |
 | `ADMIN_TOKEN`, `YOUR_TOKEN` | `finding["secret"]` | Documentation placeholder token names, not real credentials. |
 | `x90_gate_fidelity`, `x180_gate_fidelity`, `zx90_gate_fidelity` | `finding["secret"]` | Quantum gate fidelity metric names that resemble high-entropy tokens. |
+| Same MongoDB URI under `generic-credential-uri` | `finding["rule_id"]`, `finding["secret"]` equal to `example`, `finding["match"]` | Betterleaks 1.9 reports only the password part of the local-dev URI as the secret, so this branch matches the full URI instead. |
+| `example`, `prefect`, `passw0rd` in `.env.example` and `.env.example.qubex` | `generic-password`, path, `finding["secret"]` | Published local-dev defaults for MongoDB, PostgreSQL, and the initial admin account; every developer copies them to `.env`. |
+| `secure_password123`, `admin_password123`, `short` in `tests/data/sample_data.py` | `generic-password`, path, `finding["secret"]` | Sample user records (`SAMPLE_USERS`) in shared test data. |
+| `password="hashed"` or `password="unused"` in `tests/qdash/api/{routers,services}/test_*.py` | `generic-password`, path, `finding["match"]` | Placeholder `hashed_password` field values on test users; the tests never verify them as passwords. |
+| `changed-password` in `tests/qdash/api/routers/test_admin.py` | `generic-password`, path, `finding["secret"]` | Request body for the password-change test. |
+| `temporary-secret`, `current`, `next-password` in the `EditUserModal` and `PasswordChangeCard` tests | `generic-password`, path, `finding["secret"]` | Form input values in UI tests. |
+| `Show password` in `LoginPageContent.tsx`, `new-password` in `PasswordChangeCard/index.tsx` | `generic-password`, path, `finding["secret"]` | An `aria-label` string and an `autoComplete` token, not credentials. |
 
-The shared property of every path entry is **generation-owned**: the file is rewritten by a tool, not by a human. A developer pasting a real credential into one of these files would lose it on the next regeneration step, so the scanning blind spot has no practical attack surface. The value entries cover fixed sample/placeholder strings that are identical across every developer's machine.
+The shared property of every path entry is **generation-owned**: the file is rewritten by a tool, not by a human. A developer pasting a real credential into one of these files would lose it on the next regeneration step, so the scanning blind spot has no practical attack surface. The value entries cover fixed sample/placeholder strings that are identical across every developer's machine. Value entries scoped to a file also require the rule ID and the exact literal, so any other value in that file, or the same literal in another file, is still reported. Write `finding["rule_id"]` in the filter; the camel-case `ruleID` key is not set and silently never matches.
 
 ### Trufflehog
 

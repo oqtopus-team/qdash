@@ -1,8 +1,8 @@
 "use client";
 
 import { GitBranch, X } from "lucide-react";
-import Link from "next/link";
 
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { CouplingMetricHistoryModal } from "@/components/features/metrics/CouplingMetricHistoryModal";
 import { QubitMetricHistoryModal } from "@/components/features/metrics/QubitMetricHistoryModal";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -141,13 +141,13 @@ export function DashboardMetricModal({
         {/* Footer */}
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
           {!isCoupling && (
-            <Link
-              href={`/provenance?parameter=${encodeURIComponent(metricKey)}&qid=${encodeURIComponent(targetId)}&tab=lineage`}
+            <LineageButton
+              target={{ parameterName: metricKey, qid: targetId }}
               className="btn btn-ghost btn-sm sm:btn-md gap-1"
             >
               <GitBranch className="h-4 w-4" />
               <span className="hidden sm:inline">Lineage</span>
-            </Link>
+            </LineageButton>
           )}
           <div className="flex gap-2 ml-auto">
             <button type="button" onClick={onClose} className="btn btn-ghost btn-sm sm:btn-md">
