@@ -84,7 +84,9 @@ feedback.
 Use DaisyUI for buttons, cards, inputs, badges, tables, alerts, and other visual components. Reuse
 the shared Radix-based `Dialog`, `DropdownMenu`, and `Tooltip` wrappers when focus management,
 keyboard navigation, portals, dismissal, or collision handling requires them. Feature code does
-not import another headless primitive to replace an established wrapper.
+not import another headless primitive to replace an established wrapper. The app root mounts one
+`TooltipProvider`, so moving between neighbouring tooltips skips the open delay; feature code
+does not add its own provider.
 
 How these boundaries connect: [UI Architecture](./architecture.md).
 
