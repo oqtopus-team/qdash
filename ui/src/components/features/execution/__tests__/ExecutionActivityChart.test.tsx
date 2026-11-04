@@ -26,7 +26,7 @@ function bucket(date: string, counts: Partial<Record<string, number>> = {}) {
 
 const activity = {
   chip_id: "64Q",
-  days: 7,
+  days: 30,
   timezone: "Asia/Tokyo",
   since: "2026-10-26",
   until: "2026-11-01",
@@ -50,7 +50,7 @@ afterEach(() => {
 function renderChart(overrides: Partial<Parameters<typeof ExecutionActivityChart>[0]> = {}) {
   const props = {
     chipId: "64Q",
-    days: 7 as const,
+    days: 30 as const,
     onDaysChange: vi.fn(),
     selectedDate: "latest",
     onDateSelect: vi.fn(),
@@ -103,13 +103,13 @@ describe("ExecutionActivityChart", () => {
     ]);
     expect(blocksOf("2026-11-01")).toHaveLength(3);
     expect(screen.getByTestId("activity-scale")).toHaveTextContent("1 block = 1 execution");
-    expect(screen.getByText(/8 in the last 7 days, 1 failed, 1 in progress/)).toBeTruthy();
+    expect(screen.getByText(/8 in the last 30 days, 1 failed, 1 in progress/)).toBeTruthy();
     const legend = screen.getByRole("list", { name: "Executions by status" });
     expect(legend).toHaveTextContent("Completed 6");
     expect(legend).toHaveTextContent("Failed 1");
     expect(legend).toHaveTextContent("Running 1");
     expect(legend).not.toHaveTextContent("Scheduled");
-    expect(mocks.lastParams).toMatchObject({ chip_id: "64Q", days: 7 });
+    expect(mocks.lastParams).toMatchObject({ chip_id: "64Q", days: 30 });
   });
 
   it("names each day with its date and per-status counts", () => {
@@ -208,10 +208,45 @@ describe("ExecutionActivityChart", () => {
     mocks.activity = activity;
     const props = renderChart();
 
-    fireEvent.click(screen.getByRole("tab", { name: "90d" }));
+    fireEvent.click(screen.getByRole("tab", { name: "180d" }));
 
-    expect(props.onDaysChange).toHaveBeenCalledWith(90);
-    expect(screen.getByRole("tab", { name: "7d" })).toHaveAttribute("aria-selected", "true");
+    expect(props.onDaysChange).toHaveBeenCalledWith(180);
+    expect(screen.getByRole("tab", { name: "30d" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("draws every day of the 180-day window with sparse date labels", () => {
+    const end = Date.UTC(2026, 10, 1);
+    const dates = Array.from({ length: 180 }, (_, index) =>
+      new Date(end - (179 - index) * 86_400_000).toISOString().slice(0, 10),
+    );
+    mocks.activity = {
+      ...activity,
+      days: 180,
+      since: dates[0],
+      until: dates[179],
+      buckets: dates.map((date, index) =>
+        bucket(date, index === 100 ? { completed: 230, failed: 4 } : { completed: index % 3 }),
+      ),
+    };
+    renderChart({ days: 180 });
+
+    expect(mocks.lastParams).toMatchObject({ chip_id: "64Q", days: 180 });
+    expect(dates[0]).toBe("2026-05-06");
+    expect(dayButtons()).toHaveLength(180);
+    expect(screen.getByRole("tab", { name: "180d" })).toHaveAttribute("aria-selected", "true");
+    for (const button of dayButtons()) {
+      expect(button.querySelectorAll("[data-status]").length).toBeLessThanOrEqual(20);
+    }
+    expect(representedCounts(dates[100])).toEqual({ completed: 230, failed: 4 });
+    // Every 15th day from the latest carries a date, so 180 columns show 12 labels.
+    const labels = Array.from(
+      screen
+        .getByRole("toolbar")
+        .parentElement!.querySelectorAll("[aria-hidden='true'] > span > span"),
+    ).map((label) => label.textContent);
+    expect(labels).toHaveLength(12);
+    expect(labels[labels.length - 1]).toBe("Nov 1");
+    expect(labels[0]).toBe("May 20");
   });
 
   it("shows a skeleton while loading", () => {
@@ -226,7 +261,7 @@ describe("ExecutionActivityChart", () => {
     mocks.activity = { ...activity, buckets: activity.buckets.map((b) => bucket(b.date)) };
     renderChart();
 
-    expect(screen.getByText("No executions in the last 7 days")).toBeTruthy();
+    expect(screen.getByText("No executions in the last 30 days")).toBeTruthy();
     expect(screen.queryByRole("toolbar")).toBeNull();
   });
 
