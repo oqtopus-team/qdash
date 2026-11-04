@@ -7,7 +7,7 @@ abstracting away the repository layer from the routers.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any, NamedTuple
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -21,6 +21,7 @@ from prefect.states import Cancelling
 from qdash.api.schemas.execution import (
     CancelExecutionResponse,
     ExecutionActivityDay,
+    ExecutionActivityGranularity,
     ExecutionActivityResponse,
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
@@ -54,6 +55,48 @@ _ACTIVITY_BUCKET_BY_STATUS: dict[str, str] = {
     "pending": "scheduled",
     "cancelled": "cancelled",
 }
+
+
+# Hours per activity bucket. Both divide a day evenly, so buckets start on local wall-clock
+# hours that are multiples of the length (00:00, 06:00, 12:00, 18:00 for 6-hour buckets).
+_ACTIVITY_BUCKET_HOURS: dict[str, int] = {"day": 24, "6h": 6}
+# Longest window 6-hour buckets are served for: 31 days, 124 buckets.
+MAX_SIX_HOUR_ACTIVITY_DAYS = 31
+
+
+def _activity_now(zone: ZoneInfo) -> datetime:
+    """Current time in ``zone``; a seam so tests can pin the activity window."""
+    return datetime.now(tz=zone)
+
+
+class _ActivitySlots:
+    """Numbering of the activity buckets of one length in one zone.
+
+    Bucket ``n`` starts on day ``n // per_day`` (a proleptic Gregorian ordinal) at local
+    hour ``(n % per_day) * hours``, so consecutive numbers are consecutive buckets.
+    """
+
+    def __init__(self, zone: ZoneInfo, hours: int) -> None:
+        self.zone = zone
+        self.hours = hours
+        self.per_day = 24 // hours
+
+    def index_of(self, moment: datetime) -> int:
+        """Number of the bucket whose local wall-clock span contains ``moment``."""
+        local = moment.astimezone(self.zone)
+        return local.date().toordinal() * self.per_day + local.hour // self.hours
+
+    def day_of(self, index: int) -> date:
+        return date.fromordinal(index // self.per_day)
+
+    def start_of(self, index: int) -> datetime:
+        """Start of bucket ``index`` as an aware local datetime.
+
+        A boundary that falls in a DST gap resolves to the instant the clocks jump, and
+        the round trip through UTC renders it with the offset in force at that instant.
+        """
+        naive = datetime.combine(self.day_of(index), time(hour=(index % self.per_day) * self.hours))
+        return naive.replace(tzinfo=self.zone).astimezone(UTC).astimezone(self.zone)
 
 
 def _resolve_zone(timezone: str) -> ZoneInfo:
@@ -181,27 +224,48 @@ class ExecutionService:
         chip_id: str | None,
         days: int = 30,
         timezone: str = "UTC",
+        granularity: ExecutionActivityGranularity = "day",
     ) -> ExecutionActivityResponse:
-        """Count executions per calendar day over the trailing ``days`` days.
+        """Count executions per bucket over the trailing ``days`` days.
 
         Counts one chip's executions, or every chip's in the project when ``chip_id`` is
-        ``None``. Days are bucketed in ``timezone`` so the chart matches the dates the user sees;
-        every day of the window is present, empty days with zero counts. Only executions
-        with a start time are counted, since the day is taken from it.
-        """
-        zone = _resolve_zone(timezone)
-        today = datetime.now(tz=zone).date()
-        first_day = today - timedelta(days=days - 1)
-        since = datetime.combine(first_day, time.min, tzinfo=zone).astimezone(UTC)
+        ``None``. Buckets follow wall-clock time in ``timezone`` so the chart matches the
+        dates the user sees, and every bucket of the window is present, empty ones with zero
+        counts. Only executions with a start time are counted, since the bucket is taken
+        from it.
 
-        buckets = {
-            first_day + timedelta(days=offset): ExecutionActivityDay(
-                date=(first_day + timedelta(days=offset)).isoformat()
+        ``granularity="day"`` returns one bucket per calendar day, today included.
+        ``granularity="6h"`` returns ``days * 4`` six-hour buckets ending with the one that
+        contains the current time, and accepts at most ``MAX_SIX_HOUR_ACTIVITY_DAYS`` days.
+        """
+        hours = _ACTIVITY_BUCKET_HOURS.get(granularity)
+        if hours is None:
+            raise HTTPException(status_code=400, detail=f"Unknown granularity: {granularity}")
+        if days < 1:
+            raise HTTPException(status_code=400, detail="days must be at least 1")
+        if granularity == "6h" and days > MAX_SIX_HOUR_ACTIVITY_DAYS:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"6-hour buckets cover at most {MAX_SIX_HOUR_ACTIVITY_DAYS} days; got {days}"
+                ),
             )
-            for offset in range(days)
-        }
+        zone = _resolve_zone(timezone)
+        slots = _ActivitySlots(zone, hours)
+        last = slots.index_of(_activity_now(zone))
+        first = last - days * slots.per_day + 1
+
+        buckets: dict[int, ExecutionActivityDay] = {}
+        for index in range(first, last + 1):
+            buckets[index] = ExecutionActivityDay(
+                date=slots.day_of(index).isoformat(),
+                start=slots.start_of(index).astimezone(UTC),
+                end=slots.start_of(index + 1).astimezone(UTC),
+            )
         executions = self._history_repo.list_started_since(
-            project_id=project_id, chip_id=chip_id, since=since
+            project_id=project_id,
+            chip_id=chip_id,
+            since=slots.start_of(first).astimezone(UTC),
         )
         for execution in executions:
             if execution.start_at is None:
@@ -209,7 +273,7 @@ class ExecutionService:
             started = execution.start_at
             if started.tzinfo is None:
                 started = started.replace(tzinfo=UTC)
-            bucket = buckets.get(started.astimezone(zone).date())
+            bucket = buckets.get(slots.index_of(started))
             if bucket is None:
                 continue
             field = _ACTIVITY_BUCKET_BY_STATUS.get(execution.status, "other")
@@ -220,8 +284,9 @@ class ExecutionService:
             chip_id=chip_id,
             days=days,
             timezone=timezone,
-            since=first_day.isoformat(),
-            until=today.isoformat(),
+            granularity=granularity,
+            since=slots.day_of(first).isoformat(),
+            until=slots.day_of(last).isoformat(),
             buckets=list(buckets.values()),
         )
 

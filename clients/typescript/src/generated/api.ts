@@ -946,13 +946,16 @@ const listExecutions = (
     }
 
 /**
- * Count executions per calendar day, by status, over a trailing window.
+ * Count executions per bucket, by status, over a trailing window.
  *
  * With ``chip_id`` only that chip's executions count; without it, every execution in the
  * caller's current project counts. Executions of other projects are never included.
- * Every day of the window is returned, empty days included, so a chart can draw a
- * continuous axis. Days follow ``timezone`` so they match what the user sees.
- * @summary Count executions per day
+ * Every bucket of the window is returned, empty ones included, so a chart can draw a
+ * continuous axis. Buckets follow wall-clock time in ``timezone`` so they match what the
+ * user sees: one per calendar day ending today, or with ``granularity=6h`` four per day
+ * (local 00:00, 06:00, 12:00, 18:00) ending with the slot that contains the current time.
+ * Each bucket carries its ``start`` and exclusive ``end``.
+ * @summary Count executions per day or per 6-hour slot
  */
 const getExecutionActivity = (
     params?: GetExecutionActivityParams,

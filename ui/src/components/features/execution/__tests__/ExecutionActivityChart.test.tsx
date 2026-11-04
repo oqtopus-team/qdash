@@ -18,16 +18,47 @@ vi.mock("@/client/execution/execution", () => ({
 
 vi.mock("@/contexts/ThemeContext", () => ({ useIsDarkTheme: () => false }));
 
+const ZERO = { completed: 0, failed: 0, running: 0, scheduled: 0, cancelled: 0, other: 0 };
+
+function withCounts(counts: Partial<Record<string, number>>) {
+  const merged = { ...ZERO, ...counts };
+  return { ...merged, total: Object.values(merged).reduce((a, b) => a + b, 0) };
+}
+
+/** A Tokyo wall-clock time as the API renders bucket boundaries: UTC. */
+const tokyo = (local: string) => new Date(`${local}+09:00`).toISOString();
+
+/** A daily bucket in Tokyo: local midnight to the next local midnight. */
 function bucket(date: string, counts: Partial<Record<string, number>> = {}) {
-  const base = { completed: 0, failed: 0, running: 0, scheduled: 0, cancelled: 0, other: 0 };
-  const merged = { ...base, ...counts };
-  return { date, ...merged, total: Object.values(merged).reduce((a, b) => a + b, 0) };
+  const next = new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  return {
+    date,
+    start: tokyo(`${date}T00:00:00`),
+    end: tokyo(`${next}T00:00:00`),
+    ...withCounts(counts),
+  };
+}
+
+/** A 6-hour bucket in Tokyo starting at `hour` on `date`. */
+function slot(date: string, hour: number, counts: Partial<Record<string, number>> = {}) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const next =
+    hour === 18
+      ? `${new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10)}T00`
+      : `${date}T${pad(hour + 6)}`;
+  return {
+    date,
+    start: tokyo(`${date}T${pad(hour)}:00:00`),
+    end: tokyo(`${next}:00:00`),
+    ...withCounts(counts),
+  };
 }
 
 const activity = {
   chip_id: "64Q",
   days: 30,
   timezone: "Asia/Tokyo",
+  granularity: "day",
   since: "2026-10-26",
   until: "2026-11-01",
   buckets: [
@@ -70,6 +101,49 @@ function dayButton(date: string) {
   return button;
 }
 
+/** The column of the 6-hour bucket starting at a Tokyo wall-clock time, e.g. 2026-11-04T06:00. */
+function slotButton(local: string) {
+  const start = tokyo(`${local}:00`);
+  const button = dayButtons().find((item) => item.dataset.start === start);
+  if (!button) throw new Error(`No column starting ${start}`);
+  return button;
+}
+
+/** Date labels drawn under the columns. */
+function dateLabels() {
+  return Array.from(
+    screen
+      .getByRole("toolbar")
+      .parentElement!.querySelectorAll("[aria-hidden='true'] > span > span"),
+  ).map((label) => label.textContent);
+}
+
+/** Count guides on the y axis, bottom up. */
+function guides() {
+  return Array.from(
+    screen.getByTestId("activity-y-axis").querySelectorAll<HTMLElement>("[data-guide]"),
+  ).map((guide) => Number(guide.dataset.guide));
+}
+
+/** Seven days of 6-hour buckets ending with the 12:00 bucket of 2026-11-04 (28 buckets). */
+function sixHourActivity(counts: Record<string, Partial<Record<string, number>>> = {}) {
+  const buckets = [];
+  for (let index = 27; index >= 0; index -= 1) {
+    const at = Date.parse("2026-11-04T12:00:00Z") - index * 6 * 3_600_000;
+    const date = new Date(at).toISOString().slice(0, 10);
+    const hour = new Date(at).getUTCHours();
+    buckets.push(slot(date, hour, counts[`${date} ${hour}`] ?? {}));
+  }
+  return {
+    ...activity,
+    days: 7,
+    granularity: "6h",
+    since: buckets[0].date,
+    until: "2026-11-04",
+    buckets,
+  };
+}
+
 /** Status of each filled block bottom-up, with the executions it stands for. */
 function blocksOf(date: string) {
   return Array.from(dayButton(date).querySelectorAll<HTMLElement>("[data-status]")).map(
@@ -109,7 +183,9 @@ describe("ExecutionActivityChart", () => {
     expect(legend).toHaveTextContent("Failed 1");
     expect(legend).toHaveTextContent("Running 1");
     expect(legend).not.toHaveTextContent("Scheduled");
-    expect(mocks.lastParams).toMatchObject({ chip_id: "64Q", days: 30 });
+    expect(mocks.lastParams).toMatchObject({ chip_id: "64Q", days: 30, granularity: "day" });
+    expect(screen.getByRole("heading", { name: "Executions per day" })).toBeTruthy();
+    expect(guides()).toEqual([0, 5, 10]);
   });
 
   it("names each day with its date and per-status counts", () => {
@@ -135,7 +211,7 @@ describe("ExecutionActivityChart", () => {
     expect(tooltip).toHaveTextContent("Failed1");
   });
 
-  it("aggregates dense days into labeled blocks that keep exact partial counts", () => {
+  it("aggregates dense days into blocks whose filled height is exact", () => {
     mocks.activity = {
       ...activity,
       buckets: [
@@ -146,21 +222,38 @@ describe("ExecutionActivityChart", () => {
     };
     renderChart();
 
-    for (const button of dayButtons()) {
-      expect(button.querySelectorAll("[data-status]").length).toBeLessThanOrEqual(20);
-    }
     expect(screen.getByTestId("activity-scale")).toHaveTextContent(
-      "1 block = 10 executions, a lighter block holds fewer",
+      "1 block = 10 executions, a partly filled block holds fewer",
     );
+    for (const button of dayButtons()) {
+      expect(button.querySelectorAll("[data-block-executions]").length).toBeLessThanOrEqual(20);
+    }
     expect(representedCounts("2026-10-31")).toEqual({ completed: 37, failed: 3, cancelled: 1 });
     expect(representedCounts("2026-11-01")).toEqual({ completed: 120, running: 4 });
     expect(representedCounts("2026-10-30")).toEqual({ completed: 3 });
-    expect(blocksOf("2026-10-31").filter((block) => block.partial)).toEqual([
-      { status: "completed", executions: 7, partial: true },
-      { status: "failed", executions: 3, partial: true },
-      { status: "cancelled", executions: 1, partial: true },
+    // 41 executions fill 4 blocks and a tenth of a fifth: statuses share blocks rather than
+    // each rounding up, so the column is 4.1 blocks tall, not 6.
+    const blocks = Array.from(
+      dayButton("2026-10-31").querySelectorAll<HTMLElement>("[data-block-executions]"),
+    );
+    expect(blocks.map((block) => Number(block.dataset.blockExecutions))).toEqual([
+      10, 10, 10, 10, 1,
     ]);
-    // Accessible names keep the exact count rather than the rounded block count.
+    const segments = (block: HTMLElement) =>
+      Array.from(block.querySelectorAll<HTMLElement>("[data-status]")).map((segment) => [
+        segment.dataset.status,
+        Number(segment.dataset.executions),
+        segment.style.height,
+      ]);
+    expect(segments(blocks[3])).toEqual([
+      ["completed", 7, "70%"],
+      ["failed", 3, "30%"],
+    ]);
+    expect(segments(blocks[4])).toEqual([["cancelled", 1, "10%"]]);
+    // 124 executions need 12.4 blocks, so the grid grows to the next guide, 15 blocks.
+    expect(dayButton("2026-11-01").querySelectorAll("[data-block-executions]")).toHaveLength(13);
+    expect(guides()).toEqual([0, 50, 100, 150]);
+    // Accessible names keep the exact count rather than the block count.
     expect(dayButton("2026-10-31")).toHaveAccessibleName(
       "Sat, Oct 31, 2026: 41 executions, 37 completed, 3 failed, 1 cancelled",
     );
@@ -208,45 +301,118 @@ describe("ExecutionActivityChart", () => {
     mocks.activity = activity;
     const props = renderChart();
 
-    fireEvent.click(screen.getByRole("tab", { name: "180d" }));
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["7d", "30d", "90d"]);
+    fireEvent.click(screen.getByRole("tab", { name: "7d" }));
 
-    expect(props.onDaysChange).toHaveBeenCalledWith(180);
+    expect(props.onDaysChange).toHaveBeenCalledWith(7);
     expect(screen.getByRole("tab", { name: "30d" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("draws every day of the 180-day window with sparse date labels", () => {
+  it("draws every day of the 90-day window with sparse date labels", () => {
     const end = Date.UTC(2026, 10, 1);
-    const dates = Array.from({ length: 180 }, (_, index) =>
-      new Date(end - (179 - index) * 86_400_000).toISOString().slice(0, 10),
+    const dates = Array.from({ length: 90 }, (_, index) =>
+      new Date(end - (89 - index) * 86_400_000).toISOString().slice(0, 10),
     );
     mocks.activity = {
       ...activity,
-      days: 180,
+      days: 90,
       since: dates[0],
-      until: dates[179],
+      until: dates[89],
       buckets: dates.map((date, index) =>
-        bucket(date, index === 100 ? { completed: 230, failed: 4 } : { completed: index % 3 }),
+        bucket(date, index === 50 ? { completed: 230, failed: 4 } : { completed: index % 3 }),
       ),
     };
-    renderChart({ days: 180 });
+    renderChart({ days: 90 });
 
-    expect(mocks.lastParams).toMatchObject({ chip_id: "64Q", days: 180 });
-    expect(dates[0]).toBe("2026-05-06");
-    expect(dayButtons()).toHaveLength(180);
-    expect(screen.getByRole("tab", { name: "180d" })).toHaveAttribute("aria-selected", "true");
+    expect(mocks.lastParams).toMatchObject({ chip_id: "64Q", days: 90, granularity: "day" });
+    expect(dates[0]).toBe("2026-08-04");
+    expect(dayButtons()).toHaveLength(90);
+    expect(screen.getByRole("tab", { name: "90d" })).toHaveAttribute("aria-selected", "true");
     for (const button of dayButtons()) {
-      expect(button.querySelectorAll("[data-status]").length).toBeLessThanOrEqual(20);
+      expect(button.querySelectorAll("[data-block-executions]").length).toBeLessThanOrEqual(20);
     }
-    expect(representedCounts(dates[100])).toEqual({ completed: 230, failed: 4 });
-    // Every 15th day from the latest carries a date, so 180 columns show 12 labels.
-    const labels = Array.from(
-      screen
-        .getByRole("toolbar")
-        .parentElement!.querySelectorAll("[aria-hidden='true'] > span > span"),
-    ).map((label) => label.textContent);
-    expect(labels).toHaveLength(12);
+    expect(representedCounts(dates[50])).toEqual({ completed: 230, failed: 4 });
+    // Every 15th day from the latest carries a date, so 90 columns show 6 labels.
+    const labels = dateLabels();
+    expect(labels).toHaveLength(6);
     expect(labels[labels.length - 1]).toBe("Nov 1");
-    expect(labels[0]).toBe("May 20");
+    expect(labels[0]).toBe("Aug 18");
+  });
+
+  it("draws the 7-day window as 28 six-hour buckets labeled by day", () => {
+    mocks.activity = sixHourActivity({
+      "2026-11-04 6": { completed: 2, failed: 1 },
+      "2026-11-03 18": { running: 1 },
+    });
+    renderChart({ days: 7 });
+
+    expect(mocks.lastParams).toMatchObject({ chip_id: "64Q", days: 7, granularity: "6h" });
+    expect(screen.getByRole("heading", { name: "Executions per 6 hours" })).toBeTruthy();
+    expect(dayButtons()).toHaveLength(28);
+    // Empty buckets keep their columns, so the timeline stays continuous.
+    expect(dayButtons().filter((button) => button.querySelector("[data-status]"))).toHaveLength(2);
+    expect(dayButtons()[0].dataset.start).toBe(tokyo("2026-10-28T18:00:00"));
+    expect(dayButtons()[27].dataset.start).toBe(tokyo("2026-11-04T12:00:00"));
+    // A date marks each day's first bucket; the oldest bucket starts at 18:00, so it has none.
+    expect(dateLabels()).toEqual([
+      "Oct 29",
+      "Oct 30",
+      "Oct 31",
+      "Nov 1",
+      "Nov 2",
+      "Nov 3",
+      "Nov 4",
+    ]);
+    expect(slotButton("2026-11-04T06:00")).toHaveAccessibleName(
+      "Wed, Nov 4, 2026, 06:00–12:00: 3 executions, 2 completed, 1 failed",
+    );
+    expect(slotButton("2026-11-03T18:00")).toHaveAccessibleName(
+      "Tue, Nov 3, 2026, 18:00–24:00: 1 execution, 1 running",
+    );
+    expect(screen.getByText(/4 in the last 7 days, 1 failed, 1 in progress/)).toBeTruthy();
+    expect(guides()).toEqual([0, 5, 10]);
+  });
+
+  it("says a 6-hour bucket shows its whole day, and selects that day", async () => {
+    mocks.activity = sixHourActivity({ "2026-11-04 6": { completed: 2 } });
+    const props = renderChart({ days: 7 });
+
+    fireEvent.focus(slotButton("2026-11-04T06:00"));
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("Wed, Nov 4, 2026, 06:00–12:00");
+    expect(tooltip).toHaveTextContent("Select to show all of Nov 4 in the list");
+    expect(
+      screen.getByText("Select a 6-hour bucket to show all executions of its day in the list."),
+    ).toBeTruthy();
+
+    fireEvent.click(slotButton("2026-11-04T06:00"));
+    expect(props.onDateSelect).toHaveBeenCalledWith("20261104");
+
+    cleanup();
+    const again = renderChart({ days: 7, selectedDate: "20261104" });
+    const pressed = dayButtons().filter((button) => button.getAttribute("aria-pressed") === "true");
+    expect(pressed.map((button) => button.dataset.start)).toEqual([
+      tokyo("2026-11-04T00:00:00"),
+      tokyo("2026-11-04T06:00:00"),
+      tokyo("2026-11-04T12:00:00"),
+    ]);
+    expect(screen.getByText(/Showing Wed, Nov 4, 2026 in the list/)).toBeTruthy();
+    // Any bucket of the selected day clears the day filter.
+    fireEvent.click(slotButton("2026-11-04T12:00"));
+    expect(again.onDateSelect).toHaveBeenCalledWith("latest");
+  });
+
+  it("moves between 6-hour buckets with arrow keys from a single tab stop", () => {
+    mocks.activity = sixHourActivity({ "2026-11-03 12": { completed: 1 } });
+    renderChart({ days: 7, selectedDate: "20261103" });
+
+    const tabbable = dayButtons().filter((button) => button.tabIndex === 0);
+    expect(tabbable.map((button) => button.dataset.start)).toEqual([tokyo("2026-11-03T00:00:00")]);
+    tabbable[0].focus();
+    fireEvent.keyDown(tabbable[0], { key: "ArrowLeft" });
+    expect(slotButton("2026-11-02T18:00")).toHaveFocus();
+    fireEvent.keyDown(slotButton("2026-11-02T18:00"), { key: "End" });
+    expect(slotButton("2026-11-04T12:00")).toHaveFocus();
   });
 
   it("shows a skeleton while loading", () => {

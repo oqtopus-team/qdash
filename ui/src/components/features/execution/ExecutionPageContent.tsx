@@ -19,7 +19,11 @@ import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { DEFAULT_TIMEZONE, formatDateTime } from "@/lib/utils/datetime";
 
-import { type ActivityWindow, ExecutionActivityChart } from "./ExecutionActivityChart";
+import {
+  type ActivityWindow,
+  DEFAULT_ACTIVITY_WINDOW,
+  ExecutionActivityChart,
+} from "./ExecutionActivityChart";
 
 import type { ExecutionResponseSummary } from "@/schemas";
 
@@ -127,7 +131,7 @@ export function ExecutionPageContent() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [activityDays, setActivityDays] = useState<ActivityWindow>(90);
+  const [activityDays, setActivityDays] = useState<ActivityWindow>(DEFAULT_ACTIVITY_WINDOW);
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const executionCards = useRef(new Map<string, HTMLDivElement>());
