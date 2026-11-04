@@ -273,6 +273,118 @@ class TestExecutionActivity:
         assert response.status_code == 400
         assert "Unknown time zone" in response.json()["detail"]
 
+    def test_without_chip_id_counts_every_chip_in_the_project_only(
+        self, test_client, test_project, auth_headers
+    ) -> None:
+        zone = ZoneInfo("Asia/Tokyo")
+        today = datetime.now(tz=zone).replace(hour=12, minute=0, second=0, microsecond=0)
+        _seed_execution(execution_id="a-1", status="completed", start_at=today, chip_id="chip-1")
+        _seed_execution(execution_id="b-1", status="failed", start_at=today, chip_id="chip-2")
+        _seed_execution(
+            execution_id="b-2", status="running", start_at=today - timedelta(days=2), chip_id="c3"
+        )
+        _seed_execution(execution_id="old", status="completed", start_at=today - timedelta(days=9))
+        _seed_execution(
+            execution_id="other-project", status="completed", start_at=today, project_id="p2"
+        )
+        _seed_execution(execution_id="unstarted", status="scheduled", start_at=None)
+
+        response = test_client.get(
+            "/executions/activity",
+            params={"days": 7, "timezone": "Asia/Tokyo"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["chip_id"] is None
+        assert body["days"] == 7
+        assert body["timezone"] == "Asia/Tokyo"
+        assert len(body["buckets"]) == 7
+        assert body["until"] == today.date().isoformat()
+        last = body["buckets"][-1]
+        assert (last["completed"], last["failed"], last["total"]) == (1, 1, 2)
+        assert body["buckets"][-3]["running"] == 1
+        assert sum(bucket["total"] for bucket in body["buckets"]) == 3
+
+    def test_chip_id_still_limits_the_counts_to_that_chip(
+        self, test_client, test_project, auth_headers
+    ) -> None:
+        now = datetime.now(tz=timezone.utc)
+        _seed_execution(execution_id="a-1", status="completed", start_at=now, chip_id="chip-1")
+        _seed_execution(execution_id="b-1", status="failed", start_at=now, chip_id="chip-2")
+
+        body = test_client.get(
+            "/executions/activity", params={"chip_id": "chip-2"}, headers=auth_headers
+        ).json()
+
+        assert body["chip_id"] == "chip-2"
+        assert body["days"] == 30
+        assert body["timezone"] == "UTC"
+        assert sum(bucket["total"] for bucket in body["buckets"]) == 1
+        assert sum(bucket["failed"] for bucket in body["buckets"]) == 1
+
+    def test_project_wide_counts_follow_the_callers_project_header(
+        self, test_client, test_project, auth_headers
+    ) -> None:
+        """A member of two projects sees only the project named in X-Project-Id."""
+        owner = UserDocument.find_one({"username": "test_user"}).run()
+        assert owner is not None
+        ProjectDocument(
+            project_id="p2",
+            name="Second Project",
+            owner_user_id=owner.user_id,
+            owner_username="test_user",
+        ).insert()
+        now = datetime.now(tz=timezone.utc)
+        _seed_execution(execution_id="t-1", status="completed", start_at=now)
+        _seed_execution(execution_id="p2-1", status="failed", start_at=now, project_id="p2")
+        _seed_execution(execution_id="p2-2", status="failed", start_at=now, project_id="p2")
+
+        body = test_client.get(
+            "/executions/activity", headers={**auth_headers, "X-Project-Id": "p2"}
+        ).json()
+
+        assert sum(bucket["total"] for bucket in body["buckets"]) == 2
+        assert sum(bucket["failed"] for bucket in body["buckets"]) == 2
+
+    def test_viewer_can_read_project_wide_counts(
+        self, test_client, test_project, viewer_user, viewer_headers
+    ) -> None:
+        _seed_execution(
+            execution_id="t-1", status="completed", start_at=datetime.now(tz=timezone.utc)
+        )
+
+        response = test_client.get("/executions/activity", headers=viewer_headers)
+
+        assert response.status_code == 200
+        assert sum(bucket["total"] for bucket in response.json()["buckets"]) == 1
+
+    def test_non_member_cannot_read_another_projects_counts(
+        self, test_client, test_project, init_db
+    ) -> None:
+        UserDocument(
+            username="outsider",
+            hashed_password="hashed",
+            access_token="outsider_token",
+            system_info=SystemInfoModel(),
+        ).insert()
+        _seed_execution(
+            execution_id="t-1", status="completed", start_at=datetime.now(tz=timezone.utc)
+        )
+
+        response = test_client.get(
+            "/executions/activity",
+            headers={"Authorization": "Bearer outsider_token", "X-Project-Id": "test_project"},
+        )
+
+        assert response.status_code == 403
+
+    def test_requires_authentication(self, test_client, test_project) -> None:
+        response = test_client.get("/executions/activity", headers={"X-Project-Id": "test_project"})
+
+        assert response.status_code in (401, 403)
+
 
 def test_get_execution_lock_status_includes_latest_execution(
     test_client: TestClient,

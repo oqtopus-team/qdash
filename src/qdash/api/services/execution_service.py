@@ -178,13 +178,14 @@ class ExecutionService:
     def get_execution_activity(
         self,
         project_id: str,
-        chip_id: str,
+        chip_id: str | None,
         days: int = 30,
         timezone: str = "UTC",
     ) -> ExecutionActivityResponse:
         """Count executions per calendar day over the trailing ``days`` days.
 
-        Days are bucketed in ``timezone`` so the chart matches the dates the user sees;
+        Counts one chip's executions, or every chip's in the project when ``chip_id`` is
+        ``None``. Days are bucketed in ``timezone`` so the chart matches the dates the user sees;
         every day of the window is present, empty days with zero counts. Only executions
         with a start time are counted, since the day is taken from it.
         """

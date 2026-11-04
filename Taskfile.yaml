@@ -405,18 +405,20 @@ tasks:
     cmds:
       - trufflehog git file://. --fail --exclude-paths=.trufflehog-exclude-paths.txt
 
+  check-betterleaks-version:
+    desc: Verify betterleaks matches BETTERLEAKS_VERSION in .devcontainer/Dockerfile
+    cmds:
+      - bash scripts/check_betterleaks_version.sh
+
   scan-leaks:
     desc: Run Betterleaks scan over git history (full repository)
     cmds:
+      - task: check-betterleaks-version
       - |
-        if command -v betterleaks >/dev/null 2>&1; then
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0=safe.directory \
-            GIT_CONFIG_VALUE_0="$PWD" \
-            betterleaks git "$(git rev-parse --absolute-git-dir)" --config .betterleaks.toml --verbose
-        else
-          echo "betterleaks not installed; skipping leak scan"
-        fi
+        GIT_CONFIG_COUNT=1 \
+          GIT_CONFIG_KEY_0=safe.directory \
+          GIT_CONFIG_VALUE_0="$PWD" \
+          betterleaks git "$(git rev-parse --absolute-git-dir)" --config .betterleaks.toml --verbose
 
   scan-leaks-staged:
     desc: Run Betterleaks on staged files only (same as pre-commit)
@@ -437,6 +439,8 @@ tasks:
   check:
     desc: Run all checks locally (lint, typecheck, test, UI, audit)
     cmds:
+      # Fail fast on the wrong scanner before the slower checks run.
+      - task: check-betterleaks-version
       - task: lint
       - task: ci-lint
       - task: ci-typecheck

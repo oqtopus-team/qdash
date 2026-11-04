@@ -63,11 +63,30 @@ helpers over handwritten string keys.
 `ui/src/lib/api/base-url.ts` fixes browser API requests to the same-origin `/api` path;
 `NEXT_PUBLIC_API_URL` is not used. Caddy routes this prefix directly to FastAPI in the standard
 deployment. When the UI server is opened directly for development, the Next.js rewrite uses
-`INTERNAL_API_URL`. The shared Axios instance in `ui/src/lib/api/custom-instance.ts` adds the bearer
-token and active project header, and its returned promise exposes cancellation for TanStack Query.
+`INTERNAL_API_URL`. The interceptor of the shared Axios instance in
+`ui/src/lib/api/custom-instance.ts` adds the bearer token and, unless the request already sets
+`X-Project-Id`, the active project header. Its returned promise exposes cancellation for TanStack
+Query.
 
-Feature code does not add those headers itself. A missing project or authorization error must be
+Feature code does not add the bearer token. A missing project or authorization error must be
 handled as an application state, not bypassed with another Axios instance.
+
+A query whose parameters do not identify the project, such as project-wide activity, returns
+different data for each project under the same generated key. Switching projects invalidates
+every query before the old project's components unmount, so that refetch reads the new project
+from storage. For such a query, add `projectId` from `useProject()` to the query key, set
+`enabled: Boolean(projectId)`, and pin the header to that key's project:
+
+```tsx
+const { projectId } = useProject();
+useGetExecutionActivity(params, {
+  query: {
+    queryKey: [...getGetExecutionActivityQueryKey(params), projectId],
+    enabled: Boolean(projectId),
+  },
+  request: projectId ? { headers: { "X-Project-Id": projectId } } : undefined,
+});
+```
 
 ## Add Feature Composition
 

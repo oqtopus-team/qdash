@@ -284,26 +284,12 @@ Compose deployment rather than the host-side development stack.
 
 ## Secret Scanning Tools
 
-DevContainer users are automatically set up with Betterleaks, Trufflehog, and Lefthook. For local development outside the DevContainer, install the tools manually:
+The DevContainer and the [Nix host shell](#nix-host-shell) provide Betterleaks, Trufflehog, and Lefthook. Both pin Betterleaks to `BETTERLEAKS_VERSION` in `.devcontainer/Dockerfile`, and every leak scan rejects any other release; see [scanner version](./conventions/credential-scan.md#scanner-version). A Betterleaks installed by Homebrew or from the latest GitHub release is usually newer and fails that check, so on the host run checks and commits through `nix develop`.
 
-**macOS:**
-
-```shell
-brew install betterleaks trufflehog lefthook
-```
-
-**Linux:**
-
-Download binaries from GitHub Releases:
-
-- [Betterleaks Releases](https://github.com/betterleaks/betterleaks/releases)
-- [Trufflehog Releases](https://github.com/trufflesecurity/trufflehog/releases)
-- [Lefthook Releases](https://github.com/evilmartians/lefthook/releases)
-
-After installing the tools, enable the git hooks:
+Enable the git hooks from the Nix shell or the DevContainer:
 
 ```shell
 lefthook install
 ```
 
-> The pre-commit hook requires Betterleaks. Install it before enabling Lefthook; otherwise commits fail closed instead of bypassing the staged leak scan.
+> The pre-commit hook requires the pinned Betterleaks release. Commit from the Nix shell (`nix develop -c git commit`) or the DevContainer; with a missing or different release, commits fail closed instead of bypassing the staged leak scan.

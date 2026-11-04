@@ -19,8 +19,9 @@ AXIOS_INSTANCE.interceptors.request.use((config) => {
     }
     if (config.headers instanceof AxiosHeaders) {
       config.headers.set("Authorization", `Bearer ${token}`);
+      // A request pinned to a project keeps it; others follow the currently selected project.
       const projectId = getProjectId();
-      if (projectId) {
+      if (projectId && !config.headers.has("X-Project-Id")) {
         config.headers.set("X-Project-Id", projectId);
       }
     }

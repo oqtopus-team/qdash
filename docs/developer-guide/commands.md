@@ -52,6 +52,7 @@ task check-docs-links    # documentation build, links, and anchors
 ## Secrets
 
 ```bash
+task check-betterleaks-version
 task scan-leaks
 task scan-leaks-staged
 task scan-secrets

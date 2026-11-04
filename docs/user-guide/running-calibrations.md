@@ -75,9 +75,11 @@ finished and which one is being measured, and the running task shows its measure
 Cancelling a run sends a cancellation request to the worker. A task that is inside an operation
 that cannot be interrupted can take time to stop.
 
-**Executions per day** at the top of the page counts the chip's runs for the last 7, 30 or 90
-days, stacked by status. Select a bar to limit the list below to that day; select it again to
-return to the latest runs.
+**Executions per day** at the top of the page counts the chip's runs for the last 30, 90 or 180
+days as blocks stacked by status; it opens on 90 days. Each block represents one execution. For busy periods,
+the chart labels how many executions a full block represents; lighter blocks contain fewer.
+Hover over or focus a day to see its exact counts. Select a day to limit the list below to
+that day; select it again to return to the latest runs.
 
 ## Inspect a Result
 

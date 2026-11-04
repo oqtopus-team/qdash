@@ -6,12 +6,14 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ExecutionActivityDay } from './executionActivityDay';
+import type { ExecutionActivityResponseChipId } from './executionActivityResponseChipId';
 
 /**
- * Daily execution counts for a chip over a trailing window of days.
+ * Daily execution counts for a chip, or a whole project, over a trailing window of days.
  */
 export interface ExecutionActivityResponse {
-  chip_id: string;
+  /** Chip the counts are for, or null when every chip in the project counts */
+  chip_id: ExecutionActivityResponseChipId;
   /** Length of the window in calendar days */
   days: number;
   /** IANA time zone the days are bucketed in */
