@@ -14,7 +14,6 @@ import {
   investigationKey,
   investigationPrompt,
   investigationTitle,
-  sameInvestigation,
 } from "@/lib/copilotInvestigation";
 
 /**
@@ -73,7 +72,7 @@ const ChatDockCtx = createContext<ChatDockValue | null>(null);
 export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const {
     activeSession,
-    sessions,
+    findInvestigationSession,
     findSessionByContext,
     switchSession,
     createNewSession,
@@ -168,17 +167,12 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   // Investigations started in this tab, by failure. Written in the click handler
   // itself, so a double click resumes the session the first click created.
   const investigations = useRef<Map<string, string>>(new Map());
-  const sessionsRef = useRef(sessions);
-  sessionsRef.current = sessions;
 
   const investigate = useCallback(
     (target: InvestigationTarget, surface: InvestigationSurface = "sidebar") => {
       const key = investigationKey(target);
       const known = investigations.current.get(key);
-      const resumed =
-        known && hasSession(known)
-          ? known
-          : sessionsRef.current?.find((s) => sameInvestigation(s.investigation, target))?.id;
+      const resumed = known && hasSession(known) ? known : findInvestigationSession(target)?.id;
       if (resumed) {
         investigations.current.set(key, resumed);
         switchSession(resumed);
@@ -198,7 +192,14 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
         setIsOpen(true);
       }
     },
-    [createNewSession, currentPage, hasSession, sendMessage, switchSession],
+    [
+      createNewSession,
+      currentPage,
+      findInvestigationSession,
+      hasSession,
+      sendMessage,
+      switchSession,
+    ],
   );
 
   const value = useMemo(

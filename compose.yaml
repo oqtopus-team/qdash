@@ -198,8 +198,6 @@ services:
       # Read-only source the Copilot searches when it investigates a failure
       - ./src/qdash:/app/source/qdash:ro
       - ${CALIBTASKS_PATH:-./src/qdash/workflow/calibtasks}:/app/source/qdash/workflow/calibtasks:ro
-    environment:
-      QDASH_SOURCE_ROOT: /app/source/qdash
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
     develop:
@@ -220,6 +218,7 @@ services:
         condition: service_completed_successfully
     environment:
       - PYTHONPATH=/app:/app/qdash:/app/qdash/api:/app/qdash/dbmodel:/app/qdash/datamodel:/app/qdash
+      - QDASH_SOURCE_ROOT=/app/source/qdash
       - CALIB_DATA_PATH=/app/calib_data
       - PREFECT_API_URL=http://prefect-server:4200/api
       - DEPLOYMENT_SERVICE_URL=http://deployment-service:8001
