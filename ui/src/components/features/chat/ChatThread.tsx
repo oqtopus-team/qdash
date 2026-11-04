@@ -4,7 +4,6 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { useGetCopilotPreferences } from "@/client/copilot/copilot";
 import { ArrowDown, FlaskConical } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
-import { useAuth } from "@/contexts/AuthContext";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
 import { useCopilotChat } from "@/hooks/useCopilotChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
@@ -30,7 +29,7 @@ type ChatThreadVariant = "page" | "panel" | "compact";
 export function ContextChip({ context }: { context: TaskChatContext }) {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium max-w-full"
+      className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium max-w-full"
       title={`${context.taskName} · ${context.qid} · ${context.chipId}`}
     >
       <FlaskConical className="w-3 h-3 shrink-0" />
@@ -56,13 +55,6 @@ function ScrollToBottomButton() {
   );
 }
 
-function greetingFor(hour: number): string {
-  if (hour < 5) return "Working late";
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
-
 function EmptyState({
   variant,
   context,
@@ -74,13 +66,11 @@ function EmptyState({
   suggestions: ChatSuggestion[];
   onPick: (text: string) => void;
 }) {
-  const { user, username } = useAuth();
   const large = variant === "page";
-  const name = user?.display_name || username;
   const title = context
     ? "Ask about this result"
     : large
-      ? `${greetingFor(new Date().getHours())}${name ? `, ${name}` : ""}`
+      ? "Ask about calibration data"
       : "Ask anything about calibration";
 
   if (large) {
@@ -92,7 +82,7 @@ function EmptyState({
             <ContextChip context={context} />
           </div>
         )}
-        <h2 className="text-2xl sm:text-[28px] font-medium tracking-tight">{title}</h2>
+        <h2 className="text-xl font-medium tracking-tight">{title}</h2>
       </div>
     );
   }
@@ -104,7 +94,7 @@ function EmptyState({
           <ContextChip context={context} />
         </div>
       )}
-      <h2 className="text-sm font-semibold mb-1">{title}</h2>
+      <h2 className="text-sm font-medium mb-1">{title}</h2>
       <p className="text-xs text-base-content/50 mb-4">
         {context
           ? "The result figures are attached to your first question."
@@ -145,7 +135,7 @@ function SuggestionPills({
           className="chat-suggestion-pill group"
         >
           <Icon className="w-3.5 h-3.5 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
-          <span className="text-[13px] leading-snug">{text}</span>
+          <span className="text-xs leading-snug">{text}</span>
         </button>
       ))}
     </div>
@@ -243,7 +233,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       onStop={stop}
       isStreaming={isStreaming}
       disabled={isLoadingMessages}
-      placeholder={context ? "Ask about this result..." : "Ask about calibration data..."}
+      placeholder={context ? "Ask about this result" : "Ask a question"}
       attachments={attachments}
       onAttach={attach}
       onRemoveAttachment={remove}
@@ -348,7 +338,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
           <div className={variant === "page" ? "max-w-3xl mx-auto" : ""}>
             {composer}
             {variant === "page" && (
-              <p className="text-[11px] text-base-content/35 text-center mt-2">
+              <p className="text-xs text-base-content/35 text-center mt-2">
                 AI can make mistakes. Verify important calibration values.
               </p>
             )}

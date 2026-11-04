@@ -25,12 +25,12 @@ export function AppearanceSettingsPanel() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className="card bg-base-200 shadow-lg" key="appearance">
+    <div className="card bg-base-200 shadow-sm" key="appearance">
       <div className="card-body">
-        <h2 className="card-title text-xl mb-4">Theme Settings</h2>
+        <h2 className="card-title mb-4">Theme Settings</h2>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
-            <label className="text-sm font-medium">Select Theme</label>
+            <label className="text-xs font-medium text-base-content/60">Select Theme</label>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {AVAILABLE_THEMES.map((themeName) => (
                 <button
@@ -45,7 +45,7 @@ export function AppearanceSettingsPanel() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <h3 className="text-sm font-medium">Color Palette</h3>
+            <h3 className="text-xs font-medium text-base-content/60">Color Palette</h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {paletteItems.map(([label, swatchClass]) => (
                 <div key={label} className="flex items-center gap-2 rounded-lg bg-base-100 p-2">
@@ -56,7 +56,7 @@ export function AppearanceSettingsPanel() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <h3 className="text-sm font-medium">Preview Components</h3>
+              <h3 className="text-xs font-medium text-base-content/60">Preview Components</h3>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <button className="btn btn-primary btn-sm w-full">Primary</button>
                 <button className="btn btn-secondary btn-sm w-full">Secondary</button>

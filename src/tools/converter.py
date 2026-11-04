@@ -65,7 +65,7 @@ class QubitProperties(BaseModel):
 
     resonator_frequency: float | None = None
     qubit_frequency: float | None = None
-    anharmonicity: float | None = None
+    qubit_anharmonicity: float | None = None
     external_loss_rate: float | None = None
     internal_loss_rate: float | None = None
     t1: float | None = None  # in ns
@@ -97,6 +97,11 @@ def _process_qubit_data(qubit_data: dict) -> QubitProperties:
     qubit_props = QubitProperties()
     if not qubit_data:
         return qubit_props
+    anharmonicity_data = qubit_data.get("qubit_anharmonicity")
+    if anharmonicity_data is None:
+        anharmonicity_data = qubit_data.get("anharmonicity")
+    if anharmonicity_data is not None:
+        qubit_props.qubit_anharmonicity = anharmonicity_data.get("value")
     for key, value in qubit_data.items():
         v = value.get("value")
         if key == "qubit_frequency":
@@ -230,7 +235,7 @@ def write_yaml(data: CommentedMap | ChipProperties, filename: str = "chip_proper
         sections = [
             "resonator_frequency",
             "qubit_frequency",
-            "anharmonicity",
+            "qubit_anharmonicity",
             "external_loss_rate",
             "internal_loss_rate",
             "t1",

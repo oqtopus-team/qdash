@@ -87,7 +87,7 @@ def test_run_requires_ef_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     measure = MagicMock()
     monkeypatch.setattr(qubex.contrib, "measure_thermal_excitation", measure)
 
-    with pytest.raises(ValueError, match="Run ConfigureEF"):
+    with pytest.raises(ValueError, match="EF-capable configuration_mode"):
         task.run(cast("Any", SimpleNamespace(get_instance=lambda: exp)), "0")
 
     measure.assert_not_called()

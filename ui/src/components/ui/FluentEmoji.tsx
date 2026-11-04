@@ -199,7 +199,7 @@ export function FluentEmoji({ name, size = 24, className = "", alt }: FluentEmoj
       alt={alt || name}
       width={size}
       height={size}
-      className={"inline-block " + className}
+      className={"inline-block" + className}
       onError={() => setHasImageError(true)}
       unoptimized
     />

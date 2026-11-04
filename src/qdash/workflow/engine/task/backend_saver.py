@@ -26,6 +26,28 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def resolve_publish_targets(
+    task: TaskProtocol,
+    output_parameters: Mapping[str, Any],
+) -> dict[str, tuple[str, ...]]:
+    """Map each measured output to the calibration parameter names it publishes.
+
+    An output without a ``publish_targets`` declaration publishes under its own
+    name. The same expansion feeds the calibration database write, the in-memory
+    ``calib_data``, and the backend params YAML update, so every consumer sees
+    the published names rather than the raw output names.
+    """
+    output_spec = getattr(task.__class__, "output_spec", {})
+    publish_targets: dict[str, tuple[str, ...]] = {}
+    for output_name in output_parameters:
+        declaration = output_spec.get(output_name) if isinstance(output_spec, Mapping) else None
+        declared_targets = (
+            declaration.publish_targets if isinstance(declaration, OutputParameterSpec) else ()
+        )
+        publish_targets[output_name] = declared_targets or (output_name,)
+    return publish_targets
+
+
 class BackendSaver:
     """Handles backend-specific persistence for calibration task results.
 
@@ -91,11 +113,10 @@ class BackendSaver:
         success : bool
             Whether backend updates should be applied
         """
-        if task.backend == "qubex":
-            self._save_qubex(task, execution_service, qid, backend, success)
-        elif task.backend == "fake":
-            # Simulation metadata save (implement as needed)
-            pass
+        if task.backend in ("qubex", "fake"):
+            # Fake tasks run on a QUBEX-compatible simulator and persist their outputs the
+            # same way, so the qubex tasks routed to the fake backend find their inputs.
+            self._save_calibration(task, execution_service, qid, backend, success)
 
     def save_mux_qid(
         self,
@@ -151,7 +172,7 @@ class BackendSaver:
             task_model, output_parameters, publish_targets, previous_data
         )
 
-    def _save_qubex(
+    def _save_calibration(
         self,
         task: TaskProtocol,
         execution_service: ExecutionService,
@@ -159,7 +180,7 @@ class BackendSaver:
         backend: BaseBackend,
         success: bool,
     ) -> None:
-        """Qubex-specific save processing.
+        """Persist outputs to the calibration database and the backend parameter store.
 
         Parameters
         ----------
@@ -268,21 +289,14 @@ class BackendSaver:
     ) -> tuple[dict[str, Any], dict[str, tuple[str, ...]]]:
         """Expand measured outputs into their declared calibration publish targets."""
         persisted_parameters: dict[str, Any] = {}
-        publish_targets: dict[str, tuple[str, ...]] = {}
-        output_spec = getattr(task.__class__, "output_spec", {})
+        publish_targets = resolve_publish_targets(task, output_parameters)
 
         for output_name, parameter in output_parameters.items():
-            declaration = output_spec.get(output_name) if isinstance(output_spec, Mapping) else None
-            declared_targets = (
-                declaration.publish_targets if isinstance(declaration, OutputParameterSpec) else ()
-            )
-            targets = declared_targets or (output_name,)
-            publish_targets[output_name] = targets
-
+            targets = publish_targets[output_name]
             for target in targets:
                 if target in persisted_parameters:
                     raise ValueError(f"Multiple outputs publish to '{target}' in {task.get_name()}")
-                if not declared_targets and target == output_name:
+                if targets == (output_name,):
                     persisted_parameters[target] = parameter
                     continue
                 if hasattr(parameter, "model_dump"):

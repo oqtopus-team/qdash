@@ -45,6 +45,7 @@ import type {
   FlowTemplateWithCode,
   GetFlowResponse,
   ListChipsResponse,
+  ExecutionActivityResponse,
   ListExecutionsResponse,
   ListTaskKnowledgeResponse,
   ListTaskResponse,
@@ -336,8 +337,9 @@ export class QDashClient {
     return this.get(`/flows/${pathPart(name)}`);
   }
 
-  async listFlowTemplates(): Promise<FlowTemplate[]> {
-    return this.get("/flows/templates");
+  /** List flow templates, optionally only those written for one backend (e.g. "fake"). */
+  async listFlowTemplates(backend?: string): Promise<FlowTemplate[]> {
+    return this.get("/flows/templates", query({ backend }));
   }
 
   async getFlowTemplate(templateId: string): Promise<FlowTemplateWithCode> {
@@ -352,11 +354,27 @@ export class QDashClient {
     return this.post(`/flows/${pathPart(name)}/execute`, { parameters });
   }
 
+  /** Count a chip's executions per calendar day over the trailing window. */
+  async getExecutionActivity(options: {
+    chipId: string;
+    days?: number;
+    timezone?: string;
+  }): Promise<ExecutionActivityResponse> {
+    return this.get(
+      "/executions/activity",
+      query({ chip_id: options.chipId, days: options.days, timezone: options.timezone }),
+    );
+  }
+
   async listExecutions(options: {
     flowName?: string;
     status?: string;
     skip?: number;
     limit?: number;
+    /** Only executions started on this calendar day, YYYYMMDD. */
+    date?: string;
+    /** IANA time zone that defines the day for `date`. */
+    timezone?: string;
   } = {}): Promise<ListExecutionsResponse> {
     return this.get(
       "/executions",
@@ -365,6 +383,8 @@ export class QDashClient {
         status: options.status,
         skip: options.skip,
         limit: options.limit,
+        date: options.date,
+        timezone: options.timezone,
       }),
     );
   }

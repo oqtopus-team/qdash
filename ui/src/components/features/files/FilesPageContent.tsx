@@ -45,6 +45,7 @@ import {
   gitStatusEntries,
 } from "./WorkspaceChangesView";
 import { useGitWorkspace } from "./useGitWorkspace";
+import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -394,7 +395,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                     role="tab"
                     aria-selected={!showChanges}
                     onClick={() => setShowChanges(false)}
-                    className={`flex flex-1 items-center justify-center gap-1 px-2 py-2 text-xs font-semibold tracking-wider ${showChanges ? "text-base-content/50 hover:text-base-content" : "border-b-2 border-primary text-base-content"}`}
+                    className={`flex flex-1 items-center justify-center gap-1 px-2 py-2 text-xs font-medium ${showChanges ? "text-base-content/50 hover:text-base-content" : "border-b-2 border-primary text-base-content"}`}
                   >
                     <FolderTree size={14} />
                     EXPLORER
@@ -404,7 +405,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                     role="tab"
                     aria-selected={showChanges}
                     onClick={() => setShowChanges(true)}
-                    className={`flex flex-1 items-center justify-center gap-1 px-2 py-2 text-xs font-semibold tracking-wider ${showChanges ? "border-b-2 border-primary text-base-content" : "text-base-content/50 hover:text-base-content"}`}
+                    className={`flex flex-1 items-center justify-center gap-1 px-2 py-2 text-xs font-medium ${showChanges ? "border-b-2 border-primary text-base-content" : "text-base-content/50 hover:text-base-content"}`}
                     title="All saved changes against the last commit"
                   >
                     <FileDiff size={14} />
@@ -438,7 +439,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                   </ul>
                 ) : (
                   <>
-                    <div className="text-xs text-base-content/50 px-3 pt-2 mb-1 uppercase tracking-wide">
+                    <div className="text-xs text-base-content/50 px-3 pt-2 mb-1">
                       {workspace.title}
                     </div>
                     {fileTreeData && (
@@ -519,9 +520,11 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                           theme="vs-dark"
                           value={fileContent}
                           onChange={handleContentChange}
+                          onMount={(_editor, monaco) => remeasureMonacoFontsWhenLoaded(monaco)}
                           options={{
                             minimap: { enabled: false },
                             fontSize: 14,
+                            fontFamily: monoFontFamily,
                             lineNumbers: "on",
                             automaticLayout: true,
                             scrollBeyondLastLine: false,
@@ -545,6 +548,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                     value={fileContent}
                     onChange={handleContentChange}
                     onMount={(editor, monaco) => {
+                      remeasureMonacoFontsWhenLoaded(monaco);
                       editor.onDidChangeCursorPosition((e) => {
                         setCursorPosition({
                           line: e.position.lineNumber,
@@ -561,6 +565,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                     options={{
                       minimap: { enabled: true },
                       fontSize: 14,
+                      fontFamily: monoFontFamily,
                       lineNumbers: "on",
                       automaticLayout: true,
                       scrollBeyondLastLine: false,
@@ -579,7 +584,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
             ) : (
               <div className="flex items-center justify-center h-full text-base-content/50">
                 <div className="text-center">
-                  <p className="text-lg mb-2">No file selected</p>
+                  <p className="text-sm mb-2">No file selected</p>
                   <p className="text-sm">Select a file from the tree to edit</p>
                 </div>
               </div>

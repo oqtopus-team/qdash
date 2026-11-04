@@ -22,6 +22,8 @@ import { getDaisySelectStyles, getDaisySelectStylesSm } from "@/lib/react-select
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { ParameterVersionResponse } from "@/schemas/parameterVersionResponse";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
+import { chartTheme } from "@/lib/chartTheme";
 
 interface ParameterOption {
   value: string;
@@ -54,6 +56,8 @@ export function ParameterHistoryPanel({
   onParameterChange,
   onQidChange,
 }: ParameterHistoryPanelProps) {
+  const isDark = useIsDarkTheme();
+  const palette = chartTheme(isDark);
   // Use controlled state from URL when callbacks are provided
   const [localParameter, setLocalParameter] = useState(initialParameter);
   const [prevInitialParameter, setPrevInitialParameter] = useState(initialParameter);
@@ -312,7 +316,7 @@ export function ParameterHistoryPanel({
       mode: "lines+markers" as const,
       name: `${data?.parameter_name} (${data?.qid})`,
       marker: { size: 7, symbol: "circle" },
-      line: { width: 2, color: "#1f77b4" },
+      line: { width: 2, color: palette.accent },
       yaxis: "y",
     });
 
@@ -336,12 +340,13 @@ export function ParameterHistoryPanel({
         mode: "lines+markers" as const,
         name: `${compareLabel} (${compareData?.qid})`,
         marker: { size: 7, symbol: "diamond" },
-        line: { width: 2, dash: "dash", color: "#e377c2" },
+        line: { width: 2, dash: "dash", color: palette.secondary },
         yaxis: "y2",
       });
     }
     return traces;
   }, [
+    palette,
     showChart,
     chartVersions,
     compareChartVersions,
@@ -358,7 +363,6 @@ export function ParameterHistoryPanel({
         title: "Time",
         type: "date",
         tickformat: "%Y-%m-%d %H:%M",
-        gridcolor: "#eee",
         zeroline: false,
         domain: showDual ? [0, 0.92] : [0, 1],
       },
@@ -367,11 +371,10 @@ export function ParameterHistoryPanel({
           ? `${data.parameter_name}${data.versions[0]?.unit ? ` [${data.versions[0].unit}]` : ""}`
           : "",
         type: "linear",
-        gridcolor: "#eee",
         zeroline: false,
         exponentformat: "e",
-        titlefont: { color: "#1f77b4" },
-        tickfont: { color: "#1f77b4" },
+        titlefont: { color: palette.accent },
+        tickfont: { color: palette.accent },
       },
       showlegend: showDual,
       legend: {
@@ -379,12 +382,9 @@ export function ParameterHistoryPanel({
         y: 1,
         xanchor: "left",
         yanchor: "top",
-        bgcolor: "rgba(255, 255, 255, 0.8)",
       },
       autosize: true,
       margin: { l: 80, r: showDual ? 180 : 40, t: 30, b: 60 },
-      plot_bgcolor: "transparent",
-      paper_bgcolor: "transparent",
       hovermode: "closest",
     };
 
@@ -394,16 +394,15 @@ export function ParameterHistoryPanel({
         type: "linear",
         overlaying: "y",
         side: "right",
-        gridcolor: "rgba(227, 119, 194, 0.2)",
         zeroline: false,
         exponentformat: "e",
-        titlefont: { color: "#e377c2" },
-        tickfont: { color: "#e377c2" },
+        titlefont: { color: palette.secondary },
+        tickfont: { color: palette.secondary },
       };
     }
 
     return layout;
-  }, [data, compareData, compareLabel, isComparing, compareChartVersions.length]);
+  }, [palette, data, compareData, compareLabel, isComparing, compareChartVersions.length]);
 
   // Version diff computation
   const diffVersions = useMemo(() => {
@@ -431,11 +430,11 @@ export function ParameterHistoryPanel({
       {/* Search Form */}
       <div className="card bg-base-200">
         <div className="card-body p-4 sm:p-6">
-          <h3 className="card-title text-base sm:text-lg">Search Parameter History</h3>
+          <h3 className="card-title">Search Parameter History</h3>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="form-control flex-1">
               <label className="label py-1">
-                <span className="label-text text-xs sm:text-sm">Parameter Name</span>
+                <span className="label-text text-sm">Parameter Name</span>
               </label>
               <Select<ParameterOption, false, GroupBase<ParameterOption>>
                 options={parameterOptions}
@@ -450,7 +449,7 @@ export function ParameterHistoryPanel({
             </div>
             <div className="form-control flex-1">
               <label className="label py-1">
-                <span className="label-text text-xs sm:text-sm">Qubit ID</span>
+                <span className="label-text text-sm">Qubit ID</span>
               </label>
               <input
                 type="text"
@@ -482,7 +481,7 @@ export function ParameterHistoryPanel({
           <div className="card-body p-4 sm:p-6">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              <h3 className="card-title text-sm sm:text-base">Compare with another parameter</h3>
+              <h3 className="card-title">Compare with another parameter</h3>
             </div>
             {isComparing && compareData ? (
               <div className="flex items-center gap-2 flex-wrap">
@@ -550,7 +549,7 @@ export function ParameterHistoryPanel({
         <div className="card bg-base-200">
           <div className="card-body p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-              <h3 className="card-title text-base sm:text-lg">
+              <h3 className="card-title">
                 {data.parameter_name} ({data.qid})
               </h3>
               <span className="badge badge-primary badge-sm sm:badge-md">
@@ -609,17 +608,17 @@ export function ParameterHistoryPanel({
                       {showCompareColumns && (
                         <>
                           <th className="border-l border-base-300">
-                            <span className="text-xs" style={{ color: "#e377c2" }}>
+                            <span className="text-xs" style={{ color: palette.secondary }}>
                               {compareLabel}
                             </span>
                           </th>
                           <th className="hidden md:table-cell">
-                            <span className="text-xs" style={{ color: "#e377c2" }}>
+                            <span className="text-xs" style={{ color: palette.secondary }}>
                               Error
                             </span>
                           </th>
                           <th className="hidden sm:table-cell">
-                            <span className="text-xs" style={{ color: "#e377c2" }}>
+                            <span className="text-xs" style={{ color: palette.secondary }}>
                               Trend
                             </span>
                           </th>
@@ -652,9 +651,7 @@ export function ParameterHistoryPanel({
                           <td>
                             <span className="badge badge-outline badge-sm">v{version.version}</span>
                           </td>
-                          <td className="font-mono text-xs sm:text-sm">
-                            {formatValue(version.value)}
-                          </td>
+                          <td className="font-mono text-sm">{formatValue(version.value)}</td>
                           <td className="hidden sm:table-cell">{version.unit || "-"}</td>
                           <td className="font-mono text-xs hidden md:table-cell">
                             {version.error ? `±${version.error.toExponential(2)}` : "-"}
@@ -675,14 +672,14 @@ export function ParameterHistoryPanel({
                               return (
                                 <>
                                   <td
-                                    className="font-mono text-xs sm:text-sm border-l border-base-300"
-                                    style={{ color: "#e377c2" }}
+                                    className="font-mono text-sm border-l border-base-300"
+                                    style={{ color: palette.secondary }}
                                   >
                                     {matched ? formatValue(matched.value) : "-"}
                                   </td>
                                   <td
                                     className="font-mono text-xs hidden md:table-cell"
-                                    style={{ color: "#e377c2" }}
+                                    style={{ color: palette.secondary }}
                                   >
                                     {matched?.error ? `±${matched.error.toExponential(2)}` : "-"}
                                   </td>
@@ -702,7 +699,7 @@ export function ParameterHistoryPanel({
                           <td className="hidden lg:table-cell">
                             <span className="text-sm">{version.task_name || "-"}</span>
                           </td>
-                          <td className="text-xs sm:text-sm hidden md:table-cell">
+                          <td className="text-sm hidden md:table-cell">
                             {formatDate(version.valid_from)}
                           </td>
                           <td className="hidden lg:table-cell">
@@ -735,9 +732,7 @@ export function ParameterHistoryPanel({
       {!isSearching && !data && (
         <div className="text-center py-12 text-base-content/50">
           <Search className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm sm:text-base">
-            Select a parameter and enter a qubit ID to view version history
-          </p>
+          <p className="text-sm">Select a parameter and enter a qubit ID to view version history</p>
         </div>
       )}
     </div>
@@ -771,7 +766,7 @@ function DiffCard({
   return (
     <div className="bg-base-300/50 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="font-semibold text-sm flex items-center gap-2">
+        <h4 className="font-medium text-sm flex items-center gap-2">
           Version Diff
           <span className="badge badge-outline badge-sm">
             v{older.version} → v{newer.version}
@@ -829,7 +824,7 @@ function DiffCard({
         <div className="flex items-center gap-3 text-sm">
           <span className="text-base-content/60">Delta:</span>
           <span
-            className={`font-mono font-semibold ${delta > 0 ? "text-success" : delta < 0 ? "text-error" : "text-base-content/50"}`}
+            className={`font-mono font-medium ${delta > 0 ? "text-success" : delta < 0 ? "text-error" : "text-base-content/50"}`}
           >
             {delta > 0 ? "+" : ""}
             {delta.toExponential(4)}
@@ -850,7 +845,7 @@ function DiffCard({
 
       {/* Figure Comparison */}
       <div className="space-y-2">
-        <h4 className="font-semibold text-sm flex items-center gap-2">
+        <h4 className="font-medium text-sm flex items-center gap-2">
           <Image className="h-4 w-4" />
           Figures
         </h4>

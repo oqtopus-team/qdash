@@ -96,7 +96,7 @@ function FlowSavePreview({ args }: { args: Record<string, unknown> }) {
       data-testid="flow-save-preview"
     >
       <div className="text-xs">
-        Flow <span className="font-mono font-semibold">{name ?? "?"}</span>
+        Flow <span className="font-mono font-medium">{name ?? "?"}</span>
         {chipId ? (
           <>
             {" "}
@@ -117,7 +117,7 @@ function FlowSavePreview({ args }: { args: Record<string, unknown> }) {
           {code}
         </CodeBlock>
       </div>
-      <p className="text-[11px] text-base-content/50">
+      <p className="text-xs text-base-content/50">
         QDash checks the @flow function, formats the file, and registers the deployment. A flow of
         the same name is replaced. Saving does not run it.
       </p>
@@ -128,7 +128,7 @@ function FlowSavePreview({ args }: { args: Record<string, unknown> }) {
 function ArgValue({ value }: { value: unknown }) {
   if (value !== null && typeof value === "object") {
     return (
-      <pre className="text-[11px] leading-relaxed font-mono whitespace-pre-wrap break-all bg-base-200/70 rounded-md px-2 py-1 m-0">
+      <pre className="text-xs leading-relaxed font-mono whitespace-pre-wrap break-all bg-base-200/70 rounded-md px-2 py-1 m-0">
         {JSON.stringify(value, null, 2)}
       </pre>
     );
@@ -167,7 +167,7 @@ export function ApprovalCard({
       <div className="flex items-start gap-2">
         <ShieldCheck className="w-4 h-4 mt-0.5 text-warning shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold leading-snug">{approval.label}</p>
+          <p className="text-sm font-medium leading-snug">{approval.label}</p>
           <p className="text-xs text-base-content/55 mt-0.5">
             This changes QDash. It runs only if you approve, with exactly these arguments.
           </p>
@@ -197,7 +197,7 @@ export function ApprovalCard({
           ))}
         </dl>
       )}
-      <p className="mt-2 text-[11px] font-mono text-base-content/35">{approval.tool}</p>
+      <p className="mt-2 text-xs font-mono text-base-content/35">{approval.tool}</p>
 
       <div className="mt-3 flex items-center gap-2">
         {decided ? (
@@ -273,7 +273,7 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
       <div className="flex items-start gap-2">
         <FileDiff className="w-4 h-4 mt-0.5 text-primary shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold leading-snug">
+          <p className="text-sm font-medium leading-snug">
             Proposed change to <span className="font-mono">{edit.flowName}</span>
           </p>
           <p className="text-xs text-base-content/70 mt-0.5">{edit.summary}</p>
@@ -293,15 +293,15 @@ export function EditProposalCard({ edit, state }: { edit: EditProposal; state: I
         )}
       </div>
       {unchanged && (
-        <p className="mt-2 text-[11px] text-base-content/50">The editor already holds this code.</p>
+        <p className="mt-2 text-xs text-base-content/50">The editor already holds this code.</p>
       )}
       {changed && outcome === null && (
-        <p className="mt-2 text-[11px] text-warning" role="status">
+        <p className="mt-2 text-xs text-warning" role="status">
           The editor changed since this diff was made. Review the updated diff, then apply.
         </p>
       )}
       {(!state.applyCode || current === null) && (
-        <p className="mt-2 text-[11px] text-base-content/50">
+        <p className="mt-2 text-xs text-base-content/50">
           Open this flow in the Workflow editor on the same chip to apply the change there.
         </p>
       )}

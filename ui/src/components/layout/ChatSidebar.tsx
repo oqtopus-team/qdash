@@ -123,14 +123,11 @@ export function ChatSidebar() {
       {!isOpen && (
         <button
           onClick={openGeneralChat}
-          className="fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1.5 bg-primary text-primary-content px-1.5 py-3 rounded-l-xl shadow-lg hover:px-2 transition-all duration-200"
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1.5 rounded-l-lg border border-r-0 border-base-300 bg-base-100 px-1.5 py-3 text-base-content/70 shadow-sm transition-colors hover:text-base-content"
           title="Ask AI"
         >
           <Bot className="w-5 h-5" />
-          <span
-            className="text-[10px] font-semibold select-none"
-            style={{ writingMode: "vertical-rl" }}
-          >
+          <span className="text-xs font-medium select-none" style={{ writingMode: "vertical-rl" }}>
             Ask AI
           </span>
         </button>

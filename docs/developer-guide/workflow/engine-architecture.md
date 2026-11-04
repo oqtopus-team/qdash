@@ -72,7 +72,9 @@ QDash keeps execution state and task state separate.
   data. `ExecutionService` persists state changes through `ExecutionRepository` and uses
   optimistic locking for concurrent note updates.
 - `TaskStateManager` is the source of truth for per-target task status, parameters, messages,
-  figures, and raw-data paths.
+  figures, and raw-data paths. Task results keep the raw output names; its in-memory `calib_data`
+  is keyed by the published parameter names declared through `publish_targets`, so it mirrors the
+  calibration database and the finish-time params YAML selection sees the same names.
 - `TaskHistoryRecorder` writes task-result history and optional provenance records.
 - `BackendSaver` decides which validated outputs update the backend and accepted calibration
   state. `persist_output_parameters=False` records the task without promoting its outputs.
@@ -151,6 +153,28 @@ engine.
 Implement `BaseBackend`, add construction logic to `engine/backend/factory.py`, and provide tests
 for connection lifecycle and the task operations it supports. Avoid branching on backend names in
 the orchestrator or executor.
+
+### Keep the fake backend in step with qubex
+
+The fake backend runs the qubex task classes against `FakeExperiment`
+(`engine/backend/fake_qubex/simulation.py`), a QUBEX-compatible simulator. Its task set is the
+`fake` section of `config/app/backend.yaml`: `calibtasks/fake/__init__.py` routes every listed
+name that the fake package does not implement to the qubex class of the same name, and
+`scripts/generate_task_catalog.py` publishes the qubex declarations under the fake backend. The
+only fake-only task is `FakeBringUp`, which seeds a fresh project with the simulator's device
+parameters in place of the hardware bring-up tasks. `BackendSaver` persists fake outputs through
+the same path as qubex outputs, so a routed task finds what the task before it published.
+
+To add a qubex task to the fake backend, list it in `backend.yaml` and run the fake template; a
+gap in the simulator shows up as an `AttributeError` on `FakeExperiment`, which is fixed in
+`simulation.py`, never by a fake copy of the task. Keep the fix at the measurement level: the
+simulator answers `sweep_parameter`, `repeat_sequence` and the coherence experiments with
+physically shaped IQ data, and qubex's own analysis and figures (for example the chevron matched
+transform in `qubex.contrib`) run on top of it unchanged. An emulator-side re-implementation of a
+qubex analysis is drift waiting to happen and is removed when found. `tests/qdash/workflow/calibtasks/
+test_fake_backend_sync.py` fails when the list names a task qubex no longer has, when a fake
+class shadows a qubex task, or when the template's default chain can no longer resolve a
+required input from the tasks before it.
 
 ### Add persistence behavior
 

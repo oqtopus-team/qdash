@@ -384,7 +384,7 @@ export function AdminPageContent() {
 
   return (
     <PageContainer>
-      <PageHeader title="Admin" description="Manage access, projects, and this deployment" />
+      <PageHeader title="Admin" description="Users, projects and deployment settings" />
 
       {bulkFeedback && (
         <div
@@ -1315,13 +1315,13 @@ function AssignUsersToProjectModal({
                 <div className="stats stats-vertical sm:stats-horizontal w-full bg-base-200">
                   <div className="stat py-2 px-3">
                     <div className="stat-title text-xs">Will add</div>
-                    <div className="stat-value text-primary text-2xl">
+                    <div className="stat-value">
                       {selectedProjectMembersLoading ? "-" : assignableUsers.length}
                     </div>
                   </div>
                   <div className="stat py-2 px-3">
                     <div className="stat-title text-xs">Already member</div>
-                    <div className="stat-value text-2xl">
+                    <div className="stat-value">
                       {selectedProjectMembersLoading ? "-" : alreadyAssignedUsers.length}
                     </div>
                   </div>

@@ -220,13 +220,13 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
 
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <h1 className="text-2xl sm:text-3xl font-bold break-all">{execution.name}</h1>
+            <h1 className="text-xl font-medium break-all">{execution.name}</h1>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
               {isCancellable && (
                 <button
                   onClick={() => setShowCancelConfirm(true)}
                   disabled={cancelMutation.isPending}
-                  className="bg-error text-error-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base disabled:opacity-50"
+                  className="bg-error text-error-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm disabled:opacity-50"
                 >
                   <StopCircle className="mr-2" size={16} />
                   {cancelMutation.isPending ? "Cancelling..." : "Cancel Execution"}
@@ -272,7 +272,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
         </div>
 
         <div className="bg-base-100 rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4">Execution Flow</h2>
+          <h2 className="text-sm font-medium mb-4">Execution Flow</h2>
           <ExecutionDAG tasks={validTasks} />
         </div>
 
@@ -282,7 +282,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           Object.keys(execution.note).length > 0 && (
             <div className="bg-base-100 rounded-lg shadow-md p-6">
               <details className="collapse collapse-arrow border border-base-300">
-                <summary className="collapse-title text-lg font-semibold">Execution Note</summary>
+                <summary className="collapse-title text-sm font-medium">Execution Note</summary>
                 <div className="collapse-content">
                   <div className="pt-4 space-y-4">
                     <div className="flex justify-end">
@@ -327,7 +327,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
             }`}
           >
             <div>
-              <h2 className="text-lg sm:text-xl font-bold">Task Topology</h2>
+              <h2 className="text-sm font-medium">Task Topology</h2>
               <p className="mt-1 text-xs text-base-content/60">
                 {filteredTasks.length} {topologyMode === "2q" ? "coupling" : "one-qubit"} tasks
                 shown on the chip layout
@@ -363,7 +363,7 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
           >
             <div className="form-control flex-1 min-w-0">
               <label className="label py-1">
-                <span className="label-text text-xs font-semibold">Task Name</span>
+                <span className="label-text text-xs font-medium">Task Name</span>
               </label>
               <Select<FilterOption, false>
                 className="text-sm"

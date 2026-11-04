@@ -96,6 +96,8 @@ class CalibOrchestrator:
 
         # Task execution state
         self._last_executed_task_id_by_qid: dict[str, str] = {}
+        self._published_names_by_task: dict[tuple[str, str, str], set[str]] = {}
+        self._published_name_owner: dict[tuple[str, str, str], tuple[str, str, str]] = {}
 
     @property
     def execution_service(self) -> ExecutionService:
@@ -753,6 +755,8 @@ class CalibOrchestrator:
             self.task_context.state.calib_data.coupling.update(executed_context.calib_data.coupling)
         # Track task_id for upstream dependency
         executed_task = executed_context.get_task(task_name=task_name, task_type=task_type, qid=qid)
+        if update_calibration_parameters and executed_task.status.value == "completed":
+            self._reconcile_published_parameters(executed_context, task_name, task_type, qid)
         self._last_executed_task_id_by_qid[qid] = executed_task.task_id
 
         # Extract and return output parameters
@@ -782,6 +786,8 @@ class CalibOrchestrator:
             executed_task = executed_context.get_task(
                 task_name=task_name, task_type=task_type, qid=qid
             )
+            if update_calibration_parameters and executed_task.status.value == "completed":
+                self._reconcile_published_parameters(executed_context, task_name, task_type, qid)
             self._last_executed_task_id_by_qid[qid] = executed_task.task_id
             result = executed_context.state.get_output_parameter_by_task_name(
                 task_name, task_type=task_type, qid=qid
@@ -800,6 +806,31 @@ class CalibOrchestrator:
             results[qid] = dict(result)
 
         return results
+
+    def _reconcile_published_parameters(
+        self, executed_context: TaskContext, task_name: str, task_type: str, qid: str
+    ) -> None:
+        """Remove aliases dropped by a rerun if the same task still owns them."""
+        published_names = executed_context.state.get_published_parameter_names(
+            task_name, task_type, qid
+        )
+        if task_type not in (TaskTypes.QUBIT, TaskTypes.COUPLING):
+            return
+        task_key = (task_name, task_type, qid)
+        previous_names = self._published_names_by_task.get(task_key, set())
+        calib_data = [self.task_context.state.calib_data]
+        if self._execution_service is not None:
+            calib_data.append(self._execution_service.calib_data)
+        for name in previous_names - published_names:
+            owner_key = (task_type, qid, name)
+            if self._published_name_owner.get(owner_key) == task_key:
+                for current in calib_data:
+                    data = current.qubit if task_type == TaskTypes.QUBIT else current.coupling
+                    data.get(qid, {}).pop(name, None)
+                del self._published_name_owner[owner_key]
+        for name in published_names:
+            self._published_name_owner[(task_type, qid, name)] = task_key
+        self._published_names_by_task[task_key] = published_names
 
     def _ensure_task_in_workflow(self, task_name: str, task_type: str, qid: str) -> None:
         """Ensure task exists in TaskContext's workflow structure."""

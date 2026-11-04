@@ -22,9 +22,9 @@ def test_qubit_spectroscopy_publishes_coarse_frequency_as_operational_seed() -> 
     assert publish_targets == ("coarse_qubit_frequency", "control_frequency")
 
 
-def test_qubit_spectroscopy_does_not_declare_anharmonicity_output() -> None:
+def test_qubit_spectroscopy_does_not_declare_qubit_anharmonicity_output() -> None:
     """Keep spectroscopy-derived anharmonicity out of calibration state."""
-    assert "anharmonicity" not in CheckQubitSpectroscopy.output_spec
+    assert {"qubit_anharmonicity", "anharmonicity"}.isdisjoint(CheckQubitSpectroscopy.output_spec)
 
 
 def test_check_qubit_spectroscopy_outputs_uplifted_coarse_control_amplitude_and_marks_it(
@@ -59,7 +59,7 @@ def test_check_qubit_spectroscopy_outputs_uplifted_coarse_control_amplitude_and_
     )
 
     assert result.output_parameters["coarse_qubit_frequency"].value == 4.321
-    assert "anharmonicity" not in result.output_parameters
+    assert {"qubit_anharmonicity", "anharmonicity"}.isdisjoint(result.output_parameters)
     assert result.output_parameters["f01_repr_db"].value == -20.0
     assert result.output_parameters["coarse_control_amplitude"].value == pytest.approx(
         10 ** (-10 / 20)

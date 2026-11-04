@@ -36,7 +36,10 @@ function AnalyzePageContent() {
     <PageContainer maxWidth>
       <div className="space-y-4 sm:space-y-8">
         {/* Header Section */}
-        <PageHeader title="Chip Analysis" description="Analyze and visualize chip parameters" />
+        <PageHeader
+          title="Analysis"
+          description="Time series, histograms, CDFs and correlations of chip parameters"
+        />
 
         {/* View Selection Tabs */}
         <div className="tabs tabs-boxed w-full sm:w-fit gap-1 sm:gap-2 p-1 sm:p-2 overflow-x-auto flex-nowrap">

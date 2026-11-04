@@ -18,6 +18,13 @@ services:
     command: start-container
     volumes:
       - .:/workspace/qdash
+      # Share sibling checkouts with the host, regardless of how they were cloned.
+      # Override QDASH_SHARED_REPOS_DIR to use a different host directory.
+      - type: bind
+        source: ${QDASH_SHARED_REPOS_DIR:-..}
+        target: /workspace/repos
+        bind:
+          create_host_path: false
       - type: volume
         source: devcontainer-venv
         target: /workspace/qdash/.venv

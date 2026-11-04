@@ -16,6 +16,7 @@ from qdash.client import (
     ChipResponse,
     CouplingResponse,
     ExecuteFlowResponse,
+    ExecutionActivityResponse,
     FileTreeNode,
     FlowTemplate,
     FlowTemplateWithCode,
@@ -810,6 +811,7 @@ def test_task_file_and_flow_read_helpers_return_models() -> None:
         "name": "Rabi",
         "description": "Run Rabi calibration",
         "category": "calibration",
+        "backend": "qubex",
         "filename": "rabi.py",
         "function_name": "rabi",
     }
@@ -833,7 +835,26 @@ def test_task_file_and_flow_read_helpers_return_models() -> None:
                 return httpx.Response(200, json={"path": "flows/demo.py", "content": "pass"})
             case "/task-results/task-1/issues":
                 return httpx.Response(200, json=[issue_payload])
+            case "/executions/activity":
+                assert request.url.params.get("chip_id") == "chip-1"
+                assert request.url.params.get("timezone") == "Asia/Tokyo"
+                return httpx.Response(
+                    200,
+                    json={
+                        "chip_id": "chip-1",
+                        "days": 2,
+                        "timezone": "Asia/Tokyo",
+                        "since": "2026-11-01",
+                        "until": "2026-11-02",
+                        "buckets": [
+                            {"date": "2026-11-01", "completed": 2, "failed": 1, "total": 3},
+                            {"date": "2026-11-02", "total": 0},
+                        ],
+                    },
+                )
             case "/flows/templates":
+                if request.url.params.get("backend") in {"fake", ""}:
+                    return httpx.Response(200, json=[])
                 return httpx.Response(200, json=[flow_template_payload])
             case "/flows/templates/rabi":
                 return httpx.Response(
@@ -888,7 +909,14 @@ def test_task_file_and_flow_read_helpers_return_models() -> None:
     try:
         assert client.get_file_content("flows/demo.py")["content"] == "pass"
         assert client.list_task_result_issues("task-1")[0].id == "issue-1"
+        activity = client.get_execution_activity(chip_id="chip-1", days=2, timezone="Asia/Tokyo")
+        assert isinstance(activity, ExecutionActivityResponse)
+        assert activity.buckets[0].failed == 1 and activity.buckets[1].total == 0
         assert isinstance(client.list_flow_templates()[0], FlowTemplate)
+        assert client.list_flow_templates()[0].backend == "qubex"
+        assert client.list_flow_templates(backend="fake") == []
+        # An explicit empty backend is sent as-is and matches nothing, like the API.
+        assert client.list_flow_templates(backend="") == []
         assert isinstance(client.get_flow_template("rabi"), FlowTemplateWithCode)
         assert client.list_flow_helper_files() == ["common.py"]
         assert client.get_flow_helper_file("common.py") == "def helper(): pass"

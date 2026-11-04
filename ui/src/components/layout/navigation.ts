@@ -10,7 +10,6 @@ import {
   Files,
   Gauge,
   House,
-  Inbox,
   LayoutDashboard,
   ListTodo,
   MessagesSquare,
@@ -27,7 +26,6 @@ export type NavItem = {
   title?: string;
   icon: LucideIcon;
   match?: "exact" | "prefix";
-  badge?: number;
   visible?: boolean;
 };
 
@@ -39,14 +37,9 @@ export type NavSection = {
 interface NavigationOptions {
   canEdit: boolean;
   isAdmin: boolean;
-  unreadNotifications?: number;
 }
 
-export function getNavigationSections({
-  canEdit,
-  isAdmin,
-  unreadNotifications = 0,
-}: NavigationOptions): NavSection[] {
+export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): NavSection[] {
   return [
     {
       label: "Overview",
@@ -90,12 +83,6 @@ export function getNavigationSections({
     {
       label: "Collaborate",
       items: [
-        {
-          href: "/inbox",
-          label: "Inbox",
-          icon: Inbox,
-          badge: unreadNotifications,
-        },
         {
           href: "/forum",
           label: "Forum",

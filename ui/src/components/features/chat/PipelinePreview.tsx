@@ -160,7 +160,7 @@ export function PipelinePreview({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="mt-2 inline-flex items-center gap-1 text-[11px] text-base-content/55 hover:text-base-content"
+        className="mt-2 inline-flex items-center gap-1 text-xs text-base-content/55 hover:text-base-content"
         aria-expanded={open}
       >
         {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}

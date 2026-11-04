@@ -109,7 +109,7 @@ function RunCard({
               )}
               {runIsActive(run) && <span className="badge badge-info">running</span>}
             </div>
-            <div className="truncate text-sm font-semibold text-base-content">{run.task_name}</div>
+            <div className="truncate text-sm font-medium text-base-content">{run.task_name}</div>
             <div className="mt-1 flex flex-wrap gap-2 text-xs text-base-content/60">
               <span>{run.chip_id}</span>
               {run.date && <span>{run.date}</span>}
@@ -260,7 +260,7 @@ export function EvaluationRunsPageContent() {
     <PageContainer maxWidth>
       <PageHeader
         title="AI Evaluations"
-        description="Runs of the calibration evaluation model over task results. Open a run to read each evaluation, see what the model saw, and record whether you agree. Pick two runs to compare them entity by entity."
+        description="Runs of the evaluation model over task results, with your agreement recorded per evaluation"
         actions={
           <span className="badge badge-neutral gap-1">
             <strong>{runs.length}</strong> runs

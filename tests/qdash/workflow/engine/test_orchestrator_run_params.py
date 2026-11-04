@@ -22,7 +22,7 @@ from qdash.workflow.engine.task_parameters import (
 if TYPE_CHECKING:
     from qdash.workflow.engine.task.context import TaskContext
 
-# FakeCheckRabi registers as "CheckRabi" with backend "fake"
+# The fake backend routes "CheckRabi" to the qubex implementation
 TASK_NAME = "CheckRabi"
 # CheckRabi also declares calibration inputs.
 INPUT_TASK_NAME = "CheckRabi"

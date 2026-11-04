@@ -55,11 +55,13 @@ permission. See [Running Calibrations](./running-calibrations.md) for the end-to
 
 | Page | Purpose | Guide |
 | --- | --- | --- |
-| **Inbox** | Review mentions, replies, and system notifications. | [Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) |
 | **Forum** | Hold project-wide discussions that are not tied to one result. | [Reviewing and Sharing Results](./reviewing-results.md#start-a-discussion) |
 | **Knowledge** | Maintain task background and expert-labeled examples. | [Reviewing and Sharing Results](./reviewing-results.md#reuse-the-finding) |
 
-See [Reviewing and Sharing Results](./reviewing-results.md) for how these records relate.
+Mentions and replies arrive at the bell in the top bar, which shows the unread count. Select the
+bell to preview the newest notifications, or **View all** to open **Inbox**. See
+[Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) for the notification
+flow and the same page for how these records relate.
 
 ## Manage
 
@@ -78,6 +80,7 @@ them.
 
 ## External Tools
 
-The bottom of the sidebar links to this documentation, the Prefect dashboard, and the interactive
-API documentation. Prefect and API documentation links are available to project editors. Use the
-QDash UI or API for workflow changes so QDash project metadata remains synchronized with Prefect.
+The bottom of the sidebar links to this documentation and, for project editors, to the Prefect
+dashboard. Use the QDash UI or API for workflow changes so QDash project metadata remains
+synchronized with Prefect. The interactive API documentation is not linked from the sidebar; it is
+served at the API's `/docs` path, listed in [Setup](./setup.md#verify-the-installation).
