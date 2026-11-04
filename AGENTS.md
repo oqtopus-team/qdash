@@ -1,6 +1,6 @@
 # QDash Agent Guide
 
-This file is the Codex-facing project guide. Keep it concise and update it when repository-wide conventions change. The older `CLAUDE.md` is retained as a Claude Code reference, but Codex should use this file first.
+This file is the shared guide for coding agents working in this repository. It covers project-wide conventions only; keep it concise and update it when those conventions change. Package directories may add their own `AGENTS.md` with package-specific rules.
 
 ## Project Overview
 
@@ -137,3 +137,5 @@ regardless of change size, including documentation-only changes.
 - If changing UI behavior, add or adjust Vitest tests where practical and run the relevant UI checks.
 - If changing workflow or repository behavior, run the matching Python tests.
 - Mention any verification that could not be run and why.
+- Keep personal model, provider, editor, and delegation preferences in user-level agent
+  configuration, not in repository guidance.
