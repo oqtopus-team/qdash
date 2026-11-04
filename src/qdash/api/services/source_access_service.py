@@ -266,13 +266,24 @@ class SourceAccessService:
 
         A traceback from the workflow worker names files such as
         ``/app/qdash/workflow/engine/x.py`` or
-        ``/app/.venv/lib/python3.11/site-packages/qubex/y.py``. Under
-        ``site-packages`` the package is the segment that follows it. Elsewhere
-        the QDash root wins over dependencies, because QDash's own tree has
+        ``/app/.venv/lib/python3.11/site-packages/qubex/y.py``.
+        Configured directory matches take precedence, with the most specific
+        root winning when roots overlap. Under ``site-packages`` the package
+        is the segment that follows it. Elsewhere the QDash root wins over dependencies, because QDash's own tree has
         directories named after them (``workflow/calibtasks/qubex/``); within a
         root, the last segment with its name is used.
         """
-        parts = PurePosixPath(path.strip().replace("\\", "/")).parts
+        candidate = PurePosixPath(path.strip().replace("\\", "/"))
+        # A real checkout path is more precise than package-name heuristics.
+        for configured_root in sorted(
+            self.roots, key=lambda root: len(root.path.parts), reverse=True
+        ):
+            directory = PurePosixPath(configured_root.path.as_posix())
+            if candidate.is_relative_to(directory):
+                relative = candidate.relative_to(directory)
+                if relative.parts:
+                    return configured_root, relative.as_posix()
+        parts = candidate.parts
         by_name = {root.name: root for root in self.roots}
         installed = [i for i, part in enumerate(parts) if part in INSTALL_DIRS]
         if installed:

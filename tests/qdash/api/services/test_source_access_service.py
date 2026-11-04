@@ -170,3 +170,29 @@ def test_search_cannot_read_excluded_targets_through_aliases(roots):
     assert service.search("SECRET_FLOW", path_prefix="alias.py")[0] == []
     matches, _ = service.search("bad readout")
     assert [match.path for match in matches] == ["workflow/engine/runner.py"]
+
+
+def test_editable_dependency_beneath_qdash_uses_its_configured_root(tmp_path):
+    """Prefer the most specific configured directory over package-name segments."""
+    checkout = tmp_path / "qdash"
+    dependency = checkout / "vendor" / "qubex" / "qubex"
+    dependency.mkdir(parents=True)
+    source = dependency / "measurement.py"
+    source.write_text("class Measurement: pass\n")
+    service = SourceAccessService(
+        (
+            SourceRoot(name="qdash", path=checkout, kind="qdash"),
+            SourceRoot(name="qubex", path=dependency, kind="dependency"),
+        )
+    )
+    result = service.read(None, str(source))
+    assert (result.root, result.path) == ("qubex", "measurement.py")
+    assert "class Measurement" in result.content
+
+
+def test_configured_traceback_paths_still_enforce_exclusions(roots):
+    """An exact root match must still reject private files and escaping links."""
+    service = SourceAccessService(roots)
+    for relative in ("workflow/user_flows/alice/flow.py", "escape.py"):
+        with pytest.raises(SourceAccessError):
+            service.read(None, str(roots[0].path / relative))

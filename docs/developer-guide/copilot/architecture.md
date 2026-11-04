@@ -133,9 +133,11 @@ refused. Only text source suffixes (`.py`, `.toml`, `.yaml`, `.md`, and similar)
 search is literal, capped at 200 matches and 20,000 files; a read returns at most 400 lines of a
 file under 1 MB. The routes require a signed-in user; source is the same for every project.
 
-`SourceAccessService.locate` maps a traceback path when `qdash_read_source` gets no root. Under
-`site-packages` or `dist-packages`, the next segment names the package, and a package that is not
-a root is not mapped. Elsewhere the `qdash` root is tried before dependencies, using its last
+`SourceAccessService.locate` maps a traceback path when `qdash_read_source` gets no root.
+It first matches configured root directories, preferring the most specific directory when roots
+overlap. This preserves editable dependency checkouts nested beneath a QDash checkout.
+For other paths under `site-packages` or `dist-packages`, the next segment names the package;
+a package that is not a root is not mapped. Elsewhere the `qdash` root is tried before dependencies, using its last
 segment in the path: `/app/qdash/workflow/calibtasks/qubex/base.py` is
 `qdash:workflow/calibtasks/qubex/base.py`, not a file of the qubex package.
 

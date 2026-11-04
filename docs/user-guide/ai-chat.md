@@ -78,9 +78,9 @@ task details. It works when the execution failed before any task result was reco
    stack trace, and the execution, task, qubit, and chip identifiers to the chat.
 3. Read the answer, then ask follow-up questions in the same chat.
 
-The assistant reads the QDash source code, and the qubex source when the deployment has it,
+The assistant reads available source code,
 starting from the code that raised the error. The answer is short: the likely cause, the evidence
-(a quoted log line and code locations as `root:path:line`), and one next step to check or a fix
+(a quoted log line and cited code locations), and one next step to check or a fix
 to review. The assistant reads more code only when the evidence is unclear; ask a follow-up
 question for a deeper analysis. It does not apply fixes or re-run anything.
 
