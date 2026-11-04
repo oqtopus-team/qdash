@@ -51,6 +51,13 @@ When backend API schemas or routes change, run `task generate` from the reposito
 
 Run commands from the repository root unless a directory is specified.
 
+On the host, run `task check` as `nix develop -c task check` and create commits inside the Nix
+shell (for example `nix develop -c git commit`) so the leak scans and pre-commit hook use the
+Betterleaks release pinned by `BETTERLEAKS_VERSION` in `.devcontainer/Dockerfile`. Inside the
+DevContainer, run the commands directly. Any brief that delegates checks or commits must carry
+this requirement. If `task check-betterleaks-version` fails, fix the environment; do not bypass
+the hook or edit leak allowlists to silence findings from another release.
+
 - Show available tasks: `task -l`
 - Install host-side local dependencies: `task dev-local-setup`
 - Start lightweight host-side stack: `task dev-local`
@@ -118,8 +125,8 @@ regardless of change size, including documentation-only changes.
 - For PR text, follow `.github/pull_request_template.md` and `.github/instructions/pull-request-description-instructions.md`.
 - Branches usually start from `develop`; common prefixes are `feature/`, `bugfix/`, and `hotfix/`.
 - Before every push, including updates to an existing PR, run `task check` from the
-  repository root and require exit status 0. Focused tests, pre-commit hooks, and CI
-  do not replace this gate. Follow the [pre-push procedure](docs/developer-guide/development-flow.md#before-pushing).
+  repository root (`nix develop -c task check` on the host) and require exit status 0.
+  Focused tests, pre-commit hooks, and CI do not replace this gate. Follow the [pre-push procedure](docs/developer-guide/development-flow.md#before-pushing).
 - Stage intended new files before checking so the leak scan includes them. Fetch the
   PR target and use `LEAKS_BASE=origin/<target>` when it is not `develop`.
 - Review any auto-fix changes from `task check` and include intended fixes in the

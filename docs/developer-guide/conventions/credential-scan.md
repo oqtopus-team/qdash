@@ -31,7 +31,7 @@ The result is a clear division of labor: Betterleaks is the strict, fast, syntac
 
 ### Lefthook
 
-`lefthook.yml` defines a single pre-commit command that calls `scripts/scan_staged_leaks.sh`. The helper copies staged index contents into a temporary tree and scans that tree with Betterleaks, avoiding Betterleaks' git-diff integration while still checking exactly the files about to be committed. Running `lefthook install` once writes the git hook into `.git/hooks/`. If the Betterleaks binary is missing, the helper fails closed so commits cannot proceed without the staged leak scan.
+`lefthook.yml` defines a single pre-commit command that calls `scripts/scan_staged_leaks.sh`. The helper copies staged index contents into a temporary tree and scans that tree with Betterleaks, avoiding Betterleaks' git-diff integration while still checking exactly the files about to be committed. Running `lefthook install` once writes the git hook into `.git/hooks/`. If the Betterleaks binary is missing or is not the [pinned release](#scanner-version), the helper fails closed so commits cannot proceed without the staged leak scan.
 
 ### Betterleaks
 
@@ -127,7 +127,7 @@ unrelated branches or commits already reachable from the target.
 Fetch the target branch before checking so the local reference is current. Override
 the target with `task check LEAKS_BASE=origin/main` or
 `task scan-leaks-local LEAKS_BASE=origin/main`. A missing target, shallow clone,
-unrelated target history, or missing Betterleaks executable causes the local scan to fail.
+unrelated target history, or missing or unpinned Betterleaks executable causes the local scan to fail.
 
 New files must be staged with `git add` to enter the working-file scan. Untracked files,
 deleted files, symlinks, and submodule directories are excluded from that scan.
@@ -135,6 +135,30 @@ The pre-commit hook separately checks staged contents; the local scan reads curr
 working contents, including unstaged edits. Findings are redacted in local scan output.
 Use `task scan-leaks` explicitly for an audit across all local Git history, including
 other fetched branches.
+
+### Scanner Version
+
+Every Betterleaks scan requires the release pinned by `ARG BETTERLEAKS_VERSION` in
+`.devcontainer/Dockerfile`; `flake.nix` pins the Nix shell to the same release. Other
+releases ship different default rules, so a newer host install can flag the repository's
+sample values that the pinned release accepts.
+
+`scripts/check_betterleaks_version.sh` reads the pinned version from the Dockerfile and
+compares it with the output of `betterleaks version`. The staged scan, the local scan,
+`task scan-leaks`, and the start of `task check` run this check before reading any content.
+A missing executable, a different release, or unparseable version output stops the scan
+with the expected and actual versions:
+
+```text
+betterleaks version check failed: expected betterleaks 1.3.1, actual: 1.9.0 (/opt/homebrew/bin/betterleaks)
+Run checks and commits in the Nix shell, for example: nix develop -c task check
+or nix develop -c git commit. The DevContainer also provides the pinned release.
+```
+
+Fix the environment rather than the policy: run the command inside `nix develop` or the
+DevContainer. Run `task check-betterleaks-version` to test the active environment alone.
+To upgrade Betterleaks, change `BETTERLEAKS_VERSION` and the `nixpkgs-betterleaks` pin
+together and rerun the scans.
 
 ## Reading Output
 
