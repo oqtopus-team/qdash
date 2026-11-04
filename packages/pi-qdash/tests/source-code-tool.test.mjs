@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { registerSourceCodeTools, sourceRootsMarkdown } from "../.test-dist/tools/source-code.js";
+import { registerSourceCodeTools, searchMarkdown, sourceRootsMarkdown } from "../.test-dist/tools/source-code.js";
 
 function registeredTools(client) {
   const tools = new Map();
@@ -86,3 +86,13 @@ test("a refused or missing file is reported, other errors propagate", async () =
   });
   await assert.rejects(failing.get("qdash_read_source").execute("t", { path: "x.py" }), /server down/);
 });
+
+for (const mode of ["content", "path"]) {
+  test(`empty ${mode} search distinguishes incomplete and complete scans`, () => {
+    const data = { query: "missing", mode, matches: [] };
+    assert.match(searchMarkdown({ ...data, truncated: true }), /unsearched files may match/);
+    assert.match(searchMarkdown({ ...data, truncated: true }), /Narrow root or pathPrefix/);
+    assert.equal(searchMarkdown({ ...data, truncated: false }),
+      `No ${mode === "path" ? "file paths" : "lines"} match \`missing\`.`);
+  });
+}

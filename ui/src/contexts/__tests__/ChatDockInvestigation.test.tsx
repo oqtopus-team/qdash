@@ -127,7 +127,7 @@ describe("ChatDock investigations", () => {
     expect(result.current.store.activeSessionId).not.toBe(first);
   });
 
-  it("names the investigation on follow-ups, so a retried first turn keeps its logs", async () => {
+  it("omits investigation on follow-ups and retains it when retrying the first turn", async () => {
     const { result } = await renderDock();
     act(() => result.current.dock.investigate(TASK));
     await waitFor(() => expect(result.current.store.activeSession?.messages).toHaveLength(2));
@@ -139,8 +139,15 @@ describe("ChatDock investigations", () => {
     await waitFor(() => expect(streamBodies()).toHaveLength(2));
     const followUp = streamBodies()[1];
     expect(followUp.session_id).toBe(sessionId);
-    expect(followUp.investigation.task_id).toBe("task-9");
+    expect(followUp.investigation).toBeUndefined();
     expect(followUp.conversation_history).toHaveLength(2);
+    await waitFor(() => expect(result.current.store.runs).toEqual({}));
+    act(() => {
+      result.current.store.sendMessage("Retry the investigation", { sessionId, history: [] });
+    });
+    await waitFor(() => expect(streamBodies()).toHaveLength(3));
+    expect(streamBodies()[2].investigation.task_id).toBe("task-9");
+    expect(streamBodies()[2].conversation_history).toEqual([]);
   });
 
   it("keeps ordinary chats free of investigation context", async () => {

@@ -297,7 +297,9 @@ function buildTurnRequest(
   return {
     url: `${BASE_URL}/copilot/chat/stream`,
     body: {
-      ...(investigation ? { investigation: toInvestigationRequest(investigation) } : {}),
+      ...(investigation && !history.some((message) => message.role === "user")
+        ? { investigation: toInvestigationRequest(investigation) }
+        : {}),
       ...(approval ? { approval } : {}),
       ...(images.length ? { images } : {}),
       ...(page

@@ -109,8 +109,9 @@ unknown execution answers 404; `task` and `investigation` together answer 400.
 
 The UI starts it with `ChatDockContext.investigate`: the click handler creates the session, with
 `context: {investigation}` stored server-side, and sends the first turn once. A second click for
-the same failure resumes that session, including after a reload. Every turn of the session
-carries `investigation`, so a retried first turn still opens with the logs. The session's
+the same failure resumes that session, including after a reload. The first turn and retries of that turn
+carry `investigation`. Follow-ups use the existing conversation without reloading the execution,
+so they can continue after the execution record is removed. The session's
 `context` stays null, so task chats and their lookup are unchanged.
 
 The model reads code through three read-only pi-qdash tools backed by `GET /copilot/source/roots`,

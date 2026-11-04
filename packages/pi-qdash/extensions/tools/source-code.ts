@@ -95,7 +95,12 @@ export function sourceRootsMarkdown(data: SourceRoots): string {
 
 export function searchMarkdown(data: SearchResult): string {
   const matches = data.matches ?? [];
-  if (!matches.length) return `No ${data.mode === "path" ? "file paths" : "lines"} match \`${data.query}\`.`;
+  if (!matches.length) {
+    if (data.truncated) {
+      return `No matches found in the files searched for \`${data.query}\`. The search stopped at the file limit; unsearched files may match. Narrow root or pathPrefix.`;
+    }
+    return `No ${data.mode === "path" ? "file paths" : "lines"} match \`${data.query}\`.`;
+  }
   const lines = matches.map((match) =>
     match.line == null ? `- ${match.root}:${match.path}` : `- ${match.root}:${match.path}:${match.line}  ${match.text ?? ""}`,
   );

@@ -175,7 +175,7 @@ async def chat_stream(
                 status_code=400, detail="A chat cannot set both task and investigation"
             )
         # The logs come from the project the user may read, checked before streaming.
-        ctx: ProjectContext = get_project_context(current_user, project_id)
+        ctx: ProjectContext = await asyncio.to_thread(get_project_context, current_user, project_id)
         try:
             investigation = await asyncio.to_thread(
                 investigation_service.build,
