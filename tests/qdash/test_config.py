@@ -96,6 +96,37 @@ def test_client_url_rejects_non_origin_values(value: str) -> None:
         )
 
 
+def test_client_url_rejects_non_string_value() -> None:
+    """A non-string CLIENT_URL fails with the origin error instead of being coerced."""
+    with pytest.raises(ValidationError, match=r"must be an HTTP\(S\) origin"):
+        Settings.model_validate(
+            {
+                "env": "test",
+                "client_url": 12345,
+                "prefect_api_url": "http://prefect.example.com",
+                "postgres_data_path": "/tmp/postgres",
+                "mongo_data_path": "/tmp/mongo",
+                "calib_data_path": "/tmp/calib",
+            }
+        )
+
+
+def test_client_url_treats_none_as_unset() -> None:
+    """A None CLIENT_URL normalizes to an empty string."""
+    settings = Settings.model_validate(
+        {
+            "env": "test",
+            "client_url": None,
+            "prefect_api_url": "http://prefect.example.com",
+            "postgres_data_path": "/tmp/postgres",
+            "mongo_data_path": "/tmp/mongo",
+            "calib_data_path": "/tmp/calib",
+        }
+    )
+
+    assert settings.client_url == ""
+
+
 def test_public_origin_falls_back_to_local_ui_port() -> None:
     """An unset CLIENT_URL resolves to the configured local UI port."""
     settings = Settings.model_construct(client_url="", ui_port=3000)

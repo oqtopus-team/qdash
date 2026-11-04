@@ -65,8 +65,9 @@ helpers over handwritten string keys.
 deployment. When the UI server is opened directly for development, the Next.js rewrite uses
 `INTERNAL_API_URL`. The interceptor of the shared Axios instance in
 `ui/src/lib/api/custom-instance.ts` adds the bearer token and, unless the request already sets
-`X-Project-Id`, the active project header. Its returned promise exposes cancellation for TanStack
-Query.
+`X-Project-Id`, the active project header. Generated query functions pass TanStack Query's
+`signal` to `customInstance`, which forwards it to Axios through the request config, so TanStack
+Query aborts the request.
 
 Feature code does not add the bearer token. A missing project or authorization error must be
 handled as an application state, not bypassed with another Axios instance.
