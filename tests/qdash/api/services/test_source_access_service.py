@@ -196,3 +196,19 @@ def test_configured_traceback_paths_still_enforce_exclusions(roots):
     for relative in ("workflow/user_flows/alice/flow.py", "escape.py"):
         with pytest.raises(SourceAccessError):
             service.read(None, str(roots[0].path / relative))
+
+
+def test_the_package_qualified_executor_path_reads_from_the_real_qdash_root(monkeypatch):
+    # The path a user's investigation sent to the config file API, read the right way.
+    monkeypatch.delenv("QDASH_SOURCE_ROOT", raising=False)
+    root = source_access_service._qdash_root()
+    assert root is not None
+    service = SourceAccessService((root,))
+    for root_name, path in (
+        (None, "qdash/workflow/engine/task/executor.py"),
+        ("qdash", "workflow/engine/task/executor.py"),
+    ):
+        source = service.read(root_name, path, start_line=1, end_line=5)
+        assert (source.root, source.path) == ("qdash", "workflow/engine/task/executor.py")
+        assert (source.start_line, source.end_line) == (1, 5)
+        assert source.total_lines > 5

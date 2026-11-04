@@ -80,7 +80,11 @@ def _source_section(source: SourceAccessService) -> str:
         lines += [
             "Search with `qdash_search_source` (literal text, or `mode: path` for file "
             "names) and read with `qdash_read_source` (a path inside a root, or a path "
-            "exactly as a traceback prints it). They are read-only. Available roots:",
+            "exactly as a traceback prints it), for example "
+            '`qdash_read_source {"path": "qdash/workflow/engine/task/executor.py"}` or '
+            '`{"root": "qdash", "path": "workflow/engine/task/executor.py"}`. They are '
+            "read-only. `qdash_query` `files_tree` and `file_content` cover only the "
+            "calibration config directory; never use them for source. Available roots:",
             "",
             *(_revision_line(root) for root in roots),
         ]

@@ -82,7 +82,7 @@ Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
 
 | Tool | Result |
 | --- | --- |
-| `qdash_query` | Read-only queries without a dedicated tool. |
+| `qdash_query` | Read-only queries without a dedicated tool. `files_tree` and `file_content` cover only the calibration config directory. `files_tree` takes no `path`. A source path sent to either returns the source tool call to use instead. |
 | `qdash_raw_get` | Read-only GET endpoints through qdash-client. |
 
 ## Pipeline and flow operations
