@@ -21,7 +21,7 @@ for the role to assign.
 
 | Page | Purpose | Guide |
 | --- | --- | --- |
-| **Home** | Start common work and review active executions, failed tasks, and recent notifications. | This page |
+| **Home** | Start common work and review recent executions, failed tasks, and recent notifications. | This page |
 | **Dashboard** | Scan all configured chip metrics, coverage, distributions, and scoped notes. | [Dashboard](./dashboard.md) |
 | **Metrics** | Inspect one metric across qubits or couplings and compare its history. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Chip** | Browse calibration tasks and the latest results on the chip topology. | [Calibration Data and Provenance](./data-and-provenance.md) |
@@ -30,6 +30,13 @@ for the role to assign.
 
 Use **Dashboard** for broad health checks, **Metrics** for a parameter-focused investigation, and
 **Chip** when the calibration task or physical target is the starting point.
+
+**Executions** on Home counts the runs started on every chip of the active project in the last 30
+days, one column of blocks per day colored by status. Each block represents one execution; on
+busy days the card labels how many executions a full block represents, and lighter blocks contain
+fewer. Hover over or focus a day to see its exact counts, and select the chart or
+**All executions** to open the **Execution** page. A run in progress appears as a badge in the top
+bar with its name and status; select the badge to open the run.
 
 When a project has no chips, Home highlights the **Setup tour** for project editors. After a chip
 exists, the tour remains available as a compact Home action for replay. It opens the Chip page,

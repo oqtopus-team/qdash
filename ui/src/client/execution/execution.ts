@@ -746,14 +746,16 @@ export function useListExecutions<TData = Awaited<ReturnType<typeof listExecutio
 
 
 /**
- * Count a chip's executions per calendar day, by status, over a trailing window.
+ * Count executions per calendar day, by status, over a trailing window.
  *
+ * With ``chip_id`` only that chip's executions count; without it, every execution in the
+ * caller's current project counts. Executions of other projects are never included.
  * Every day of the window is returned, empty days included, so a chart can draw a
  * continuous axis. Days follow ``timezone`` so they match what the user sees.
  * @summary Count executions per day
  */
 export const getExecutionActivity = (
-    params: GetExecutionActivityParams,
+    params?: GetExecutionActivityParams,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
 
@@ -775,7 +777,7 @@ export const getGetExecutionActivityQueryKey = (params?: GetExecutionActivityPar
     }
 
 
-export const getGetExecutionActivityQueryOptions = <TData = Awaited<ReturnType<typeof getExecutionActivity>>, TError = HTTPValidationError>(params: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetExecutionActivityQueryOptions = <TData = Awaited<ReturnType<typeof getExecutionActivity>>, TError = HTTPValidationError>(params?: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -798,7 +800,7 @@ export type GetExecutionActivityQueryError = HTTPValidationError
 
 
 export function useGetExecutionActivity<TData = Awaited<ReturnType<typeof getExecutionActivity>>, TError = HTTPValidationError>(
- params: GetExecutionActivityParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>> & Pick<
+ params: undefined |  GetExecutionActivityParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getExecutionActivity>>,
           TError,
@@ -808,7 +810,7 @@ export function useGetExecutionActivity<TData = Awaited<ReturnType<typeof getExe
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetExecutionActivity<TData = Awaited<ReturnType<typeof getExecutionActivity>>, TError = HTTPValidationError>(
- params: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>> & Pick<
+ params?: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getExecutionActivity>>,
           TError,
@@ -818,7 +820,7 @@ export function useGetExecutionActivity<TData = Awaited<ReturnType<typeof getExe
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetExecutionActivity<TData = Awaited<ReturnType<typeof getExecutionActivity>>, TError = HTTPValidationError>(
- params: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ params?: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -826,7 +828,7 @@ export function useGetExecutionActivity<TData = Awaited<ReturnType<typeof getExe
  */
 
 export function useGetExecutionActivity<TData = Awaited<ReturnType<typeof getExecutionActivity>>, TError = HTTPValidationError>(
- params: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ params?: GetExecutionActivityParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getExecutionActivity>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 

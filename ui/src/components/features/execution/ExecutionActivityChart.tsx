@@ -1,125 +1,33 @@
 "use client";
 
-import {
-  type CSSProperties,
-  type KeyboardEvent,
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type KeyboardEvent, useCallback, useMemo, useRef, useState } from "react";
 
 import { useGetExecutionActivity } from "@/client/execution/execution";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useIsDarkTheme } from "@/contexts/ThemeContext";
 import { chartTheme } from "@/lib/chartTheme";
 import { DEFAULT_TIMEZONE } from "@/lib/utils/datetime";
-import type { ExecutionActivityDay } from "@/schemas";
+
+import {
+  type ActivityDayColumn,
+  activityBlockScale,
+  activityBlockStyler,
+  activityStatusTotals,
+  describeActivityDay,
+  longActivityDate,
+  parseActivityDay,
+  pluralize,
+  shortActivityDate,
+  toActivityColumn,
+} from "./executionActivityBlocks";
 
 const ACTIVITY_WINDOWS = [30, 90, 180] as const;
 export type ActivityWindow = (typeof ACTIVITY_WINDOWS)[number];
-
-type StatusKey = Exclude<keyof ExecutionActivityDay, "date" | "total">;
-
-/** Stacking order, bottom to top. */
-const SERIES: ReadonlyArray<{ key: StatusKey; label: string }> = [
-  { key: "completed", label: "Completed" },
-  { key: "failed", label: "Failed" },
-  { key: "running", label: "Running" },
-  { key: "scheduled", label: "Scheduled" },
-  { key: "cancelled", label: "Cancelled" },
-  { key: "other", label: "Other" },
-];
 
 /** Tallest column in blocks; denser days are drawn with one block per several executions. */
 const MAX_BLOCKS = 20;
 /** Shortest grid, so a quiet window still reads as a grid of small blocks. */
 const MIN_ROWS = 10;
-/** Opacity of a block that stands for fewer executions than the scale. */
-const PARTIAL_OPACITY = 0.45;
-
-interface Block {
-  status: StatusKey;
-  /** Executions this block stands for: the scale, or the remainder for a partial block. */
-  executions: number;
-  partial: boolean;
-}
-
-interface DayColumn {
-  date: string;
-  compact: string;
-  total: number;
-  counts: ReadonlyArray<{ key: StatusKey; label: string; count: number }>;
-  blocks: Block[];
-}
-
-const count = (bucket: ExecutionActivityDay, key: StatusKey) => bucket[key] ?? 0;
-
-/** Blocks a day needs when one block stands for `scale` executions; each status rounds up. */
-const blocksNeeded = (bucket: ExecutionActivityDay, scale: number) =>
-  SERIES.reduce((acc, { key }) => acc + Math.ceil(count(bucket, key) / scale), 0);
-
-/**
- * Smallest 1-2-5 step that keeps every day within MAX_BLOCKS. A step always exists because a
- * day needs at most one block per status once the step exceeds its largest count.
- */
-function blockScale(buckets: readonly ExecutionActivityDay[]): number {
-  for (let magnitude = 1; ; magnitude *= 10) {
-    for (const step of [1, 2, 5]) {
-      const scale = step * magnitude;
-      if (buckets.every((bucket) => blocksNeeded(bucket, scale) <= MAX_BLOCKS)) return scale;
-    }
-  }
-}
-
-function toColumn(bucket: ExecutionActivityDay, scale: number): DayColumn {
-  const blocks: Block[] = [];
-  for (const { key } of SERIES) {
-    const value = count(bucket, key);
-    for (let i = 0; i < Math.floor(value / scale); i += 1) {
-      blocks.push({ status: key, executions: scale, partial: false });
-    }
-    const remainder = value % scale;
-    if (remainder > 0) blocks.push({ status: key, executions: remainder, partial: true });
-  }
-  const counts = SERIES.map((series) => ({ ...series, count: count(bucket, series.key) }));
-  return {
-    date: bucket.date,
-    compact: bucket.date.replace(/-/g, ""),
-    total: counts.reduce((acc, item) => acc + item.count, 0),
-    counts,
-    blocks,
-  };
-}
-
-function parseDay(date: string): Date {
-  const [year, month, day] = date.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
-// Bucket dates are calendar days in the requested zone, so they are formatted as UTC midnight.
-const shortDate = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-});
-const longDate = new Intl.DateTimeFormat("en-US", {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-const plural = (value: number, noun: string) => `${value} ${noun}${value === 1 ? "" : "s"}`;
-
-function describeDay(column: DayColumn): string {
-  const parts = column.counts
-    .filter((item) => item.count > 0)
-    .map((item) => `${item.count} ${item.label.toLowerCase()}`);
-  const summary = plural(column.total, "execution");
-  return `${longDate.format(parseDay(column.date))}: ${summary}${parts.length ? `, ${parts.join(", ")}` : ""}`;
-}
 
 /** Every `step`-th column from the latest backwards carries a date under it. */
 const labelStep = (columns: number) => (columns <= 7 ? 1 : columns <= 31 ? 5 : 15);
@@ -156,18 +64,14 @@ export function ExecutionActivityChart({
   const buckets = useMemo(() => activity?.buckets ?? [], [activity]);
 
   const { scale, columns, rows, totals } = useMemo(() => {
-    const blockSize = blockScale(buckets);
-    const dayColumns = buckets.map((bucket) => toColumn(bucket, blockSize));
+    const blockSize = activityBlockScale(buckets, MAX_BLOCKS);
+    const dayColumns = buckets.map((bucket) => toActivityColumn(bucket, blockSize));
     const tallest = dayColumns.reduce((acc, column) => Math.max(acc, column.blocks.length), 0);
-    const statusTotals = SERIES.map((series) => ({
-      ...series,
-      count: buckets.reduce((acc, bucket) => acc + count(bucket, series.key), 0),
-    }));
     return {
       scale: blockSize,
       columns: dayColumns,
       rows: Math.max(MIN_ROWS, tallest),
-      totals: statusTotals,
+      totals: activityStatusTotals(buckets),
     };
   }, [buckets]);
 
@@ -175,21 +79,7 @@ export function ExecutionActivityChart({
   const failed = totals.find((item) => item.key === "failed")?.count ?? 0;
   const running = totals.find((item) => item.key === "running")?.count ?? 0;
 
-  const colors: Record<StatusKey, string> = {
-    completed: palette.pass,
-    failed: palette.fail,
-    running: palette.accent,
-    scheduled: palette.warn,
-    cancelled: palette.muted,
-    other: palette.muted,
-  };
-  // "Other" is outlined so it stays apart from cancelled, which shares the muted color.
-  const blockStyle = (status: StatusKey, partial: boolean): CSSProperties => ({
-    ...(status === "other"
-      ? { border: `1px solid ${colors.other}` }
-      : { backgroundColor: colors[status] }),
-    opacity: partial ? PARTIAL_OPACITY : 1,
-  });
+  const blockStyle = activityBlockStyler(palette);
 
   const selectedIndex = columns.findIndex((column) => column.compact === selectedDate);
   const selectedColumn = selectedIndex >= 0 ? columns[selectedIndex] : null;
@@ -225,7 +115,7 @@ export function ExecutionActivityChart({
     moveFocus(targets[event.key]);
   };
 
-  const toggleDay = (column: DayColumn) =>
+  const toggleDay = (column: ActivityDayColumn) =>
     onDateSelect(column.compact === selectedDate ? "latest" : column.compact);
 
   const step = labelStep(columns.length);
@@ -302,7 +192,7 @@ export function ExecutionActivityChart({
                         type="button"
                         tabIndex={index === activeIndex ? 0 : -1}
                         aria-pressed={selected}
-                        aria-label={describeDay(column)}
+                        aria-label={describeActivityDay(column)}
                         data-date={column.date}
                         onClick={() => toggleDay(column)}
                         onFocus={() => setFocusIndex(index)}
@@ -332,8 +222,10 @@ export function ExecutionActivityChart({
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top">
-                      <p className="font-medium">{longDate.format(parseDay(column.date))}</p>
-                      <p className="text-base-content/60">{plural(column.total, "execution")}</p>
+                      <p className="font-medium">
+                        {longActivityDate.format(parseActivityDay(column.date))}
+                      </p>
+                      <p className="text-base-content/60">{pluralize(column.total, "execution")}</p>
                       {column.total > 0 && (
                         <ul className="mt-1 space-y-0.5">
                           {column.counts
@@ -377,7 +269,7 @@ export function ExecutionActivityChart({
                           selected ? "z-10 rounded-sm bg-base-100 px-0.5 text-primary" : ""
                         }`}
                       >
-                        {shortDate.format(parseDay(column.date))}
+                        {shortActivityDate.format(parseActivityDay(column.date))}
                       </span>
                     )}
                   </span>
@@ -410,7 +302,7 @@ export function ExecutionActivityChart({
           </div>
           <p className="mt-2 text-xs text-base-content/60" aria-live="polite">
             {selectedColumn
-              ? `Showing ${longDate.format(parseDay(selectedColumn.date))} in the list. Select it again to show the latest executions.`
+              ? `Showing ${longActivityDate.format(parseActivityDay(selectedColumn.date))} in the list. Select it again to show the latest executions.`
               : "Select a day to show its executions in the list."}
           </p>
         </>

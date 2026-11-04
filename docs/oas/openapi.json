@@ -1998,7 +1998,7 @@
           "execution"
         ],
         "summary": "Count executions per day",
-        "description": "Count a chip's executions per calendar day, by status, over a trailing window.\n\nEvery day of the window is returned, empty days included, so a chart can draw a\ncontinuous axis. Days follow ``timezone`` so they match what the user sees.",
+        "description": "Count executions per calendar day, by status, over a trailing window.\n\nWith ``chip_id`` only that chip's executions count; without it, every execution in the\ncaller's current project counts. Executions of other projects are never included.\nEvery day of the window is returned, empty days included, so a chart can draw a\ncontinuous axis. Days follow ``timezone`` so they match what the user sees.",
         "operationId": "getExecutionActivity",
         "security": [
           {
@@ -2009,13 +2009,20 @@
           {
             "name": "chip_id",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "string",
-              "description": "Chip ID to count executions for",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Chip ID to count executions for; omit to count every chip in the project",
               "title": "Chip Id"
             },
-            "description": "Chip ID to count executions for"
+            "description": "Chip ID to count executions for; omit to count every chip in the project"
           },
           {
             "name": "days",
@@ -21594,8 +21601,16 @@
       "ExecutionActivityResponse": {
         "properties": {
           "chip_id": {
-            "type": "string",
-            "title": "Chip Id"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id",
+            "description": "Chip the counts are for, or null when every chip in the project counts"
           },
           "days": {
             "type": "integer",
@@ -21636,7 +21651,7 @@
           "buckets"
         ],
         "title": "ExecutionActivityResponse",
-        "description": "Daily execution counts for a chip over a trailing window of days."
+        "description": "Daily execution counts for a chip, or a whole project, over a trailing window of days."
       },
       "ExecutionAvailabilityRequest": {
         "properties": {

@@ -237,9 +237,11 @@ class ExecutionActivityDay(BaseModel):
 
 
 class ExecutionActivityResponse(BaseModel):
-    """Daily execution counts for a chip over a trailing window of days."""
+    """Daily execution counts for a chip, or a whole project, over a trailing window of days."""
 
-    chip_id: str
+    chip_id: str | None = Field(
+        ..., description="Chip the counts are for, or null when every chip in the project counts"
+    )
     days: int = Field(..., description="Length of the window in calendar days")
     timezone: str = Field(..., description="IANA time zone the days are bucketed in")
     since: str = Field(..., description="First day of the window, YYYY-MM-DD")
