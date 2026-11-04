@@ -16,6 +16,11 @@ permissions: {}
 jobs:
   pullfrog:
     name: Review
+    # Share one model slot across PRs; keep pending reviews instead of replacing them.
+    concurrency:
+      group: pullfrog-studio-llm-qwen-review
+      cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
