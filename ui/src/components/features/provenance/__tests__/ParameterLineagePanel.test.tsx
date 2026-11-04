@@ -7,6 +7,12 @@ const mocks = vi.hoisted(() => ({
   history: {} as Record<string, unknown[]>,
   lineageCalls: [] as Array<{ entityId: string; enabled: boolean }>,
   graphOpened: null as string | null,
+  entity: {} as {
+    data?: unknown;
+    isLoading?: boolean;
+    status?: number;
+  },
+  entityCalls: [] as Array<{ entityId: string; enabled: boolean }>,
 }));
 
 function version(
@@ -47,6 +53,17 @@ vi.mock("@/client/provenance/provenance", () => ({
     isLoading: false,
     isError: false,
   }),
+  useGetProvenanceEntity: (entityId: string, options: { query: { enabled: boolean } }) => {
+    mocks.entityCalls.push({ entityId, enabled: options.query.enabled });
+    if (!options.query.enabled) return { data: undefined, isLoading: false, isError: false };
+    const { data, isLoading = false, status } = mocks.entity;
+    return {
+      data: data ? { data } : undefined,
+      isLoading,
+      isError: status !== undefined,
+      error: status !== undefined ? { isAxiosError: true, response: { status } } : null,
+    };
+  },
   useGetProvenanceLineage: (
     entityId: string,
     params: { max_depth: number },
@@ -98,6 +115,8 @@ afterEach(() => {
   mocks.history = {};
   mocks.lineageCalls = [];
   mocks.graphOpened = null;
+  mocks.entity = {};
+  mocks.entityCalls = [];
 });
 
 describe("ParameterLineagePanel", () => {
@@ -130,20 +149,6 @@ describe("ParameterLineagePanel", () => {
     fireEvent.change(select, { target: { value: current.entity_id } });
     expect(select.value).toBe(current.entity_id);
     expect(mocks.lineageCalls.some((call) => call.entityId === current.entity_id)).toBe(true);
-  });
-
-  it("falls back to the current version when the run did not publish the parameter", () => {
-    mocks.history["qubit_frequency:1"] = [current];
-    render(
-      <ParameterLineagePanel
-        parameterName="qubit_frequency"
-        qid="1"
-        entityId="qubit_frequency:1:other-run:task-x"
-      />,
-    );
-
-    expect(screen.getByText(/did not publish qubit_frequency/)).toBeTruthy();
-    expect(screen.getByText("7.15723 GHz")).toBeTruthy();
   });
 
   it("follows an input in place and comes back", () => {
@@ -224,5 +229,100 @@ describe("ParameterLineagePanel on a task result", () => {
     });
 
     expect(screen.getByRole("region", { name: "Inputs" })).toBeTruthy();
+  });
+});
+
+describe("ParameterLineagePanel with a version outside the loaded history", () => {
+  const unresolvedNotice = /not among the latest 50 versions loaded; showing the current version/;
+
+  it("fetches an older requested entity and shows that version and its lineage", () => {
+    mocks.history["qubit_frequency:1"] = [current];
+    mocks.entity = { data: older };
+    render(
+      <ParameterLineagePanel parameterName="qubit_frequency" qid="1" entityId={older.entity_id} />,
+    );
+
+    expect(mocks.entityCalls).toContainEqual({ entityId: older.entity_id, enabled: true });
+    const select = screen.getByRole("combobox", { name: "Version" }) as HTMLSelectElement;
+    expect(select.value).toBe(older.entity_id);
+    expect(screen.getByText(/replaced/)).toBeTruthy();
+    expect(mocks.lineageCalls.some((call) => call.entityId === older.entity_id)).toBe(true);
+    expect(mocks.lineageCalls.some((call) => call.entityId === current.entity_id)).toBe(false);
+    expect(screen.queryByText(unresolvedNotice)).toBeNull();
+    expect(screen.queryByText(/did not publish/)).toBeNull();
+  });
+
+  it("does not fetch the entity when the loaded history already holds it", () => {
+    mocks.history["qubit_frequency:1"] = [current, older];
+    render(
+      <ParameterLineagePanel parameterName="qubit_frequency" qid="1" entityId={older.entity_id} />,
+    );
+
+    expect(mocks.entityCalls.every((call) => !call.enabled)).toBe(true);
+  });
+
+  it("waits for the entity lookup instead of showing the current lineage", () => {
+    mocks.history["qubit_frequency:1"] = [current];
+    mocks.entity = { isLoading: true };
+    const { container } = render(
+      <ParameterLineagePanel parameterName="qubit_frequency" qid="1" entityId={older.entity_id} />,
+    );
+
+    expect(container.querySelector(".loading")).toBeTruthy();
+    expect(screen.queryByText("7.15723 GHz")).toBeNull();
+    expect(mocks.lineageCalls.every((call) => !call.enabled)).toBe(true);
+  });
+
+  it("reports a failed entity lookup instead of showing the current version", () => {
+    mocks.history["qubit_frequency:1"] = [current];
+    mocks.entity = { status: 500 };
+    render(
+      <ParameterLineagePanel parameterName="qubit_frequency" qid="1" entityId={older.entity_id} />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The requested version of qubit_frequency could not be loaded.",
+    );
+    expect(screen.queryByText("7.15723 GHz")).toBeNull();
+    expect(mocks.lineageCalls.every((call) => !call.enabled)).toBe(true);
+  });
+
+  it("uses neutral wording when the entity does not exist", () => {
+    mocks.history["qubit_frequency:1"] = [current];
+    mocks.entity = { status: 404 };
+    render(
+      <ParameterLineagePanel
+        parameterName="qubit_frequency"
+        qid="1"
+        entityId="qubit_frequency:1:other-run:task-x"
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(unresolvedNotice);
+    expect(screen.queryByText(/did not publish/)).toBeNull();
+    expect(screen.getByText("7.15723 GHz")).toBeTruthy();
+  });
+
+  it("ignores a fetched entity that belongs to another parameter", () => {
+    mocks.history["qubit_frequency:1"] = [current];
+    mocks.entity = { data: { ...input, entity_id: older.entity_id } };
+    render(
+      <ParameterLineagePanel parameterName="qubit_frequency" qid="1" entityId={older.entity_id} />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(unresolvedNotice);
+    expect(screen.getByText("7.15723 GHz")).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Version" })).toBeNull();
+  });
+
+  it("uses neutral wording for a run outside the window, without an entity lookup", () => {
+    mocks.history["qubit_frequency:1"] = [current];
+    render(
+      <ParameterLineagePanel parameterName="qubit_frequency" qid="1" executionId="20250101-001" />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(unresolvedNotice);
+    expect(screen.queryByText(/did not publish/)).toBeNull();
+    expect(mocks.entityCalls.every((call) => !call.enabled)).toBe(true);
   });
 });

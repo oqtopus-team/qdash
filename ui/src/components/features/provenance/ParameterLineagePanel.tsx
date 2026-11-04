@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from "react";
 
+import { isAxiosError } from "axios";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink, GitBranch } from "lucide-react";
 
 import {
   useGetParameterHistory,
+  useGetProvenanceEntity,
   useGetProvenanceImpact,
   useGetProvenanceLineage,
 } from "@/client/provenance/provenance";
@@ -22,6 +24,11 @@ import { LineageGraphDialog } from "./LineageGraphDialog";
 const DIRECT_HOPS = 1;
 /** Versions offered in the version selector. */
 const VERSION_LIMIT = 50;
+
+/** True when the API answered 404: the requested entity does not exist in this project. */
+function isNotFound(error: unknown): boolean {
+  return isAxiosError(error) && error.response?.status === 404;
+}
 
 /** One step of in-panel exploration: a parameter and, optionally, which version to show. */
 type LineageFocus = ProvenanceTarget;
@@ -176,7 +183,45 @@ export function ParameterLineagePanel({
     { parameter_name: focus.parameterName, qid: focus.qid, limit: VERSION_LIMIT },
     { query: { enabled: !!focus.parameterName && !!focus.qid } },
   );
-  const versions = useMemo(() => historyResponse?.data?.versions ?? [], [historyResponse]);
+  const historyVersions = useMemo(() => historyResponse?.data?.versions ?? [], [historyResponse]);
+  const historyHasRequestedEntity =
+    !!focus.entityId && historyVersions.some((version) => version.entity_id === focus.entityId);
+
+  // The history holds only the newest VERSION_LIMIT versions, so an older requested entity is
+  // fetched on its own. A run named only by execution id cannot be fetched this way.
+  const entityLookupEnabled =
+    !!focus.entityId && !!historyResponse && !isHistoryLoading && !historyHasRequestedEntity;
+  const {
+    data: entityResponse,
+    isLoading: isEntityLoading,
+    isError: isEntityError,
+    error: entityError,
+  } = useGetProvenanceEntity(focus.entityId ?? "", {
+    query: {
+      enabled: entityLookupEnabled,
+      retry: (failureCount, error) => !isNotFound(error) && failureCount < 2,
+    },
+  });
+  const fetchedEntity = entityResponse?.data;
+  // Ignore a response that belongs to another focus or names a different parameter.
+  const fetchedVersion =
+    fetchedEntity &&
+    fetchedEntity.entity_id === focus.entityId &&
+    fetchedEntity.parameter_name === focus.parameterName &&
+    (fetchedEntity.qid ?? "") === focus.qid
+      ? fetchedEntity
+      : undefined;
+  const entityLookupPending = entityLookupEnabled && isEntityLoading;
+  const entityLookupFailed = entityLookupEnabled && isEntityError && !isNotFound(entityError);
+
+  // Offer the fetched historical version in the selector alongside the loaded window.
+  const versions = useMemo(
+    () =>
+      fetchedVersion && !historyVersions.some((v) => v.entity_id === fetchedVersion.entity_id)
+        ? [...historyVersions, fetchedVersion]
+        : historyVersions,
+    [historyVersions, fetchedVersion],
+  );
   const requestedVersion = pickedEntityId
     ? versions.find((version) => version.entity_id === pickedEntityId)
     : focus.entityId
@@ -184,14 +229,18 @@ export function ParameterLineagePanel({
       : focus.executionId
         ? versions.find((version) => version.execution_id === focus.executionId)
         : undefined;
-  const version = requestedVersion ?? versions[0];
+  // Until the lookup settles, no version stands in, so the current lineage is not fetched.
+  const version =
+    entityLookupPending || entityLookupFailed ? undefined : (requestedVersion ?? versions[0]);
   const currentEntityId = version?.entity_id ?? "";
-  // The caller named a version or run that did not publish this parameter; the current value
-  // stands in.
-  const requestedMissing =
+  // The caller named a version or run that neither the loaded window nor the entity lookup
+  // resolved. The window is not known to be complete, so the panel does not claim the run
+  // published nothing; it says the version is outside the loaded window and shows the current one.
+  const requestedUnresolved =
     !!(focus.entityId || focus.executionId) && !pickedEntityId && !!version && !requestedVersion;
   // Inputs are redundant only while the panel shows the very version the host already lists.
-  const inputsRedundant = hideInputs && trail.length === 1 && !pickedEntityId && !requestedMissing;
+  const inputsRedundant =
+    hideInputs && trail.length === 1 && !pickedEntityId && !requestedUnresolved;
 
   const { data: lineageResponse, isLoading: isLineageLoading } = useGetProvenanceLineage(
     currentEntityId,
@@ -254,7 +303,7 @@ export function ParameterLineagePanel({
     </button>
   );
 
-  if (isHistoryLoading) {
+  if (isHistoryLoading || entityLookupPending) {
     return (
       <div className="flex justify-center py-8">
         <span className="loading loading-spinner" />
@@ -266,6 +315,16 @@ export function ParameterLineagePanel({
       <p role="alert" className="text-sm text-base-content/60">
         Lineage could not be loaded.
       </p>
+    );
+  }
+  if (entityLookupFailed) {
+    return (
+      <div className="space-y-2 text-sm">
+        {backButton}
+        <p role="alert" className="text-base-content/60">
+          The requested version of {focus.parameterName} could not be loaded.
+        </p>
+      </div>
     );
   }
   if (!version) {
@@ -316,9 +375,10 @@ export function ParameterLineagePanel({
             <span className="badge badge-ghost badge-sm font-mono">v{version.version}</span>
           )}
         </div>
-        {requestedMissing && (
-          <p className="mt-1 text-xs text-base-content/60">
-            This run did not publish {focus.parameterName}; showing the current version.
+        {requestedUnresolved && (
+          <p role="status" className="mt-1 text-xs text-base-content/60">
+            The requested version is not among the latest {VERSION_LIMIT} versions loaded; showing
+            the current version.
           </p>
         )}
         <p className="mt-1 text-xs text-base-content/60">
