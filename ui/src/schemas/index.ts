@@ -287,6 +287,7 @@ export * from './executePipelineResponse';
 export * from './executePipelineResponseTargets';
 export * from './executionActivityDay';
 export * from './executionActivityResponse';
+export * from './executionActivityResponseChipId';
 export * from './executionAvailabilityRequest';
 export * from './executionAvailabilityRequestFlowName';
 export * from './executionAvailabilityRequestParameters';

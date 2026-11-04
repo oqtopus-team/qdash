@@ -1,18 +1,27 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HomePageContent } from "@/components/features/home/HomePageContent";
 
-const mockExecutionLock = vi.hoisted(() => vi.fn());
-const mockExecution = vi.hoisted(() => vi.fn());
+const mockExecutionActivity = vi.hoisted(() => vi.fn());
 const mockChips = vi.hoisted(() => vi.fn());
 const mockTaskResults = vi.hoisted(() => vi.fn());
 const mockNotifications = vi.hoisted(() => vi.fn());
 
+// Only the activity hook is provided: the page must not poll the lock or a running execution,
+// since the global execution indicator already shows progress.
 vi.mock("@/client/execution/execution", () => ({
-  useGetExecutionLockStatus: mockExecutionLock,
-  useGetExecution: mockExecution,
+  getGetExecutionActivityQueryKey: () => ["/executions/activity"],
+  useGetExecutionActivity: mockExecutionActivity,
 }));
+
+vi.mock("@/contexts/ThemeContext", () => ({ useIsDarkTheme: () => false }));
+
+function day(date: string, counts: Partial<Record<string, number>> = {}) {
+  const merged = { completed: 0, failed: 0, running: 0, scheduled: 0, cancelled: 0, other: 0 };
+  Object.assign(merged, counts);
+  return { date, ...merged, total: Object.values(merged).reduce((a, b) => a + b, 0) };
+}
 
 vi.mock("@/client/chip/chip", () => ({
   useListChips: mockChips,
@@ -23,7 +32,7 @@ vi.mock("@/client/task-result/task-result", () => ({
 }));
 
 vi.mock("@/contexts/ProjectContext", () => ({
-  useProject: () => ({ canEdit: true }),
+  useProject: () => ({ canEdit: true, projectId: "project-1" }),
 }));
 
 vi.mock("@/hooks/useNotifications", () => ({
@@ -38,18 +47,19 @@ describe("HomePageContent", () => {
       isLoading: false,
       error: null,
     });
-    mockExecution.mockReturnValue({ data: undefined });
-    mockExecutionLock.mockReturnValue({
+    mockExecutionActivity.mockReturnValue({
       data: {
         data: {
-          lock: true,
-          execution_id: "execution-1",
-          chip_id: "chip-1",
-          name: "Daily calibration",
-          status: "running",
+          chip_id: null,
+          days: 30,
+          timezone: "Asia/Tokyo",
+          since: "2026-10-04",
+          until: "2026-11-02",
+          buckets: [day("2026-11-01", { completed: 2 }), day("2026-11-02", { failed: 1 })],
         },
       },
       isLoading: false,
+      isError: false,
     });
     mockTaskResults.mockReturnValue({
       data: {
@@ -101,7 +111,8 @@ describe("HomePageContent", () => {
     render(<HomePageContent />);
 
     expect(screen.getByRole("heading", { name: "Home" })).toBeTruthy();
-    expect(screen.getByText("Daily calibration")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Executions" })).toBeTruthy();
+    expect(screen.getByTestId("home-activity-total")).toHaveTextContent("3executions · 1 failed");
     expect(screen.getByText("CheckRabi")).toBeTruthy();
     expect(screen.getByText("A new reply")).toBeTruthy();
     expect(screen.getByRole("link", { name: /Run a task/ }).getAttribute("href")).toBe("/tasks");
@@ -122,9 +133,10 @@ describe("HomePageContent", () => {
   });
 
   it("shows calm empty states when no work is waiting", () => {
-    mockExecutionLock.mockReturnValue({
-      data: { data: { lock: false } },
+    mockExecutionActivity.mockReturnValue({
+      data: { data: { buckets: [day("2026-11-02")] } },
       isLoading: false,
+      isError: false,
     });
     mockTaskResults.mockReturnValue({
       data: { data: { items: [] } },
@@ -139,7 +151,7 @@ describe("HomePageContent", () => {
 
     render(<HomePageContent />);
 
-    expect(screen.getByText("No calibration is running")).toBeTruthy();
+    expect(screen.getByText("No executions in the last 30 days")).toBeTruthy();
     expect(screen.getByText("No failed task results")).toBeTruthy();
     expect(screen.getByText("You are all caught up")).toBeTruthy();
   });
@@ -160,75 +172,19 @@ describe("HomePageContent", () => {
     expect(screen.queryByRole("link", { name: "Setup tour" })).toBeNull();
   });
 
-  it("distinguishes an unavailable execution status from an idle calibration and retries", async () => {
-    let finishRefetch: () => void = () => {};
-    const refetch = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          finishRefetch = resolve;
-        }),
+  it("replaces the current execution card with project-wide activity", () => {
+    render(<HomePageContent />);
+
+    expect(mockExecutionActivity).toHaveBeenCalled();
+    const [params] = mockExecutionActivity.mock.calls[0];
+    expect(params).toEqual({ days: 30, timezone: expect.any(String) });
+    expect(params).not.toHaveProperty("chip_id");
+    expect(screen.queryByRole("heading", { name: "Current execution" })).toBeNull();
+    expect(screen.queryByText(/tasks$/)).toBeNull();
+    expect(screen.getByRole("link", { name: /All executions/ }).getAttribute("href")).toBe(
+      "/execution",
     );
-    mockExecutionLock.mockReturnValue({
-      data: undefined,
-      error: new Error("Network unavailable"),
-      isLoading: false,
-      isFetching: false,
-      refetch,
-    });
-    render(<HomePageContent />);
-    expect(screen.getByRole("alert")).toHaveTextContent("Execution status unavailable");
-    expect(screen.queryByText("No calibration is running")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(refetch).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "Retrying…" })).toBeDisabled();
-
-    await act(async () => finishRefetch());
-    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
-  });
-
-  it("keeps retry available while background polling is in flight", () => {
-    mockExecutionLock.mockReturnValue({
-      data: undefined,
-      error: new Error("Network unavailable"),
-      isLoading: false,
-      isFetching: true,
-      refetch: vi.fn(),
-    });
-    render(<HomePageContent />);
-    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
-  });
-
-  it("does not report cached execution status as current after a failed refresh", () => {
-    mockExecutionLock.mockReturnValue({
-      data: { data: { lock: false } },
-      error: new Error("Network unavailable"),
-      isLoading: false,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-    render(<HomePageContent />);
-    expect(screen.getByRole("alert")).toHaveTextContent("Execution status unavailable");
-    expect(screen.queryByText("No calibration is running")).not.toBeInTheDocument();
-  });
-
-  it("shows task progress for the running execution", () => {
-    mockExecution.mockReturnValue({
-      data: {
-        data: {
-          task: [
-            { name: "CheckT1", status: "completed" },
-            { name: "CheckT2Echo", status: "completed" },
-            { name: "CheckRamsey", status: "running" },
-            { name: "RandomizedBenchmarking", status: "scheduled" },
-          ],
-        },
-      },
-    });
-
-    render(<HomePageContent />);
-
-    expect(screen.getByText(/2\/4 tasks/)).toBeTruthy();
-    expect(screen.getByText("CheckRamsey")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Needs attention" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Recent notifications" })).toBeTruthy();
   });
 });
