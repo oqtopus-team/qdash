@@ -1813,6 +1813,37 @@ class ListCopilotChatSessionsResponse(BaseModel):
     sessions: Annotated[list[CopilotChatSessionSummary], Field(title="Sessions")]
 
 
+class ExecutionActivityDay(BaseModel):
+    """
+    Executions started on one calendar day, counted by status.
+    """
+
+    date: Annotated[str, Field(title="Date")]
+    """
+    Calendar day in the requested time zone, YYYY-MM-DD
+    """
+    completed: Annotated[int | None, Field(title="Completed")] = 0
+    failed: Annotated[int | None, Field(title="Failed")] = 0
+    running: Annotated[int | None, Field(title="Running")] = 0
+    scheduled: Annotated[int | None, Field(title="Scheduled")] = 0
+    cancelled: Annotated[int | None, Field(title="Cancelled")] = 0
+    other: Annotated[int | None, Field(title="Other")] = 0
+    total: Annotated[int | None, Field(title="Total")] = 0
+
+
+class ExecutionActivityResponse(BaseModel):
+    """
+    Daily execution counts for a chip over a trailing window of days.
+    """
+
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    days: Annotated[int, Field(title="Days")]
+    timezone: Annotated[str, Field(title="Timezone")]
+    since: Annotated[str, Field(title="Since")]
+    until: Annotated[str, Field(title="Until")]
+    buckets: Annotated[list[ExecutionActivityDay], Field(title="Buckets")]
+
+
 class ListExecutionsResponse(BaseModel):
     """
     Response model for listing executions.
