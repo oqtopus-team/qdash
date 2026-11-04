@@ -1,6 +1,8 @@
 "use client";
 
-import { Bot } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import { Bot, LoaderCircle } from "lucide-react";
 
 import { useListEvaluations } from "@/client/evaluation/evaluation";
 import { useGetTaskResult } from "@/client/task/task";
@@ -61,6 +63,15 @@ export function TaskResultEvaluations({
     },
   );
   const evaluations = response?.data.evaluations ?? [];
+  const inFlight = evaluations.some(
+    (item) => item.status === "pending" || item.status === "running",
+  );
+  // Bridges the moment between sending a request and its record arriving in the list.
+  const [requestedCount, setRequestedCount] = useState<number | null>(null);
+  const awaitingRecord = requestedCount !== null && evaluations.length <= requestedCount;
+  useEffect(() => {
+    if (requestedCount !== null && evaluations.length > requestedCount) setRequestedCount(null);
+  }, [evaluations.length, requestedCount]);
 
   return (
     <section className="mb-6">
@@ -80,8 +91,27 @@ export function TaskResultEvaluations({
           chatContext={chatContext}
           onChat={onChat}
           variant="outline"
+          onRequested={() => setRequestedCount(evaluations.length)}
         />
       </div>
+      {(inFlight || awaitingRecord) && (
+        <p
+          role="status"
+          className="mb-3 flex items-center gap-2 rounded-lg bg-base-200/60 p-3 text-sm"
+        >
+          <LoaderCircle
+            className="h-4 w-4 shrink-0 animate-spin text-primary motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+          <span>
+            <span className="font-medium">Evaluating</span>
+            <span className="text-base-content/60">
+              {" "}
+              · the model usually answers within a minute; the record appears here when it does.
+            </span>
+          </span>
+        </p>
+      )}
       {evaluations.length === 0 ? (
         <p className="text-sm text-base-content/50">
           No AI evaluation yet. Ask AI sends the figure and the task&apos;s reference to the

@@ -938,3 +938,35 @@ async def test_save_flow_restores_old_source_when_update_registration_fails(
     assert file_path.exists()
     assert file_path.read_text(encoding="utf-8") == FLOW_CODE
     assert repo.updated == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "signature", ["", "qids=None", "mux_ids=None, qids=None, exclude_qids=None"]
+)
+async def test_target_override_uses_context_without_adding_unknown_parameters(tmp_path, signature):
+    from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
+
+    file_path = tmp_path / "my_flow.py"
+    source = f'def my_flow({signature}):\n    CalibService("user", "chip", qids=["0"])\n'
+    file_path.write_text(source)
+    coordinator = _StubCoordinator()
+    service = _service(
+        tmp_path, repo=_FakeFlowRepository(flow=_make_flow(file_path)), coordinator=coordinator
+    )
+    override = FlowTargetOverride(mux_ids=[2], exclude_qids=["9"])
+    await service.execute_flow(
+        "my_flow", ExecuteFlowRequest(target_override=override), "user", "project-1"
+    )
+    call = coordinator.run_calls[0]
+    assert call["context"] == {TARGET_CONTEXT_KEY: override.model_dump()}
+    if "mux_ids" in signature:
+        assert call["parameters"]["mux_ids"] == [2]
+        assert call["parameters"]["exclude_qids"] == ["9"]
+        assert call["parameters"]["qids"] is None
+    else:
+        # A flow that cannot receive MUX targets keeps its saved qids; the
+        # run context still carries the override to CalibService.
+        assert "mux_ids" not in call["parameters"]
+        assert "qids" not in call["parameters"]
+    assert file_path.read_text() == source

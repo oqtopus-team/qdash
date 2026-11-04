@@ -890,7 +890,6 @@ export function DashboardPageContent() {
                               value={cov.pct}
                               current={cov.current}
                               total={cov.total}
-                              duration={400}
                               label="Coverage"
                             />
                           </div>
@@ -1069,7 +1068,6 @@ export function DashboardPageContent() {
                               value={cov.pct}
                               current={cov.current}
                               total={cov.total}
-                              duration={400}
                               label="Coverage"
                             />
                           </div>

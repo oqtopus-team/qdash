@@ -1801,13 +1801,15 @@ export function WorkflowEditorPageContent() {
             chipId={chipId}
             description={description}
             tags={tags}
+            targetDefaults={data?.data?.target_defaults}
             disabledReason={executeDisabledReason}
-            onConfirm={() => {
+            onConfirm={(targetOverride) => {
               if (executeDisabledReason) return;
               setShowExecuteConfirm(false);
               executeMutation.mutate({
                 name,
                 data: {
+                  target_override: targetOverride,
                   parameters: {
                     username: username,
                     chip_id: chipId,

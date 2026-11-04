@@ -105,6 +105,7 @@ class ExecutionCoordinator:
         parameters: dict[str, Any],
         tags: list[str] | None = None,
         workflow: bool = False,
+        context: dict[str, Any] | None = None,
     ) -> DispatchResult:
         """Dispatch a run that owns the execution lock until the flow adopts it."""
         claimed_execution_id = self._claim(
@@ -119,6 +120,7 @@ class ExecutionCoordinator:
             flow_run_id = await self._prefect.create_flow_run(
                 deployment_id=deployment_id,
                 parameters=parameters,
+                **({"context": context} if context else {}),
             )
         except Exception as exc:
             # Nothing reached Prefect, so the flow will never adopt the lock.
