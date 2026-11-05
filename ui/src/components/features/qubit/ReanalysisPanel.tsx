@@ -416,7 +416,7 @@ function PanelShell({ title, children, mutation, onSubmit, onReset }: PanelShell
     <div className="card bg-base-100 shadow-md border border-base-300">
       <div className="card-body p-4">
         <div className="flex items-center justify-between mb-2">
-          <h4 className="font-semibold flex items-center gap-2">
+          <h4 className="font-medium flex items-center gap-2">
             <Sparkles size={16} className="text-primary" />
             {title}
           </h4>
@@ -506,7 +506,7 @@ function ReanalysisResult({ result }: ReanalysisResultProps) {
       )}
 
       <div>
-        <div className="text-xs font-semibold mb-1">Re-estimated outputs</div>
+        <div className="text-xs font-medium mb-1">Re-estimated outputs</div>
         {result.output_parameters.length === 0 ? (
           <div className="text-xs text-base-content/60">No outputs (e.g. no f01 detected).</div>
         ) : (

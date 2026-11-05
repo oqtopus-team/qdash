@@ -34,6 +34,7 @@ if "prefect" not in sys.modules:
     sys.modules["prefect.client.schemas.actions"] = MagicMock()
     sys.modules["prefect.client.schemas.filters"] = MagicMock()
     sys.modules["prefect.client.schemas.schedules"] = MagicMock()
+    sys.modules["prefect.client.schemas.sorting"] = MagicMock()
     sys.modules["prefect.deployments"] = MagicMock()
     sys.modules["prefect.exceptions"] = MagicMock()
     sys.modules["prefect.states"] = MagicMock()

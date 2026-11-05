@@ -309,13 +309,16 @@ async def stream(
     task: TaskContextBundle | None = None,
     images_sent: dict[str, Any] | None = None,
     recorder: EvaluationRecorder | None = None,
+    opening_message: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Proxy one chat turn through the Pi Agent Runtime as SSE events.
 
     With ``task``, the turn belongs to a chat about one task result: a new
     conversation opens with the result's context and figures (the runtime
     attaches them only when the conversation is new), and the final result
-    reports which figures were sent.
+    reports which figures were sent. ``opening_message`` (an investigation's
+    logs and instructions) likewise replaces the first message of a new
+    conversation only; later turns are sent as typed.
     """
     if not request.session_id:
         yield sse_event(
@@ -326,7 +329,18 @@ async def stream(
 
     payload = _request_payload(request, config, username)
     extra_result: dict[str, Any] | None = None
-    if task is not None:
+    if opening_message is not None:
+        try:
+            await ensure_agent_session(username, request.session_id)
+        except Exception:
+            logger.exception("Failed to ensure persisted Pi chat session")
+            yield sse_event(
+                "error",
+                {"step": "init", "detail": "Could not persist the chat session"},
+            )
+            return
+        payload["initial_message"] = opening_message
+    elif task is not None:
         try:
             await ensure_agent_session(username, request.session_id)
         except Exception:

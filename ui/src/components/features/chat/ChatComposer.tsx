@@ -99,7 +99,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     onStop,
     isStreaming,
     disabled = false,
-    placeholder = "Ask about calibration data...",
+    placeholder = "Ask a question",
     modelOptions,
     selectedModelKey,
     onModelChange,
@@ -123,12 +123,30 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   useImperativeHandle(ref, () => ({ focus: () => textareaRef.current?.focus() }), []);
 
   // Grow with the content up to MAX_HEIGHT_PX, then scroll.
-  useEffect(() => {
+  const fitHeight = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT_PX)}px`;
-  }, [value]);
+  }, []);
+
+  useEffect(fitHeight, [value, fitHeight]);
+
+  // The height depends on the width too: the docked sidebar mounts the composer while
+  // it slides open from zero width, where even the placeholder wraps to the height cap.
+  // Measure again whenever the width settles somewhere new.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fitHeight();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fitHeight]);
 
   const canAttach = Boolean(onAttach) && !isStreaming && !disabled;
   const attachmentsFull = (attachments?.length ?? 0) >= MAX_ATTACHMENTS;
@@ -250,9 +268,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         placeholder={placeholder}
         rows={1}
         aria-label="Message"
-        className={`w-full resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 placeholder:text-base-content/35 ${
-          compact ? "text-sm" : "text-[15px]"
-        }`}
+        className="w-full resize-none bg-transparent border-none outline-none focus:ring-0 leading-6 px-1 pt-1 text-sm placeholder:text-base-content/35"
       />
       <div className="flex items-center gap-2 pt-1">
         {onAttach && (

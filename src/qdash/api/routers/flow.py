@@ -3,7 +3,7 @@
 from logging import getLogger
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from qdash.api.dependencies import (
     get_flow_schedule_service,
@@ -82,9 +82,13 @@ async def list_flows(
 )
 async def list_flow_templates(
     service: Annotated[FlowService, Depends(get_flow_service)],
+    backend: Annotated[
+        str | None,
+        Query(description="Only templates written for this backend, e.g. qubex or fake"),
+    ] = None,
 ) -> list[FlowTemplate]:
-    """List all available flow templates."""
-    return await service.list_templates()
+    """List the flow templates, optionally filtered to one backend."""
+    return await service.list_templates(backend)
 
 
 @router.get(

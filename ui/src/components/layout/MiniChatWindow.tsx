@@ -102,7 +102,8 @@ const MARGIN = 16;
  * the sidebar, so expanding it keeps a streaming answer going.
  */
 export function MiniChatWindow() {
-  const { miniChat, closeMiniChat, openSidebar, openMiniChatForSession } = useChatDock();
+  const { miniChat, closeMiniChat, openSidebar, openMiniChatForSession, endInvestigation } =
+    useChatDock();
   const { createNewSession, activeSession, activeSessionId, runs } = useCopilotChatSessionContext();
   const router = useRouter();
   const pathname = usePathname();
@@ -190,7 +191,7 @@ export function MiniChatWindow() {
       >
         <GripHorizontal className="w-3.5 h-3.5 mt-1 text-base-content/30 flex-shrink-0" />
         {minimized ? (
-          <span className="flex-1 min-w-0 truncate text-sm font-semibold">
+          <span className="flex-1 min-w-0 truncate text-sm font-medium">
             {activeSession?.title ?? "Ask AI"}
           </span>
         ) : (
@@ -201,7 +202,10 @@ export function MiniChatWindow() {
             <>
               <SurfaceButton
                 label="New chat"
-                onClick={() => createNewSession(activeSession?.context ?? null)}
+                onClick={() => {
+                  endInvestigation(activeSession?.id);
+                  createNewSession(activeSession?.context ?? null);
+                }}
               >
                 <SquarePen className="w-3.5 h-3.5" />
               </SurfaceButton>

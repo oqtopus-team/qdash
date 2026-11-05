@@ -25,6 +25,9 @@ import type {
   ListFlowsResponse,
   ListForumPostsResponse,
   ListQubitsResponse,
+  ListSourceRootsResponse,
+  SearchSourceResponse,
+  SourceFileResponse,
   ProvenanceStatsResponse,
   QdashApiSchemasProjectProjectListResponse,
   SaveFlowRequest,
@@ -45,6 +48,7 @@ import type {
   FlowTemplateWithCode,
   GetFlowResponse,
   ListChipsResponse,
+  ExecutionActivityResponse,
   ListExecutionsResponse,
   ListTaskKnowledgeResponse,
   ListTaskResponse,
@@ -72,6 +76,22 @@ export interface TaskResultsTimeseriesOptions {
   endAt: string;
   tag?: string;
   qid?: string;
+}
+
+export interface SearchSourceOptions {
+  query: string;
+  root?: string;
+  pathPrefix?: string;
+  mode?: "content" | "path";
+  caseSensitive?: boolean;
+  limit?: number;
+}
+
+export interface GetSourceFileOptions {
+  path: string;
+  root?: string;
+  startLine?: number;
+  endLine?: number;
 }
 
 export interface ListTaskResultsOptions {
@@ -301,6 +321,39 @@ export class QDashClient {
     return this.get(`/tasks/${pathPart(taskName)}/knowledge/markdown`);
   }
 
+  /** Source trees the Copilot may read, with the revision of each when it is known. */
+  async listSourceRoots(): Promise<ListSourceRootsResponse> {
+    return this.get("/copilot/source/roots");
+  }
+
+  /** Literal search in source contents (`content`) or file paths (`path`). */
+  async searchSource(options: SearchSourceOptions): Promise<SearchSourceResponse> {
+    return this.get(
+      "/copilot/source/search",
+      query({
+        query: options.query,
+        root: options.root,
+        path_prefix: options.pathPrefix,
+        mode: options.mode,
+        case_sensitive: options.caseSensitive,
+        limit: options.limit,
+      }),
+    );
+  }
+
+  /** A numbered line range of one source file; without `root`, a traceback path is mapped. */
+  async getSourceFile(options: GetSourceFileOptions): Promise<SourceFileResponse> {
+    return this.get(
+      "/copilot/source/file",
+      query({
+        path: options.path,
+        root: options.root,
+        start_line: options.startLine,
+        end_line: options.endLine,
+      }),
+    );
+  }
+
   async listProjects(): Promise<QdashApiSchemasProjectProjectListResponse> {
     return this.get("/projects");
   }
@@ -336,8 +389,9 @@ export class QDashClient {
     return this.get(`/flows/${pathPart(name)}`);
   }
 
-  async listFlowTemplates(): Promise<FlowTemplate[]> {
-    return this.get("/flows/templates");
+  /** List flow templates, optionally only those written for one backend (e.g. "fake"). */
+  async listFlowTemplates(backend?: string): Promise<FlowTemplate[]> {
+    return this.get("/flows/templates", query({ backend }));
   }
 
   async getFlowTemplate(templateId: string): Promise<FlowTemplateWithCode> {
@@ -352,11 +406,27 @@ export class QDashClient {
     return this.post(`/flows/${pathPart(name)}/execute`, { parameters });
   }
 
+  /** Count a chip's executions per calendar day over the trailing window. */
+  async getExecutionActivity(options: {
+    chipId: string;
+    days?: number;
+    timezone?: string;
+  }): Promise<ExecutionActivityResponse> {
+    return this.get(
+      "/executions/activity",
+      query({ chip_id: options.chipId, days: options.days, timezone: options.timezone }),
+    );
+  }
+
   async listExecutions(options: {
     flowName?: string;
     status?: string;
     skip?: number;
     limit?: number;
+    /** Only executions started on this calendar day, YYYYMMDD. */
+    date?: string;
+    /** IANA time zone that defines the day for `date`. */
+    timezone?: string;
   } = {}): Promise<ListExecutionsResponse> {
     return this.get(
       "/executions",
@@ -365,6 +435,8 @@ export class QDashClient {
         status: options.status,
         skip: options.skip,
         limit: options.limit,
+        date: options.date,
+        timezone: options.timezone,
       }),
     );
   }

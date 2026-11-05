@@ -2,6 +2,16 @@
 @plugin "@tailwindcss/typography";
 @plugin "daisyui";
 
+/* Geist Sans and Geist Mono are self-hosted through next/font in app/layout.tsx. */
+@theme {
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-mono:
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    monospace;
+}
+
 /* ========================================
    Rich Interactive Design System
    ======================================== */
@@ -26,9 +36,6 @@
 }
 
 /* Button active press effect */
-.btn:active:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
-  transform: scale(0.97);
-}
 
 /* Button focus ring improvement */
 .btn:focus-visible {
@@ -43,23 +50,6 @@
   transition-duration: 200ms;
 }
 
-/* Tab active state improvement */
-.tab.tab-active {
-  position: relative;
-}
-
-.tabs-boxed .tab.tab-active::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 60%;
-  height: 2px;
-  background: oklch(var(--p));
-  border-radius: 1px;
-}
-
 /* Form elements - only border and shadow */
 input,
 textarea,
@@ -70,14 +60,6 @@ select,
   transition-property: border-color, box-shadow;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
-}
-
-/* Enhanced input focus states */
-.input:focus,
-.select:focus,
-.textarea:focus {
-  border-color: oklch(var(--p));
-  box-shadow: 0 0 0 3px oklch(var(--p) / 0.15);
 }
 
 /* Disable transitions during page load and for reduced motion preference */
@@ -95,126 +77,68 @@ select,
    Card & Box Styles - Rich Interactive
    ---------------------------------------- */
 
-/* Rich card with deeper shadow */
-.card {
-  border-radius: 1rem;
-  box-shadow:
-    0 4px 6px -1px rgb(0 0 0 / 0.1),
-    0 2px 4px -2px rgb(0 0 0 / 0.1);
-  border: 1px solid color-mix(in oklch, var(--color-base-content) 8%, transparent);
+/* Body text is the 14px step; unsized text must not fall back to the browser's 16px. */
+body {
+  font-size: 0.875rem;
 }
 
-/* Interactive cards get lift effect with glow */
+/* Numerals get emphasis from size, not weight: the only step above the page title. */
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Card titles share the section-heading step (14px / 500). */
+.card-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Flat card: a border carries the edge, the shadow is a hairline. */
+.card {
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
+}
+
+/* Interactive cards respond with the border, not by moving. */
 .card[role="button"]:hover,
 .card.cursor-pointer:hover,
 button.card:hover,
 a.card:hover {
-  transform: translateY(-4px);
-  box-shadow:
-    0 20px 25px -5px rgb(0 0 0 / 0.15),
-    0 8px 10px -6px rgb(0 0 0 / 0.1),
-    0 0 0 1px color-mix(in oklch, var(--color-primary) 20%, transparent);
+  border-color: color-mix(in oklch, var(--color-base-content) 20%, transparent);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08);
 }
 
 /* ----------------------------------------
    Button Styles - Rich Interactive
    ---------------------------------------- */
 
-/* Base button improvements */
+/* Flat buttons: DaisyUI's solid fills, a 0.5rem radius and no shadow, gloss or lift. */
 .btn {
-  border-radius: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Leave disabled colors and effects to DaisyUI. */
-.btn:where(:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled)) {
-  box-shadow:
-    0 2px 4px 0 rgb(0 0 0 / 0.1),
-    inset 0 1px 0 0 rgb(255 255 255 / 0.1);
-}
-
-.btn:where(:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled))::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 50%;
-  background: linear-gradient(to bottom, rgb(255 255 255 / 0.1), transparent);
-  pointer-events: none;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  box-shadow: none;
 }
 
 .btn:hover:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
-  transform: translateY(-2px);
-  box-shadow:
-    0 8px 12px -2px rgb(0 0 0 / 0.15),
-    0 4px 6px -2px rgb(0 0 0 / 0.1),
-    inset 0 1px 0 0 rgb(255 255 255 / 0.15);
+  box-shadow: none;
+  transform: none;
 }
 
 .btn:active:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
-  transform: translateY(0);
-  box-shadow:
-    0 1px 2px 0 rgb(0 0 0 / 0.1),
-    inset 0 2px 4px 0 rgb(0 0 0 / 0.1);
-}
-
-/* Primary button with gradient */
-.btn-primary:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
-  background: linear-gradient(
-    135deg,
-    var(--color-primary),
-    color-mix(in oklch, var(--color-primary) 80%, var(--color-accent))
-  );
-  color: var(--color-primary-content);
-}
-
-.btn-primary:hover:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
-  background: linear-gradient(
-    135deg,
-    color-mix(in oklch, var(--color-primary) 90%, white),
-    var(--color-primary)
-  );
-}
-
-/* Secondary button with gradient */
-.btn-secondary:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
-  background: linear-gradient(
-    135deg,
-    var(--color-secondary),
-    color-mix(in oklch, var(--color-secondary) 80%, var(--color-accent))
-  );
-  color: var(--color-secondary-content);
-}
-
-/* Ghost buttons - subtle hover effect */
-.btn-ghost {
-  box-shadow: none;
-  background: transparent;
-}
-
-.btn-ghost::before {
-  display: none;
+  transform: none;
+  box-shadow: inset 0 1px 2px 0 rgb(0 0 0 / 0.08);
 }
 
 .btn-ghost:hover:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
-  box-shadow: none;
-  transform: none;
-  background-color: color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  background-color: color-mix(in oklch, var(--color-base-content) 8%, transparent);
 }
 
-/* Small buttons - proportional effects */
 .btn-xs,
 .btn-sm {
-  border-radius: 0.5rem;
-}
-
-.btn-xs:hover:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled),
-.btn-sm:hover:not(:disabled, [disabled], [aria-disabled="true"], .btn-disabled) {
-  transform: translateY(-1px);
+  border-radius: 0.375rem;
 }
 
 /* ----------------------------------------
@@ -225,8 +149,8 @@ a.card:hover {
 .input,
 .select,
 .textarea {
-  border-radius: 0.75rem;
-  border: 2px solid var(--color-base-300);
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-base-300);
   background-color: var(--color-base-100);
   transition:
     border-color 0.2s ease,
@@ -237,16 +161,14 @@ a.card:hover {
 .input:hover,
 .select:hover,
 .textarea:hover {
-  border-color: color-mix(in oklch, var(--color-primary) 50%, var(--color-base-300));
+  border-color: color-mix(in oklch, var(--color-base-content) 25%, transparent);
 }
 
 .input:focus,
 .select:focus,
 .textarea:focus {
   border-color: var(--color-primary);
-  box-shadow:
-    0 0 0 4px color-mix(in oklch, var(--color-primary) 20%, transparent),
-    0 4px 6px -1px rgb(0 0 0 / 0.1);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 15%, transparent);
   outline: none;
   background-color: var(--color-base-100);
 }
@@ -257,25 +179,21 @@ a.card:hover {
 
 .badge {
   border-radius: 9999px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.1);
+  font-weight: 500;
+  box-shadow: none;
 }
 
-.badge-primary {
-  background: linear-gradient(
-    135deg,
-    var(--color-primary),
-    color-mix(in oklch, var(--color-primary) 80%, var(--color-accent))
-  );
-}
-
-.badge-secondary {
-  background: linear-gradient(
-    135deg,
-    var(--color-secondary),
-    color-mix(in oklch, var(--color-secondary) 80%, var(--color-accent))
-  );
+/* Colored badges are tints: the hue marks state or role without filling the pill. */
+.badge-primary,
+.badge-secondary,
+.badge-accent,
+.badge-info,
+.badge-success,
+.badge-warning,
+.badge-error {
+  color: var(--badge-color);
+  background-color: color-mix(in oklch, var(--badge-color) 12%, var(--color-base-100));
+  border-color: color-mix(in oklch, var(--badge-color) 25%, transparent);
 }
 
 /* ----------------------------------------
@@ -284,13 +202,12 @@ a.card:hover {
 
 .tabs-boxed {
   background-color: var(--color-base-200);
-  border-radius: 1rem;
-  padding: 0.375rem;
-  box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.06);
+  border-radius: 0.5rem;
+  padding: 0.25rem;
 }
 
 .tabs-boxed .tab {
-  border-radius: 0.625rem;
+  border-radius: 0.375rem;
   transition: all 0.25s ease-out;
   font-weight: 500;
 }
@@ -301,10 +218,7 @@ a.card:hover {
 
 .tabs-boxed .tab-active {
   background-color: var(--color-base-100);
-  box-shadow:
-    0 2px 8px 0 rgb(0 0 0 / 0.12),
-    0 1px 2px 0 rgb(0 0 0 / 0.08);
-  font-weight: 600;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.06);
 }
 
 /* ----------------------------------------
@@ -312,8 +226,8 @@ a.card:hover {
    ---------------------------------------- */
 
 .modal-box {
-  border-radius: 1.5rem;
-  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  border-radius: 0.75rem;
+  box-shadow: 0 16px 40px -12px rgb(0 0 0 / 0.25);
   border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
   will-change: transform, opacity;
   contain: layout style paint;
@@ -387,9 +301,9 @@ a.card:hover {
    ---------------------------------------- */
 
 .alert {
-  border-radius: 1rem;
+  border-radius: 0.5rem;
   border: 1px solid color-mix(in oklch, currentColor 20%, transparent);
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  box-shadow: none;
 }
 
 /* ----------------------------------------
@@ -397,16 +311,13 @@ a.card:hover {
    ---------------------------------------- */
 
 .table {
-  border-radius: 1rem;
+  border-radius: 0.5rem;
   overflow: hidden;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
 }
 
 .table th {
-  font-weight: 700;
-  text-transform: uppercase;
+  font-weight: 500;
   font-size: 0.75rem;
-  letter-spacing: 0.08em;
   color: var(--color-base-content);
   opacity: 0.7;
   background-color: color-mix(in oklch, var(--color-base-200) 50%, transparent);
@@ -418,7 +329,7 @@ a.card:hover {
 }
 
 .table tr:hover td {
-  background-color: color-mix(in oklch, var(--color-primary) 5%, transparent);
+  background-color: color-mix(in oklch, var(--color-base-content) 4%, transparent);
 }
 
 /* ----------------------------------------
@@ -426,10 +337,8 @@ a.card:hover {
    ---------------------------------------- */
 
 .dropdown-content {
-  border-radius: 1rem;
-  box-shadow:
-    0 10px 25px -5px rgb(0 0 0 / 0.2),
-    0 8px 10px -6px rgb(0 0 0 / 0.1);
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.2);
   border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
   animation: dropdownFadeIn 0.2s ease-out;
 }
@@ -451,19 +360,15 @@ a.card:hover {
 
 .menu li > a:hover,
 .menu li > button:hover {
-  background-color: color-mix(in oklch, var(--color-primary) 10%, transparent);
+  background-color: color-mix(in oklch, var(--color-base-content) 6%, transparent);
 }
 
 .menu li > a.active,
 .menu li > button.active {
-  background: linear-gradient(
-    135deg,
-    var(--color-primary),
-    color-mix(in oklch, var(--color-primary) 85%, var(--color-accent))
-  );
-  color: var(--color-primary-content);
-  font-weight: 600;
-  box-shadow: 0 2px 8px -2px color-mix(in oklch, var(--color-primary) 50%, transparent);
+  background-color: color-mix(in oklch, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  font-weight: 500;
+  box-shadow: none;
 }
 
 /* ----------------------------------------
@@ -490,22 +395,12 @@ a.card:hover {
 }
 
 /* ----------------------------------------
-   Loading Spinner Enhancement
-   ---------------------------------------- */
-
-.loading {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-  -webkit-background-clip: text;
-  background-clip: text;
-}
-
-/* ----------------------------------------
    Tooltip Styles - Rich
    ---------------------------------------- */
 
 .tooltip::before {
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 12px -2px rgb(0 0 0 / 0.2);
+  border-radius: 0.375rem;
+  box-shadow: 0 2px 8px -2px rgb(0 0 0 / 0.2);
   font-weight: 500;
 }
 
@@ -645,359 +540,7 @@ html[data-theme="dark"],
   background-clip: text;
 }
 
-/* ----------------------------------------
-   Page Title Gradient (Generic)
-   ---------------------------------------- */
-
-/* Subtle gradient for page titles - Light mode */
-.title-gradient {
-  background: linear-gradient(135deg, var(--color-base-content) 0%, var(--color-primary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Subtle gradient for page titles - Dark mode */
-[data-theme="dark"] .title-gradient,
-[data-theme="night"] .title-gradient,
-[data-theme="dracula"] .title-gradient,
-[data-theme="dim"] .title-gradient,
-[data-theme="abyss"] .title-gradient {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, var(--color-primary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Glow button effect - Light mode */
-.btn-glow {
-  background: linear-gradient(135deg, #1f1fdd 0%, #3b3be8 100%);
-  border: none;
-  box-shadow:
-    0 4px 15px rgba(31, 31, 221, 0.3),
-    0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-.btn-glow:hover:not(:disabled) {
-  background: linear-gradient(135deg, #3b3be8 0%, #5555f0 100%);
-  box-shadow:
-    0 6px 20px rgba(31, 31, 221, 0.4),
-    0 0 30px rgba(31, 31, 221, 0.2),
-    0 4px 8px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
-}
-
-.btn-glow:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow:
-    0 2px 10px rgba(31, 31, 221, 0.3),
-    0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* Glow button effect - Dark mode */
-[data-theme="dark"] .btn-glow {
-  background: linear-gradient(135deg, #5555f0 0%, #6b6bf5 100%);
-  box-shadow:
-    0 4px 15px rgba(85, 85, 240, 0.4),
-    0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-[data-theme="dark"] .btn-glow:hover:not(:disabled) {
-  background: linear-gradient(135deg, #6b6bf5 0%, #8080f8 100%);
-  box-shadow:
-    0 6px 20px rgba(85, 85, 240, 0.5),
-    0 0 30px rgba(85, 85, 240, 0.3),
-    0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-[data-theme="dark"] .btn-glow:active:not(:disabled) {
-  box-shadow:
-    0 2px 10px rgba(85, 85, 240, 0.4),
-    0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-/* ========================================
-   Status Animations & Effects
-   ======================================== */
-
-/* Pulse animation for active/running status */
-@keyframes status-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.05);
-  }
-}
-
-.status-pulse {
-  animation: status-pulse 2s ease-in-out infinite;
-}
-
-/* Glow effect for status indicators */
-@keyframes status-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 4px currentColor;
-  }
-  50% {
-    box-shadow:
-      0 0 12px currentColor,
-      0 0 20px currentColor;
-  }
-}
-
-.status-glow {
-  animation: status-glow 2s ease-in-out infinite;
-}
-
-/* Running status - combines pulse and color */
-.status-running {
-  animation: status-pulse 1.5s ease-in-out infinite;
-}
-
-.status-running::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  background: linear-gradient(45deg, oklch(var(--p)), oklch(var(--s)));
-  opacity: 0;
-  animation: status-glow 1.5s ease-in-out infinite;
-  z-index: -1;
-}
-
-/* Success pulse - one-time animation */
-@keyframes success-pop {
-  0% {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-.animate-success {
-  animation: success-pop 0.4s ease-out;
-}
-
-/* ========================================
-   Glass & Card Effects
-   ======================================== */
-
-/* Glass card effect */
-.card-glass {
-  background: oklch(var(--b2) / 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid oklch(var(--b3) / 0.5);
-}
-
-[data-theme="dark"] .card-glass,
-[data-theme="night"] .card-glass,
-[data-theme="dracula"] .card-glass,
-[data-theme="dim"] .card-glass,
-[data-theme="abyss"] .card-glass {
-  background: oklch(var(--b2) / 0.5);
-  border: 1px solid oklch(var(--b3) / 0.3);
-}
-
-/* Default card hover effect - subtle for all cards */
-.card {
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
-}
-
-/* Card hover lift effect - more pronounced */
-.card-hover {
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 8px 25px -5px oklch(var(--bc) / 0.1),
-    0 4px 10px -5px oklch(var(--bc) / 0.05);
-}
-
-/* Interactive card - for clickable cards */
-.card-interactive {
-  cursor: pointer;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
-}
-
-.card-interactive:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 8px 20px -4px oklch(var(--bc) / 0.12),
-    0 4px 8px -4px oklch(var(--bc) / 0.06);
-  border-color: oklch(var(--p) / 0.3);
-}
-
-.card-interactive:active {
-  transform: translateY(0);
-}
-
-/* Static card - suppress hover shadow/transform effects */
-.card.card-no-hover:hover {
-  box-shadow:
-    0 4px 6px -1px rgb(0 0 0 / 0.1),
-    0 2px 4px -2px rgb(0 0 0 / 0.1);
-  transform: none;
-}
-
-/* Hover: one-shot lift + border highlight */
-.float-hover {
-  transition:
-    translate 0.25s ease-out,
-    box-shadow 0.25s ease-out,
-    outline-color 0.2s ease;
-  outline: 1px solid transparent;
-  outline-offset: 1px;
-}
-
-.float-hover:hover,
-.float-hover:focus {
-  translate: 0 -4px;
-  box-shadow:
-    0 14px 24px -4px rgb(0 0 0 / 0.16),
-    0 6px 10px -4px rgb(0 0 0 / 0.1);
-  outline-color: color-mix(in oklch, var(--color-accent) 50%, transparent);
-}
-
-/* Gradient border for highlighted cards */
-.card-gradient-border {
-  position: relative;
-  background: oklch(var(--b1));
-}
-
-.card-gradient-border::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  padding: 1px;
-  border-radius: inherit;
-  background: linear-gradient(135deg, oklch(var(--p)), oklch(var(--s)));
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-
-/* ========================================
-   Number/Value Transitions
-   ======================================== */
-
-.value-transition {
-  transition: all 0.3s ease-out;
-}
-
-/* ========================================
-   Page Transition Animations
-   ======================================== */
-
-@keyframes page-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes page-fade-in-fast {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.page-transition {
-  animation: page-fade-in 0.3s ease-out;
-}
-
-.page-transition-fast {
-  animation: page-fade-in-fast 0.2s ease-out;
-}
-
-/* Stagger animation for list items */
-@keyframes stagger-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.stagger-item {
-  animation: stagger-fade-in 0.4s ease-out backwards;
-}
-
-.stagger-item:nth-child(1) {
-  animation-delay: 0ms;
-}
-.stagger-item:nth-child(2) {
-  animation-delay: 50ms;
-}
-.stagger-item:nth-child(3) {
-  animation-delay: 100ms;
-}
-.stagger-item:nth-child(4) {
-  animation-delay: 150ms;
-}
-.stagger-item:nth-child(5) {
-  animation-delay: 200ms;
-}
-.stagger-item:nth-child(6) {
-  animation-delay: 250ms;
-}
-.stagger-item:nth-child(7) {
-  animation-delay: 300ms;
-}
-.stagger-item:nth-child(8) {
-  animation-delay: 350ms;
-}
-
-/* Modal animations */
-@keyframes modal-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.modal-box {
-  animation: modal-slide-up 0.2s ease-out;
-}
-
+/* Sign-in and 404 hero: the one place the logo may float and glow. */
 /* Login page floating logo animation */
 @keyframes float {
   0%,
@@ -1095,6 +638,130 @@ html[data-theme="dark"],
     drift 8s ease-in-out infinite,
     pulse-fade-dark 4s ease-in-out infinite;
 }
+/* ========================================
+   Status Animations & Effects
+   ======================================== */
+
+/* Pulse animation for active/running status */
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+.status-pulse {
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+/* Success pulse - one-time animation */
+@keyframes success-pop {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ========================================
+   Card Effects
+   ======================================== */
+
+/* Cards animate only their edge and shadow. */
+.card {
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+/* Interactive card - for clickable cards */
+.card-interactive {
+  cursor: pointer;
+}
+
+.card-interactive:hover {
+  border-color: color-mix(in oklch, var(--color-primary) 40%, transparent);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08);
+}
+
+/* ========================================
+   Number/Value Transitions
+   ======================================== */
+
+.value-transition {
+  transition: all 0.3s ease-out;
+}
+
+/* ========================================
+   Page Transition Animations
+   ======================================== */
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-fade-in-fast {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-transition {
+  animation: page-fade-in 0.3s ease-out;
+}
+
+.page-transition-fast {
+  animation: page-fade-in-fast 0.2s ease-out;
+}
+
+/* Stagger animation for list items */
+@keyframes stagger-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Modal animations */
+@keyframes modal-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-box {
+  animation: modal-slide-up 0.2s ease-out;
+}
 
 /* Dashboard focus styles for hiding non-essential elements */
 .dashboard-focus-timeseries .col-span-3:first-of-type {
@@ -1171,11 +838,6 @@ html[data-theme="dark"],
   gap: 1rem;
 }
 
-.dashboard-focus-chip h1 {
-  /* Smaller title for dashboard */
-  font-size: 1.5rem;
-}
-
 /* Optimize content area for dashboard */
 .dashboard-focus-chip .pt-4 {
   padding-top: 0.5rem;
@@ -1191,11 +853,6 @@ html[data-theme="dark"],
   /* Reduce horizontal padding */
   padding-left: 1rem;
   padding-right: 1rem;
-}
-
-.dashboard-focus-execution h1 {
-  /* Smaller title for dashboard */
-  font-size: 1.5rem;
 }
 
 /* Hide execution stats section in dashboard view */
@@ -1354,9 +1011,8 @@ html[data-theme="dark"],
 .css-1tkfr4s-group,
 [class$="-group"] > div:first-child {
   color: var(--color-base-content) !important;
-  font-weight: 600 !important;
+  font-weight: 500 !important;
   font-size: 0.75rem !important;
-  text-transform: uppercase !important;
   opacity: 0.7 !important;
 }
 
@@ -1469,11 +1125,6 @@ html[data-theme="dark"],
    Chat UI Styles
    ======================================== */
 
-/* The QDash bot mark (OQTOPUS logo) on the empty chat. */
-.chat-avatar-hero {
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-base-content) 8%, transparent);
-}
-
 /*
  * First-message transition on the chat page (lib/viewTransition.ts): the mark
  * and the composer keep their names across the layout change, so the browser
@@ -1562,7 +1213,7 @@ html[data-theme="dark"],
   align-items: center;
   padding: 0.4rem 2rem 0.4rem 0.625rem;
   border-radius: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   text-align: left;
   color: color-mix(in oklch, var(--color-base-content) 85%, transparent);
   transition: background-color 0.15s ease;
@@ -1600,7 +1251,7 @@ html[data-theme="dark"],
   height: 2rem;
   padding: 0 0.5rem;
   border-radius: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   background: var(--color-base-100);
   border: 1px solid color-mix(in oklch, var(--color-primary) 50%, transparent);
   outline: none;
@@ -1704,9 +1355,9 @@ html[data-theme="dark"],
     0 6px 20px -8px rgb(0 0 0 / 0.12);
 }
 
-/* Answer typography: a little roomier than prose-sm, like chat products. */
+/* Answer typography: body size, with roomier leading like chat products. */
 .chat-prose {
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
@@ -1722,7 +1373,7 @@ html[data-theme="dark"],
 .chat-prose :where(h1, h2, h3, h4) {
   margin-top: 1.4em;
   margin-bottom: 0.5em;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .chat-prose :where(ul, ol) {
@@ -1745,7 +1396,7 @@ html[data-theme="dark"],
   padding: 0.1rem 0.35rem;
   border-radius: 0.375rem;
   font-size: 0.85em;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   background: color-mix(in oklch, var(--color-base-content) 8%, transparent);
 }
 
@@ -1763,7 +1414,7 @@ html[data-theme="dark"],
 
 .chat-table-wrap table {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
 .chat-table-wrap :where(th, td) {
@@ -1937,7 +1588,7 @@ html[data-theme="dark"],
   max-height: 16rem;
   overflow-y: auto;
   white-space: pre-wrap;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   line-height: 1.6;
   color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
   border-left: 2px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
@@ -2006,8 +1657,8 @@ html[data-theme="dark"],
   display: inline-block;
   padding: 0.05rem 0.4rem;
   border-radius: 0.3rem;
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
   line-height: 1.4;
   color: color-mix(in oklch, var(--color-base-content) 75%, transparent);
   background: color-mix(in oklch, var(--color-base-content) 7%, transparent);
@@ -2028,14 +1679,13 @@ html[data-theme="dark"],
   flex-shrink: 0;
   border-radius: 0.375rem;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 500;
   color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
   background: color-mix(in oklch, var(--color-base-content) 7%, transparent);
 }
 
 /* Narrow chat surfaces (docked panel, floating window). */
 .chat-compact .chat-prose {
-  font-size: 0.875rem;
   line-height: 1.65;
 }
 
@@ -2044,17 +1694,13 @@ html[data-theme="dark"],
   padding: 0.5rem 0.5rem 0.4rem 0.625rem;
 }
 
-.chat-compact-xs .chat-prose {
-  font-size: 0.8125rem;
-}
-
 /* highlight.js tokens mapped onto the active DaisyUI theme. */
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-built_in,
 .hljs-literal {
   color: var(--color-primary);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .hljs-string,
@@ -2102,8 +1748,8 @@ html[data-theme="dark"],
 .driver-popover.qdash-tour-popover .driver-popover-title {
   color: var(--color-base-content);
   font-family: inherit;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .driver-popover.qdash-tour-popover .driver-popover-description,

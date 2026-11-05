@@ -16,7 +16,7 @@ export function DeleteUserDialog({ user, isLoading, onClose, onConfirm }: Delete
       <DialogContent>
         <DialogTitle>Confirm Delete</DialogTitle>
         <DialogDescription className="py-4">
-          Are you sure you want to delete user <span className="font-bold">{user.username}</span>?
+          Are you sure you want to delete user <span className="font-medium">{user.username}</span>?
           This action cannot be undone.
         </DialogDescription>
         <div className="modal-action">
@@ -98,7 +98,8 @@ export function DeleteProjectDialog({
       <DialogContent>
         <DialogTitle>Confirm Delete Project</DialogTitle>
         <DialogDescription className="py-4">
-          Are you sure you want to delete project <span className="font-bold">{project.name}</span>?
+          Are you sure you want to delete project{" "}
+          <span className="font-medium">{project.name}</span>?
         </DialogDescription>
         <p className="text-sm text-base-content/60">
           This will also remove all project memberships. This action cannot be undone.

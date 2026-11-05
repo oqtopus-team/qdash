@@ -271,10 +271,26 @@ def test_list_task_info_extracts_input_parameter_metadata() -> None:
     clear_backend_config_cache()
     service = TaskFileService()
 
-    tasks = service.list_task_info("fake").tasks
+    tasks = service.list_task_info("qubex").tasks
     task = next(t for t in tasks if t.name == "CheckRabi")
 
-    assert task.input_parameters["qubit_frequency"]["resolution"] == "default_only"
+    parameter = task.input_parameters["control_frequency"]
+    assert parameter["resolution"] == "database_required"
+    assert parameter["fallback_parameter_names"] == ["qubit_frequency"]
+
+
+def test_fake_backend_publishes_the_qubex_task_declarations() -> None:
+    """A qubex task routed to the fake backend keeps its qubex declaration in the catalog."""
+    clear_backend_config_cache()
+    service = TaskFileService()
+
+    fake = {t.name: t for t in service.list_task_info("fake").tasks}
+    qubex = {t.name: t for t in service.list_task_info("qubex").tasks}
+
+    assert fake["CheckRabi"].input_parameters == qubex["CheckRabi"].input_parameters
+    assert fake["CheckRabi"].run_parameters == qubex["CheckRabi"].run_parameters
+    assert fake["FakeBringUp"].input_parameters == {}
+    assert "FakeBringUp" not in qubex
 
 
 def test_coarse_readout_task_is_enabled_with_resolvable_input_metadata() -> None:

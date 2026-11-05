@@ -75,21 +75,23 @@ export function UserAvatar({
 export function QdashBotAvatar({
   size = 28,
   className = "",
+  unframed = false,
 }: {
   size?: number;
   className?: string;
+  unframed?: boolean;
 }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-base-100 ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center ${unframed ? "" : "rounded-full bg-base-100"} ${className}`}
       title="QDash"
     >
       <Image
-        src="/oqtopus_logo.png"
+        src={unframed ? "/oqtopus_logo.svg" : "/oqtopus_logo.png"}
         alt="OQTOPUS"
         width={size}
         height={size}
-        className="rounded-full"
+        className={unframed ? "" : "rounded-full"}
       />
     </span>
   );

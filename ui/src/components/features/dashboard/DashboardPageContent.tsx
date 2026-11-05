@@ -552,8 +552,8 @@ export function DashboardPageContent() {
       <div className="h-full flex flex-col gap-4 md:gap-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <PageHeader
-            title="Chip Dashboard"
-            description="One-page summary of every metric on the selected chip. Click any qubit or coupling to update its pinned summary or start a forum topic."
+            title="Dashboard"
+            description="Every metric of the selected chip on one page"
             className="mb-0"
           />
         </div>
@@ -563,10 +563,7 @@ export function DashboardPageContent() {
           aria-labelledby="dashboard-data-scope"
           className="rounded-xl border border-base-300 bg-base-200/45 p-3 sm:p-4"
         >
-          <h2
-            id="dashboard-data-scope"
-            className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-base-content/55"
-          >
+          <h2 id="dashboard-data-scope" className="mb-3 text-xs font-medium text-base-content/55">
             Data scope
           </h2>
           <div className="flex flex-col gap-4">
@@ -694,7 +691,7 @@ export function DashboardPageContent() {
                 onClick={() => setShowTargetSummaries((visible) => !visible)}
               >
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-lg font-semibold">Target Summaries</h3>
+                  <h3 className="text-sm font-medium">Target Summaries</h3>
                   <p className="mt-0.5 text-sm text-base-content/60">
                     Pin shared context to individual qubits and couplings.
                   </p>
@@ -724,7 +721,7 @@ export function DashboardPageContent() {
                 >
                   <div className="flex flex-col gap-2">
                     <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
-                      <h4 className="text-sm font-semibold">Qubit summaries</h4>
+                      <h4 className="text-sm font-medium">Qubit summaries</h4>
                     </div>
                     <div className={SUMMARY_TOPOLOGY_VIEWPORT_CLASS}>
                       <DashboardQubitGrid
@@ -748,7 +745,7 @@ export function DashboardPageContent() {
                   <div className="flex flex-col gap-2">
                     <div className={SUMMARY_TOPOLOGY_HEADER_CLASS}>
                       <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-semibold">Coupling summaries</h4>
+                        <h4 className="text-sm font-medium">Coupling summaries</h4>
                       </div>
                       <button
                         type="button"
@@ -797,7 +794,7 @@ export function DashboardPageContent() {
               <details className="group">
                 <summary className="flex cursor-pointer list-none items-center gap-3">
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-lg font-semibold">All Metrics Summary</h3>
+                    <h3 className="text-sm font-medium">All Metrics Summary</h3>
                     <p className="text-sm text-base-content/60">
                       Coverage, median, min and max for every metric in the active time range.
                     </p>
@@ -881,7 +878,7 @@ export function DashboardPageContent() {
                         className="scroll-mt-32 space-y-2"
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-base font-semibold">{m.title}</h4>
+                          <h4 className="text-sm font-medium">{m.title}</h4>
                           <span className="badge badge-outline badge-sm">{m.unit}</span>
                           {noted.size > 0 && (
                             <span className="badge badge-warning badge-sm">
@@ -893,7 +890,6 @@ export function DashboardPageContent() {
                               value={cov.pct}
                               current={cov.current}
                               total={cov.total}
-                              duration={400}
                               label="Coverage"
                             />
                           </div>
@@ -1060,7 +1056,7 @@ export function DashboardPageContent() {
                         className="scroll-mt-32 space-y-2"
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-base font-semibold">{m.title}</h4>
+                          <h4 className="text-sm font-medium">{m.title}</h4>
                           <span className="badge badge-outline badge-sm">{m.unit}</span>
                           {noted.size > 0 && (
                             <span className="badge badge-warning badge-sm">
@@ -1072,7 +1068,6 @@ export function DashboardPageContent() {
                               value={cov.pct}
                               current={cov.current}
                               total={cov.total}
-                              duration={400}
                               label="Coverage"
                             />
                           </div>

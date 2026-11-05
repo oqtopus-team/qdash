@@ -32,6 +32,10 @@ from qdash.api.services.flow_service.execution import (
 )
 from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnavailable
 from qdash.api.services.flow_service.source_store import FlowSourceStore
+from qdash.api.services.flow_service.target_defaults import (
+    flow_parameter_names,
+    resolve_target_defaults,
+)
 from qdash.api.services.flow_service.templates import TemplateCatalog
 from qdash.api.services.flow_service.validation import (
     format_with_ruff,
@@ -40,6 +44,7 @@ from qdash.api.services.flow_service.validation import (
     validate_flow_name,
 )
 from qdash.config import get_settings
+from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -240,6 +245,9 @@ class FlowService:
             created_by=flow.username,
             description=flow.description,
             code=code,
+            target_defaults=resolve_target_defaults(
+                code, flow.flow_function_name, flow.default_parameters
+            ),
             flow_function_name=flow.flow_function_name,
             chip_id=flow.chip_id,
             default_parameters=flow.default_parameters,
@@ -325,6 +333,22 @@ class FlowService:
         if "tags" not in parameters and flow.tags:
             parameters["tags"] = flow.tags
 
+        run_context: dict[str, Any] = {}
+        if request.target_override is not None:
+            override = request.target_override.model_dump()
+            run_context[TARGET_CONTEXT_KEY] = override
+            code = self._sources.read(Path(flow.file_path))
+            accepted = flow_parameter_names(code, flow.flow_function_name)
+            mode = "mux_ids" if request.target_override.mux_ids is not None else "qids"
+            # Templates may validate targets before creating CalibService. Pass
+            # them (and clear the other mode) only when the flow can receive
+            # this mode; otherwise saved parameters stay and CalibService
+            # applies the override from the run context.
+            if mode in accepted:
+                parameters.update(
+                    {key: value for key, value in override.items() if key in accepted}
+                )
+
         logger.info(
             f"Executing flow '{name}' "
             f"(deployment={flow.deployment_id}) "
@@ -342,6 +366,7 @@ class FlowService:
                 parameters=parameters,
                 tags=parameters.get("tags") or flow.tags,
                 workflow=True,
+                **({"context": run_context} if run_context else {}),
             )
         except FlowDispatchError as exc:
             logger.error(f"Failed to execute flow: {exc}")
@@ -532,9 +557,9 @@ class FlowService:
             message=f"Agent candidate commit '{commit_id}' queued for backend application",
         )
 
-    async def list_templates(self) -> list[FlowTemplate]:
-        """List the available flow templates."""
-        return self._templates.list_templates()
+    async def list_templates(self, backend: str | None = None) -> list[FlowTemplate]:
+        """List the available flow templates, optionally only those for one backend."""
+        return self._templates.list_templates(backend)
 
     async def get_template(self, template_id: str) -> FlowTemplateWithCode:
         """Return one flow template together with its source."""

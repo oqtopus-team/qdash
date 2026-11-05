@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { FlowScheduleSummaryChipId } from './flowScheduleSummaryChipId';
 import type { FlowScheduleSummaryCron } from './flowScheduleSummaryCron';
 import type { FlowScheduleSummaryNextRun } from './flowScheduleSummaryNextRun';
 
@@ -26,4 +27,6 @@ export interface FlowScheduleSummary {
   active: boolean;
   /** Schedule creation time */
   created_at: string;
+  /** Target chip ID of the schedule, when known */
+  chip_id?: FlowScheduleSummaryChipId;
 }

@@ -12,8 +12,10 @@ when you are learning the editor or checking a new task sequence without laborat
    per creator, with the subfolders set by each workflow's **Folder** property inside. Your own
    folder comes first and starts open; select another creator's folder header to open it.
 2. Select **New Flow**.
-3. Under **TEMPLATE**, select the workflow closest to the procedure you need. **Simple
-   Calibration** is the smallest general-purpose starting point.
+3. Under **TEMPLATE**, confirm the backend; the configured default backend is preselected, and
+   the list holds only the templates written for it, so a Fake backend never offers hardware
+   templates. Then select the workflow closest to the procedure you need. **Simple Calibration**
+   is the smallest general-purpose starting point on the qubex backend.
 4. Under **PROPERTIES**, enter a unique **Flow Name** using letters, numbers, and underscores.
 5. Confirm **Entrypoint Function**, **Username**, and **Chip ID**. The entrypoint must match the
    function marked as the flow in the source.
@@ -46,9 +48,12 @@ targets priority when both are present.
 | `exclude_qids` | Qubits to remove from a MUX selection |
 | `qids` | An explicit list of individual qubits |
 
-The current **Execute Flow** dialog does not collect MUX or qubit targets. To run or schedule a
-workflow from the application, give the template a safe default target. In **Simple Calibration**,
-add this fallback immediately before the block that creates the targets:
+For an immediate run, select targets in **Execute Flow** as described in
+[Run a Workflow](./running-calibrations.md#run-a-workflow). Changes in that dialog apply only to
+that run and do not change the saved source or schedules.
+
+For scheduled runs, give the template a safe default target. In **Simple Calibration**, add this
+fallback immediately before the block that creates the targets:
 
 ```python
 if mux_ids is None and qids is None:
@@ -66,8 +71,8 @@ before running resonator spectroscopy. The template requires `mux_ids` and runs
 **CorrectCaptureDelay** once per MUX.
 
 1. Select **Box Setup** under **TEMPLATE** and set a flow name.
-2. Set a default MUX target in the source when you plan to run it from the application. Replace
-   the template's missing-target check with:
+2. For an immediate run, select **MUX IDs** in **Execute Flow**. For scheduled runs, set a
+   default MUX target in the source by replacing the template's missing-target check with:
 
    ```python
    if mux_ids is None:

@@ -13,6 +13,7 @@ import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { CalibrationUpdateStatusBadge } from "@/components/features/metrics/ParametersTable";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
+import { ParameterLineageDialog } from "@/components/features/provenance/ParameterLineageDialog";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import {
   DropdownMenu,
@@ -26,6 +27,11 @@ import {
   formatTime as formatTimeUtil,
   formatDateTime as formatDateTimeUtil,
 } from "@/lib/utils/datetime";
+import {
+  firstPublishedParameter,
+  resolveParameterQid,
+  type ProvenanceTarget,
+} from "@/lib/provenanceTarget";
 import { formatSweepValue } from "@/lib/utils/task-parameters";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
@@ -76,22 +82,7 @@ export function TaskDetailModal({
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [subIndex, setSubIndex] = useState(initialSubIndex);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  const resolveQid = (taskQid: string, qidRole?: string): string => {
-    if (!qidRole || qidRole === "self" || qidRole === "coupling") return taskQid;
-    const match = taskQid.match(/^(\d+)-(\d+)$/);
-    if (!match) return taskQid;
-    const [, control, target] = match;
-    if (qidRole === "control") return control;
-    if (qidRole === "target") return target;
-    return taskQid;
-  };
-
-  const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
-    const p = encodeURIComponent(parameterName);
-    const q = encodeURIComponent(qidValue);
-    return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
-  };
+  const [lineageTarget, setLineageTarget] = useState<ProvenanceTarget | null>(null);
 
   // Use generated API client hook when taskId is provided
   const {
@@ -223,10 +214,8 @@ export function TaskDetailModal({
       >
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
-              {modalTitle}
-            </DialogTitle>
-            <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+            <DialogTitle className="text-sm font-medium truncate">{modalTitle}</DialogTitle>
+            <DialogDescription className="text-sm text-base-content/70 mt-0.5 sm:mt-1">
               QID {qid}
             </DialogDescription>
           </div>
@@ -315,7 +304,7 @@ export function TaskDetailModal({
               {/* Figures */}
               {figures.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="text-lg font-semibold mb-3">Figures ({figures.length})</h4>
+                  <h4 className="text-sm font-medium mb-3">Figures ({figures.length})</h4>
                   {variant === "detailed" ? (
                     /* Detailed view: 2-column grid */
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -485,7 +474,7 @@ export function TaskDetailModal({
                   {task.output_parameters && (
                     <div className="mb-6">
                       <div className="mb-3 flex items-center gap-2">
-                        <h4 className="text-lg font-semibold">Output Parameters</h4>
+                        <h4 className="text-sm font-medium">Output Parameters</h4>
                         <CalibrationUpdateStatusBadge
                           parameters={task.output_parameters as Record<string, unknown>}
                         />
@@ -538,7 +527,7 @@ export function TaskDetailModal({
                   {/* Run Parameters (Experiment Configuration) */}
                   {task.run_parameters && Object.keys(task.run_parameters).length > 0 && (
                     <div className="mb-6">
-                      <h4 className="text-lg font-semibold mb-3">Run Parameters</h4>
+                      <h4 className="text-sm font-medium mb-3">Run Parameters</h4>
                       <div className="overflow-x-auto">
                         <table className="table table-zebra table-sm">
                           <thead>
@@ -600,7 +589,7 @@ export function TaskDetailModal({
                   {/* Input Parameters (Calibration Dependencies) - Card View */}
                   {task.input_parameters && Object.keys(task.input_parameters).length > 0 && (
                     <div className="mb-6">
-                      <h4 className="text-lg font-semibold mb-3">Calibration Inputs</h4>
+                      <h4 className="text-sm font-medium mb-3">Calibration Inputs</h4>
                       <div className="space-y-2">
                         {Object.entries(task.input_parameters).map(([key, value]) => {
                           const paramValue = (
@@ -688,7 +677,7 @@ export function TaskDetailModal({
                                       {freshness.icon}
                                     </span>
                                     <div>
-                                      <div className="font-semibold text-sm">{key}</div>
+                                      <div className="font-medium text-sm">{key}</div>
                                       <div className="text-xs text-base-content/60">
                                         {paramValue.description || "Calibration parameter"}
                                       </div>
@@ -697,7 +686,7 @@ export function TaskDetailModal({
 
                                   {/* Right: Value */}
                                   <div className="text-right">
-                                    <div className="font-mono font-semibold">
+                                    <div className="font-mono font-medium">
                                       {typeof paramValue.value === "number"
                                         ? paramValue.value.toFixed(precision)
                                         : typeof paramValue.value === "object"
@@ -745,16 +734,15 @@ export function TaskDetailModal({
                                             <DropdownMenuItem
                                               onSelect={() => {
                                                 const pv = paramValue as Record<string, unknown>;
-                                                const parameterName =
-                                                  (pv?.parameter_name as string | undefined) || key;
-                                                const resolvedQid = resolveQid(
-                                                  qid,
-                                                  pv?.qid_role as string | undefined,
-                                                );
-                                                router.push(
-                                                  buildProvenanceUrl(parameterName, resolvedQid),
-                                                );
-                                                onClose();
+                                                setLineageTarget({
+                                                  parameterName:
+                                                    (pv?.parameter_name as string | undefined) ||
+                                                    key,
+                                                  qid: resolveParameterQid(
+                                                    qid,
+                                                    pv?.qid_role as string | undefined,
+                                                  ),
+                                                });
                                               }}
                                             >
                                               View Lineage
@@ -778,42 +766,29 @@ export function TaskDetailModal({
                         })}
                       </div>
 
-                      {/* Lineage Graph Button */}
+                      {/* Lineage of the first published parameter */}
                       <div className="mt-4 text-center">
                         <button
-                          className="btn btn-ghost btn-sm gap-2 hover:btn-primary"
-                          onClick={() => {
-                            const outputs =
-                              task?.output_parameters && typeof task.output_parameters === "object"
-                                ? Object.entries(task.output_parameters)
-                                : [];
-                            const inputs =
-                              task?.input_parameters && typeof task.input_parameters === "object"
-                                ? Object.entries(task.input_parameters)
-                                : [];
-
-                            const [key, paramValue] =
-                              (outputs[0] as [string, Record<string, unknown>] | undefined) ??
-                              (inputs[0] as [string, Record<string, unknown>] | undefined) ??
-                              [];
-
-                            if (key && paramValue) {
-                              const pv = paramValue as Record<string, unknown>;
-                              const parameterName =
-                                (pv?.parameter_name as string | undefined) || key;
-                              const resolvedQid = resolveQid(
+                          className="btn btn-ghost btn-sm gap-2"
+                          disabled={
+                            !firstPublishedParameter(
+                              qid,
+                              task?.output_parameters,
+                              task?.input_parameters,
+                            )
+                          }
+                          onClick={() =>
+                            setLineageTarget(
+                              firstPublishedParameter(
                                 qid,
-                                pv?.qid_role as string | undefined,
-                              );
-                              router.push(buildProvenanceUrl(parameterName, resolvedQid));
-                            } else {
-                              router.push("/provenance");
-                            }
-                            onClose();
-                          }}
+                                task?.output_parameters,
+                                task?.input_parameters,
+                              ),
+                            )
+                          }
                         >
                           <GitBranch size={16} />
-                          Explore Provenance
+                          Lineage
                         </button>
                       </div>
                     </div>
@@ -858,6 +833,7 @@ export function TaskDetailModal({
           )}
         </div>
       </DialogContent>
+      <ParameterLineageDialog target={lineageTarget} onClose={() => setLineageTarget(null)} />
     </Dialog>
   );
 }

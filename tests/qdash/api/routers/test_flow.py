@@ -397,6 +397,31 @@ class TestFlowExecution:
 class TestFlowTemplates:
     """Tests for flow template endpoints."""
 
+    def test_every_shipped_template_declares_a_backend(
+        self, test_client, test_project, auth_headers
+    ):
+        """Each entry in templates.json names the backend it runs on."""
+        response = test_client.get("/flows/templates", headers=auth_headers)
+
+        assert response.status_code == 200
+        templates = response.json()
+        assert templates
+        assert {template["backend"] for template in templates} == {"qubex", "fake"}
+
+    def test_list_templates_filters_by_backend(self, test_client, test_project, auth_headers):
+        """The backend query keeps fake templates out of a qubex deployment and vice versa."""
+        fake = test_client.get("/flows/templates", params={"backend": "fake"}, headers=auth_headers)
+        qubex = test_client.get(
+            "/flows/templates", params={"backend": "qubex"}, headers=auth_headers
+        )
+
+        assert fake.status_code == 200
+        assert [template["id"] for template in fake.json()] == ["fake_calibration"]
+        assert qubex.status_code == 200
+        qubex_ids = [template["id"] for template in qubex.json()]
+        assert "simple" in qubex_ids
+        assert "fake_calibration" not in qubex_ids
+
     def test_get_full_calibration_template_includes_configure_all(
         self, test_client, test_project, auth_headers
     ):

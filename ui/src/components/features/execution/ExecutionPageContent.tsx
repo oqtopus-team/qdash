@@ -6,8 +6,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowUpRight,
-  BarChart3,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -17,11 +15,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { isExecutionCancellable, isExecutionInProgress } from "@/lib/executionStatus";
+import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
-import { formatDate, formatDateTime } from "@/lib/utils/datetime";
+import { DEFAULT_TIMEZONE, formatDateTime } from "@/lib/utils/datetime";
 
-import { ExecutionDurationBreakdown } from "./ExecutionDurationBreakdown";
+import {
+  type ActivityWindow,
+  DEFAULT_ACTIVITY_WINDOW,
+  ExecutionActivityChart,
+} from "./ExecutionActivityChart";
 
 import type { ExecutionResponseSummary } from "@/schemas";
 
@@ -34,7 +36,9 @@ import {
   getGetExecutionQueryKey,
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
+import { ExecutionRunSummary } from "@/components/features/execution/ExecutionRunSummary";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
@@ -42,6 +46,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useToast } from "@/components/ui/Toast";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
@@ -100,7 +105,7 @@ function PaginationControls({
       >
         Prev
       </button>
-      <span className="text-xs sm:text-sm">{pageLabel}</span>
+      <span className="text-sm">{pageLabel}</span>
       <button
         onClick={() => setCurrentPage((prev) => prev + 1)}
         disabled={isNextDisabled}
@@ -127,9 +132,8 @@ export function ExecutionPageContent() {
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [showDurationBreakdown, setShowDurationBreakdown] = useState(false);
+  const [activityDays, setActivityDays] = useState<ActivityWindow>(DEFAULT_ACTIVITY_WINDOW);
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const executionCards = useRef(new Map<string, HTMLDivElement>());
@@ -173,6 +177,9 @@ export function ExecutionPageContent() {
       chip_id: selectedChip || "",
       skip: (currentPage - 1) * itemsPerPage,
       limit: itemsPerPage,
+      // A picked day is filtered on the server, so every run of that day is reachable,
+      // not only those on the first page. The day follows the UI's display time zone.
+      ...(selectedDate === "latest" ? {} : { date: selectedDate, timezone: DEFAULT_TIMEZONE }),
     },
     {
       query: {
@@ -205,15 +212,7 @@ export function ExecutionPageContent() {
   });
 
   // Compute card data from execution data (filter by date)
-  const cardData = useMemo(() => {
-    if (!executionData?.data?.executions) return [];
-    if (selectedDate === "latest") return executionData.data.executions;
-    return executionData.data.executions.filter((exec) => {
-      if (!exec.start_at) return false;
-      const execDateStr = formatDate(exec.start_at).replace(/-/g, "");
-      return execDateStr === selectedDate;
-    });
-  }, [executionData, selectedDate]);
+  const cardData = useMemo(() => executionData?.data?.executions ?? [], [executionData]);
 
   const selectedExecutionIndex = cardData.findIndex(
     (execution) => execution.execution_id === selectedExecutionId,
@@ -246,16 +245,6 @@ export function ExecutionPageContent() {
     if (sidebarRef.current) sidebarRef.current.scrollTop = 0;
   }, [selectedExecutionId]);
 
-  const statusSummary = useMemo(
-    () => ({
-      total: cardData.length,
-      running: cardData.filter((execution) => isExecutionInProgress(execution.status)).length,
-      failed: cardData.filter((execution) => execution.status === "failed").length,
-      completed: cardData.filter((execution) => execution.status === "completed").length,
-    }),
-    [cardData],
-  );
-
   useEffect(() => {
     if (!isSidebarOpen) return;
 
@@ -279,6 +268,8 @@ export function ExecutionPageContent() {
   const handleChipChange = (chipId: string) => {
     handleCloseSidebar();
     setSelectedChip(chipId || null);
+    // A day picked for one chip means nothing for another.
+    setSelectedDate("latest");
     setCurrentPage(1);
   };
 
@@ -293,10 +284,7 @@ export function ExecutionPageContent() {
   if (isError) {
     return (
       <PageContainer>
-        <PageHeader
-          title="Execution History"
-          description="Monitor workflow runs and task results"
-        />
+        <PageHeader title="Execution" description="Workflow runs and their task results" />
         <div role="alert" className="alert alert-error">
           <AlertCircle className="h-5 w-5" />
           <span>Execution history could not be loaded. Please try again.</span>
@@ -371,7 +359,7 @@ export function ExecutionPageContent() {
 
   return (
     <PageContainer>
-      <PageHeader title="Execution History" description="Monitor workflow runs and task results" />
+      <PageHeader title="Execution" description="Workflow runs and their task results" />
       <PageFiltersBar className="mb-4 sm:mb-6">
         <PageFiltersBar.Group>
           <PageFiltersBar.Item className="sm:w-64">
@@ -387,67 +375,20 @@ export function ExecutionPageContent() {
           </PageFiltersBar.Item>
         </PageFiltersBar.Group>
       </PageFiltersBar>
-      <section aria-label="Execution status summary" className="mb-4 sm:mb-6">
-        <div className="stats stats-horizontal w-full overflow-x-auto border border-base-300 bg-base-100 shadow-sm">
-          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
-            <div className="stat-title text-xs">Total</div>
-            <div className="stat-value text-2xl">{statusSummary.total}</div>
-          </div>
-          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
-            <div className="stat-title text-xs">Running</div>
-            <div className="stat-value text-2xl text-info">{statusSummary.running}</div>
-          </div>
-          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
-            <div className="stat-title text-xs">Failed</div>
-            <div className="stat-value text-2xl text-error">{statusSummary.failed}</div>
-          </div>
-          <div className="stat min-w-28 px-4 py-3 sm:min-w-0">
-            <div className="stat-title text-xs">Completed</div>
-            <div className="stat-value text-2xl text-success">{statusSummary.completed}</div>
-          </div>
-        </div>
-      </section>
-      <section className="mb-6" aria-labelledby="duration-breakdown-heading">
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-box border border-base-300 bg-base-100 px-4 py-3 text-left transition-colors hover:bg-base-200/50"
-          aria-expanded={showDurationBreakdown}
-          aria-controls="duration-breakdown-content"
-          onClick={() => setShowDurationBreakdown((value) => !value)}
-        >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <BarChart3 className="h-5 w-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span id="duration-breakdown-heading" className="block font-semibold">
-              Task duration breakdown
-            </span>
-            <span className="block text-sm text-base-content/60">
-              Compare task timing across the current execution set
-            </span>
-          </span>
-          <ChevronDown
-            className={`h-5 w-5 shrink-0 transition-transform ${showDurationBreakdown ? "rotate-180" : ""}`}
-          />
-        </button>
-        {showDurationBreakdown && (
-          <div id="duration-breakdown-content" className="mt-3">
-            <ExecutionDurationBreakdown
-              executions={cardData}
-              selectedTag={selectedTag}
-              onTagSelect={setSelectedTag}
-              allItemsHref={`/execution/durations${selectedChip ? `?chip=${encodeURIComponent(selectedChip)}` : ""}`}
-            />
-          </div>
-        )}
-      </section>
+      <ExecutionActivityChart
+        chipId={selectedChip || ""}
+        days={activityDays}
+        onDaysChange={setActivityDays}
+        selectedDate={selectedDate}
+        onDateSelect={handleDateChange}
+      />
       <section aria-labelledby="recent-executions-heading">
         <div className="mb-3">
           <h2
             ref={executionListHeading}
             tabIndex={-1}
             id="recent-executions-heading"
-            className="text-lg font-semibold"
+            className="text-sm font-medium"
           >
             Recent executions
           </h2>
@@ -459,7 +400,7 @@ export function ExecutionPageContent() {
         </div>
         {cardData.length === 0 && (
           <div className="rounded-box border border-dashed border-base-300 bg-base-100 px-6 py-12 text-center">
-            <h3 className="font-semibold">No executions found</h3>
+            <h3 className="font-medium">No executions found</h3>
             <p className="mt-1 text-sm text-base-content/60">
               Try another chip or date to view execution history.
             </p>
@@ -497,16 +438,14 @@ export function ExecutionPageContent() {
                 )}
                 <div className="relative z-10 w-full">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="truncate text-sm font-semibold sm:text-base">
-                      {execution.name}
-                    </h3>
+                    <h3 className="truncate text-sm font-medium">{execution.name}</h3>
                     <span
                       className={`badge badge-sm flex-shrink-0 ${getStatusBadgeClass(execution.status)} ${execution.status === "running" || execution.status === "cancelling" ? "status-pulse" : ""}`}
                     >
                       {getStatusLabel(execution.status)}
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-xs sm:text-sm text-base-content/60">
+                  <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-sm text-base-content/60">
                     <span>{formatDateTime(execution.start_at)}</span>
                     {execution.elapsed_time && (
                       <span className="hidden sm:inline">Duration: {execution.elapsed_time}</span>
@@ -587,9 +526,16 @@ export function ExecutionPageContent() {
               </button>
             </nav>
             <div className="p-2 sm:p-4 bg-base-100 mb-4 sm:mb-6">
-              <h2 className="text-lg sm:text-2xl font-bold pr-8">
+              <h2 className="text-sm font-medium pr-8">
                 {cardData.find((exec) => getExecutionKey(exec) === selectedExecutionId)?.name}
               </h2>
+              {executionDetailData?.data && (
+                <ExecutionRunSummary
+                  status={executionDetailData.data.status}
+                  tasks={executionDetailData.data.task ?? []}
+                  className="mt-3"
+                />
+              )}
               <div className="mt-3 sm:mt-4 flex flex-wrap gap-2">
                 <Link
                   href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}
@@ -623,7 +569,9 @@ export function ExecutionPageContent() {
               </div>
             </div>
             <div>
-              <h3 className="text-base sm:text-xl font-bold mb-3 sm:mb-4">Execution Details</h3>
+              <h3 className="mb-3 text-xs font-medium text-base-content/60 sm:mb-4">
+                Execution Details
+              </h3>
               {isDetailLoading && (
                 <div role="status" className="flex items-center gap-2 py-4 text-base-content/60">
                   <span className="loading loading-spinner loading-sm" aria-hidden="true" />
@@ -631,15 +579,25 @@ export function ExecutionPageContent() {
                 </div>
               )}
               {isDetailError && <div>Error loading details.</div>}
-              {executionDetailData?.data.status === "failed" &&
-                executionDetailData.data.message && (
-                  <div className="alert alert-error mb-4 items-start text-sm">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span className="break-words whitespace-pre-wrap">
-                      {executionDetailData.data.message}
-                    </span>
-                  </div>
-                )}
+              {executionDetailData?.data.status === "failed" && selectedExecutionId && (
+                // This panel is already a right-hand drawer, so the investigation
+                // opens in the floating window instead of a second docked sidebar.
+                <TaskMessagePanel
+                  status="failed"
+                  message={executionDetailData.data.message}
+                  showEmptyFallback
+                  className="mb-4"
+                  action={
+                    <InvestigateWithAiButton
+                      target={{
+                        executionId: selectedExecutionId,
+                        chipId: executionDetailData.data.chip_id || null,
+                      }}
+                      surface="mini"
+                    />
+                  }
+                />
+              )}
               {executionDetailData &&
                 executionDetailData.data.task &&
                 executionDetailData.data.task.map((detailTask, idx) => {
@@ -652,7 +610,7 @@ export function ExecutionPageContent() {
                       onClick={() => handleTaskClick(idx)}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-sm sm:text-lg font-semibold text-left truncate flex-1">
+                        <h4 className="text-sm font-medium text-left truncate flex-1">
                           {detailTask.task_id ? (
                             <Link
                               href={`/task-results/${detailTask.task_id}`}
@@ -671,7 +629,7 @@ export function ExecutionPageContent() {
                           )}
                         </h4>
                         <span
-                          className={`text-xs sm:text-sm font-semibold flex-shrink-0 ${
+                          className={`text-sm font-medium flex-shrink-0 ${
                             detailTask.status === "running"
                               ? "text-info status-pulse"
                               : detailTask.status === "completed"
@@ -694,7 +652,7 @@ export function ExecutionPageContent() {
                                   : "Failed"}
                         </span>
                       </div>
-                      <div className="text-xs sm:text-sm text-base-content/60 mt-1">
+                      <div className="text-sm text-base-content/60 mt-1">
                         <span>
                           {detailTask.start_at ? formatDateTime(detailTask.start_at) : "N/A"}
                         </span>
@@ -713,7 +671,7 @@ export function ExecutionPageContent() {
                           detailTask.figure_path.length > 0 ? (
                             detailTask.figure_path.map((path, i) => (
                               <div key={i}>
-                                <h5 className="text-xs sm:text-sm font-semibold mb-1 text-left">
+                                <h5 className="text-sm font-medium mb-1 text-left">
                                   Figure {i + 1}
                                 </h5>
                                 <TaskFigure
@@ -725,9 +683,7 @@ export function ExecutionPageContent() {
                             ))
                           ) : detailTask.figure_path ? (
                             <div>
-                              <h5 className="text-xs sm:text-sm font-semibold mb-1 text-left">
-                                Figure
-                              </h5>
+                              <h5 className="text-sm font-medium mb-1 text-left">Figure</h5>
                               <TaskFigure
                                 path={detailTask.figure_path}
                                 qid={detailTask.qid || ""}
@@ -735,7 +691,7 @@ export function ExecutionPageContent() {
                               />
                             </div>
                           ) : (
-                            <p className="text-xs sm:text-sm text-base-content/50 italic">
+                            <p className="text-sm text-base-content/50 italic">
                               No figure available
                             </p>
                           )}

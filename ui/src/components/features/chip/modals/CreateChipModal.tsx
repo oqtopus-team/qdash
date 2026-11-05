@@ -253,7 +253,10 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
           </div>
 
           {/* Qubex configuration directory (system_id == chip_id) */}
-          <fieldset className="space-y-2 rounded-lg border border-base-300 p-3">
+          <fieldset
+            className="space-y-2 rounded-lg border border-base-300 p-3"
+            data-tour="chip-config"
+          >
             <legend className="px-1 text-sm font-medium">Qubex configuration</legend>
             {isLoadingSources ? (
               <div className="flex items-center gap-2">

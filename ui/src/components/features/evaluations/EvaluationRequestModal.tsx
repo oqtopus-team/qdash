@@ -84,6 +84,8 @@ interface EvaluationRequestModalProps {
    * (model only or via Copilot) or a conversation, chosen the same way.
    */
   onChat?: () => void;
+  /** Called once an evaluation run has been created, before the modal closes. */
+  onRequested?: () => void;
 }
 
 /** What the modal can do for one result: a recorded evaluation, or a chat about it. */
@@ -326,6 +328,7 @@ export function EvaluationRequestModal({
   scope,
   scopeLabel,
   onChat,
+  onRequested,
 }: EvaluationRequestModalProps) {
   const router = useRouter();
   const toast = useToast();
@@ -403,6 +406,7 @@ export function EvaluationRequestModal({
       );
       setDraft(null);
       setExcluded(new Set());
+      onRequested?.();
       onClose();
     } catch (error) {
       toast.error(errorDetail(error));
@@ -415,7 +419,7 @@ export function EvaluationRequestModal({
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
-            <DialogTitle className="font-semibold">
+            <DialogTitle className="font-medium">
               {onChat ? "Ask AI" : "Request AI evaluation"}
             </DialogTitle>
           </div>

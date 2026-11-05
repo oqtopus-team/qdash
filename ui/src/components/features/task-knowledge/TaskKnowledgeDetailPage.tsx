@@ -144,7 +144,7 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <h1 className="text-xl font-bold font-mono">{taskName}</h1>
+        <h1 className="text-xl font-medium font-mono">{taskName}</h1>
         <div className="ml-auto">
           <DownloadArchiveButton taskName={taskName} />
         </div>
@@ -156,7 +156,7 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
       {(detail?.examples?.length ?? 0) > 0 && (
         <section className="mt-10">
           <div className="mb-3">
-            <h2 className="text-lg font-semibold">Labeled examples</h2>
+            <h2 className="text-sm font-medium">Labeled examples</h2>
             <p className="text-sm text-base-content/60">
               Plots with the diagnosis an expert validated. The evaluation model sees them as
               demonstrations.
@@ -169,7 +169,7 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
                 className="rounded-xl border border-base-300 bg-base-100 p-5"
               >
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <h3 className="text-base font-semibold">{example.title}</h3>
+                  <h3 className="text-sm font-medium">{example.title}</h3>
                   <span
                     className={`badge badge-sm ${OUTCOME_BADGE[example.outcome] ?? "badge-ghost"}`}
                   >

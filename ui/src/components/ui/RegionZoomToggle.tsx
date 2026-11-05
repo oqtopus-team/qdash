@@ -10,7 +10,7 @@ interface RegionZoomToggleProps {
 export function RegionZoomToggle({ enabled, onToggle }: RegionZoomToggleProps) {
   return (
     <label
-      className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all duration-200 cursor-pointer select-none ${
+      className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-colors duration-200 cursor-pointer select-none ${
         enabled
           ? "bg-primary/10 border-primary"
           : "bg-base-200/50 border-base-300 hover:border-primary/50"

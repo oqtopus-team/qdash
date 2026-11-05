@@ -77,21 +77,17 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
         title: { text: "Time (JST)" },
         type: "date",
         tickformat: "%Y-%m-%d %H:%M",
-        gridcolor: "#eee",
         zeroline: false,
       },
       yaxis: {
         title: { text: `${metadata.description} [${metadata.unit}]` },
         type: "linear",
-        gridcolor: "#eee",
         zeroline: false,
         exponentformat: "e" as const,
       },
       showlegend: false,
       autosize: true,
       margin: { l: 80, r: 50, t: 60, b: 80 },
-      plot_bgcolor: "white",
-      paper_bgcolor: "white",
       hovermode: "closest",
     }),
     [selectedParameter, qubitId, metadata],
@@ -116,9 +112,9 @@ export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProp
   return (
     <div className="space-y-8">
       {/* Parameter Selection Card */}
-      <div className="card bg-base-100 shadow-xl rounded-xl p-8 border border-base-300">
+      <div className="card bg-base-100 shadow-sm rounded-xl p-8 border border-base-300">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
+          <h2 className="text-sm font-medium flex items-center gap-2">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="w-5 h-5"

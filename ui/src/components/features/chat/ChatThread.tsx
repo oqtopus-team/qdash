@@ -4,10 +4,11 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { useGetCopilotPreferences } from "@/client/copilot/copilot";
 import { ArrowDown, FlaskConical } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
-import { useAuth } from "@/contexts/AuthContext";
 import { useChatSuggestions, type ChatSuggestion } from "@/hooks/useChatSuggestions";
 import { useCopilotChat } from "@/hooks/useCopilotChat";
 import { useChatAttachments } from "@/hooks/useChatAttachments";
+import { useChatGreeting } from "@/hooks/useChatGreeting";
+import { useAuth } from "@/contexts/AuthContext";
 import { withViewTransition } from "@/lib/viewTransition";
 import { ChatComposer, type ChatComposerHandle } from "@/components/features/chat/ChatComposer";
 import { ChatLinkPreviewProvider } from "@/components/features/chat/ChatLinkPreview";
@@ -30,7 +31,7 @@ type ChatThreadVariant = "page" | "panel" | "compact";
 export function ContextChip({ context }: { context: TaskChatContext }) {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium max-w-full"
+      className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium max-w-full"
       title={`${context.taskName} · ${context.qid} · ${context.chipId}`}
     >
       <FlaskConical className="w-3 h-3 shrink-0" />
@@ -56,13 +57,6 @@ function ScrollToBottomButton() {
   );
 }
 
-function greetingFor(hour: number): string {
-  if (hour < 5) return "Working late";
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
-
 function EmptyState({
   variant,
   context,
@@ -74,51 +68,58 @@ function EmptyState({
   suggestions: ChatSuggestion[];
   onPick: (text: string) => void;
 }) {
-  const { user, username } = useAuth();
   const large = variant === "page";
-  const name = user?.display_name || username;
-  const title = context
-    ? "Ask about this result"
-    : large
-      ? `${greetingFor(new Date().getHours())}${name ? `, ${name}` : ""}`
-      : "Ask anything about calibration";
+  const { user, username } = useAuth();
+  const greeting = useChatGreeting(user?.display_name?.trim() || username);
+  const title = context ? "Ask about this result" : greeting;
 
   if (large) {
     return (
       <div className="w-full text-center px-4">
-        <QdashBotAvatar size={48} className="mx-auto mb-5 chat-avatar-hero" />
+        <QdashBotAvatar size={64} unframed className="mx-auto mb-5 chat-avatar-hero" />
         {context && (
           <div className="mb-3">
             <ContextChip context={context} />
           </div>
         )}
-        <h2 className="text-2xl sm:text-[28px] font-medium tracking-tight">{title}</h2>
+        <h2 className="text-xl font-medium break-words">{title}</h2>
       </div>
     );
   }
 
   return (
-    <div className="w-full mx-auto px-1">
+    <div className={`w-full mx-auto px-1 ${variant === "panel" ? "text-center" : ""}`}>
+      {variant === "panel" && <QdashBotAvatar size={80} unframed className="mb-4" />}
       {context && (
         <div className="mb-2">
           <ContextChip context={context} />
         </div>
       )}
-      <h2 className="text-sm font-semibold mb-1">{title}</h2>
-      <p className="text-xs text-base-content/50 mb-4">
+      <h2 className="text-sm font-medium mb-1 break-words">{title}</h2>
+      <p className="text-xs text-base-content/50 mb-4 mx-auto max-w-64">
         {context
           ? "The result figures are attached to your first question."
           : "I can fetch parameters, analyze trends, run Python and plot charts."}
       </p>
-      <div className="flex flex-wrap gap-1.5">
+      <div
+        className={
+          variant === "panel" ? "flex flex-col items-center gap-2 mt-5" : "flex flex-wrap gap-1.5"
+        }
+      >
         {(variant === "compact" ? suggestions.slice(0, 3) : suggestions).map(({ text, Icon }) => (
           <button
             key={text}
             type="button"
             onClick={() => onPick(text)}
-            className="chat-suggestion-pill group"
+            className={
+              variant === "panel"
+                ? "btn btn-ghost btn-sm h-auto min-h-8 max-w-full rounded-full bg-base-200/60 px-3 py-1.5 text-base-content/60 font-normal"
+                : "chat-suggestion-pill group"
+            }
           >
-            <Icon className="w-3.5 h-3.5 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
+            {variant !== "panel" && (
+              <Icon className="w-3.5 h-3.5 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
+            )}
             <span className="text-xs leading-snug">{text}</span>
           </button>
         ))}
@@ -145,7 +146,7 @@ function SuggestionPills({
           className="chat-suggestion-pill group"
         >
           <Icon className="w-3.5 h-3.5 text-base-content/40 group-hover:text-primary transition-colors shrink-0" />
-          <span className="text-[13px] leading-snug">{text}</span>
+          <span className="text-xs leading-snug">{text}</span>
         </button>
       ))}
     </div>
@@ -243,7 +244,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       onStop={stop}
       isStreaming={isStreaming}
       disabled={isLoadingMessages}
-      placeholder={context ? "Ask about this result..." : "Ask about calibration data..."}
+      placeholder={context ? "Ask about this result" : "Ask a question"}
       attachments={attachments}
       onAttach={attach}
       onRemoveAttachment={remove}
@@ -348,7 +349,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
           <div className={variant === "page" ? "max-w-3xl mx-auto" : ""}>
             {composer}
             {variant === "page" && (
-              <p className="text-[11px] text-base-content/35 text-center mt-2">
+              <p className="text-xs text-base-content/35 text-center mt-2">
                 AI can make mistakes. Verify important calibration values.
               </p>
             )}

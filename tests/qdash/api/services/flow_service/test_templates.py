@@ -20,6 +20,7 @@ TEMPLATE = {
     "name": "Daily calibration",
     "description": "A daily calibration",
     "category": "example",
+    "backend": "qubex",
     "filename": "daily.py",
     "function_name": "daily",
 }
@@ -66,6 +67,26 @@ class TestListTemplates:
 
         assert [template.id for template in templates] == ["daily", "t1"]
         assert all(isinstance(template, FlowTemplate) for template in templates)
+
+    def test_filters_by_backend(self, tmp_path: Path):
+        catalog, templates_dir, _ = _catalog(tmp_path)
+        fake = {**TEMPLATE, "id": "fake", "backend": "fake", "filename": "fake.py"}
+        _write_index(templates_dir, [TEMPLATE, fake])
+
+        assert [t.id for t in catalog.list_templates("qubex")] == ["daily"]
+        assert [t.id for t in catalog.list_templates("fake")] == ["fake"]
+        assert catalog.list_templates("quel") == []
+        assert [t.id for t in catalog.list_templates()] == ["daily", "fake"]
+
+    def test_entry_without_backend_raises_500(self, tmp_path: Path):
+        catalog, templates_dir, _ = _catalog(tmp_path)
+        entry = {key: value for key, value in TEMPLATE.items() if key != "backend"}
+        _write_index(templates_dir, [entry])
+
+        with pytest.raises(HTTPException) as exc_info:
+            catalog.list_templates()
+
+        assert exc_info.value.status_code == 500
 
     def test_invalid_json_raises_500(self, tmp_path: Path, caplog):
         catalog, templates_dir, _ = _catalog(tmp_path)

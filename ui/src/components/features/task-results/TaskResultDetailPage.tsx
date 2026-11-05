@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, RefreshCw, ExternalLink, CheckCircle, UserRound, Pencil } from "lucide-react";
 import { useGetTaskResult } from "@/client/task/task";
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
+import { TaskLineageSection } from "@/components/features/provenance/TaskLineageSection";
+import { FigureStrip } from "@/components/charts/FigureStrip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
@@ -17,8 +19,11 @@ import type { CalibrationGitHubSync } from "@/schemas";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
+import { failedTaskInvestigation } from "@/lib/copilotInvestigation";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
+import { QubitTile } from "@/components/ui/QubitTile";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
 
@@ -112,8 +117,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="flex items-center gap-3 flex-wrap flex-1 min-w-0">
-          <span className="font-mono text-sm font-semibold truncate">{taskId}</span>
-          <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
+          <span className="font-mono text-sm font-medium truncate">{taskId}</span>
+          <QubitTile qid={taskResult.qid} />
           <StatusBadge status={taskResult.status} />
           <div className="ml-auto flex items-center gap-2">
             <TaskResultHistoryNavigation
@@ -154,7 +159,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-sm font-semibold">Manual correction applied</h2>
+                  <h2 className="text-sm font-medium">Manual correction applied</h2>
                   <span className="badge badge-sm badge-success">Calibration DB updated</span>
                 </div>
                 <p className="mt-1 text-xs text-base-content/60">
@@ -180,7 +185,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       )}
 
       <div className="bg-base-200/50 rounded-lg p-4 mb-4">
-        <h2 className="text-sm font-semibold mb-2">{taskResult.task_name}</h2>
+        <h2 className="text-sm font-medium mb-2">{taskResult.task_name}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
           <div>
             <span className="text-base-content/50">Execution ID</span>
@@ -239,7 +244,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           )}
           {manualCorrections.length > 0 && (
             <div>
-              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-base-content/60">
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
                 <Pencil className="h-3 w-3" />
                 Manual corrections ({manualCorrections.length})
               </h3>
@@ -266,7 +271,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           )}
           {relatedExecutions.length > 0 && (
             <div>
-              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-base-content/50">
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium text-base-content/50">
                 <RefreshCw className="h-3 w-3" />
                 Related executions ({relatedExecutions.length})
               </h3>
@@ -297,7 +302,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {((taskResult.json_figure_path && taskResult.json_figure_path.length > 0) ||
         (taskResult.raw_data_path && taskResult.raw_data_path.length > 0)) && (
         <div className="mb-4 rounded-lg bg-base-200/50 p-4">
-          <h2 className="mb-3 text-sm font-semibold">Artifacts</h2>
+          <h2 className="mb-3 text-sm font-medium">Artifacts</h2>
           <TaskArtifactDownloads
             jsonFigurePaths={taskResult.json_figure_path}
             rawDataPaths={taskResult.raw_data_path}
@@ -308,16 +313,18 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {/* Figure */}
       {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
         (taskResult.json_figure_path && taskResult.json_figure_path.length > 0)) && (
-        <div className="h-[280px] overflow-x-auto overflow-y-hidden flex items-center justify-start gap-3 mb-4">
-          {(taskResult.figure_path ?? []).map((fig, i) => (
-            <TaskFigure
-              key={i}
-              path={fig}
-              jsonFigurePath={(taskResult.json_figure_path ?? [])[i]}
-              qid={taskResult.qid}
-              className="h-full w-auto object-contain rounded flex-shrink-0"
-            />
-          ))}
+        <div className="mb-4">
+          <FigureStrip className="h-[280px] gap-3 overflow-y-hidden">
+            {(taskResult.figure_path ?? []).map((fig, i) => (
+              <TaskFigure
+                key={i}
+                path={fig}
+                jsonFigurePath={(taskResult.json_figure_path ?? [])[i]}
+                qid={taskResult.qid}
+                className="h-full w-auto object-contain rounded flex-shrink-0"
+              />
+            ))}
+          </FigureStrip>
         </div>
       )}
 
@@ -344,9 +351,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             qid={taskResult.qid}
             taskId={taskResult.task_id}
             taskName={taskResult.task_name}
-            taskStatus={taskResult.status}
             outputParameters={(taskResult.output_parameters ?? {}) as Record<string, unknown>}
-            outputParameterNames={taskResult.output_parameter_names ?? []}
             jsonFigurePaths={taskResult.json_figure_path ?? []}
           />
         )}
@@ -358,10 +363,20 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           />
         )}
 
+        <TaskLineageSection
+          taskId={taskId}
+          executionId={taskResult.execution_id}
+          qid={taskResult.qid ?? ""}
+          outputParameters={taskResult.output_parameters as Record<string, unknown> | undefined}
+          className="mb-4 rounded-lg bg-base-200/50 p-4"
+        />
+
         <TaskMessagePanel
           status={taskResult.status}
           message={taskResult.message}
           stackTrace={taskResult.stack_trace}
+          showEmptyFallback
+          action={<InvestigateWithAiButton target={failedTaskInvestigation(taskResult)} />}
         />
       </div>
 

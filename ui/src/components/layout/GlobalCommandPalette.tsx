@@ -1,6 +1,6 @@
 "use client";
 
-import { Braces, Check, FolderKanban, Gauge, Link, Palette, Search } from "lucide-react";
+import { Braces, Check, FolderKanban, Gauge, Inbox, Link, Palette, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -222,6 +222,14 @@ export function GlobalCommandPalette() {
               );
             })}
             <CommandGroup heading="Actions">
+              <CommandItem
+                value="Open inbox"
+                keywords={["notifications", "inbox", "mentions", "通知", "受信箱"]}
+                onSelect={() => navigate("/inbox")}
+              >
+                <Inbox size={15} className="shrink-0 opacity-60" aria-hidden="true" />
+                <span>Open inbox</span>
+              </CommandItem>
               <CommandItem
                 value="Copy current page link"
                 keywords={["url", "share", "clipboard", "リンク", "コピー", "共有"]}

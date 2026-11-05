@@ -37,7 +37,7 @@ import {
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <div className="text-xs uppercase text-base-content/50">{label}</div>
+      <div className="text-xs text-base-content/50">{label}</div>
       <div className="mt-1 text-sm">{value}</div>
     </div>
   );
@@ -165,7 +165,7 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
           <button className="btn btn-square btn-ghost btn-sm shrink-0" onClick={goBack}>
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <h1 className="text-xl font-bold">AI Evaluation</h1>
+          <h1 className="text-xl font-medium">AI Evaluation</h1>
         </div>
         <div className="alert alert-error">
           <XCircle className="h-5 w-5" />
@@ -191,7 +191,7 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold">
+            <h1 className="truncate text-xl font-medium">
               {run.task_name} · {run.chip_id}
             </h1>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/50">
@@ -286,7 +286,7 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
         </div>
         {run.knowledge_draft_id && (
           <div className="mt-3 text-sm" data-testid="run-knowledge">
-            <span className="text-xs uppercase text-base-content/50">Knowledge</span>
+            <span className="text-xs text-base-content/50">Knowledge</span>
             <p className="mt-1 flex flex-wrap items-center gap-2 text-base-content/80">
               {knowledgeLabel(run)}
               <span className="font-mono text-xs text-base-content/50">
@@ -304,7 +304,7 @@ export function EvaluationRunDetailPageContent({ runId }: { runId: string }) {
         )}
         {run.question && (
           <div className="mt-3 text-sm">
-            <span className="text-xs uppercase text-base-content/50">Question</span>
+            <span className="text-xs text-base-content/50">Question</span>
             <p className="mt-1 text-base-content/80">{run.question}</p>
           </div>
         )}

@@ -24,12 +24,13 @@ describe("ChipCreationTour", () => {
   it("targets the chip action and creation form in order", () => {
     const steps = getChipCreationTourSteps();
 
-    expect(steps).toHaveLength(5);
+    expect(steps).toHaveLength(6);
     expect(steps[1].element).toBe('[data-tour="create-chip"]');
     expect(steps[1].advanceOnClick).toBe(true);
     expect(steps[2].element).toBe("#chip-id-input");
     expect(steps[3].element).toBe("#topology-select");
-    expect(steps[4].element).toBe('[data-tour="submit-chip"]');
+    expect(steps[4].element).toBe('[data-tour="chip-config"]');
+    expect(steps[5].element).toBe('[data-tour="submit-chip"]');
   });
 
   it("starts from the beginning and restarts at the create action", () => {

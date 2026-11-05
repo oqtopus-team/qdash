@@ -21,6 +21,8 @@ interface AskAiButtonProps {
   size?: "xs" | "sm";
   variant?: "primary" | "outline";
   className?: string;
+  /** Called once an evaluation has been requested, so the host can show it is on its way. */
+  onRequested?: () => void;
 }
 
 /**
@@ -39,6 +41,7 @@ export function AskAiButton({
   size = "sm",
   variant = "primary",
   className = "",
+  onRequested,
 }: AskAiButtonProps) {
   const { canEdit } = useProject();
   const { openTaskChat } = useChatDock();
@@ -89,6 +92,7 @@ export function AskAiButton({
           }}
           scopeLabel={`${taskName} · ${qid}`}
           onChat={chat}
+          onRequested={onRequested}
         />
       )}
     </>

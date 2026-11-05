@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useRef, useCallback, useEffect, memo } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import { GitBranch, Lock, ZoomIn } from "lucide-react";
@@ -11,6 +10,7 @@ import {
   GridFullscreenButton,
   gridFullscreenPanelClass,
 } from "@/components/ui/GridFullscreenButton";
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -123,7 +123,7 @@ const GridCell = memo(function GridCell({
       {/* QID Label */}
       {showLabels && (
         <div
-          className={`absolute top-0.5 left-0.5 px-0.5 py-px rounded font-bold shadow-sm leading-tight ${
+          className={`absolute top-0.5 left-0.5 px-0.5 py-px rounded font-medium shadow-sm leading-tight ${
             value !== null && value !== undefined
               ? "bg-black/30 text-white"
               : "bg-base-content/20 text-base-content"
@@ -153,7 +153,7 @@ const GridCell = memo(function GridCell({
           }}
         >
           <div
-            className="font-bold text-white drop-shadow-md"
+            className="font-medium text-white drop-shadow-md"
             style={{ fontSize: fontSizes.valueSize }}
           >
             {value.toFixed(2)}
@@ -528,7 +528,7 @@ export function QubitMetricsGrid({
                     }}
                   >
                     <div
-                      className="font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
+                      className="font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
                       style={{ fontSize: cellFontSize(displayCellSize, 0.13) }}
                     >
                       MUX{muxIndex}
@@ -580,7 +580,7 @@ export function QubitMetricsGrid({
                     }}
                     title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
                   >
-                    <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                    <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
                       {regionRow},{regionCol}
                     </span>
                   </button>
@@ -747,10 +747,10 @@ export function QubitMetricsGrid({
             <>
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
+                  <DialogTitle className="text-sm font-medium truncate">
                     {selectedQubitInfo.qid} - {title}
                   </DialogTitle>
-                  <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+                  <DialogDescription className="text-sm text-base-content/70 mt-0.5 sm:mt-1">
                     {selectedQubitInfo.metric.value !== null
                       ? `${selectedQubitInfo.metric.value.toFixed(4)}${selectedQubitInfo.metric.stddev != null ? ` ± ${selectedQubitInfo.metric.stddev.toFixed(4)}` : ""} ${unit}`
                       : "No data"}
@@ -775,13 +775,13 @@ export function QubitMetricsGrid({
                 />
               </div>
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
-                <Link
-                  href={`/provenance?parameter=${encodeURIComponent(metricKey)}&qid=${encodeURIComponent(selectedQubitInfo.qid)}&tab=lineage`}
+                <LineageButton
+                  target={{ parameterName: metricKey, qid: selectedQubitInfo.qid }}
                   className="btn btn-ghost btn-sm sm:btn-md gap-1"
                 >
                   <GitBranch className="h-4 w-4" />
                   <span className="hidden sm:inline">Lineage</span>
-                </Link>
+                </LineageButton>
                 <div className="flex gap-2">
                   <button
                     type="button"

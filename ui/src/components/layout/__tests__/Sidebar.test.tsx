@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Sidebar } from "@/components/layout/Sidebar";
 
@@ -41,12 +41,6 @@ vi.mock("@/contexts/ThemeContext", () => ({
   useTheme: () => ({ theme: "light", setTheme: vi.fn() }),
 }));
 
-vi.mock("@/hooks/useNotifications", () => ({
-  useUnreadNotificationCount: () => ({
-    data: { data: { unread_count: 0 } },
-  }),
-}));
-
 /**
  * Pulls the desktop and mobile navigation asides out of a render. Both carry the
  * same aria-label, so they are told apart by their `lg:` visibility class.
@@ -62,10 +56,45 @@ function getAsides(container: HTMLElement) {
   return { desktop, mobile };
 }
 
+/** Returns the shared active-row pill of the section that contains `href`. */
+function getSectionIndicator(aside: Element, href: string) {
+  const link = aside.querySelector(`a[href="${href}"]`);
+  const indicator = link
+    ?.closest("ul")
+    ?.parentElement?.querySelector('[data-testid="sidebar-active-indicator"]');
+  if (!link || !indicator) {
+    throw new Error(`Expected a section indicator around ${href}`);
+  }
+  return { link, indicator };
+}
+
 describe("Sidebar", () => {
+  beforeEach(() => {
+    // jsdom has no layout, so give every element a distinct box derived from its
+    // document order; the shared indicator only moves when the active box changes.
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      const top = Array.from(document.querySelectorAll("*")).indexOf(this) * 36;
+      return {
+        x: 0,
+        y: top,
+        top,
+        left: 0,
+        width: 150,
+        height: 36,
+        right: 150,
+        bottom: top + 36,
+        toJSON: () => ({}),
+      } as DOMRect;
+    });
+  });
+
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
+    mockPathname.mockReturnValue("/dashboard");
     sidebarState.isOpen = true;
     sidebarState.isMobileOpen = false;
   });
@@ -83,10 +112,59 @@ describe("Sidebar", () => {
     const { container } = render(<Sidebar />);
 
     const menu = getAsides(container).mobile.querySelector("nav ul.menu");
+    const stack = menu?.parentElement?.closest("nav > div");
 
-    expect(menu?.className).toContain("max-lg:w-full");
+    expect(stack?.className).toContain("w-fit");
+    expect(stack?.className).toContain("max-lg:w-full");
+    expect(menu?.className).toContain("w-full");
     expect(menu?.className).toContain("max-lg:flex-nowrap");
     expect(menu?.className).toContain("max-lg:[&>li]:flex-nowrap");
+  });
+
+  it("shows the active-row indicator only in the section that owns the route", () => {
+    const { container } = render(<Sidebar />);
+
+    const { desktop } = getAsides(container);
+    const visible = desktop.querySelectorAll(
+      '[data-testid="sidebar-active-indicator"][data-state="visible"]',
+    );
+    const { link, indicator } = getSectionIndicator(desktop, "/dashboard");
+
+    expect(link.getAttribute("aria-current")).toBe("page");
+    expect(visible).toHaveLength(1);
+    expect(visible[0]).toBe(indicator);
+    expect(indicator.getAttribute("data-motion")).toBe("fade");
+  });
+
+  it("slides the indicator when the route moves within a section", () => {
+    const { container, rerender } = render(<Sidebar />);
+
+    mockPathname.mockReturnValue("/metrics");
+    rerender(<Sidebar />);
+
+    const { desktop } = getAsides(container);
+    const { link, indicator } = getSectionIndicator(desktop, "/metrics");
+
+    expect(link.getAttribute("aria-current")).toBe("page");
+    expect(indicator.getAttribute("data-state")).toBe("visible");
+    expect(indicator.getAttribute("data-motion")).toBe("slide");
+  });
+
+  it("fades between sections instead of sliding across them", () => {
+    const { container, rerender } = render(<Sidebar />);
+
+    mockPathname.mockReturnValue("/execution");
+    rerender(<Sidebar />);
+
+    const { desktop } = getAsides(container);
+    const overview = getSectionIndicator(desktop, "/dashboard").indicator;
+    const { link, indicator: operate } = getSectionIndicator(desktop, "/execution");
+
+    expect(link.getAttribute("aria-current")).toBe("page");
+    expect(overview.getAttribute("data-state")).toBe("hidden");
+    expect(overview.getAttribute("data-motion")).toBe("fade");
+    expect(operate.getAttribute("data-state")).toBe("visible");
+    expect(operate.getAttribute("data-motion")).toBe("fade");
   });
 
   it("truncates a nav label instead of letting it grow the row", () => {
@@ -136,17 +214,54 @@ describe("Sidebar", () => {
     const { mobile } = getAsides(container);
     const header = within(mobile.firstElementChild as HTMLElement);
 
-    expect(header.getByRole("link", { name: "QDash home" })).toBeTruthy();
+    expect(header.getByRole("link", { name: "QDash home" }).textContent).toBe("QDash");
     expect(header.getByRole("button", { name: "Close menu" })).toBeTruthy();
   });
 
-  it("keeps the in-nav logo out of the mobile drawer", () => {
+  it("pairs the logo and product name with the collapse button on the expanded rail", () => {
+    const { container } = render(<Sidebar />);
+
+    const { desktop } = getAsides(container);
+    const header = desktop.querySelector('[data-testid="sidebar-desktop-header"]') as HTMLElement;
+    const home = within(header).getByRole("link", { name: "QDash home" });
+
+    expect(header.className).toContain("h-16");
+    expect(home.textContent).toBe("QDash");
+    expect(home.querySelector("img")?.getAttribute("alt")).toBe("");
+    expect(within(header).getByRole("button", { name: "Collapse sidebar" })).toBeTruthy();
+  });
+
+  it("shows only the expand button in the collapsed rail header", () => {
+    sidebarState.isOpen = false;
+    const { container } = render(<Sidebar />);
+
+    const { desktop } = getAsides(container);
+    const header = desktop.querySelector('[data-testid="sidebar-desktop-header"]') as HTMLElement;
+
+    expect(header.className).toContain("h-16");
+    expect(within(header).queryByRole("link", { name: "QDash home" })).toBeNull();
+    expect(within(header).getByRole("button", { name: "Expand sidebar" })).toBeTruthy();
+  });
+
+  it("renders exactly one home logo per sidebar and none inside the nav", () => {
+    const { container } = render(<Sidebar />);
+
+    const { desktop, mobile } = getAsides(container);
+
+    for (const aside of [desktop, mobile]) {
+      expect(aside.querySelectorAll('a[aria-label="QDash home"]')).toHaveLength(1);
+      expect(aside.querySelector('nav a[aria-label="QDash home"]')).toBeNull();
+    }
+  });
+
+  it("closes the mobile drawer when the home logo is clicked", () => {
+    sidebarState.isMobileOpen = true;
     const { container } = render(<Sidebar />);
 
     const { mobile } = getAsides(container);
-    const navLogo = mobile.querySelector('nav a[aria-label="QDash home"]');
+    fireEvent.click(within(mobile as HTMLElement).getByRole("link", { name: "QDash home" }));
 
-    expect(navLogo?.closest("li")?.className).toContain("hidden lg:block");
+    expect(setMobileSidebarOpen).toHaveBeenCalledWith(false);
   });
 
   it("closes the mobile drawer when a nav link is clicked", () => {

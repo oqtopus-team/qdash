@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { URL_DEFAULTS } from "../types";
-import type { TimeRange, SelectionMode, MetricType, ProvenanceTab } from "../types";
+import type { TimeRange, SelectionMode, MetricType } from "../types";
 
 describe("URL_DEFAULTS", () => {
   it("has expected default values", () => {
@@ -43,10 +43,5 @@ describe("type exports", () => {
   it("MetricType accepts valid values", () => {
     const values: MetricType[] = ["qubit", "coupling"];
     expect(values).toHaveLength(2);
-  });
-
-  it("ProvenanceTab accepts valid values", () => {
-    const values: ProvenanceTab[] = ["history", "lineage", "compare"];
-    expect(values).toHaveLength(3);
   });
 });

@@ -1216,7 +1216,7 @@
           "projects"
         ],
         "summary": "List project members",
-        "description": "List all members of a project.",
+        "description": "List active members of a project.",
         "operationId": "listProjectMembers",
         "security": [
           {
@@ -1874,7 +1874,7 @@
           "execution"
         ],
         "summary": "List executions",
-        "description": "List executions for a given chip with pagination.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
+        "description": "List executions for a given chip with pagination, optionally for one calendar day.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\nchip_id : str\n    ID of the chip to fetch executions for\nskip : int\n    Number of items to skip (default: 0)\nlimit : int\n    Number of items to return (default: 20, max: 100)\n\nReturns\n-------\nListExecutionsResponse\n    Wrapped list of executions for the chip",
         "operationId": "listExecutions",
         "security": [
           {
@@ -1921,6 +1921,37 @@
             "description": "Number of items to return"
           },
           {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{8}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only executions started on this day, YYYYMMDD",
+              "title": "Date"
+            },
+            "description": "Only executions started on this day, YYYYMMDD"
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "IANA time zone that defines the day for ``date``",
+              "default": "UTC",
+              "title": "Timezone"
+            },
+            "description": "IANA time zone that defines the day for ``date``"
+          },
+          {
             "name": "X-Project-Id",
             "in": "header",
             "required": false,
@@ -1944,6 +1975,121 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ListExecutionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/executions/activity": {
+      "get": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Count executions per day or per 6-hour slot",
+        "description": "Count executions per bucket, by status, over a trailing window.\n\nWith ``chip_id`` only that chip's executions count; without it, every execution in the\ncaller's current project counts. Executions of other projects are never included.\nEvery bucket of the window is returned, empty ones included, so a chart can draw a\ncontinuous axis. Buckets follow wall-clock time in ``timezone`` so they match what the\nuser sees: one per calendar day ending today, or with ``granularity=6h`` four per day\n(local 00:00, 06:00, 12:00, 18:00) ending with the slot that contains the current time.\nEach bucket carries its ``start`` and exclusive ``end``.",
+        "operationId": "getExecutionActivity",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Chip ID to count executions for; omit to count every chip in the project",
+              "title": "Chip Id"
+            },
+            "description": "Chip ID to count executions for; omit to count every chip in the project"
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "description": "Trailing window in calendar days",
+              "default": 30,
+              "title": "Days"
+            },
+            "description": "Trailing window in calendar days"
+          },
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "IANA time zone used to assign executions to buckets",
+              "default": "UTC",
+              "title": "Timezone"
+            },
+            "description": "IANA time zone used to assign executions to buckets"
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day",
+                "6h"
+              ],
+              "type": "string",
+              "description": "Bucket length: `day` (default) or `6h`. `6h` returns `days` x 4 buckets and accepts at most 31 days",
+              "default": "day",
+              "title": "Granularity"
+            },
+            "description": "Bucket length: `day` (default) or `6h`. `6h` returns `days` x 4 buckets and accepts at most 31 days"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionActivityResponse"
                 }
               }
             }
@@ -4445,6 +4591,245 @@
                     "type": "boolean"
                   },
                   "title": "Response Deletecopilotchatsession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/copilot/source/roots": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "List the source trees the Copilot can read",
+        "description": "QDash and allowlisted dependency source served read-only, with known revisions.",
+        "operationId": "listCopilotSourceRoots",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSourceRootsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/copilot/source/search": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Search the source the Copilot can read",
+        "description": "Literal search in file contents or file paths; read-only and size-limited.",
+        "operationId": "searchCopilotSource",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Query"
+            }
+          },
+          {
+            "name": "root",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Root"
+            }
+          },
+          {
+            "name": "path_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path Prefix"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(content|path)$",
+              "default": "content",
+              "title": "Mode"
+            }
+          },
+          {
+            "name": "case_sensitive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Case Sensitive"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchSourceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/copilot/source/file": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Read a line range of a source file",
+        "description": "Read up to 400 numbered lines; without ``root`` the path is matched as a traceback prints it.",
+        "operationId": "getCopilotSourceFile",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "title": "Path"
+            }
+          },
+          {
+            "name": "root",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Root"
+            }
+          },
+          {
+            "name": "start_line",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Start Line"
+            }
+          },
+          {
+            "name": "end_line",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Line"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceFileResponse"
                 }
               }
             }
@@ -10562,29 +10947,59 @@
           "flow"
         ],
         "summary": "List all flow templates",
-        "description": "List all available flow templates.",
+        "description": "List the flow templates, optionally filtered to one backend.",
         "operationId": "listFlowTemplates",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "backend",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only templates written for this backend, e.g. qubex or fake",
+              "title": "Backend"
+            },
+            "description": "Only templates written for this backend, e.g. qubex or fake"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/FlowTemplate"
                   },
-                  "type": "array",
                   "title": "Response Listflowtemplates"
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/flows/templates/{template_id}": {
@@ -21188,6 +21603,17 @@
       },
       "ExecuteFlowRequest": {
         "properties": {
+          "target_override": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlowTargetOverride"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Targets for this run, overriding direct CalibService and pipeline targets"
+          },
           "parameters": {
             "additionalProperties": true,
             "type": "object",
@@ -21373,6 +21799,138 @@
         ],
         "title": "ExecutePipelineResponse",
         "description": "Dispatch result plus the resolved plan that was started."
+      },
+      "ExecutionActivityDay": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "title": "Date",
+            "description": "Calendar day in the requested time zone, YYYY-MM-DD; for a 6-hour bucket, the day the bucket starts on"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start",
+            "description": "Start of the bucket, inclusive, in UTC; local midnight, or local 00:00, 06:00, 12:00, or 18:00 for a 6-hour bucket, in the requested time zone"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End",
+            "description": "End of the bucket, exclusive, in UTC; the next bucket's start. Boundaries are local wall-clock hours, so a bucket that spans a DST change is an hour shorter or longer"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "default": 0
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running",
+            "description": "Executions still in progress (running, cancelling)",
+            "default": 0
+          },
+          "scheduled": {
+            "type": "integer",
+            "title": "Scheduled",
+            "description": "Executions not started yet (scheduled, pending)",
+            "default": 0
+          },
+          "cancelled": {
+            "type": "integer",
+            "title": "Cancelled",
+            "default": 0
+          },
+          "other": {
+            "type": "integer",
+            "title": "Other",
+            "description": "Any status not covered by the named buckets",
+            "default": 0
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "start",
+          "end"
+        ],
+        "title": "ExecutionActivityDay",
+        "description": "Executions started in one bucket (a calendar day or a 6-hour slot), counted by status."
+      },
+      "ExecutionActivityResponse": {
+        "properties": {
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id",
+            "description": "Chip the counts are for, or null when every chip in the project counts"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days",
+            "description": "Length of the window in calendar days"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "description": "IANA time zone the days are bucketed in"
+          },
+          "granularity": {
+            "type": "string",
+            "enum": [
+              "day",
+              "6h"
+            ],
+            "title": "Granularity",
+            "description": "Bucket length: `day` for one bucket per calendar day, `6h` for four buckets per day starting at local 00:00, 06:00, 12:00, and 18:00"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since",
+            "description": "Day the first bucket starts on, YYYY-MM-DD"
+          },
+          "until": {
+            "type": "string",
+            "title": "Until",
+            "description": "Day the last bucket starts on (today), YYYY-MM-DD"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionActivityDay"
+            },
+            "type": "array",
+            "title": "Buckets",
+            "description": "One entry per bucket, oldest first, including empty buckets. Daily: one per calendar day ending today. 6-hour: `days` x 4 slots ending with the slot that contains the current time, so no bucket lies entirely in the future"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "days",
+          "timezone",
+          "granularity",
+          "since",
+          "until",
+          "buckets"
+        ],
+        "title": "ExecutionActivityResponse",
+        "description": "Execution counts for a chip, or a whole project, over a trailing window of days."
       },
       "ExecutionAvailabilityRequest": {
         "properties": {
@@ -21895,6 +22453,18 @@
             "format": "date-time",
             "title": "Created At",
             "description": "Schedule creation time"
+          },
+          "chip_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chip Id",
+            "description": "Target chip ID of the schedule, when known"
           }
         },
         "type": "object",
@@ -21982,6 +22552,52 @@
         "title": "FlowSummary",
         "description": "Summary of a Flow for listing."
       },
+      "FlowTargetOverride": {
+        "properties": {
+          "mux_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer",
+                  "minimum": 0.0
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mux Ids"
+          },
+          "qids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "pattern": "^\\d+$"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qids"
+          },
+          "exclude_qids": {
+            "items": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "type": "array",
+            "title": "Exclude Qids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FlowTargetOverride",
+        "description": "Replace workflow targets for one execution; omission preserves source behavior."
+      },
       "FlowTemplate": {
         "properties": {
           "id": {
@@ -22004,6 +22620,11 @@
             "title": "Category",
             "description": "Template category"
           },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "description": "Backend the template's tasks run on, e.g. qubex or fake"
+          },
           "filename": {
             "type": "string",
             "title": "Filename",
@@ -22021,6 +22642,7 @@
           "name",
           "description",
           "category",
+          "backend",
           "filename",
           "function_name"
         ],
@@ -22049,6 +22671,11 @@
             "title": "Category",
             "description": "Template category"
           },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "description": "Backend the template's tasks run on, e.g. qubex or fake"
+          },
           "filename": {
             "type": "string",
             "title": "Filename",
@@ -22071,6 +22698,7 @@
           "name",
           "description",
           "category",
+          "backend",
           "filename",
           "function_name",
           "code"
@@ -23044,6 +23672,17 @@
       },
       "GetFlowResponse": {
         "properties": {
+          "target_defaults": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlowTargetOverride"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Statically resolved source targets; null when dynamic or ambiguous"
+          },
           "name": {
             "type": "string",
             "title": "Name",
@@ -24058,6 +24697,37 @@
         "title": "ListQubitsResponse",
         "description": "Response model for listing qubits with pagination."
       },
+      "ListSourceRootsResponse": {
+        "properties": {
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRootResponse"
+            },
+            "type": "array",
+            "title": "Roots"
+          },
+          "missing_dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Dependencies",
+            "description": "Allowlisted dependencies whose source is not installed here"
+          },
+          "execution_revision_recorded": {
+            "type": "boolean",
+            "title": "Execution Revision Recorded",
+            "description": "Whether executions record the source revision they ran with. QDash does not record it, so a match between served source and an execution cannot be established.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "roots"
+        ],
+        "title": "ListSourceRootsResponse",
+        "description": "The source trees available to this QDash API."
+      },
       "ListTagResponse": {
         "properties": {
           "tags": {
@@ -24285,7 +24955,7 @@
           "source_task_id"
         ],
         "title": "ManualParameterUpdateRequest",
-        "description": "Request to manually correct calibration parameters from a task result.\n\nCorrections must reference a supported source task result, and only that\nresult's output parameters can be written. Parameters are written to the DB\nand provenance is recorded.\nThe qid format determines target type: \"0\" for qubit, \"0-1\" for coupling."
+        "description": "Request to manually correct calibration parameters from a task result.\n\nCorrections must reference a supported spectroscopy result, and only the\noperational parameters mapped for that task can be written: readout\nfrequency and amplitude for resonator spectroscopy, control frequency and\ncoarse control amplitude for qubit spectroscopy. Measured frequencies are\nnever corrected by hand. Parameters are written to the DB and provenance\nis recorded.\nThe qid format determines target type: \"0\" for qubit, \"0-1\" for coupling."
       },
       "ManualParameterUpdateResponse": {
         "properties": {
@@ -28031,6 +28701,39 @@
         "title": "ScheduleFlowResponse",
         "description": "Response after scheduling a flow."
       },
+      "SearchSourceResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSearchMatch"
+            },
+            "type": "array",
+            "title": "Matches"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "The search stopped at the result or file limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "mode",
+          "matches",
+          "truncated"
+        ],
+        "title": "SearchSourceResponse",
+        "description": "Matches of a literal source search."
+      },
       "SeedImportRequest": {
         "properties": {
           "chip_id": {
@@ -28376,6 +29079,172 @@
         ],
         "title": "SettingsResponse",
         "description": "Settings for the QDash application."
+      },
+      "SourceFileResponse": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "title": "Root"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "start_line": {
+            "type": "integer",
+            "title": "Start Line"
+          },
+          "end_line": {
+            "type": "integer",
+            "title": "End Line"
+          },
+          "total_lines": {
+            "type": "integer",
+            "title": "Total Lines"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "More lines follow the returned range"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root",
+          "path",
+          "start_line",
+          "end_line",
+          "total_lines",
+          "content",
+          "truncated"
+        ],
+        "title": "SourceFileResponse",
+        "description": "A line range of one source file, each line prefixed with its number."
+      },
+      "SourceRootResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Root name used by search and read, such as qdash or qubex"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "qdash or dependency"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Installed package version, if known"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision",
+            "description": "Commit of the served source, when it can be established"
+          },
+          "revision_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Source",
+            "description": "Where the revision came from: git, direct_url.json or QDASH_SOURCE_REVISION"
+          },
+          "dirty": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dirty",
+            "description": "The git checkout has uncommitted changes (git revisions only)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "SourceRootResponse",
+        "description": "One source tree the Copilot can search and read."
+      },
+      "SourceSearchMatch": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "title": "Root"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root",
+          "path"
+        ],
+        "title": "SourceSearchMatch",
+        "description": "One search hit; ``line`` and ``text`` are null for a path search."
       },
       "SubmitAgentActionRequest": {
         "properties": {

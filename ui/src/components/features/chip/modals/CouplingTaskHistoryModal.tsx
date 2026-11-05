@@ -2,11 +2,11 @@
 
 import dynamic from "next/dynamic";
 import React, { useState, useMemo } from "react";
-import Link from "next/link";
 import { ChevronRight, History, FileText, GitBranch, ListTodo } from "lucide-react";
 
 import type { TaskResult as Task } from "@/schemas";
 
+import { firstPublishedParameter, inExecution } from "@/lib/provenanceTarget";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import { useGetExecution } from "@/client/execution/execution";
@@ -20,6 +20,7 @@ import {
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
@@ -56,22 +57,6 @@ export function CouplingTaskHistoryModal({
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
   const { openMiniChat } = useChatDock();
   const manualOverrides = useManualOverrides(couplingId);
-
-  const resolveQid = (taskQid: string, qidRole?: string): string => {
-    if (!qidRole || qidRole === "self" || qidRole === "coupling") return taskQid;
-    const match = taskQid.match(/^(\d+)-(\d+)$/);
-    if (!match) return taskQid;
-    const [, control, target] = match;
-    if (qidRole === "control") return control;
-    if (qidRole === "target") return target;
-    return taskQid;
-  };
-
-  const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
-    const p = encodeURIComponent(parameterName);
-    const q = encodeURIComponent(qidValue);
-    return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
-  };
 
   const { data, isLoading, isError } = useGetCouplingTaskHistory(
     couplingId,
@@ -191,7 +176,7 @@ export function CouplingTaskHistoryModal({
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
           <History className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-bold text-base-content">Execution History</h3>
+          <h3 className="text-sm font-medium text-base-content">Execution History</h3>
         </div>
         <p className="text-xs text-base-content/50">
           {historyArray.length} executions with {taskName}
@@ -213,7 +198,7 @@ export function CouplingTaskHistoryModal({
               >
                 <div className="flex justify-between items-start">
                   <div className="min-w-0 flex-1">
-                    <div className="font-bold text-lg">
+                    <div className="font-medium text-sm">
                       {item.task.status === "completed" ? (
                         <span className={isSelected ? "" : "text-success"}>Completed</span>
                       ) : item.task.status === "failed" ? (
@@ -258,13 +243,11 @@ export function CouplingTaskHistoryModal({
     <div className="flex flex-col min-h-0 h-full">
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
-          <ListTodo className="h-4 w-4 text-secondary" />
-          <h3 className="text-sm font-bold text-base-content">Tasks in Execution</h3>
+          <ListTodo className="h-4 w-4 text-base-content/60" />
+          <h3 className="text-sm font-medium text-base-content">Tasks in Execution</h3>
         </div>
         {selectedExecutionId ? (
-          <p className="text-[0.65rem] text-base-content/50 font-mono truncate">
-            {selectedExecutionId}
-          </p>
+          <p className="text-xs text-base-content/50 font-mono truncate">{selectedExecutionId}</p>
         ) : null}
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
@@ -300,7 +283,9 @@ export function CouplingTaskHistoryModal({
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm truncate">{task.name || "Unnamed"}</span>
+                        <span className="font-medium text-sm truncate">
+                          {task.name || "Unnamed"}
+                        </span>
                         {isMatchingTask && (
                           <span
                             className={`badge badge-xs ${
@@ -347,8 +332,8 @@ export function CouplingTaskHistoryModal({
     <div className="flex flex-col">
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-bold text-base-content">Task Details</h3>
+          <FileText className="h-4 w-4 text-base-content/60" />
+          <h3 className="text-sm font-medium text-base-content">Task Details</h3>
         </div>
         {executionTasks.length > 0 ? (
           <div className="text-xs text-base-content/60">
@@ -451,17 +436,17 @@ export function CouplingTaskHistoryModal({
         <div className="mt-2 text-xs text-base-content/60 space-y-1 bg-base-200 p-3 rounded-lg">
           {selectedTask.name && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Task Name:</span>
+              <span className="font-medium">Task Name:</span>
               <span className="font-mono">{selectedTask.name}</span>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <span className="font-semibold">Execution ID:</span>
+            <span className="font-medium">Execution ID:</span>
             <span className="font-mono truncate">{selectedExecutionId}</span>
           </div>
           {selectedTask.task_id && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Task ID:</span>
+              <span className="font-medium">Task ID:</span>
               <a
                 href={`/task-results/${selectedTask.task_id}`}
                 className="font-mono truncate link link-primary"
@@ -472,44 +457,33 @@ export function CouplingTaskHistoryModal({
           )}
           {selectedTask.start_at != null && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Start:</span>
+              <span className="font-medium">Start:</span>
               <span>{formatDateTime(String(selectedTask.start_at))}</span>
             </div>
           )}
           {selectedTask.end_at && (
             <div className="flex items-center gap-2">
-              <span className="font-semibold">End:</span>
+              <span className="font-medium">End:</span>
               <span>{formatDateTime(String(selectedTask.end_at))}</span>
             </div>
           )}
           <TaskArtifactDownloads jsonFigurePaths={jsonFigures} rawDataPaths={rawDataPaths} />
-          {/* Provenance link and Ask AI */}
+          {/* Lineage and Ask AI */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
-            <Link
-              href={(() => {
-                const outputs = selectedTask.output_parameters
-                  ? Object.entries(selectedTask.output_parameters)
-                  : [];
-                const inputs = selectedTask.input_parameters
-                  ? Object.entries(selectedTask.input_parameters)
-                  : [];
-                const [key, paramValue] =
-                  (outputs[0] as [string, Record<string, unknown>] | undefined) ??
-                  (inputs[0] as [string, Record<string, unknown>] | undefined) ??
-                  [];
-                if (key && paramValue) {
-                  const pv = paramValue as Record<string, unknown>;
-                  const parameterName = (pv?.parameter_name as string | undefined) || key;
-                  const resolvedQid = resolveQid(couplingId, pv?.qid_role as string | undefined);
-                  return buildProvenanceUrl(parameterName, resolvedQid);
-                }
-                return "/provenance";
-              })()}
+            <LineageButton
+              target={inExecution(
+                firstPublishedParameter(
+                  couplingId,
+                  selectedTask.output_parameters,
+                  selectedTask.input_parameters,
+                ),
+                selectedExecutionId,
+              )}
               className="btn btn-xs btn-outline gap-1"
             >
               <GitBranch className="h-3 w-3" />
-              View Provenance Lineage
-            </Link>
+              Lineage
+            </LineageButton>
             {chatContext && (
               <AskAiButton
                 taskId={chatContext.taskId}
@@ -581,8 +555,8 @@ export function CouplingTaskHistoryModal({
       <DialogContent className="max-sm:top-auto max-sm:bottom-0 max-sm:translate-y-0 max-sm:rounded-b-none w-full max-w-[112rem] h-[90vh] sm:h-[95vh] p-0 !overflow-hidden flex flex-col">
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <DialogTitle className="text-lg sm:text-2xl font-bold truncate">{taskName}</DialogTitle>
-            <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+            <DialogTitle className="text-sm font-medium truncate">{taskName}</DialogTitle>
+            <DialogDescription className="text-sm text-base-content/70 mt-0.5 sm:mt-1">
               Coupling {couplingId}
             </DialogDescription>
           </div>

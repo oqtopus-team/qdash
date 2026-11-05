@@ -21,7 +21,7 @@ for the role to assign.
 
 | Page | Purpose | Guide |
 | --- | --- | --- |
-| **Home** | Start common work and review active executions, failed tasks, and recent notifications. | This page |
+| **Home** | Start common work and review recent executions, upcoming scheduled workflow runs, and recent failed tasks. | This page |
 | **Dashboard** | Scan all configured chip metrics, coverage, distributions, and scoped notes. | [Dashboard](./dashboard.md) |
 | **Metrics** | Inspect one metric across qubits or couplings and compare its history. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Chip** | Browse calibration tasks and the latest results on the chip topology. | [Calibration Data and Provenance](./data-and-provenance.md) |
@@ -31,10 +31,19 @@ for the role to assign.
 Use **Dashboard** for broad health checks, **Metrics** for a parameter-focused investigation, and
 **Chip** when the calibration task or physical target is the starting point.
 
+**Executions** on Home counts the runs started on every chip of the active project in the last 30
+days, one column of blocks per day colored by status. Each block represents one execution; on
+busy days the card labels how many executions a full block represents, and the top block of a
+day is only partly filled when it holds fewer. Hover over or focus a day to see its exact counts, and select the chart or
+**All executions** to open the **Execution** page. A run in progress appears as a badge in the top
+bar with its name and status; select the badge to open the run.
+
 When a project has no chips, Home highlights the **Setup tour** for project editors. After a chip
 exists, the tour remains available as a compact Home action for replay. It opens the Chip page,
-points to the creation action, and explains the chip ID and topology fields without creating data
-until the form is submitted.
+points to the creation action, and explains the chip ID, topology, and Qubex configuration fields
+without creating data until the form is submitted. The Qubex configuration options are available
+only when a configuration tree is mounted. They copy wiring from an existing system or start from
+a backend template, and the new files are pushed from the Config page.
 
 ## Operate
 
@@ -55,11 +64,13 @@ permission. See [Running Calibrations](./running-calibrations.md) for the end-to
 
 | Page | Purpose | Guide |
 | --- | --- | --- |
-| **Inbox** | Review mentions, replies, and system notifications. | [Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) |
 | **Forum** | Hold project-wide discussions that are not tied to one result. | [Reviewing and Sharing Results](./reviewing-results.md#start-a-discussion) |
 | **Knowledge** | Maintain task background and expert-labeled examples. | [Reviewing and Sharing Results](./reviewing-results.md#reuse-the-finding) |
 
-See [Reviewing and Sharing Results](./reviewing-results.md) for how these records relate.
+Mentions and replies arrive at the bell in the top bar, which shows the unread count. Select the
+bell to preview the newest notifications, or **View all** to open **Inbox**. See
+[Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) for the notification
+flow and the same page for how these records relate.
 
 ## Manage
 
@@ -78,6 +89,7 @@ them.
 
 ## External Tools
 
-The bottom of the sidebar links to this documentation, the Prefect dashboard, and the interactive
-API documentation. Prefect and API documentation links are available to project editors. Use the
-QDash UI or API for workflow changes so QDash project metadata remains synchronized with Prefect.
+The bottom of the sidebar links to this documentation and, for project editors, to the Prefect
+dashboard. Use the QDash UI or API for workflow changes so QDash project metadata remains
+synchronized with Prefect. The interactive API documentation is not linked from the sidebar; it is
+served at the API's `/docs` path, listed in [Setup](./setup.md#verify-the-installation).

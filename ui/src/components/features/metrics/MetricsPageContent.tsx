@@ -372,8 +372,8 @@ export function MetricsPageContent() {
         <div className="flex flex-col gap-3 md:gap-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <PageHeader
-              title="Chip Metrics Dashboard"
-              description="View and compare qubit performance metrics"
+              title="Metrics"
+              description="Qubit and coupling performance metrics"
               className="mb-0"
             />
             <div className="flex items-start gap-2">
@@ -424,10 +424,7 @@ export function MetricsPageContent() {
             aria-labelledby="metrics-data-scope"
             className="rounded-xl border border-base-300 bg-base-200/45 p-3 sm:p-4"
           >
-            <h2
-              id="metrics-data-scope"
-              className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-base-content/55"
-            >
+            <h2 id="metrics-data-scope" className="mb-3 text-xs font-medium text-base-content/55">
               Data scope
             </h2>
             <div className="flex flex-col gap-4">
@@ -557,7 +554,7 @@ export function MetricsPageContent() {
           <>
             {/* Metric Title */}
             <div className="flex items-center gap-3">
-              <h2 className="text-xl md:text-2xl font-bold">{currentMetricConfig.title}</h2>
+              <h2 className="text-sm font-medium">{currentMetricConfig.title}</h2>
               <span className="badge badge-outline badge-sm">{currentMetricConfig.unit}</span>
             </div>
 
@@ -667,12 +664,7 @@ function CdfWithCoverage({
     <div className="space-y-2">
       {/* Linear Gauge for Coverage */}
       <Card variant="compact" padding="sm">
-        <LinearGauge
-          value={stats.coverage}
-          current={stats.withData}
-          total={stats.total}
-          duration={800}
-        />
+        <LinearGauge value={stats.coverage} current={stats.withData} total={stats.total} />
       </Card>
 
       {/* CDF Chart */}

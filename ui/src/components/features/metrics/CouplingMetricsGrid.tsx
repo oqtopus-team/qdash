@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react";
-import Link from "next/link";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import { ArrowRightLeft, GitBranch, Lock, ZoomIn } from "lucide-react";
 
+import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
@@ -363,7 +363,7 @@ export function CouplingMetricsGrid({
                 }}
               >
                 <div
-                  className="font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
+                  className="font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
                   style={{ fontSize: cellFontSize(displayCellSize, 0.13) }}
                 >
                   MUX{muxIndex}
@@ -436,14 +436,14 @@ export function CouplingMetricsGrid({
                   height: displayCellSize * 0.5,
                   backgroundColor: bgColor || undefined,
                 }}
-                className={`rounded-md shadow-md flex flex-col items-center justify-center transition-all hover:shadow-xl hover:scale-110 -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
+                className={`rounded-md shadow-md flex flex-col items-center justify-center transition-transform hover:shadow-xl -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
                   !bgColor ? "bg-base-300/50" : ""
                 }`}
               >
                 {/* Value Display - LOD controlled */}
                 {value !== null && value !== undefined && showValues && (
                   <div
-                    className="font-bold text-white drop-shadow-md leading-tight"
+                    className="font-medium text-white drop-shadow-md leading-tight"
                     style={{ fontSize: valueFontSizes.valueSize }}
                   >
                     {value.toFixed(showUnits ? 2 : 1)}
@@ -528,7 +528,7 @@ export function CouplingMetricsGrid({
                 }}
                 title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
               >
-                <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded">
                   {regionRow},{regionCol}
                 </span>
               </button>
@@ -674,10 +674,10 @@ export function CouplingMetricsGrid({
               {/* Modal Header */}
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <DialogTitle className="text-lg sm:text-2xl font-bold truncate">
+                  <DialogTitle className="text-sm font-medium truncate">
                     {selectedCouplingInfo.couplingId} - {title}
                   </DialogTitle>
-                  <DialogDescription className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
+                  <DialogDescription className="text-sm text-base-content/70 mt-0.5 sm:mt-1">
                     {selectedCouplingInfo.metric.value !== null
                       ? `${selectedCouplingInfo.metric.value.toFixed(4)} ${unit}`
                       : "No data"}
@@ -706,13 +706,13 @@ export function CouplingMetricsGrid({
 
               {/* Modal Footer */}
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
-                <Link
-                  href={`/provenance?parameter=${encodeURIComponent(metricKey)}&qid=${encodeURIComponent(selectedCouplingInfo.couplingId)}&tab=lineage`}
+                <LineageButton
+                  target={{ parameterName: metricKey, qid: selectedCouplingInfo.couplingId }}
                   className="btn btn-ghost btn-sm sm:btn-md gap-1"
                 >
                   <GitBranch className="h-4 w-4" />
                   <span className="hidden sm:inline">Lineage</span>
-                </Link>
+                </LineageButton>
                 <div className="flex gap-2">
                   <button
                     type="button"

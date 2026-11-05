@@ -33,7 +33,7 @@ export interface LoaderProps {
 
 const BOX: Record<LoaderSize, string> = { sm: "size-4", md: "size-5", lg: "size-6" };
 const ROW: Record<LoaderSize, string> = { sm: "h-4", md: "h-5", lg: "h-6" };
-const TEXT: Record<LoaderSize, string> = { sm: "text-xs", md: "text-sm", lg: "text-base" };
+const TEXT: Record<LoaderSize, string> = { sm: "text-xs", md: "text-sm", lg: "text-sm" };
 
 function CircularLoader({ className, size }: { className?: string; size: LoaderSize }) {
   return (

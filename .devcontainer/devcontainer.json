@@ -3,6 +3,7 @@
   "dockerComposeFile": ["../compose.devcontainer.yaml"],
   "service": "devcontainer",
   "workspaceFolder": "/workspace/qdash",
+  "initializeCommand": ["${localWorkspaceFolder}/.devcontainer/check-shared-repos.sh", "${localWorkspaceFolder}"],
 
   "customizations": {
     "vscode": {
