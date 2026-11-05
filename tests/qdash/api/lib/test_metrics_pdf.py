@@ -159,7 +159,7 @@ def test_summary_exact_capacity_uses_one_page(monkeypatch):
 
 def test_summary_overflow_all_populated_metrics(monkeypatch):
     total = len(_metric_slots())
-    assert total == 32
+    assert total == 34
     generator = _make_generator(total)
     capacity = generator._summary_rows_per_page()
     c, drawn_rows = _draw_summary(generator, monkeypatch)
