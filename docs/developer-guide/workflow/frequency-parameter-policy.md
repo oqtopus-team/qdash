@@ -221,6 +221,24 @@ Do not require every scan point to pass: exploration can include low readout amp
 
 Preserve the heatmap and available raw scan data for inspection, mark the task failed, and publish neither frequency nor amplitude on rejection. The selected R² is recorded as task quality metadata when finite. This gate is implemented in the task; it does not establish that the response maximum is the fidelity optimum or guarantee rejection of every possible noise realization.
 
+## Manual correction
+
+A manual correction from a spectroscopy Task Result writes operational values only. The
+measured frequency stays as recorded, because experiments own `resonator_frequency`,
+`qubit_frequency`, and the exploration estimate `coarse_qubit_frequency`.
+
+| Source task | Correctable parameters | Measured value shown for reference |
+| --- | --- | --- |
+| `CheckResonatorSpectroscopy` | `readout_frequency`, `readout_amplitude` | `resonator_frequency` |
+| `CheckQubitSpectroscopy` | `control_frequency`, `coarse_control_amplitude` | `coarse_qubit_frequency` |
+
+The allowlist is fixed per task in `ManualUpdateService` and does not depend on the source
+result's status or recorded output names, so a failed result can still seed the operating
+values. Diagnostics such as `optimal_power`, `f01_repr_db`, and `f01_quality_level` are never
+written by hand. A point picked on the figure sets the frequency from `x` and derives the
+amplitude from `y` with the same conversions as the task: `10**(y/20)` for readout, and
+`min(10**((y + 10)/20), 1)` for the coarse control amplitude.
+
 ## YAML export
 
 YAML files represent accepted parameter values and the default drive configuration derived from them. They do not export every new measurement automatically.

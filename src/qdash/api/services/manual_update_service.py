@@ -51,19 +51,12 @@ from qdash.repository.qubit import MongoQubitCalibrationRepository
 
 logger = logging.getLogger(__name__)
 
-_MANUALLY_CORRECTABLE_TASKS = {
-    "CheckQubitSpectroscopy",
-    "CheckResonatorSpectroscopy",
-}
-
-_FAILED_TASK_CORRECTABLE_PARAMETERS = {
-    "CheckQubitSpectroscopy": {
-        "coarse_qubit_frequency",
-        "qubit_anharmonicity",
-        "f01_repr_db",
-        "f01_quality_level",
-        "coarse_control_amplitude",
-    },
+# Operational parameters an operator may correct from each spectroscopy result.
+# Measured values (``resonator_frequency``, ``coarse_qubit_frequency``) and
+# diagnostics stay as recorded; see docs/developer-guide/workflow/frequency-parameter-policy.md.
+_MANUALLY_CORRECTABLE_PARAMETERS: dict[str, frozenset[str]] = {
+    "CheckResonatorSpectroscopy": frozenset({"readout_frequency", "readout_amplitude"}),
+    "CheckQubitSpectroscopy": frozenset({"control_frequency", "coarse_control_amplitude"}),
 }
 
 
@@ -383,13 +376,18 @@ class ManualUpdateService:
         request: ManualParameterUpdateRequest,
         project_id: str,
     ) -> TaskResultHistoryDocument:
-        """Validate a correction against the source spectroscopy result."""
+        """Validate a correction against the source spectroscopy result.
+
+        Only the operational parameters mapped for the source task may be written.
+        Measured frequencies are owned by experiments and are never corrected by hand.
+        """
         source_doc = TaskResultHistoryDocument.find_one(
             {"project_id": project_id, "task_id": request.source_task_id}
         ).run()
         if source_doc is None:
             raise HTTPException(status_code=404, detail="Source task result not found")
-        if source_doc.name not in _MANUALLY_CORRECTABLE_TASKS:
+        allowed_names = _MANUALLY_CORRECTABLE_PARAMETERS.get(source_doc.name)
+        if allowed_names is None:
             raise HTTPException(
                 status_code=400,
                 detail=f"Manual correction is not supported for {source_doc.name}",
@@ -400,16 +398,14 @@ class ManualUpdateService:
                 detail="Source task result does not match the requested chip and qid",
             )
 
-        allowed_names = set(source_doc.output_parameter_names)
-        if "anharmonicity" in allowed_names:
-            allowed_names.add("qubit_anharmonicity")
-        if source_doc.status == "failed":
-            allowed_names.update(_FAILED_TASK_CORRECTABLE_PARAMETERS.get(source_doc.name, set()))
         unknown_names = sorted(set(request.parameters) - allowed_names)
         if unknown_names:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unknown source output parameter(s): {', '.join(unknown_names)}",
+                detail=(
+                    f"Parameter(s) not correctable from {source_doc.name}: "
+                    f"{', '.join(unknown_names)}. Allowed: {', '.join(sorted(allowed_names))}"
+                ),
             )
         return source_doc
 
