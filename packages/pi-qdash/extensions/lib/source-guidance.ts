@@ -37,7 +37,7 @@ export function readSourceArguments(path: string): { path: string; root?: string
   if (value.startsWith("/") || SOURCE_ROOT_NAMES.has(first) || /(site|dist)-packages\//.test(value)) {
     return { path: value };
   }
-  return { root: "qdash", path: value.replace(/^\.?\//, "") };
+  return { root: "qdash", path: value };
 }
 
 /** The qdash_search_source arguments that list files under a source directory. */
@@ -48,7 +48,9 @@ export function searchSourceArguments(path: string): { root?: string; pathPrefix
   const query = !value.endsWith("/") && /\.[a-z0-9]+$/i.test(filename) ? filename : ".py";
   const rootIndex = segments.findIndex((segment) => SOURCE_ROOT_NAMES.has(segment));
   if (rootIndex < 0) return { mode: "path", query };
-  const pathPrefix = segments.slice(rootIndex + 1).join("/");
+  // A failed file path may include a moved or missing parent directory.
+  // Search its name across the root; directory requests still narrow the scope.
+  const pathPrefix = query === filename ? "" : segments.slice(rootIndex + 1).join("/");
   return { root: segments[rootIndex], ...(pathPrefix ? { pathPrefix } : {}), mode: "path", query };
 }
 
