@@ -150,7 +150,9 @@ through `FileService`, not source. The opening message and the `qdash_query` des
 `qdash_query` does not read source for these actions; it returns the source tool call to use:
 
 - `files_tree` with a `path` lists nothing. The result names `qdash_list_source_roots` and
-  `qdash_search_source`.
+  `qdash_search_source`. For a file path, the suggested search uses its filename across the
+  source root so a missing parent directory does not exclude a relocated file. Directory paths
+  retain their search prefix. A renamed file may require a different search term.
 - `file_content` returns matching `qdash_read_source` arguments after HTTP 400 or 404
   only for source-looking paths: Python files, installed-package paths, paths starting with
   a source root name, or absolute paths containing a source root name.

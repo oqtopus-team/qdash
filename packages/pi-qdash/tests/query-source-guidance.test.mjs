@@ -38,6 +38,14 @@ async function fakeQDash(t, { fileContentStatus } = {}) {
         revision: null,
       });
     }
+    if (url.pathname === "/copilot/source/search") {
+      const path = "workflow/new_location/executor.py";
+      const query = url.searchParams.get("query");
+      const prefix = url.searchParams.get("path_prefix") ?? "";
+      return send(200, { query, mode: "path", truncated: false,
+        matches: path.startsWith(prefix) && path.includes(query)
+          ? [{ root: "qdash", path, line: null, text: null }] : [] });
+    }
     if (url.pathname === "/copilot/source/roots") return send(200, { roots: [], missing_dependencies: ["qubex"], execution_revision_recorded: false });
     return send(404, { detail: "unexpected" });
   });
@@ -150,7 +158,7 @@ test("package-qualified non-Python paths normalize before root recognition", () 
 test("source search guidance queries the requested filename", () => {
   for (const filename of ["schema.yaml", "executor.py", "config.toml"]) {
     assert.deepEqual(searchSourceArguments(`/app/qdash/workflow/${filename}`), {
-      root: "qdash", pathPrefix: `workflow/${filename}`, mode: "path", query: filename,
+      root: "qdash", mode: "path", query: filename,
     });
   }
   assert.deepEqual(searchSourceArguments("/app/qdash/workflow/"), {
@@ -168,4 +176,15 @@ test("absolute config paths keep the config API error instead of source guidance
   }
   assert.equal(looksLikeSourcePath("/app/qdash"), true);
   assert.equal(looksLikeSourcePath("/app/qdash/workflow/engine/task/executor.py"), true);
+});
+
+
+test("recovery search finds a file even when its old parent directory is missing", async (t) => {
+  const { run } = await fakeQDash(t);
+  const result = await run("qdash_query", {
+    action: "files_tree", path: "/app/qdash/workflow/removed_location/executor.py",
+  });
+  const args = JSON.parse(result.content[0].text.match(/qdash_search_source (\{.*\})/)[1]);
+  const search = await run("qdash_search_source", args);
+  assert.match(search.content[0].text, /qdash:workflow\/new_location\/executor\.py/);
 });
