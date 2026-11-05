@@ -1,6 +1,14 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { usePathname } from "next/navigation";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
 import type {
@@ -11,6 +19,7 @@ import type {
 } from "@/types/copilotChat";
 import { matchesEditTarget } from "@/lib/copilotEditTarget";
 import {
+  sameInvestigation,
   investigationKey,
   investigationPrompt,
   investigationTitle,
@@ -54,9 +63,16 @@ interface ChatDockValue {
 
   /**
    * Start an AI investigation of a failure, or resume the one already started
-   * for it. The first turn is sent once, here; a rerender sends nothing.
+   * for it. The first turn is sent once, here; a rerender sends nothing. A
+   * resumed chat that turns out to hold no turn is asked again.
    */
   investigate: (target: InvestigationTarget, surface?: InvestigationSurface) => void;
+  /**
+   * The user left this chat with New chat. When it is an investigation, the
+   * next Investigate click for that failure starts a fresh run; the chat itself
+   * stays in the history.
+   */
+  endInvestigation: (sessionId: string | null | undefined) => void;
 
   /** Tell the chat what this page shows; returns the unregister function for unmount. */
   registerPage: (provider: PageContextProvider) => () => void;
@@ -72,7 +88,7 @@ const ChatDockCtx = createContext<ChatDockValue | null>(null);
 export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   const {
     activeSession,
-    findInvestigationSession,
+    sessions,
     findSessionByContext,
     switchSession,
     createNewSession,
@@ -100,7 +116,10 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
     if (!pathname || pathname.startsWith("/chat")) return null;
     const page = pageProvider.current?.current();
     if (page) return page;
-    return { path: pathname, title: typeof document === "undefined" ? "" : document.title };
+    return {
+      path: pathname,
+      title: typeof document === "undefined" ? "" : document.title,
+    };
   }, [pathname]);
 
   const applyCode = useCallback((edit: EditProposal): boolean => {
@@ -170,22 +189,96 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   // Investigations started in this tab, by failure. Written in the click handler
   // itself, so a double click resumes the session the first click created.
   const investigations = useRef<Map<string, string>>(new Map());
+  // Investigations the user left with New chat: Investigate starts over instead
+  // of resuming them, unless the chat is the one on screen.
+  const ended = useRef<Set<string>>(new Set());
+  const sessionsRef = useRef(sessions);
+  const activeIdRef = useRef(activeSession?.id ?? null);
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
+  useEffect(() => {
+    activeIdRef.current = activeSession?.id ?? null;
+  }, [activeSession?.id]);
+
+  const endInvestigation = useCallback((sessionId: string | null | undefined) => {
+    if (!sessionId) return;
+    const session = sessionsRef.current?.find((s) => s.id === sessionId);
+    if (!session?.investigation) return;
+    const key = investigationKey(session.investigation);
+    // Reset this failure, including older runs loaded from history.
+    for (const candidate of sessionsRef.current ?? []) {
+      if (sameInvestigation(candidate.investigation, session.investigation)) {
+        ended.current.add(candidate.id);
+      }
+    }
+    investigations.current.delete(key);
+    // New chat can be followed by Investigate before React renders the switch.
+    activeIdRef.current = null;
+  }, []);
+
+  // A resumed investigation whose stored chat may hold no turn (its first one
+  // was never saved). Checked once its messages are loaded.
+  const emptyCheck = useRef<{
+    sessionId: string;
+    target: InvestigationTarget;
+  } | null>(null);
+
+  const askAgainIfEmpty = useCallback(() => {
+    const pending = emptyCheck.current;
+    if (!pending) return;
+    const session = sessionsRef.current?.find((s) => s.id === pending.sessionId);
+    if (!session || pending.sessionId !== activeIdRef.current) {
+      emptyCheck.current = null;
+      return;
+    }
+    if (!session.messagesLoaded) return;
+    emptyCheck.current = null;
+    if (session.messages.length > 0) return;
+    sendMessage(investigationPrompt(pending.target), {
+      sessionId: pending.sessionId,
+      page: currentPage(),
+    });
+  }, [currentPage, sendMessage]);
+
+  useEffect(() => {
+    askAgainIfEmpty();
+  }, [askAgainIfEmpty, sessions, activeSession?.id]);
 
   const investigate = useCallback(
     (target: InvestigationTarget, surface: InvestigationSurface = "sidebar") => {
       const key = investigationKey(target);
+      const resumable = (id: string) => !ended.current.has(id) || id === activeIdRef.current;
       const known = investigations.current.get(key);
-      const resumed = known && hasSession(known) ? known : findInvestigationSession(target)?.id;
+      // Deleting the known run starts fresh instead of reviving older history.
+      const resumed =
+        known && hasSession(known) && resumable(known)
+          ? known
+          : known && !hasSession(known)
+            ? undefined
+            : sessionsRef.current?.find(
+                (s) => sameInvestigation(s.investigation, target) && resumable(s.id),
+              )?.id;
       if (resumed) {
         investigations.current.set(key, resumed);
         switchSession(resumed);
+        // Current before the switch renders, so the check below and a double
+        // click see the chat this click opened.
+        activeIdRef.current = resumed;
+        emptyCheck.current = { sessionId: resumed, target };
+        askAgainIfEmpty();
       } else {
         const sessionId = createNewSession(null, {
           title: investigationTitle(target),
           investigation: target,
         });
         investigations.current.set(key, sessionId);
-        sendMessage(investigationPrompt(target), { sessionId, page: currentPage() });
+        activeIdRef.current = sessionId;
+        emptyCheck.current = null;
+        sendMessage(investigationPrompt(target), {
+          sessionId,
+          page: currentPage(),
+        });
       }
       if (surface === "mini") {
         setIsOpen(false);
@@ -195,14 +288,7 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
         setIsOpen(true);
       }
     },
-    [
-      createNewSession,
-      currentPage,
-      findInvestigationSession,
-      hasSession,
-      sendMessage,
-      switchSession,
-    ],
+    [askAgainIfEmpty, createNewSession, currentPage, hasSession, sendMessage, switchSession],
   );
 
   const value = useMemo(
@@ -218,6 +304,7 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
       openMiniChatForSession,
       closeMiniChat,
       investigate,
+      endInvestigation,
       registerPage,
       currentPage,
       applyCode,
@@ -235,6 +322,7 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
       openMiniChatForSession,
       closeMiniChat,
       investigate,
+      endInvestigation,
       registerPage,
       currentPage,
       applyCode,

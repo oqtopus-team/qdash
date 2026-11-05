@@ -113,9 +113,12 @@ details, and the task result preview pass `"mini"`, the floating window, because
 sit in a drawer or modal; the task result page uses the sidebar. The dock shows one surface at a
 time: opening either closes the other. The click handler creates the session, with
 `context: {investigation}` stored server-side, and sends the first turn once. A second click for
-the same failure resumes that session, including after a reload. The first turn and retries of that turn
-carry `investigation`. Follow-ups use the existing conversation without reloading the execution,
-so they can continue after the execution record is removed. The session's
+the same failure resumes that session, including after a reload, where the most recently updated
+match wins. **New chat** from an investigation calls `ChatDockContext.endInvestigation`, so the
+next click for that failure creates a fresh session and leaves the old one in the history; the
+ended set lives in the tab and is not restored after a reload. A resumed session that loads with
+no messages gets the first turn sent again. The first turn and retries of that turn carry `investigation`. Follow-ups use the existing
+conversation without reloading the execution, so they can continue after the execution record is removed. The session's
 `context` stays null, so task chats and their lookup are unchanged.
 
 The model reads code through three read-only pi-qdash tools backed by `GET /copilot/source/roots`,

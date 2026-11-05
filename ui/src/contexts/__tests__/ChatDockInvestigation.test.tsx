@@ -17,7 +17,10 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </CopilotChatSessionProvider>
 );
 
-const EXECUTION_ONLY: InvestigationTarget = { executionId: "exec-1", chipId: "64Q" };
+const EXECUTION_ONLY: InvestigationTarget = {
+  executionId: "exec-1",
+  chipId: "64Q",
+};
 const TASK: InvestigationTarget = {
   executionId: "exec-1",
   taskId: "task-9",
@@ -27,6 +30,7 @@ const TASK: InvestigationTarget = {
 };
 
 let storedSessions: unknown[];
+let storedMessages: Record<string, unknown[]>;
 let fetchMock: ReturnType<typeof vi.fn>;
 
 function sse(event: string, data: unknown): string {
@@ -35,14 +39,23 @@ function sse(event: string, data: unknown): string {
 
 beforeEach(() => {
   storedSessions = [];
+  storedMessages = {};
   fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/stream")) {
-      return new Response(sse("result", { blocks: [], assessment: null }), { status: 200 });
+      return new Response(sse("result", { blocks: [], assessment: null }), {
+        status: 200,
+      });
     }
     if (url.endsWith("/copilot/chat/sessions") && !init?.method) {
       return Response.json({ sessions: storedSessions });
     }
-    return Response.json({ session_id: "x", title: "", context: null, messages: [] });
+    const id = decodeURIComponent(String(url).split("/").pop() ?? "");
+    return Response.json({
+      session_id: id,
+      title: "",
+      context: null,
+      messages: storedMessages[id] ?? [],
+    });
   });
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -67,6 +80,20 @@ function calls(suffix: string, method?: string) {
   );
 }
 
+const ANSWER = {
+  role: "assistant",
+  content: '{"blocks":[],"assessment":null}',
+};
+
+/** What the dock's New chat button does: leave the active chat for a blank one. */
+function newChatFromDock(rendered: Awaited<ReturnType<typeof renderDock>>) {
+  const { dock, store } = rendered.result.current;
+  act(() => {
+    dock.endInvestigation(store.activeSessionId);
+    store.createNewSession(store.activeSession?.context ?? null);
+  });
+}
+
 function streamBodies() {
   return calls("/stream", "POST").map(([, init]) => JSON.parse(String(init.body)));
 }
@@ -80,10 +107,16 @@ describe("ChatDock investigations", () => {
     rerender();
 
     const [body] = streamBodies();
-    expect(body.investigation).toEqual({ execution_id: "exec-1", chip_id: "64Q" });
+    expect(body.investigation).toEqual({
+      execution_id: "exec-1",
+      chip_id: "64Q",
+    });
     expect(body.task).toBeUndefined();
     expect(body.message).toMatch(/why execution exec-1 failed/);
-    expect(body.page).toEqual({ path: "/execution", title: expect.any(String) });
+    expect(body.page).toEqual({
+      path: "/execution",
+      title: expect.any(String),
+    });
 
     const [, createInit] = calls("/copilot/chat/sessions", "POST")[0];
     const created = JSON.parse(String(createInit.body));
@@ -178,13 +211,242 @@ describe("ChatDock investigations", () => {
         updated_at: "2026-11-04T00:01:00Z",
       },
     ];
+    storedMessages = {
+      saved: [{ role: "user", content: "Investigate" }, ANSWER],
+    };
     const { result } = await renderDock();
     expect(result.current.store.sessions[0].context).toBeNull();
 
     act(() => result.current.dock.investigate(EXECUTION_ONLY));
     expect(result.current.store.activeSessionId).toBe("saved");
+    await waitFor(() => expect(result.current.store.activeSession?.messages).toHaveLength(2));
     expect(streamBodies()).toHaveLength(0);
     expect(calls("/copilot/chat/sessions", "POST")).toHaveLength(0);
+  });
+
+  it("starts a fresh investigation after New chat, keeping the old one", async () => {
+    const rendered = await renderDock();
+    const { result } = rendered;
+    act(() => result.current.dock.investigate(TASK));
+    await waitFor(() => expect(result.current.store.activeSession?.messages).toHaveLength(2));
+    const first = result.current.store.activeSessionId!;
+
+    newChatFromDock(rendered);
+    act(() => result.current.dock.investigate(TASK));
+    await waitFor(() => expect(streamBodies()).toHaveLength(2));
+
+    const second = result.current.store.activeSessionId!;
+    expect(second).not.toBe(first);
+    expect(streamBodies()[1].session_id).toBe(second);
+    expect(streamBodies()[1].conversation_history).toEqual([]);
+    expect(streamBodies()[1].investigation.task_id).toBe("task-9");
+    expect(result.current.store.sessions.some((s) => s.id === first)).toBe(true);
+    await waitFor(() => expect(result.current.store.activeSession?.messages).toHaveLength(2));
+
+    // The fresh run is now the one a click resumes, double click included.
+    act(() => {
+      result.current.dock.investigate(TASK);
+      result.current.dock.investigate(TASK);
+    });
+    expect(result.current.store.activeSessionId).toBe(second);
+    expect(streamBodies()).toHaveLength(2);
+  });
+
+  it("dedups a double click right after New chat", async () => {
+    const rendered = await renderDock();
+    const { result } = rendered;
+    act(() => result.current.dock.investigate(TASK));
+    await waitFor(() => expect(streamBodies()).toHaveLength(1));
+
+    newChatFromDock(rendered);
+    act(() => {
+      result.current.dock.investigate(TASK);
+      result.current.dock.investigate(TASK);
+    });
+    await waitFor(() => expect(streamBodies()).toHaveLength(2));
+    expect(
+      calls("/copilot/chat/sessions", "POST").filter(([, init]) =>
+        String(init.body).includes("investigation"),
+      ),
+    ).toHaveLength(2);
+  });
+
+  it("starts fresh after the chat page's New chat", async () => {
+    const { result } = await renderDock();
+    act(() => result.current.dock.investigate(EXECUTION_ONLY));
+    await waitFor(() => expect(streamBodies()).toHaveLength(1));
+    const first = result.current.store.activeSessionId;
+
+    act(() => {
+      result.current.dock.endInvestigation(result.current.store.activeSessionId);
+      result.current.store.switchSession(null);
+    });
+    act(() => result.current.dock.investigate(EXECUTION_ONLY));
+    await waitFor(() => expect(streamBodies()).toHaveLength(2));
+    expect(result.current.store.activeSessionId).not.toBe(first);
+  });
+
+  it("resumes after closing or leaving for another chat without New chat", async () => {
+    const rendered = await renderDock();
+    const { result } = rendered;
+    act(() => result.current.dock.investigate(TASK));
+    await waitFor(() => expect(streamBodies()).toHaveLength(1));
+    const first = result.current.store.activeSessionId;
+
+    act(() => result.current.dock.closeSidebar());
+    act(() => result.current.dock.investigate(TASK));
+    expect(result.current.store.activeSessionId).toBe(first);
+
+    // New chat from an ordinary chat does not end the investigation.
+    act(() => result.current.dock.openGeneralChat());
+    newChatFromDock(rendered);
+    act(() => result.current.dock.investigate(TASK));
+    expect(result.current.store.activeSessionId).toBe(first);
+    expect(streamBodies()).toHaveLength(1);
+  });
+
+  it("keeps an ended investigation that the user reopened", async () => {
+    const rendered = await renderDock();
+    const { result } = rendered;
+    act(() => result.current.dock.investigate(TASK));
+    await waitFor(() => expect(streamBodies()).toHaveLength(1));
+    const first = result.current.store.activeSessionId!;
+
+    newChatFromDock(rendered);
+    act(() => result.current.store.switchSession(first));
+    act(() => result.current.dock.investigate(TASK));
+    expect(result.current.store.activeSessionId).toBe(first);
+    expect(streamBodies()).toHaveLength(1);
+  });
+
+  it("starts fresh once the investigation chat is deleted", async () => {
+    const { result } = await renderDock();
+    act(() => result.current.dock.investigate(TASK));
+    await waitFor(() => expect(streamBodies()).toHaveLength(1));
+    const first = result.current.store.activeSessionId!;
+
+    act(() => result.current.store.deleteSession(first));
+    act(() => result.current.dock.investigate(TASK));
+    await waitFor(() => expect(streamBodies()).toHaveLength(2));
+    expect(result.current.store.activeSessionId).not.toBe(first);
+    expect(result.current.store.sessions.some((s) => s.id === first)).toBe(false);
+  });
+
+  it("resumes the newest investigation after a reload", async () => {
+    const summary = (id: string, updated: string) => ({
+      session_id: id,
+      title: "Investigate execution exec-1",
+      context: { investigation: EXECUTION_ONLY },
+      message_count: 2,
+      created_at: "2026-11-04T00:00:00Z",
+      updated_at: updated,
+    });
+    // The API lists the most recently updated first.
+    storedSessions = [
+      summary("rerun", "2026-11-04T00:05:00Z"),
+      summary("old", "2026-11-04T00:01:00Z"),
+    ];
+    storedMessages = {
+      rerun: [{ role: "user", content: "Investigate" }, ANSWER],
+    };
+    const { result } = await renderDock();
+
+    act(() => result.current.dock.investigate(EXECUTION_ONLY));
+    expect(result.current.store.activeSessionId).toBe("rerun");
+    await waitFor(() => expect(result.current.store.activeSession?.messagesLoaded).toBe(true));
+    expect(streamBodies()).toHaveLength(0);
+  });
+
+  it.each(["reset", "delete"])(
+    "starts fresh after %s with multiple historical runs",
+    async (action) => {
+      storedSessions = ["newest", "older"].map((id) => ({
+        session_id: id,
+        title: "Investigate execution exec-1",
+        context: { investigation: EXECUTION_ONLY },
+        message_count: 2,
+        created_at: "2026-11-04T00:00:00Z",
+        updated_at: "2026-11-04T00:01:00Z",
+      }));
+      storedMessages = { newest: [{ role: "user", content: "Investigate" }, ANSWER] };
+      const { result } = await renderDock();
+      act(() => result.current.dock.investigate(EXECUTION_ONLY));
+      await waitFor(() => expect(result.current.store.activeSession?.messages).toHaveLength(2));
+      act(() => {
+        if (action === "reset") {
+          result.current.dock.endInvestigation("newest");
+          result.current.store.switchSession(null);
+        } else {
+          result.current.store.deleteSession("newest");
+        }
+      });
+      act(() => result.current.dock.investigate(EXECUTION_ONLY));
+      await waitFor(() => expect(streamBodies()).toHaveLength(1));
+      expect(result.current.store.activeSessionId).not.toBe("newest");
+      expect(result.current.store.activeSessionId).not.toBe("older");
+      expect(streamBodies()[0].conversation_history).toEqual([]);
+    },
+  );
+
+  it("starts fresh when reset and investigation happen before a render", async () => {
+    const { result } = await renderDock();
+    act(() => result.current.dock.investigate(TASK));
+    await waitFor(() => expect(result.current.store.activeSession?.messages).toHaveLength(2));
+    const first = result.current.store.activeSessionId!;
+    act(() => {
+      result.current.dock.endInvestigation(first);
+      result.current.store.switchSession(null);
+      result.current.dock.investigate(TASK);
+      result.current.dock.investigate(TASK);
+    });
+    await waitFor(() => expect(streamBodies()).toHaveLength(2));
+    expect(result.current.store.activeSessionId).not.toBe(first);
+    expect(streamBodies()[1].conversation_history).toEqual([]);
+  });
+
+  it("keeps a reset through an unrelated render before switching sessions", async () => {
+    const { result } = await renderDock();
+    act(() => result.current.dock.investigate(TASK));
+    await waitFor(() => expect(result.current.store.activeSession?.messages).toHaveLength(2));
+    const first = result.current.store.activeSessionId!;
+    act(() => {
+      result.current.dock.endInvestigation(first);
+      result.current.dock.closeSidebar();
+    });
+    act(() => {
+      result.current.store.switchSession(null);
+      result.current.dock.investigate(TASK);
+    });
+    await waitFor(() => expect(streamBodies()).toHaveLength(2));
+    expect(result.current.store.activeSessionId).not.toBe(first);
+    expect(streamBodies()[1].conversation_history).toEqual([]);
+  });
+
+  it("asks again in a stored investigation that holds no turn", async () => {
+    storedSessions = [
+      {
+        session_id: "empty",
+        title: "Investigate execution exec-1",
+        context: { investigation: EXECUTION_ONLY },
+        message_count: 0,
+        created_at: "2026-11-04T00:00:00Z",
+        updated_at: "2026-11-04T00:01:00Z",
+      },
+    ];
+    const { result } = await renderDock();
+
+    act(() => result.current.dock.investigate(EXECUTION_ONLY));
+    await waitFor(() => expect(streamBodies()).toHaveLength(1));
+    expect(streamBodies()[0].session_id).toBe("empty");
+    expect(streamBodies()[0].investigation).toEqual({
+      execution_id: "exec-1",
+      chip_id: "64Q",
+    });
+    expect(calls("/copilot/chat/sessions", "POST")).toHaveLength(0);
+    await waitFor(() => expect(result.current.store.activeSession?.messages).toHaveLength(2));
+
+    act(() => result.current.dock.investigate(EXECUTION_ONLY));
+    expect(streamBodies()).toHaveLength(1);
   });
 
   it("never shows the docked sidebar and the floating window at once", async () => {
