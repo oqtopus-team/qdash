@@ -28,6 +28,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
@@ -337,7 +338,7 @@ export function QubitGrid({
   }, [selectedForDownload, taskResponse?.data?.result]);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
   const [selectedRegion, setSelectedRegion] = useState<{
@@ -349,6 +350,7 @@ export function QubitGrid({
     col: number;
   } | null>(null);
   const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
 
   // LOD: store zoom scale, compute visibility flags from effective cell size.
   // Initialize to a conservative value; will be updated on first transform.
@@ -910,6 +912,7 @@ export function QubitGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",

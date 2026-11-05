@@ -16,6 +16,7 @@ import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { pickColor } from "@/lib/utils/color-scale";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
@@ -270,7 +271,7 @@ export function QubitMetricsGrid({
   );
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
   const [selectedRegion, setSelectedRegion] = useState<{
@@ -292,6 +293,7 @@ export function QubitMetricsGrid({
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
   const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
     cols: displayCols,
     rows: displayRows,
@@ -722,6 +724,7 @@ export function QubitMetricsGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",
