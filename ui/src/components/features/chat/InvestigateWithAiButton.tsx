@@ -17,7 +17,8 @@ interface InvestigateWithAiButtonProps {
 /**
  * One click from a failure's log to an AI investigation of it: the chat opens
  * with the recorded logs, identifiers and the source the assistant can read,
- * and asks for an evidence-backed cause. Clicking again resumes that chat.
+ * and asks for an evidence-backed cause. Clicking again resumes that chat; after
+ * New chat in it, a click starts a fresh investigation.
  */
 export function InvestigateWithAiButton({
   target,

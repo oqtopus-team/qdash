@@ -89,6 +89,8 @@ of the source it read, or says it is unknown, and says that it cannot confirm th
 matches the failed run. When the logs are missing or too long, the answer says what is missing.
 
 Selecting the button again for the same failure reopens that chat instead of starting a new one.
+To run the investigation again from the start, select **New chat** while the investigation chat is
+open, then select **Investigate with AI**. The earlier chat stays in your chat history.
 
 ### Run a calibration pipeline from chat
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { PanelLeftOpen, SquarePen } from "lucide-react";
+import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { useCopilotChatSessionContext } from "@/contexts/CopilotChatSessionContext";
 import { withViewTransition } from "@/lib/viewTransition";
 import { ChatSidebar, RenameInput, SessionMenu } from "@/components/features/chat/ChatSidebar";
@@ -52,6 +53,7 @@ export function CopilotChatPage() {
     deleteSession,
     renameSession,
   } = useCopilotChatSessionContext();
+  const endInvestigation = useOptionalChatDock()?.endInvestigation;
   const runningSessionIds = Object.keys(runs);
 
   const [showSidebar, setShowSidebar] = useState(true);
@@ -72,14 +74,20 @@ export function CopilotChatPage() {
   }, []);
 
   const handleNewChat = useCallback(() => {
-    if (activeSession && activeSession.messages.length === 0 && !activeSession.context) {
+    if (
+      activeSession &&
+      activeSession.messages.length === 0 &&
+      !activeSession.context &&
+      !activeSession.investigation
+    ) {
       threadRef.current?.focus();
       return;
     }
+    endInvestigation?.(activeSession?.id);
     // The page starts from the greeting; the session is created on first send.
     withViewTransition(() => switchSession(null));
     if (isMobile) setShowSidebar(false);
-  }, [activeSession, isMobile, switchSession]);
+  }, [activeSession, endInvestigation, isMobile, switchSession]);
 
   const handleSelect = useCallback(
     (id: string) => {
