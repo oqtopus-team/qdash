@@ -193,9 +193,13 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
   // of resuming them, unless the chat is the one on screen.
   const ended = useRef<Set<string>>(new Set());
   const sessionsRef = useRef(sessions);
-  sessionsRef.current = sessions;
   const activeIdRef = useRef(activeSession?.id ?? null);
-  activeIdRef.current = activeSession?.id ?? null;
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
+  useEffect(() => {
+    activeIdRef.current = activeSession?.id ?? null;
+  }, [activeSession?.id]);
 
   const endInvestigation = useCallback((sessionId: string | null | undefined) => {
     if (!sessionId) return;
@@ -246,6 +250,7 @@ export function ChatDockProvider({ children }: { children: React.ReactNode }) {
       const key = investigationKey(target);
       const resumable = (id: string) => !ended.current.has(id) || id === activeIdRef.current;
       const known = investigations.current.get(key);
+      // Deleting the known run starts fresh instead of reviving older history.
       const resumed =
         known && hasSession(known) && resumable(known)
           ? known

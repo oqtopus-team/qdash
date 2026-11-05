@@ -404,6 +404,24 @@ describe("ChatDock investigations", () => {
     expect(streamBodies()[1].conversation_history).toEqual([]);
   });
 
+  it("keeps a reset through an unrelated render before switching sessions", async () => {
+    const { result } = await renderDock();
+    act(() => result.current.dock.investigate(TASK));
+    await waitFor(() => expect(result.current.store.activeSession?.messages).toHaveLength(2));
+    const first = result.current.store.activeSessionId!;
+    act(() => {
+      result.current.dock.endInvestigation(first);
+      result.current.dock.closeSidebar();
+    });
+    act(() => {
+      result.current.store.switchSession(null);
+      result.current.dock.investigate(TASK);
+    });
+    await waitFor(() => expect(streamBodies()).toHaveLength(2));
+    expect(result.current.store.activeSessionId).not.toBe(first);
+    expect(streamBodies()[1].conversation_history).toEqual([]);
+  });
+
   it("asks again in a stored investigation that holds no turn", async () => {
     storedSessions = [
       {

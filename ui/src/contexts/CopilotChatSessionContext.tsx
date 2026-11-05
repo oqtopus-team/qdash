@@ -21,11 +21,7 @@ import {
   toPersistedTrace,
 } from "@/lib/copilotChatStream";
 import { buildHeaders, consumeSSEEvents, readErrorResponse } from "@/lib/sse-utils";
-import {
-  investigationFromStored,
-  sameInvestigation,
-  toInvestigationRequest,
-} from "@/lib/copilotInvestigation";
+import { investigationFromStored, toInvestigationRequest } from "@/lib/copilotInvestigation";
 import type {
   TaskChatContext,
   AnswerFeedback,
@@ -101,8 +97,6 @@ interface CopilotChatSessionContextValue {
   /** Rate the assistant message at `index`; null clears the rating. */
   setMessageFeedback: (sessionId: string, index: number, feedback: AnswerFeedback | null) => void;
   findSessionByContext: (context: TaskChatContext) => CopilotChatSession | null;
-  /** Find an investigation using the current session store, including just-created sessions. */
-  findInvestigationSession: (target: InvestigationTarget) => CopilotChatSession | null;
 
   sendMessage: (text: string, options?: SendOptions) => boolean;
   stop: (sessionId: string) => void;
@@ -496,12 +490,6 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
     [],
   );
 
-  const findInvestigationSession = useCallback(
-    (target: InvestigationTarget) =>
-      sessionsRef.current.find((s) => sameInvestigation(s.investigation, target)) ?? null,
-    [],
-  );
-
   const findSessionByContext = useCallback(
     (context: TaskChatContext) => sessions.find((s) => sameContext(s.context, context)) ?? null,
     [sessions],
@@ -792,7 +780,6 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
       renameSession,
       setMessageFeedback,
       findSessionByContext,
-      findInvestigationSession,
       sendMessage,
       stop,
     }),
@@ -809,7 +796,6 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
       renameSession,
       setMessageFeedback,
       findSessionByContext,
-      findInvestigationSession,
       sendMessage,
       stop,
     ],
