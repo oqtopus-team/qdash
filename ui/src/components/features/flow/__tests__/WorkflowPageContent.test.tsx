@@ -34,7 +34,9 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("@/client/flow/flow", () => ({ listFlows: vi.fn() }));
-vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ username: "mia" }) }));
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({ username: "mia" }),
+}));
 vi.mock("@/components/features/flow/FlowSchedulesSection", () => ({
   FlowSchedulesSection: () => <div data-testid="schedules" />,
 }));

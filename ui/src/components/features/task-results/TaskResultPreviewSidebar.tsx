@@ -7,6 +7,7 @@ import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task
 import { useGetTaskResult } from "@/client/task/task";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
+import { useRecordJourneyResultView } from "@/components/features/first-calibration/useRecordJourneyResultView";
 import { QubitTile } from "@/components/ui/QubitTile";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useEscapeLayer } from "@/hooks/useFullscreenPanel";
@@ -157,6 +158,7 @@ export function TaskResultPreviewSidebar({
     },
   });
   const taskResult = response?.data;
+  useRecordJourneyResultView(isOpen ? taskResult : null);
   const { data: taskFileSettings } = useGetTaskFileSettings({ query: { enabled: isOpen } });
   const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
   const { data: taskInfoData } = useListTaskInfo(
@@ -239,7 +241,7 @@ export function TaskResultPreviewSidebar({
           ) : (
             <div className="space-y-4">
               {(figures.length > 0 || jsonFigures.length > 0) && (
-                <div>
+                <div data-coachmark="task-result-figure" data-task-id={taskId}>
                   <h3 className="mb-2 text-xs font-medium text-base-content/60">Figures</h3>
                   <div className="flex h-56 items-center gap-3 overflow-x-auto rounded-lg bg-base-200/60 p-3">
                     {figures.length > 0 ? (
@@ -302,10 +304,12 @@ export function TaskResultPreviewSidebar({
                 showEmptyFallback
               />
 
-              <ParameterPreview
-                title="Output Parameters"
-                parameters={taskResult.output_parameters as Record<string, unknown> | undefined}
-              />
+              <div data-coachmark="task-result-metrics" data-task-id={taskId}>
+                <ParameterPreview
+                  title="Output Parameters"
+                  parameters={taskResult.output_parameters as Record<string, unknown> | undefined}
+                />
+              </div>
               <ParameterPreview
                 title="Input Parameters"
                 parameters={taskResult.input_parameters as Record<string, unknown> | undefined}

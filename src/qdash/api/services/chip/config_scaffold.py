@@ -22,6 +22,13 @@ it with ``system_id == chip_id``::
   first box setup and spectroscopy;
 * ``calibration/calib_note.json`` holds ``{}``.
 
+When the deployment runs the fake backend, the ``fake`` preset writes a complete
+configuration for the 64-qubit, 16-MUX virtual device the simulator runs instead
+(see :data:`FAKE_PRESET`): one virtual QuEL-1 A box per MUX on documentation-only
+addresses, their wiring and skew, and operating parameters for every qubit taken from
+:mod:`qdash.common.fake_device`. Every generated file says it describes virtual
+hardware.
+
 An existing chip directory is never modified.
 """
 
@@ -37,13 +44,18 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from string import Template
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import yaml
 
+from qdash.common import fake_device
+from qdash.common.config.backend import get_default_backend
 from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.path_resolver import resolve_config_base_path
 from qdash.common.utils.chip_id import CHIP_ID_PATTERN, RESERVED_CHIP_IDS, validate_chip_id
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +87,84 @@ _BAND_FREQUENCY_DEFAULTS: dict[str, dict[str, float]] = {
 _DIR_NAME = re.compile(CHIP_ID_PATTERN)
 
 
+@dataclass(frozen=True)
+class ConfigPreset:
+    """A complete configuration a new chip can start from instead of hardware files."""
+
+    preset_id: str
+    name: str
+    description: str
+    deployment_backend: str
+    topology_id: str
+    n_qubits: int
+    mux_count: int
+    workflow_template_id: str
+
+
+FAKE_PRESET = ConfigPreset(
+    preset_id="fake",
+    name="Virtual fake device",
+    description=(
+        "64 simulated qubits on 16 MUXes, each MUX wired to its own virtual QuEL-1 box. "
+        "No hardware is contacted; the fake backend simulates the device."
+    ),
+    deployment_backend="fake",
+    topology_id=fake_device.FAKE_DEVICE_TOPOLOGY_ID,
+    n_qubits=fake_device.FAKE_DEVICE_QUBITS,
+    mux_count=fake_device.FAKE_DEVICE_MUXES,
+    workflow_template_id="fake_calibration",
+)
+PRESETS: dict[str, ConfigPreset] = {FAKE_PRESET.preset_id: FAKE_PRESET}
+
+# The virtual hardware of the fake preset: one QuEL-1 A box per MUX. 192.0.2.0/24
+# (TEST-NET-1, RFC 5737) is reserved for documentation and never routed, so a hardware backend
+# cannot reach a real box with these addresses. Box IDs end in "A" because QDash's MUX
+# schedulers read the box type from that suffix.
+_FAKE_CLOCK_MASTER = "192.0.2.1"
+_FAKE_BOX_ADDRESS_OFFSET = 10
+# Port layout of a QuEL-1 A box serving one MUX, as legacy ``<box>-<port>`` specifiers, which
+# both Qubex and QDash's MUX schedulers read.
+_FAKE_CTRL_PORTS = (2, 4, 9, 11)
+_FAKE_READ_OUT_PORT = 1
+_FAKE_READ_IN_PORT = 0
+
+
+def _fake_box_id(mux: int) -> str:
+    return f"FAKE{mux:02d}A"
+
+
+def _fake_wiring(n_muxes: int) -> list[dict[str, Any]]:
+    """One wiring row per MUX; MUX ``m`` drives qubits ``4m`` to ``4m + 3`` in ``ctrl`` order."""
+    return [
+        {
+            "mux": mux,
+            "ctrl": [f"{_fake_box_id(mux)}-{port}" for port in _FAKE_CTRL_PORTS],
+            "read_out": f"{_fake_box_id(mux)}-{_FAKE_READ_OUT_PORT}",
+            "read_in": f"{_fake_box_id(mux)}-{_FAKE_READ_IN_PORT}",
+        }
+        for mux in range(n_muxes)
+    ]
+
+
+def _fake_boxes(n_muxes: int) -> dict[str, dict[str, str]]:
+    return {
+        _fake_box_id(mux): {
+            "name": f"Virtual QuEL-1 A for MUX {mux} (fake backend; no hardware)",
+            "type": "quel1-a",
+            "address": f"192.0.2.{_FAKE_BOX_ADDRESS_OFFSET + mux}",
+            "adapter": f"virtual-fake-adapter-{mux:02d}",
+        }
+        for mux in range(n_muxes)
+    }
+
+
+_FAKE_HEADER = (
+    "# VIRTUAL HARDWARE for the QDash fake backend: no physical device or box exists.\n"
+    "# The fake backend simulates this chip; the box address is a documentation-only\n"
+    "# address (192.0.2.0/24) that no hardware backend can reach."
+)
+
+
 class ChipConfigError(ValueError):
     """The configuration cannot be created as asked; the message is for the user."""
 
@@ -97,6 +187,7 @@ class ScaffoldResult:
     path: str
     source_system_id: str | None = None
     backend: str | None = None
+    preset: str | None = None
     files: list[str] = field(default_factory=list)
     message: str = ""
 
@@ -159,6 +250,33 @@ def _seed_frequencies(params_dir: Path, n_qubits: int, band: str) -> None:
         path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
+# Operating settings the fake preset writes: the simulator's readout and drive settings.
+# Measured values (qubit and resonator frequencies, coherence, ...) stay empty; FakeBringUp
+# and the calibration chain record them.
+_FAKE_PARAM_VALUES: dict[str, Callable[[int], float]] = {
+    "readout_frequency.yaml": lambda qubit: fake_device.fake_device_value(
+        fake_device.FAKE_READOUT_FREQUENCIES, qubit
+    ),
+    "control_frequency.yaml": lambda qubit: fake_device.fake_device_value(
+        fake_device.FAKE_QUBIT_FREQUENCIES, qubit
+    ),
+    "readout_amplitude.yaml": lambda _: fake_device.FAKE_READOUT_AMPLITUDE,
+    "control_amplitude.yaml": lambda _: fake_device.FAKE_CONTROL_AMPLITUDE,
+}
+
+
+def _seed_fake_params(params_dir: Path, n_qubits: int, header: str) -> None:
+    """Write the fake device's operating settings for every qubit, keyed by Qubex label."""
+    digits = len(str(n_qubits - 1))
+    for name, value in _FAKE_PARAM_VALUES.items():
+        path = params_dir / name
+        payload = _load_yaml(path)
+        if not isinstance(payload, dict):
+            raise ChipConfigError(f"Missing parameter template: {name}")
+        payload["data"] = {f"Q{index:0{digits}d}": value(index) for index in range(n_qubits)}
+        _dump(path, payload, header)
+
+
 class ChipConfigScaffolder:
     """Create ``<config root>/<chip_id>/`` for a new chip."""
 
@@ -167,8 +285,10 @@ class ChipConfigScaffolder:
         config_base: Path | None = None,
         templates_dir: Path | None = None,
         config_templates_dir: Path | None = None,
+        deployment_backend: Callable[[], str] = get_default_backend,
     ) -> None:
         self._base = config_base or resolve_config_base_path()
+        self._deployment_backend = deployment_backend
         self._templates = templates_dir or ConfigLoader.get_config_dir() / PARAMS_TEMPLATES_DIR
         self._config_templates = (
             config_templates_dir or ConfigLoader.get_config_dir() / CONFIG_TEMPLATES_DIR
@@ -233,6 +353,34 @@ class ChipConfigScaffolder:
             system[DEFAULT_BACKEND] = {"clock_master": chip["clock_master"]}
         return system
 
+    # ------------------------------------------------------------------ presets
+
+    @property
+    def deployment_backend(self) -> str:
+        """The backend this deployment runs calibrations on (``DEFAULT_BACKEND``)."""
+        return self._deployment_backend()
+
+    def list_presets(self) -> list[ConfigPreset]:
+        """Presets of this deployment's backend.
+
+        They are listed even when no configuration tree is mounted, so a client can tell a
+        fake deployment apart and explain why a preset chip cannot be created yet.
+        """
+        backend = self.deployment_backend
+        return [preset for preset in PRESETS.values() if preset.deployment_backend == backend]
+
+    def resolve_preset(self, preset_id: str) -> ConfigPreset:
+        """The preset named ``preset_id``; an error when this deployment does not offer it."""
+        preset = PRESETS.get(preset_id)
+        if preset is None:
+            raise ChipConfigError(f"Unknown configuration preset '{preset_id}'")
+        if preset.deployment_backend != self._deployment_backend():
+            raise ChipConfigError(
+                f"The '{preset_id}' preset is available only when the deployment backend is "
+                f"'{preset.deployment_backend}'"
+            )
+        return preset
+
     # ----------------------------------------------------------------- scaffold
 
     def scaffold(
@@ -242,25 +390,23 @@ class ChipConfigScaffolder:
         n_qubits: int,
         source_system_id: str | None = None,
         backend: str | None = None,
+        preset: str | None = None,
     ) -> ScaffoldResult:
         """Write the chip directory; an existing one is left untouched."""
         try:
             validate_chip_id(chip_id)
         except ValueError as exc:
             raise ChipConfigError(str(exc)) from exc
+        if preset is not None:
+            return self._scaffold_preset(chip_id, n_qubits, self.resolve_preset(preset))
         if not self.available:
             return ScaffoldResult(
                 status="skipped",
                 path=chip_id,
                 message="No Qubex configuration tree is mounted; no files were created.",
             )
-        target = self.chip_dir(chip_id)
-        if target.exists():
-            return ScaffoldResult(
-                status="existing",
-                path=chip_id,
-                message=f"{chip_id}/ already exists in the configuration tree and was kept as is.",
-            )
+        if self.chip_dir(chip_id).exists():
+            return self._existing(chip_id)
 
         system, rows, hardware = self._plan_hardware(source_system_id, backend)
         system_backend = str(system["backend"])
@@ -270,9 +416,9 @@ class ChipConfigScaffolder:
                 f"(supported: {', '.join(SUPPORTED_BACKENDS)})"
             )
 
-        staging = Path(tempfile.mkdtemp(prefix=f".{chip_id}.", dir=self._base))
-        try:
-            files = self._write_tree(
+        files = self._commit_tree(
+            chip_id,
+            lambda staging: self._write_tree(
                 staging,
                 chip_id=chip_id,
                 n_qubits=n_qubits,
@@ -280,23 +426,10 @@ class ChipConfigScaffolder:
                 rows=rows,
                 hardware=hardware,
                 source_system_id=source_system_id,
-            )
-            staging.chmod(0o755)
-            try:
-                staging.rename(target)
-            except OSError as exc:
-                if exc.errno not in {errno.EEXIST, errno.ENOTEMPTY} or not target.is_dir():
-                    raise
-                shutil.rmtree(staging, ignore_errors=True)
-                return ScaffoldResult(
-                    status="existing",
-                    path=chip_id,
-                    message=f"{chip_id}/ already exists in the configuration tree and was kept as is.",
-                )
-        except Exception:
-            shutil.rmtree(staging, ignore_errors=True)
-            raise
-        self._match_owner(target)
+            ),
+        )
+        if files is None:
+            return self._existing(chip_id)
         logger.info(
             "Created configuration %s/ (backend=%s, wiring from %s)",
             chip_id,
@@ -314,6 +447,64 @@ class ChipConfigScaffolder:
                 "Push it from the Config page to share it."
             ),
         )
+
+    def _scaffold_preset(self, chip_id: str, n_qubits: int, preset: ConfigPreset) -> ScaffoldResult:
+        if n_qubits != preset.n_qubits:
+            raise ChipConfigError(
+                f"The '{preset.preset_id}' preset describes a {preset.n_qubits}-qubit chip; "
+                f"use the {preset.topology_id} topology"
+            )
+        if not self.available:
+            # A preset chip is only usable with its configuration, so never create it without.
+            raise ChipConfigError(
+                f"No Qubex configuration tree is mounted, so the {preset.name.lower()} "
+                "configuration cannot be written. Mount the configuration tree and try again."
+            )
+        if self.chip_dir(chip_id).exists():
+            return self._existing(chip_id, preset)
+        files = self._commit_tree(chip_id, lambda staging: self._write_fake_tree(staging, chip_id))
+        if files is None:
+            return self._existing(chip_id, preset)
+        logger.info("Created configuration %s/ from preset %s", chip_id, preset.preset_id)
+        return ScaffoldResult(
+            status="created",
+            path=chip_id,
+            backend=DEFAULT_BACKEND,
+            preset=preset.preset_id,
+            files=files,
+            message=(
+                f"Created {chip_id}/ for the virtual {preset.n_qubits}-qubit, "
+                f"{preset.mux_count}-MUX fake device. "
+                "Run the Fake Backend Calibration template to bring it up."
+            ),
+        )
+
+    @staticmethod
+    def _existing(chip_id: str, preset: ConfigPreset | None = None) -> ScaffoldResult:
+        message = f"{chip_id}/ already exists in the configuration tree and was kept as is."
+        if preset is not None:
+            message += f" The {preset.name.lower()} preset was not applied."
+        return ScaffoldResult(status="existing", path=chip_id, message=message)
+
+    def _commit_tree(self, chip_id: str, write: Callable[[Path], list[str]]) -> list[str] | None:
+        """Write a tree in a staging directory and move it into place; ``None`` if one exists."""
+        target = self.chip_dir(chip_id)
+        staging = Path(tempfile.mkdtemp(prefix=f".{chip_id}.", dir=self._base))
+        try:
+            files = write(staging)
+            staging.chmod(0o755)
+            try:
+                staging.rename(target)
+            except OSError as exc:
+                if exc.errno not in {errno.EEXIST, errno.ENOTEMPTY} or not target.is_dir():
+                    raise
+                shutil.rmtree(staging, ignore_errors=True)
+                return None
+        except Exception:
+            shutil.rmtree(staging, ignore_errors=True)
+            raise
+        self._match_owner(target)
+        return files
 
     def remove(self, chip_id: str) -> None:
         """Delete a directory this scaffolder created (used to roll back)."""
@@ -388,6 +579,54 @@ class ChipConfigScaffolder:
             shutil.copy2(template, params_dir / template.name)
         band = _readout_band(str(system["backend"]), rows, _load_yaml(config_dir / "box.yaml"))
         _seed_frequencies(params_dir, n_qubits, band)
+        (calibration_dir / "calib_note.json").write_text("{}\n", encoding="utf-8")
+
+        written = [
+            path.relative_to(root).as_posix() for path in sorted(root.rglob("*")) if path.is_file()
+        ]
+        return [f"{chip_id}/{path}" for path in written]
+
+    def _write_fake_tree(self, root: Path, chip_id: str) -> list[str]:
+        """The complete configuration of the fake backend's virtual device."""
+        config_dir = root / "config"
+        params_dir = root / "params"
+        calibration_dir = root / "calibration"
+        for directory in (config_dir, params_dir, calibration_dir):
+            directory.mkdir(parents=True)
+
+        header = (
+            f"# Generated by QDash for {chip_id} (system_id == chip_id; fake backend preset).\n"
+            f"{_FAKE_HEADER}"
+        )
+        n_qubits = FAKE_PRESET.n_qubits
+        n_muxes = FAKE_PRESET.mux_count
+        _dump(config_dir / "chip.yaml", {chip_id: {"name": chip_id, "n_qubits": n_qubits}}, header)
+        _dump(
+            config_dir / "system.yaml",
+            {
+                chip_id: {
+                    "chip_id": chip_id,
+                    "backend": DEFAULT_BACKEND,
+                    DEFAULT_BACKEND: {"clock_master": _FAKE_CLOCK_MASTER},
+                }
+            },
+            header,
+        )
+        _dump(config_dir / "wiring.yaml", {chip_id: _fake_wiring(n_muxes)}, header)
+        _dump(config_dir / "box.yaml", _fake_boxes(n_muxes), header)
+        _dump(
+            config_dir / "skew.yaml",
+            {
+                "box_setting": {
+                    _fake_box_id(mux): {"slot": mux, "wait": 0} for mux in range(n_muxes)
+                }
+            },
+            header,
+        )
+
+        for template in self._param_templates(DEFAULT_BACKEND):
+            shutil.copy2(template, params_dir / template.name)
+        _seed_fake_params(params_dir, n_qubits, header)
         (calibration_dir / "calib_note.json").write_text("{}\n", encoding="utf-8")
 
         written = [

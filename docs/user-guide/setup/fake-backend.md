@@ -18,8 +18,37 @@ DEFAULT_BACKEND=fake
 ```
 
 The Fake backend runs the Qubex calibration tasks against a simulator instead of hardware. It
-does not read Qubex hardware configuration or open a hardware session. Database records, task
-results, figures, and other QDash state still persist in the paths configured in `.env`.
+never opens a hardware session or contacts a box. Database records, task results, figures, and
+other QDash state still persist in the paths configured in `.env`.
+
+## Create a Chip
+
+Every chip on a Fake deployment is the same virtual device: 64 qubits on 16 MUXes, with the
+**Square Lattice with MUX** 64-qubit topology. The simulator and the generated configuration
+describe the same device, so a run on any subset of qubits sees the parameters the full chip
+gives them.
+
+1. Open **Chip** and select **Create Chip**.
+2. Enter a **Chip ID**. The dialog shows the virtual device, its topology, and its size as
+   fixed information; there is no topology, wiring, or backend to choose.
+3. Select **Create Chip**.
+
+QDash then writes `<chip_id>/` in the configuration tree set by `CONFIG_PATH`
+(`./config/qubex-config` in the example `.env`): chip, system, wiring, box, skew, and parameter
+files for 16 virtual QuEL-1 boxes, one per MUX. Every file is labelled as virtual hardware, and
+the box addresses are documentation-only addresses that no hardware backend can reach. When
+`<chip_id>/` already exists, QDash keeps it unchanged and creates only the chip record.
+
+The dialog blocks creation when no configuration tree is mounted, because a virtual chip cannot
+run without its configuration; mount the tree and reopen the dialog. If the dialog cannot check
+the deployment, it shows an error and blocks creation; close and reopen it to retry.
+
+After the chip is created, select **Open template** in the confirmation to open the **Fake
+Backend Calibration** template in **New Flow** with the new chip already selected.
+
+To be guided from this dialog to the first inspected result, start
+[Run Your First Calibration](../application-tour.md#run-your-first-calibration) from **Home**
+instead.
 
 ## What the Fake Backend Runs
 
@@ -33,8 +62,17 @@ publishes its outputs there, with figures and parameters in the same shape.
 first on a new chip: it writes the simulator's qubit frequency, resonator frequency, readout
 amplitude, and control amplitude to the database, so the Qubex tasks after it find every input
 they require. The **Fake Backend Calibration** workflow template runs FakeBringUp, CheckChevron,
-CheckRabi, CreateHPIPulse, CreatePIPulse, CheckT1, CheckT2Echo, and CheckRamsey in that order;
-pass a `tasks` list to rerun a subset once the chip has been brought up.
+CheckRabi, CreateHPIPulse, CreatePIPulse, CheckT1, CheckT2Echo, and CheckRamsey in that order.
+
+The template targets MUXes, as the hardware templates do. `MUX_IDS = list(range(16))` at the
+top of the source selects MUX 0 to 15, all 64 qubits. QDash finds the four qubits of each MUX in
+the chip's wiring, and the same box-aware scheduler that runs a hardware chip runs them: MUXes
+that share no box run in parallel, and the qubits of one MUX run one after another. Edit
+`MUX_IDS`, for example to `[9, 15]` for qubits 36 to 39 and 60 to 63, to calibrate fewer qubits;
+pass `exclude_qids` to leave qubits out of the selected MUXes, and a `tasks` list to rerun a
+subset once the chip has been brought up. A `qids` list does not change the targets; the template
+logs that it ignores it. Flows saved from an earlier version of the template keep their own
+source and targets.
 
 Set the administrator credentials and any shared deployment options in
 [Configure Shared Deployment Settings](../setup.md#configure-shared-deployment-settings), then

@@ -7,6 +7,7 @@ import { useGetTaskResult } from "@/client/task/task";
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
+import { useRecordJourneyResultView } from "@/components/features/first-calibration/useRecordJourneyResultView";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
@@ -61,6 +62,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
     },
   });
   const taskResult = taskResultResponse?.data;
+  useRecordJourneyResultView(taskResult);
   const { data: taskFileSettings } = useGetTaskFileSettings();
   const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
@@ -309,7 +311,11 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {/* Figure */}
       {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
         (taskResult.json_figure_path && taskResult.json_figure_path.length > 0)) && (
-        <div className="h-[280px] overflow-x-auto overflow-y-hidden flex items-center justify-start gap-3 mb-4">
+        <div
+          className="h-[280px] overflow-x-auto overflow-y-hidden flex items-center justify-start gap-3 mb-4"
+          data-coachmark="task-result-figure"
+          data-task-id={taskId}
+        >
           {(taskResult.figure_path ?? []).map((fig, i) => (
             <TaskFigure
               key={i}
@@ -333,10 +339,12 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         )}
 
         {taskResult.output_parameters && Object.keys(taskResult.output_parameters).length > 0 && (
-          <ParametersTable
-            title="Output Parameters"
-            parameters={taskResult.output_parameters as Record<string, unknown>}
-          />
+          <div data-coachmark="task-result-metrics" data-task-id={taskId}>
+            <ParametersTable
+              title="Output Parameters"
+              parameters={taskResult.output_parameters as Record<string, unknown>}
+            />
+          </div>
         )}
 
         {taskResult.chip_id && REANALYZABLE_TASKS.has(taskResult.task_name) && (

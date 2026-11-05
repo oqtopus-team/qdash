@@ -31,6 +31,14 @@ class SaveFlowRequest(BaseModel):
             " Omitted keeps an existing flow's folder (a new flow goes to the root)."
         ),
     )
+    create_only: bool = Field(
+        default=False,
+        description=(
+            "Create a new flow only. When a flow or flow file with this name already exists"
+            " in the project, the request fails with 409 and changes nothing."
+            " False (the default) creates the flow or overwrites an existing one."
+        ),
+    )
 
     model_config = ConfigDict(
         json_schema_extra={

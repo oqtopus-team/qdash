@@ -46,6 +46,16 @@ sequenceDiagram
 API-visible path to the deployment container's shared volume. Registration fails when the file
 cannot be imported or the expected function is absent.
 
+A save creates the flow or replaces an existing one, which is what the flow editor's **Save**
+expects. With `create_only` in `SaveFlowRequest`, as **New Flow** sends it, the save only creates:
+an existing flow record or flow file with that name returns 409, and the stored source, metadata
+and deployment stay untouched. Saves of one flow name run one at a time:
+`FlowSourceStore.lock()` holds the `filelock` lock `.<flow_name>.py.lock` beside the source
+file, so the lookup and the write cannot interleave across API processes on the host. A
+create-only save also opens the source file exclusively, and the unique `(project_id, name)`
+index turns a concurrent metadata insert into 409, so a writer that bypasses the lock still
+cannot overwrite the flow. A save waits up to 120 seconds for the lock, then returns 503.
+
 Updating a registered flow replaces its Prefect deployment. Before deletion, the deployment
 service reads its schedules and default parameters and applies them to the replacement. The
 read-delete-create sequence is not transactional; a concurrent Prefect edit in that interval can

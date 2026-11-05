@@ -15,6 +15,11 @@ vi.mock("@/client/task/task", () => ({
   }),
 }));
 
+// Journey recording has its own tests; it needs the auth and project providers.
+vi.mock("@/components/features/first-calibration/useRecordJourneyResultView", () => ({
+  useRecordJourneyResultView: () => {},
+}));
+
 vi.mock("@/client/task-file/task-file", () => ({
   useGetTaskFileSettings: () => ({ data: undefined }),
   useListTaskInfo: () => ({ data: undefined }),

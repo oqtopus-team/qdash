@@ -21,6 +21,11 @@ when you are learning the editor or checking a new task sequence without laborat
    function marked as the flow in the source.
 6. Edit the source, then select **Save Flow**.
 
+**Save Flow** only creates a workflow. When the project already has a workflow with that name,
+including one created while you were editing, nothing is saved: the page keeps your source and
+properties and asks for another **Flow Name**. To change an existing workflow, open it and
+select **Save**, which replaces it.
+
 Selecting another template replaces the current editor contents. Choose the template before
 making source changes.
 

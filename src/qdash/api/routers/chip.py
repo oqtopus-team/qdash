@@ -27,6 +27,7 @@ from qdash.api.schemas.chip import (
     ChipDatesResponse,
     ChipDeletionImpactResponse,
     ChipResponse,
+    ConfigPresetResponse,
     ConfigSourceResponse,
     CouplingResponse,
     CreateChipRequest,
@@ -106,6 +107,7 @@ def list_chip_config_sources(
     """
     return ListConfigSourcesResponse(
         available=scaffolder.available,
+        deployment_backend=scaffolder.deployment_backend,
         sources=[
             ConfigSourceResponse(
                 system_id=source.system_id,
@@ -114,6 +116,18 @@ def list_chip_config_sources(
                 files=source.files,
             )
             for source in scaffolder.list_sources()
+        ],
+        presets=[
+            ConfigPresetResponse(
+                preset_id=preset.preset_id,
+                name=preset.name,
+                description=preset.description,
+                topology_id=preset.topology_id,
+                n_qubits=preset.n_qubits,
+                mux_count=preset.mux_count,
+                workflow_template_id=preset.workflow_template_id,
+            )
+            for preset in scaffolder.list_presets()
         ],
     )
 
@@ -135,7 +149,9 @@ def create_chip(
     configuration tree (``system_id == chip_id``) unless ``config.create`` is
     false or the directory already exists. Wiring and hardware files are copied
     from ``config.source_system_id`` when given; parameter files always start
-    from QDash's templates.
+    from QDash's templates. ``config.preset`` writes a complete virtual
+    configuration instead; the ``fake`` preset is accepted only when the
+    deployment backend is fake and the chip uses the preset's topology.
 
     Parameters
     ----------
@@ -164,7 +180,14 @@ def create_chip(
 
     try:
         ChipInitializer.check_chip_available(request.chip_id, ctx.project_id)
-        _, topology = ChipInitializer._load_topology(request.topology_id, request.size)
+        topology_id, topology = ChipInitializer._load_topology(request.topology_id, request.size)
+        preset_id = options.preset if options else None
+        if preset_id is not None:
+            preset = scaffolder.resolve_preset(preset_id)
+            if topology_id != preset.topology_id:
+                raise ChipConfigError(
+                    f"The '{preset_id}' preset needs the {preset.topology_id} topology"
+                )
         config_result = None
         if create_config:
             outcome = scaffolder.scaffold(
@@ -172,12 +195,14 @@ def create_chip(
                 n_qubits=topology.num_qubits,
                 source_system_id=options.source_system_id if options else None,
                 backend=options.backend if options else None,
+                preset=preset_id,
             )
             config_result = ChipConfigResult(
                 status=outcome.status,
                 path=outcome.path,
                 source_system_id=outcome.source_system_id,
                 backend=outcome.backend,
+                preset=outcome.preset,
                 files=outcome.files,
                 message=outcome.message,
             )

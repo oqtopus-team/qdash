@@ -1,7 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -12,7 +13,12 @@ import { useListTopologies } from "@/client/topology/topology";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
 import { SelectedLabel } from "@/components/ui/SelectedLabel";
 import { useToast } from "@/components/ui/Toast/useToast";
+import { newFlowTemplateHref } from "@/lib/flowTemplates";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
+import type { ChipCreateSubmission } from "@/components/features/first-calibration/useChipPageJourney";
+import type { ChipConfigResult, ConfigPresetResponse } from "@/schemas";
+
+import { FAKE_PRESET_ID, canCreateFakeChip, resolveChipSetupMode } from "../chipSetupMode";
 
 interface TopologyItem {
   id: string;
@@ -23,14 +29,29 @@ interface TopologyItem {
 interface CreateChipModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (chipId: string) => void;
+  onSuccess?: (
+    chipId: string,
+    config: ChipConfigResult | null,
+    submission?: ChipCreateSubmission,
+  ) => void;
+  /**
+   * Snapshot taken when Create Chip is submitted and handed back with that submission's answer,
+   * so the answer is judged by the guide, user and project it was submitted in.
+   */
+  captureSubmission?: () => ChipCreateSubmission;
+  /**
+   * The first calibration guide takes the user on from the new chip, so the success message
+   * leaves out its Open template shortcut, which would bypass the guide.
+   */
+  guidedByJourney?: boolean;
 }
 
 const EMPTY_WIRING = "";
 
+// The topology is required only for a hardware chip; submit() checks it there.
 const createChipSchema = z.object({
   chipId: z.string().trim().min(1, "Chip ID is required"),
-  topologyId: z.string().min(1, "Please select a topology template"),
+  topologyId: z.string(),
   createConfig: z.boolean(),
   wiringSource: z.string(),
   backend: z.enum(["quel1", "quel3"]),
@@ -38,7 +59,13 @@ const createChipSchema = z.object({
 
 type CreateChipFormData = z.infer<typeof createChipSchema>;
 
-export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalProps) {
+export function CreateChipModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  guidedByJourney = false,
+  captureSubmission,
+}: CreateChipModalProps) {
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -63,17 +90,20 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
   const createConfig = watch("createConfig");
   const wiringSource = watch("wiringSource");
   const toast = useToast();
+  const router = useRouter();
 
   // Systems in the Qubex configuration tree whose wiring a new chip can copy
-  const {
-    data: configSourcesData,
-    isLoading: isLoadingSources,
-    isError: isConfigSourcesError,
-  } = useListChipConfigSources({
+  const { data: configSourcesData, isError: isConfigSourcesError } = useListChipConfigSources({
     query: { enabled: isOpen },
   });
   const configAvailable = configSourcesData?.data?.available ?? false;
   const configSources = configSourcesData?.data?.sources ?? [];
+  // A fake deployment creates only its fixed virtual device; until the deployment is known,
+  // no setup controls are shown so a fake deployment never offers hardware settings.
+  const setupMode = resolveChipSetupMode(configSourcesData?.data, {
+    isError: isConfigSourcesError,
+  });
+  const fakePreset = setupMode.kind === "fake" ? setupMode.preset : null;
 
   // Fetch available topologies
   const { data: topologiesData, isLoading: isLoadingTopologies } = useListTopologies(undefined, {
@@ -111,11 +141,17 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
     if (!selectedTopologyId && topologies.length > 0) {
       // Default to first 64-qubit topology or first available
       const default64 = topologies.find((t) => t.num_qubits === 64);
-      setValue("topologyId", default64?.id ?? topologies[0].id, { shouldValidate: true });
+      setValue("topologyId", default64?.id ?? topologies[0].id, {
+        shouldValidate: true,
+      });
     }
   }, [setValue, topologies, selectedTopologyId]);
 
   const queryClient = useQueryClient();
+
+  // The snapshot of the submission whose answer is pending; the submit button stays disabled
+  // until it answers, so one submission is in flight at a time.
+  const pendingSubmission = useRef<ChipCreateSubmission | undefined>(undefined);
 
   const createChipMutation = useCreateChip({
     mutation: {
@@ -126,15 +162,35 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
         const config = data.data?.config;
         if (config?.message) {
           if (config.status === "created") {
-            toast.success(config.message);
+            const templateId =
+              !guidedByJourney &&
+              config.preset === FAKE_PRESET_ID &&
+              fakePreset?.workflow_template_id;
+            toast.success(
+              config.message,
+              templateId
+                ? {
+                    action: {
+                      label: "Open template",
+                      onClick: () =>
+                        router.push(
+                          newFlowTemplateHref(FAKE_PRESET_ID, templateId, data.data.chip_id),
+                        ),
+                    },
+                  }
+                : undefined,
+            );
           } else {
             toast.info(config.message);
           }
         }
 
-        // Call success callback if provided
+        // The success callback goes first, so a page that leaves for another route has done so
+        // before the dialog reports its close.
+        const submission = pendingSubmission.current;
+        pendingSubmission.current = undefined;
         if (onSuccess && data.data) {
-          onSuccess(data.data.chip_id);
+          onSuccess(data.data.chip_id, config ?? null, submission);
         }
 
         // Reset form and close modal
@@ -143,21 +199,40 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
         onClose();
       },
       onError: (err: Error) => {
+        pendingSubmission.current = undefined;
         setServerError(getApiErrorMessage(err, "Failed to create chip"));
       },
     },
   });
 
+  const create = (request: Parameters<typeof createChipMutation.mutate>[0]) => {
+    pendingSubmission.current = captureSubmission?.();
+    createChipMutation.mutate(request);
+  };
+
   const submit = (data: CreateChipFormData) => {
-    if (isLoadingSources || isConfigSourcesError) return;
+    if (setupMode.kind === "pending") return;
     setServerError(null);
+    if (setupMode.kind === "fake") {
+      // Never fall back to a hardware chip on a fake deployment.
+      if (!canCreateFakeChip(setupMode)) return;
+      create({
+        data: {
+          chip_id: data.chipId,
+          size: setupMode.preset.n_qubits,
+          topology_id: setupMode.preset.topology_id,
+          config: { preset: FAKE_PRESET_ID },
+        },
+      });
+      return;
+    }
     if (!selectedTopology) {
       setError("topologyId", { message: "Please select a topology template" });
       return;
     }
 
     const withConfig = configAvailable && data.createConfig;
-    createChipMutation.mutate({
+    create({
       data: {
         chip_id: data.chipId,
         size: selectedTopology.num_qubits,
@@ -207,129 +282,147 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
             )}
           </div>
 
-          {/* Topology Template Selection */}
-          <div className="form-control">
-            <label className="label" htmlFor="topology-select">
-              <span className="label-text">Topology Template</span>
-            </label>
-            {isLoadingTopologies ? (
-              <div className="flex items-center gap-2 h-12">
-                <span className="loading loading-spinner loading-sm"></span>
-                <span className="text-sm text-base-content/60">Loading templates...</span>
-              </div>
-            ) : (
-              <select
-                id="topology-select"
-                className={`select select-bordered w-full ${errors.topologyId ? "select-error" : ""}`}
-                disabled={createChipMutation.isPending}
-                aria-invalid={Boolean(errors.topologyId)}
-                aria-describedby={errors.topologyId ? "topology-error" : undefined}
-                {...register("topologyId")}
-              >
-                <SelectedLabel />
-                {groupedTopologies.map(([size, topos]) => (
-                  <optgroup key={size} label={`${size} Qubits`}>
-                    {topos.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            )}
-            {errors.topologyId && (
-              <p id="topology-error" className="mt-1 text-sm text-error">
-                {errors.topologyId.message}
-              </p>
-            )}
-            {selectedTopology && (
-              <label className="label">
-                <span className="label-text-alt text-base-content/60">
-                  {selectedTopology.num_qubits} qubits
+          {setupMode.kind === "pending" ? (
+            setupMode.failed ? (
+              <div className="alert alert-error alert-soft" role="alert">
+                <span className="min-w-0 break-words">
+                  Unable to check how this deployment creates chips. Close and reopen this dialog to
+                  retry.
                 </span>
-              </label>
-            )}
-          </div>
-
-          {/* Qubex configuration directory (system_id == chip_id) */}
-          <fieldset className="space-y-2 rounded-lg border border-base-300 p-3">
-            <legend className="px-1 text-sm font-medium">Qubex configuration</legend>
-            {isLoadingSources ? (
-              <div className="flex items-center gap-2">
-                <span className="loading loading-spinner loading-sm"></span>
-                <span className="text-sm text-base-content/60">Checking configuration...</span>
               </div>
-            ) : isConfigSourcesError ? (
-              <p className="text-sm text-error" role="alert">
-                Unable to check the Qubex configuration tree. Close and reopen this dialog to retry.
-              </p>
-            ) : !configAvailable ? (
-              <p className="text-sm text-base-content/60">
-                No Qubex configuration tree is mounted, so only the chip record is created.
-              </p>
             ) : (
-              <>
-                <label className="label cursor-pointer justify-start gap-2">
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-sm"
-                    disabled={createChipMutation.isPending}
-                    {...register("createConfig")}
-                  />
-                  <span className="label-text">
-                    Create <code>{chipIdValue.trim() || "<chip_id>"}/</code> with system ID = chip
-                    ID
-                  </span>
+              <div className="flex items-center gap-2">
+                <span className="loading loading-spinner loading-sm shrink-0"></span>
+                <span className="text-sm text-base-content/60">Checking the deployment...</span>
+              </div>
+            )
+          ) : setupMode.kind === "fake" ? (
+            <FakeDeviceSetup
+              preset={setupMode.preset}
+              configAvailable={setupMode.configAvailable}
+              chipId={chipIdValue.trim()}
+              topologyName={
+                topologies.find((topology) => topology.id === setupMode.preset?.topology_id)?.name
+              }
+            />
+          ) : (
+            <>
+              {/* Topology Template Selection */}
+              <div className="form-control">
+                <label className="label" htmlFor="topology-select">
+                  <span className="label-text">Topology Template</span>
                 </label>
-                {createConfig && (
-                  <>
-                    <div className="form-control">
-                      <label className="label" htmlFor="wiring-source-select">
-                        <span className="label-text">Wiring</span>
-                      </label>
-                      <select
-                        id="wiring-source-select"
-                        className="select select-bordered select-sm w-full"
-                        disabled={createChipMutation.isPending}
-                        {...register("wiringSource")}
-                      >
-                        <option value={EMPTY_WIRING}>Start from template</option>
-                        {configSources.map((source) => (
-                          <option key={source.system_id} value={source.system_id}>
-                            Copy from {source.system_id} ({source.backend}, {source.mux_count} MUX)
+                {isLoadingTopologies ? (
+                  <div className="flex items-center gap-2 h-12">
+                    <span className="loading loading-spinner loading-sm"></span>
+                    <span className="text-sm text-base-content/60">Loading templates...</span>
+                  </div>
+                ) : (
+                  <select
+                    id="topology-select"
+                    className={`select select-bordered w-full ${errors.topologyId ? "select-error" : ""}`}
+                    disabled={createChipMutation.isPending}
+                    aria-invalid={Boolean(errors.topologyId)}
+                    aria-describedby={errors.topologyId ? "topology-error" : undefined}
+                    {...register("topologyId")}
+                  >
+                    <SelectedLabel />
+                    {groupedTopologies.map(([size, topos]) => (
+                      <optgroup key={size} label={`${size} Qubits`}>
+                        {topos.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
                           </option>
                         ))}
-                      </select>
-                    </div>
-                    {wiringSource === EMPTY_WIRING && (
-                      <div className="form-control">
-                        <label className="label" htmlFor="backend-select">
-                          <span className="label-text">Backend</span>
-                        </label>
-                        <select
-                          id="backend-select"
-                          className="select select-bordered select-sm w-full"
-                          disabled={createChipMutation.isPending}
-                          {...register("backend")}
-                        >
-                          <option value="quel1">quel1</option>
-                          <option value="quel3">quel3</option>
-                        </select>
-                      </div>
+                      </optgroup>
+                    ))}
+                  </select>
+                )}
+                {errors.topologyId && (
+                  <p id="topology-error" className="mt-1 text-sm text-error">
+                    {errors.topologyId.message}
+                  </p>
+                )}
+                {selectedTopology && (
+                  <p className="mt-1 text-xs text-base-content/60">
+                    {selectedTopology.num_qubits} qubits
+                  </p>
+                )}
+              </div>
+
+              {/* Qubex configuration directory (system_id == chip_id) */}
+              <fieldset className="min-w-0 space-y-2 rounded-lg border border-base-300 p-3">
+                <legend className="px-1 text-sm font-medium">Qubex configuration</legend>
+                {!configAvailable ? (
+                  <p className="text-sm text-base-content/60">
+                    No Qubex configuration tree is mounted, so only the chip record is created.
+                  </p>
+                ) : (
+                  <>
+                    <label className="flex cursor-pointer items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm mt-0.5 shrink-0"
+                        disabled={createChipMutation.isPending}
+                        {...register("createConfig")}
+                      />
+                      <span className="min-w-0 flex-1">
+                        Create{" "}
+                        <code className="break-all">{chipIdValue.trim() || "<chip_id>"}/</code> with
+                        system ID = chip ID
+                      </span>
+                    </label>
+                    {createConfig && (
+                      <>
+                        <div className="form-control">
+                          <label className="label" htmlFor="wiring-source-select">
+                            <span className="label-text">Wiring</span>
+                          </label>
+                          <select
+                            id="wiring-source-select"
+                            className="select select-bordered select-sm w-full"
+                            disabled={createChipMutation.isPending}
+                            {...register("wiringSource")}
+                          >
+                            <option value={EMPTY_WIRING}>Start from template</option>
+                            {configSources.map((source) => (
+                              <option key={source.system_id} value={source.system_id}>
+                                Copy from {source.system_id} ({source.backend}, {source.mux_count}{" "}
+                                MUX)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {wiringSource === EMPTY_WIRING && (
+                          <div className="form-control">
+                            <label className="label" htmlFor="backend-select">
+                              <span className="label-text">Backend</span>
+                            </label>
+                            <select
+                              id="backend-select"
+                              className="select select-bordered select-sm w-full"
+                              disabled={createChipMutation.isPending}
+                              {...register("backend")}
+                            >
+                              <option value="quel1">quel1</option>
+                              <option value="quel3">quel3</option>
+                            </select>
+                          </div>
+                        )}
+                        <p className="text-xs break-words text-base-content/60">
+                          {wiringSource === EMPTY_WIRING
+                            ? "Config templates include commented examples. Edit hardware settings on the Config page before running."
+                            : `Wiring, boxes and other hardware files are copied from ${wiringSource}.`}{" "}
+                          Parameter files start from templates. An existing directory is kept as is.
+                          Push the new files from the Config page.
+                        </p>
+                      </>
                     )}
-                    <p className="text-xs text-base-content/60">
-                      {wiringSource === EMPTY_WIRING
-                        ? "Config templates include commented examples. Edit hardware settings on the Config page before running."
-                        : `Wiring, boxes and other hardware files are copied from ${wiringSource}.`}{" "}
-                      Parameter files start from templates. An existing directory is kept as is.
-                      Push the new files from the Config page.
-                    </p>
                   </>
                 )}
-              </>
-            )}
-          </fieldset>
+              </fieldset>
+            </>
+          )}
 
           {/* Error Message */}
           {serverError && (
@@ -365,8 +458,12 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={createChipMutation.isPending || isLoadingSources || isConfigSourcesError}
-              data-tour="submit-chip"
+              data-coachmark="create-chip-submit"
+              disabled={
+                createChipMutation.isPending ||
+                setupMode.kind === "pending" ||
+                (setupMode.kind === "fake" && !canCreateFakeChip(setupMode))
+              }
             >
               {createChipMutation.isPending ? (
                 <>
@@ -381,5 +478,68 @@ export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalP
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface FakeDeviceSetupProps {
+  preset: ConfigPresetResponse | null;
+  configAvailable: boolean;
+  chipId: string;
+  topologyName?: string;
+}
+
+/** The fixed virtual device every chip of a fake deployment is; nothing to choose. */
+function FakeDeviceSetup({ preset, configAvailable, chipId, topologyName }: FakeDeviceSetupProps) {
+  if (!preset) {
+    return (
+      <div className="alert alert-error alert-soft" role="alert">
+        <span className="min-w-0 break-words">
+          This deployment runs the fake backend, but the API does not offer its virtual device
+          configuration, so no chip can be created here.
+        </span>
+      </div>
+    );
+  }
+  return (
+    <fieldset
+      className="min-w-0 space-y-2 rounded-lg border border-base-300 p-3"
+      aria-describedby="fake-device-summary"
+    >
+      <legend className="px-1 text-sm font-medium">Virtual device</legend>
+      <p id="fake-device-summary" className="text-xs break-words text-base-content/60">
+        Fixed by this deployment. No hardware is contacted.
+      </p>
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+        <dt className="text-base-content/60">Backend</dt>
+        <dd className="min-w-0">Fake backend</dd>
+        <dt className="text-base-content/60">Topology</dt>
+        <dd className="min-w-0 break-words" data-testid="fake-device-topology">
+          {topologyName ? `${topologyName} ` : ""}
+          <code className="break-all text-xs">{preset.topology_id}</code>
+        </dd>
+        <dt className="text-base-content/60">Size</dt>
+        <dd className="min-w-0">
+          {preset.n_qubits} qubits, {preset.mux_count} MUX
+        </dd>
+        <dt className="text-base-content/60">Configuration</dt>
+        <dd className="min-w-0 break-words">
+          <code className="break-all">{chipId || "<chip_id>"}/</code> generated from the chip ID
+        </dd>
+      </dl>
+      {configAvailable ? (
+        <p className="text-xs break-words text-base-content/60">
+          Writes the virtual device&apos;s configuration files and keeps an existing directory as
+          is. Calibrate it with the Fake Backend Calibration template.
+        </p>
+      ) : (
+        <div className="alert alert-warning alert-soft" role="alert">
+          <span className="min-w-0 break-words">
+            No Qubex configuration tree is mounted, so the virtual configuration cannot be generated
+            and no chip can be created. Mount the configuration tree for this deployment, then
+            reopen this dialog.
+          </span>
+        </div>
+      )}
+    </fieldset>
   );
 }

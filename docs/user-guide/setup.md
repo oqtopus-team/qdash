@@ -139,8 +139,9 @@ Open these services using the ports from `.env`:
 - API documentation: <http://localhost:5715/docs>
 - Prefect: <http://localhost:4200>
 
-Sign in with `QDASH_ADMIN_USERNAME` and `QDASH_ADMIN_PASSWORD`. For a Fake deployment, continue
-with [Running Calibrations](./running-calibrations.md). For Qubex, confirm the intended chip and
+Sign in with `QDASH_ADMIN_USERNAME` and `QDASH_ADMIN_PASSWORD`. For a Fake deployment,
+[create a chip](./setup/fake-backend.md#create-a-chip), then continue with
+[Running Calibrations](./running-calibrations.md). For Qubex, confirm the intended chip and
 hardware configuration before starting a task.
 
 ## Enable Remote Access

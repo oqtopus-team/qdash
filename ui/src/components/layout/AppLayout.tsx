@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { FolderLock, Settings, ShieldCheck } from "lucide-react";
 
 import { Navbar } from "./Navbar";
@@ -10,6 +10,8 @@ import { Sidebar } from "./Sidebar";
 import { ChatSidebar } from "./ChatSidebar";
 import { MiniChatWindow } from "./MiniChatWindow";
 
+import { FirstCalibrationBanner } from "@/components/features/first-calibration/FirstCalibrationBanner";
+import { FirstCalibrationCoachmarks } from "@/components/features/first-calibration/FirstCalibrationCoachmarks";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { ChatDockProvider } from "@/contexts/ChatDockContext";
 import { CopilotChatSessionProvider } from "@/contexts/CopilotChatSessionContext";
@@ -89,8 +91,11 @@ export function AppLayout({ children }: AppLayoutProps) {
             <Sidebar />
             <div className="flex-1 flex flex-col h-screen w-0 min-w-0 transition-[flex] duration-300 ease-in-out">
               <Navbar />
+              {!showProjectAccessState && <FirstCalibrationBanner />}
               <main className="flex-1 overflow-y-auto bg-base-100">
-                <div key={pathname} className="page-transition">
+                {/* Full height of the area under the navbar and the guide banner, so editor
+                    pages can fill it with h-full; taller pages overflow and scroll in main. */}
+                <div key={pathname} className="page-transition h-full">
                   {showProjectAccessState ? <ProjectAccessState /> : children}
                 </div>
               </main>
@@ -98,6 +103,11 @@ export function AppLayout({ children }: AppLayoutProps) {
             <ChatSidebar />
           </div>
           {!showProjectAccessState && <MiniChatWindow />}
+          {!showProjectAccessState && (
+            <Suspense fallback={null}>
+              <FirstCalibrationCoachmarks />
+            </Suspense>
+          )}
         </ChatDockProvider>
       </CopilotChatSessionProvider>
     </SidebarProvider>

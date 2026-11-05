@@ -1797,7 +1797,9 @@ const listChips = (
  * configuration tree (``system_id == chip_id``) unless ``config.create`` is
  * false or the directory already exists. Wiring and hardware files are copied
  * from ``config.source_system_id`` when given; parameter files always start
- * from QDash's templates.
+ * from QDash's templates. ``config.preset`` writes a complete virtual
+ * configuration instead; the ``fake`` preset is accepted only when the
+ * deployment backend is fake and the chip uses the preset's topology.
  *
  * Parameters
  * ----------
@@ -3425,6 +3427,10 @@ const listBackends = (
 
 /**
  * Save a Flow to file system and MongoDB.
+ *
+ * By default the save creates the flow or overwrites an existing one. With
+ * ``create_only`` it only creates a new flow, and an existing name returns 409
+ * without changing the stored flow.
  * @summary Save a flow
  */
 const saveFlow = (
