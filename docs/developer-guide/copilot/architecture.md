@@ -266,7 +266,6 @@ for both API styles and both model roles. Deployment steps are in
 | `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` | OpenAI-compatible API base URL through `/v1`; the suffix is operator-defined |
 | `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` | API key for the endpoint with the matching suffix; it can be a placeholder for a keyless endpoint |
 | `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` | Shared Cloudflare Access service token for configured OpenAI-compatible endpoints; optional, set both |
-| `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
 
 Existing deployments must rename the earlier fixed variables and add `/v1` to each base URL:
 

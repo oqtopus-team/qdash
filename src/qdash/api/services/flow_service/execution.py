@@ -142,9 +142,9 @@ class ExecutionCoordinator:
         settings = get_settings()
         return DispatchResult(
             flow_run_id=flow_run_id,
-            flow_run_url=_flow_run_url(settings.prefect_port, flow_run_id),
+            flow_run_url=_flow_run_url(settings.public_origin, flow_run_id),
             execution_id=execution_id,
-            qdash_ui_url=_qdash_ui_url(settings.ui_port, chip_id, execution_id),
+            qdash_ui_url=_qdash_ui_url(settings.public_origin, chip_id, execution_id),
         )
 
     async def dispatch_background(
@@ -293,14 +293,14 @@ class ExecutionCoordinator:
             return None
 
 
-def _flow_run_url(prefect_port: int, flow_run_id: str) -> str:
+def _flow_run_url(public_origin: str, flow_run_id: str) -> str:
     """Build the Prefect UI URL of a flow run."""
-    return f"http://localhost:{prefect_port}/runs/flow-run/{flow_run_id}"
+    return f"{public_origin}/prefect/runs/flow-run/{flow_run_id}"
 
 
-def _qdash_ui_url(ui_port: int, chip_id: str | None, execution_id: str | None) -> str:
+def _qdash_ui_url(public_origin: str, chip_id: str | None, execution_id: str | None) -> str:
     """Build the QDash UI URL of an execution."""
-    base = f"http://localhost:{ui_port}/execution"
+    base = f"{public_origin}/execution"
     if not chip_id:
         return base
     if not execution_id:

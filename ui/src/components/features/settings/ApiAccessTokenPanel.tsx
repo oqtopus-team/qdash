@@ -5,6 +5,7 @@ import { Check, Copy, Eye, EyeOff, Info, Loader2, Play } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { API_BASE_URL } from "@/lib/api/base-url";
 
 type CurlMode = "standard" | "cloudflare";
 
@@ -16,22 +17,9 @@ type TestResult = {
 
 const TEST_PATH = "/auth/me";
 
-function getConfiguredApiUrl() {
-  return process.env.NEXT_PUBLIC_API_URL || "/api";
-}
-
+/** Resolves the same-origin API URL shown in curl examples, falling back to the base path before hydration. */
 function resolveApiUrl() {
-  const normalizedApiUrl = getConfiguredApiUrl().replace(/\/$/, "");
-
-  if (/^https?:\/\//.test(normalizedApiUrl)) {
-    return normalizedApiUrl;
-  }
-
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}${normalizedApiUrl.startsWith("/") ? "" : "/"}${normalizedApiUrl}`;
-  }
-
-  return normalizedApiUrl || "http://127.0.0.1:5715";
+  return typeof window !== "undefined" ? `${window.location.origin}${API_BASE_URL}` : API_BASE_URL;
 }
 
 function maskSecret(value: string) {
@@ -57,6 +45,7 @@ function formatResponseBody(responseText: string, contentType: string) {
   }
 }
 
+/** Shows the user's API token and copyable same-origin request examples. */
 export function ApiAccessTokenPanel() {
   const { accessToken } = useAuth();
   const { projectId } = useProject();
@@ -66,7 +55,7 @@ export function ApiAccessTokenPanel() {
   const [curlMode, setCurlMode] = useState<CurlMode>("standard");
   const [showToken, setShowToken] = useState(false);
   const [showCfSecret, setShowCfSecret] = useState(false);
-  const [apiUrl, setApiUrl] = useState(() => getConfiguredApiUrl().replace(/\/$/, ""));
+  const [apiUrl, setApiUrl] = useState(API_BASE_URL);
   const [cfAccessClientId, setCfAccessClientId] = useState("");
   const [cfAccessClientSecret, setCfAccessClientSecret] = useState("");
   const [requestProjectId, setRequestProjectId] = useState("");

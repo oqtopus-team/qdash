@@ -9,10 +9,12 @@ ARG LYCHEE_VERSION=0.24.2
 ARG UV_VERSION=0.13.5
 ARG BUN_VERSION=1.4.4
 ARG CODEX_VERSION=0.130.0
+ARG CADDY_VERSION=2.10.2
 
 FROM ghcr.io/betterleaks/betterleaks:${BETTERLEAKS_VERSION} AS betterleaks-bin
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-bin
 FROM oven/bun:${BUN_VERSION} AS bun-bin
+FROM caddy:${CADDY_VERSION}-alpine AS caddy-bin
 FROM python:3.11.14-slim-bookworm AS base
 
 # Keep Python bundled trust stores at the eMudhra-remediation release.
@@ -24,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     gnupg \
+    procps \
  && install -m 0755 -d /etc/apt/keyrings \
  && curl -fsSL https://download.docker.com/linux/debian/gpg \
       | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
@@ -36,6 +39,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       docker-ce-cli \
       docker-compose-plugin \
  && rm -rf /var/lib/apt/lists/*
+
+# Match the Caddy 2.10 runtime used by Compose for local proxy validation.
+COPY --from=caddy-bin /usr/bin/caddy /usr/local/bin/caddy
 
 # 1. Essential build tools (Change frequency: Lowest)
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -16,11 +16,28 @@ from qdash.api.services.flow_service.execution import DispatchResult, FlowDispat
 from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnavailable
 from qdash.api.services.flow_service.service import FlowService
 from qdash.api.services.flow_service.source_store import FlowSourceStore
+from qdash.config import Settings
 
 if TYPE_CHECKING:
     from qdash.api.services.flow_service.deployment_client import DeploymentServiceClient
     from qdash.api.services.flow_service.execution import ExecutionCoordinator
     from qdash.repository import MongoFlowRepository
+
+
+def _public_settings() -> Settings:
+    """Return settings with a test public origin."""
+    return Settings.model_validate(
+        {
+            "env": "test",
+            "client_url": "https://qdash.example.test:9443/",
+            "ui_port": 5714,
+            "prefect_api_url": "http://prefect.example.test/api",
+            "postgres_data_path": "/tmp/postgres",
+            "mongo_data_path": "/tmp/mongo",
+            "calib_data_path": "/tmp/calib",
+        }
+    )
+
 
 FLOW_CODE = "from prefect import flow\n\n\n@flow\ndef my_flow():\n    pass\n"
 TIMESTAMP = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -740,8 +757,10 @@ async def test_execute_calibration_pipeline_reports_a_dispatch_failure(tmp_path:
 @pytest.mark.asyncio
 async def test_execute_agent_candidate_apply_dispatches_in_the_background(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Applying a candidate commit owns no lock and no execution row."""
+    monkeypatch.setattr(flow_service_module, "get_settings", _public_settings)
     coordinator = _StubCoordinator(flow_run_id="flow-run-7")
     service = _service(tmp_path, coordinator=coordinator)
 
@@ -761,6 +780,10 @@ async def test_execute_agent_candidate_apply_dispatches_in_the_background(
     }
     assert response.execution_id == "flow-run-7"
     assert response.flow_run_id == "flow-run-7"
+    assert (
+        response.flow_run_url == "https://qdash.example.test:9443/prefect/runs/flow-run/flow-run-7"
+    )
+    assert response.qdash_ui_url == "https://qdash.example.test:9443/"
 
 
 @pytest.mark.asyncio

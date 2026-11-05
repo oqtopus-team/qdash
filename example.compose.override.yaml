@@ -9,6 +9,13 @@
 # - Custom volume mount paths (e.g., NAS, external drives)
 # - Custom network configuration
 # - Additional services
+#
+# The default stack publishes only Caddy at UI_PORT. For local CLI development,
+# use `task dev-local`; for HTTPS use
+# `docker compose -f compose.yaml -f compose.https.yaml up -d` with CLIENT_URL
+# set to an HTTPS domain. The HTTPS override requires Docker Compose 2.24.4+.
+# For direct loopback database access, use
+# `docker compose -f compose.yaml -f compose.admin.yaml --profile admin up -d`.
 # =============================================================================
 
 # -----------------------------------------------------------------------------

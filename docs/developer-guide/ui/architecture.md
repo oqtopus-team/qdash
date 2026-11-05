@@ -29,8 +29,8 @@ authenticated login request to `/execution`. It deliberately passes `/api` reque
 FastAPI validates their bearer token and project permissions.
 
 `ui/src/app/api/copilot/chat/route.ts` is the browser-facing proxy for the streaming chat route.
-Other API calls use the generated client through the Next.js `/api` rewrite or
-`NEXT_PUBLIC_API_URL`.
+Browser API calls use the same-origin `/api` path. The Caddy gateway routes that path to FastAPI;
+when developers open the UI server directly, the Next.js `/api` rewrite uses `INTERNAL_API_URL`.
 
 ## Provider Order
 
@@ -89,6 +89,7 @@ that storage directly.
 
 - `page.tsx` and `layout.tsx` use default exports; ordinary modules use named exports.
 - Browser-visible API state comes from generated hooks, not duplicate context state.
+- Browser API requests use `/api` so the same-origin Caddy gateway can route them to FastAPI.
 - Project-scoped requests use the active project supplied by the shared client.
 - URL filters use the existing `use*UrlState` hooks so links reproduce the same view.
 - Dialogs, menus, and tooltips reuse the established accessible primitives in

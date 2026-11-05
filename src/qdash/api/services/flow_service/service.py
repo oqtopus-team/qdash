@@ -552,8 +552,8 @@ class FlowService:
         return ExecuteFlowResponse(
             execution_id=operation_id,
             flow_run_id=operation_id,
-            flow_run_url=f"http://localhost:{settings.prefect_port}/runs/flow-run/{operation_id}",
-            qdash_ui_url=f"http://localhost:{settings.ui_port}/",
+            flow_run_url=f"{settings.public_origin}/prefect/runs/flow-run/{operation_id}",
+            qdash_ui_url=f"{settings.public_origin}/",
             message=f"Agent candidate commit '{commit_id}' queued for backend application",
         )
 

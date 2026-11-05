@@ -1,0 +1,11 @@
+services:
+  caddy:
+    environment:
+      CADDY_SITE_ADDRESS: ${CLIENT_URL:?Set CLIENT_URL to https://your-domain}
+      CLIENT_URL: ${CLIENT_URL:?Set CLIENT_URL to https://your-domain}
+    volumes:
+      - ./config/caddy/https-entrypoint.sh:/etc/caddy/https-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/etc/caddy/https-entrypoint.sh"]
+    ports: !override
+      - "80:80"
+      - "443:443"

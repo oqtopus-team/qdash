@@ -1,0 +1,10 @@
+services:
+  mongo:
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+  prefect-server:
+    ports:
+      - "127.0.0.1:${PREFECT_PORT:-4200}:4200"
+  deployment-service:
+    ports:
+      - "127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}:8001"
