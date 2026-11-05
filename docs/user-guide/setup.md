@@ -144,11 +144,13 @@ Open QDash through the Caddy entry point:
 
 Replace port `5714` in these addresses if `UI_PORT` has a different value.
 
-Sign in with `QDASH_ADMIN_USERNAME` and `QDASH_ADMIN_PASSWORD`. Prefect uses the same QDash
-sign-in. Any signed-in QDash user can see orchestration state across projects in Prefect; QDash
-project permissions do not limit Prefect's view. Use QDash for workflow changes so its project
-metadata stays synchronized. For a Fake deployment, continue with
-[Running Calibrations](./running-calibrations.md). For Qubex, confirm the intended chip and
+Sign in with `QDASH_ADMIN_USERNAME` and `QDASH_ADMIN_PASSWORD`. Prefect uses the same QDash sign-in.
+Any signed-in QDash user can see orchestration state across projects in Prefect; QDash project
+permissions do not limit Prefect's view. Prefect actions that change state require a QDash system
+administrator, and a project-level role does not apply. The Prefect Blocks list also needs a system
+administrator, because the block document query can return secret values. Everyone else uses QDash
+for workflow changes so its project metadata stays synchronized. For a Fake deployment, continue
+with [Running Calibrations](./running-calibrations.md). For Qubex, confirm the intended chip and
 hardware configuration before starting a task.
 
 ## Serve QDash over HTTPS

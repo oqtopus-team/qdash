@@ -88,8 +88,10 @@ them.
 ## External Tools
 
 The bottom of the sidebar links to this documentation and, for project editors, to the Prefect
-dashboard. Prefect uses the QDash sign-in, but every signed-in QDash user can view orchestration
-state across projects; QDash project permissions do not restrict Prefect's view. Use the QDash UI or
-API for workflow changes so QDash project metadata remains synchronized with Prefect. The
-interactive API documentation is not linked from the sidebar; it is served at the API's `/docs`
-path, listed in [Setup](./setup.md#verify-the-installation).
+dashboard. Prefect uses the QDash sign-in. Every signed-in QDash user can view orchestration state
+across projects; QDash project permissions do not restrict Prefect's view. Prefect actions that
+change state require a QDash system administrator, and a project-level role does not apply. The
+Prefect Blocks list also needs a system administrator, because the block document query can return
+secret values. Everyone else uses the QDash UI or API for workflow changes so QDash project metadata
+remains synchronized with Prefect. The interactive API documentation is not linked from the sidebar;
+it is served at the API's `/docs` path, listed in [Setup](./setup.md#verify-the-installation).

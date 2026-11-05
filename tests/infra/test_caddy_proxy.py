@@ -18,6 +18,8 @@ from typing import Any
 
 import pytest
 
+from qdash.api.lib.prefect_access import is_prefect_read_request
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -76,13 +78,27 @@ class MockHandler(BaseHTTPRequestHandler):
         with state.lock:
             state.seen.append((self.path, self.headers.get("Authorization")))
 
-        if state.service == "api" and self.path == "/auth/me":
-            token_status = {
-                "Bearer valid": 200,
-                "Bearer disabled": 403,
-                "Bearer failure": 503,
-            }
-            status = token_status.get(self.headers.get("Authorization", ""), 401)
+        if state.service == "api" and self.path.partition("?")[0] == "/auth/prefect-access":
+            if self.headers.get("Upgrade"):
+                self.send_json(403, {"status": 403}, send_body=send_body)
+                return
+            authorization = self.headers.get("Authorization", "")
+            failures = {"Bearer disabled": 403, "Bearer failure": 503}
+            if authorization in failures:
+                status = failures[authorization]
+            elif authorization == "Bearer admin" or (
+                authorization == "Bearer valid"
+                and is_prefect_read_request(
+                    self.headers.get("X-Forwarded-Method", ""),
+                    self.headers.get("X-Forwarded-Uri", ""),
+                    self.headers.get("X-Forwarded-Upgrade", ""),
+                )
+            ):
+                status = 200
+            elif authorization == "Bearer valid":
+                status = 403
+            else:
+                status = 401
             self.send_json(status, {"status": status}, send_body=send_body)
             return
 
@@ -139,6 +155,8 @@ class MockHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
+        if self.path == "/preserve-headers":
+            self.send_header("X-Frame-Options", "DENY")
         self.end_headers()
         if send_body:
             self.wfile.write(payload)
@@ -326,35 +344,60 @@ def test_html_redirect_is_limited_to_get_and_head_navigation(proxy: dict[str, An
     assert post_status == 401
 
 
-def test_websocket_upgrade_is_auth_gated(proxy: dict[str, Any]) -> None:
-    """Authenticated websocket upgrades pass through and unauthorized ones do not."""
-    handshake = {
+def websocket_status(proxy: dict[str, Any], path: str, token: str | None) -> int:
+    """Send a websocket handshake through Caddy and return the response status."""
+    headers = {
         "Connection": "Upgrade",
         "Upgrade": "websocket",
         "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==",
         "Sec-WebSocket-Version": "13",
     }
-    for token, expected_status in (("valid", 101), (None, 401), ("disabled", 403)):
-        headers = dict(handshake)
-        if token is not None:
-            headers["Cookie"] = f"access_token={token}"
-        connection = http.client.HTTPConnection(
-            "localhost", int(proxy["url"].rsplit(":", 1)[1]), timeout=5
-        )
-        response: http.client.HTTPResponse | None = None
-        try:
-            connection.request("GET", "/prefect/api/events/out", headers=headers)
-            response = connection.getresponse()
-            assert response.status == expected_status
-            if expected_status == 101:
-                assert response.getheader("Upgrade") == "websocket"
-                state: BackendState = proxy["states"]["prefect"]
-                with state.lock:
-                    assert ("/prefect/api/events/out", None) in state.seen
-        finally:
-            if response is not None:
-                response.close()
-            connection.close()
+    if token is not None:
+        headers["Cookie"] = f"access_token={token}"
+    connection = http.client.HTTPConnection(
+        "localhost", int(proxy["url"].rsplit(":", 1)[1]), timeout=5
+    )
+    response: http.client.HTTPResponse | None = None
+    try:
+        connection.request("GET", path, headers=headers)
+        response = connection.getresponse()
+        return response.status
+    finally:
+        if response is not None:
+            response.close()
+        connection.close()
+
+
+def test_websocket_upgrade_is_auth_gated(proxy: dict[str, Any]) -> None:
+    """Authenticated websocket upgrades pass through and unauthorized ones do not."""
+    path = "/prefect/api/events/out"
+    for token, expected_status in (("valid", 101), ("admin", 101), (None, 401), ("disabled", 403)):
+        assert websocket_status(proxy, path, token) == expected_status, token
+    state: BackendState = proxy["states"]["prefect"]
+    with state.lock:
+        assert (path, None) in state.seen
+
+
+def test_prefect_write_websocket_requires_admin(proxy: dict[str, Any]) -> None:
+    """Read-only users get readable streams but not inbound ones; admins get both."""
+    assert websocket_status(proxy, "/prefect/api/events/out", "valid") == 101
+    assert websocket_status(proxy, "/prefect/api/events/in", "valid") == 403
+    assert websocket_status(proxy, "/prefect/api/events/in", "admin") == 101
+
+
+def test_query_string_does_not_bypass_prefect_gate(proxy: dict[str, Any]) -> None:
+    """A query string on a Prefect path is still evaluated by the access gate."""
+    denied = (
+        "/prefect/api/deployments/123e4567-e89b-12d3-a456-426614174000/create_flow_run?x=/filter"
+    )
+    status, _headers, _body = request(proxy, denied, token="valid", method="POST")
+    assert status == 403
+    assert denied not in prefect_paths_seen(proxy)
+
+    allowed = "/prefect/api/flow_runs/filter?limit=1"
+    status, _headers, _body = request(proxy, allowed, token="valid", method="POST")
+    assert status == 200
+    assert allowed in prefect_paths_seen(proxy)
 
 
 def test_prefect_sse_streaming_and_disconnect_cancel(proxy: dict[str, Any]) -> None:
@@ -372,3 +415,52 @@ def test_prefect_sse_streaming_and_disconnect_cancel(proxy: dict[str, Any]) -> N
     response.close()
     connection.close()
     assert state.stream_disconnected.wait(timeout=3)
+
+
+def prefect_paths_seen(proxy: dict[str, Any]) -> list[str]:
+    """Return the paths the Prefect mock has received."""
+    state: BackendState = proxy["states"]["prefect"]
+    with state.lock:
+        return [path for path, _authorization in state.seen]
+
+
+def test_read_only_user_cannot_change_prefect_state(proxy: dict[str, Any]) -> None:
+    """A non-admin POST outside the read allowlist is rejected before Prefect sees it."""
+    path = "/prefect/api/deployments/123e4567-e89b-12d3-a456-426614174000/create_flow_run"
+    status, _headers, _body = request(proxy, path, token="valid", method="POST")
+
+    assert status == 403
+    assert path not in prefect_paths_seen(proxy)
+
+
+def test_admin_can_change_prefect_state(proxy: dict[str, Any]) -> None:
+    """A system administrator's POST reaches Prefect."""
+    path = "/prefect/api/deployments/123e4567-e89b-12d3-a456-426614174000/create_flow_run"
+    status, _headers, body = request(proxy, path, token="admin", method="POST")
+
+    assert status == 200
+    assert json.loads(body)["service"] == "prefect"
+    assert path in prefect_paths_seen(proxy)
+
+
+def test_read_only_user_can_run_prefect_queries(proxy: dict[str, Any]) -> None:
+    """An allowlisted POST query from a non-admin reaches Prefect."""
+    path = "/prefect/api/flow_runs/filter"
+    status, _headers, _body = request(proxy, path, token="valid", method="POST")
+
+    assert status == 200
+    assert path in prefect_paths_seen(proxy)
+
+
+def test_security_headers_are_added_and_upstream_values_preserved(proxy: dict[str, Any]) -> None:
+    """Default security headers apply to every route without overriding upstream values."""
+    for path, token in (("/", None), ("/api/docs", None), ("/prefect/api/health", "valid")):
+        status, headers, _body = request(proxy, path, token=token)
+        assert status == 200
+        assert headers["X-Content-Type-Options"] == "nosniff"
+        assert headers["X-Frame-Options"] == "SAMEORIGIN"
+        assert headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+
+    _status, headers, _body = request(proxy, "/preserve-headers")
+    assert headers["X-Frame-Options"] == "DENY"
+    assert headers["X-Content-Type-Options"] == "nosniff"

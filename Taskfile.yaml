@@ -146,6 +146,7 @@ tasks:
     silent: true
     cmds:
       - |
+        pid_dir="${QDASH_DEV_PID_DIR:-.tmp}"
         stop_pidfile() {
           pid_file="$1"
           name="$2"
@@ -171,9 +172,9 @@ tasks:
           rm -f "$pid_file"
         }
 
-        stop_pidfile ".tmp/dev-api-local.pid" "API" "uvicorn src.qdash.api.main:app"
-        stop_pidfile ".tmp/dev-ui-local.pid" "UI" "bun run dev"
-        stop_pidfile ".tmp/dev-proxy-local.pid" "Caddy" "caddy run --config config/caddy/Caddyfile"
+        stop_pidfile "$pid_dir/dev-api-local.pid" "API" "uvicorn src.qdash.api.main:app"
+        stop_pidfile "$pid_dir/dev-ui-local.pid" "UI" "bun run dev"
+        stop_pidfile "$pid_dir/dev-proxy-local.pid" "Caddy" "caddy run --config config/caddy/Caddyfile"
       - docker compose -f compose.yaml -f compose.host.yaml down
 
   dev-local-setup:
@@ -195,7 +196,8 @@ tasks:
     silent: true
     cmds:
       - |
-        mkdir -p .tmp
+        pid_dir="${QDASH_DEV_PID_DIR:-.tmp}"
+        mkdir -p "$pid_dir"
         if [ "${QDASH_DEV_CONTAINER:-}" = "1" ]; then
           mongo_host="${MONGO_HOST:-mongo}"
           prefect_api_url="${PREFECT_API_URL:-http://prefect-server:4200/prefect/api}"
@@ -207,7 +209,7 @@ tasks:
           deployment_service_url="${DEPLOYMENT_SERVICE_URL:-http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}}"
           forwarded_allow_ips="${FORWARDED_ALLOW_IPS:-127.0.0.1}"
         fi
-        MONGO_HOST="$mongo_host" PREFECT_API_URL="$prefect_api_url" DEPLOYMENT_SERVICE_URL="$deployment_service_url" FORWARDED_ALLOW_IPS="$forwarded_allow_ips" python3 scripts/run-with-pidfile.py .tmp/dev-api-local.pid uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
+        MONGO_HOST="$mongo_host" PREFECT_API_URL="$prefect_api_url" DEPLOYMENT_SERVICE_URL="$deployment_service_url" FORWARDED_ALLOW_IPS="$forwarded_allow_ips" python3 scripts/run-with-pidfile.py "$pid_dir/dev-api-local.pid" uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
 
   dev-ui-local:
     desc: Start the UI on the host against the local API
@@ -216,8 +218,10 @@ tasks:
     silent: true
     cmds:
       - |
-        mkdir -p ../.tmp
-        PORT="${UI_INTERNAL_PORT:-5716}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" python3 ../scripts/run-with-pidfile.py ../.tmp/dev-ui-local.pid bun run dev --hostname 127.0.0.1
+        pid_dir="${QDASH_DEV_PID_DIR:-.tmp}"
+        case "$pid_dir" in /*) ;; *) pid_dir="../$pid_dir" ;; esac
+        mkdir -p "$pid_dir"
+        PORT="${UI_INTERNAL_PORT:-5716}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" python3 ../scripts/run-with-pidfile.py "$pid_dir/dev-ui-local.pid" bun run dev --hostname 127.0.0.1
 
   dev-proxy-local:
     desc: Start Caddy as the shared local browser entry point
@@ -225,7 +229,8 @@ tasks:
     silent: true
     cmds:
       - |
-        mkdir -p .tmp
+        pid_dir="${QDASH_DEV_PID_DIR:-.tmp}"
+        mkdir -p "$pid_dir"
         if [ "${QDASH_DEV_CONTAINER:-}" = "1" ]; then
           site_address_default="http://:${UI_PORT:-5714}"
           bind_address_default="0.0.0.0"
@@ -241,7 +246,7 @@ tasks:
         CADDY_API_UPSTREAM="${CADDY_API_UPSTREAM:-127.0.0.1:${API_PORT:-5715}}" \
         CADDY_PREFECT_UPSTREAM="${CADDY_PREFECT_UPSTREAM:-$prefect_upstream_default}" \
         CADDY_TRUSTED_PROXIES="${CADDY_TRUSTED_PROXIES:-127.0.0.1/32 ::1/128}" \
-        python3 scripts/run-with-pidfile.py .tmp/dev-proxy-local.pid caddy run --config config/caddy/Caddyfile --adapter caddyfile
+        python3 scripts/run-with-pidfile.py "$pid_dir/dev-proxy-local.pid" caddy run --config config/caddy/Caddyfile --adapter caddyfile
 
   dev-local:
     desc: Start lightweight local development services, API, UI, and Caddy

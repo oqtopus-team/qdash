@@ -42,12 +42,14 @@ After the containers start, check the browser-facing services:
 - API documentation: <http://localhost:5714/api/docs>
 - Prefect dashboard: <http://localhost:5714/prefect/dashboard>
 
-The normal Compose stack publishes only the Caddy entry point on `UI_PORT` (default `5714`).
-Prefect requires QDash sign-in. Every signed-in QDash user can view orchestration state across
-projects in Prefect because QDash project permissions are not applied there. Use QDash for
-workflow changes so project metadata stays synchronized.
-For HTTPS deployments, open the origin in `CLIENT_URL`; the `localhost:5714` links above describe
-the default HTTP configuration.
+The normal Compose stack publishes only the Caddy entry point on `UI_PORT` (default `5714`). Prefect
+requires QDash sign-in. Every signed-in QDash user can view orchestration state across projects in
+Prefect because QDash project permissions are not applied there. Prefect actions that change state
+require a QDash system administrator, and a project-level role does not apply. The Prefect Blocks
+list also needs a system administrator, because the block document query can return secret values.
+Everyone else uses QDash for workflow changes so project metadata stays synchronized. For HTTPS
+deployments, open the origin in `CLIENT_URL`; the `localhost:5714` links above describe the default
+HTTP configuration.
 
 For local database administration, start the `admin` profile with its override file:
 

@@ -8,6 +8,10 @@
 {$CADDY_SITE_ADDRESS} {
 	bind {$CADDY_BIND_ADDRESS}
 
+	header ?X-Content-Type-Options nosniff
+	header ?X-Frame-Options SAMEORIGIN
+	header ?Referrer-Policy strict-origin-when-cross-origin
+
 	@api path /api /api/*
 	handle @api {
 		uri strip_prefix /api
@@ -18,10 +22,13 @@
 	handle @prefect {
 		reverse_proxy {$CADDY_API_UPSTREAM} {
 			method GET
-			rewrite /auth/me
+			rewrite /auth/prefect-access
 			header_up Authorization "Bearer {http.request.cookie.access_token}"
 			header_up X-Forwarded-Method {method}
 			header_up X-Forwarded-Uri {uri}
+			header_up X-Forwarded-Upgrade {http.request.header.Upgrade}
+			header_up -Upgrade
+			header_up -Connection
 
 			@good status 2xx
 			handle_response @good {

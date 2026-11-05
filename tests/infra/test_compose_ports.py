@@ -226,6 +226,7 @@ def run_task_with_stub(
         {
             "QDASH_DEV_CONTAINER": "1" if devcontainer else "0",
             "TASK_CAPTURE": str(capture),
+            "QDASH_DEV_PID_DIR": str(tmp_path / "pids"),
             "PATH": f"{stub_bin}:{os.environ['PATH']}",
             "UI_PORT": "5714",
             "UI_INTERNAL_PORT": "5716",
@@ -256,6 +257,7 @@ def run_task_with_stub(
         timeout=10,
     )
     assert result.returncode == 0
+    assert (tmp_path / "pids").is_dir()
     return capture.read_text().splitlines()
 
 
