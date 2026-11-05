@@ -40,8 +40,10 @@ bar with its name and status; select the badge to open the run.
 
 When a project has no chips, Home highlights the **Setup tour** for project editors. After a chip
 exists, the tour remains available as a compact Home action for replay. It opens the Chip page,
-points to the creation action, and explains the chip ID and topology fields without creating data
-until the form is submitted.
+points to the creation action, and explains the chip ID, topology, and Qubex configuration fields
+without creating data until the form is submitted. The Qubex configuration options are available
+only when a configuration tree is mounted. They copy wiring from an existing system or start from
+a backend template, and the new files are pushed from the Config page.
 
 ## Operate
 

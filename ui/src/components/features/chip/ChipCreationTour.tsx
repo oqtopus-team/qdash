@@ -29,7 +29,8 @@ export function getChipCreationTourSteps(): DriveStep[] {
       advanceOnClick: true,
       popover: {
         title: "Open the chip form",
-        description: "Select Create Chip to enter the device ID and topology.",
+        description:
+          "Select Create Chip to enter the device ID, topology, and Qubex configuration.",
         side: "bottom",
         align: "end",
         showButtons: ["previous", "close"],
@@ -51,6 +52,17 @@ export function getChipCreationTourSteps(): DriveStep[] {
       popover: {
         title: "Choose a topology",
         description: "Select the template that matches the chip layout and number of qubits.",
+        side: "right",
+        align: "start",
+      },
+    },
+    {
+      element: '[data-tour="chip-config"]',
+      waitForElement: 3000,
+      popover: {
+        title: "Set up the Qubex configuration",
+        description:
+          "When a configuration tree is mounted, QDash can create a directory named after the chip ID. Copy the wiring from an existing system or start from a template for the chosen backend. Clear the checkbox to create only the chip record.",
         side: "right",
         align: "start",
       },
@@ -107,7 +119,8 @@ export function ChipCreationTour({
         {
           popover: {
             title: "Chip created",
-            description: "Your chip is ready. You can now select it and begin calibration work.",
+            description:
+              "Your chip is selected. If you created a Qubex configuration, review the hardware settings and push the new files from the Config page before running calibrations.",
             doneBtnText: "Finish",
             onDoneClick: (_element, _step, { driver: completedTour }) => {
               completedTour.destroy();
