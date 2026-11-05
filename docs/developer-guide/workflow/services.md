@@ -98,6 +98,30 @@ Cron-triggered runs do not pass through `FlowService.execute_flow()`. Their `Cal
 creates an execution ID and acquires the planned reservation at worker start. This difference is
 why the runtime supports both adopting an API claim and claiming resources itself.
 
+### Per-run Target Overrides
+
+`GetFlowResponse.target_defaults` exposes literal targets found in the saved entrypoint by
+`flow_service/target_defaults.py`, using the saved default parameters. Inspection does not
+import or execute user code. It follows `if` branches only when the test reads a known value.
+Unresolved expressions, possible mutations, other target types, targets built in other module
+functions, and differing targets return no default.
+
+`ExecuteFlowRequest.target_override` selects either `mux_ids` with optional `exclude_qids`, or
+`qids`. The API always stores the override in Prefect's run context under
+`qdash_target_override`. When the entrypoint declares the argument for the selected mode
+(`mux_ids` or `qids`), the API also passes the declared target arguments and sets the other mode's
+argument to `None`, so templates that validate targets before creating `CalibService` accept the
+selection. Otherwise the saved parameters stay unchanged. Workflows that pass literal targets
+directly to `CalibService` keep their source and function signature unchanged.
+Deploy the API and workflow workers together to enable this behavior.
+
+`CalibService` applies the override to constructor targets and initial `MuxTargets` or
+`QubitTargets` passed to each `run()` call. Other target types, such as `AllMuxTargets`, fail
+with an error instead of running unchanged. Every service in the current flow uses the
+selection; later pipeline filters and isolated workers retain their derived subsets. Separate
+nested Prefect flows do not inherit this context, and explicit task-level IDs are not rewritten.
+Omitting the override preserves code behavior. The complete workflow still reserves its chip.
+
 ## Manage Schedules
 
 `FlowScheduleService` resolves the saved deployment within the current project. It accepts either a

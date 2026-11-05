@@ -31,7 +31,7 @@ The result is a clear division of labor: Betterleaks is the strict, fast, syntac
 
 ### Lefthook
 
-`lefthook.yml` defines a single pre-commit command that calls `scripts/scan_staged_leaks.sh`. The helper copies staged index contents into a temporary tree and scans that tree with Betterleaks, avoiding Betterleaks' git-diff integration while still checking exactly the files about to be committed. Running `lefthook install` once writes the git hook into `.git/hooks/`. If the Betterleaks binary is missing, the helper fails closed so commits cannot proceed without the staged leak scan.
+`lefthook.yml` defines a single pre-commit command that calls `scripts/scan_staged_leaks.sh`. The helper copies staged index contents into a temporary tree and scans that tree with Betterleaks, avoiding Betterleaks' git-diff integration while still checking exactly the files about to be committed. Running `lefthook install` once writes the git hook into `.git/hooks/`. If the Betterleaks binary is missing or is not the [pinned release](#scanner-version), the helper fails closed so commits cannot proceed without the staged leak scan.
 
 ### Betterleaks
 
@@ -64,8 +64,15 @@ Value exemptions (in `filter`):
 | `mongodb://root:example@mongo:27017` | `finding["secret"]` | Local-dev compose default. The hostname `mongo` resolves only inside the compose network and the password is literally the word `example` — it is not a secret in any environment, just an example value. (Gitleaks used `regexTarget = "match"`; Betterleaks captures the clean URI in `finding["secret"]`, so the filter matches there.) |
 | `ADMIN_TOKEN`, `YOUR_TOKEN` | `finding["secret"]` | Documentation placeholder token names, not real credentials. |
 | `x90_gate_fidelity`, `x180_gate_fidelity`, `zx90_gate_fidelity` | `finding["secret"]` | Quantum gate fidelity metric names that resemble high-entropy tokens. |
+| Same MongoDB URI under `generic-credential-uri` | `finding["rule_id"]`, `finding["secret"]` equal to `example`, `finding["match"]` | Betterleaks 1.9 reports only the password part of the local-dev URI as the secret, so this branch matches the full URI instead. |
+| `example`, `prefect`, `passw0rd` in `.env.example` and `.env.example.qubex` | `generic-password`, path, `finding["secret"]` | Published local-dev defaults for MongoDB, PostgreSQL, and the initial admin account; every developer copies them to `.env`. |
+| `secure_password123`, `admin_password123`, `short` in `tests/data/sample_data.py` | `generic-password`, path, `finding["secret"]` | Sample user records (`SAMPLE_USERS`) in shared test data. |
+| `password="hashed"` or `password="unused"` in `tests/qdash/api/{routers,services}/test_*.py` | `generic-password`, path, `finding["match"]` | Placeholder `hashed_password` field values on test users; the tests never verify them as passwords. |
+| `changed-password` in `tests/qdash/api/routers/test_admin.py` | `generic-password`, path, `finding["secret"]` | Request body for the password-change test. |
+| `temporary-secret`, `current`, `next-password` in the `EditUserModal` and `PasswordChangeCard` tests | `generic-password`, path, `finding["secret"]` | Form input values in UI tests. |
+| `Show password` in `LoginPageContent.tsx`, `new-password` in `PasswordChangeCard/index.tsx` | `generic-password`, path, `finding["secret"]` | An `aria-label` string and an `autoComplete` token, not credentials. |
 
-The shared property of every path entry is **generation-owned**: the file is rewritten by a tool, not by a human. A developer pasting a real credential into one of these files would lose it on the next regeneration step, so the scanning blind spot has no practical attack surface. The value entries cover fixed sample/placeholder strings that are identical across every developer's machine.
+The shared property of every path entry is **generation-owned**: the file is rewritten by a tool, not by a human. A developer pasting a real credential into one of these files would lose it on the next regeneration step, so the scanning blind spot has no practical attack surface. The value entries cover fixed sample/placeholder strings that are identical across every developer's machine. Value entries scoped to a file also require the rule ID and the exact literal, so any other value in that file, or the same literal in another file, is still reported. Write `finding["rule_id"]` in the filter; the camel-case `ruleID` key is not set and silently never matches.
 
 ### Trufflehog
 
@@ -127,7 +134,7 @@ unrelated branches or commits already reachable from the target.
 Fetch the target branch before checking so the local reference is current. Override
 the target with `task check LEAKS_BASE=origin/main` or
 `task scan-leaks-local LEAKS_BASE=origin/main`. A missing target, shallow clone,
-unrelated target history, or missing Betterleaks executable causes the local scan to fail.
+unrelated target history, or missing or unpinned Betterleaks executable causes the local scan to fail.
 
 New files must be staged with `git add` to enter the working-file scan. Untracked files,
 deleted files, symlinks, and submodule directories are excluded from that scan.
@@ -135,6 +142,30 @@ The pre-commit hook separately checks staged contents; the local scan reads curr
 working contents, including unstaged edits. Findings are redacted in local scan output.
 Use `task scan-leaks` explicitly for an audit across all local Git history, including
 other fetched branches.
+
+### Scanner Version
+
+Every Betterleaks scan requires the release pinned by `ARG BETTERLEAKS_VERSION` in
+`.devcontainer/Dockerfile`; `flake.nix` pins the Nix shell to the same release. Other
+releases ship different default rules, so a newer host install can flag the repository's
+sample values that the pinned release accepts.
+
+`scripts/check_betterleaks_version.sh` reads the pinned version from the Dockerfile and
+compares it with the output of `betterleaks version`. The staged scan, the local scan,
+`task scan-leaks`, and the start of `task check` run this check before reading any content.
+A missing executable, a different release, or unparseable version output stops the scan
+with the expected and actual versions:
+
+```text
+betterleaks version check failed: expected betterleaks 1.3.1, actual: 1.9.0 (/opt/homebrew/bin/betterleaks)
+Run checks and commits in the Nix shell, for example: nix develop -c task check
+or nix develop -c git commit. The DevContainer also provides the pinned release.
+```
+
+Fix the environment rather than the policy: run the command inside `nix develop` or the
+DevContainer. Run `task check-betterleaks-version` to test the active environment alone.
+To upgrade Betterleaks, change `BETTERLEAKS_VERSION` and the `nixpkgs-betterleaks` pin
+together and rerun the scans.
 
 ## Reading Output
 

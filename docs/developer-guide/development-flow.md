@@ -105,20 +105,28 @@ Every push requires a successful `task check` on the content being pushed, inclu
 documentation-only changes and updates to existing PRs. Focused tests during development,
 pre-commit hooks, and CI supplement this gate.
 
+On the host, run `task check` and commits inside the Nix shell, which provides the
+pinned Betterleaks release. In the DevContainer, run the same commands directly.
+`task check` first runs `task check-betterleaks-version` and stops if the `betterleaks`
+on `PATH` is a different release; see
+[scanner version](./conventions/credential-scan.md#scanner-version).
+
 Stage intended new files so the leak scan includes them. Fetch the PR target branch
 to refresh its local reference, then run the check from the repository root:
 
 ```bash
 git fetch origin develop
-task check
+nix develop -c task check
 ```
 
 For a different PR target, fetch that branch and set `LEAKS_BASE`, for example:
 
 ```bash
 git fetch origin main
-task check LEAKS_BASE=origin/main
+nix develop -c task check LEAKS_BASE=origin/main
 ```
+
+Commit with `nix develop -c git commit` so the pre-commit hook uses the same scanner.
 
 `task check` runs auto-fixing linters. Review the resulting diff and include intended
 fixes in the commit. If you edit files after the check, rerun it before pushing.

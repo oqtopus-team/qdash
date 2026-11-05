@@ -125,7 +125,10 @@ async function confirmExecute() {
   const scope = dialog instanceof HTMLElement ? within(dialog) : screen;
   const confirm = scope
     .getAllByRole("button", { name: "Execute" })
-    .find((button) => button.className.includes("btn-success") && button !== header);
+    .find(
+      (button) =>
+        button.getAttribute("data-coachmark") === "flow-execute-confirm" && button !== header,
+    );
   if (!confirm) throw new Error("Execute confirmation button not found");
   await act(async () => {
     fireEvent.click(confirm);

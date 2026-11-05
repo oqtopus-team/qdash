@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, RefreshCw, ExternalLink, CheckCircle, UserRound, Pencil } from "lucide-react";
 import { useGetTaskResult } from "@/client/task/task";
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
+import { TaskLineageSection } from "@/components/features/provenance/TaskLineageSection";
+import { FigureStrip } from "@/components/charts/FigureStrip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { useRecordJourneyResultView } from "@/components/features/first-calibration/useRecordJourneyResultView";
@@ -18,6 +20,8 @@ import type { CalibrationGitHubSync } from "@/schemas";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
+import { failedTaskInvestigation } from "@/lib/copilotInvestigation";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import { QubitTile } from "@/components/ui/QubitTile";
@@ -311,20 +315,18 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {/* Figure */}
       {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
         (taskResult.json_figure_path && taskResult.json_figure_path.length > 0)) && (
-        <div
-          className="h-[280px] overflow-x-auto overflow-y-hidden flex items-center justify-start gap-3 mb-4"
-          data-coachmark="task-result-figure"
-          data-task-id={taskId}
-        >
-          {(taskResult.figure_path ?? []).map((fig, i) => (
-            <TaskFigure
-              key={i}
-              path={fig}
-              jsonFigurePath={(taskResult.json_figure_path ?? [])[i]}
-              qid={taskResult.qid}
-              className="h-full w-auto object-contain rounded flex-shrink-0"
-            />
-          ))}
+        <div className="mb-4" data-coachmark="task-result-figure" data-task-id={taskId}>
+          <FigureStrip className="h-[280px] gap-3 overflow-y-hidden">
+            {(taskResult.figure_path ?? []).map((fig, i) => (
+              <TaskFigure
+                key={i}
+                path={fig}
+                jsonFigurePath={(taskResult.json_figure_path ?? [])[i]}
+                qid={taskResult.qid}
+                className="h-full w-auto object-contain rounded flex-shrink-0"
+              />
+            ))}
+          </FigureStrip>
         </div>
       )}
 
@@ -353,9 +355,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             qid={taskResult.qid}
             taskId={taskResult.task_id}
             taskName={taskResult.task_name}
-            taskStatus={taskResult.status}
             outputParameters={(taskResult.output_parameters ?? {}) as Record<string, unknown>}
-            outputParameterNames={taskResult.output_parameter_names ?? []}
             jsonFigurePaths={taskResult.json_figure_path ?? []}
           />
         )}
@@ -367,10 +367,20 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           />
         )}
 
+        <TaskLineageSection
+          taskId={taskId}
+          executionId={taskResult.execution_id}
+          qid={taskResult.qid ?? ""}
+          outputParameters={taskResult.output_parameters as Record<string, unknown> | undefined}
+          className="mb-4 rounded-lg bg-base-200/50 p-4"
+        />
+
         <TaskMessagePanel
           status={taskResult.status}
           message={taskResult.message}
           stackTrace={taskResult.stack_trace}
+          showEmptyFallback
+          action={<InvestigateWithAiButton target={failedTaskInvestigation(taskResult)} />}
         />
       </div>
 

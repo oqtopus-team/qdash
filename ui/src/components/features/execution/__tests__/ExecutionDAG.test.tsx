@@ -84,6 +84,10 @@ const results: Record<string, Record<string, unknown>> = {
   },
 };
 
+vi.mock("@/components/features/provenance/TaskLineageSection", () => ({
+  TaskLineageSection: () => null,
+}));
+
 vi.mock("@/client/task/task", () => ({
   useGetTaskResult: (taskId: string) => ({
     data: taskId ? { data: results[taskId] } : undefined,

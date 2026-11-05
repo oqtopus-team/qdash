@@ -61,11 +61,29 @@ helpers over handwritten string keys.
 ## Shared Request Behavior
 
 `ui/src/lib/api/custom-instance.ts` chooses `/api` by default and uses
-`NEXT_PUBLIC_API_URL` when configured. Its interceptor adds the bearer token and active project
-header. Its returned promise exposes cancellation for TanStack Query.
+`NEXT_PUBLIC_API_URL` when configured. Its interceptor adds the bearer token and, unless the
+request already sets `X-Project-Id`, the active project header. Its returned promise exposes
+cancellation for TanStack Query.
 
-Feature code does not add those headers itself. A missing project or authorization error must be
+Feature code does not add the bearer token. A missing project or authorization error must be
 handled as an application state, not bypassed with another Axios instance.
+
+A query whose parameters do not identify the project, such as project-wide activity, returns
+different data for each project under the same generated key. Switching projects invalidates
+every query before the old project's components unmount, so that refetch reads the new project
+from storage. For such a query, add `projectId` from `useProject()` to the query key, set
+`enabled: Boolean(projectId)`, and pin the header to that key's project:
+
+```tsx
+const { projectId } = useProject();
+useGetExecutionActivity(params, {
+  query: {
+    queryKey: [...getGetExecutionActivityQueryKey(params), projectId],
+    enabled: Boolean(projectId),
+  },
+  request: projectId ? { headers: { "X-Project-Id": projectId } } : undefined,
+});
+```
 
 ## Add Feature Composition
 

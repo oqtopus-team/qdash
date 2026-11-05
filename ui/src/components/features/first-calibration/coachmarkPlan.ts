@@ -91,6 +91,7 @@ export const COACHMARK_TARGETS = {
   hardwareReadiness: coachmarkTarget("hardware-readiness"),
   createChip: coachmarkTarget("create-chip"),
   chipIdInput: "#chip-id-input",
+  chipConfig: coachmarkTarget("chip-config"),
   createChipSubmit: coachmarkTarget("create-chip-submit"),
   flowTemplateReady: `${coachmarkTarget("flow-template")}[data-coachmark-ready="true"]`,
   flowSummaryReady: `${coachmarkTarget("flow-summary")}[data-coachmark-ready="true"]`,
@@ -189,6 +190,22 @@ function chipSteps(input: CoachmarkPlanInput): CoachmarkStep[] {
         side: "bottom",
         align: "start",
       },
+      ...(setup.kind === "fake"
+        ? []
+        : [
+            {
+              id: "chip:config",
+              kind: "info",
+              title: "Set up the Qubex configuration",
+              description:
+                "When a configuration tree is mounted, QDash can create a directory named after the chip ID. Copy the wiring from an existing system or start from a template for the chosen backend. Clear the checkbox to create only the chip record.",
+              targets: [COACHMARK_TARGETS.chipConfig],
+              optional: true,
+              dim: false,
+              side: "right",
+              align: "start",
+            } satisfies CoachmarkStep,
+          ]),
       {
         id: "chip:create",
         kind: "action",

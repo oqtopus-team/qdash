@@ -15,8 +15,10 @@ Default task order:
 Targets are MUXes, as on hardware. The flow resolves each MUX to its qubits from the chip's
 wiring and schedules them with the same box-aware scheduler the hardware templates use
 (``mode="scheduled"``): MUX groups that share no box run in parallel, and the qubits of a MUX
-run one after another. By default the flow calibrates MUX 0 to 15, every qubit of the
-64-qubit, 16-MUX virtual device that the Create Chip dialog configures on a fake deployment.
+run one after another. Target arguments follow the hardware templates: ``mux_ids`` selects
+MUXes, otherwise ``qids`` selects qubits. With neither, the flow calibrates ``MUX_IDS``, MUX 0
+to 15, every qubit of the 64-qubit, 16-MUX virtual device that the Create Chip dialog
+configures on a fake deployment.
 
 Example:
     fake_calibration(username="alice", chip_id="64Q", backend_name="fake")
@@ -42,7 +44,7 @@ Example:
 
 from typing import Any
 
-from prefect import flow, get_run_logger
+from prefect import flow
 
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
@@ -51,7 +53,7 @@ from qdash.workflow.service.calib_service import (
     on_flow_failure,
 )
 from qdash.workflow.service.steps import CustomOneQubit
-from qdash.workflow.service.targets import MuxTargets
+from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 # Tasks the template runs when none are given; every name is listed for the fake backend in
 # config/app/backend.yaml and resolves its inputs from the tasks before it.
@@ -66,9 +68,10 @@ FAKE_CALIBRATION_TASKS: list[str] = [
     "CheckRamsey",
 ]
 
-# MUXes the template calibrates when no mux_ids are given: MUX 0 to 15 is the whole fake device.
-# Edit this list to calibrate a subset, for example [9, 15].
-MUX_IDS: list[int] = list(range(16))
+# MUXes the template calibrates when neither mux_ids nor qids is given: MUX 0 to 15 is the
+# whole fake device. Edit this list to calibrate a subset, for example [9, 15]. Keep it a
+# literal list so the execution dialog can show these default targets.
+MUX_IDS: list[int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 
 @flow(
@@ -94,10 +97,10 @@ def fake_calibration(
     Args:
         username: User name (from UI)
         chip_id: Chip ID (default: "64Q")
-        mux_ids: MUX IDs to calibrate (default: MUX_IDS, MUX 0 to 15)
+        mux_ids: MUX IDs to calibrate with MUX-based scheduling. Default: MUX_IDS (MUX 0 to
+            15) when qids is not given either.
         exclude_qids: Qubit IDs to leave out of the selected MUXes
-        qids: Not used; accepted so callers that pass qubit IDs keep working. The MUX
-            selection decides the qubits, so passing qids never changes the run.
+        qids: Qubit IDs to calibrate when mux_ids is not set
         mode: Execution mode, as in the hardware templates:
             - "scheduled": Box-based parallelism with hardware constraints (default)
             - "synchronized": Step-based synchronized execution
@@ -112,21 +115,18 @@ def fake_calibration(
     Returns:
         Pipeline results
     """
-    if mux_ids is None:
-        mux_ids = list(MUX_IDS)
     if exclude_qids is None:
         exclude_qids = []
     if tasks is None:
         tasks = list(FAKE_CALIBRATION_TASKS)
-    if qids is not None:
-        get_run_logger().warning(
-            "fake_calibration ignores qids=%s; the run targets mux_ids=%s. "
-            "Use mux_ids and exclude_qids to choose qubits.",
-            qids,
-            mux_ids,
-        )
 
-    targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
+    targets: Target
+    if mux_ids is not None:
+        targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
+    elif qids is not None:
+        targets = QubitTargets(qids=qids)
+    else:
+        targets = MuxTargets(mux_ids=MUX_IDS, exclude_qids=exclude_qids)
     steps = [
         CustomOneQubit(step_name="calibration", tasks=tasks, mode=mode),
     ]

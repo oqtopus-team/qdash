@@ -53,9 +53,12 @@ targets priority when both are present.
 | `exclude_qids` | Qubits to remove from a MUX selection |
 | `qids` | An explicit list of individual qubits |
 
-The current **Execute Flow** dialog does not collect MUX or qubit targets. To run or schedule a
-workflow from the application, give the template a safe default target. In **Simple Calibration**,
-add this fallback immediately before the block that creates the targets:
+For an immediate run, select targets in **Execute Flow** as described in
+[Run a Workflow](./running-calibrations.md#run-a-workflow). Changes in that dialog apply only to
+that run and do not change the saved source or schedules.
+
+For scheduled runs, give the template a safe default target. In **Simple Calibration**, add this
+fallback immediately before the block that creates the targets:
 
 ```python
 if mux_ids is None and qids is None:
@@ -73,8 +76,8 @@ before running resonator spectroscopy. The template requires `mux_ids` and runs
 **CorrectCaptureDelay** once per MUX.
 
 1. Select **Box Setup** under **TEMPLATE** and set a flow name.
-2. Set a default MUX target in the source when you plan to run it from the application. Replace
-   the template's missing-target check with:
+2. For an immediate run, select **MUX IDs** in **Execute Flow**. For scheduled runs, set a
+   default MUX target in the source by replacing the template's missing-target check with:
 
    ```python
    if mux_ids is None:

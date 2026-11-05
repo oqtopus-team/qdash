@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { RotateCw, ZoomIn } from "lucide-react";
 
+import { FigureStrip } from "@/components/charts/FigureStrip";
 import { useGetTaskResult } from "@/client/task/task";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { FigureLightbox } from "./FigureLightbox";
@@ -252,7 +253,7 @@ export function TaskFigure({
   }
 
   return (
-    <div className="flex h-full w-full items-center gap-2 overflow-x-auto">
+    <FigureStrip className="h-full w-full gap-2">
       {normalizedPaths.map((p, i) => (
         <ExpandableImage
           key={p}
@@ -263,6 +264,6 @@ export function TaskFigure({
           hideExpandButton={hideExpandButton}
         />
       ))}
-    </div>
+    </FigureStrip>
   );
 }

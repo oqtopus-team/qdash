@@ -84,6 +84,18 @@ describe("resolveCoachmarkPlan", () => {
     expect(result?.steps[0].doneWhenFilled).toBe(true);
   });
 
+  it("explains the Qubex configuration in the Create Chip dialog on hardware only", () => {
+    const result = plan({ pathname: "/chip", setup: HARDWARE });
+    expect(result?.steps.map((step) => [step.id, step.kind, step.targets[0]])).toEqual([
+      ["chip:name", "action", COACHMARK_TARGETS.chipIdInput],
+      ["chip:config", "info", COACHMARK_TARGETS.chipConfig],
+      ["chip:create", "action", COACHMARK_TARGETS.createChipSubmit],
+      ["chip:open", "action", COACHMARK_TARGETS.createChip],
+    ]);
+    expect(result?.steps[1].optional).toBe(true);
+    expect(result?.steps[1].dim).toBe(false);
+  });
+
   it("points at the Home card on Home and at the banner elsewhere", () => {
     expect(ids({ pathname: "/home" })).toEqual(["chip:choose"]);
     expect(ids({ pathname: "/metrics" })).toEqual(["chip:go"]);

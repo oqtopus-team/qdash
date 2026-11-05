@@ -9,6 +9,19 @@ export interface TaskChatContext {
   taskId: string;
 }
 
+/**
+ * A failed execution, or one task of it, that a chat investigates. The API
+ * loads the logs itself; this only names the failure. Everything but the
+ * execution is optional: an execution can fail before any task result exists.
+ */
+export interface InvestigationTarget {
+  executionId: string;
+  taskId?: string | null;
+  taskName?: string | null;
+  qid?: string | null;
+  chipId?: string | null;
+}
+
 /** One figure sent with a chat turn, as the Copilot runtime receives it. */
 export interface ChatImageAttachment {
   /** Base64 image bytes without a `data:` prefix. */

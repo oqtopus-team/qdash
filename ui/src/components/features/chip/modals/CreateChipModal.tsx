@@ -351,7 +351,10 @@ export function CreateChipModal({
               </div>
 
               {/* Qubex configuration directory (system_id == chip_id) */}
-              <fieldset className="min-w-0 space-y-2 rounded-lg border border-base-300 p-3">
+              <fieldset
+                className="min-w-0 space-y-2 rounded-lg border border-base-300 p-3"
+                data-coachmark="chip-config"
+              >
                 <legend className="px-1 text-sm font-medium">Qubex configuration</legend>
                 {!configAvailable ? (
                   <p className="text-sm text-base-content/60">

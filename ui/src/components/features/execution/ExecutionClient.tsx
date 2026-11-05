@@ -11,14 +11,18 @@ import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime as formatDateTimeUtil } from "@/lib/utils/datetime";
 
 import { ExecutionDAG } from "./ExecutionDAG";
+import { ExecutionParameterChanges } from "./ExecutionParameterChanges";
+import { ExecutionRunSummary } from "./ExecutionRunSummary";
 
 import type { ExecutionResponseDetail } from "@/schemas";
 
 import { useGetExecution, useCancelExecution } from "@/client/execution/execution";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
@@ -267,16 +271,33 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               <span className="truncate">{formatActorLabel(execution)}</span>
             </div>
           </div>
-          {execution.status === "failed" && execution.message && (
-            <div className="alert alert-error items-start">
-              <span className="break-words whitespace-pre-wrap">{execution.message}</span>
-            </div>
+          <ExecutionRunSummary status={execution.status} tasks={execution.task ?? []} />
+          {execution.status === "failed" && (
+            <TaskMessagePanel
+              status="failed"
+              message={execution.message}
+              showEmptyFallback
+              action={
+                <InvestigateWithAiButton
+                  target={{ executionId, chipId: execution.chip_id || chipId }}
+                  surface="mini"
+                />
+              }
+            />
           )}
         </div>
 
         <div className="bg-base-100 rounded-lg shadow-md p-6">
           <h2 className="text-sm font-medium mb-4">Execution Flow</h2>
           <ExecutionDAG tasks={validTasks} />
+        </div>
+
+        <div id="parameter-changes" className="bg-base-100 rounded-lg shadow-md p-6">
+          <h2 className="text-sm font-medium mb-1">Parameter changes</h2>
+          <p className="text-xs text-base-content/60 mb-3">
+            Values this run wrote to the calibration database, against the previous run.
+          </p>
+          <ExecutionParameterChanges chipId={chipId} executionId={executionId} />
         </div>
 
         {/* Execution Note (if available) */}

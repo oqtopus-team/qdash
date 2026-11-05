@@ -21,7 +21,7 @@ for the role to assign.
 
 | Page | Purpose | Guide |
 | --- | --- | --- |
-| **Home** | Start common work and review active executions, failed tasks, and recent notifications. | This page |
+| **Home** | Start common work and review recent executions, upcoming scheduled workflow runs, and recent failed tasks. | This page |
 | **Dashboard** | Scan all configured chip metrics, coverage, distributions, and scoped notes. | [Dashboard](./dashboard.md) |
 | **Metrics** | Inspect one metric across qubits or couplings and compare its history. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **Chip** | Browse calibration tasks and the latest results on the chip topology. | [Calibration Data and Provenance](./data-and-provenance.md) |
@@ -30,6 +30,13 @@ for the role to assign.
 
 Use **Dashboard** for broad health checks, **Metrics** for a parameter-focused investigation, and
 **Chip** when the calibration task or physical target is the starting point.
+
+**Executions** on Home counts the runs started on every chip of the active project in the last 30
+days, one column of blocks per day colored by status. Each block represents one execution; on
+busy days the card labels how many executions a full block represents, and the top block of a
+day is only partly filled when it holds fewer. Hover over or focus a day to see its exact counts, and select the chart or
+**All executions** to open the **Execution** page. A run in progress appears as a badge in the top
+bar with its name and status; select the badge to open the run.
 
 ## Run Your First Calibration
 
@@ -45,7 +52,11 @@ the run, or opening a result. Callouts that explain the template, the flow name,
 graph and values have **Next**. The rest of the page stays usable while a callout is shown.
 
 1. **Prepare a chip.** The guide opens the **Create Chip** dialog, or uses the chip you chose. On a
-   Fake deployment it offers only chips with the 64 qubits of the virtual device.
+   Fake deployment it offers only chips with the 64 qubits of the virtual device. On a Qubex
+   deployment the guide also explains the **Qubex configuration** options, which are available
+   only when a configuration tree is mounted: they create a directory named after the chip ID by
+   copying the wiring from an existing system or starting from a backend template. Push the new
+   files from the **Config** page before you run a calibration.
 2. **Review and run.** On a Fake deployment, creating the chip opens **New Flow** on the **Fake
    Backend Calibration** template for that chip. On a Qubex deployment, confirm the chip's
    hardware readiness first, then choose the template. Next to the code editor, **What this flow
@@ -129,6 +140,7 @@ them.
 
 ## External Tools
 
-The bottom of the sidebar links to this documentation, the Prefect dashboard, and the interactive
-API documentation. Prefect and API documentation links are available to project editors. Use the
-QDash UI or API for workflow changes so QDash project metadata remains synchronized with Prefect.
+The bottom of the sidebar links to this documentation and, for project editors, to the Prefect
+dashboard. Use the QDash UI or API for workflow changes so QDash project metadata remains
+synchronized with Prefect. The interactive API documentation is not linked from the sidebar; it is
+served at the API's `/docs` path, listed in [Setup](./setup.md#verify-the-installation).

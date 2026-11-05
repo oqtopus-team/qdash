@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from qdash.datamodel.flow_targets import FlowTargetOverride
+
 
 class SaveFlowRequest(BaseModel):
     """Request to save a Flow."""
@@ -92,6 +94,9 @@ class ListFlowsResponse(BaseModel):
 class GetFlowResponse(BaseModel):
     """Response for getting flow details."""
 
+    target_defaults: FlowTargetOverride | None = Field(
+        None, description="Statically resolved source targets; null when dynamic or ambiguous"
+    )
     name: str = Field(..., description="Flow name")
     created_by: str = Field(..., description="Username of the flow creator")
     description: str = Field(..., description="Flow description")
@@ -131,6 +136,10 @@ class MoveFlowResponse(BaseModel):
 class ExecuteFlowRequest(BaseModel):
     """Request to execute a Flow."""
 
+    target_override: FlowTargetOverride | None = Field(
+        None,
+        description="Targets for this run, overriding direct CalibService and pipeline targets",
+    )
     parameters: dict[str, Any] = Field(
         default_factory=dict, description="Execution parameters (overrides default_parameters)"
     )
@@ -216,6 +225,7 @@ class FlowScheduleSummary(BaseModel):
     next_run: datetime | None = Field(None, description="Next scheduled run time")
     active: bool = Field(..., description="Whether the schedule is active")
     created_at: datetime = Field(..., description="Schedule creation time")
+    chip_id: str | None = Field(None, description="Target chip ID of the schedule, when known")
 
 
 class ListFlowSchedulesResponse(BaseModel):

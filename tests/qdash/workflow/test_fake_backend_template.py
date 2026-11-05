@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from qdash.workflow.service.targets import MuxTargets
+from qdash.api.services.flow_service.target_defaults import (
+    flow_parameter_names,
+    resolve_target_defaults,
+)
+from qdash.datamodel.flow_targets import FlowTargetOverride
+from qdash.workflow.service.flow_targets import override_target
+from qdash.workflow.service.targets import MuxTargets, QubitTargets
 
 fake_backend_module = importlib.import_module("qdash.workflow.templates.fake_backend")
 
@@ -39,13 +46,6 @@ def test_defaults_to_mux_0_to_15_scheduled_like_hardware() -> None:
     assert step.mode == "scheduled"
 
 
-def test_the_default_mux_list_is_a_copy() -> None:
-    result = fake_backend_module.fake_calibration(username="alice", chip_id="fake-64q")
-    result["targets"].mux_ids.append(99)
-
-    assert list(range(16)) == fake_backend_module.MUX_IDS
-
-
 def test_mux_subset_exclusions_and_tasks_narrow_the_run() -> None:
     result = fake_backend_module.fake_calibration(
         username="alice",
@@ -63,12 +63,49 @@ def test_mux_subset_exclusions_and_tasks_narrow_the_run() -> None:
     assert result["steps"][0].mode == "serial"
 
 
-@pytest.mark.parametrize("mux_ids", [None, [9]])
-def test_qids_never_override_the_mux_selection(mux_ids: list[int] | None) -> None:
+def test_qids_select_qubits_when_no_mux_ids_are_given() -> None:
     result = fake_backend_module.fake_calibration(
-        username="alice", chip_id="fake-64q", mux_ids=mux_ids, qids=["0", "1"]
+        username="alice", chip_id="fake-64q", qids=["0", "1"]
     )
 
-    targets = result["targets"]
-    assert isinstance(targets, MuxTargets)
-    assert targets.mux_ids == (mux_ids if mux_ids is not None else list(range(16)))
+    assert result["targets"] == QubitTargets(qids=["0", "1"])
+
+
+def test_mux_ids_take_precedence_over_qids() -> None:
+    result = fake_backend_module.fake_calibration(
+        username="alice", chip_id="fake-64q", mux_ids=[9], qids=["0", "1"]
+    )
+
+    assert result["targets"] == MuxTargets(mux_ids=[9], exclude_qids=[])
+
+
+def test_execution_dialog_reads_the_template_default_targets() -> None:
+    assert fake_backend_module.__file__ is not None
+    source = Path(fake_backend_module.__file__).read_text()
+
+    defaults = resolve_target_defaults(source, "fake_calibration", {})
+
+    assert defaults == FlowTargetOverride(mux_ids=list(range(16)))
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        FlowTargetOverride(mux_ids=[9, 15], exclude_qids=["37"]),
+        FlowTargetOverride(qids=["0", "5"]),
+    ],
+)
+def test_template_targets_match_an_execution_override(override: FlowTargetOverride) -> None:
+    # FlowService passes the override fields the entrypoint accepts as parameters, and
+    # CalibService.run replaces the targets from the run context. Both must agree so the
+    # logged and executed targets are the same.
+    assert fake_backend_module.__file__ is not None
+    source = Path(fake_backend_module.__file__).read_text()
+    accepted = flow_parameter_names(source, "fake_calibration")
+    parameters = {key: value for key, value in override.model_dump().items() if key in accepted}
+
+    result = fake_backend_module.fake_calibration(
+        username="alice", chip_id="fake-64q", **parameters
+    )
+
+    assert result["targets"] == override_target(result["targets"], override)

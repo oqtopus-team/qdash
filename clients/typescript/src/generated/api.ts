@@ -91,6 +91,7 @@ import type {
   ExecuteFlowResponse,
   ExecutePipelineRequest,
   ExecutePipelineResponse,
+  ExecutionActivityResponse,
   ExecutionAvailabilityRequest,
   ExecutionAvailabilityResponse,
   ExecutionComparisonResponse,
@@ -114,9 +115,11 @@ import type {
   GetChipNoteParams,
   GetChipNotesSummaryParams,
   GetCopilotConfig200,
+  GetCopilotSourceFileParams,
   GetCouplingMetricHistoryParams,
   GetCouplingTaskHistoryParams,
   GetDegradationTrendsParams,
+  GetExecutionActivityParams,
   GetFigureByPathParams,
   GetFileContent200,
   GetFileContentParams,
@@ -186,6 +189,7 @@ import type {
   ListNotificationsParams,
   ListNotificationsResponse,
   ListQubitsResponse,
+  ListSourceRootsResponse,
   ListTagResponse,
   ListTargetNoteEventsParams,
   ListTaskFileBackendsResponse,
@@ -248,11 +252,14 @@ import type {
   SaveFlowResponse,
   ScheduleFlowRequest,
   ScheduleFlowResponse,
+  SearchCopilotSourceParams,
   SearchNoteEventsParams,
+  SearchSourceResponse,
   SeedImportRequest,
   SeedImportResponse,
   SetEvaluationVerdictRequest,
   SettingsResponse,
+  SourceFileResponse,
   SubmitAgentActionRequest,
   SuccessResponse,
   TaskFileSettings,
@@ -718,7 +725,7 @@ const deleteProject = (
     }
 
 /**
- * List all members of a project.
+ * List active members of a project.
  * @summary List project members
  */
 const listProjectMembers = (
@@ -912,7 +919,7 @@ const checkExecutionAvailability = (
     }
 
 /**
- * List executions for a given chip with pagination.
+ * List executions for a given chip with pagination, optionally for one calendar day.
  *
  * Parameters
  * ----------
@@ -938,6 +945,28 @@ const listExecutions = (
  options?: SecondParameter<typeof qdashRequest<ListExecutionsResponse>>,) => {
       return qdashRequest<ListExecutionsResponse>(
       {url: `/executions`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Count executions per bucket, by status, over a trailing window.
+ *
+ * With ``chip_id`` only that chip's executions count; without it, every execution in the
+ * caller's current project counts. Executions of other projects are never included.
+ * Every bucket of the window is returned, empty ones included, so a chart can draw a
+ * continuous axis. Buckets follow wall-clock time in ``timezone`` so they match what the
+ * user sees: one per calendar day ending today, or with ``granularity=6h`` four per day
+ * (local 00:00, 06:00, 12:00, 18:00) ending with the slot that contains the current time.
+ * Each bucket carries its ``start`` and exclusive ``end``.
+ * @summary Count executions per day or per 6-hour slot
+ */
+const getExecutionActivity = (
+    params?: GetExecutionActivityParams,
+ options?: SecondParameter<typeof qdashRequest<ExecutionActivityResponse>>,) => {
+      return qdashRequest<ExecutionActivityResponse>(
+      {url: `/executions/activity`, method: 'GET',
         params
     },
       options);
@@ -1716,6 +1745,47 @@ const deleteCopilotChatSession = (
  options?: SecondParameter<typeof qdashRequest<DeleteCopilotChatSession200>>,) => {
       return qdashRequest<DeleteCopilotChatSession200>(
       {url: `/copilot/chat/sessions/${sessionId}`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
+ * QDash and allowlisted dependency source served read-only, with known revisions.
+ * @summary List the source trees the Copilot can read
+ */
+const listCopilotSourceRoots = (
+
+ options?: SecondParameter<typeof qdashRequest<ListSourceRootsResponse>>,) => {
+      return qdashRequest<ListSourceRootsResponse>(
+      {url: `/copilot/source/roots`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Literal search in file contents or file paths; read-only and size-limited.
+ * @summary Search the source the Copilot can read
+ */
+const searchCopilotSource = (
+    params: SearchCopilotSourceParams,
+ options?: SecondParameter<typeof qdashRequest<SearchSourceResponse>>,) => {
+      return qdashRequest<SearchSourceResponse>(
+      {url: `/copilot/source/search`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Read up to 400 numbered lines; without ``root`` the path is matched as a traceback prints it.
+ * @summary Read a line range of a source file
+ */
+const getCopilotSourceFile = (
+    params: GetCopilotSourceFileParams,
+ options?: SecondParameter<typeof qdashRequest<SourceFileResponse>>,) => {
+      return qdashRequest<SourceFileResponse>(
+      {url: `/copilot/source/file`, method: 'GET',
+        params
     },
       options);
     }
@@ -4773,7 +4843,7 @@ const getRecalibrationRecommendations = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,listCopilotSourceRoots,searchCopilotSource,getCopilotSourceFile,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -4810,6 +4880,7 @@ export type PreviewArtifactByPathResult = NonNullable<Awaited<ReturnType<ReturnT
 export type GetExecutionLockStatusResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getExecutionLockStatus']>>>
 export type CheckExecutionAvailabilityResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['checkExecutionAvailability']>>>
 export type ListExecutionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listExecutions']>>>
+export type GetExecutionActivityResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getExecutionActivity']>>>
 export type GetExecutionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getExecution']>>>
 export type CancelExecutionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['cancelExecution']>>>
 export type DownloadFileResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['downloadFile']>>>
@@ -4852,6 +4923,9 @@ export type CreateCopilotChatSessionResult = NonNullable<Awaited<ReturnType<Retu
 export type GetCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotChatSession']>>>
 export type UpdateCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateCopilotChatSession']>>>
 export type DeleteCopilotChatSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['deleteCopilotChatSession']>>>
+export type ListCopilotSourceRootsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listCopilotSourceRoots']>>>
+export type SearchCopilotSourceResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['searchCopilotSource']>>>
+export type GetCopilotSourceFileResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotSourceFile']>>>
 export type GetCopilotPreferencesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotPreferences']>>>
 export type UpdateCopilotPreferencesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateCopilotPreferences']>>>
 export type GetCopilotSystemPromptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotSystemPrompt']>>>

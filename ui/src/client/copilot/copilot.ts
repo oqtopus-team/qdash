@@ -32,8 +32,13 @@ import type {
   CreateCopilotChatSessionRequest,
   DeleteCopilotChatSession200,
   GetCopilotConfig200,
+  GetCopilotSourceFileParams,
   HTTPValidationError,
   ListCopilotChatSessionsResponse,
+  ListSourceRootsResponse,
+  SearchCopilotSourceParams,
+  SearchSourceResponse,
+  SourceFileResponse,
   UpdateCopilotChatSessionRequest
 } from '../../schemas';
 
@@ -543,6 +548,287 @@ export const useDeleteCopilotChatSession = <TError = HTTPValidationError,
       return useMutation(getDeleteCopilotChatSessionMutationOptions(options), queryClient);
     }
     /**
+ * QDash and allowlisted dependency source served read-only, with known revisions.
+ * @summary List the source trees the Copilot can read
+ */
+export const listCopilotSourceRoots = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ListSourceRootsResponse>(
+      {url: `/copilot/source/roots`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListCopilotSourceRootsQueryKey = () => {
+    return [
+    `/copilot/source/roots`
+    ] as const;
+    }
+
+
+export const getListCopilotSourceRootsQueryOptions = <TData = Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCopilotSourceRootsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCopilotSourceRoots>>> = ({ signal }) => listCopilotSourceRoots(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListCopilotSourceRootsQueryResult = NonNullable<Awaited<ReturnType<typeof listCopilotSourceRoots>>>
+export type ListCopilotSourceRootsQueryError = unknown
+
+
+export function useListCopilotSourceRoots<TData = Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCopilotSourceRoots>>,
+          TError,
+          Awaited<ReturnType<typeof listCopilotSourceRoots>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCopilotSourceRoots<TData = Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCopilotSourceRoots>>,
+          TError,
+          Awaited<ReturnType<typeof listCopilotSourceRoots>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCopilotSourceRoots<TData = Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List the source trees the Copilot can read
+ */
+
+export function useListCopilotSourceRoots<TData = Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListCopilotSourceRootsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Literal search in file contents or file paths; read-only and size-limited.
+ * @summary Search the source the Copilot can read
+ */
+export const searchCopilotSource = (
+    params: SearchCopilotSourceParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<SearchSourceResponse>(
+      {url: `/copilot/source/search`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getSearchCopilotSourceQueryKey = (params?: SearchCopilotSourceParams,) => {
+    return [
+    `/copilot/source/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchCopilotSourceQueryOptions = <TData = Awaited<ReturnType<typeof searchCopilotSource>>, TError = HTTPValidationError>(params: SearchCopilotSourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchCopilotSourceQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchCopilotSource>>> = ({ signal }) => searchCopilotSource(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchCopilotSourceQueryResult = NonNullable<Awaited<ReturnType<typeof searchCopilotSource>>>
+export type SearchCopilotSourceQueryError = HTTPValidationError
+
+
+export function useSearchCopilotSource<TData = Awaited<ReturnType<typeof searchCopilotSource>>, TError = HTTPValidationError>(
+ params: SearchCopilotSourceParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchCopilotSource>>,
+          TError,
+          Awaited<ReturnType<typeof searchCopilotSource>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchCopilotSource<TData = Awaited<ReturnType<typeof searchCopilotSource>>, TError = HTTPValidationError>(
+ params: SearchCopilotSourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchCopilotSource>>,
+          TError,
+          Awaited<ReturnType<typeof searchCopilotSource>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchCopilotSource<TData = Awaited<ReturnType<typeof searchCopilotSource>>, TError = HTTPValidationError>(
+ params: SearchCopilotSourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Search the source the Copilot can read
+ */
+
+export function useSearchCopilotSource<TData = Awaited<ReturnType<typeof searchCopilotSource>>, TError = HTTPValidationError>(
+ params: SearchCopilotSourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchCopilotSourceQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Read up to 400 numbered lines; without ``root`` the path is matched as a traceback prints it.
+ * @summary Read a line range of a source file
+ */
+export const getCopilotSourceFile = (
+    params: GetCopilotSourceFileParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<SourceFileResponse>(
+      {url: `/copilot/source/file`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetCopilotSourceFileQueryKey = (params?: GetCopilotSourceFileParams,) => {
+    return [
+    `/copilot/source/file`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCopilotSourceFileQueryOptions = <TData = Awaited<ReturnType<typeof getCopilotSourceFile>>, TError = HTTPValidationError>(params: GetCopilotSourceFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCopilotSourceFileQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCopilotSourceFile>>> = ({ signal }) => getCopilotSourceFile(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCopilotSourceFileQueryResult = NonNullable<Awaited<ReturnType<typeof getCopilotSourceFile>>>
+export type GetCopilotSourceFileQueryError = HTTPValidationError
+
+
+export function useGetCopilotSourceFile<TData = Awaited<ReturnType<typeof getCopilotSourceFile>>, TError = HTTPValidationError>(
+ params: GetCopilotSourceFileParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotSourceFile>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotSourceFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotSourceFile<TData = Awaited<ReturnType<typeof getCopilotSourceFile>>, TError = HTTPValidationError>(
+ params: GetCopilotSourceFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotSourceFile>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotSourceFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotSourceFile<TData = Awaited<ReturnType<typeof getCopilotSourceFile>>, TError = HTTPValidationError>(
+ params: GetCopilotSourceFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Read a line range of a source file
+ */
+
+export function useGetCopilotSourceFile<TData = Awaited<ReturnType<typeof getCopilotSourceFile>>, TError = HTTPValidationError>(
+ params: GetCopilotSourceFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCopilotSourceFileQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * The instructions this user added to their chats.
  * @summary Get the current user's Copilot preferences
  */

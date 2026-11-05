@@ -1,1073 +1,549 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+
 import {
-  ReactFlow,
   Background,
   Controls,
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-  type Node,
-  type Edge,
-  type NodeTypes,
-  type NodeProps,
   Handle,
-  Position,
   MarkerType,
+  Position,
+  ReactFlow,
+  ReactFlowProvider,
+  useEdgesState,
+  useNodesState,
+  useReactFlow,
 } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 
-import type { LineageNodeResponse, LineageEdgeResponse } from "@/schemas";
-import { TaskDetailPanel } from "./TaskDetailPanel";
-import { Network } from "lucide-react";
+import type { Edge, Node, NodeProps, NodeTypes } from "@xyflow/react";
+
 import { QubitTile } from "@/components/ui/QubitTile";
+import { formatParameterValue } from "@/lib/formatParameterValue";
+import type { LineageEdgeResponse, LineageNodeResponse } from "@/schemas";
+
+import { TaskDetailPanel } from "./TaskDetailPanel";
+import "@xyflow/react/dist/style.css";
 
 interface ProvenanceGraphProps {
   nodes: LineageNodeResponse[];
   edges: LineageEdgeResponse[];
+  /** Entity the graph was opened on; it is marked and the depth is measured from it. */
   originId?: string;
 }
 
-// Status-based styling following ExecutionDAG pattern
-const getNodeStyles = (isOrigin: boolean, isEntity: boolean) => {
-  if (isOrigin) {
-    return {
-      background: "hsl(var(--p) / 0.15)",
-      borderColor: "hsl(var(--p))",
-    };
-  }
-  if (isEntity) {
-    return {
-      background: "hsl(var(--b2))",
-      borderColor: "hsl(var(--p) / 0.4)",
-    };
-  }
-  return {
-    background: "hsl(var(--b2))",
-    borderColor: "hsl(var(--s) / 0.4)",
-  };
-};
+type View = "values" | "tasks";
 
-// Custom node for Entity (Parameter)
-function EntityNode({ data, selected }: NodeProps) {
-  const typedData = data as {
-    label: string;
-    value?: string;
-    isOrigin?: boolean;
-    unit?: string;
-    qid?: string;
-    error?: string;
-    lowConfidence?: boolean;
-    isMatch?: boolean;
-    dimmed?: boolean;
-    latestVersion?: number;
-    hasNewerVersion?: boolean;
-    nodeVersion?: number;
-  };
-  const styles = getNodeStyles(typedData.isOrigin ?? false, true);
+/** Hops shown by default: the origin, its task, that task's inputs and the tasks that wrote them. */
+const DEFAULT_DEPTH = 3;
+const DEPTH_CHOICES = [1, 2, 3, 4, 6, 8];
+/** Relative error at or above which a value is marked as uncertain. */
+const UNCERTAIN_RATIO = 0.05;
 
-  // Compact value + unit + error in one line
-  const valueParts: string[] = [];
-  if (typedData.value)
-    valueParts.push(`${typedData.value}${typedData.unit ? ` ${typedData.unit}` : ""}`);
-  if (typedData.error) valueParts.push(`±${typedData.error}`);
-  const valueText = valueParts.join("  ");
+const EDGE_COLOR = "color-mix(in oklch, var(--color-base-content) 35%, transparent)";
+const DIM_OPACITY = 0.2;
 
+interface ValueNodeData extends Record<string, unknown> {
+  label: string;
+  qid?: string;
+  valueText: string;
+  isOrigin: boolean;
+  uncertain: boolean;
+  /** Set when a newer version of a direct input exists; the origin was computed from a stale one. */
+  newerVersion?: { from: number; to: number };
+  isMatch: boolean;
+  dimmed: boolean;
+}
+
+interface TaskNodeData extends Record<string, unknown> {
+  label: string;
+  qid?: string;
+  status?: string;
+  taskId?: string;
+  staleInputs: string[];
+  isMatch: boolean;
+  dimmed: boolean;
+  isSelected: boolean;
+}
+
+function nodeFrame(isMatch: boolean, dimmed: boolean, extra = "") {
+  return `rounded-lg border bg-base-100 px-3 py-2 text-xs transition-opacity ${
+    isMatch ? "outline outline-2 outline-primary outline-offset-2" : ""
+  } ${dimmed ? "opacity-20" : ""} ${extra}`;
+}
+
+function ValueNode({ data }: NodeProps) {
+  const node = data as ValueNodeData;
   return (
     <div
-      className={`group/entity px-3 py-2 shadow-md rounded-full border-2 min-w-[180px] max-w-[240px] relative ${
-        selected || typedData.isMatch ? "ring-2 ring-accent" : ""
-      } ${typedData.lowConfidence ? "border-warning" : ""} ${typedData.hasNewerVersion ? "border-info" : ""}`}
-      style={{
-        backgroundColor: styles.background,
-        borderColor: typedData.hasNewerVersion ? "hsl(var(--in))" : styles.borderColor,
-        opacity: typedData.dimmed ? 0.25 : 1,
-      }}
-    >
-      {typedData.hasNewerVersion && (
-        <>
-          <span className="absolute -top-1 -right-1 flex h-3 w-3">
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-info" />
-          </span>
-          {/* Hover tooltip - stale */}
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 border border-info/30 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover/entity:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-            <div className="font-medium text-info mb-1">Input version updated</div>
-            <div>
-              <span className="font-mono">v{typedData.nodeVersion}</span>
-              <span className="mx-1">&rarr;</span>
-              <span className="font-mono font-medium">v{typedData.latestVersion}</span>
-            </div>
-            <div className="text-base-content/60 mt-1">Recalibration recommended</div>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-base-100" />
-          </div>
-        </>
+      className={nodeFrame(
+        node.isMatch,
+        node.dimmed,
+        node.isOrigin ? "border-2 border-primary" : "border-base-300",
       )}
-      <Handle type="target" position={Position.Top} className="!bg-primary !w-2 !h-2" />
-      {/* Row 1: name + qid */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <div
-            className={`w-2 h-2 rounded-full flex-shrink-0 ${
-              typedData.isOrigin ? "bg-primary" : "bg-primary/40"
-            }`}
-          />
-          <div className="font-medium text-xs truncate">{typedData.label}</div>
-        </div>
-        {typedData.qid && (
-          <span className="text-xs text-primary/70 font-mono flex-shrink-0">{typedData.qid}</span>
+      style={{ width: 220 }}
+      title={node.newerVersion ? "A newer version of this input exists" : undefined}
+    >
+      <Handle type="target" position={Position.Top} className="!h-1.5 !w-1.5 !bg-base-content/40" />
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate font-medium">{node.label}</span>
+        {node.qid && <QubitTile qid={node.qid} />}
+      </div>
+      <div className="mt-0.5 flex items-center justify-between gap-2 font-mono">
+        <span className={`truncate ${node.uncertain ? "text-warning" : "text-base-content/70"}`}>
+          {node.valueText}
+        </span>
+        {node.newerVersion && (
+          <span className="shrink-0 text-warning">
+            v{node.newerVersion.from} → v{node.newerVersion.to}
+          </span>
         )}
       </div>
-      {/* Row 2: value ± error (single line) */}
-      {valueText && (
-        <div
-          className={`text-xs font-mono mt-0.5 text-center truncate ${
-            typedData.lowConfidence ? "text-warning" : "text-base-content/60"
-          }`}
-        >
-          {valueText}
-        </div>
-      )}
-      {/* Row 3: version update badge */}
-      {typedData.hasNewerVersion &&
-        typedData.nodeVersion != null &&
-        typedData.latestVersion != null && (
-          <div className="text-xs font-mono mt-0.5 rounded-full px-2 py-0.5 text-center bg-info/10 text-info">
-            v{typedData.nodeVersion} &rarr; v{typedData.latestVersion}
-          </div>
-        )}
-      <Handle type="source" position={Position.Bottom} className="!bg-primary !w-2 !h-2" />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!h-1.5 !w-1.5 !bg-base-content/40"
+      />
     </div>
   );
 }
 
-// Custom node for Activity (Task) with hover capability
-function ActivityNode({ data, selected }: NodeProps) {
-  const typedData = data as {
-    label: string;
-    status?: string;
-    taskId?: string;
-    qid?: string;
-    isMatch?: boolean;
-    dimmed?: boolean;
-    isPinned?: boolean;
-    isTaskFlow?: boolean;
-    staleInputCount?: number;
-    staleInputNames?: string[];
-  };
-  const styles = getNodeStyles(false, false);
-  const hasStaleInputs = (typedData.staleInputCount ?? 0) > 0;
-
-  const statusClass =
-    typedData.status === "completed"
-      ? "text-success"
-      : typedData.status === "failed"
-        ? "text-error"
-        : typedData.status === "running"
-          ? "text-info"
-          : "text-warning";
-
-  const sizeClass = typedData.isTaskFlow
-    ? "px-5 py-4 min-w-[240px] max-w-[280px] rounded-lg"
-    : "px-4 py-2.5 min-w-[200px] max-w-[260px] rounded-xl";
-
+function TaskNode({ data }: NodeProps) {
+  const node = data as TaskNodeData;
+  const statusClass = node.status === "failed" ? "text-error" : "text-base-content/50";
   return (
     <div
-      className={`group/activity ${sizeClass} shadow-lg border-2 cursor-pointer relative ${
-        selected || typedData.isMatch ? "ring-2 ring-accent" : ""
-      } ${typedData.isPinned ? "ring-2 ring-secondary" : ""}`}
-      style={{
-        backgroundColor: styles.background,
-        borderColor: hasStaleInputs ? "hsl(var(--in))" : styles.borderColor,
-        opacity: typedData.dimmed ? 0.25 : 1,
-      }}
+      className={nodeFrame(
+        node.isMatch,
+        node.dimmed,
+        `cursor-pointer !bg-base-200 ${node.isSelected ? "border-base-content/60" : "border-base-300"}`,
+      )}
+      style={{ width: 200 }}
+      title={
+        node.staleInputs.length > 0
+          ? `Newer versions exist for: ${node.staleInputs.join(", ")}`
+          : "Select to see what this task read and wrote"
+      }
     >
-      {hasStaleInputs && (
-        <>
-          <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-info" />
-          </span>
-          {/* Hover tooltip */}
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 border border-info/30 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover/activity:opacity-100 transition-opacity pointer-events-none z-50 min-w-[180px]">
-            <div className="font-medium text-info mb-1">Stale inputs detected</div>
-            {typedData.staleInputNames && typedData.staleInputNames.length > 0 ? (
-              <ul className="space-y-0.5">
-                {typedData.staleInputNames.map((name, i) => (
-                  <li key={i} className="font-mono text-xs text-base-content/80">
-                    {name}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="text-base-content/60">
-                {typedData.staleInputCount} input
-                {typedData.staleInputCount === 1 ? "" : "s"} updated
-              </div>
-            )}
-            <div className="text-base-content/60 mt-1">Recalibration recommended</div>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-base-100" />
-          </div>
-        </>
-      )}
-      <Handle type="target" position={Position.Top} className="!bg-secondary !w-2 !h-2" />
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-2 h-2 rounded-sm bg-secondary/60 flex-shrink-0" />
-          <div className="font-medium truncate text-sm">{typedData.label}</div>
-        </div>
-        {typedData.isTaskFlow && typedData.qid && <QubitTile qid={typedData.qid} />}
+      <Handle type="target" position={Position.Top} className="!h-1.5 !w-1.5 !bg-base-content/40" />
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate font-medium">{node.label}</span>
+        {node.qid && <QubitTile qid={node.qid} />}
       </div>
-      {typedData.status && (
-        <div className={`text-xs ${statusClass} mt-1 capitalize`}>{typedData.status}</div>
-      )}
-      {hasStaleInputs && (
-        <div className="text-xs font-mono mt-1 rounded px-2 py-1 text-center bg-info/10 text-info">
-          {typedData.staleInputCount} stale input
-          {typedData.staleInputCount === 1 ? "" : "s"}
-        </div>
-      )}
-      {typedData.taskId && !hasStaleInputs && (
-        <div className="text-xs text-base-content/50 mt-1 truncate">Click to view details</div>
-      )}
-      <Handle type="source" position={Position.Bottom} className="!bg-secondary !w-2 !h-2" />
+      <div className="mt-0.5 flex items-center justify-between gap-2">
+        <span className={statusClass}>{node.status ?? "task"}</span>
+        {node.staleInputs.length > 0 && (
+          <span className="text-warning">
+            {node.staleInputs.length} input{node.staleInputs.length === 1 ? "" : "s"} updated
+          </span>
+        )}
+      </div>
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!h-1.5 !w-1.5 !bg-base-content/40"
+      />
     </div>
   );
 }
 
-const nodeTypes: NodeTypes = {
-  entity: EntityNode,
-  activity: ActivityNode,
-};
+const nodeTypes: NodeTypes = { value: ValueNode, task: TaskNode };
 
-// Edge colors by relation type
-const EDGE_COLORS = {
-  wasGeneratedBy: "#22c55e", // green-500
-  wasDerivedFrom: "#3b82f6", // blue-500
-  used: "#f59e0b", // amber-500
-  taskFlow: "#d946ef", // fuchsia-500 (task dependency)
-  default: "#64748b", // slate-500
-};
-
-type ViewDetail = "full" | "taskFlow";
+const FIT_PADDING = 0.08;
+const FIT_DURATION_MS = 300;
 
 /**
- * Collapse entity nodes, keeping only activity nodes with direct
- * activity-to-activity edges inferred via shared entities.
+ * Glides the viewport to the graph whenever its shape changes: a new depth or view re-fits the
+ * whole graph, a search fits the matches, and opening the side panel re-fits the narrower canvas.
+ * Selecting a node is deliberately not a trigger, so the view stays put under the pointer.
  */
-function collapseToTaskFlow(
-  apiNodes: LineageNodeResponse[],
-  apiEdges: LineageEdgeResponse[],
-  directInputIds?: Set<string>,
-): {
-  nodes: LineageNodeResponse[];
-  edges: LineageEdgeResponse[];
-  staleInputsByActivity: Map<string, number>;
-  staleInputNamesByActivity: Map<string, string[]>;
-} {
-  // Keep only activity nodes
-  const activityNodes = apiNodes.filter((n) => n.node_type === "activity");
-
-  // Index entity nodes by id for quick lookup
-  const entityById = new Map(
-    apiNodes.filter((n) => n.node_type === "entity").map((n) => [n.node_id, n]),
-  );
-
-  // Build maps: entity → generating activity, entity → consuming activities
-  const entityToGenerator = new Map<string, string>();
-  const entityToConsumers = new Map<string, string[]>();
-  // activity → set of entity ids it used
-  const activityUsedEntities = new Map<string, Set<string>>();
-
-  for (const edge of apiEdges) {
-    if (edge.relation_type === "wasGeneratedBy") {
-      // source = entity, target = activity that generated it
-      entityToGenerator.set(edge.source_id, edge.target_id);
-    } else if (edge.relation_type === "used") {
-      // source = activity, target = entity it consumed
-      const consumers = entityToConsumers.get(edge.target_id) ?? [];
-      consumers.push(edge.source_id);
-      entityToConsumers.set(edge.target_id, consumers);
-      // Track which entities each activity used
-      const used = activityUsedEntities.get(edge.source_id) ?? new Set();
-      used.add(edge.target_id);
-      activityUsedEntities.set(edge.source_id, used);
-    }
-  }
-
-  // Compute stale input counts and names per activity (only for direct inputs of origin)
-  const staleInputsByActivity = new Map<string, number>();
-  const staleInputNamesByActivity = new Map<string, string[]>();
-  for (const [activityId, entityIds] of activityUsedEntities) {
-    let staleCount = 0;
-    const staleNames: string[] = [];
-    for (const entityId of entityIds) {
-      // Only count as stale if it's a direct input of the origin
-      if (directInputIds && !directInputIds.has(entityId)) continue;
-      const entity = entityById.get(entityId);
-      if (entity?.latest_version != null && entity.entity?.version != null) {
-        if (entity.latest_version > entity.entity.version) {
-          staleCount++;
-          const name = entity.entity?.parameter_name || entityId;
-          const qid = entity.entity?.qid;
-          staleNames.push(qid ? `${name}(${qid})` : name);
-        }
-      }
-    }
-    if (staleCount > 0) {
-      staleInputsByActivity.set(activityId, staleCount);
-      staleInputNamesByActivity.set(activityId, staleNames);
-    }
-  }
-
-  // For each entity, create edges from the generator activity to each consumer activity
-  const edgeSet = new Set<string>();
-  const directEdges: LineageEdgeResponse[] = [];
-
-  for (const [entityId, generatorId] of entityToGenerator) {
-    const consumers = entityToConsumers.get(entityId) ?? [];
-    for (const consumerId of consumers) {
-      if (generatorId === consumerId) continue;
-      const key = `${generatorId}->${consumerId}`;
-      if (edgeSet.has(key)) continue;
-      edgeSet.add(key);
-      directEdges.push({
-        source_id: consumerId,
-        target_id: generatorId,
-        relation_type: "taskFlow",
-      });
-    }
-  }
-
-  return {
-    nodes: activityNodes,
-    edges: directEdges,
-    staleInputsByActivity,
-    staleInputNamesByActivity,
-  };
+function ViewportFitter({
+  layoutKey,
+  focusIds,
+  panelOpen,
+}: {
+  layoutKey: string;
+  focusIds: string[];
+  panelOpen: boolean;
+}) {
+  const { fitView } = useReactFlow();
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      void fitView(
+        focusIds.length > 0
+          ? {
+              nodes: focusIds.map((id) => ({ id })),
+              padding: 0.5,
+              maxZoom: 1,
+              duration: FIT_DURATION_MS,
+            }
+          : { padding: FIT_PADDING, duration: FIT_DURATION_MS },
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [layoutKey, focusIds, panelOpen, fitView]);
+  return null;
 }
 
-function normalizeForSearch(value: unknown): string {
-  return String(value ?? "")
-    .toLowerCase()
-    .trim();
-}
-
-function nodeMatchesQuery(node: LineageNodeResponse, query: string): boolean {
-  const q = normalizeForSearch(query);
-  if (!q) return false;
-
-  const parts: string[] = [node.node_id, node.node_type];
-  if (node.node_type === "entity" && node.entity) {
+function nodeMatches(node: LineageNodeResponse, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return false;
+  const parts = [node.node_id];
+  if (node.entity) {
     parts.push(
-      node.entity.parameter_name ?? "",
+      node.entity.parameter_name,
       node.entity.qid ?? "",
       node.entity.unit ?? "",
       String(node.entity.value ?? ""),
     );
   }
-  if (node.node_type === "activity" && node.activity) {
-    parts.push(
-      node.activity.task_name ?? "",
-      node.activity.status ?? "",
-      node.activity.task_id ?? "",
-      node.activity.qid ?? "",
-    );
+  if (node.activity) {
+    parts.push(node.activity.task_name, node.activity.status ?? "", node.activity.qid ?? "");
   }
-
-  return normalizeForSearch(parts.join(" ")).includes(q);
+  return parts.join(" ").toLowerCase().includes(needle);
 }
 
-function buildUndirectedAdjacency(edges: LineageEdgeResponse[]) {
+/** Undirected hop distance from the origin, so depth is the same whichever way an edge points. */
+function hopDistances(originId: string, edges: LineageEdgeResponse[]): Map<string, number> {
   const adjacency = new Map<string, Set<string>>();
-  const add = (from: string, to: string) => {
+  const link = (from: string, to: string) => {
     if (!adjacency.has(from)) adjacency.set(from, new Set());
     adjacency.get(from)!.add(to);
   };
   for (const edge of edges) {
-    add(edge.source_id, edge.target_id);
-    add(edge.target_id, edge.source_id);
+    link(edge.source_id, edge.target_id);
+    link(edge.target_id, edge.source_id);
   }
-  return adjacency;
-}
-
-function computeHopDistances(originId: string, edges: LineageEdgeResponse[]): Map<string, number> {
-  const adjacency = buildUndirectedAdjacency(edges);
-  const distance = new Map<string, number>();
-  const queue: string[] = [];
-  distance.set(originId, 0);
-  queue.push(originId);
-
+  const distance = new Map<string, number>([[originId, 0]]);
+  const queue = [originId];
   while (queue.length > 0) {
     const current = queue.shift()!;
-    const d = distance.get(current) ?? 0;
-    const neighbors = adjacency.get(current);
-    if (!neighbors) continue;
-    for (const next of neighbors) {
+    for (const next of adjacency.get(current) ?? []) {
       if (!distance.has(next)) {
-        distance.set(next, d + 1);
+        distance.set(next, distance.get(current)! + 1);
         queue.push(next);
       }
     }
   }
-
   return distance;
 }
 
-// Helper to format value for display
-function formatValue(value: unknown): string {
-  if (value === undefined || value === null) return "";
-  if (typeof value === "number") {
-    if (Math.abs(value) < 0.01 || Math.abs(value) > 10000) {
-      return value.toExponential(2);
-    }
-    return value.toFixed(4);
-  }
-  if (typeof value === "boolean") return value ? "true" : "false";
-  return String(value);
-}
-
-// Use dagre for automatic hierarchical layout
-function getLayoutedElements(
-  nodes: Node[],
-  edges: Edge[],
-  direction: "TB" | "BT" | "LR" | "RL" = "TB",
-  opts?: {
-    nodeWidth?: number;
-    nodeHeight?: number;
-    nodesep?: number;
-    ranksep?: number;
-    edgesep?: number;
-    ranker?: string;
-  },
-): { nodes: Node[]; edges: Edge[] } {
-  const nodeWidth = opts?.nodeWidth ?? 180;
-  const nodeHeight = opts?.nodeHeight ?? 70;
-
-  const dagreGraph = new dagre.graphlib.Graph();
-  dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-  const isHorizontal = direction === "LR" || direction === "RL";
-  dagreGraph.setGraph({
-    rankdir: direction,
-    nodesep: opts?.nodesep ?? 60,
-    ranksep: opts?.ranksep ?? 80,
-    edgesep: opts?.edgesep ?? 20,
-    marginx: 40,
-    marginy: 40,
-    ...(opts?.ranker && { ranker: opts.ranker }),
-  });
-
-  // Add nodes to dagre
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
-  });
-
-  // Add edges to dagre
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  // Calculate layout
-  dagre.layout(dagreGraph);
-
-  // Apply positions to nodes
-  const layoutedNodes = nodes.map((node) => {
-    const dagreNode = dagreGraph.node(node.id);
-    return {
-      ...node,
-      position: {
-        x: dagreNode.x - nodeWidth / 2,
-        y: dagreNode.y - nodeHeight / 2,
-      },
-      targetPosition: isHorizontal ? Position.Left : Position.Top,
-      sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
-    };
-  });
-
-  return { nodes: layoutedNodes, edges };
-}
-
-// Convert API response to React Flow nodes and edges
-function convertToFlowElements(
-  apiNodes: LineageNodeResponse[],
-  apiEdges: LineageEdgeResponse[],
-  originId?: string,
-  isTaskFlow?: boolean,
-  staleInputsByActivity?: Map<string, number>,
-  directInputIds?: Set<string>,
-  staleInputNamesByActivity?: Map<string, string[]>,
-): { nodes: Node[]; edges: Edge[] } {
-  // Convert nodes
-  const flowNodes: Node[] = apiNodes.map((node) => {
-    const isEntity = node.node_type === "entity";
-
-    let label = node.node_id.split(":").slice(0, 2).join(":");
-    let value: string | undefined;
-    let error: string | undefined;
-    let lowConfidence: boolean | undefined;
-    let status: string | undefined;
-    let unit: string | undefined;
-    let taskId: string | undefined;
-    let qid: string | undefined;
-    let latestVersion: number | undefined;
-    let hasNewerVersion: boolean | undefined;
-    let nodeVersion: number | undefined;
-
-    if (isEntity && node.entity) {
-      label = node.entity.parameter_name || "?";
-      value = formatValue(node.entity.value);
-      unit = node.entity.unit;
-      qid = node.entity.qid;
-      nodeVersion = node.entity.version;
-      // Only show staleness indicator for direct inputs of the origin
-      const isDirectInput = !directInputIds || directInputIds.has(node.node_id);
-      if (
-        isDirectInput &&
-        node.latest_version != null &&
-        node.entity.version != null &&
-        node.latest_version > node.entity.version
-      ) {
-        latestVersion = node.latest_version;
-        hasNewerVersion = true;
-      }
-      if (typeof node.entity.error === "number" && node.entity.error !== 0) {
-        error = formatValue(node.entity.error);
-        if (typeof node.entity.value === "number") {
-          if (node.entity.value === 0) {
-            lowConfidence = true;
-          } else {
-            lowConfidence = Math.abs(node.entity.error / node.entity.value) >= 0.05;
-          }
-        }
-      }
-    } else if (!isEntity && node.activity) {
-      label = node.activity.task_name || node.node_id;
-      status = node.activity.status;
-      taskId = node.activity.task_id;
-      qid = node.activity.qid;
-    }
-
-    // For activity nodes in task flow, propagate stale input info
-    const staleInputCount =
-      !isEntity && staleInputsByActivity ? (staleInputsByActivity.get(node.node_id) ?? 0) : 0;
-    const staleInputNames =
-      !isEntity && staleInputNamesByActivity
-        ? (staleInputNamesByActivity.get(node.node_id) ?? [])
-        : [];
-
-    return {
-      id: node.node_id,
-      type: isEntity ? "entity" : "activity",
-      position: { x: 0, y: 0 },
-      data: {
-        label,
-        value,
-        error,
-        lowConfidence,
-        unit,
-        status,
-        taskId,
-        qid,
-        isOrigin: node.node_id === originId,
-        latestVersion,
-        hasNewerVersion,
-        nodeVersion,
-        staleInputCount,
-        staleInputNames,
-      },
-    };
-  });
-
-  // Convert edges
-  const flowEdges: Edge[] = apiEdges.map((edge, index) => {
-    const strokeColor =
-      EDGE_COLORS[edge.relation_type as keyof typeof EDGE_COLORS] || EDGE_COLORS.default;
-
-    return {
-      id: `edge-${index}`,
-      source: edge.source_id,
-      target: edge.target_id,
-      type: "default",
-      style: {
-        stroke: strokeColor,
-        strokeWidth: isTaskFlow ? 2.5 : 1.5,
-        opacity: isTaskFlow ? 1 : 0.7,
-      },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: strokeColor,
-        width: isTaskFlow ? 20 : 12,
-        height: isTaskFlow ? 20 : 12,
-      },
-      animated: edge.relation_type === "wasDerivedFrom",
-    };
-  });
-
-  // Apply dagre layout
-  return getLayoutedElements(
-    flowNodes,
-    flowEdges,
-    "TB",
-    isTaskFlow
-      ? {
-          nodeWidth: 260,
-          nodeHeight: 90,
-          nodesep: 100,
-          ranksep: 120,
-          ranker: "tight-tree",
-        }
-      : {
-          nodeWidth: 230,
-          nodeHeight: 56,
-          nodesep: 90,
-          ranksep: 110,
-          edgesep: 30,
-          ranker: "network-simplex",
-        },
+/** Inputs of the task that produced the origin: the only values whose staleness matters here. */
+function directInputsOf(originId: string, edges: LineageEdgeResponse[]): Set<string> {
+  const generated = edges.find(
+    (edge) => edge.relation_type === "wasGeneratedBy" && edge.source_id === originId,
+  );
+  if (!generated) return new Set();
+  return new Set(
+    edges
+      .filter((edge) => edge.relation_type === "used" && edge.source_id === generated.target_id)
+      .map((edge) => edge.target_id),
   );
 }
 
+/** Collapse values away, leaving tasks joined wherever one task wrote what another read. */
+function tasksOnly(
+  nodes: LineageNodeResponse[],
+  edges: LineageEdgeResponse[],
+): { nodes: LineageNodeResponse[]; edges: LineageEdgeResponse[] } {
+  const generator = new Map<string, string>();
+  const consumers = new Map<string, string[]>();
+  for (const edge of edges) {
+    if (edge.relation_type === "wasGeneratedBy") generator.set(edge.source_id, edge.target_id);
+    if (edge.relation_type === "used") {
+      consumers.set(edge.target_id, [...(consumers.get(edge.target_id) ?? []), edge.source_id]);
+    }
+  }
+  const seen = new Set<string>();
+  const flow: LineageEdgeResponse[] = [];
+  for (const [entityId, producer] of generator) {
+    for (const consumer of consumers.get(entityId) ?? []) {
+      const key = `${consumer}>${producer}`;
+      if (consumer === producer || seen.has(key)) continue;
+      seen.add(key);
+      flow.push({ source_id: consumer, target_id: producer, relation_type: "taskFlow" });
+    }
+  }
+  return { nodes: nodes.filter((node) => node.node_type === "activity"), edges: flow };
+}
+
+function layout(nodes: Node[], edges: Edge[]): Node[] {
+  const graph = new dagre.graphlib.Graph();
+  graph.setDefaultEdgeLabel(() => ({}));
+  graph.setGraph({ rankdir: "TB", nodesep: 28, ranksep: 56, marginx: 16, marginy: 16 });
+  for (const node of nodes) {
+    graph.setNode(node.id, { width: node.type === "value" ? 220 : 200, height: 52 });
+  }
+  for (const edge of edges) graph.setEdge(edge.source, edge.target);
+  dagre.layout(graph);
+  return nodes.map((node) => {
+    const placed = graph.node(node.id);
+    const width = node.type === "value" ? 220 : 200;
+    return { ...node, position: { x: placed.x - width / 2, y: placed.y - 26 } };
+  });
+}
+
+/**
+ * Every value the origin derives from, drawn as a graph: values (rounded cards) alternate with the
+ * tasks (grey cards) that read and wrote them. Depth, search and a tasks-only view keep a long
+ * calibration chain readable; selecting a task opens what it read and wrote.
+ */
 export function ProvenanceGraph({
   nodes: apiNodes,
   edges: apiEdges,
   originId,
 }: ProvenanceGraphProps) {
-  const [pinnedTask, setPinnedTask] = useState<{
-    taskId: string;
-    qid: string;
-    taskName?: string;
-    nodeId: string;
-  } | null>(null);
-  const [showDerivedEdges, setShowDerivedEdges] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [focusHops, setFocusHops] = useState(4);
-  const [showAll, setShowAll] = useState(false);
-  const [viewDetail, setViewDetail] = useState<ViewDetail>("full");
+  const [query, setQuery] = useState("");
+  const [depth, setDepth] = useState<number | "all">(DEFAULT_DEPTH);
+  const [view, setView] = useState<View>("values");
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
-  // Filter out wasDerivedFrom edges when toggle is off
-  const filteredApiEdges = useMemo(() => {
-    if (showDerivedEdges) return apiEdges;
-    return apiEdges.filter((edge) => edge.relation_type !== "wasDerivedFrom");
-  }, [apiEdges, showDerivedEdges]);
-
-  const matchingNodeIds = useMemo(() => {
-    if (!searchQuery) return new Set<string>();
-    return new Set(apiNodes.filter((n) => nodeMatchesQuery(n, searchQuery)).map((n) => n.node_id));
-  }, [apiNodes, searchQuery]);
-
-  const hopDistances = useMemo(() => {
-    if (!originId) return new Map<string, number>();
-    return computeHopDistances(originId, filteredApiEdges);
-  }, [originId, filteredApiEdges]);
-
-  const maxDistance = useMemo(() => {
-    let max = 0;
-    for (const d of hopDistances.values()) max = Math.max(max, d);
-    return max;
-  }, [hopDistances]);
-
-  useEffect(() => {
-    if (focusHops > maxDistance && maxDistance > 0) {
-      setFocusHops(maxDistance);
-    }
-  }, [focusHops, maxDistance]);
-
-  const effectiveShowAll = showAll || (!!searchQuery && matchingNodeIds.size > 0);
-  const maxHopsToShow = effectiveShowAll ? Number.POSITIVE_INFINITY : focusHops;
-
-  const constrainedApiNodes = useMemo(() => {
-    if (!originId) return apiNodes;
-    return apiNodes.filter((n) => (hopDistances.get(n.node_id) ?? Infinity) <= maxHopsToShow);
-  }, [apiNodes, hopDistances, maxHopsToShow, originId]);
-
-  const constrainedNodeIds = useMemo(
-    () => new Set(constrainedApiNodes.map((n) => n.node_id)),
-    [constrainedApiNodes],
+  // Derivation edges duplicate what the task edges already say; the graph draws tasks only.
+  const structuralEdges = useMemo(
+    () => apiEdges.filter((edge) => edge.relation_type !== "wasDerivedFrom"),
+    [apiEdges],
+  );
+  const distances = useMemo(
+    () => (originId ? hopDistances(originId, structuralEdges) : new Map<string, number>()),
+    [originId, structuralEdges],
+  );
+  const maxDepth = useMemo(() => Math.max(0, ...distances.values()), [distances]);
+  const directInputs = useMemo(
+    () => (originId ? directInputsOf(originId, structuralEdges) : new Set<string>()),
+    [originId, structuralEdges],
+  );
+  const matches = useMemo(
+    () => new Set(apiNodes.filter((node) => nodeMatches(node, query)).map((node) => node.node_id)),
+    [apiNodes, query],
   );
 
-  const constrainedApiEdges = useMemo(() => {
-    return filteredApiEdges.filter(
-      (e) => constrainedNodeIds.has(e.source_id) && constrainedNodeIds.has(e.target_id),
+  // A search shows the whole graph so a match outside the current depth is not hidden.
+  const limit = matches.size > 0 || depth === "all" ? Number.POSITIVE_INFINITY : depth;
+  const shown = useMemo(() => {
+    const nodes = originId
+      ? apiNodes.filter((node) => (distances.get(node.node_id) ?? Infinity) <= limit)
+      : apiNodes;
+    const ids = new Set(nodes.map((node) => node.node_id));
+    const edges = structuralEdges.filter(
+      (edge) => ids.has(edge.source_id) && ids.has(edge.target_id),
     );
-  }, [filteredApiEdges, constrainedNodeIds]);
+    return view === "tasks" ? tasksOnly(nodes, edges) : { nodes, edges };
+  }, [apiNodes, structuralEdges, distances, limit, originId, view]);
 
-  // Compute direct input entity IDs for the origin parameter.
-  // Only these entities should show staleness indicators.
-  const directInputIds = useMemo(() => {
-    if (!originId) return new Set<string>();
-    // Find the activity that generated the origin entity
-    const genEdge = constrainedApiEdges.find(
-      (e) => e.relation_type === "wasGeneratedBy" && e.source_id === originId,
-    );
-    if (!genEdge) return new Set<string>();
-    const generatingActivity = genEdge.target_id;
-    // Find entities that the generating activity used
-    const inputIds = new Set<string>();
-    for (const e of constrainedApiEdges) {
-      if (e.relation_type === "used" && e.source_id === generatingActivity) {
-        inputIds.add(e.target_id);
+  const staleInputsByTask = useMemo(() => {
+    const byId = new Map(apiNodes.map((node) => [node.node_id, node]));
+    const result = new Map<string, string[]>();
+    for (const edge of structuralEdges) {
+      if (edge.relation_type !== "used" || !directInputs.has(edge.target_id)) continue;
+      const input = byId.get(edge.target_id);
+      if (!input?.entity || input.latest_version == null) continue;
+      if (input.latest_version > input.entity.version) {
+        const name = `${input.entity.parameter_name} ${input.entity.qid ?? ""}`.trim();
+        result.set(edge.source_id, [...(result.get(edge.source_id) ?? []), name]);
       }
     }
-    return inputIds;
-  }, [originId, constrainedApiEdges]);
-
-  // Apply Task Flow collapse when in taskFlow mode
-  const {
-    nodes: flowApiNodes,
-    edges: flowApiEdges,
-    staleInputsByActivity,
-    staleInputNamesByActivity,
-  } = useMemo(() => {
-    if (viewDetail === "taskFlow") {
-      return collapseToTaskFlow(constrainedApiNodes, constrainedApiEdges, directInputIds);
-    }
-    return {
-      nodes: constrainedApiNodes,
-      edges: constrainedApiEdges,
-      staleInputsByActivity: new Map<string, number>(),
-      staleInputNamesByActivity: new Map<string, string[]>(),
-    };
-  }, [viewDetail, constrainedApiNodes, constrainedApiEdges, directInputIds]);
-
-  const isTaskFlow = viewDetail === "taskFlow";
-
-  const { nodes: baseNodes, edges: baseEdges } = useMemo(
-    () =>
-      convertToFlowElements(
-        flowApiNodes,
-        flowApiEdges,
-        originId,
-        isTaskFlow,
-        staleInputsByActivity,
-        directInputIds,
-        staleInputNamesByActivity,
-      ),
-    [
-      flowApiNodes,
-      flowApiEdges,
-      originId,
-      isTaskFlow,
-      staleInputsByActivity,
-      directInputIds,
-      staleInputNamesByActivity,
-    ],
-  );
+    return result;
+  }, [apiNodes, structuralEdges, directInputs]);
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
-    const hasSearch = !!searchQuery && matchingNodeIds.size > 0;
-    const matchNeighborhood = (() => {
-      if (!hasSearch) return new Set<string>();
-      const neighbors = new Set<string>(matchingNodeIds);
-      for (const edge of baseEdges) {
-        if (matchingNodeIds.has(edge.source) || matchingNodeIds.has(edge.target)) {
-          neighbors.add(edge.source);
-          neighbors.add(edge.target);
-        }
+    const neighbourhood = new Set(matches);
+    for (const edge of shown.edges) {
+      if (matches.has(edge.source_id) || matches.has(edge.target_id)) {
+        neighbourhood.add(edge.source_id);
+        neighbourhood.add(edge.target_id);
       }
-      return neighbors;
-    })();
+    }
+    const dim = (id: string) => matches.size > 0 && !neighbourhood.has(id);
 
-    const withDecorations = baseNodes.map((node) => {
-      const isMatch = matchingNodeIds.has(node.id);
-      const dimmed = hasSearch ? !matchNeighborhood.has(node.id) : false;
-      const isPinned =
-        node.type === "activity" && !!pinnedTask?.nodeId && node.id === pinnedTask.nodeId;
-      return {
-        ...node,
-        data: {
-          ...(node.data as Record<string, unknown>),
-          isMatch,
-          dimmed,
-          isPinned,
-          ...(node.type === "activity" && { isTaskFlow }),
-        },
+    const flowNodes: Node[] = shown.nodes.map((node) => {
+      if (node.entity) {
+        const entity = node.entity;
+        const error = typeof entity.error === "number" ? entity.error : 0;
+        const value = typeof entity.value === "number" ? entity.value : null;
+        const uncertain =
+          error !== 0 &&
+          value !== null &&
+          (value === 0 || Math.abs(error / value) >= UNCERTAIN_RATIO);
+        const stale =
+          directInputs.has(node.node_id) &&
+          node.latest_version != null &&
+          node.latest_version > entity.version;
+        const data: ValueNodeData = {
+          label: entity.parameter_name,
+          qid: entity.qid,
+          valueText: formatParameterValue(entity.value, entity.unit),
+          isOrigin: node.node_id === originId,
+          uncertain,
+          newerVersion: stale ? { from: entity.version, to: node.latest_version! } : undefined,
+          isMatch: matches.has(node.node_id),
+          dimmed: dim(node.node_id),
+        };
+        return { id: node.node_id, type: "value", position: { x: 0, y: 0 }, data };
+      }
+      const data: TaskNodeData = {
+        label: node.activity?.task_name ?? node.node_id,
+        qid: node.activity?.qid || undefined,
+        status: node.activity?.status || undefined,
+        taskId: node.activity?.task_id,
+        staleInputs: staleInputsByTask.get(node.node_id) ?? [],
+        isMatch: matches.has(node.node_id),
+        dimmed: dim(node.node_id),
+        isSelected: node.node_id === selectedTaskId,
       };
+      return { id: node.node_id, type: "task", position: { x: 0, y: 0 }, data };
     });
 
-    const withEdgeDimming = baseEdges.map((edge) => {
-      const dimmed =
-        !!searchQuery &&
-        matchingNodeIds.size > 0 &&
-        !(matchNeighborhood.has(edge.source) || matchNeighborhood.has(edge.target));
-      return {
-        ...edge,
-        style: {
-          ...(edge.style as Record<string, unknown>),
-          opacity: dimmed ? 0.15 : 1,
-        },
-      };
-    });
+    const flowEdges: Edge[] = shown.edges.map((edge, index) => ({
+      id: `edge-${index}`,
+      source: edge.source_id,
+      target: edge.target_id,
+      type: "smoothstep",
+      style: {
+        stroke: EDGE_COLOR,
+        strokeWidth: 1.25,
+        opacity: dim(edge.source_id) || dim(edge.target_id) ? DIM_OPACITY : 1,
+      },
+      markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR, width: 14, height: 14 },
+    }));
 
-    return { nodes: withDecorations, edges: withEdgeDimming };
-  }, [baseNodes, baseEdges, matchingNodeIds, searchQuery, pinnedTask?.nodeId, isTaskFlow]);
+    return { nodes: layout(flowNodes, flowEdges), edges: flowEdges };
+  }, [shown, matches, directInputs, originId, staleInputsByTask, selectedTaskId]);
+
+  const matchIds = useMemo(() => [...matches].sort(), [matches]);
+  const layoutKey = `${view}:${limit}:${shown.nodes.length}`;
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-
-  // Update nodes and edges when data changes (e.g., toggle derived edges)
   useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
-  const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      const apiNode = apiNodes.find((n) => n.node_id === node.id);
-      if (apiNode?.node_type === "activity") {
-        const nodeData = node.data as Record<string, unknown>;
-        const taskId = (nodeData?.taskId as string) || "";
-        const qid = (nodeData.qid as string) || "0";
-        const taskName =
-          typeof nodeData.label === "string" ? (nodeData.label as string) : undefined;
-        setPinnedTask((prev) => {
-          if (prev?.nodeId === node.id) return null;
-          return { taskId, qid, taskName, nodeId: node.id };
-        });
-      }
-    },
-    [apiNodes],
-  );
+  const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (node.type !== "task") return;
+    setSelectedTaskId((current) => (current === node.id ? null : node.id));
+  }, []);
 
-  const visibleCounts = useMemo(() => {
-    const entityCount = initialNodes.filter((n) => n.type === "entity").length;
-    const taskCount = initialNodes.filter((n) => n.type === "activity").length;
-    const failedTasks = initialNodes.filter(
-      (n) => n.type === "activity" && (n.data as Record<string, unknown>)?.status === "failed",
-    ).length;
-    const lowConfidenceParams = initialNodes.filter(
-      (n) => n.type === "entity" && (n.data as Record<string, unknown>)?.lowConfidence,
-    ).length;
-    const staleInputs = initialNodes.filter(
-      (n) => n.type === "entity" && (n.data as Record<string, unknown>)?.hasNewerVersion,
-    ).length;
-    return {
-      entityCount,
-      taskCount,
-      failedTasks,
-      lowConfidenceParams,
-      staleInputs,
-    };
-  }, [initialNodes]);
+  const counts = useMemo(() => {
+    const values = shown.nodes.filter((node) => node.node_type === "entity").length;
+    const tasks = shown.nodes.length - values;
+    const failed = shown.nodes.filter((node) => node.activity?.status === "failed").length;
+    const stale = [...directInputs].filter((id) => {
+      const node = apiNodes.find((candidate) => candidate.node_id === id);
+      return (
+        node?.entity && node.latest_version != null && node.latest_version > node.entity.version
+      );
+    }).length;
+    return { values, tasks, failed, stale };
+  }, [shown.nodes, directInputs, apiNodes]);
 
   if (apiNodes.length === 0) {
     return (
-      <div className="h-[calc(100vh-16rem)] min-h-[500px] flex flex-col items-center justify-center text-base-content/50 bg-base-200 rounded-lg border border-base-300">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-base-100 text-base-content/50">
-          <Network className="h-6 w-6" aria-hidden="true" />
-        </div>
-        <p className="text-sm font-medium">No lineage data</p>
-        <p className="text-sm mt-1">Select a parameter to explore its provenance</p>
-      </div>
+      <p className="flex h-full min-h-[320px] items-center justify-center text-sm text-base-content/60">
+        No lineage is recorded for this value.
+      </p>
     );
   }
 
-  const controlsBody = (
-    <>
-      <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Find parameter/task..."
-          className="input input-bordered input-sm w-full sm:w-56 pointer-events-auto"
-        />
-        {searchQuery && (
-          <button
-            className="btn btn-ghost btn-sm pointer-events-auto"
-            onClick={() => setSearchQuery("")}
-          >
-            Clear
-          </button>
-        )}
-      </div>
-      <div className="flex flex-col sm:flex-row items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-base-content/60 whitespace-nowrap">Focus</div>
-          <input
-            type="range"
-            min={1}
-            max={Math.max(1, Math.min(10, maxDistance || 10))}
-            value={Math.min(focusHops, Math.max(1, Math.min(10, maxDistance || 10)))}
-            onChange={(e) => setFocusHops(Number(e.target.value))}
-            className="range range-xs range-primary w-28 pointer-events-auto"
-            disabled={effectiveShowAll}
-          />
-          <div className="text-xs font-medium tabular-nums w-10 text-right">
-            {effectiveShowAll ? "All" : `${focusHops}h`}
-          </div>
-          <button
-            className={`btn btn-xs pointer-events-auto ${effectiveShowAll ? "btn-primary" : ""}`}
-            onClick={() => setShowAll((v) => !v)}
-          >
-            All
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 ml-2 cursor-pointer pointer-events-auto">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-xs checkbox-primary pointer-events-auto"
-              checked={showDerivedEdges}
-              onChange={(e) => setShowDerivedEdges(e.target.checked)}
-            />
-            <span className="text-xs text-base-content/60">derived</span>
-          </label>
-          <div className="join ml-2">
-            <button
-              className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "full" ? "btn-primary" : ""}`}
-              onClick={() => setViewDetail("full")}
-            >
-              Detail
-            </button>
-            <button
-              className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "taskFlow" ? "btn-primary" : ""}`}
-              onClick={() => setViewDetail("taskFlow")}
-            >
-              Task Flow
-            </button>
-          </div>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-1 sm:gap-2 bg-base-100/90 border border-base-300 rounded-lg px-2 sm:px-3 py-2 shadow-sm w-full sm:w-auto sm:shrink-0">
-        <span className="badge badge-primary badge-sm whitespace-nowrap">
-          {initialNodes.length}/{apiNodes.length} shown
-        </span>
-        <span className="badge badge-ghost badge-sm whitespace-nowrap">
-          params {visibleCounts.entityCount}
-        </span>
-        <span className="badge badge-ghost badge-sm whitespace-nowrap">
-          tasks {visibleCounts.taskCount}
-        </span>
-        {visibleCounts.failedTasks > 0 && (
-          <span className="badge badge-error badge-sm whitespace-nowrap">
-            failed {visibleCounts.failedTasks}
-          </span>
-        )}
-        {visibleCounts.lowConfidenceParams > 0 && (
-          <span className="badge badge-warning badge-sm whitespace-nowrap">
-            uncertain {visibleCounts.lowConfidenceParams}
-          </span>
-        )}
-        {visibleCounts.staleInputs > 0 && (
-          <span className="badge badge-info badge-sm whitespace-nowrap">
-            updated {visibleCounts.staleInputs}
-          </span>
-        )}
-      </div>
-    </>
-  );
+  const depthChoices = DEPTH_CHOICES.filter((choice) => choice < maxDepth);
 
   return (
-    <div className="h-[calc(100vh-16rem)] min-h-[500px] flex bg-base-200 rounded-lg border border-base-300 overflow-hidden">
-      {/* Graph canvas */}
-      <div className="flex-1 relative">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={handleNodeClick}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.3 }}
-          minZoom={0.1}
-          maxZoom={2}
-          defaultEdgeOptions={{
-            type: "smoothstep",
-          }}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background color="currentColor" className="text-base-content/10" gap={20} size={1} />
-          <Controls
-            className="!bg-base-100 !border-base-300 !rounded-lg !shadow"
-            showInteractive={false}
-          />
-          <MiniMap
-            nodeColor={(node) => (node.type === "entity" ? "oklch(var(--p))" : "oklch(var(--s))")}
-            maskColor="rgba(0,0,0,0.1)"
-            className="!bg-base-100/80 !border-base-300 !rounded-lg"
-            pannable
-            zoomable
-          />
-        </ReactFlow>
-
-        {/* Controls — SP: accordion (hidden on sm+) */}
-        <details className="group absolute top-2 left-2 right-2 z-20 pointer-events-auto sm:hidden">
-          <summary className="bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm cursor-pointer select-none list-none text-sm font-medium flex items-center gap-2">
-            <span
-              className="inline-block transition-transform group-open:rotate-90"
-              aria-hidden="true"
+    <div className="flex h-full min-h-[480px] flex-col overflow-hidden rounded-lg border border-base-300">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-base-300 bg-base-100 px-3 py-2 text-xs">
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Find a value or task"
+          aria-label="Find a value or task"
+          className="input input-bordered input-xs w-48"
+        />
+        {originId && maxDepth > 1 && (
+          <label className="flex items-center gap-1.5">
+            <span className="text-base-content/60">Depth</span>
+            <select
+              aria-label="Depth"
+              className="select select-bordered select-xs"
+              value={depth === "all" || depth >= maxDepth ? "all" : depth}
+              onChange={(event) =>
+                setDepth(event.target.value === "all" ? "all" : Number(event.target.value))
+              }
+              disabled={matches.size > 0}
             >
-              ▶
+              {depthChoices.map((choice) => (
+                <option key={choice} value={choice}>
+                  {choice} hop{choice === 1 ? "" : "s"}
+                </option>
+              ))}
+              <option value="all">All ({maxDepth} hops)</option>
+            </select>
+          </label>
+        )}
+        <div className="tabs tabs-boxed bg-base-200" role="tablist" aria-label="Graph view">
+          {(["values", "tasks"] as const).map((choice) => (
+            <button
+              key={choice}
+              type="button"
+              role="tab"
+              aria-selected={view === choice}
+              className={`tab tab-xs ${view === choice ? "tab-active" : ""}`}
+              onClick={() => setView(choice)}
+            >
+              {choice === "values" ? "Values and tasks" : "Tasks only"}
+            </button>
+          ))}
+        </div>
+        <p className="ml-auto text-base-content/60">
+          {shown.nodes.length} of {apiNodes.length} nodes
+          {view === "values" ? `, ${counts.values} values and ${counts.tasks} tasks` : ""}
+          {counts.failed > 0 && <span className="text-error">, {counts.failed} failed</span>}
+          {counts.stale > 0 && (
+            <span className="text-warning">
+              , {counts.stale} input{counts.stale === 1 ? "" : "s"} updated since
             </span>
-            Controls
-          </summary>
-          <div className="flex flex-col gap-2 items-start mt-2">{controlsBody}</div>
-        </details>
-        {/* Controls — PC: always visible (hidden below sm) */}
-        <div className="hidden sm:flex sm:flex-row sm:flex-wrap gap-2 items-center absolute top-4 left-4 right-4 z-20 pointer-events-none">
-          {controlsBody}
-        </div>
-
-        {/* Legend */}
-        <div className="absolute bottom-4 left-4 bg-base-100 p-3 rounded-lg shadow border border-base-300 text-xs">
-          <div className="font-medium mb-2">Legend</div>
-          <div className="flex gap-4">
-            {viewDetail === "full" && (
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-primary/20 border border-primary/50" />
-                <span className="text-base-content/70">Parameter</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-secondary/20 border border-secondary/50" />
-              <span className="text-base-content/70">Task</span>
-            </div>
-          </div>
-          {viewDetail === "full" ? (
-            <>
-              <div className="flex gap-4 mt-2 pt-2 border-t border-base-300">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-4 h-0.5 bg-green-500 rounded" />
-                  <span className="text-base-content/60">generated</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-4 h-0.5 bg-amber-500 rounded" />
-                  <span className="text-base-content/60">used</span>
-                </div>
-              </div>
-              <div className="flex gap-4 mt-2 pt-2 border-t border-base-300">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-4 h-0.5 bg-blue-500 rounded" />
-                  <span className="text-base-content/60">derived</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="px-1.5 py-0.5 rounded bg-info/10 text-info text-xs font-mono leading-none">
-                    v1→v2
-                  </div>
-                  <span className="text-base-content/60">newer available</span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-base-300">
-              <div className="w-4 h-0.5 bg-fuchsia-500 rounded" />
-              <span className="text-base-content/60">task flow</span>
-            </div>
           )}
-        </div>
+          . Arrows point from a result to what it came from.
+        </p>
       </div>
 
-      {/* Task Detail Panel */}
-      {pinnedTask && (
-        <TaskDetailPanel
-          activityNodeId={pinnedTask.nodeId}
-          nodes={apiNodes}
-          edges={apiEdges}
-          onClose={() => setPinnedTask(null)}
-        />
-      )}
+      <div className="flex min-h-0 flex-1">
+        <div className="relative min-w-0 flex-1 bg-base-200/60">
+          <ReactFlowProvider>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onNodeClick={handleNodeClick}
+              nodeTypes={nodeTypes}
+              fitView
+              fitViewOptions={{ padding: FIT_PADDING }}
+              minZoom={0.1}
+              maxZoom={2}
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background color="currentColor" className="text-base-content/10" gap={20} size={1} />
+              <Controls
+                className="!rounded-lg !border-base-300 !bg-base-100 !shadow-none"
+                showInteractive={false}
+              />
+              <ViewportFitter
+                layoutKey={layoutKey}
+                focusIds={matchIds}
+                panelOpen={selectedTaskId !== null}
+              />
+            </ReactFlow>
+          </ReactFlowProvider>
+        </div>
+        {selectedTaskId && (
+          <TaskDetailPanel
+            activityNodeId={selectedTaskId}
+            nodes={apiNodes}
+            edges={apiEdges}
+            onClose={() => setSelectedTaskId(null)}
+          />
+        )}
+      </div>
     </div>
   );
 }
