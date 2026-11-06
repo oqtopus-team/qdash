@@ -43,6 +43,8 @@ class OneQubitConfig:
     simultaneous_spectroscopy_schedule_mode: str = "local_index"
     continue_on_failure: bool = False
     stop_on_failure_tasks: tuple[str, ...] = ()
+    # Effective settings for this step; None falls back to service-wide settings.
+    task_parameters: dict[str, dict[str, Any]] | None = None
 
 
 # =============================================================================
@@ -88,6 +90,18 @@ class OneQubitStrategy(ABC):
             return qids
         allowed_set = set(allowed_qids)
         return [qid for qid in qids if qid in allowed_set]
+
+    @staticmethod
+    def _task_parameters(
+        cal_service: CalibService,
+        config: OneQubitConfig,
+    ) -> dict[str, dict[str, Any]]:
+        """Return step-local settings when supplied, otherwise service settings."""
+        return (
+            config.task_parameters
+            if config.task_parameters is not None
+            else cal_service.task_parameters
+        )
 
 
 # =============================================================================
@@ -170,7 +184,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
             "muxes": None,
             "execution_id": cal_service.execution_id,
             "default_run_parameters": cal_service.default_run_parameters,
-            "task_parameters": cal_service.task_parameters,
+            "task_parameters": self._task_parameters(cal_service, config),
             "configuration_mode": getattr(cal_service, "configuration_mode", None),
             "tags": cal_service.tags,
             "flow_name": cal_service.flow_name,
@@ -257,7 +271,7 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             "muxes": None,
             "execution_id": cal_service.execution_id,
             "default_run_parameters": cal_service.default_run_parameters,
-            "task_parameters": cal_service.task_parameters,
+            "task_parameters": self._task_parameters(cal_service, config),
             "configuration_mode": getattr(cal_service, "configuration_mode", None),
             "tags": cal_service.tags,
             "flow_name": cal_service.flow_name,
@@ -324,6 +338,7 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
             schedule,
             tasks=config.tasks,
             allowed_qids=config.qids,
+            task_parameters=config.task_parameters,
         )
 
         # Match the per-qubit status supplied by the other strategies so a
@@ -382,15 +397,17 @@ class OneQubitSerialStrategy(OneQubitStrategy):
         all_results = {}
         for mux_group in all_mux_groups:
             # Execute single MUX group (no parallelism)
+            execution_options: dict[str, Any] = {}
             if config.continue_on_failure:
-                result = _calibrate_mux_qubits(
-                    qids=mux_group,
-                    tasks=config.tasks,
-                    continue_on_failure=True,
-                    stop_on_failure_tasks=config.stop_on_failure_tasks,
-                )
-            else:
-                result = _calibrate_mux_qubits(qids=mux_group, tasks=config.tasks)
+                execution_options["continue_on_failure"] = True
+                execution_options["stop_on_failure_tasks"] = config.stop_on_failure_tasks
+            if config.task_parameters is not None:
+                execution_options["task_parameters"] = config.task_parameters
+            result = _calibrate_mux_qubits(
+                qids=mux_group,
+                tasks=config.tasks,
+                **execution_options,
+            )
             all_results.update(result)
 
         cal_service.record_stage_result("1q_serial", all_results)
