@@ -7,6 +7,7 @@ import { ExecutionDAG } from "@/components/features/execution/ExecutionDAG";
 
 const mocks = vi.hoisted(() => ({
   capturedProps: null as Record<string, unknown> | null,
+  capturedControlsProps: null as Record<string, unknown> | null,
   fitView: vi.fn(),
 }));
 
@@ -38,19 +39,22 @@ vi.mock("@xyflow/react", () => {
       );
     },
     Background: () => null,
-    Controls: ({
-      onInteractiveChange,
-    }: {
+    Controls: (props: {
       onInteractiveChange?: (interactive: boolean) => void;
-    }) => (
-      <button
-        type="button"
-        data-testid="controls-interactive"
-        onClick={() => onInteractiveChange?.(true)}
-      >
-        toggle-lock
-      </button>
-    ),
+      [key: string]: unknown;
+    }) => {
+      mocks.capturedControlsProps = props;
+      const interactive = mocks.capturedProps?.zoomOnScroll === true;
+      return (
+        <button
+          type="button"
+          data-testid="controls-interactive"
+          onClick={() => props.onInteractiveChange?.(!interactive)}
+        >
+          toggle-lock
+        </button>
+      );
+    },
     Handle: () => null,
     Position: { Left: "left", Right: "right" },
     ReactFlowProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -124,14 +128,46 @@ const tasks = [
 afterEach(() => {
   cleanup();
   mocks.capturedProps = null;
+  mocks.capturedControlsProps = null;
   mocks.fitView.mockClear();
 });
 
 describe("ExecutionDAG lock control", () => {
-  it("starts locked with pan/zoom and dragging disabled", () => {
+  it("starts unlocked with pan/zoom and dragging enabled", () => {
     render(<ExecutionDAG tasks={tasks} />);
 
     expect(screen.getByTestId("controls-interactive")).toBeTruthy();
+    expect(mocks.capturedProps).toMatchObject({
+      zoomOnScroll: true,
+      panOnScroll: false,
+      panOnDrag: true,
+      zoomOnPinch: true,
+      zoomOnDoubleClick: true,
+      preventScrolling: true,
+      nodesDraggable: true,
+      nodesConnectable: false,
+      elementsSelectable: true,
+    });
+    expect(mocks.capturedControlsProps).toMatchObject({
+      showInteractive: true,
+      showZoom: true,
+      showFitView: true,
+      fitViewOptions: { padding: 0.05, minZoom: 0.1, maxZoom: 1.5 },
+    });
+  });
+
+  it("locks pan/zoom and dragging when the lock control is toggled", () => {
+    render(<ExecutionDAG tasks={tasks} />);
+    mocks.fitView.mockClear();
+
+    fireEvent.click(screen.getByTestId("controls-interactive"));
+
+    expect(mocks.fitView).toHaveBeenCalledWith({
+      padding: 0.05,
+      minZoom: 0.1,
+      maxZoom: 1.5,
+      duration: 0,
+    });
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: false,
       panOnScroll: false,
@@ -143,22 +179,32 @@ describe("ExecutionDAG lock control", () => {
       nodesConnectable: false,
       elementsSelectable: false,
     });
+    expect(mocks.capturedControlsProps).toMatchObject({
+      showInteractive: true,
+      showZoom: false,
+      showFitView: false,
+    });
   });
 
-  it("unlocks pan/zoom and dragging when the lock control is toggled", () => {
+  it("restores pan/zoom and the Controls buttons when unlocked again", () => {
     render(<ExecutionDAG tasks={tasks} />);
 
     fireEvent.click(screen.getByTestId("controls-interactive"));
+    expect(mocks.capturedControlsProps).toMatchObject({ showZoom: false, showFitView: false });
+    mocks.fitView.mockClear();
 
+    fireEvent.click(screen.getByTestId("controls-interactive"));
+
+    expect(mocks.fitView).not.toHaveBeenCalled();
+    expect(mocks.capturedControlsProps).toMatchObject({
+      showInteractive: true,
+      showZoom: true,
+      showFitView: true,
+    });
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: true,
-      panOnScroll: false,
       panOnDrag: true,
-      zoomOnPinch: true,
-      zoomOnDoubleClick: true,
-      preventScrolling: true,
       nodesDraggable: true,
-      nodesConnectable: false,
       elementsSelectable: true,
     });
   });

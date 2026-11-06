@@ -12,6 +12,7 @@ import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { pickColor } from "@/lib/utils/color-scale";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
@@ -123,7 +124,7 @@ export function CouplingMetricsGrid({
   const [isDirectionReversed, setIsDirectionReversed] = useState(false);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
 
   // Region tab is only available for square grids; fall back to pan-zoom otherwise.
   useEffect(() => {
@@ -133,6 +134,7 @@ export function CouplingMetricsGrid({
   }, [isSquareGrid, viewMode]);
 
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -648,6 +650,7 @@ export function CouplingMetricsGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",
