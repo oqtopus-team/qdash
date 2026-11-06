@@ -9,6 +9,7 @@ import type { ReExecutionEntry } from './reExecutionEntry';
 import type { TaskResultResponseElapsedTime } from './taskResultResponseElapsedTime';
 import type { TaskResultResponseEndAt } from './taskResultResponseEndAt';
 import type { TaskResultResponseInputParameters } from './taskResultResponseInputParameters';
+import type { TaskResultResponseInvocation } from './taskResultResponseInvocation';
 import type { TaskResultResponseNote } from './taskResultResponseNote';
 import type { TaskResultResponseOutputParameters } from './taskResultResponseOutputParameters';
 import type { TaskResultResponseRunParameters } from './taskResultResponseRunParameters';
@@ -56,6 +57,8 @@ export interface TaskResultResponse {
   output_parameters: TaskResultResponseOutputParameters;
   output_parameter_names?: string[];
   run_parameters?: TaskResultResponseRunParameters;
+  /** Planned step and call this result executed; null for older results. */
+  invocation?: TaskResultResponseInvocation;
   note?: TaskResultResponseNote;
   tags?: string[];
   message?: string;

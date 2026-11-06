@@ -7248,7 +7248,7 @@
           "task-result"
         ],
         "summary": "List task results",
-        "description": "List task results for cross-task investigation.",
+        "description": "List task results for cross-task investigation.\n\n``step_id`` and ``call_id`` return the results of one planned call, so two\ncalls of the same task in one step can be read separately.",
         "operationId": "listTaskResults",
         "security": [
           {
@@ -7419,6 +7419,42 @@
               "title": "Message Contains"
             },
             "description": "Case-insensitive message search"
+          },
+          {
+            "name": "step_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Planned step id filter (invocation.step_id)",
+              "title": "Step Id"
+            },
+            "description": "Planned step id filter (invocation.step_id)"
+          },
+          {
+            "name": "call_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Planned call id filter (invocation.call_id)",
+              "title": "Call Id"
+            },
+            "description": "Planned call id filter (invocation.call_id)"
           },
           {
             "name": "skip",
@@ -27309,6 +27345,18 @@
             "type": "string",
             "title": "Name"
           },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id",
+            "description": "Plan-scoped step id; null for transforms and older runs"
+          },
           "type": {
             "type": "string",
             "title": "Type",
@@ -29950,6 +29998,17 @@
             ],
             "title": "Task Type"
           },
+          "invocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskInvocation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Planned step and call this result executed; null for older results."
+          },
           "default_view": {
             "type": "boolean",
             "title": "Default View",
@@ -30126,6 +30185,58 @@
         ],
         "title": "TaskInfo",
         "description": "Task information extracted from Python file."
+      },
+      "TaskInvocation": {
+        "properties": {
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id",
+            "description": "Plan-scoped step identifier."
+          },
+          "call_id": {
+            "type": "string",
+            "title": "Call Id",
+            "description": "Step-scoped call identifier."
+          },
+          "plan_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Digest",
+            "description": "Version of the validated plan."
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settings",
+            "description": "Effective call settings: run, input, update policy."
+          }
+        },
+        "type": "object",
+        "required": [
+          "call_id"
+        ],
+        "title": "TaskInvocation",
+        "description": "The plan identity of one task result.\n\n``step_id`` and ``call_id`` name the planned call; ``task_id`` on the task\nresult stays the runtime identity of this one execution on one target.\n``plan_digest`` identifies the validated plan version the call belongs to.\n``settings`` is the call's effective task settings (the call's own settings\nover the workflow's per-task defaults) as the worker resolved them; the task\nresult's run and input parameter snapshots remain the runtime source of truth.\nResults recorded before task calls existed have no invocation."
       },
       "TaskKnowledgeResponse": {
         "properties": {
@@ -30806,6 +30917,17 @@
             ],
             "title": "Task Type"
           },
+          "invocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskInvocation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Planned step and call this result executed; null for older results."
+          },
           "default_view": {
             "type": "boolean",
             "title": "Default View",
@@ -30957,6 +31079,17 @@
               }
             ],
             "title": "Source Task Id"
+          },
+          "invocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskInvocation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Planned step and call this result executed; null for older results."
           },
           "start_at": {
             "anyOf": [
@@ -31383,6 +31516,17 @@
             "type": "object",
             "title": "Run Parameters",
             "default": {}
+          },
+          "invocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskInvocation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Planned step and call this result executed; null for older results."
           },
           "note": {
             "additionalProperties": true,

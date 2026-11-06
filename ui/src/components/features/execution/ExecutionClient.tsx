@@ -20,6 +20,7 @@ import { useGetExecution, useCancelExecution } from "@/client/execution/executio
 import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
+import { distinctCallId } from "@/components/features/execution/executionTopologyTasks";
 import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
@@ -190,7 +191,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     return execution.task
       .filter((task) => task.task_id)
       .map((task) => {
-        const taskName = task.name || "Unnamed Task";
+        const callId = distinctCallId(task);
+        const taskName = `${task.name || "Unnamed Task"}${callId ? ` (${callId})` : ""}`;
         const displayName = task.qid ? `${task.qid}-${taskName}` : taskName;
         return {
           task_id: task.task_id as string,
