@@ -76,6 +76,7 @@ EF_CALIBRATION_TASKS: list[str] = [
 ]
 
 EF_CHARACTERIZATION_TASKS: list[str] = [
+    "CheckGEFRelaxation",
     "CheckThermalExcitation",
     "CheckReadoutMIST",
     "CheckAdaptiveFHChevron",
@@ -146,9 +147,14 @@ def characterization(
     if run_coupling_characterization:
         enabled_tasks.extend(COUPLING_CHARACTERIZATION_TASKS)
 
-    # FH Chevron requires the GE/EF/FH layout. GE and JAZZ remain available in it,
-    # so the full workflow can keep one configuration from start to finish.
-    configuration_mode = "ge-ef-fh" if "CheckAdaptiveFHChevron" in enabled_tasks else "ge-cr-cr"
+    # FH Chevron requires the GE/EF/FH layout. Other EF measurements use the
+    # GE/EF/CR layout, while a flow without EF can use the GE/CR/CR layout.
+    if "CheckAdaptiveFHChevron" in enabled_tasks:
+        configuration_mode = "ge-ef-fh"
+    elif run_ef_characterization:
+        configuration_mode = "ge-ef-cr"
+    else:
+        configuration_mode = "ge-cr-cr"
 
     # Configure the selected MUXes once; isolated workers inherit the same logical layout.
     steps: list[Step] = [
@@ -361,6 +367,14 @@ def _build_task_parameters(configuration_mode: str) -> dict[str, dict[str, Any]]
             "run": {"shots": 2048, "interval": LONG_INTERVAL},
         },
         # EF characterization
+        "CheckGEFRelaxation": {
+            "run": {
+                "time_range": sweep.logspace(math.log10(200), math.log10(200_000), 18),
+                "shots": 4096,
+                "calibration_shots": 8192,
+                "interval": LONG_INTERVAL,
+            },
+        },
         "CheckThermalExcitation": {
             "run": {"shots": 256 * 1024, "interval": LONG_INTERVAL},
         },

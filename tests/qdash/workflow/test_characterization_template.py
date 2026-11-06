@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +62,7 @@ def test_characterization_builds_full_pipeline_in_dependency_order() -> None:
     assert steps[4].stop_on_failure_tasks == ()
     assert steps[5].tasks == characterization_module.EF_CALIBRATION_TASKS
     assert steps[7].tasks == characterization_module.EF_CHARACTERIZATION_TASKS
+    assert steps[7].tasks[0] == "CheckGEFRelaxation"
     assert steps[7].continue_on_failure is True
     assert steps[7].stop_on_failure_tasks == ()
     assert steps[8].tasks == ["CheckCouplingStrength"]
@@ -97,6 +99,30 @@ def test_ge_only_characterization_uses_ge_configuration() -> None:
     assert (
         result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
         == result["kwargs"]["configuration_mode"]
+    )
+
+
+def test_ef_characterization_without_fh_chevron_uses_ef_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        characterization_module,
+        "EF_CHARACTERIZATION_TASKS",
+        ["CheckGEFRelaxation", "CheckThermalExcitation", "CheckReadoutMIST"],
+    )
+
+    result = characterization_module.characterization(
+        username="alice",
+        chip_id="64Q",
+        qids=["0"],
+        run_ge_characterization=False,
+        run_coupling_characterization=False,
+    )
+
+    assert result["kwargs"]["configuration_mode"] == "ge-ef-cr"
+    assert (
+        result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
+        == "ge-ef-cr"
     )
 
 
@@ -190,6 +216,11 @@ def test_characterization_exposes_primary_task_parameters() -> None:
         == characterization_module.LONG_INTERVAL
     )
     assert parameters["CheckThermalExcitation"]["run"]["shots"] > 0
+    gef_time_range = parameters["CheckGEFRelaxation"]["run"]["time_range"]
+    assert gef_time_range.value_type == "np.logspace"
+    assert gef_time_range.arguments == (math.log10(200), math.log10(200_000), 18)
+    assert parameters["CheckGEFRelaxation"]["run"]["shots"] == 4096
+    assert parameters["CheckGEFRelaxation"]["run"]["calibration_shots"] == 8192
 
 
 def test_characterization_task_parameters_match_task_specs() -> None:
