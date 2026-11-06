@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.steps.one_qubit import CustomOneQubit
 
 if TYPE_CHECKING:
@@ -34,7 +35,7 @@ def test_custom_one_qubit_direct_targets_reuse_step_execution(monkeypatch) -> No
         note={},
         record_stage_result=MagicMock(),
     )
-    step = CustomOneQubit(step_name="simple_tasks", tasks=["CheckRabi"])
+    step = CustomOneQubit(step_name="simple_tasks", tasks=[TaskCall(name="CheckRabi")])
     result = step._execute_direct(cast("CalibService", service), ["1"])
 
     assert result == {"direct": {"1": {"status": "success"}}}
@@ -42,6 +43,7 @@ def test_custom_one_qubit_direct_targets_reuse_step_execution(monkeypatch) -> No
     assert config["execution_id"] == "exec-step"
     assert config["tags"] == []
     assert config["flow_name"] == "simple_tasks"
+    assert run.call_args.kwargs["plan"].step_id == "simple_tasks"
     service.record_stage_result.assert_called_once_with("simple_tasks", result)
     init.assert_not_called()
     finish.assert_not_called()
@@ -76,10 +78,9 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
     )
     step = CustomOneQubit(
         step_name="simple_tasks",
-        tasks=["Configure", "CheckRabi"],
+        tasks=[TaskCall(name="Configure", on_failure="stop"), TaskCall(name="CheckRabi")],
         mode="scheduled",
         continue_on_failure=True,
-        stop_on_failure_tasks=("Configure",),
     )
 
     step.execute(cast("CalibService", service), QubitTargets(["1", "4"]), StepContext())
@@ -89,8 +90,8 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
     assert calls[0].qids == ["1", "4"]
     assert calls[0].tasks == ["Configure", "CheckRabi"]
     assert calls[0].flow_name == "simple_calibration_simple_tasks"
-    assert calls[0].continue_on_failure is True
-    assert calls[0].stop_on_failure_tasks == ("Configure",)
+    assert calls[0].plan.continue_on_failure is True
+    assert [call.on_failure for call in calls[0].plan.calls] == ["stop", None]
 
 
 def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> None:
@@ -121,7 +122,7 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
         flow_name="one_qubit",
         note={},
     )
-    step = OneQubitCheck(mode="synchronized", tasks=["CheckRabi"])
+    step = OneQubitCheck(mode="synchronized", tasks=[TaskCall(name="CheckRabi")])
 
     step.execute(cast("CalibService", service), QubitTargets(["2", "5"]), StepContext())
 

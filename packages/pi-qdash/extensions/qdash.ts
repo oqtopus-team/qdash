@@ -613,7 +613,7 @@ async function buildDashboard(params: { profile?: string; configPath?: string; u
     failedTaskResults: {
       count: payloadTotal(failedTasksPayload),
       shown: arrayFromPayload(failedTasksPayload).length,
-      items: compactItems(failedTasksPayload, ["task_id", "task_name", "status", "qid", "coupling_id", "start_at", "created_at"], limit),
+      items: compactItems(failedTasksPayload, ["task_id", "task_name", "invocation", "status", "qid", "coupling_id", "start_at", "created_at"], limit),
       raw: failedTasksPayload,
     },
     provenanceStats: value(provenanceStats),

@@ -33,6 +33,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -47,14 +48,14 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import QubitTargets
 
-TWO_QUBIT_TASKS: list[str] = [
-    "CheckCrossResonance",
-    "CreateZX90",
-    "CheckZX90",
-    "CheckBellState",
-    "CheckBellStateTomography",
-    "Check2QGateCoherenceLimit",
-    "ZX90InterleavedRandomizedBenchmarking",
+TWO_QUBIT_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckCrossResonance"),
+    TaskCall(name="CreateZX90"),
+    TaskCall(name="CheckZX90"),
+    TaskCall(name="CheckBellState"),
+    TaskCall(name="CheckBellStateTomography"),
+    TaskCall(name="Check2QGateCoherenceLimit"),
+    TaskCall(name="ZX90InterleavedRandomizedBenchmarking"),
 ]
 
 
@@ -67,7 +68,7 @@ def two_qubit(
     username: str,
     chip_id: str,
     qids: list[str] | None = None,
-    tasks: list[str] | None = None,
+    tasks: list[TaskCall] | None = None,
     inverse: bool = False,
     max_parallel_ops: int = 10,
     tags: list[str] | None = None,
@@ -128,7 +129,7 @@ def two_qubit(
             username="alice",
             chip_id="64Qv3",
             qids=["0", "1", "4", "5"],
-            tasks=["CheckCrossResonance", "CreateZX90", "CheckZX90"],
+            tasks=[TaskCall(name="CheckCrossResonance"), TaskCall(name="CreateZX90"), TaskCall(name="CheckZX90")],
         )
 
         # Limit parallel operations

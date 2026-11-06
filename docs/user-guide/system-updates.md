@@ -88,6 +88,28 @@ Use the ports from `.env` if the deployment overrides the defaults. Follow servi
 described in [Operations](./operations.md#inspect-logs) when a container is unhealthy or a page is
 unavailable.
 
+## Check Saved Workflows
+
+Workflows saved before task calls list tasks by name and stop before they measure on a release
+that requires task calls. List the saved workflows that need a change after the update:
+
+```bash
+docker compose exec api python -m qdash.common.migration.task_calls /app/qdash/workflow/user_flows
+```
+
+The report names each file and line, marks what can be converted automatically, and what needs a
+manual edit. To get converted copies without changing the saved workflows, write them to a
+directory in the container and copy it out:
+
+```bash
+docker compose exec api python -m qdash.common.migration.task_calls /app/qdash/workflow/user_flows --write-to /tmp/converted-flows
+docker compose cp api:/tmp/converted-flows ./converted-flows
+```
+
+Review each copy, rename any generated call IDs such as `CheckRabi_2`, and paste the change into
+the workflow in the editor. The command reads the files only; it never runs a workflow. How to
+edit a workflow by hand: [Update a flow saved before task calls](./creating-workflows.md#update-a-flow-saved-before-task-calls).
+
 ## Recover from a Failed Update
 
 Follow the target release notes when deployment fails after stored data changes. Moving the Git

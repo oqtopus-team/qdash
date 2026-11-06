@@ -20,6 +20,7 @@ from pydantic import (
 
 from qdash.common.utils.datetime import format_elapsed_time, format_iso, now, parse_elapsed_time
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.datamodel.task_invocation import TaskInvocation
 
 SCHDULED = "scheduled"
 RUNNING = "running"
@@ -638,6 +639,10 @@ class BaseTaskResultModel(BaseModel):
     elapsed_time: timedelta | None = None
     task_type: str = "global"
     system_info: SystemInfoModel = SystemInfoModel()
+    invocation: TaskInvocation | None = Field(
+        default=None,
+        description="Planned step and call this result executed; None outside a step.",
+    )
 
     @field_validator("elapsed_time", mode="before")
     @classmethod

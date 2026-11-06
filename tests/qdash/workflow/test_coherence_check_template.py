@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,7 @@ from qdash.workflow.calibtasks.qubex import CheckChevron
 from qdash.workflow.engine.task_parameters import normalize_task_parameters
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.task_call_helpers import names
 
 coherence_check_module = importlib.import_module("qdash.workflow.templates.coherence_check")
 
@@ -39,12 +41,12 @@ def test_coherence_check_runs_expected_tasks_in_order() -> None:
         qids=["0"],
     )
 
-    assert len(result["steps"]) == 1
-    step = result["steps"][0]
-    assert isinstance(step, CustomOneQubit)
-    assert step.name == "coherence_check"
-    assert step.mode == "synchronized"
-    assert step.tasks == [
+    assert len(result["steps"]) == 2
+    first_step, second_step = result["steps"]
+    assert isinstance(first_step, CustomOneQubit)
+    assert first_step.name == "coherence_check"
+    assert first_step.mode == "synchronized"
+    assert names(first_step.tasks) == [
         "Configure",
         "CheckChevron",
         "CheckRabi",
@@ -52,6 +54,46 @@ def test_coherence_check_runs_expected_tasks_in_order() -> None:
         "CheckT2Echo",
         "CheckRamsey",
     ]
+    # The second pass keeps its own Configure/Rabi measurement before the long Ramsey.
+    assert isinstance(second_step, CustomOneQubit)
+    assert second_step.name == "long_ramsey_check"
+    assert second_step.mode == "synchronized"
+    assert names(second_step.tasks) == ["Configure", "CheckRabi", "CheckRamsey"]
+
+
+def test_coherence_check_scales_second_ramsey_range_and_detuning_on_its_call() -> None:
+    result = coherence_check_module.coherence_check(
+        username="alice",
+        chip_id="64Q",
+        qids=["0"],
+    )
+
+    second_ramsey = result["steps"][1].tasks[-1]
+    assert second_ramsey.call_id == "ramsey_long"
+    assert second_ramsey.run == {
+        "time_range": {"value": (0, 50_001, 500), "value_type": "np.arange"},
+        "detuning": {"value": 0.0002},
+    }
+    # The call's settings override the per-task defaults only for this call.
+    defaults = normalize_task_parameters(result["kwargs"]["task_parameters"])
+    effective = second_ramsey.effective_settings(defaults)
+    assert effective["run"]["detuning"] == {"value": 0.0002}
+    assert defaults["CheckRamsey"]["run"]["detuning"] == {"value": 0.001}
+    first_ramsey = result["steps"][0].tasks[-1]
+    assert first_ramsey.effective_settings(defaults)["run"]["detuning"] == {"value": 0.001}
+
+
+def test_coherence_check_uses_explicit_shared_run_defaults() -> None:
+    result = coherence_check_module.coherence_check(
+        username="alice",
+        chip_id="64Q",
+        qids=["0"],
+    )
+
+    assert result["kwargs"]["default_run_parameters"] == {
+        "readout_duration": 1024,
+        "interval": 256 * 1024,
+    }
 
 
 def test_coherence_check_uses_explicit_chevron_settings_without_updating_calibration() -> None:
@@ -69,6 +111,22 @@ def test_coherence_check_uses_explicit_chevron_settings_without_updating_calibra
                 "shots": 256,
             },
             "update_calibration_parameters": False,
+        },
+        "CheckT1": {
+            "run": {
+                "time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51),
+            },
+        },
+        "CheckT2Echo": {
+            "run": {
+                "time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51),
+            },
+        },
+        "CheckRamsey": {
+            "run": {
+                "time_range": sweep.arange(0, 10_001, 100),
+                "detuning": 0.001,
+            },
         },
     }
     chevron_settings = normalize_task_parameters(result["kwargs"]["task_parameters"])[

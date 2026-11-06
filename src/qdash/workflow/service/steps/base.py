@@ -6,8 +6,10 @@ This module defines the abstract base classes for all step types.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+
+from qdash.datamodel.task_call import StepCalls, TaskCall
 
 if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
@@ -83,7 +85,38 @@ class CalibrationStep(Step):
     supplied session without creating additional execution history entries.
 
     Examples: OneQubitCheck, OneQubitFineTune, TwoQubitCalibration
+
+    A calibration step that runs tasks lists them as ``TaskCall`` entries and
+    exposes them through :meth:`calls`. ``step_id`` names the step in the plan;
+    it defaults to the step's name and must be unique within a pipeline, so set
+    it when a pipeline runs the same step type twice.
     """
+
+    step_id: str | None = field(default=None, kw_only=True)
+
+    @property
+    def resolved_step_id(self) -> str:
+        """Plan-scoped identifier of this step; filters reference it."""
+        return self.step_id or self.name
+
+    def calls(self) -> tuple[TaskCall, ...]:
+        """The normalized calls the step runs on each target, in order."""
+        return ()
+
+    @property
+    def continue_on_failure(self) -> bool:
+        """Default for calls without on_failure: run a target's later calls after a failure."""
+        return False
+
+    def step_calls(self, service: CalibService) -> StepCalls:
+        """The calls with step identity and failure policy, as workers receive them."""
+        digest = getattr(service, "plan_digest", None)
+        return StepCalls(
+            step_id=self.resolved_step_id,
+            calls=self.calls(),
+            continue_on_failure=self.continue_on_failure,
+            plan_digest=digest if isinstance(digest, str) else None,
+        )
 
 
 @dataclass
