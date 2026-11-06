@@ -15,6 +15,8 @@ from qdash.common.config.backend import get_tasks
 from qdash.workflow.calibtasks.base import BaseTask
 from qdash.workflow.templates.fake_backend import FAKE_CALIBRATION_TASKS
 
+FAKE_CALIBRATION_TASK_NAMES = [call.name for call in FAKE_CALIBRATION_TASKS]
+
 if TYPE_CHECKING:
     from qdash.datamodel.task import InputParameterSpec
 
@@ -53,8 +55,8 @@ def test_fake_only_tasks_are_listed_for_the_fake_backend() -> None:
 
 
 def test_template_default_chain_is_available_on_the_fake_backend() -> None:
-    assert set(FAKE_CALIBRATION_TASKS) <= set(get_tasks("fake"))
-    assert FAKE_CALIBRATION_TASKS[0] == "FakeBringUp"
+    assert set(FAKE_CALIBRATION_TASK_NAMES) <= set(get_tasks("fake"))
+    assert FAKE_CALIBRATION_TASK_NAMES[0] == "FakeBringUp"
 
 
 def test_default_chain_resolves_every_required_input_from_earlier_tasks() -> None:
@@ -62,14 +64,14 @@ def test_default_chain_resolves_every_required_input_from_earlier_tasks() -> Non
     the outputs of the tasks before it (through the declared aliases and fallbacks)."""
     fake, _ = _registries()
     available: set[str] = set()
-    for task_name in FAKE_CALIBRATION_TASKS:
+    for task_name in FAKE_CALIBRATION_TASK_NAMES:
         task_cls = fake[task_name]
         for key, spec in task_cls.input_spec.items():
             if spec.resolution != "database_required":
                 continue
             assert _required_names(spec, key) & available, (
                 f"{task_name} requires '{key}', which no earlier task in "
-                f"{FAKE_CALIBRATION_TASKS} produces"
+                f"{FAKE_CALIBRATION_TASK_NAMES} produces"
             )
         available |= set(task_cls.output_spec)
 
@@ -77,7 +79,7 @@ def test_default_chain_resolves_every_required_input_from_earlier_tasks() -> Non
 def test_bring_up_seeds_what_the_first_qubex_task_requires() -> None:
     fake, _ = _registries()
     seeded = set(fake["FakeBringUp"].output_spec)
-    first_qubex = fake[FAKE_CALIBRATION_TASKS[1]]
+    first_qubex = fake[FAKE_CALIBRATION_TASK_NAMES[1]]
     for key, spec in first_qubex.input_spec.items():
         if spec.resolution == "database_required":
             assert _required_names(spec, key) & seeded, f"FakeBringUp does not seed '{key}'"

@@ -11,6 +11,7 @@ import pytest
 
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.task_call_helpers import names
 
 ef_calibration_module = importlib.import_module("qdash.workflow.templates.ef_calibration")
 
@@ -41,7 +42,7 @@ def test_ef_calibration_runs_expected_tasks_in_one_synchronized_step() -> None:
     assert isinstance(step, CustomOneQubit)
     assert step.name == "ef_calibration"
     assert step.mode == "synchronized"
-    assert step.tasks == [
+    assert names(step.tasks) == [
         "ConfigureEF",
         "CheckRabi",
         "CreateHPIPulse",

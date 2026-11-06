@@ -5,6 +5,8 @@ from typing import Any
 
 import pytest
 
+from tests.qdash.workflow.task_call_helpers import names
+
 check_waveform_module = importlib.import_module("qdash.workflow.templates.check_waveform")
 
 
@@ -31,7 +33,7 @@ def test_check_waveform_template_runs_check_waveform_step(monkeypatch) -> None:
 
     step = result["steps"][0]
     assert step.name == "check_waveform"
-    assert step.tasks == ["CheckWaveform"]
+    assert names(step.tasks) == ["CheckWaveform"]
     assert step.mode == "scheduled"
 
 

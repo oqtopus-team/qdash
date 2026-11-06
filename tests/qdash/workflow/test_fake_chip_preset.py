@@ -235,16 +235,16 @@ def test_fake_chip_runs_bring_up_and_the_fake_calibration_chain(
     assert isinstance(exp, FakeExperiment)
     assert Path(exp.config_path) == fake_deployment / CHIP_ID / "config"
 
-    for task_name in FAKE_CALIBRATION_TASKS:
+    for call in FAKE_CALIBRATION_TASKS:
         for qid in qids:
-            service.execute_task(task_name, qid)
+            service.execute_task(call.name, qid, parameters=call.settings())
     service.finish_calibration()
 
     results = list(
         TaskResultHistoryDocument.find({"project_id": PROJECT_ID, "chip_id": CHIP_ID}).run()
     )
     by_task = {(result.name, result.qid): result for result in results}
-    for task_name in FAKE_CALIBRATION_TASKS:
+    for task_name in (call.name for call in FAKE_CALIBRATION_TASKS):
         for qid in qids:
             result = by_task[(task_name, qid)]
             assert result.status == "completed", (task_name, qid, result.message)
@@ -369,10 +369,11 @@ def test_the_template_runs_through_the_hardware_box_scheduler(
     calls: list[list[list[str]]] = []
 
     def _record_mux_run(
-        mux_groups: list[list[str]], tasks: list[str], session_config: dict[str, Any], **_: Any
+        mux_groups: list[list[str]], plan: Any, session_config: dict[str, Any], **_: Any
     ) -> dict[str, Any]:
         calls.append(mux_groups)
-        assert tasks == FAKE_CALIBRATION_TASKS
+        assert plan.task_names() == [call.name for call in FAKE_CALIBRATION_TASKS]
+        assert plan.step_id == "calibration"
         assert session_config["backend_name"] == "fake"
         return {qid: {"status": "success"} for group in mux_groups for qid in group}
 

@@ -50,6 +50,7 @@ Example:
         return results
 """
 
+from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.calib_service import CalibService
 from qdash.workflow.service.execution_id import generate_execution_id
 from qdash.workflow.service.github import (
@@ -126,6 +127,7 @@ __all__ = [
     "StepContext",
     # === Targets ===
     "Target",
+    "TaskCall",
     "TransformStep",
     "TwoQubitCalibration",
     "clear_current_session",

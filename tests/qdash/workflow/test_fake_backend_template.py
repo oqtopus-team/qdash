@@ -13,8 +13,10 @@ from qdash.api.services.flow_service.target_defaults import (
     resolve_target_defaults,
 )
 from qdash.datamodel.flow_targets import FlowTargetOverride
+from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.flow_targets import override_target
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.task_call_helpers import names
 
 fake_backend_module = importlib.import_module("qdash.workflow.templates.fake_backend")
 
@@ -41,7 +43,7 @@ def test_defaults_to_mux_0_to_15_scheduled_like_hardware() -> None:
     assert targets.mux_ids == list(range(16)) == fake_backend_module.MUX_IDS
     assert targets.exclude_qids == []
     [step] = result["steps"]
-    assert step.tasks == fake_backend_module.FAKE_CALIBRATION_TASKS
+    assert names(step.tasks) == names(fake_backend_module.FAKE_CALIBRATION_TASKS)
     # The hardware templates (bringup, check_waveform) default to the box-aware scheduler.
     assert step.mode == "scheduled"
 
@@ -52,14 +54,14 @@ def test_mux_subset_exclusions_and_tasks_narrow_the_run() -> None:
         chip_id="fake-64q",
         mux_ids=[9, 15],
         exclude_qids=["37"],
-        tasks=["CheckRabi"],
+        tasks=[TaskCall(name="CheckRabi")],
         mode="serial",
     )
 
     targets = result["targets"]
     assert targets.mux_ids == [9, 15]
     assert targets.exclude_qids == ["37"]
-    assert result["steps"][0].tasks == ["CheckRabi"]
+    assert names(result["steps"][0].tasks) == ["CheckRabi"]
     assert result["steps"][0].mode == "serial"
 
 

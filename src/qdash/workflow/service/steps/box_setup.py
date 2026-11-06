@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from prefect import get_run_logger
 
+from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.targets import MuxTargets
 
@@ -25,7 +26,11 @@ class ConfigureAll(CalibrationStep):
 
     @property
     def name(self) -> str:
-        return "configure_all"
+        return self.step_id or "configure_all"
+
+    def calls(self) -> tuple[TaskCall, ...]:
+        # mux_ids is resolved from the targets when the step runs.
+        return (TaskCall(name="ConfigureAll", call_id="ConfigureAll"),)
 
     @property
     def provides(self) -> set[str]:
@@ -45,6 +50,7 @@ class ConfigureAll(CalibrationStep):
         if owns_session:
             service._initialize([])
 
+        plan = self.step_calls(service)
         try:
             raw_result = service.execute_task(
                 "ConfigureAll",
@@ -54,6 +60,7 @@ class ConfigureAll(CalibrationStep):
                         "mux_ids": mux_ids,
                     },
                 },
+                invocation=plan.invocation(plan.calls[0]),
             )
             ctx.metadata[self.name] = raw_result
             if owns_session:

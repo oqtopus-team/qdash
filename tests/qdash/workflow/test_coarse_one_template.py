@@ -9,6 +9,7 @@ import pytest
 
 from qdash.workflow.service.steps import OneQubitCheck
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.task_call_helpers import names
 
 coarse_one_module = importlib.import_module("qdash.workflow.templates.coarse_one")
 
@@ -34,7 +35,7 @@ def test_coarse_one_configures_before_readout_search_and_calibrates_all_pulses()
     step = result["steps"][0]
     assert isinstance(step, OneQubitCheck)
     assert step.mode == "synchronized"
-    assert step.tasks == [
+    assert names(step.tasks) == [
         "Configure",
         "CheckCoarseReadoutParams",
         "Configure",

@@ -15,7 +15,7 @@ from typing import Any
 
 from prefect import flow
 
-from qdash.workflow import sweep  # noqa: F401  # used by commented range overrides below
+from qdash.workflow import TaskCall, sweep  # noqa: F401  # used by commented range overrides below
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -25,11 +25,11 @@ from qdash.workflow.service.calib_service import (
 from qdash.workflow.service.steps import BringUp
 from qdash.workflow.service.targets import MuxTargets
 
-BRINGUP_TASKS: list[str] = [
-    "CheckResonatorSpectroscopy",
-    "CheckQubitSpectroscopy",
-    "CheckControlAmplitude",
-    "CheckAdaptiveChevron",
+BRINGUP_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckResonatorSpectroscopy"),
+    TaskCall(name="CheckQubitSpectroscopy"),
+    TaskCall(name="CheckControlAmplitude"),
+    TaskCall(name="CheckAdaptiveChevron"),
 ]
 
 

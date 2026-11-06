@@ -19,6 +19,8 @@ export interface PipelineCatalogResponse {
   one_qubit_modes: string[];
   /** Available task names by task_type ("qubit", "coupling", ...). */
   tasks: PipelineCatalogResponseTasks;
+  /** The spec version this QDash accepts. */
+  spec_version: number;
   /** JSON schema of CalibrationPipelineSpec. */
   spec_schema: PipelineCatalogResponseSpecSchema;
   example?: PipelineCatalogResponseExample;
