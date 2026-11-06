@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException
+from pymongo.errors import DuplicateKeyError
 
 from qdash.api.schemas.execution import (
     ExecutionAvailabilityRequest,
@@ -99,8 +100,25 @@ class FlowService:
         validate_flow_code(request.code, request.flow_function_name)
 
         file_path = self._sources.path_for(project_id, request.name)
+        # Saves of one flow run one at a time, also across API processes, so a
+        # create-only save cannot race another save of the same name.
+        async with self._sources.lock(file_path):
+            return await self._save_flow_locked(request, username, project_id, file_path, folder)
+
+    async def _save_flow_locked(
+        self,
+        request: SaveFlowRequest,
+        username: str,
+        project_id: str,
+        file_path: Path,
+        folder: str | None,
+    ) -> SaveFlowResponse:
+        """Save a flow while holding its save lock."""
+        flow_function_name = request.flow_function_name or request.name
         file_path_str = str(file_path)
         existing_flow = self._flow_repo.find_by_project_and_name(project_id, request.name)
+        if request.create_only and existing_flow:
+            raise _flow_exists(request.name)
         old_deployment_id = existing_flow.deployment_id if existing_flow else None
 
         # Read the old source on an update path, so we can restore it if the
@@ -109,14 +127,21 @@ class FlowService:
         if existing_flow and self._sources.exists(file_path):
             old_source = self._sources.read(file_path)
 
-        self._sources.write(file_path, request.code)
+        if request.create_only:
+            try:
+                self._sources.create(file_path, request.code)
+            except FileExistsError:
+                # A source without metadata still belongs to someone; never replace it.
+                raise _flow_exists(request.name) from None
+        else:
+            self._sources.write(file_path, request.code)
         format_with_ruff(file_path)
 
         deployment_name = f"{project_id}-{request.name}"
         try:
             deployment_id = await self._deployment.register(
                 file_path=str(self._sources.to_deployment_path(file_path)),
-                flow_function_name=request.flow_function_name,
+                flow_function_name=flow_function_name,
                 deployment_name=deployment_name,
                 old_deployment_id=old_deployment_id,
             )
@@ -141,7 +166,7 @@ class FlowService:
                     flow=existing_flow,
                     description=request.description,
                     chip_id=request.chip_id,
-                    flow_function_name=request.flow_function_name,
+                    flow_function_name=flow_function_name,
                     default_parameters=request.default_parameters,
                     default_run_parameters=request.default_run_parameters,
                     file_path=file_path_str,
@@ -160,7 +185,7 @@ class FlowService:
                     username=username,
                     chip_id=request.chip_id,
                     description=request.description,
-                    flow_function_name=request.flow_function_name,
+                    flow_function_name=flow_function_name,
                     default_parameters=request.default_parameters,
                     file_path=file_path_str,
                     deployment_id=deployment_id,
@@ -173,6 +198,14 @@ class FlowService:
                     f" by user '{username}'"
                 )
                 message = f"Flow '{request.name}' created successfully"
+        except DuplicateKeyError as exc:
+            # Another writer created the flow after the lookup above.
+            logger.error(f"Flow '{request.name}' was created concurrently: {exc}")
+            if existing_flow and old_source is not None:
+                self._sources.write(file_path, old_source)
+            else:
+                self._discard_file(file_path)
+            raise _flow_exists(request.name) from exc
         except Exception as exc:
             logger.error(f"Failed to save flow to database: {exc}")
             # On an update, restore the previous source rather than deleting
@@ -622,6 +655,14 @@ class FlowService:
         """Remove a file written for a save that could not be completed."""
         if file_path.exists():
             file_path.unlink()
+
+
+def _flow_exists(name: str) -> HTTPException:
+    """The conflict a create-only save reports for a name that is already taken."""
+    return HTTPException(
+        status_code=409,
+        detail=f"Flow '{name}' already exists. Choose another name.",
+    )
 
 
 def _execute_response(result: DispatchResult, message: str) -> ExecuteFlowResponse:

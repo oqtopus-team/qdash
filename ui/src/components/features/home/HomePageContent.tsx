@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ArrowRight,
   CalendarClock,
   CheckCircle2,
   ClipboardList,
-  Cpu,
   Gauge,
   GraduationCap,
   Play,
@@ -20,6 +19,8 @@ import type { FlowScheduleSummary } from "@/schemas";
 import { useListChips } from "@/client/chip/chip";
 import { useListAllFlowSchedules } from "@/client/flow/flow";
 import { useListTaskResults } from "@/client/task-result/task-result";
+import { FirstCalibrationHomeCard } from "@/components/features/first-calibration/FirstCalibrationHomeCard";
+import { useFirstCalibrationJourney } from "@/components/features/first-calibration/useFirstCalibrationJourney";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useProject } from "@/contexts/ProjectContext";
@@ -217,6 +218,8 @@ function UpcomingRuns({ canEdit }: UpcomingRunsProps) {
 
 export function HomePageContent() {
   const { canEdit } = useProject();
+  const journey = useFirstCalibrationJourney();
+  const [journeyStartRequested, setJourneyStartRequested] = useState(false);
   const {
     data: chipsResponse,
     isLoading: chipsLoading,
@@ -232,9 +235,10 @@ export function HomePageContent() {
   );
 
   const failedResults = failedResponse?.data.items ?? [];
-  const hasChips = (chipsResponse?.data.chips.length ?? 0) > 0;
-  const showGettingStarted = canEdit && !chipsLoading && !chipsError && !hasChips;
-  const showHeaderTour = canEdit && !chipsLoading && (hasChips || Boolean(chipsError));
+  const chips = chipsResponse?.data.chips ?? [];
+  const showJourney = canEdit && !chipsLoading && !chipsError;
+  const showJourneyStart =
+    showJourney && chips.length > 0 && !journey.state && !journeyStartRequested;
 
   return (
     <PageContainer maxWidth>
@@ -242,37 +246,26 @@ export function HomePageContent() {
         title="Home"
         description="Recent execution activity and what needs attention"
         actions={
-          showHeaderTour && (
-            <Link href="/chip?tutorial=create-chip" className="btn btn-ghost btn-sm gap-2">
-              <GraduationCap size={18} />
-              Setup tour
-            </Link>
+          showJourneyStart && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm gap-2"
+              onClick={() => setJourneyStartRequested(true)}
+            >
+              <GraduationCap size={18} aria-hidden="true" />
+              First calibration guide
+            </button>
           )
         }
       />
 
       <div className="space-y-6">
-        {showGettingStarted && (
-          <section className="flex flex-col gap-4 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-base-200 text-base-content/70">
-                <Cpu size={20} />
-              </span>
-              <div>
-                <h2 className="font-medium">Create your first chip</h2>
-                <p className="mt-1 text-sm text-base-content/60">
-                  Set up the device QDash will use for calibration tasks and results.
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/chip?tutorial=create-chip"
-              className="btn btn-primary btn-sm shrink-0 gap-2 sm:self-center"
-            >
-              <GraduationCap size={18} />
-              Start setup tour
-            </Link>
-          </section>
+        {showJourney && (
+          <FirstCalibrationHomeCard
+            projectHasChips={chips.length > 0}
+            startRequested={journeyStartRequested}
+            onStartDismissed={() => setJourneyStartRequested(false)}
+          />
         )}
 
         <QuickActions canEdit={canEdit} />

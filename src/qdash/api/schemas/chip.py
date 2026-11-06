@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 from qdash.common.utils.chip_id import validate_chip_id
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
@@ -53,6 +53,24 @@ class ChipConfigOptions(BaseModel):
         default=None,
         description="Backend of the new system; taken from the source system when one is given",
     )
+    preset: Literal["fake"] | None = Field(
+        default=None,
+        description=(
+            "Write a complete virtual configuration instead of hardware files. 'fake' is "
+            "offered only when the deployment backend is fake and needs its preset topology"
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_preset(self) -> "ChipConfigOptions":
+        if self.preset is not None and (
+            not self.create or self.source_system_id is not None or self.backend is not None
+        ):
+            raise ValueError(
+                "A configuration preset cannot be combined with create=false, "
+                "source_system_id or backend"
+            )
+        return self
 
 
 class CreateChipRequest(BaseModel):
@@ -89,6 +107,7 @@ class ChipConfigResult(BaseModel):
     path: str
     source_system_id: str | None = None
     backend: str | None = None
+    preset: str | None = None
     files: list[str] = Field(default_factory=list)
     message: str = ""
 
@@ -108,11 +127,36 @@ class ConfigSourceResponse(BaseModel):
     files: list[str]
 
 
+class ConfigPresetResponse(BaseModel):
+    """A complete configuration a new chip can start from."""
+
+    preset_id: str
+    name: str
+    description: str
+    topology_id: str = Field(description="Topology the chip must use with this preset")
+    n_qubits: int
+    mux_count: int
+    workflow_template_id: str = Field(
+        description="Flow template that brings up and calibrates a chip created from the preset"
+    )
+
+
 class ListConfigSourcesResponse(BaseModel):
     """Systems available as wiring sources for a new chip."""
 
     available: bool = Field(description="Whether a Qubex configuration tree is mounted")
     sources: list[ConfigSourceResponse]
+    deployment_backend: str | None = Field(
+        default=None,
+        description="Backend this deployment calibrates with (DEFAULT_BACKEND), e.g. qubex or fake",
+    )
+    presets: list[ConfigPresetResponse] = Field(
+        default_factory=list,
+        description=(
+            "Presets of the deployment backend, listed even when no tree is mounted; "
+            "the fake preset only on the fake backend"
+        ),
+    )
 
 
 class UpdateChipRequest(BaseModel):

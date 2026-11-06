@@ -271,3 +271,14 @@ def test_fake_repeated_pulse_check_drifts_and_carries_noise() -> None:
     # The noise is seeded per target; only the simulator's lifetime jitter differs between runs.
     repeated = 2.0 * np.imag(np.asarray(again.data["Q00"].data, dtype=complex))
     assert np.allclose(signal, repeated, atol=0.05)
+
+
+def test_default_device_parameters_follow_the_physical_qubit() -> None:
+    """A session on a subset of qubits simulates each qubit as the full device does."""
+    full = FakeExperiment()
+    subset = FakeExperiment(qubits=[2, 3])
+
+    for label in ("Q02", "Q03"):
+        assert subset.get_target(label).frequency == full.get_target(label).frequency
+        assert subset.get_target(f"R{label}").frequency == full.get_target(f"R{label}").frequency
+        assert subset.get_qubit(label).anharmonicity == full.get_qubit(label).anharmonicity

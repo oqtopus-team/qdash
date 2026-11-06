@@ -10,6 +10,7 @@ from qdash.api.dependencies import (
     get_flow_service,
 )
 from qdash.api.lib.project import ProjectContext, get_project_context, get_project_context_editor
+from qdash.api.schemas.error import Detail
 from qdash.api.schemas.flow import (
     DeleteScheduleResponse,
     ExecuteFlowRequest,
@@ -45,13 +46,24 @@ logger = getLogger("uvicorn.app")
     response_model=SaveFlowResponse,
     summary="Save a flow",
     operation_id="saveFlow",
+    responses={
+        409: {
+            "model": Detail,
+            "description": "create_only is set and a flow with this name already exists",
+        },
+    },
 )
 async def save_flow(
     request: SaveFlowRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[FlowService, Depends(get_flow_service)],
 ) -> SaveFlowResponse:
-    """Save a Flow to file system and MongoDB."""
+    """Save a Flow to file system and MongoDB.
+
+    By default the save creates the flow or overwrites an existing one. With
+    ``create_only`` it only creates a new flow, and an existing name returns 409
+    without changing the stored flow.
+    """
     return await service.save_flow(request, ctx.user.username, ctx.project_id)
 
 

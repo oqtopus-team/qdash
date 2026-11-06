@@ -223,7 +223,10 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
         </Link>
 
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div
+            className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"
+            data-coachmark="execution-header"
+          >
             <h1 className="text-xl font-medium break-all">{execution.name}</h1>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
               {isCancellable && (
