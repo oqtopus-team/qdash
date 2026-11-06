@@ -12,12 +12,23 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from prefect import get_run_logger
 
+from qdash.datamodel.calibration_pipeline import BRINGUP_METRICS
+from qdash.datamodel.task_call import StepCalls, TaskCall, normalize_calls
 from qdash.workflow.engine.task_parameters import normalize_task_parameters
-from qdash.workflow.service.results import OneQubitResult, normalize_metric_value
+from qdash.workflow.service._internal.call_runner import (
+    NOT_MUX_REPRESENTATIVE,
+    call_results,
+    latest_call_output,
+)
+from qdash.workflow.service.results import (
+    OneQubitResult,
+    build_one_qubit_result,
+    normalize_metric_value,
+)
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import BRINGUP_TASKS
 
@@ -58,16 +69,27 @@ class BringUp(CalibrationStep):
         BringUp()
 
         # With custom tasks
-        BringUp(tasks=["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"])
+        BringUp(tasks=[
+            TaskCall(name="CheckResonatorSpectroscopy"),
+            TaskCall(name="CheckQubitSpectroscopy"),
+        ])
     """
 
     mode: str = "scheduled"
-    tasks: list[str] = field(default_factory=lambda: list(BRINGUP_TASKS))
+    tasks: list[TaskCall] = field(default_factory=lambda: list(BRINGUP_TASKS))
     resonator_assignment_order: list[int] | None = None
+
+    step_metrics: ClassVar[tuple[str, ...]] = BRINGUP_METRICS
+
+    def __post_init__(self) -> None:
+        self.tasks = list(normalize_calls(self.tasks, where=f"{self.name}.tasks"))
 
     @property
     def name(self) -> str:
-        return "bringup"
+        return self.step_id or "bringup"
+
+    def calls(self) -> tuple[TaskCall, ...]:
+        return tuple(self.tasks)
 
     @property
     def provides(self) -> set[str]:
@@ -85,10 +107,10 @@ class BringUp(CalibrationStep):
         by the scheduling infrastructure.
         """
         logger = get_run_logger()
-        tasks = self.tasks
-
-        logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(tasks)} tasks")
         self._apply_resonator_assignment_order(service)
+        plan = self.step_calls(service)
+
+        logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(plan.calls)} calls")
 
         from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
         from qdash.workflow.service.targets import MuxTargets
@@ -97,7 +119,7 @@ class BringUp(CalibrationStep):
             config = OneQubitConfig(
                 mux_ids=targets.mux_ids,
                 exclude_qids=targets.exclude_qids,
-                tasks=tasks,
+                plan=plan,
                 flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
                 project_id=service.project_id,
             )
@@ -105,13 +127,14 @@ class BringUp(CalibrationStep):
             raw_results = strategy.execute(service, config)
         else:
             qids = targets.to_qids(service.chip_id)
-            raw_results = self._execute_direct(service, qids, tasks)
+            raw_results = self._execute_direct(service, qids, plan)
 
         # Build typed result
         result = self._build_result(raw_results)
 
         # Store in context metadata
         ctx.metadata["bringup"] = result
+        ctx.record_step_result(self.resolved_step_id, result)
 
         # Count actual executions (exclude skipped)
         executed_count = sum(
@@ -145,7 +168,7 @@ class BringUp(CalibrationStep):
         self,
         service: CalibService,
         qids: list[str],
-        tasks: list[str],
+        plan: StepCalls | None = None,
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets using multiprocess parallelism."""
         from qdash.workflow.service._internal.scheduling_tasks import (
@@ -169,74 +192,48 @@ class BringUp(CalibrationStep):
 
         results = run_qubit_calibrations_parallel(
             qids=qids,
-            tasks=tasks,
+            plan=plan or self.step_calls(service),
             session_config=session_config,
         )
         return {"direct": results}
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
         """Build typed result from raw backend data."""
-        from qdash.workflow.service.results import QubitCalibData
-
-        result = OneQubitResult()
         for stage_data in raw_results.values():
             if not isinstance(stage_data, dict):
                 continue
-            for qid, raw in stage_data.items():
-                if not isinstance(raw, dict):
-                    continue
-
-                # Check if this was a skipped execution (MUX task for non-representative qubit)
-                was_skipped = any(
-                    isinstance(task_result, dict) and task_result.get("skipped", False)
-                    for task_result in raw.values()
-                    if isinstance(task_result, dict)
-                )
-
-                # Mark skipped qubits as success (intentional skip) with skipped flag in raw
-                if was_skipped:
+            for raw in stage_data.values():
+                # A qubit that skipped a MUX task (not the MUX representative) is
+                # marked so the summary does not count it as a processed MUX.
+                if isinstance(raw, dict) and any(
+                    call.get("reason") == NOT_MUX_REPRESENTATIVE for call in call_results(raw)
+                ):
                     raw["_skipped"] = True
-
-                result.add_qubit(
-                    qid,
-                    QubitCalibData(
-                        status="success" if raw.get("status") == "success" else "failed",
-                        metrics=self._extract_metrics(raw),
-                        raw=raw,
-                    ),
-                )
-        return result
+        return build_one_qubit_result(raw_results, self.resolved_step_id, self._extract_metrics)
 
     def _extract_metrics(self, raw: dict[str, Any]) -> dict[str, float]:
-        """Extract metrics from raw result."""
+        """Extract metrics from the latest call of each task in the step."""
         metrics: dict[str, float] = {}
 
         # Readout parameters from CheckResonatorSpectroscopy
-        reso_result = raw.get("CheckResonatorSpectroscopy", {})
-        if reso_result and not reso_result.get("skipped", False):
-            freq_param = reso_result.get("readout_frequency") or reso_result.get(
-                "estimated_resonator_frequency"
-            )
-            if (value := normalize_metric_value(freq_param)) is not None:
-                metrics["readout_frequency"] = value
-            amp_param = reso_result.get("readout_amplitude")
-            if (value := normalize_metric_value(amp_param)) is not None:
-                metrics["readout_amplitude"] = value
+        reso_result = latest_call_output(raw, "CheckResonatorSpectroscopy")
+        freq_param = reso_result.get("readout_frequency") or reso_result.get(
+            "estimated_resonator_frequency"
+        )
+        if (value := normalize_metric_value(freq_param)) is not None:
+            metrics["readout_frequency"] = value
+        if (value := normalize_metric_value(reso_result.get("readout_amplitude"))) is not None:
+            metrics["readout_amplitude"] = value
 
-        # Coarse qubit frequency from CheckQubitSpectroscopy
-        qubit_result = raw.get("CheckQubitSpectroscopy", {})
-        if qubit_result and not qubit_result.get("skipped", False):
-            # Coarse qubit frequency (f01) — proper qubit_frequency comes from
-            # CheckAdaptiveChevron's adaptive chevron fit.
-            qubit_freq_param = qubit_result.get("coarse_qubit_frequency")
-            if (value := normalize_metric_value(qubit_freq_param)) is not None:
-                metrics["coarse_qubit_frequency"] = value
+        # Coarse qubit frequency (f01) from CheckQubitSpectroscopy. The proper
+        # qubit_frequency comes from CheckAdaptiveChevron's adaptive chevron fit.
+        qubit_result = latest_call_output(raw, "CheckQubitSpectroscopy")
+        coarse = normalize_metric_value(qubit_result.get("coarse_qubit_frequency"))
+        if coarse is not None:
+            metrics["coarse_qubit_frequency"] = coarse
 
-        # Proper qubit frequency from the adaptive Chevron search.
-        chevron_result = raw.get("CheckAdaptiveChevron", {})
-        if chevron_result and not chevron_result.get("skipped", False):
-            qubit_freq_param = chevron_result.get("qubit_frequency")
-            if (value := normalize_metric_value(qubit_freq_param)) is not None:
-                metrics["qubit_frequency"] = value
+        chevron_result = latest_call_output(raw, "CheckAdaptiveChevron")
+        if (value := normalize_metric_value(chevron_result.get("qubit_frequency"))) is not None:
+            metrics["qubit_frequency"] = value
 
         return metrics

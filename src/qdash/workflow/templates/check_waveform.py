@@ -14,6 +14,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -68,7 +69,9 @@ def check_waveform(
         raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
     steps = [
-        CustomOneQubit(step_name="check_waveform", tasks=["CheckWaveform"], mode=mode),
+        CustomOneQubit(
+            step_name="check_waveform", tasks=[TaskCall(name="CheckWaveform")], mode=mode
+        ),
     ]
 
     cal = CalibService(

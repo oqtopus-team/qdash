@@ -21829,9 +21829,10 @@
             "chip_id": "64Qv3",
             "spec": {
               "default_run_parameters": {
-                "shots": 1024
+                "interval": 153600
               },
-              "name": "coarse-then-coherence",
+              "name": "coarse-then-two-pass-ramsey",
+              "spec_version": 2,
               "steps": [
                 {
                   "mode": "scheduled",
@@ -21841,13 +21842,44 @@
                   "type": "FilterByStatus"
                 },
                 {
+                  "continue_on_failure": true,
                   "mode": "scheduled",
                   "step_name": "coherence",
                   "tasks": [
-                    "CheckT1",
-                    "CheckT2Echo"
+                    {
+                      "name": "CheckT1"
+                    },
+                    {
+                      "call_id": "ramsey_coarse",
+                      "name": "CheckRamsey",
+                      "run": {
+                        "detuning": 0.001
+                      }
+                    },
+                    {
+                      "call_id": "ramsey_fine",
+                      "name": "CheckRamsey",
+                      "run": {
+                        "detuning": 0.0002,
+                        "time_range": {
+                          "value": [
+                            0,
+                            50001,
+                            500
+                          ],
+                          "value_type": "np.arange"
+                        }
+                      }
+                    }
                   ],
                   "type": "CustomOneQubit"
+                },
+                {
+                  "call_id": "ramsey_fine",
+                  "metric": "t2_star",
+                  "step": "coherence",
+                  "threshold": 10.0,
+                  "type": "FilterByMetric"
                 }
               ],
               "targets": {
@@ -21855,6 +21887,13 @@
                   "0",
                   "1"
                 ]
+              },
+              "task_parameters": {
+                "CheckRamsey": {
+                  "run": {
+                    "shots": 1024
+                  }
+                }
               }
             }
           }
@@ -27253,6 +27292,11 @@
             "title": "Tasks",
             "description": "Available task names by task_type (\"qubit\", \"coupling\", ...)."
           },
+          "spec_version": {
+            "type": "integer",
+            "title": "Spec Version",
+            "description": "The spec version this QDash accepts."
+          },
           "spec_schema": {
             "additionalProperties": true,
             "type": "object",
@@ -27271,6 +27315,7 @@
           "step_types",
           "one_qubit_modes",
           "tasks",
+          "spec_version",
           "spec_schema"
         ],
         "title": "PipelineCatalogResponse",
@@ -27459,12 +27504,33 @@
             "title": "Task Scope",
             "description": "\"qubit\" or \"coupling\" for steps that run tasks."
           },
+          "default_step_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Step Id",
+            "description": "step_id of a calibration step that sets none."
+          },
           "default_tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskCall"
+            },
+            "type": "array",
+            "title": "Default Tasks",
+            "description": "Calls the step runs without tasks."
+          },
+          "step_metrics": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Default Tasks"
+            "title": "Step Metrics",
+            "description": "Metrics FilterByMetric can read from the step itself."
           }
         },
         "type": "object",
@@ -28496,6 +28562,18 @@
             "title": "Name",
             "description": "Step name as it appears in execution history."
           },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id",
+            "description": "Plan-scoped id of a calibration step; filters reference it."
+          },
           "kind": {
             "type": "string",
             "title": "Kind",
@@ -28507,7 +28585,28 @@
             },
             "type": "array",
             "title": "Tasks",
-            "description": "Tasks the step runs, in order; empty for transforms."
+            "description": "Task names in call order, with repeats; empty for transforms."
+          },
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedTaskCall"
+            },
+            "type": "array",
+            "title": "Calls",
+            "description": "The calls each target runs, in order."
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference",
+            "description": "For filters: the step and call they read, or null for the default."
           }
         },
         "type": "object",
@@ -28519,7 +28618,7 @@
           "tasks"
         ],
         "title": "ResolvedPipelineStep",
-        "description": "A step as it will run: effective tasks filled in from the catalog defaults."
+        "description": "A step as it will run: effective calls filled in from the catalog defaults."
       },
       "ResolvedPipelineTargets": {
         "properties": {
@@ -28552,6 +28651,40 @@
         ],
         "title": "ResolvedPipelineTargets",
         "description": "The starting targets after chip lookup."
+      },
+      "ResolvedTaskCall": {
+        "properties": {
+          "call_id": {
+            "type": "string",
+            "title": "Call Id",
+            "description": "Identifier of the call within its step."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Task name."
+          },
+          "on_failure": {
+            "type": "string",
+            "title": "On Failure",
+            "description": "\"stop\" or \"continue\": what the target's later calls do if this one fails."
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings",
+            "description": "Effective call settings (run, input, and update_calibration_parameters when set): the call's own settings over task_parameters. default_run_parameters and task declarations fill in the rest when the task runs."
+          }
+        },
+        "type": "object",
+        "required": [
+          "call_id",
+          "name",
+          "on_failure",
+          "settings"
+        ],
+        "title": "ResolvedTaskCall",
+        "description": "One call as it will run: identity and settings after per-task defaults."
       },
       "RetryEvaluationRunResponse": {
         "properties": {
@@ -30018,6 +30151,90 @@
         "type": "object",
         "title": "Task",
         "description": "Task is a Pydantic model that represents a task."
+      },
+      "TaskCall": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,127}$",
+            "title": "Name",
+            "description": "Registered task name, e.g. \"CheckRamsey\"."
+          },
+          "call_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Id",
+            "description": "Identifier of this call, unique within its step. Defaults to the task name; required on every occurrence of a task that appears more than once."
+          },
+          "run": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run",
+            "description": "Run parameters. A plain value, {\"value\": ..., \"value_type\": ...}, or a sweep declaration {\"value\": [start, stop, step_or_num], \"value_type\": \"np.arange\" | \"np.linspace\" | \"np.logspace\" | \"range\"} or {\"value\": [points...], \"value_type\": \"list\"}."
+          },
+          "input": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input",
+            "description": "Calibration input overrides, as plain values."
+          },
+          "update_calibration_parameters": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Update Calibration Parameters",
+            "description": "False records outputs as measurement history only. None inherits the next layer and finally the workflow's policy."
+          },
+          "on_failure": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "continue",
+                  "stop"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Failure",
+            "description": "\"stop\" skips this target's later calls in the step when this call fails; \"continue\" runs them. None inherits the step's continue_on_failure."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "TaskCall",
+        "description": "One call of a task in a step, with its own settings and identity."
       },
       "TaskFileBackend": {
         "properties": {
@@ -32505,9 +32722,10 @@
             "chip_id": "64Qv3",
             "spec": {
               "default_run_parameters": {
-                "shots": 1024
+                "interval": 153600
               },
-              "name": "coarse-then-coherence",
+              "name": "coarse-then-two-pass-ramsey",
+              "spec_version": 2,
               "steps": [
                 {
                   "mode": "scheduled",
@@ -32517,13 +32735,44 @@
                   "type": "FilterByStatus"
                 },
                 {
+                  "continue_on_failure": true,
                   "mode": "scheduled",
                   "step_name": "coherence",
                   "tasks": [
-                    "CheckT1",
-                    "CheckT2Echo"
+                    {
+                      "name": "CheckT1"
+                    },
+                    {
+                      "call_id": "ramsey_coarse",
+                      "name": "CheckRamsey",
+                      "run": {
+                        "detuning": 0.001
+                      }
+                    },
+                    {
+                      "call_id": "ramsey_fine",
+                      "name": "CheckRamsey",
+                      "run": {
+                        "detuning": 0.0002,
+                        "time_range": {
+                          "value": [
+                            0,
+                            50001,
+                            500
+                          ],
+                          "value_type": "np.arange"
+                        }
+                      }
+                    }
                   ],
                   "type": "CustomOneQubit"
+                },
+                {
+                  "call_id": "ramsey_fine",
+                  "metric": "t2_star",
+                  "step": "coherence",
+                  "threshold": 10.0,
+                  "type": "FilterByMetric"
                 }
               ],
               "targets": {
@@ -32531,6 +32780,13 @@
                   "0",
                   "1"
                 ]
+              },
+              "task_parameters": {
+                "CheckRamsey": {
+                  "run": {
+                    "shots": 1024
+                  }
+                }
               }
             }
           }
@@ -32549,9 +32805,29 @@
             "type": "array",
             "title": "Problems"
           },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineProblem"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "Allowed but probably unintended choices."
+          },
           "backend_name": {
             "type": "string",
             "title": "Backend Name"
+          },
+          "spec_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spec Version",
+            "description": "Version of the submitted spec, when it could be read."
           },
           "spec": {
             "anyOf": [
@@ -32565,6 +32841,31 @@
             ],
             "title": "Spec",
             "description": "The normalized spec, when it parsed; defaults filled in."
+          },
+          "migrated_spec": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Migrated Spec",
+            "description": "For a version 1 spec: the same pipeline converted to version 2. Review it, rename generated call_ids if you like, and submit it instead."
+          },
+          "plan_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Digest",
+            "description": "Digest of the validated spec, stored as note.pipeline.spec_digest on each step execution. Task results carry the worker's resolved-plan digest (note.calibration_plan.digest) in invocation.plan_digest."
           },
           "targets": {
             "anyOf": [
@@ -32586,7 +32887,7 @@
           "task_run_count": {
             "type": "integer",
             "title": "Task Run Count",
-            "description": "Task runs per target qubit or coupling.",
+            "description": "Task calls per target qubit or coupling.",
             "default": 0
           }
         },
@@ -32596,7 +32897,7 @@
           "backend_name"
         ],
         "title": "ValidatePipelineResponse",
-        "description": "Whether the spec can run, and what it would do."
+        "description": "Whether the spec can run, and what it would do.\n\n``valid`` is true exactly when ``problems`` is empty. ``warnings`` never make\na spec invalid; they point at choices that are allowed but probably unintended."
       },
       "ValidationError": {
         "properties": {

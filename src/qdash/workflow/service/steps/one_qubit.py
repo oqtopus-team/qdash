@@ -2,18 +2,33 @@
 
 This module defines steps for 1-qubit calibration:
 - CustomOneQubit: Flexible custom task execution
-- OneQubitCheck: Basic characterization (T1, T2, etc.)
+- OneQubitCheck: Basic characterization (Rabi, HPI and PI pulses)
 - OneQubitFineTune: Advanced calibration (DRAG, RB, etc.)
+
+Every step lists its work as ``TaskCall`` entries. A step may run the same task
+more than once when each occurrence has its own ``call_id``; each call on each
+target produces its own task result.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from prefect import get_run_logger
 
-from qdash.workflow.service.results import OneQubitResult, normalize_metric_value
+from qdash.datamodel.calibration_pipeline import (
+    CONFIGURE_CALL,
+    ONE_QUBIT_CHECK_METRICS,
+    ONE_QUBIT_FINE_TUNE_METRICS,
+)
+from qdash.datamodel.task_call import StepCalls, TaskCall, normalize_calls
+from qdash.workflow.service._internal.call_runner import latest_call_output
+from qdash.workflow.service.results import (
+    OneQubitResult,
+    build_one_qubit_result,
+    normalize_metric_value,
+)
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_1Q_TASKS_AFTER_CHECK
 
@@ -23,24 +38,8 @@ if TYPE_CHECKING:
     from qdash.workflow.service.targets import Target
 
 
-def _execute_direct_one_qubit(
-    service: CalibService,
-    *,
-    qids: list[str],
-    tasks: list[str],
-    stage_name: str,
-    continue_on_failure: bool = False,
-    stop_on_failure_tasks: tuple[str, ...] = (),
-) -> dict[str, Any]:
-    """Run explicit qubit targets under a visible parent Execution."""
-    from qdash.workflow.service._internal.scheduling_tasks import (
-        run_qubit_calibrations_parallel,
-    )
-
-    if not qids:
-        return {"direct": {}}
-
-    session_config = {
+def _session_config(service: CalibService) -> dict[str, Any]:
+    return {
         "username": service.username,
         "chip_id": service.chip_id,
         "backend_name": service.backend_name,
@@ -54,16 +53,26 @@ def _execute_direct_one_qubit(
         "note": service.note,
     }
 
-    failure_options: dict[str, Any] = {}
-    if continue_on_failure:
-        failure_options["continue_on_failure"] = True
-    if stop_on_failure_tasks:
-        failure_options["stop_on_failure_tasks"] = stop_on_failure_tasks
+
+def _execute_direct_one_qubit(
+    service: CalibService,
+    *,
+    qids: list[str],
+    plan: StepCalls,
+    stage_name: str,
+) -> dict[str, Any]:
+    """Run explicit qubit targets under a visible parent Execution."""
+    from qdash.workflow.service._internal.scheduling_tasks import (
+        run_qubit_calibrations_parallel,
+    )
+
+    if not qids:
+        return {"direct": {}}
+
     results = run_qubit_calibrations_parallel(
         qids=qids,
-        tasks=tasks,
-        session_config=session_config,
-        **failure_options,
+        plan=plan,
+        session_config=_session_config(service),
     )
     wrapped_results = {"direct": results}
     service.record_stage_result(stage_name, wrapped_results)
@@ -74,11 +83,9 @@ def _execute_scheduled_one_qubit(
     service: CalibService,
     *,
     qids: list[str],
-    tasks: list[str],
+    plan: StepCalls,
     stage_name: str,
     mode: str,
-    continue_on_failure: bool = False,
-    stop_on_failure_tasks: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Run explicit qubit targets through the same scheduler used by MUX targets."""
     from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
@@ -91,47 +98,81 @@ def _execute_scheduled_one_qubit(
         mux_ids=mux_ids,
         exclude_qids=[],
         qids=qids,
-        tasks=tasks,
+        plan=plan,
         flow_name=f"{service.flow_name}_{stage_name}" if service.flow_name else stage_name,
         project_id=service.project_id,
-        continue_on_failure=continue_on_failure,
-        stop_on_failure_tasks=stop_on_failure_tasks,
     )
     strategy = get_one_qubit_strategy(mode)
     result: dict[str, Any] = strategy.execute(service, config)
     return result
 
 
+def _execute_mux_one_qubit(
+    service: CalibService,
+    *,
+    targets: Any,
+    plan: StepCalls,
+    stage_name: str,
+    mode: str,
+) -> dict[str, Any]:
+    """Run MUX targets through the selected one-qubit strategy."""
+    from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
+
+    config = OneQubitConfig(
+        mux_ids=targets.mux_ids,
+        exclude_qids=targets.exclude_qids,
+        plan=plan,
+        flow_name=f"{service.flow_name}_{stage_name}" if service.flow_name else stage_name,
+        project_id=service.project_id,
+    )
+    result: dict[str, Any] = get_one_qubit_strategy(mode).execute(service, config)
+    return result
+
+
+def _metric(raw: dict[str, Any], task_name: str, parameter: str) -> float | None:
+    return normalize_metric_value(latest_call_output(raw, task_name).get(parameter))
+
+
 @dataclass
 class CustomOneQubit(CalibrationStep):
-    """Custom 1-qubit calibration step with user-defined tasks.
+    """Custom 1-qubit calibration step with user-defined task calls.
 
-    This is the most flexible 1-qubit step - you specify exactly which
-    tasks to run. Use this when the predefined steps don't fit your needs.
+    This is the most flexible 1-qubit step: you specify exactly which calls to
+    run, including the same task several times with different settings.
 
     Example:
-        # Run specific tasks
         CustomOneQubit(
-            step_name="frequency_check",
-            tasks=["CheckQubitSpectroscopy", "CheckFrequency"],
-        )
-
-        # Run T1/T2 characterization only
-        CustomOneQubit(
-            step_name="coherence_check",
-            tasks=["CheckT1", "CheckT2Echo", "CheckRamsey"],
+            step_name="ramsey_two_pass",
+            tasks=[
+                TaskCall(name="CheckRamsey", call_id="ramsey_coarse",
+                         run={"detuning": 0.001}),
+                TaskCall(name="CheckRamsey", call_id="ramsey_fine",
+                         run={"detuning": 0.0002}),
+            ],
             continue_on_failure=True,
         )
 
-    Set ``stop_on_failure_tasks`` for prerequisites such as ``Configure`` that must remain
-    fail-fast even when later independent measurements use best-effort execution.
+    ``continue_on_failure`` keeps a target's later calls running after one of its
+    calls fails. A call's ``on_failure="stop"`` keeps a prerequisite such as
+    ``Configure`` fail-fast for that target; ``on_failure="continue"`` does the
+    opposite under the default fail-fast policy. The step's result keeps every
+    call in order; read one with ``result.get_qubit(qid).call("ramsey_fine")``.
     """
 
     step_name: str = "custom_one_qubit"
-    tasks: list[str] = field(default_factory=list)
+    tasks: list[TaskCall] = field(default_factory=list)
     mode: str = "synchronized"
     continue_on_failure: bool = False
-    stop_on_failure_tasks: tuple[str, ...] = ()
+
+    step_metrics: ClassVar[tuple[str, ...]] = ()
+
+    def __post_init__(self) -> None:
+        if self.step_id is not None and self.step_id != self.step_name:
+            raise ValueError(
+                f"CustomOneQubit uses step_name as its step_id; got step_name="
+                f"{self.step_name!r} and step_id={self.step_id!r}"
+            )
+        self.tasks = list(normalize_calls(self.tasks, where=f"{self.step_name}.tasks"))
 
     @property
     def name(self) -> str:
@@ -146,6 +187,9 @@ class CustomOneQubit(CalibrationStep):
         """Synchronized qubit tasks connect in isolated workers."""
         return self.mode != "synchronized"
 
+    def calls(self) -> tuple[TaskCall, ...]:
+        return tuple(self.tasks)
+
     def execute(
         self,
         service: CalibService,
@@ -159,38 +203,32 @@ class CustomOneQubit(CalibrationStep):
             logger.warning(f"[{self.name}] No tasks specified, skipping")
             return ctx
 
-        logger.info(f"[{self.name}] Starting with {len(self.tasks)} tasks: {self.tasks}")
+        plan = self.step_calls(service)
+        logger.info(
+            f"[{self.name}] Starting with {len(self.tasks)} calls: "
+            f"{[call.resolved_call_id for call in self.tasks]}"
+        )
 
         has_previous_selection = bool(ctx.filters) or ctx.get_latest_one_qubit_result() is not None
         if has_previous_selection:
-            raw_results = self._execute_scheduled(service, ctx.candidate_qids)
+            raw_results = self._execute_scheduled(service, ctx.candidate_qids, plan)
         else:
-            from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
             from qdash.workflow.service.targets import MuxTargets
 
             if isinstance(targets, MuxTargets):
-                config = OneQubitConfig(
-                    mux_ids=targets.mux_ids,
-                    exclude_qids=targets.exclude_qids,
-                    tasks=self.tasks,
-                    flow_name=(
-                        f"{service.flow_name}_{self.name}" if service.flow_name else self.name
-                    ),
-                    project_id=service.project_id,
-                    continue_on_failure=self.continue_on_failure,
-                    stop_on_failure_tasks=self.stop_on_failure_tasks,
+                raw_results = _execute_mux_one_qubit(
+                    service, targets=targets, plan=plan, stage_name=self.name, mode=self.mode
                 )
-                strategy = get_one_qubit_strategy(self.mode)
-                raw_results = strategy.execute(service, config)
             else:
-                qids = targets.to_qids(service.chip_id)
-                raw_results = self._execute_scheduled(service, qids)
+                raw_results = self._execute_scheduled(
+                    service, targets.to_qids(service.chip_id), plan
+                )
 
-        # Build typed result
         result = self._build_result(raw_results)
 
-        # Store in metadata with step name as key
+        # Store in metadata with step name as key, and by step_id for filters
         ctx.metadata[self.step_name] = result
+        ctx.record_step_result(self.resolved_step_id, result)
 
         logger.info(
             f"[{self.name}] Completed. "
@@ -202,16 +240,15 @@ class CustomOneQubit(CalibrationStep):
         self,
         service: CalibService,
         qids: list[str],
+        plan: StepCalls | None = None,
     ) -> dict[str, Any]:
         """Execute explicit QubitTargets through hardware-aware scheduling."""
         return _execute_scheduled_one_qubit(
             service,
             qids=qids,
-            tasks=self.tasks,
+            plan=plan or self.step_calls(service),
             stage_name=self.step_name,
             mode=self.mode,
-            continue_on_failure=self.continue_on_failure,
-            stop_on_failure_tasks=self.stop_on_failure_tasks,
         )
 
     def _execute_direct(
@@ -223,38 +260,20 @@ class CustomOneQubit(CalibrationStep):
         return _execute_direct_one_qubit(
             service,
             qids=qids,
-            tasks=self.tasks,
+            plan=self.step_calls(service),
             stage_name=self.step_name,
-            continue_on_failure=self.continue_on_failure,
-            stop_on_failure_tasks=self.stop_on_failure_tasks,
         )
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
         """Build typed result from raw backend data."""
-        from qdash.workflow.service.results import QubitCalibData
-
-        result = OneQubitResult()
-        for stage_data in raw_results.values():
-            if not isinstance(stage_data, dict):
-                continue
-            for qid, raw in stage_data.items():
-                if not isinstance(raw, dict):
-                    continue
-                result.add_qubit(
-                    qid,
-                    QubitCalibData(
-                        status="success" if raw.get("status") == "success" else "failed",
-                        metrics=self._extract_metrics(raw),
-                        raw=raw,
-                    ),
-                )
-        return result
+        return build_one_qubit_result(raw_results, self.resolved_step_id, self._extract_metrics)
 
     def _extract_metrics(self, raw: dict[str, Any]) -> dict[str, float]:
         """Extract metrics from raw result.
 
-        Custom steps don't auto-extract metrics - raw data is available via result.raw.
-        Users can subclass and override this for specific metric extraction.
+        Custom steps derive no step-level metrics; read a call's outputs with
+        ``QubitCalibData.call(call_id)`` or filter with ``call_id``. Subclasses
+        may override this for specific metric extraction.
         """
         return {}
 
@@ -270,16 +289,30 @@ class OneQubitCheck(CalibrationStep):
     """
 
     mode: str = "synchronized"
-    tasks: list[str] | None = None
+    tasks: list[TaskCall] | None = None
     configure: bool = False
+
+    step_metrics: ClassVar[tuple[str, ...]] = ONE_QUBIT_CHECK_METRICS
+
+    def __post_init__(self) -> None:
+        self._calls = self._normalize()
+
+    def _normalize(self) -> tuple[TaskCall, ...]:
+        calls = list(self.tasks if self.tasks is not None else CHECK_1Q_TASKS)
+        if self.configure:
+            calls.insert(0, CONFIGURE_CALL)
+        return normalize_calls(calls, where=f"{self.name}.tasks")
 
     @property
     def name(self) -> str:
-        return "one_qubit_check"
+        return self.step_id or "one_qubit_check"
 
     @property
     def provides(self) -> set[str]:
         return {"one_qubit_check", "candidate_qids"}
+
+    def calls(self) -> tuple[TaskCall, ...]:
+        return self._calls
 
     def execute(
         self,
@@ -289,32 +322,23 @@ class OneQubitCheck(CalibrationStep):
     ) -> StepContext:
         """Execute 1-qubit check calibration."""
         logger = get_run_logger()
-        tasks = list(self.tasks or CHECK_1Q_TASKS)
-        if self.configure:
-            tasks.insert(0, "Configure")
+        plan = self.step_calls(service)
 
-        logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(tasks)} tasks")
+        logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(plan.calls)} calls")
 
-        from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
         from qdash.workflow.service.targets import MuxTargets
 
         if isinstance(targets, MuxTargets):
-            config = OneQubitConfig(
-                mux_ids=targets.mux_ids,
-                exclude_qids=targets.exclude_qids,
-                tasks=tasks,
-                flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
-                project_id=service.project_id,
+            raw_results = _execute_mux_one_qubit(
+                service, targets=targets, plan=plan, stage_name=self.name, mode=self.mode
             )
-            strategy = get_one_qubit_strategy(self.mode)
-            raw_results = strategy.execute(service, config)
         else:
             qids = targets.to_qids(service.chip_id)
-            raw_results = self._execute_scheduled(service, qids, tasks)
+            raw_results = self._execute_scheduled(service, qids, plan)
 
-        # Build typed result
         result = self._build_result(raw_results)
         ctx.one_qubit_check = result
+        ctx.record_step_result(self.resolved_step_id, result)
 
         logger.info(
             f"[{self.name}] Completed. "
@@ -326,13 +350,13 @@ class OneQubitCheck(CalibrationStep):
         self,
         service: CalibService,
         qids: list[str],
-        tasks: list[str],
+        plan: StepCalls | None = None,
     ) -> dict[str, Any]:
         """Execute explicit QubitTargets through hardware-aware scheduling."""
         return _execute_scheduled_one_qubit(
             service,
             qids=qids,
-            tasks=tasks,
+            plan=plan or self.step_calls(service),
             stage_name=self.name,
             mode=self.mode,
         )
@@ -341,53 +365,26 @@ class OneQubitCheck(CalibrationStep):
         self,
         service: CalibService,
         qids: list[str],
-        tasks: list[str],
     ) -> dict[str, Any]:
         """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
         return _execute_direct_one_qubit(
             service,
             qids=qids,
-            tasks=tasks,
+            plan=self.step_calls(service),
             stage_name=self.name,
         )
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
         """Build typed result from raw backend data."""
-        from qdash.workflow.service.results import QubitCalibData
-
-        result = OneQubitResult()
-        for stage_data in raw_results.values():
-            if not isinstance(stage_data, dict):
-                continue
-            for qid, raw in stage_data.items():
-                if not isinstance(raw, dict):
-                    continue
-                result.add_qubit(
-                    qid,
-                    QubitCalibData(
-                        status="success" if raw.get("status") == "success" else "failed",
-                        metrics=self._extract_metrics(raw),
-                        raw=raw,
-                    ),
-                )
-        return result
+        return build_one_qubit_result(raw_results, self.resolved_step_id, self._extract_metrics)
 
     def _extract_metrics(self, raw: dict[str, Any]) -> dict[str, float]:
-        """Extract metrics from raw result."""
+        """Extract metrics from the latest call of each task in the step."""
         metrics = {}
-        # T1 Average
-        t1_result = raw.get("CheckT1Average", {})
-        if t1_result:
-            t1_param = t1_result.get("t1_average")
-            if (value := normalize_metric_value(t1_param)) is not None:
-                metrics["t1_average"] = value
-
-        # T2 Echo Average
-        t2_result = raw.get("CheckT2EchoAverage", {})
-        if t2_result:
-            t2_param = t2_result.get("t2_echo_average")
-            if (value := normalize_metric_value(t2_param)) is not None:
-                metrics["t2_echo_average"] = value
+        if (value := _metric(raw, "CheckT1Average", "t1_average")) is not None:
+            metrics["t1_average"] = value
+        if (value := _metric(raw, "CheckT2EchoAverage", "t2_echo_average")) is not None:
+            metrics["t2_echo_average"] = value
         return metrics
 
 
@@ -403,16 +400,27 @@ class OneQubitFineTune(CalibrationStep):
     """
 
     mode: str = "synchronized"
-    tasks: list[str] | None = None
+    tasks: list[TaskCall] | None = None
     configure: bool = False
+
+    step_metrics: ClassVar[tuple[str, ...]] = ONE_QUBIT_FINE_TUNE_METRICS
+
+    def __post_init__(self) -> None:
+        calls = list(self.tasks if self.tasks is not None else FULL_1Q_TASKS_AFTER_CHECK)
+        if self.configure:
+            calls.insert(0, CONFIGURE_CALL)
+        self._calls = normalize_calls(calls, where=f"{self.name}.tasks")
 
     @property
     def name(self) -> str:
-        return "one_qubit_fine_tune"
+        return self.step_id or "one_qubit_fine_tune"
 
     @property
     def provides(self) -> set[str]:
         return {"one_qubit_fine_tune", "candidate_qids"}
+
+    def calls(self) -> tuple[TaskCall, ...]:
+        return self._calls
 
     def execute(
         self,
@@ -422,9 +430,7 @@ class OneQubitFineTune(CalibrationStep):
     ) -> StepContext:
         """Execute 1-qubit fine-tuning calibration."""
         logger = get_run_logger()
-        tasks = list(self.tasks or FULL_1Q_TASKS_AFTER_CHECK)
-        if self.configure:
-            tasks.insert(0, "Configure")
+        plan = self.step_calls(service)
 
         # Use filtered candidates from context if available
         has_previous_selection = bool(ctx.filters) or ctx.get_latest_one_qubit_result() is not None
@@ -435,18 +441,21 @@ class OneQubitFineTune(CalibrationStep):
         )
 
         logger.info(
-            f"[{self.name}] Starting with mode={self.mode}, {len(tasks)} tasks, {len(qids)} qubits"
+            f"[{self.name}] Starting with mode={self.mode}, {len(plan.calls)} calls, "
+            f"{len(qids)} qubits"
         )
 
         if not qids:
             logger.warning(f"[{self.name}] No candidate qubits, skipping")
-            ctx.one_qubit_fine_tune = OneQubitResult()
+            ctx.one_qubit_fine_tune = OneQubitResult(step_id=self.resolved_step_id)
+            ctx.record_step_result(self.resolved_step_id, ctx.one_qubit_fine_tune)
             return ctx
 
-        raw_results = self._execute_with_qids(service, qids, tasks)
+        raw_results = self._execute_with_qids(service, qids, plan)
 
         result = self._build_result(raw_results)
         ctx.one_qubit_fine_tune = result
+        ctx.record_step_result(self.resolved_step_id, result)
 
         logger.info(
             f"[{self.name}] Completed. "
@@ -458,93 +467,49 @@ class OneQubitFineTune(CalibrationStep):
         self,
         service: CalibService,
         qids: list[str],
-        tasks: list[str],
+        plan: StepCalls | None = None,
     ) -> dict[str, Any]:
         """Execute calibration for specific qubit IDs."""
-        from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
-
-        # Convert qids to mux_ids for strategy
-        mux_ids = sorted({int(qid) // 4 for qid in qids})
-        exclude_qids: list[str] = []
-
-        config = OneQubitConfig(
-            mux_ids=mux_ids,
-            exclude_qids=exclude_qids,
+        return _execute_scheduled_one_qubit(
+            service,
             qids=qids,
-            tasks=tasks,
-            flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
-            project_id=service.project_id,
+            plan=plan or self.step_calls(service),
+            stage_name=self.name,
+            mode=self.mode,
         )
-        strategy = get_one_qubit_strategy(self.mode)
-        result: dict[str, Any] = strategy.execute(service, config)
-        return result
 
     def _execute_direct(
         self,
         service: CalibService,
         qids: list[str],
-        tasks: list[str],
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets using multiprocess parallelism."""
         return _execute_direct_one_qubit(
             service,
             qids=qids,
-            tasks=tasks,
+            plan=self.step_calls(service),
             stage_name=self.name,
         )
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
         """Build typed result from raw backend data."""
-        from qdash.workflow.service.results import QubitCalibData
-
-        result = OneQubitResult()
-        for stage_data in raw_results.values():
-            if not isinstance(stage_data, dict):
-                continue
-            for qid, raw in stage_data.items():
-                if not isinstance(raw, dict):
-                    continue
-                result.add_qubit(
-                    qid,
-                    QubitCalibData(
-                        status="success" if raw.get("status") == "success" else "failed",
-                        metrics=self._extract_metrics(raw),
-                        raw=raw,
-                    ),
-                )
-        return result
+        return build_one_qubit_result(raw_results, self.resolved_step_id, self._extract_metrics)
 
     def _extract_metrics(self, raw: dict[str, Any]) -> dict[str, float]:
-        """Extract metrics from raw result."""
+        """Extract metrics from the latest call of each task in the step."""
         metrics = {}
-        # X90 fidelity from IRB
-        irb = raw.get("X90InterleavedRandomizedBenchmarking", {})
-        if irb:
-            fidelity_param = irb.get("x90_gate_fidelity")
-            if (value := normalize_metric_value(fidelity_param)) is not None:
-                metrics["x90_fidelity"] = value
-        # RB fidelity
-        rb = raw.get("RandomizedBenchmarking", {})
-        if rb:
-            fidelity_param = rb.get("fidelity")
-            if (value := normalize_metric_value(fidelity_param)) is not None:
-                metrics["rb_fidelity"] = value
-        # T1 Average
-        t1_result = raw.get("CheckT1Average", {})
-        if t1_result:
-            t1_param = t1_result.get("t1_average")
-            if (value := normalize_metric_value(t1_param)) is not None:
-                metrics["t1_average"] = value
-        # T2 Echo Average
-        t2_result = raw.get("CheckT2EchoAverage", {})
-        if t2_result:
-            t2_param = t2_result.get("t2_echo_average")
-            if (value := normalize_metric_value(t2_param)) is not None:
-                metrics["t2_echo_average"] = value
-        # 1Q gate coherence limit
-        coh_result = raw.get("Check1QGateCoherenceLimit", {})
-        if coh_result:
-            coh_param = coh_result.get("one_qubit_gate_coherence_limit")
-            if (value := normalize_metric_value(coh_param)) is not None:
-                metrics["one_qubit_gate_coherence_limit"] = value
+        if (
+            value := _metric(raw, "X90InterleavedRandomizedBenchmarking", "x90_gate_fidelity")
+        ) is not None:
+            metrics["x90_fidelity"] = value
+        if (value := _metric(raw, "RandomizedBenchmarking", "fidelity")) is not None:
+            metrics["rb_fidelity"] = value
+        if (value := _metric(raw, "CheckT1Average", "t1_average")) is not None:
+            metrics["t1_average"] = value
+        if (value := _metric(raw, "CheckT2EchoAverage", "t2_echo_average")) is not None:
+            metrics["t2_echo_average"] = value
+        if (
+            value := _metric(raw, "Check1QGateCoherenceLimit", "one_qubit_gate_coherence_limit")
+        ) is not None:
+            metrics["one_qubit_gate_coherence_limit"] = value
         return metrics

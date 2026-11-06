@@ -18,6 +18,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -27,47 +28,51 @@ from qdash.workflow.service.calib_service import (
 from qdash.workflow.service.steps import OneQubitFineTune
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
-FINE_ONE_TASKS: list[str] = [
-    "Configure",
+FINE_ONE_TASKS: list[TaskCall] = [
+    TaskCall(name="Configure", call_id="configure_round1"),
     # Round 1: calibrate HPI -> PI -> DRAG HPI -> DRAG PI, then tune amplitude/frequency.
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "CheckOptimalReadoutAmplitude",
-    "CheckOptimalReadoutFrequency",
-    "Configure",  # Apply round 1's readout frequency before recalibrating pulses.
+    TaskCall(name="CheckRabi", call_id="rabi_round1"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_round1"),
+    TaskCall(name="CheckHPIPulse", call_id="hpi_check_round1"),
+    TaskCall(name="CreatePIPulse", call_id="pi_create_round1"),
+    TaskCall(name="CheckPIPulse", call_id="pi_check_round1"),
+    TaskCall(name="CreateDRAGHPIPulse", call_id="drag_hpi_create_round1"),
+    TaskCall(name="CheckDRAGHPIPulse", call_id="drag_hpi_check_round1"),
+    TaskCall(name="CreateDRAGPIPulse", call_id="drag_pi_create_round1"),
+    TaskCall(name="CheckDRAGPIPulse", call_id="drag_pi_check_round1"),
+    TaskCall(name="CheckOptimalReadoutAmplitude", call_id="readout_amplitude_round1"),
+    TaskCall(name="CheckOptimalReadoutFrequency", call_id="readout_frequency_round1"),
+    TaskCall(
+        name="Configure", call_id="configure_round2"
+    ),  # Apply round 1's readout frequency before recalibrating pulses.
     # Round 2: recalibrate all four pulse types at the updated settings, then repeat the pair.
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "CheckOptimalReadoutAmplitude",
-    "CheckOptimalReadoutFrequency",
-    "Configure",  # Apply the final readout frequency before final pulse calibration.
+    TaskCall(name="CheckRabi", call_id="rabi_round2"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_round2"),
+    TaskCall(name="CheckHPIPulse", call_id="hpi_check_round2"),
+    TaskCall(name="CreatePIPulse", call_id="pi_create_round2"),
+    TaskCall(name="CheckPIPulse", call_id="pi_check_round2"),
+    TaskCall(name="CreateDRAGHPIPulse", call_id="drag_hpi_create_round2"),
+    TaskCall(name="CheckDRAGHPIPulse", call_id="drag_hpi_check_round2"),
+    TaskCall(name="CreateDRAGPIPulse", call_id="drag_pi_create_round2"),
+    TaskCall(name="CheckDRAGPIPulse", call_id="drag_pi_check_round2"),
+    TaskCall(name="CheckOptimalReadoutAmplitude", call_id="readout_amplitude_round2"),
+    TaskCall(name="CheckOptimalReadoutFrequency", call_id="readout_frequency_round2"),
+    TaskCall(
+        name="Configure", call_id="configure_final"
+    ),  # Apply the final readout frequency before final pulse calibration.
     # Calibrate all pulses at the final readout settings before classification and RB.
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "ReadoutClassification",
-    "RandomizedBenchmarking",
-    "X90InterleavedRandomizedBenchmarking",
+    TaskCall(name="CheckRabi", call_id="rabi_final"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_final"),
+    TaskCall(name="CheckHPIPulse", call_id="hpi_check_final"),
+    TaskCall(name="CreatePIPulse", call_id="pi_create_final"),
+    TaskCall(name="CheckPIPulse", call_id="pi_check_final"),
+    TaskCall(name="CreateDRAGHPIPulse", call_id="drag_hpi_create_final"),
+    TaskCall(name="CheckDRAGHPIPulse", call_id="drag_hpi_check_final"),
+    TaskCall(name="CreateDRAGPIPulse", call_id="drag_pi_create_final"),
+    TaskCall(name="CheckDRAGPIPulse", call_id="drag_pi_check_final"),
+    TaskCall(name="ReadoutClassification"),
+    TaskCall(name="RandomizedBenchmarking"),
+    TaskCall(name="X90InterleavedRandomizedBenchmarking"),
 ]
 
 

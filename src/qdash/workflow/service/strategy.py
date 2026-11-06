@@ -22,6 +22,7 @@ from qdash.workflow.service._internal.scheduling_tasks import (
 )
 
 if TYPE_CHECKING:
+    from qdash.datamodel.task_call import StepCalls
     from qdash.workflow.service.calib_service import CalibService
 
 
@@ -32,17 +33,25 @@ if TYPE_CHECKING:
 
 @dataclass
 class OneQubitConfig:
-    """Configuration for 1-qubit calibration."""
+    """Configuration for 1-qubit calibration.
+
+    ``plan`` holds the step's normalized calls, its step_id and failure policy.
+    The strategy decides only where and when targets run; every target runs the
+    plan's calls in order.
+    """
 
     mux_ids: list[int]
     exclude_qids: list[str]
-    tasks: list[str]
+    plan: StepCalls
     flow_name: str | None
     project_id: str | None
     qids: list[str] | None = None  # Explicit qubit IDs (overrides mux_ids if set)
     simultaneous_spectroscopy_schedule_mode: str = "local_index"
-    continue_on_failure: bool = False
-    stop_on_failure_tasks: tuple[str, ...] = ()
+
+    @property
+    def tasks(self) -> list[str]:
+        """Task names in call order, with repeats."""
+        return self.plan.task_names()
 
 
 # =============================================================================
@@ -182,17 +191,11 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
             stage_name = f"Box_{box_type}"
             stage_results = {}
 
-            for seq_idx, parallel_groups in enumerate(sequential_groups):
-                failure_options: dict[str, Any] = {}
-                if config.continue_on_failure:
-                    failure_options["continue_on_failure"] = True
-                if config.stop_on_failure_tasks:
-                    failure_options["stop_on_failure_tasks"] = config.stop_on_failure_tasks
+            for parallel_groups in sequential_groups:
                 mux_results = run_mux_calibrations_parallel(
                     mux_groups=parallel_groups,
-                    tasks=config.tasks,
+                    plan=config.plan,
                     session_config=session_config,
-                    **failure_options,
                 )
                 stage_results.update(mux_results)
 
@@ -271,16 +274,10 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             if not filtered_qids:
                 continue
 
-            failure_options: dict[str, Any] = {}
-            if config.continue_on_failure:
-                failure_options["continue_on_failure"] = True
-            if config.stop_on_failure_tasks:
-                failure_options["stop_on_failure_tasks"] = config.stop_on_failure_tasks
             step_results = run_qubit_calibrations_parallel(
                 qids=filtered_qids,
-                tasks=config.tasks,
+                plan=config.plan,
                 session_config=session_config,
-                **failure_options,
             )
             # Group results by box type for organized output
             box_key = f"Box_{step.box_type}"
@@ -320,21 +317,13 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
         if not all_qids:
             return {}
 
+        # Reject what the batch path cannot run before any batch measures.
+        runner.preflight_batch(config.plan)
         all_results = runner.execute_simultaneous_spectroscopy_schedule(
             schedule,
-            tasks=config.tasks,
+            plan=config.plan,
             allowed_qids=config.qids,
         )
-
-        # Match the per-qubit status supplied by the other strategies so a
-        # successful batch remains eligible for the pipeline's status filter.
-        for step_results in all_results.values():
-            for qubit_results in step_results.values():
-                qubit_results["status"] = (
-                    "success"
-                    if all(task_name in qubit_results for task_name in config.tasks)
-                    else "failed"
-                )
 
         cal_service.record_stage_result("experimental_simultaneous_spectroscopy", all_results)
         return all_results
@@ -378,20 +367,10 @@ class OneQubitSerialStrategy(OneQubitStrategy):
         if not all_qids:
             return {}
 
-        # Execute MUX groups one by one (completely serial)
+        # Execute MUX groups one by one (completely serial) in the parent session
         all_results = {}
         for mux_group in all_mux_groups:
-            # Execute single MUX group (no parallelism)
-            if config.continue_on_failure:
-                result = _calibrate_mux_qubits(
-                    qids=mux_group,
-                    tasks=config.tasks,
-                    continue_on_failure=True,
-                    stop_on_failure_tasks=config.stop_on_failure_tasks,
-                )
-            else:
-                result = _calibrate_mux_qubits(qids=mux_group, tasks=config.tasks)
-            all_results.update(result)
+            all_results.update(_calibrate_mux_qubits(qids=mux_group, plan=config.plan))
 
         cal_service.record_stage_result("1q_serial", all_results)
 

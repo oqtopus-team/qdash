@@ -23,7 +23,7 @@ Example:
         username="alice",
         chip_id="64Qv3",
         mux_ids=[0, 1],
-        tasks=["CheckRamsey", "CheckT1"],
+        tasks=[TaskCall(name="CheckRamsey"), TaskCall(name="CheckT1")],
     )
 """
 
@@ -31,6 +31,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -52,7 +53,7 @@ def simple_calibration(
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
-    tasks: list[str] | None = None,
+    tasks: list[TaskCall] | None = None,
     mode: str = "scheduled",
     tags: list[str] | None = None,
     flow_name: str | None = None,
@@ -70,7 +71,8 @@ def simple_calibration(
         mux_ids: MUX IDs to calibrate (uses MUX-based scheduling)
         exclude_qids: Qubit IDs to exclude (only with mux_ids)
         qids: Qubit IDs to calibrate (fallback if mux_ids not set)
-        tasks: Task names to run (default: CheckRabi, CreateHPIPulse, CheckHPIPulse)
+        tasks: Task calls to run; flow runs pass [{"name": "CheckRabi"}, ...]
+            (default: CheckRabi, CreateHPIPulse, CheckHPIPulse)
         mode: Execution mode:
             - "scheduled": Box-based parallelism with hardware constraints (default)
             - "serial": Fully sequential execution
@@ -100,9 +102,9 @@ def simple_calibration(
     # Define tasks to run
     if tasks is None:
         tasks = [
-            "CheckRabi",
-            "CreateHPIPulse",
-            "CheckHPIPulse",
+            TaskCall(name="CheckRabi"),
+            TaskCall(name="CreateHPIPulse"),
+            TaskCall(name="CheckHPIPulse"),
         ]
 
     # Define steps

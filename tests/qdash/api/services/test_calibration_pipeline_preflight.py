@@ -6,7 +6,9 @@ from typing import Any
 
 from qdash.api.services.calibration_pipeline_preflight import (
     PreflightTask,
+    batch_input_problems,
     effective_readout_duration,
+    input_parameter_problems,
     prerequisite_problems,
     run_parameter_problems,
 )
@@ -107,7 +109,7 @@ def spec(
     **extra: Any,
 ) -> CalibrationPipelineSpec:
     return CalibrationPipelineSpec.model_validate(
-        {"targets": {"qids": list(qids)}, "steps": steps, **extra}
+        {"spec_version": 2, "targets": {"qids": list(qids)}, "steps": steps, **extra}
     )
 
 
@@ -115,8 +117,9 @@ def one_qubit_check() -> dict[str, Any]:
     return {"type": "OneQubitCheck"}
 
 
-def custom(*tasks: str, step_name: str = "custom") -> dict[str, Any]:
-    return {"type": "CustomOneQubit", "step_name": step_name, "tasks": list(tasks)}
+def custom(*tasks: str | dict[str, Any], step_name: str = "custom") -> dict[str, Any]:
+    calls = [{"name": task} if isinstance(task, str) else task for task in tasks]
+    return {"type": "CustomOneQubit", "step_name": step_name, "tasks": calls}
 
 
 def paths(problems: list[Any]) -> dict[str, str]:
@@ -137,11 +140,13 @@ def test_effective_readout_duration_defaults_to_the_task_default() -> None:
 def test_valid_run_parameters_have_no_problems() -> None:
     valid = spec(
         [one_qubit_check(), custom("CheckT1")],
-        task_run_parameters={
+        task_parameters={
             "CheckT1": {
-                "shots": 2048,
-                "time_range": {"value": [0, 500, 26], "value_type": "np.linspace"},
-                "readout_duration": DEFAULT_READOUT_DURATION,
+                "run": {
+                    "shots": 2048,
+                    "time_range": {"value": [0, 500, 26], "value_type": "np.linspace"},
+                    "readout_duration": DEFAULT_READOUT_DURATION,
+                }
             }
         },
         default_run_parameters={"shots": 512, "readout_duration": {"value": None}},
@@ -152,20 +157,86 @@ def test_valid_run_parameters_have_no_problems() -> None:
 def test_undeclared_and_mistyped_task_run_parameters_are_problems() -> None:
     bad = spec(
         [custom("CheckT1")],
-        task_run_parameters={
-            "CheckT1": {"n_shots": 10, "shots": "many", "time_range": 5},
-            "NoSuchTask": {"shots": 1},
+        task_parameters={
+            "CheckT1": {"run": {"n_shots": 10, "shots": "many", "time_range": 5}},
+            "NoSuchTask": {"run": {"shots": 1}},
         },
     )
     problems = paths(run_parameter_problems(bad, TASKS))
     assert (
         "does not declare run parameter 'n_shots'"
-        in problems["task_run_parameters.CheckT1.n_shots"]
+        in problems["task_parameters.CheckT1.run.n_shots"]
     )
-    assert "must be int" in problems["task_run_parameters.CheckT1.shots"]
-    assert "must be np.logspace" in problems["task_run_parameters.CheckT1.time_range"]
+    assert "must be int" in problems["task_parameters.CheckT1.run.shots"]
+    assert "must be np.logspace" in problems["task_parameters.CheckT1.run.time_range"]
     # An unknown task is reported by the task check, not here.
-    assert "task_run_parameters.NoSuchTask.shots" not in problems
+    assert "task_parameters.NoSuchTask.run.shots" not in problems
+
+
+def test_call_run_values_are_checked_with_paths_into_the_call() -> None:
+    bad = spec(
+        [
+            custom(
+                {"name": "CheckT1", "call_id": "t1_short", "run": {"shots": 512}},
+                {"name": "CheckT1", "call_id": "t1_long", "run": {"shots": "many"}},
+                {"name": "CheckRabi", "run": {"readout_amplitude": 0.1}},
+            )
+        ]
+    )
+    problems = paths(run_parameter_problems(bad, TASKS))
+    assert set(problems) == {
+        "steps[0].tasks[1].run.shots",
+        "steps[0].tasks[2].run.readout_amplitude",
+    }
+    assert "must be int" in problems["steps[0].tasks[1].run.shots"]
+    assert "set it under input" in problems["steps[0].tasks[2].run.readout_amplitude"]
+
+
+def test_call_and_default_input_names_must_be_declared() -> None:
+    bad = spec(
+        [
+            custom(
+                {"name": "CheckRabi", "input": {"readout_amplitude": 0.05, "shots": 3}},
+                {"name": "CheckT1", "input": {"nonsense": 1.0}},
+            )
+        ],
+        task_parameters={"CheckRabi": {"input": {"control_frequency": 7.0}}},
+    )
+    problems = paths(input_parameter_problems(bad, TASKS))
+    assert set(problems) == {
+        "steps[0].tasks[0].input.shots",
+        "steps[0].tasks[1].input.nonsense",
+    }
+    assert "run parameter" in problems["steps[0].tasks[0].input.shots"]
+
+
+def test_batch_mode_rejects_input_overrides_before_dispatch() -> None:
+    batch = spec(
+        [
+            {
+                "type": "CustomOneQubit",
+                "step_name": "spectroscopy",
+                "mode": "simultaneous_spectroscopy",
+                "tasks": [
+                    {"name": "CheckRabi", "call_id": "first"},
+                    {"name": "CheckRabi", "call_id": "second", "input": {"readout_amplitude": 1}},
+                ],
+            }
+        ],
+    )
+    problems = paths(batch_input_problems(batch))
+    assert list(problems) == ["steps[0].tasks[1]"]
+    assert "simultaneous_spectroscopy" in problems["steps[0].tasks[1]"]
+    defaults = spec(
+        [{"type": "OneQubitCheck", "mode": "simultaneous_spectroscopy"}],
+        task_parameters={"CheckRabi": {"input": {"readout_amplitude": 1}}},
+    )
+    assert list(paths(batch_input_problems(defaults))) == ["steps[0]"]
+    serial = spec(
+        [{"type": "OneQubitCheck", "mode": "serial"}],
+        task_parameters={"CheckRabi": {"input": {"readout_amplitude": 1}}},
+    )
+    assert batch_input_problems(serial) == []
 
 
 def test_shared_run_parameters_are_checked_against_every_declaring_task() -> None:
@@ -201,17 +272,17 @@ def test_shared_parameter_unknown_to_some_task_is_fine() -> None:
 def test_per_task_readout_duration_must_match_the_session() -> None:
     mismatched = spec(
         [custom("CheckT1")],
-        task_run_parameters={"CheckT1": {"readout_duration": 2048}},
+        task_parameters={"CheckT1": {"run": {"readout_duration": 2048}}},
     )
     problems = paths(run_parameter_problems(mismatched, TASKS))
-    message = problems["task_run_parameters.CheckT1.readout_duration"]
+    message = problems["task_parameters.CheckT1.run.readout_duration"]
     assert "session-scoped" in message
     assert "2048 ns" in message
     assert f"{DEFAULT_READOUT_DURATION} ns" in message
 
     aligned = spec(
         [custom("CheckT1")],
-        task_run_parameters={"CheckT1": {"readout_duration": 2048}},
+        task_parameters={"CheckT1": {"run": {"readout_duration": 2048}}},
         default_run_parameters={"readout_duration": 2048},
     )
     assert run_parameter_problems(aligned, TASKS) == []
@@ -220,7 +291,7 @@ def test_per_task_readout_duration_must_match_the_session() -> None:
 def test_tasks_without_metadata_are_skipped() -> None:
     unknown = spec(
         [custom("CheckT1", "Mystery")],
-        task_run_parameters={"Mystery": {"anything": 1}},
+        task_parameters={"Mystery": {"run": {"anything": 1}}},
         default_run_parameters={"shots": 1},
     )
     assert run_parameter_problems(unknown, TASKS) == []
@@ -345,7 +416,11 @@ def test_coupling_steps_and_unknown_tasks_are_not_checked() -> None:
     pipeline = spec(
         [
             custom("Mystery"),
-            {"type": "CustomTwoQubit", "step_name": "cr", "tasks": ["CheckCrossResonance"]},
+            {
+                "type": "CustomTwoQubit",
+                "step_name": "cr",
+                "tasks": [{"name": "CheckCrossResonance"}],
+            },
         ]
     )
     assert prerequisite_problems(pipeline, ["0"], TASKS, calibrated_lookup(**{"0": {}}), None) == []
