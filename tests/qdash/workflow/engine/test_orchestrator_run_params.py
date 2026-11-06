@@ -580,7 +580,8 @@ class TestTaskCalibrationParameterUpdates:
         )
         orchestrator = CalibOrchestrator(config)
         task = SimpleNamespace(get_task_type=lambda: "qubit")
-        execution_context = SimpleNamespace()
+        # The orchestrator registers the planned call on the context before running it.
+        execution_context = SimpleNamespace(state=MagicMock())
         executed_context = SimpleNamespace()
         create_task = MagicMock(return_value=task)
         ensure_task = MagicMock()
@@ -621,7 +622,8 @@ class TestTaskCalibrationParameterUpdates:
         )
         orchestrator = CalibOrchestrator(config)
         task = SimpleNamespace(get_task_type=lambda: "qubit")
-        execution_context = SimpleNamespace()
+        # The orchestrator registers the planned call on the context before running it.
+        execution_context = SimpleNamespace(state=MagicMock())
         executed_context = SimpleNamespace()
         create_task = MagicMock(return_value=task)
         ensure_task = MagicMock()

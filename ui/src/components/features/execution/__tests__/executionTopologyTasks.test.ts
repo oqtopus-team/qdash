@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Task } from "@/schemas";
 
 import {
+  distinctCallId,
   filterTaskGroupsByName,
   groupTasksByEntity,
   resolveInitialTaskIndex,
@@ -72,5 +73,18 @@ describe("resolveInitialTaskIndex", () => {
 
     expect(resolveInitialTaskIndex(oneQubit["0"], "CheckT1")).toBe(0);
     expect(resolveInitialTaskIndex(oneQubit["0"], "")).toBe(0);
+  });
+});
+
+describe("distinctCallId", () => {
+  it("names the call only when it differs from the task", () => {
+    expect(distinctCallId({ name: "CheckRamsey", invocation: { call_id: "ramsey_fine" } })).toBe(
+      "ramsey_fine",
+    );
+    expect(distinctCallId({ name: "CheckRamsey", invocation: { call_id: "CheckRamsey" } })).toBe(
+      null,
+    );
+    // Results recorded before task calls existed have no invocation.
+    expect(distinctCallId({ name: "CheckRamsey" })).toBe(null);
   });
 });
