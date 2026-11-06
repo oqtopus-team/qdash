@@ -1,0 +1,6 @@
+meta:
+  description: Readout frequency of the resonator
+  unit: GHz
+  default: 6.2
+  scope: qubit
+data: {}

@@ -40,6 +40,7 @@ _MULTI_PHASE_TASKS = {
     "CheckAdaptiveChevron",
     "CheckChevron",
     "CheckCrossResonance",
+    "CheckCKP",
     "CheckRamsey",
     "CheckT1Average",
     "CheckT2EchoAverage",
@@ -182,6 +183,8 @@ def _select_progress_bar(task_name: str, description: str) -> bool:
     if task_name == "CheckResonatorSpectroscopy":
         ignored = ("electrical delay", "subrange", "within subrange")
         return not any(fragment in normalized for fragment in ignored)
+    if task_name == "CheckCPMGNoiseSpectroscopy":
+        return normalized.endswith("frequencies")
     return True
 
 
@@ -192,6 +195,7 @@ def _progress_description(task_name: str, description: str) -> str:
     task_labels = {
         "CheckAdaptiveChevron": "Adaptive Chevron sweep",
         "CheckChevron": "Chevron sweep",
+        "CheckCKP": "Filtered CKP sweep",
         "CheckRabi": "Rabi time sweep",
         "CheckCoarseReadoutParams": "Readout parameter search",
         "CheckRamsey": "Ramsey delay sweep",
@@ -201,6 +205,7 @@ def _progress_description(task_name: str, description: str) -> str:
         "CheckT2EchoAverage": "T2 echo measurement sweep",
         "CheckPIPulse": "Pi-pulse sweep",
         "CheckHPIPulse": "Half-pi-pulse sweep",
+        "CheckReadoutMIST": "Readout MIST acquisition",
         "CreatePIPulse": "Pi-pulse calibration sweep",
         "CreateHPIPulse": "Half-pi-pulse calibration sweep",
     }
@@ -215,10 +220,22 @@ def _install_adapter() -> None:
     if _installed:
         return
 
+    import importlib
+
+    from qubex.contrib.experiment import ckp_characterization
     from qubex.experiment.services import characterization_service, measurement_service
 
-    characterization_service.__dict__["tqdm"] = ReportingTqdm
-    measurement_service.__dict__["tqdm"] = ReportingTqdm
+    modules = [
+        characterization_service,
+        measurement_service,
+        ckp_characterization,
+        importlib.import_module("qubex.contrib.experiment.cpmg_noise_spectroscopy"),
+        importlib.import_module("qubex.contrib.experiment.quantum_efficiency_measurement"),
+        importlib.import_module("qubex.contrib.experiment.spin_lock_relaxation"),
+    ]
+
+    for module in modules:
+        module.__dict__["tqdm"] = ReportingTqdm
     _installed = True
 
 

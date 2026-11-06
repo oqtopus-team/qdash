@@ -5,7 +5,9 @@ import { useMemo, useState } from "react";
 import { MessageSquare, StickyNote } from "lucide-react";
 
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
-import { forumMarkerClass } from "../forum/categories";
+import type { ForumLabelDefinition } from "../forum/categories";
+import { getForumMarkerStyle } from "../forum/ForumLabelBadge";
+import { type ColorRange, getValueExtent, pickColor } from "@/lib/utils/color-scale";
 import { getQubitGridPosition } from "@/lib/utils/grid-position";
 
 import type { NoteEntryWithMetric, TargetNoteEntry } from "./MetricNotePanel";
@@ -21,6 +23,11 @@ interface DashboardCouplingGridProps {
   unit: string;
   topologyId: string;
   colors: string[];
+  /**
+   * Interval mapped onto `colors`. Defaults to the extent of `metricData`;
+   * values outside it take the end colors.
+   */
+  colorRange?: ColorRange | null;
   /** Maximum cell side length in px. Cells shrink to fit narrower containers. */
   maxCellSize?: number;
   /** Render the reverse direction of each topology coupling. */
@@ -28,7 +35,9 @@ interface DashboardCouplingGridProps {
   notedTargets?: Set<string>;
   targetNotedTargets?: Set<string>;
   /** Linked forum discussion label keyed by coupling ID. */
-  forumLinkedTargets?: Record<string, string>;
+  forumLinkedTargets?: Record<string, string | null>;
+  /** Forum label definitions used to resolve marker colors. */
+  forumLabels?: ForumLabelDefinition[];
   /** Linked forum discussion details keyed by coupling ID. */
   forumLinksByTarget?: Record<string, ForumLinkEntry[]>;
   crossMetricNotedTargets?: Set<string>;
@@ -39,33 +48,6 @@ interface DashboardCouplingGridProps {
   /** Presentation optimized for metric heatmaps or note summary topology. */
   presentation?: "metric" | "summary";
   onCouplingClick?: (couplingId: string) => void;
-}
-
-function interpolateColor(c1: string, c2: string, factor: number): string {
-  const a = parseInt(c1.slice(1), 16);
-  const b = parseInt(c2.slice(1), 16);
-  const ar = (a >> 16) & 0xff;
-  const ag = (a >> 8) & 0xff;
-  const ab = a & 0xff;
-  const br = (b >> 16) & 0xff;
-  const bg = (b >> 8) & 0xff;
-  const bb = b & 0xff;
-  const r = Math.round(ar + (br - ar) * factor);
-  const g = Math.round(ag + (bg - ag) * factor);
-  const bl = Math.round(ab + (bb - ab) * factor);
-  return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
-}
-
-function pickColor(value: number, min: number, max: number, colors: string[]): string | null {
-  if (colors.length === 0) return null;
-  if (min === max) return colors[colors.length - 1];
-  const t = Math.max(0, Math.min(1, (value - min) / (max - min)));
-  const pos = t * (colors.length - 1);
-  const lo = Math.floor(pos);
-  const hi = Math.min(lo + 1, colors.length - 1);
-  const f = pos - lo;
-  if (f === 0 || lo === hi) return colors[lo];
-  return interpolateColor(colors[lo], colors[hi], f);
 }
 
 /**
@@ -81,11 +63,13 @@ export function DashboardCouplingGrid({
   unit,
   topologyId,
   colors,
+  colorRange,
   maxCellSize = 60,
   reverseDirection = false,
   notedTargets,
   targetNotedTargets,
   forumLinkedTargets,
+  forumLabels,
   forumLinksByTarget,
   crossMetricNotedTargets,
   notesByTarget,
@@ -139,17 +123,16 @@ export function DashboardCouplingGrid({
     return getQubitGridPosition(qid, layoutParams);
   };
 
-  const { autoMin, autoMax } = useMemo(() => {
-    if (!metricData) return { autoMin: 0, autoMax: 0 };
-    const vals = Object.values(metricData)
-      .map((m) => m.value)
-      .filter((v): v is number => v !== null && v !== undefined);
-    if (vals.length === 0) return { autoMin: 0, autoMax: 0 };
-    return {
-      autoMin: Math.min(...vals),
-      autoMax: Math.max(...vals),
-    };
-  }, [metricData]);
+  const { min: rangeMin, max: rangeMax } = useMemo<ColorRange>(() => {
+    if (colorRange) return colorRange;
+    if (!metricData) return { min: 0, max: 0 };
+    return (
+      getValueExtent(Object.values(metricData).map((m) => m.value)) ?? {
+        min: 0,
+        max: 0,
+      }
+    );
+  }, [metricData, colorRange]);
 
   const couplingList: [number, number][] = useMemo(() => {
     const base =
@@ -224,7 +207,7 @@ export function DashboardCouplingGrid({
                 height: cellSize,
               }}
             >
-              <span className="text-[10px] font-semibold px-1 leading-tight">{qid}</span>
+              <span className="text-xs font-medium px-1 leading-tight">{qid}</span>
             </div>
           );
         })}
@@ -237,7 +220,7 @@ export function DashboardCouplingGrid({
           const couplingId = `${qid1}-${qid2}`;
           const metric = metricData?.[couplingId];
           const value = metric?.value ?? null;
-          const bg = value !== null ? pickColor(value, autoMin, autoMax, colors) : null;
+          const bg = value !== null ? pickColor(value, rangeMin, rangeMax, colors) : null;
           const centerX = ((pos1.col + pos2.col) / 2) * (cellSize + gap) + cellSize / 2;
           const centerY = ((pos1.row + pos2.row) / 2) * (cellSize + gap) + cellSize / 2;
           const dx = pos2.col - pos1.col;
@@ -246,7 +229,8 @@ export function DashboardCouplingGrid({
           const hasNote = notedTargets?.has(couplingId) ?? false;
           const hasTargetNote = targetNotedTargets?.has(couplingId) ?? false;
           const forumLabel = forumLinkedTargets?.[couplingId];
-          const hasForumDiscussion = !!forumLabel;
+          const hasForumDiscussion = forumLabel !== undefined;
+          const forumMarkerStyle = getForumMarkerStyle(forumLabel, forumLabels);
           const hasCrossMetricNote =
             !hasNote && !hasTargetNote && (crossMetricNotedTargets?.has(couplingId) ?? false);
           const Tag = onCouplingClick ? "button" : "div";
@@ -284,11 +268,11 @@ export function DashboardCouplingGrid({
                 });
               }}
               onMouseLeave={() => setHover(null)}
-              className={`absolute flex items-center justify-center transition-all ${
+              className={`absolute flex items-center justify-center transition-colors ${
                 isSummaryPresentation
                   ? "rounded-full"
                   : "rounded-md shadow-sm flex-col -translate-x-1/2 -translate-y-1/2"
-              } ${onCouplingClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60 hover:scale-105" : ""} ${
+              } ${onCouplingClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""} ${
                 isSummaryPresentation ? `border ${summaryChipClass}` : !bg ? "bg-base-300/60" : ""
               }`}
               style={{
@@ -308,11 +292,11 @@ export function DashboardCouplingGrid({
                   Q{qid1}→Q{qid2}
                 </span>
               ) : value !== null ? (
-                <span className="text-[10px] font-bold text-white drop-shadow leading-none">
+                <span className="text-xs font-medium text-white drop-shadow leading-none">
                   {value.toFixed(2)}
                 </span>
               ) : (
-                <span className="text-[9px] text-base-content/50 leading-none">—</span>
+                <span className="text-xs text-base-content/50 leading-none">—</span>
               )}
               {!isSummaryPresentation && (
                 <svg
@@ -363,7 +347,8 @@ export function DashboardCouplingGrid({
                 <span
                   className={`absolute rounded-full p-0.5 shadow ${
                     isSummaryPresentation ? "-bottom-2 -right-2" : "-bottom-1 -right-1"
-                  } ${forumMarkerClass(forumLabel)}`}
+                  }`}
+                  style={forumMarkerStyle}
                   title="Linked forum discussion"
                 >
                   <MessageSquare className="h-2.5 w-2.5" />

@@ -1,16 +1,22 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ExecutionResponseDetail, SaveFlowRequest, ExecuteFlowResponse } from "@/schemas";
+import type {
+  ExecuteFlowRequest,
+  ExecuteFlowResponse,
+  ExecutionResponseDetail,
+  SaveFlowRequest,
+} from "@/schemas";
 import type { AxiosResponse } from "axios";
 
+import { useChatDock } from "@/contexts/ChatDockContext";
+import { useProject } from "@/contexts/ProjectContext";
 import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
 import { useToast } from "@/components/ui/Toast";
-import { PierreFileTree } from "@/components/ui/PierreFileTree";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import {
   Command,
@@ -33,7 +39,7 @@ import {
   getFlow,
   saveFlow,
   deleteFlow,
-  useExecuteFlow,
+  executeFlow,
   useListFlows,
   listFlowSchedules,
 } from "@/client/flow/flow";
@@ -68,12 +74,19 @@ import {
 } from "lucide-react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 
+import {
+  useFirstCalibrationJourney,
+  type JourneyContext,
+} from "@/components/features/first-calibration/useFirstCalibrationJourney";
+import { executionHref } from "@/components/features/first-calibration/journeyProgress";
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
+import { FlowExplorer } from "@/components/features/flow/FlowExplorer";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { formatDateTime } from "@/lib/utils/datetime";
+import { monoFontFamily, remeasureMonacoFontsWhenLoaded } from "@/lib/fonts";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -81,8 +94,7 @@ const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 const EDITOR_OPTIONS = {
   minimap: { enabled: true, renderCharacters: false, maxColumn: 80, scale: 2 },
   fontSize: 14,
-  fontFamily:
-    "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace",
+  fontFamily: monoFontFamily,
   fontLigatures: true,
   lineNumbers: "on" as const,
   automaticLayout: true,
@@ -97,7 +109,11 @@ const EDITOR_OPTIONS = {
   cursorSmoothCaretAnimation: "on" as const,
   smoothScrolling: true,
   bracketPairColorization: { enabled: true },
-  guides: { bracketPairs: true, indentation: true, highlightActiveIndentation: true },
+  guides: {
+    bracketPairs: true,
+    indentation: true,
+    highlightActiveIndentation: true,
+  },
   renderWhitespace: "selection" as const,
   stickyScroll: { enabled: true },
   suggest: { showKeywords: true, showSnippets: true },
@@ -116,9 +132,12 @@ type SidePanel = "explorer" | "properties";
 export function WorkflowEditorPageContent() {
   const router = useRouter();
   const params = useParams();
+  // `?space=<creator>`: the Workflow page opened this editor to browse that creator's tree.
+  const initialSpace = useSearchParams().get("space");
   const queryClient = useQueryClient();
   const toast = useToast();
   const name = params.name as string;
+  const { capture: captureJourneyContext } = useFirstCalibrationJourney();
 
   const [description, setDescription] = useState("");
   const [code, setCode] = useState("");
@@ -126,6 +145,7 @@ export function WorkflowEditorPageContent() {
   const [username, setUsername] = useState("");
   const [chipId, setChipId] = useState("");
   const [tags, setTags] = useState("");
+  const [folder, setFolder] = useState("");
   const [defaultInterval, setDefaultInterval] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
@@ -210,9 +230,13 @@ export function WorkflowEditorPageContent() {
     Boolean(data?.data && chipId),
   );
 
+  // Save and run answers are checked against the user and project they were submitted in; one
+  // that lands after a project switch is dropped instead of updating this page or the guide.
   const saveMutation = useMutation({
-    mutationFn: (request: SaveFlowRequest) => saveFlow(request),
-    onSuccess: () => {
+    mutationFn: ({ request }: { request: SaveFlowRequest; context: JourneyContext }) =>
+      saveFlow(request),
+    onSuccess: (_response, { context }) => {
+      if (!context.isCurrent()) return;
       queryClient.invalidateQueries({ queryKey: ["flow", name] });
       queryClient.invalidateQueries({ queryKey: ["flows"] });
       queryClient.invalidateQueries({ queryKey: ["execution-availability"] });
@@ -229,21 +253,64 @@ export function WorkflowEditorPageContent() {
     },
   });
 
-  const executeMutation = useExecuteFlow({
-    mutation: {
-      onSuccess: (response: AxiosResponse<ExecuteFlowResponse>) => {
-        const execId = response.data.execution_id || null;
-        setLastExecutionId(execId);
-        setLastFlowRunId(response.data.flow_run_id || null);
-        toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`);
-      },
-      onSettled: () =>
-        Promise.all([
-          queryClient.invalidateQueries({ queryKey: getGetExecutionLockStatusQueryKey() }),
-          queryClient.invalidateQueries({ queryKey: ["execution-availability"] }),
-        ]),
+  const executeMutation = useMutation({
+    mutationFn: ({
+      name: flowName,
+      data: request,
+    }: {
+      name: string;
+      data: ExecuteFlowRequest;
+      context: JourneyContext;
+    }) => executeFlow(flowName, request),
+    onSuccess: (response: AxiosResponse<ExecuteFlowResponse>, variables) => {
+      if (!variables.context.isCurrent()) return;
+      const execId = response.data.execution_id || null;
+      const runChipId = variables.data.parameters?.chip_id;
+      // The first calibration guide follows this run when it is the guide's flow and chip.
+      let followedByJourney = false;
+      if (execId && typeof runChipId === "string") {
+        // Checked before recording: a guide paused or restarted during the request stays put.
+        const follows = variables.context.followsSubmittedJourney();
+        const journeyAfter = variables.context.record({
+          type: "runStarted",
+          flowName: variables.name,
+          chipId: runChipId,
+          executionId: execId,
+        });
+        followedByJourney =
+          follows &&
+          journeyAfter?.executionId === execId &&
+          journeyAfter.flowName === variables.name &&
+          journeyAfter.chipId === runChipId;
+      }
+      setLastExecutionId(execId);
+      setLastFlowRunId(response.data.flow_run_id || null);
+      toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`);
+      // The guide's run opens on its execution page, where the guide follows its progress.
+      if (followedByJourney && execId && typeof runChipId === "string") {
+        router.push(executionHref(runChipId, execId));
+      }
     },
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: getGetExecutionLockStatusQueryKey(),
+        }),
+        queryClient.invalidateQueries({ queryKey: ["execution-availability"] }),
+      ]),
   });
+
+  // Errors shown on this page belong to the project they were made in.
+  const { projectId } = useProject();
+  const resetSave = saveMutation.reset;
+  const resetExecute = executeMutation.reset;
+  const previousProjectId = useRef(projectId);
+  useEffect(() => {
+    if (previousProjectId.current === projectId) return;
+    previousProjectId.current = projectId;
+    resetSave();
+    resetExecute();
+  }, [projectId, resetSave, resetExecute]);
 
   const cancelMutation = useCancelExecution({
     mutation: {
@@ -285,6 +352,7 @@ export function WorkflowEditorPageContent() {
       setChipId(flow.chip_id);
 
       setTags(flow.tags?.join(", ") || "");
+      setFolder(flow.folder ?? "");
       const runParams = flow.default_run_parameters as
         | Record<string, { value?: string | number }>
         | undefined;
@@ -316,6 +384,33 @@ export function WorkflowEditorPageContent() {
 
   const isDirty = code !== originalCode;
 
+  // Tell the chat sidebar what is open here: the flow and the editor's current
+  // text, read when a turn is sent; a proposed edit lands in the editor unlocked.
+  const { registerPage } = useChatDock();
+  const pageState = useRef({ name, chipId, code, isDirty });
+  // Written after each commit, never during render; the provider below reads it when a turn is sent.
+  useEffect(() => {
+    pageState.current = { name, chipId, code, isDirty };
+  });
+  useEffect(
+    () =>
+      registerPage({
+        current: () => {
+          const { name, chipId, code, isDirty } = pageState.current;
+          return {
+            path: `/workflow/${name}`,
+            title: `Workflow editor: ${name}`,
+            flow: { name, chipId: chipId || undefined, code, dirty: isDirty },
+          };
+        },
+        applyCode: (next) => {
+          setCode(next);
+          setIsEditorLocked(false);
+        },
+      }),
+    [registerPage],
+  );
+
   const handleSave = useCallback(() => {
     if (isEditorLocked) return;
     if (!username.trim()) {
@@ -333,6 +428,7 @@ export function WorkflowEditorPageContent() {
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
+      folder: folder.trim(),
       default_parameters: {
         username: username.trim(),
         chip_id: chipId.trim(),
@@ -348,7 +444,7 @@ export function WorkflowEditorPageContent() {
         : {},
     };
 
-    saveMutation.mutate(request);
+    saveMutation.mutate({ request, context: captureJourneyContext() });
   }, [
     isEditorLocked,
     username,
@@ -358,8 +454,10 @@ export function WorkflowEditorPageContent() {
     flowFunctionName,
     chipId,
     tags,
+    folder,
     defaultInterval,
     saveMutation,
+    captureJourneyContext,
     toast,
   ]);
 
@@ -581,13 +679,6 @@ export function WorkflowEditorPageContent() {
     cmd.action();
   };
 
-  const filteredFlows =
-    flowsData?.data?.flows
-      ?.filter((f) =>
-        sidebarSearch ? f.name.toLowerCase().includes(sidebarSearch.toLowerCase()) : true,
-      )
-      .sort((a, b) => a.name.localeCompare(b.name)) ?? [];
-
   const sidePanelItems = [
     {
       id: "explorer" as const,
@@ -611,6 +702,7 @@ export function WorkflowEditorPageContent() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleEditorMount = useCallback((editor: any, monaco: any) => {
     editorRef.current = editor;
+    remeasureMonacoFontsWhenLoaded(monaco);
     editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
       setCursorPosition({
         line: e.position.lineNumber,
@@ -660,7 +752,7 @@ export function WorkflowEditorPageContent() {
         <div className="alert alert-error">
           <AlertTriangle className="h-5 w-5" />
           <div>
-            <div className="font-semibold">Failed to load flow</div>
+            <div className="font-medium">Failed to load flow</div>
             <div className="text-sm">{(error as Error)?.message}</div>
           </div>
         </div>
@@ -731,7 +823,8 @@ export function WorkflowEditorPageContent() {
 
   return (
     <>
-      <div className="h-[calc(100dvh-4rem)] flex flex-col bg-base-300">
+      {/* Fills the page area under the navbar and the guide banner, whatever their height. */}
+      <div className="flex h-full min-h-0 flex-col bg-base-300">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
@@ -798,6 +891,8 @@ export function WorkflowEditorPageContent() {
             <button
               onClick={() => setShowExecuteConfirm(true)}
               className="btn btn-sm btn-success"
+              data-coachmark="flow-execute"
+              data-coachmark-ready={executeDisabledReason ? undefined : "true"}
               disabled={Boolean(executeDisabledReason)}
               aria-describedby={executeDisabledReason ? "flow-execution-availability" : undefined}
               title={executeDisabledReason ?? "Execute Flow"}
@@ -882,7 +977,7 @@ export function WorkflowEditorPageContent() {
         )}
 
         {/* Main Editor Area */}
-        <div className="flex-1 flex overflow-hidden mb-4">
+        <div className="flex min-h-0 flex-1 overflow-hidden mb-4">
           {/* Activity Bar */}
           <div className="flex w-12 flex-col items-center border-r border-base-300 bg-base-200">
             <div className="flex flex-1 flex-col items-center gap-1 py-2">
@@ -908,7 +1003,7 @@ export function WorkflowEditorPageContent() {
                   >
                     <Icon size={18} />
                     {item.count ? (
-                      <span className="absolute right-0 top-0 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-content">
+                      <span className="absolute right-0 top-0 min-w-4 rounded-full bg-primary px-1 text-xs leading-4 text-primary-content">
                         {item.count > 99 ? "99+" : item.count}
                       </span>
                     ) : null}
@@ -931,7 +1026,7 @@ export function WorkflowEditorPageContent() {
 
           {/* Side Panel */}
           <div
-            className={`flex flex-col overflow-hidden bg-base-200 transition-all duration-200 ${
+            className={`flex flex-col overflow-hidden bg-base-200 transition-colors duration-200 ${
               isSidebarVisible
                 ? "w-56 min-w-56 border-r border-base-300 sm:w-72 sm:min-w-72"
                 : "w-0 min-w-0"
@@ -939,7 +1034,7 @@ export function WorkflowEditorPageContent() {
           >
             <div className="flex h-full w-56 min-w-56 flex-col sm:w-72 sm:min-w-72">
               <div className="flex h-9 items-center justify-between border-b border-base-300 px-3">
-                <span className="text-xs font-semibold uppercase tracking-wider text-base-content/60">
+                <span className="text-xs font-medium text-base-content/60">
                   {sidePanelItems.find((item) => item.id === activeSidePanel)?.label}
                 </span>
                 <button
@@ -973,40 +1068,19 @@ export function WorkflowEditorPageContent() {
                     </div>
                   </div>
                   <div className="min-h-0 flex-1 py-1">
-                    {filteredFlows.length > 0 && (
-                      <PierreFileTree
-                        nodes={filteredFlows.map((flow) => ({
-                          decoration:
-                            flow.name === name && isDirty
-                              ? {
-                                  color: "var(--color-warning)",
-                                  text: "●",
-                                  title: "Unsaved changes",
-                                }
-                              : flow.file_exists === false
-                                ? {
-                                    color: "var(--color-warning)",
-                                    text: "missing",
-                                    title: "Missing source file",
-                                  }
-                                : undefined,
-                          path: `${flow.name}.py`,
-                          type: "file",
-                        }))}
-                        onSelectFile={(path) => {
-                          const flowName = path.replace(/\.py$/, "");
-                          if (flowName !== name) {
-                            router.push(`/workflow/${encodeURIComponent(flowName)}`);
-                          }
-                        }}
-                        selectedPath={`${name}.py`}
-                      />
-                    )}
-                    {filteredFlows.length === 0 && (
-                      <div className="px-3 py-6 text-center text-xs text-base-content/40">
-                        No flows match the filter.
-                      </div>
-                    )}
+                    <FlowExplorer
+                      flows={flowsData?.data?.flows ?? []}
+                      username={userData?.data?.username}
+                      currentName={name}
+                      isDirty={isDirty}
+                      filter={sidebarSearch}
+                      initialSpace={initialSpace}
+                      onOpen={(flowName) => {
+                        if (flowName !== name) {
+                          router.push(`/workflow/${encodeURIComponent(flowName)}`);
+                        }
+                      }}
+                    />
                   </div>
                   <div className="border-t border-base-300 p-2">
                     <button
@@ -1027,7 +1101,7 @@ export function WorkflowEditorPageContent() {
                     <div className="flex items-center gap-2">
                       <FileCode size={16} className="text-primary" />
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold">{name}.py</div>
+                        <div className="truncate text-sm font-medium">{name}.py</div>
                         <div className="truncate text-xs text-base-content/50">
                           {flowFunctionName ? `${flowFunctionName}()` : "No entrypoint set"}
                         </div>
@@ -1114,6 +1188,20 @@ export function WorkflowEditorPageContent() {
                         className="input input-bordered input-sm"
                         value={tags}
                         onChange={(e) => setTags(e.target.value)}
+                      />
+                    </label>
+                    <label className="form-control flex flex-col gap-1">
+                      <span className="label py-1">
+                        <span className="label-text text-xs">Folder</span>
+                      </span>
+                      <input
+                        id="flow-side-folder"
+                        name="flowFolder"
+                        type="text"
+                        placeholder="daily/t1"
+                        className="input input-bordered input-sm"
+                        value={folder}
+                        onChange={(e) => setFolder(e.target.value)}
                       />
                     </label>
                     <label className="form-control flex flex-col gap-1">
@@ -1493,6 +1581,8 @@ export function WorkflowEditorPageContent() {
             <button
               onClick={() => setShowExecuteConfirm(true)}
               className="btn btn-circle btn-success shadow-lg"
+              data-coachmark="flow-execute"
+              data-coachmark-ready={executeDisabledReason ? undefined : "true"}
               disabled={Boolean(executeDisabledReason)}
               aria-describedby={executeDisabledReason ? "flow-execution-availability" : undefined}
             >
@@ -1663,6 +1753,25 @@ export function WorkflowEditorPageContent() {
                 </div>
 
                 <div className="form-control flex flex-col gap-1">
+                  <label htmlFor="flow-folder" className="label">
+                    <span className="label-text text-xs">Folder</span>
+                  </label>
+                  <input
+                    id="flow-folder"
+                    type="text"
+                    placeholder="daily/t1"
+                    className="input input-bordered input-sm"
+                    value={folder}
+                    onChange={(e) => setFolder(e.target.value)}
+                  />
+                  <label className="label">
+                    <span className="label-text-alt text-xs">
+                      Where it sits in your space on the Workflow page; "/" nests
+                    </span>
+                  </label>
+                </div>
+
+                <div className="form-control flex flex-col gap-1">
                   <label htmlFor="flow-interval" className="label">
                     <span className="label-text text-xs">Default Interval (ns)</span>
                   </label>
@@ -1761,13 +1870,16 @@ export function WorkflowEditorPageContent() {
             chipId={chipId}
             description={description}
             tags={tags}
+            targetDefaults={data?.data?.target_defaults}
             disabledReason={executeDisabledReason}
-            onConfirm={() => {
+            onConfirm={(targetOverride) => {
               if (executeDisabledReason) return;
               setShowExecuteConfirm(false);
               executeMutation.mutate({
                 name,
+                context: captureJourneyContext(),
                 data: {
+                  target_override: targetOverride,
                   parameters: {
                     username: username,
                     chip_id: chipId,

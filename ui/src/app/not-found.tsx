@@ -30,7 +30,7 @@ export default function NotFound() {
 
         {/* Action buttons */}
         <div className="flex flex-col sm:flex-row gap-4 mt-8">
-          <Link href="/" className="btn btn-primary btn-glow px-8">
+          <Link href="/" className="btn btn-primary px-8">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-5 w-5 mr-2"

@@ -1,0 +1,6 @@
+meta:
+  description: Critical photon number n_crit of the qubit-resonator system
+  unit: a.u.
+  default: null
+  scope: qubit
+data: {}

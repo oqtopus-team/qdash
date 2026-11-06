@@ -1,0 +1,7 @@
+# TODO: Remove {} and uncomment/adapt an entry for each physical box.
+# Match these box IDs with wiring.yaml.
+{}
+# quel3-02-a01:
+#   name: "<box-name>"
+#   type: "quel3"
+# Use the box ID registered on your QuEL-3 server.

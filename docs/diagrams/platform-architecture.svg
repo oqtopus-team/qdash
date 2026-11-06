@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 620" role="img" aria-label="QDash runs as containers: the browser talks to the UI, the UI calls the API, the API registers flows through the deployment service and starts runs on the Prefect server, and the user flow worker picks up runs from Prefect and writes results to MongoDB and calib_data.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-dash { stroke-dasharray: 5 4; }
+    .qd-ui { fill: rgba(46, 160, 67, 0.12); stroke: #2ea043; stroke-width: 1.5; }
+    .qd-api { fill: rgba(219, 109, 40, 0.12); stroke: #db6d28; stroke-width: 1.5; }
+    .qd-wf { fill: rgba(130, 80, 223, 0.12); stroke: #8250df; stroke-width: 1.5; }
+    .qd-data { fill: rgba(9, 105, 218, 0.10); stroke: #0969da; stroke-width: 1.5; }
+    .qd-ext { fill: none; stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  </style>
+  <defs>
+    <marker id="qd-arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+  </defs>
+
+  <g class="qd-root">
+    <!-- Row 1: browser -->
+    <rect x="455" y="20" width="130" height="40" rx="20" class="qd-ext"/>
+    <text x="520" y="45" class="qd-title">Browser</text>
+
+    <!-- Row 2: UI -->
+    <rect x="435" y="100" width="170" height="56" rx="8" class="qd-ui"/>
+    <text x="520" y="124" class="qd-title">UI</text>
+    <text x="520" y="142" class="qd-sub">Next.js · React</text>
+
+    <!-- Row 3: deployment service, API, agent runtime -->
+    <rect x="25" y="210" width="170" height="56" rx="8" class="qd-wf"/>
+    <text x="110" y="234" class="qd-title">Deployment service</text>
+    <text x="110" y="252" class="qd-sub">registers user flows</text>
+
+    <rect x="435" y="210" width="170" height="56" rx="8" class="qd-api"/>
+    <text x="520" y="234" class="qd-title">API</text>
+    <text x="520" y="252" class="qd-sub">FastAPI</text>
+
+    <rect x="845" y="210" width="170" height="56" rx="8" class="qd-ext"/>
+    <text x="930" y="234" class="qd-title">Agent runtime</text>
+    <text x="930" y="252" class="qd-sub">optional · Copilot</text>
+
+    <!-- Row 4: Prefect server, MongoDB, calib_data -->
+    <rect x="225" y="340" width="170" height="56" rx="8" class="qd-wf"/>
+    <text x="310" y="364" class="qd-title">Prefect server</text>
+    <text x="310" y="382" class="qd-sub">deployments · flow runs</text>
+
+    <path d="M435,348 v40 a85,8 0 0,0 170,0 v-40" class="qd-data"/>
+    <ellipse cx="520" cy="348" rx="85" ry="8" class="qd-data"/>
+    <text x="520" y="371" class="qd-title">MongoDB</text>
+    <text x="520" y="387" class="qd-sub">chips · task results</text>
+
+    <path d="M645,346 h100 l8,-6 h58 a4,4 0 0,1 4,4 v52 h-170 z" class="qd-data"/>
+    <text x="730" y="374" class="qd-title">calib_data</text>
+    <text x="730" y="390" class="qd-sub">figures · raw data</text>
+
+    <!-- Row 5: PostgreSQL, user flow worker, hardware -->
+    <path d="M25,478 v40 a85,8 0 0,0 170,0 v-40" class="qd-data"/>
+    <ellipse cx="110" cy="478" rx="85" ry="8" class="qd-data"/>
+    <text x="110" y="501" class="qd-title">PostgreSQL</text>
+    <text x="110" y="517" class="qd-sub">Prefect state</text>
+
+    <rect x="435" y="470" width="170" height="56" rx="8" class="qd-wf"/>
+    <text x="520" y="494" class="qd-title">User flow worker</text>
+    <text x="520" y="512" class="qd-sub">runs calibration tasks</text>
+
+    <rect x="845" y="470" width="170" height="56" rx="8" class="qd-ext"/>
+    <text x="930" y="494" class="qd-title">Quantum hardware</text>
+    <text x="930" y="512" class="qd-sub">control electronics</text>
+
+    <!-- Edges -->
+    <line x1="520" y1="60" x2="520" y2="98" class="qd-edge" marker-end="url(#qd-arch-arrow)"/>
+    <text x="530" y="84" class="qd-label">HTTPS</text>
+
+    <line x1="520" y1="156" x2="520" y2="208" class="qd-edge" marker-end="url(#qd-arch-arrow)"/>
+    <text x="530" y="187" class="qd-label">REST (OpenAPI)</text>
+
+    <line x1="435" y1="238" x2="197" y2="238" class="qd-edge" marker-end="url(#qd-arch-arrow)"/>
+    <text x="316" y="230" class="qd-label" text-anchor="middle">save &amp; register flow</text>
+
+    <line x1="607" y1="238" x2="843" y2="238" class="qd-edge qd-dash" marker-start="url(#qd-arch-arrow)" marker-end="url(#qd-arch-arrow)"/>
+    <text x="725" y="230" class="qd-label" text-anchor="middle">chat · tool calls</text>
+
+    <line x1="150" y1="266" x2="262" y2="338" class="qd-edge" marker-end="url(#qd-arch-arrow)"/>
+    <text x="196" y="314" class="qd-label" text-anchor="end">create deployment</text>
+
+    <line x1="475" y1="266" x2="360" y2="338" class="qd-edge" marker-end="url(#qd-arch-arrow)"/>
+    <text x="432" y="314" class="qd-label">run · cancel</text>
+
+    <line x1="520" y1="266" x2="520" y2="338" class="qd-edge" marker-start="url(#qd-arch-arrow)" marker-end="url(#qd-arch-arrow)"/>
+    <text x="530" y="306" class="qd-label">read · write</text>
+
+    <line x1="565" y1="266" x2="680" y2="338" class="qd-edge" marker-end="url(#qd-arch-arrow)"/>
+    <text x="640" y="298" class="qd-label">read</text>
+
+    <line x1="270" y1="396" x2="160" y2="468" class="qd-edge" marker-end="url(#qd-arch-arrow)"/>
+    <text x="200" y="436" class="qd-label" text-anchor="end">run state</text>
+
+    <line x1="475" y1="470" x2="360" y2="398" class="qd-edge" marker-end="url(#qd-arch-arrow)"/>
+    <text x="408" y="450" class="qd-label" text-anchor="end">polls work pool</text>
+
+    <line x1="520" y1="470" x2="520" y2="400" class="qd-edge" marker-end="url(#qd-arch-arrow)"/>
+    <text x="530" y="440" class="qd-label">results</text>
+
+    <line x1="565" y1="470" x2="680" y2="398" class="qd-edge" marker-end="url(#qd-arch-arrow)"/>
+    <text x="652" y="452" class="qd-label">writes</text>
+
+    <line x1="605" y1="498" x2="843" y2="498" class="qd-edge" marker-end="url(#qd-arch-arrow)"/>
+    <text x="725" y="490" class="qd-label" text-anchor="middle">measure via qubex</text>
+
+    <!-- Legend -->
+    <g transform="translate(25,580)">
+      <rect x="0" y="0" width="22" height="14" rx="3" class="qd-ui"/>
+      <text x="30" y="11" class="qd-label">UI</text>
+      <rect x="80" y="0" width="22" height="14" rx="3" class="qd-api"/>
+      <text x="110" y="11" class="qd-label">API</text>
+      <rect x="165" y="0" width="22" height="14" rx="3" class="qd-wf"/>
+      <text x="195" y="11" class="qd-label">Workflow</text>
+      <rect x="275" y="0" width="22" height="14" rx="3" class="qd-data"/>
+      <text x="305" y="11" class="qd-label">Data store</text>
+      <rect x="390" y="0" width="22" height="14" rx="3" class="qd-ext"/>
+      <text x="420" y="11" class="qd-label">Optional or external</text>
+    </g>
+  </g>
+</svg>

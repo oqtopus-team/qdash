@@ -17,13 +17,24 @@ from typing import TYPE_CHECKING, Any, cast
 
 from prefect import get_run_logger
 
+from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
 from qdash.datamodel.task import RunParameterModel, TaskTypes
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.task.context import TaskContext
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
+from qdash.workflow.engine.task_parameters import (
+    INPUT,
+    RUN,
+    UPDATE_CALIBRATION_PARAMETERS,
+    normalize_task_settings,
+    validate_sweep_type,
+    validate_task_settings,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.config import CalibConfig
     from qdash.workflow.engine.task.snapshot_loader import SnapshotParameterLoader
@@ -85,6 +96,8 @@ class CalibOrchestrator:
 
         # Task execution state
         self._last_executed_task_id_by_qid: dict[str, str] = {}
+        self._published_names_by_task: dict[tuple[str, str, str], set[str]] = {}
+        self._published_name_owner: dict[tuple[str, str, str], tuple[str, str, str]] = {}
 
     @property
     def execution_service(self) -> ExecutionService:
@@ -136,7 +149,7 @@ class CalibOrchestrator:
         2. Pulls config from GitHub (if configured)
         3. Initializes ExecutionService
         4. Initializes TaskContext
-        5. Initializes and connects Backend
+        5. Initializes Backend and connects it when this session executes hardware tasks
         """
         if self._initialized:
             return
@@ -182,8 +195,14 @@ class CalibOrchestrator:
 
             # Initialize Backend
             self._backend = self._create_backend()
-            self._backend.connect()
+            if config.connect_backend:
+                self._backend.connect()
         except Exception:
+            if self._backend is not None:
+                try:
+                    self._backend.disconnect()
+                except Exception:
+                    logger.exception("Failed to disconnect backend after initialization error")
             if not config.skip_execution:
                 try:
                     self._execution_service.fail(traceback.format_exc())
@@ -244,6 +263,12 @@ class CalibOrchestrator:
         if config.configuration_mode is not None:
             session_config["configuration_mode"] = config.configuration_mode
 
+        # readout_duration is session-scoped in Qubex. Every task that declares it
+        # defaults to DEFAULT_READOUT_DURATION, so the session must start from the
+        # same value when no shared default is given; otherwise Qubex falls back to
+        # its own default (or the chip's measurement_defaults.yaml) and every such
+        # task fails its session check before acquiring data.
+        session_config["readout_duration"] = float(DEFAULT_READOUT_DURATION)
         readout_duration = config.default_run_parameters.get("readout_duration")
         if isinstance(readout_duration, dict) and (
             "value" in readout_duration or "value_type" in readout_duration
@@ -366,7 +391,7 @@ class CalibOrchestrator:
         self,
         task_name: str,
         qid: str,
-        task_details: dict[str, Any] | None = None,
+        parameters: Mapping[str, Any] | None = None,
         upstream_id: str | None = None,
     ) -> dict[str, Any]:
         """Run a calibration task.
@@ -380,15 +405,17 @@ class CalibOrchestrator:
         Args:
             task_name: Name of the task (e.g., 'CheckRabi')
             qid: Qubit ID to calibrate
-            task_details: Optional call-level task configuration. Its
-                ``update_calibration_parameters`` value overrides the service setting.
+            parameters: Optional call-level settings in the form of one
+                ``task_parameters`` entry (``run``, ``input``,
+                ``update_calibration_parameters``). They take precedence over the
+                service's ``task_parameters`` for this call only.
             upstream_id: Optional upstream task_id for dependency tracking
 
         Returns:
             Task output parameters including task_id
         """
         # Step 1: Create task instance
-        task_instance = self._create_task_instance(task_name, task_details)
+        task_instance = self._create_task_instance(task_name, parameters)
         task_type = task_instance.get_task_type()
 
         # Step 2: Register task in workflow
@@ -396,7 +423,7 @@ class CalibOrchestrator:
 
         # Step 3: Prepare execution context
         update_calibration_parameters = self._should_update_calibration_parameters(
-            task_name, task_details
+            task_name, parameters
         )
         exec_context = self._prepare_execution_context(
             qid,
@@ -420,26 +447,26 @@ class CalibOrchestrator:
         self,
         task_name: str,
         qids: list[str],
-        task_details: dict[str, Any] | None = None,
+        parameters: Mapping[str, Any] | None = None,
         upstream_id: str | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Run one calibration task for a batch of qubits.
 
         ``update_calibration_parameters`` in the service's task settings controls whether
         validated outputs replace current calibration parameters. A call-level value in
-        ``task_details`` takes precedence.
+        ``parameters`` takes precedence.
         """
         if not qids:
             return {}
 
-        task_instance = self._create_task_instance(task_name, task_details)
+        task_instance = self._create_task_instance(task_name, parameters)
         task_type = task_instance.get_task_type()
 
         for qid in qids:
             self._ensure_task_in_workflow(task_name, task_type, qid)
 
         update_calibration_parameters = self._should_update_calibration_parameters(
-            task_name, task_details
+            task_name, parameters
         )
         exec_context = self._prepare_batch_execution_context(
             qids,
@@ -459,55 +486,51 @@ class CalibOrchestrator:
     def _create_task_instance(
         self,
         task_name: str,
-        task_details: dict[str, Any] | None,
+        parameters: Mapping[str, Any] | None,
     ) -> Any:
-        """Create a task instance from task name."""
+        """Create a task instance from task name.
+
+        Run parameter precedence: call-level ``parameters`` > ``task_parameters``
+        > legacy nested defaults > shared defaults > ``run_spec``. Input overrides
+        follow the same order between ``parameters`` and ``task_parameters``.
+        """
         from qdash.workflow.calibtasks.active_protocols import generate_task_instances
+        from qdash.workflow.calibtasks.base import BaseTask
 
-        if task_details is None:
-            task_details = {}
-        if task_name not in task_details:
-            task_details[task_name] = {}
+        explicit = normalize_task_settings(task_name, parameters)
+        configured = normalize_task_settings(task_name, self.config.task_parameters.get(task_name))
+        task_class = BaseTask.registry.get(self.config.backend_name, {}).get(task_name)
+        if task_class is not None:
+            validate_task_settings(
+                task_class, task_name, configured, source=f"task_parameters[{task_name!r}]"
+            )
+            validate_task_settings(
+                task_class, task_name, explicit, source=f"parameters for {task_name}"
+            )
 
-        # Inject task-specific settings and shared defaults unless explicitly overridden.
         logger.debug(
-            "_create_task_instance(%s) default_run_parameters=%s task_run_parameters=%s",
+            "_create_task_instance(%s) default_run_parameters=%s task_parameters=%s",
             task_name,
             self.config.default_run_parameters,
-            self.config.task_run_parameters,
+            configured,
         )
-        if self.config.default_run_parameters or self.config.task_run_parameters:
-            task_params = task_details[task_name]
-            if "run_parameters" not in task_params:
-                task_params["run_parameters"] = {}
-
-            # Nested defaults are retained for compatibility with existing flow documents.
-            flat_defaults: dict[str, dict[str, Any]] = {}
-            legacy_task_defaults: dict[str, Any] = {}
-            for key, data in self.config.default_run_parameters.items():
-                if not isinstance(data, dict):
-                    logger.warning(
-                        "Skipping invalid default_run_parameter %r: expected dict, got %s",
-                        key,
-                        type(data).__name__,
-                    )
-                    continue
-                if "value" in data or "value_type" in data:
-                    flat_defaults[key] = data
-                else:
-                    legacy_task_defaults[key] = data
-
-            # Precedence: explicit task_details > task_run_parameters > legacy nested defaults
-            # > shared defaults > task class defaults.
-            scoped_parameters = (
-                self.config.task_run_parameters.get(task_name),
-                legacy_task_defaults.get(task_name),
-            )
-            for task_overrides in scoped_parameters:
-                if not isinstance(task_overrides, dict):
-                    continue
-                for param_name, param_data in task_overrides.items():
-                    if param_name == "update_calibration_parameters":
+        # Shared fallbacks. Nested defaults are retained for compatibility with
+        # existing flow documents and take precedence over flat ones.
+        default_run_parameters: dict[str, Any] = {}
+        flat_defaults: dict[str, dict[str, Any]] = {}
+        for key, data in self.config.default_run_parameters.items():
+            if not isinstance(data, dict):
+                logger.warning(
+                    "Skipping invalid default_run_parameter %r: expected dict, got %s",
+                    key,
+                    type(data).__name__,
+                )
+                continue
+            if "value" in data or "value_type" in data:
+                flat_defaults[key] = data
+            elif key == task_name:
+                for param_name, param_data in data.items():
+                    if param_name == UPDATE_CALIBRATION_PARAMETERS:
                         continue
                     if not isinstance(param_data, dict):
                         logger.warning(
@@ -517,28 +540,32 @@ class CalibOrchestrator:
                             type(param_data).__name__,
                         )
                         continue
-                    if param_name not in task_params["run_parameters"]:
-                        task_params["run_parameters"][param_name] = param_data
-                        logger.debug(
-                            "Injected task run parameter %r into task %r: %s",
-                            param_name,
-                            task_name,
-                            param_data,
-                        )
-
-            for param_name, param_data in flat_defaults.items():
-                if param_name not in task_params["run_parameters"]:
-                    task_params["run_parameters"][param_name] = param_data
-                    logger.debug(
-                        "Injected shared default run parameter %r into task %r: %s",
-                        param_name,
+                    default_run_parameters[param_name] = param_data
+        for param_name, param_data in flat_defaults.items():
+            default_run_parameters.setdefault(param_name, param_data)
+        if task_class is not None:
+            # A shared value must fit the declared type of every task it reaches
+            # (any sweep form for a sweep parameter, never a sweep for a scalar);
+            # a task-scoped value for the same name replaces it for this task.
+            for param_name, param_data in default_run_parameters.items():
+                overridden = param_name in configured[RUN] or param_name in explicit[RUN]
+                if param_name in task_class.run_spec and not overridden:
+                    validate_sweep_type(
+                        task_class,
                         task_name,
+                        param_name,
                         param_data,
+                        source="default_run_parameters",
                     )
 
+        params = {
+            "run_parameters": default_run_parameters,
+            "run": {**configured[RUN], **explicit[RUN]},
+            "input": {**configured[INPUT], **explicit[INPUT]},
+        }
         task_instances = generate_task_instances(
             task_names=[task_name],
-            task_details=task_details,
+            task_details={task_name: params},
             backend=self.config.backend_name,
         )
         return task_instances[task_name]
@@ -546,23 +573,14 @@ class CalibOrchestrator:
     def _should_update_calibration_parameters(
         self,
         task_name: str,
-        task_details: dict[str, Any] | None,
+        parameters: Mapping[str, Any] | None,
     ) -> bool:
         """Return whether one task should update the current calibration parameters."""
-        task_config = (task_details or {}).get(task_name, {})
-        if not isinstance(task_config, dict):
-            raise ValueError(f"Task details for {task_name} must be a mapping")
-
-        task_run_parameters = self.config.task_run_parameters.get(task_name, {})
-        if not isinstance(task_run_parameters, dict):
-            raise ValueError(f"Task run parameters for {task_name} must be a mapping")
-
-        value = task_config.get(
-            "update_calibration_parameters",
-            task_run_parameters.get(
-                "update_calibration_parameters",
-                self.config.persist_output_parameters,
-            ),
+        explicit = normalize_task_settings(task_name, parameters)
+        configured = normalize_task_settings(task_name, self.config.task_parameters.get(task_name))
+        value = explicit.get(
+            UPDATE_CALIBRATION_PARAMETERS,
+            configured.get(UPDATE_CALIBRATION_PARAMETERS, self.config.persist_output_parameters),
         )
         if not isinstance(value, bool):
             raise ValueError(f"update_calibration_parameters for {task_name} must be a boolean")
@@ -737,6 +755,8 @@ class CalibOrchestrator:
             self.task_context.state.calib_data.coupling.update(executed_context.calib_data.coupling)
         # Track task_id for upstream dependency
         executed_task = executed_context.get_task(task_name=task_name, task_type=task_type, qid=qid)
+        if update_calibration_parameters and executed_task.status.value == "completed":
+            self._reconcile_published_parameters(executed_context, task_name, task_type, qid)
         self._last_executed_task_id_by_qid[qid] = executed_task.task_id
 
         # Extract and return output parameters
@@ -766,6 +786,8 @@ class CalibOrchestrator:
             executed_task = executed_context.get_task(
                 task_name=task_name, task_type=task_type, qid=qid
             )
+            if update_calibration_parameters and executed_task.status.value == "completed":
+                self._reconcile_published_parameters(executed_context, task_name, task_type, qid)
             self._last_executed_task_id_by_qid[qid] = executed_task.task_id
             result = executed_context.state.get_output_parameter_by_task_name(
                 task_name, task_type=task_type, qid=qid
@@ -784,6 +806,31 @@ class CalibOrchestrator:
             results[qid] = dict(result)
 
         return results
+
+    def _reconcile_published_parameters(
+        self, executed_context: TaskContext, task_name: str, task_type: str, qid: str
+    ) -> None:
+        """Remove aliases dropped by a rerun if the same task still owns them."""
+        published_names = executed_context.state.get_published_parameter_names(
+            task_name, task_type, qid
+        )
+        if task_type not in (TaskTypes.QUBIT, TaskTypes.COUPLING):
+            return
+        task_key = (task_name, task_type, qid)
+        previous_names = self._published_names_by_task.get(task_key, set())
+        calib_data = [self.task_context.state.calib_data]
+        if self._execution_service is not None:
+            calib_data.append(self._execution_service.calib_data)
+        for name in previous_names - published_names:
+            owner_key = (task_type, qid, name)
+            if self._published_name_owner.get(owner_key) == task_key:
+                for current in calib_data:
+                    data = current.qubit if task_type == TaskTypes.QUBIT else current.coupling
+                    data.get(qid, {}).pop(name, None)
+                del self._published_name_owner[owner_key]
+        for name in published_names:
+            self._published_name_owner[(task_type, qid, name)] = task_key
+        self._published_names_by_task[task_key] = published_names
 
     def _ensure_task_in_workflow(self, task_name: str, task_type: str, qid: str) -> None:
         """Ensure task exists in TaskContext's workflow structure."""

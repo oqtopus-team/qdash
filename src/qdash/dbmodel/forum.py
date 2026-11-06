@@ -48,6 +48,33 @@ class ForumCategoryDocument(Document):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ForumLabelDocument(Document):
+    """Project-scoped custom forum label."""
+
+    project_id: str = Field(..., description="Owning project identifier")
+    key: str = Field(..., description="Stable label key")
+    name: str = Field(..., description="Display name")
+    description: str = Field(default="", description="Short label description")
+    color: str = Field(..., description="Display color as a lowercase hex string")
+    system_info: SystemInfoModel = Field(
+        default_factory=SystemInfoModel, description="System timestamps"
+    )
+
+    class Settings:
+        """Settings for the document."""
+
+        name = "forum_label"
+        indexes: ClassVar = [
+            IndexModel(
+                [("project_id", ASCENDING), ("key", ASCENDING)],
+                unique=True,
+                name="project_key_unique_idx",
+            ),
+        ]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 FORUM_THREAD_STATUSES = {"open", "investigating", "identified", "resolved"}
 
 
@@ -79,6 +106,9 @@ class ForumPostDocument(Document):
         default=None, description="Linked target type: qubit or coupling"
     )
     target_id: str | None = Field(default=None, description="Linked target identifier")
+    task_id: str | None = Field(
+        default=None, description="Linked task result; the thread is about that result"
+    )
     cooldown_id: str | None = Field(default=None, description="Linked cool-down identifier")
     parent_id: str | None = Field(
         default=None, description="Parent forum post ID for replies. None for root threads."
@@ -119,6 +149,16 @@ class ForumPostDocument(Document):
                     ("system_info.created_at", ASCENDING),
                 ],
                 name="project_parent_deleted_status_created_idx",
+            ),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("task_id", ASCENDING),
+                    ("is_deleted", ASCENDING),
+                    ("system_info.created_at", DESCENDING),
+                ],
+                name="project_task_deleted_created_idx",
+                partialFilterExpression={"task_id": {"$type": "string"}},
             ),
             IndexModel(
                 [

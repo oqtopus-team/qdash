@@ -9,7 +9,7 @@ title = "QDash Betterleaks Configuration"
 # Path-level exemptions (was: Gitleaks `[[allowlists]] paths`).
 # `prefilter` runs *before* any regex and only sees file/commit metadata, so it
 # skips whole files cheaply. These are all generation-owned or fixed-sample
-# files; see docs/development/credential-scan.md for why each is safe.
+# files; see docs/developer-guide/conventions/credential-scan.md for why each is safe.
 # ---------------------------------------------------------------------------
 prefilter = '''
 matchesAny(attributes[?"path"].orValue(""), [
@@ -28,6 +28,10 @@ matchesAny(attributes[?"path"].orValue(""), [
 # betterleaks exposes the clean value in finding["secret"]; we match the mongodb
 # URI here (Gitleaks used regexTarget="match") because betterleaks' finding["match"]
 # includes a trailing quote that would break the `$` anchor.
+#
+# The remaining branches pin each known sample value to its rule and file so the
+# same literal elsewhere, or any other value in these files, is still reported.
+# The filter uses the snake_case key finding["rule_id"]; paths are repo-relative.
 # ---------------------------------------------------------------------------
 filter = '''
 matchesAny(finding["secret"], [
@@ -38,6 +42,48 @@ matchesAny(finding["secret"], [
   r"""^x180_gate_fidelity$""",
   r"""^zx90_gate_fidelity$""",
 ])
+|| (
+  finding["rule_id"] == "generic-credential-uri"
+  && finding["secret"] == "example"
+  && matchesAny(finding["match"], [r"""^mongodb://root:example@mongo:27017(/|\b)"""])
+)
+|| (
+  finding["rule_id"] == "generic-password"
+  && (
+    (
+      matchesAny(attributes[?"path"].orValue(""), [r"""^\.env\.example(\.qubex)?$"""])
+      && matchesAny(finding["secret"], [r"""^(example|prefect|passw0rd)$"""])
+    )
+    || (
+      matchesAny(attributes[?"path"].orValue(""), [r"""^tests/data/sample_data\.py$"""])
+      && matchesAny(finding["secret"], [r"""^(secure_password123|admin_password123|short)$"""])
+    )
+    || (
+      matchesAny(attributes[?"path"].orValue(""), [r"""^tests/qdash/api/routers/test_backend\.py$""", r"""^tests/qdash/api/routers/test_provenance\.py$""", r"""^tests/qdash/api/routers/test_admin\.py$""", r"""^tests/qdash/api/routers/test_forum\.py$""", r"""^tests/qdash/api/routers/test_flow\.py$""", r"""^tests/qdash/api/routers/test_copilot_auth\.py$""", r"""^tests/qdash/api/routers/test_chip\.py$""", r"""^tests/qdash/api/routers/test_evaluation\.py$""", r"""^tests/qdash/api/routers/test_execution\.py$""", r"""^tests/qdash/api/routers/test_project_members\.py$""", r"""^tests/qdash/api/routers/test_task_knowledge_archive\.py$""", r"""^tests/qdash/api/routers/test_file\.py$""", r"""^tests/qdash/api/routers/test_calibration_pipeline\.py$""", r"""^tests/qdash/api/routers/test_copilot_preferences\.py$""", r"""^tests/qdash/api/routers/test_note\.py$""", r"""^tests/qdash/api/routers/test_settings\.py$""", r"""^tests/qdash/api/services/test_notification_service\.py$"""])
+      && matchesAny(finding["match"], [r"""^password="(hashed|unused)",?$"""])
+    )
+    || (
+      matchesAny(attributes[?"path"].orValue(""), [r"""^tests/qdash/api/routers/test_admin\.py$"""])
+      && finding["secret"] == "changed-password"
+    )
+    || (
+      matchesAny(attributes[?"path"].orValue(""), [r"""^ui/src/components/features/admin/__tests__/EditUserModal\.test\.tsx$"""])
+      && finding["secret"] == "temporary-secret"
+    )
+    || (
+      matchesAny(attributes[?"path"].orValue(""), [r"""^ui/src/components/features/settings/PasswordChangeCard/PasswordChangeCard\.test\.tsx$"""])
+      && matchesAny(finding["secret"], [r"""^(current|next-password)$"""])
+    )
+    || (
+      matchesAny(attributes[?"path"].orValue(""), [r"""^ui/src/components/features/auth/LoginPageContent\.tsx$"""])
+      && finding["secret"] == "Show password"
+    )
+    || (
+      matchesAny(attributes[?"path"].orValue(""), [r"""^ui/src/components/features/settings/PasswordChangeCard/index\.tsx$"""])
+      && finding["secret"] == "new-password"
+    )
+  )
+)
 '''
 
 # Inherit all built-in detection rules (AWS, GitHub, GCP, Azure, Slack, Stripe,

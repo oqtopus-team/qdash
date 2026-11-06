@@ -23,6 +23,7 @@ from qdash.workflow.calibtasks.base import (
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.raw_data import extract_qubex_raw_data
+from qdash.workflow.calibtasks.qubex.validation import DEFAULT_RABI_R2_THRESHOLD
 from qdash.workflow.engine.task.provenance_recorder import resolve_qid
 
 if TYPE_CHECKING:
@@ -35,12 +36,24 @@ RABI_CONTEXT_PARAMETER_UNITS = {
     "rabi_amplitude": "a.u.",
     "rabi_phase": "a.u.",
     "rabi_offset": "a.u.",
-    "rabi_angle": "degree",
+    "rabi_angle": "rad",
     "rabi_noise": "a.u.",
     "rabi_distance": "a.u.",
     "rabi_reference_phase": "a.u.",
     "rabi_r2": "",
     "maximum_rabi_frequency": "MHz/a.u.",
+}
+
+EF_RABI_CONTEXT_PARAMETER_UNITS = {
+    "ef_rabi_amplitude": "a.u.",
+    "ef_rabi_frequency": "MHz",
+    "ef_rabi_phase": "a.u.",
+    "ef_rabi_offset": "a.u.",
+    "ef_rabi_angle": "rad",
+    "ef_rabi_noise": "a.u.",
+    "ef_rabi_distance": "a.u.",
+    "ef_rabi_reference_phase": "a.u.",
+    "ef_rabi_r2": "",
 }
 
 
@@ -187,10 +200,10 @@ class QubexTask(BaseTask):
                 continue
             label = self.get_qubit_label(backend, role_qid)
             rabi_r2 = values[f"{prefix}rabi_r2"]
-            if not math.isfinite(rabi_r2) or rabi_r2 < 0.6:
+            if not math.isfinite(rabi_r2) or rabi_r2 < DEFAULT_RABI_R2_THRESHOLD:
                 raise ValueError(
                     f"{self.name} requires finite {prefix}rabi_r2 greater than or equal to "
-                    f"0.6; got {rabi_r2}"
+                    f"{DEFAULT_RABI_R2_THRESHOLD}; got {rabi_r2}"
                 )
             self._validate_rabi_readout_duration(backend, prefix, role_qid, names)
             rabi_params[label] = RabiParam(
@@ -213,6 +226,39 @@ class QubexTask(BaseTask):
             exp = self.get_experiment(backend)
             exp.store_rabi_params(rabi_params)
 
+    def _restore_ef_rabi_context(self, backend: "QubexBackend", qid: str) -> None:
+        """Restore an EF Rabi fit persisted as transition-specific QDash inputs."""
+        names = tuple(EF_RABI_CONTEXT_PARAMETER_UNITS)
+        values = self._resolved_input_values(names)
+        if values is None:
+            return
+        r2 = values["ef_rabi_r2"]
+        if not math.isfinite(r2) or r2 < DEFAULT_RABI_R2_THRESHOLD:
+            raise ValueError(
+                f"{self.name} requires finite ef_rabi_r2 greater than or equal to "
+                f"{DEFAULT_RABI_R2_THRESHOLD}; got {r2}"
+            )
+        self._validate_rabi_readout_duration(backend, "ef_", qid, names)
+        exp = self.get_experiment(backend)
+        label = self.get_qubit_label(backend, qid)
+        ef_label = exp.ctx.resolve_ef_label(label)
+        exp.store_rabi_params(
+            {
+                ef_label: RabiParam(
+                    target=ef_label,
+                    amplitude=values["ef_rabi_amplitude"],
+                    frequency=values["ef_rabi_frequency"] / 1000,
+                    phase=values["ef_rabi_phase"],
+                    offset=values["ef_rabi_offset"],
+                    noise=values["ef_rabi_noise"],
+                    angle=values["ef_rabi_angle"],
+                    distance=values["ef_rabi_distance"],
+                    r2=r2,
+                    reference_phase=values["ef_rabi_reference_phase"],
+                )
+            }
+        )
+
     @staticmethod
     def _parameter_value(parameters: Mapping[str, Any], name: str) -> Any:
         """Return a persisted parameter value from either a model or a dictionary."""
@@ -229,6 +275,14 @@ class QubexTask(BaseTask):
         names: tuple[str, ...],
     ) -> None:
         """Verify that restored Rabi parameters match the active readout duration."""
+        role = prefix.removesuffix("_")
+        if role == "ef":
+            context_name = "EF Rabi"
+        elif role:
+            context_name = f"{role} Rabi"
+        else:
+            context_name = "Rabi"
+        source_task_name = "CheckEFRabi" if role == "ef" else "CheckRabi"
         control_amplitude_name = f"{prefix}control_amplitude"
         source_task_ids = {
             parameter.task_id
@@ -238,20 +292,20 @@ class QubexTask(BaseTask):
         }
         if not source_task_ids:
             raise ValueError(
-                f"{self.name} cannot validate {prefix}Rabi parameters for qid {role_qid}: "
-                "the source task ID was not recorded. Run CheckRabi under the current "
-                "readout conditions before retrying."
+                f"{self.name} cannot validate {context_name} parameters for qid {role_qid}: "
+                f"the source task ID was not recorded. Run {source_task_name} under the "
+                "current readout conditions before retrying."
             )
         if len(source_task_ids) != 1:
             raise ValueError(
-                f"{self.name} received {prefix}Rabi parameters from multiple source tasks: "
+                f"{self.name} received {context_name} parameters from multiple source tasks: "
                 + ", ".join(sorted(source_task_ids))
             )
 
         project_id = backend.config.get("project_id")
         if not project_id:
             raise ValueError(
-                f"{self.name} cannot validate {prefix}Rabi readout duration without project_id"
+                f"{self.name} cannot validate {context_name} readout duration without project_id"
             )
         source_task_id = next(iter(source_task_ids))
         source_tasks = MongoTaskResultHistoryRepository().find(
@@ -260,7 +314,8 @@ class QubexTask(BaseTask):
         )
         if not source_tasks:
             raise ValueError(
-                f"{self.name} cannot find source Rabi task {source_task_id} for qid {role_qid}"
+                f"{self.name} cannot find source {context_name} task {source_task_id} "
+                f"for qid {role_qid}"
             )
         source_task = source_tasks[0]
         source_duration = self._parameter_value(source_task.run_parameters, "readout_duration")
@@ -278,10 +333,10 @@ class QubexTask(BaseTask):
         current_duration = float(self.get_experiment(backend).readout_duration)
         if not math.isclose(source_duration_value, current_duration):
             raise ValueError(
-                f"{self.name} cannot use {prefix}Rabi parameters for qid {role_qid}: "
+                f"{self.name} cannot use {context_name} parameters for qid {role_qid}: "
                 f"source readout_duration is {source_duration_value:g} ns, but the current "
-                f"Qubex session uses {current_duration:g} ns. Run CheckRabi under the current "
-                "readout conditions before retrying."
+                f"Qubex session uses {current_duration:g} ns. Run {source_task_name} under "
+                "the current readout conditions before retrying."
             )
 
     def _restore_qubit_pulse_context(self, backend: "QubexBackend", qid: str) -> None:
@@ -330,14 +385,26 @@ class QubexTask(BaseTask):
                 )
 
             for pulse_type in ("drag_hpi", "drag_pi"):
-                drag = self._resolved_input_values(
-                    (
-                        f"{prefix}{pulse_type}_amplitude",
-                        f"{prefix}{pulse_type}_duration",
-                        f"{prefix}{pulse_type}_beta",
-                    )
+                drag_names = (
+                    f"{prefix}{pulse_type}_amplitude",
+                    f"{prefix}{pulse_type}_duration",
+                    f"{prefix}{pulse_type}_beta",
                 )
+                drag = self._resolved_input_values(drag_names)
                 if drag is None:
+                    continue
+                drag_declarations = [self.__class__.input_spec.get(name) for name in drag_names]
+                optional_group = all(
+                    declaration is not None and declaration.resolution == "database_or_default"
+                    for declaration in drag_declarations
+                )
+                # Optional pulse groups use zero-valued fallbacks when no complete
+                # calibration exists. Leave the Qubex session untouched in that case.
+                if optional_group and (
+                    not all(math.isfinite(value) for value in drag.values())
+                    or drag[f"{prefix}{pulse_type}_amplitude"] <= 0
+                    or drag[f"{prefix}{pulse_type}_duration"] <= 0
+                ):
                     continue
                 getattr(exp.calib_note, f"update_{pulse_type}_param")(
                     label,
@@ -346,6 +413,32 @@ class QubexTask(BaseTask):
                         "duration": drag[f"{prefix}{pulse_type}_duration"],
                         "amplitude": drag[f"{prefix}{pulse_type}_amplitude"],
                         "beta": drag[f"{prefix}{pulse_type}_beta"],
+                    },
+                )
+
+            if prefix:
+                continue
+            ef_label = exp.ctx.resolve_ef_label(label)
+            ef_hpi = self._resolved_input_values(("ef_hpi_amplitude", "ef_hpi_duration"))
+            if ef_hpi is not None:
+                exp.calib_note.update_hpi_param(
+                    ef_label,
+                    {
+                        "target": ef_label,
+                        "duration": ef_hpi["ef_hpi_duration"],
+                        "amplitude": ef_hpi["ef_hpi_amplitude"],
+                        "tau": HPI_RAMPTIME,
+                    },
+                )
+            ef_pi = self._resolved_input_values(("ef_pi_amplitude", "ef_pi_duration"))
+            if ef_pi is not None:
+                exp.calib_note.update_pi_param(
+                    ef_label,
+                    {
+                        "target": ef_label,
+                        "duration": ef_pi["ef_pi_duration"],
+                        "amplitude": ef_pi["ef_pi_amplitude"],
+                        "tau": PI_RAMPTIME,
                     },
                 )
 
@@ -425,6 +518,7 @@ class QubexTask(BaseTask):
     def _restore_calibration_context(self, backend: "QubexBackend", qid: str) -> None:
         """Synchronize resolved task inputs into the Qubex in-memory context."""
         self._restore_rabi_context(backend, qid)
+        self._restore_ef_rabi_context(backend, qid)
         self._restore_qubit_pulse_context(backend, qid)
         self._restore_cr_context(backend, qid)
 
@@ -443,6 +537,7 @@ class QubexTask(BaseTask):
 
         Behavior for each parameter:
         - If resolution="database_required": Load from DB or raise an error
+        - If resolution="database_optional": Load from DB or leave the value as None
         - If resolution="database_or_default": Prefer DB, otherwise use default
         - If resolution="default_only": Do not use a DB value
         - If value is None: Deprecated compatibility behavior; create from DB data
@@ -537,18 +632,26 @@ class QubexTask(BaseTask):
             # Get the ordered list of data sources for this role
             sources = role_data_sources.get(qid_role, role_data_sources.get("", []))
 
-            lookup_keys: tuple[str, ...] = (lookup_key,)
+            primary_lookup_keys: tuple[str, ...] = (lookup_key,)
+            fallback_lookup_keys: tuple[str, ...] = ()
             if isinstance(declaration, InputParameterSpec):
-                lookup_keys += declaration.parameter_aliases
+                primary_lookup_keys += declaration.parameter_aliases
+                fallback_lookup_keys = declaration.fallback_parameter_names
 
-            # Search sources in order, preferring the canonical key within each source.
+            # Preserve source priority for equivalent names, but only use semantic
+            # fallbacks when no canonical name or alias exists in any source.
             db_value = None
+            resolved_parameter_name = lookup_key
             value_found = False
-            for source in sources:
-                for candidate_key in lookup_keys:
-                    if candidate_key in source:
-                        db_value = source[candidate_key]
-                        value_found = True
+            for lookup_keys in (primary_lookup_keys, fallback_lookup_keys):
+                for source in sources:
+                    for candidate_key in lookup_keys:
+                        if candidate_key in source:
+                            db_value = source[candidate_key]
+                            resolved_parameter_name = candidate_key
+                            value_found = True
+                            break
+                    if value_found:
                         break
                 if value_found:
                     break
@@ -559,6 +662,8 @@ class QubexTask(BaseTask):
                         if declaration.resolution == "default_only":
                             continue
                         self.input_parameters[param_name] = InputParameterModel(
+                            parameter_name=resolved_parameter_name,
+                            qid_role=declaration.qid_role,
                             value=db_value.get("value", declaration.default),
                             value_type=declaration.value_type,
                             unit=db_value.get("unit", declaration.unit),
@@ -815,9 +920,9 @@ class QubexTask(BaseTask):
         raise ValueError("readout_amplitude input parameter is required")
 
     def _is_frequency_overridden(self, backend: "QubexBackend", qid: str) -> bool:
-        """Check if qubit_frequency was explicitly overridden from default.
+        """Check if control_frequency was explicitly overridden from default.
 
-        This method compares the current qubit_frequency in input_parameters
+        This method compares the current control_frequency in input_parameters
         with the default frequency from the quantum system. If they differ,
         it indicates that the user explicitly provided a custom frequency.
 
@@ -831,15 +936,15 @@ class QubexTask(BaseTask):
             True if frequency was explicitly provided (differs from default)
 
         """
-        # If qubit_frequency is not in input_parameters, there's no override
-        if "qubit_frequency" not in self.input_parameters:
+        # If control_frequency is not in input_parameters, there's no override
+        if "control_frequency" not in self.input_parameters:
             return False
 
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
 
         # Get current frequency from input_parameters
-        current_freq = self._get_calibration_value("qubit_frequency")
+        current_freq = self._get_calibration_value("control_frequency")
 
         # Get default frequency from quantum system
         default_freq = exp.experiment_system.quantum_system.get_qubit(label).frequency
@@ -854,7 +959,7 @@ class QubexTask(BaseTask):
         """Context manager to apply multiple parameter overrides.
 
         This unified method handles parameter types that can be overridden:
-        - qubit_frequency: Uses exp.modified_frequencies() context manager
+        - control_frequency: Uses exp.modified_frequencies() context manager
         - readout_amplitude: Direct modification with restoration
         - control_amplitude: Direct modification with restoration
 
@@ -878,24 +983,20 @@ class QubexTask(BaseTask):
         Example:
         -------
             ```python
-            # Single parameter override
-            task_details = {
-                "CheckFineChevron": {
-                    "input_parameters": {
-                        "readout_amplitude": {"value": 0.15}
+            # Overrides are declared per task in the workflow and applied to
+            # input_parameters by TaskExecutor after preprocess.
+            cal = CalibService(
+                username,
+                chip_id,
+                task_parameters={
+                    "CheckFineChevron": {
+                        "input": {
+                            "control_frequency": 5.2,
+                            "readout_amplitude": 0.15,
+                        }
                     }
-                }
-            }
-
-            # Multiple parameter overrides
-            task_details = {
-                "CheckFineChevron": {
-                    "input_parameters": {
-                        "qubit_frequency": {"value": 5.2},
-                        "readout_amplitude": {"value": 0.15}
-                    }
-                }
-            }
+                },
+            )
 
             # Usage in task run method:
             with self._apply_parameter_overrides(session, qid):
@@ -934,9 +1035,9 @@ class QubexTask(BaseTask):
             # a method argument (e.g., exp.qubit_spectroscopy(readout_frequency=...))
             # because resonator.frequency is a read-only property in qubex.
 
-            # Check qubit_frequency override (handled specially via modified_frequencies)
+            # Check control_frequency override (handled specially via modified_frequencies)
             if self._is_frequency_overridden(backend, qid):
-                frequency_override = self._get_calibration_value("qubit_frequency")
+                frequency_override = self._get_calibration_value("control_frequency")
 
             # Execute with frequency override if needed
             if frequency_override is not None:
@@ -960,8 +1061,8 @@ class QubexTask(BaseTask):
 
         DEPRECATED: Use _apply_parameter_overrides() instead for better flexibility.
 
-        This method checks if the qubit_frequency was explicitly overridden
-        via task_details. If so, it uses exp.modified_frequencies() to
+        This method checks if the control_frequency was explicitly overridden
+        through a calibration input override. If so, it uses exp.modified_frequencies() to
         temporarily modify the qubit frequency during task execution.
 
         Args:
@@ -985,7 +1086,7 @@ class QubexTask(BaseTask):
         label = self.get_qubit_label(backend, qid)
 
         if self._is_frequency_overridden(backend, qid):
-            override_freq = self._get_calibration_value("qubit_frequency")
+            override_freq = self._get_calibration_value("control_frequency")
             with exp.modified_frequencies({label: override_freq}):
                 yield
         else:

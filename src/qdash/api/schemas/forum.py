@@ -1,9 +1,9 @@
 """Schema definitions for forum discussions."""
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 FORUM_CATEGORY_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,63}$"
 FORUM_CATEGORY_COLOR_PATTERN = (
@@ -12,7 +12,11 @@ FORUM_CATEGORY_COLOR_PATTERN = (
 FORUM_CATEGORY_ICON_PATTERN = r"^[a-z0-9][a-z0-9-]{0,63}$"
 FORUM_TARGET_TYPE_PATTERN = r"^(qubit|coupling)$"
 FORUM_THREAD_STATUS_PATTERN = r"^(open|investigating|identified|resolved)$"
+FORUM_LABEL_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
 ForumThreadStatus = Literal["open", "investigating", "identified", "resolved"]
+ForumLabelName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)
+]
 
 
 class ForumImageUploadResponse(BaseModel):
@@ -87,6 +91,39 @@ class ListForumCategoriesResponse(BaseModel):
     categories: list[ForumCategoryResponse]
 
 
+class ForumLabelCreate(BaseModel):
+    """Request schema for creating a forum label."""
+
+    name: ForumLabelName = Field(..., description="Display name")
+    description: str = Field(default="", max_length=200, description="Short description")
+    color: str = Field(..., pattern=FORUM_LABEL_COLOR_PATTERN, description="Display hex color")
+
+
+class ForumLabelUpdate(BaseModel):
+    """Request schema for updating a forum label."""
+
+    name: ForumLabelName | None = Field(default=None, description="Display name")
+    description: str | None = Field(default=None, max_length=200, description="Short description")
+    color: str | None = Field(
+        default=None, pattern=FORUM_LABEL_COLOR_PATTERN, description="Display hex color"
+    )
+
+
+class ForumLabelResponse(BaseModel):
+    """Response schema for a forum label."""
+
+    key: str = Field(..., description="Stable label key")
+    name: str = Field(..., description="Display name")
+    description: str = Field(default="", description="Short label description")
+    color: str = Field(..., description="Display hex color")
+
+
+class ListForumLabelsResponse(BaseModel):
+    """List of forum labels."""
+
+    labels: list[ForumLabelResponse]
+
+
 class ForumPostCreate(BaseModel):
     """Request schema for creating a forum thread or reply."""
 
@@ -112,8 +149,7 @@ class ForumPostCreate(BaseModel):
     )
     labels: list[str] = Field(
         default_factory=list,
-        max_length=1,
-        description="Operator label for root threads",
+        description="Operator labels for root threads",
     )
     assignee_username: str | None = Field(
         default=None, max_length=64, description="Assigned project member username"
@@ -127,6 +163,13 @@ class ForumPostCreate(BaseModel):
     )
     target_id: str | None = Field(default=None, max_length=128, description="Linked target ID")
     cooldown_id: str | None = Field(default=None, max_length=128, description="Linked cool-down ID")
+    task_id: str | None = Field(
+        default=None,
+        max_length=128,
+        description=(
+            "Task result this thread is about. Chip and target are filled from it when not given."
+        ),
+    )
 
 
 class ForumPostUpdate(BaseModel):
@@ -149,8 +192,7 @@ class ForumPostUpdate(BaseModel):
     )
     labels: list[str] | None = Field(
         default=None,
-        max_length=1,
-        description="Updated operator label for root threads",
+        description="Updated operator labels for root threads",
     )
     assignee_username: str | None = Field(
         default=None, max_length=64, description="Updated assigned project member username"
@@ -178,6 +220,19 @@ class ForumAiReplyRequest(BaseModel):
     user_message: str = Field(..., min_length=1, max_length=8000, description="User message to AI")
 
 
+class ForumTaskResultSummary(BaseModel):
+    """The task result a thread is about, as the forum shows it without another request."""
+
+    task_id: str
+    task_name: str
+    qid: str
+    chip_id: str | None = None
+    status: str
+    end_at: datetime | None = None
+    figure_path: list[str] = Field(default_factory=list)
+    json_figure_path: list[str] = Field(default_factory=list)
+
+
 class ForumPostResponse(BaseModel):
     """Response schema for a forum post."""
 
@@ -199,7 +254,10 @@ class ForumPostResponse(BaseModel):
         description="BlockNote document JSON. Source of truth for rich content; content is derived.",
     )
     parent_id: str | None = Field(default=None, description="Parent forum post ID")
-    labels: list[str] = Field(default_factory=list, description="Operator label for root threads")
+    labels: list[str] = Field(
+        default_factory=list,
+        description="Operator labels for root threads",
+    )
     assignee_username: str | None = Field(
         default=None, description="Assigned project member username"
     )
@@ -208,6 +266,10 @@ class ForumPostResponse(BaseModel):
     target_type: str | None = Field(default=None, description="Linked target type")
     target_id: str | None = Field(default=None, description="Linked target ID")
     cooldown_id: str | None = Field(default=None, description="Linked cool-down ID")
+    task_id: str | None = Field(default=None, description="Task result this thread is about")
+    task_result: ForumTaskResultSummary | None = Field(
+        default=None, description="Summary of that task result, on threads and listings"
+    )
     reply_count: int = Field(default=0, description="Number of replies to this thread")
     is_deleted: bool = Field(default=False, description="Whether this post is archived/deleted")
     is_ai_reply: bool = Field(default=False, description="Whether this reply was generated by AI")

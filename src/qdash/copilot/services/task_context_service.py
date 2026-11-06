@@ -1,0 +1,171 @@
+"""Context assembly for a chat about one task result."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from qdash.copilot.config import CopilotConfig
+    from qdash.copilot.contracts import TaskContextBundle
+
+
+HISTORY_LAST_N = 5
+"""Recent runs of the same task shown when a chat opens on a result."""
+
+COUPLING_PARAMS = ("zx_rate", "coupling_strength")
+"""Coupling parameters shown for a two-qubit target."""
+
+
+class TaskContextBuilder:
+    """Build a task result's context from task knowledge and repository-backed loaders."""
+
+    def __init__(
+        self,
+        *,
+        load_qubit_params: Callable[[str, str], dict[str, Any]],
+        load_task_result: Callable[[str], dict[str, Any] | None],
+        load_task_history: Callable[[str, str, str, int], list[dict[str, Any]]],
+        load_neighbor_qubit_params: Callable[
+            [str, str, list[str] | None], dict[str, dict[str, Any]]
+        ],
+        load_coupling_params: Callable[[str, str, list[str] | None], dict[str, dict[str, Any]]],
+        load_figure_as_base64: Callable[[list[str]], str | None],
+        load_figures_as_base64: Callable[[list[str]], list[tuple[str, str]]],
+        collect_expected_images: Callable[..., list[tuple[str, str]]],
+    ) -> None:
+        self._load_qubit_params = load_qubit_params
+        self._load_task_result = load_task_result
+        self._load_task_history = load_task_history
+        self._load_neighbor_qubit_params = load_neighbor_qubit_params
+        self._load_coupling_params = load_coupling_params
+        self._load_figure_as_base64 = load_figure_as_base64
+        self._load_figures_as_base64 = load_figures_as_base64
+        self._collect_expected_images = collect_expected_images
+
+    def build_task_context(
+        self,
+        *,
+        task_name: str,
+        chip_id: str,
+        qid: str,
+        task_id: str,
+        image_base64: str | None,
+        config: CopilotConfig,
+    ) -> TaskContextBundle:
+        """Build the full context a chat about this task result opens with."""
+        from qdash.copilot.contracts import (
+            TaskContext,
+            TaskContextBundle,
+        )
+        from qdash.datamodel.task_knowledge import get_task_knowledge
+
+        knowledge = get_task_knowledge(task_name)
+        knowledge_prompt = self._build_task_knowledge_prompt(task_name, knowledge)
+        qubit_params = self._load_qubit_params(chip_id, qid)
+        task_result = self._load_task_result(task_id)
+        input_params, output_params, run_params, figure_paths = self._extract_task_result_payload(
+            task_result
+        )
+        history_results, neighbor_qubit_params, coupling_params = self._load_related_context(
+            task_name=task_name,
+            chip_id=chip_id,
+            qid=qid,
+            knowledge=knowledge,
+        )
+        image_base64, expected_images, experiment_images = self._resolve_images(
+            knowledge=knowledge,
+            task_result=task_result,
+            figure_paths=figure_paths,
+            image_base64=image_base64,
+            config=config,
+        )
+
+        context = TaskContext(
+            task_knowledge_prompt=knowledge_prompt,
+            chip_id=chip_id,
+            qid=qid,
+            qubit_params=qubit_params,
+            input_parameters=input_params,
+            output_parameters=output_params,
+            run_parameters=run_params,
+            history_results=history_results,
+            neighbor_qubit_params=neighbor_qubit_params,
+            coupling_params=coupling_params,
+        )
+        return TaskContextBundle(
+            context=context,
+            image_base64=image_base64,
+            expected_images=expected_images,
+            experiment_images=experiment_images,
+            figure_paths=figure_paths,
+        )
+
+    @staticmethod
+    def _build_task_knowledge_prompt(task_name: str, knowledge: Any) -> str:
+        """Build the prompt prefix from task knowledge or fall back to the task name."""
+        if not knowledge:
+            return f"Task: {task_name}"
+        return str(knowledge.to_prompt(include_examples=True))
+
+    @staticmethod
+    def _extract_task_result_payload(
+        task_result: dict[str, Any] | None,
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], list[str]]:
+        """Extract the task-result fields the context is built from."""
+        if not task_result:
+            return {}, {}, {}, []
+        return (
+            task_result.get("input_parameters", {}),
+            task_result.get("output_parameters", {}),
+            task_result.get("run_parameters", {}),
+            task_result.get("figure_path", []),
+        )
+
+    def _load_related_context(
+        self,
+        *,
+        task_name: str,
+        chip_id: str,
+        qid: str,
+        knowledge: Any,
+    ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+        """Load the result's recent history and, for a coupling target, its coupling parameters.
+
+        The knowledge text is declarative and no longer says what to load:
+        every task chat gets the last runs of the same task; two-qubit tasks
+        also get the coupling's parameters. The planner fetches anything else.
+        """
+        del knowledge
+        history_results = self._load_task_history(task_name, chip_id, qid, HISTORY_LAST_N)
+        neighbor_qubit_params: dict[str, dict[str, Any]] = {}
+        coupling_params: dict[str, dict[str, Any]] = {}
+        if "-" in qid:
+            coupling_params = self._load_coupling_params(chip_id, qid, list(COUPLING_PARAMS))
+        return history_results, neighbor_qubit_params, coupling_params
+
+    def _resolve_images(
+        self,
+        *,
+        knowledge: Any,
+        task_result: dict[str, Any] | None,
+        figure_paths: list[str],
+        image_base64: str | None,
+        config: CopilotConfig,
+    ) -> tuple[str | None, list[tuple[str, str]], list[tuple[str, str]]]:
+        """Resolve the measured and expected figures the chat opens with."""
+        expected_images: list[tuple[str, str]] = []
+        experiment_images: list[tuple[str, str]] = []
+        if not config.task_chat.multimodal:
+            return image_base64, expected_images, experiment_images
+
+        if task_result:
+            experiment_images = self._load_figures_as_base64(figure_paths)
+        if not image_base64:
+            image_base64 = self._load_figure_as_base64(figure_paths)
+        # Example figures illustrate labeled outcomes; they follow the expected plot.
+        expected_images = self._collect_expected_images(
+            knowledge, config.task_chat.max_expected_images, include_example_images=True
+        )
+        return image_base64, expected_images, experiment_images

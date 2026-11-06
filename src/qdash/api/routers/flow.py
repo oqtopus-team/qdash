@@ -3,13 +3,14 @@
 from logging import getLogger
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from qdash.api.dependencies import (
     get_flow_schedule_service,
     get_flow_service,
 )
 from qdash.api.lib.project import ProjectContext, get_project_context, get_project_context_editor
+from qdash.api.schemas.error import Detail
 from qdash.api.schemas.flow import (
     DeleteScheduleResponse,
     ExecuteFlowRequest,
@@ -19,6 +20,8 @@ from qdash.api.schemas.flow import (
     GetFlowResponse,
     ListFlowSchedulesResponse,
     ListFlowsResponse,
+    MoveFlowRequest,
+    MoveFlowResponse,
     SaveFlowRequest,
     SaveFlowResponse,
     ScheduleFlowRequest,
@@ -43,13 +46,24 @@ logger = getLogger("uvicorn.app")
     response_model=SaveFlowResponse,
     summary="Save a flow",
     operation_id="saveFlow",
+    responses={
+        409: {
+            "model": Detail,
+            "description": "create_only is set and a flow with this name already exists",
+        },
+    },
 )
 async def save_flow(
     request: SaveFlowRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[FlowService, Depends(get_flow_service)],
 ) -> SaveFlowResponse:
-    """Save a Flow to file system and MongoDB."""
+    """Save a Flow to file system and MongoDB.
+
+    By default the save creates the flow or overwrites an existing one. With
+    ``create_only`` it only creates a new flow, and an existing name returns 409
+    without changing the stored flow.
+    """
     return await service.save_flow(request, ctx.user.username, ctx.project_id)
 
 
@@ -80,9 +94,13 @@ async def list_flows(
 )
 async def list_flow_templates(
     service: Annotated[FlowService, Depends(get_flow_service)],
+    backend: Annotated[
+        str | None,
+        Query(description="Only templates written for this backend, e.g. qubex or fake"),
+    ] = None,
 ) -> list[FlowTemplate]:
-    """List all available flow templates."""
-    return await service.list_templates()
+    """List the flow templates, optionally filtered to one backend."""
+    return await service.list_templates(backend)
 
 
 @router.get(
@@ -221,6 +239,22 @@ async def execute_flow(
 ) -> ExecuteFlowResponse:
     """Execute a Flow via Prefect deployment."""
     return await service.execute_flow(name, request, ctx.user.username, ctx.project_id)
+
+
+@router.patch(
+    "/flows/{name}/folder",
+    response_model=MoveFlowResponse,
+    summary="Move a flow to another folder",
+    operation_id="moveFlow",
+)
+async def move_flow(
+    name: str,
+    request: MoveFlowRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[FlowService, Depends(get_flow_service)],
+) -> MoveFlowResponse:
+    """Change the folder a Flow is filed under; its code and deployment are untouched."""
+    return await service.move_flow(name, ctx.project_id, request.folder)
 
 
 @router.delete(

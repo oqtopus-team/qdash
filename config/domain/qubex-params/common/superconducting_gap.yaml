@@ -1,0 +1,6 @@
+meta:
+  description: The minimum energy required to break an electron pair in a superconductor
+  unit: μeV
+  default: null
+  scope: qubit
+data: {}

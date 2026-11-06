@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from qdash.datamodel.flow_targets import FlowTargetOverride
+
 
 class SaveFlowRequest(BaseModel):
     """Request to save a Flow."""
@@ -24,6 +26,21 @@ class SaveFlowRequest(BaseModel):
         description="Default run parameters applied to all tasks (e.g., interval, shots)",
     )
     tags: list[str] = Field(default_factory=list, description="Tags for categorization")
+    folder: str | None = Field(
+        default=None,
+        description=(
+            'Folder path inside the creator\'s space, e.g. "daily/t1"; "" is the root.'
+            " Omitted keeps an existing flow's folder (a new flow goes to the root)."
+        ),
+    )
+    create_only: bool = Field(
+        default=False,
+        description=(
+            "Create a new flow only. When a flow or flow file with this name already exists"
+            " in the project, the request fails with 409 and changes nothing."
+            " False (the default) creates the flow or overwrites an existing one."
+        ),
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -36,6 +53,7 @@ class SaveFlowRequest(BaseModel):
                     "chip_id": "64Qv3",
                     "default_parameters": {"qids": ["32"], "max_iterations": 10},
                     "tags": ["adaptive", "calibration"],
+                    "folder": "adaptive",
                 }
             ]
         }
@@ -61,6 +79,9 @@ class FlowSummary(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     tags: list[str] = Field(..., description="Tags")
+    folder: str = Field(
+        "", description='Folder path inside the creator\'s space, e.g. "daily/t1" (empty = root)'
+    )
     file_exists: bool = Field(True, description="Whether the flow source file exists")
 
 
@@ -73,6 +94,9 @@ class ListFlowsResponse(BaseModel):
 class GetFlowResponse(BaseModel):
     """Response for getting flow details."""
 
+    target_defaults: FlowTargetOverride | None = Field(
+        None, description="Statically resolved source targets; null when dynamic or ambiguous"
+    )
     name: str = Field(..., description="Flow name")
     created_by: str = Field(..., description="Username of the flow creator")
     description: str = Field(..., description="Flow description")
@@ -88,11 +112,34 @@ class GetFlowResponse(BaseModel):
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
     tags: list[str] = Field(..., description="Tags")
+    folder: str = Field(
+        "", description='Folder path inside the creator\'s space, e.g. "daily/t1" (empty = root)'
+    )
+
+
+class MoveFlowRequest(BaseModel):
+    """Request to move a Flow to another folder of its creator's space."""
+
+    folder: str = Field(
+        ..., description='Target folder path, e.g. "daily/t1"; "" moves the flow to the root'
+    )
+
+
+class MoveFlowResponse(BaseModel):
+    """Response after moving a flow."""
+
+    name: str = Field(..., description="Flow name")
+    folder: str = Field(..., description="The folder the flow now sits in")
+    message: str = Field(..., description="Success message")
 
 
 class ExecuteFlowRequest(BaseModel):
     """Request to execute a Flow."""
 
+    target_override: FlowTargetOverride | None = Field(
+        None,
+        description="Targets for this run, overriding direct CalibService and pipeline targets",
+    )
     parameters: dict[str, Any] = Field(
         default_factory=dict, description="Execution parameters (overrides default_parameters)"
     )
@@ -178,6 +225,7 @@ class FlowScheduleSummary(BaseModel):
     next_run: datetime | None = Field(None, description="Next scheduled run time")
     active: bool = Field(..., description="Whether the schedule is active")
     created_at: datetime = Field(..., description="Schedule creation time")
+    chip_id: str | None = Field(None, description="Target chip ID of the schedule, when known")
 
 
 class ListFlowSchedulesResponse(BaseModel):
@@ -217,6 +265,7 @@ class FlowTemplate(BaseModel):
     name: str = Field(..., description="Template name")
     description: str = Field(..., description="Template description")
     category: str = Field(..., description="Template category")
+    backend: str = Field(..., description="Backend the template's tasks run on, e.g. qubex or fake")
     filename: str = Field(..., description="Python filename")
     function_name: str = Field(..., description="Flow function name")
 

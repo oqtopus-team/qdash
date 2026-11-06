@@ -52,7 +52,7 @@ def test_partial_write_failure_restores_all_files(updater, tmp_path, monkeypatch
     before = {p.name: p.read_bytes() for p in tmp_path.glob("*.yaml")}
     original = updater._update_yaml
 
-    def fail_second(path, label, value):
+    def fail_second(path, label, value, **kwargs):
         if path.name == "frequency.yaml":
             raise OSError("disk full")
         return original(path, label, value)
@@ -68,7 +68,7 @@ def test_partial_write_failure_restores_all_files(updater, tmp_path, monkeypatch
 
 def test_verification_failure_rolls_back(updater, tmp_path, monkeypatch):
     before = (tmp_path / "frequency.yaml").read_bytes()
-    monkeypatch.setattr(updater, "_update_yaml", lambda *args: False)
+    monkeypatch.setattr(updater, "_update_yaml", lambda *args, **kwargs: False)
     with (
         pytest.raises(ValueError, match="verification failed"),
         updater.applied("4", {"frequency": {"value": 5.0}}),
@@ -182,3 +182,114 @@ def test_rollback_failure_is_explicit(updater, monkeypatch):
         updater.applied("4", {"frequency": {"value": 5.0}}),
     ):
         raise RuntimeError("DB failed")
+
+
+def test_mux_files_are_keyed_by_mux_index_with_integer_values(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "qdash.common.config.params_updater.ConfigLoader.load_workflow",
+        lambda: {
+            "params_updater": {
+                "parameter_file_map": {
+                    "capture_delay": "capture_delay.yaml",
+                    "capture_delay_word": "capture_delay_word.yaml",
+                },
+                "mux_file_names": ["capture_delay.yaml", "capture_delay_word.yaml"],
+            }
+        },
+    )
+    (tmp_path / "capture_delay.yaml").write_text(
+        "meta:\n  unit: ndelay\ndata:\n  # MUX\n  0: 7\n  2: 8\n"
+    )
+    updater = YamlParamsUpdater(tmp_path, "Q05")
+
+    with updater.applied(
+        "5",
+        {
+            "capture_delay": {"value": 9.0, "unit": "ndelay"},
+            "capture_delay_word": {"value": 4, "unit": "word"},
+        },
+    ):
+        pass
+
+    delay = YAML().load((tmp_path / "capture_delay.yaml").read_text())
+    word = YAML().load((tmp_path / "capture_delay_word.yaml").read_text())
+    assert dict(delay["data"]) == {0: 7, 1: 9, 2: 8}
+    assert list(delay["data"]) == [0, 1, 2]
+    assert isinstance(delay["data"][1], int)
+    assert dict(word["data"]) == {1: 4}
+    # Qubex rejects capture delay files without meta.unit, so a new file declares it.
+    assert word["meta"]["unit"] == "word"
+    assert list(word) == ["meta", "data"]
+    assert delay["meta"]["unit"] == "ndelay"
+    assert "# MUX" in (tmp_path / "capture_delay.yaml").read_text()
+
+
+def test_missing_unit_is_added_even_when_the_value_is_unchanged(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "qdash.common.config.params_updater.ConfigLoader.load_workflow",
+        lambda: {
+            "params_updater": {
+                "parameter_file_map": {"capture_delay_word": "capture_delay_word.yaml"},
+                "mux_file_names": ["capture_delay_word.yaml"],
+            }
+        },
+    )
+    (tmp_path / "capture_delay_word.yaml").write_text("data:\n  1: 4\n")
+    updater = YamlParamsUpdater(tmp_path, "Q05")
+
+    assert updater.update("5", {"capture_delay_word": {"value": 4, "unit": "word"}}) == {
+        "capture_delay_word.yaml"
+    }
+
+    word = YAML().load((tmp_path / "capture_delay_word.yaml").read_text())
+    assert word["meta"]["unit"] == "word"
+    assert dict(word["data"]) == {1: 4}
+
+
+def test_mux_unit_mismatch_rejects_update_without_changing_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "qdash.common.config.params_updater.ConfigLoader.load_workflow",
+        lambda: {
+            "params_updater": {
+                "parameter_file_map": {"capture_delay_word": "capture_delay_word.yaml"},
+                "mux_file_names": ["capture_delay_word.yaml"],
+            }
+        },
+    )
+    path = tmp_path / "capture_delay_word.yaml"
+    before = "meta:\n  unit: ndelay\ndata:\n  1: 4\n"
+    path.write_text(before)
+    updater = YamlParamsUpdater(tmp_path, "Q05")
+
+    with pytest.raises(ValueError, match=r"declares meta\.unit='ndelay'"):
+        updater.update("5", {"capture_delay_word": {"value": 4, "unit": "word"}})
+
+    assert path.read_text() == before
+
+
+def test_equal_mux_value_is_rewritten_as_integer(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "qdash.common.config.params_updater.ConfigLoader.load_workflow",
+        lambda: {
+            "params_updater": {
+                "parameter_file_map": {"capture_delay_word": "capture_delay_word.yaml"},
+                "mux_file_names": ["capture_delay_word.yaml"],
+            }
+        },
+    )
+    path = tmp_path / "capture_delay_word.yaml"
+    path.write_text("meta:\n  unit: word\ndata:\n  1: 4.0\n")
+    updater = YamlParamsUpdater(tmp_path, "Q05")
+
+    assert updater.update("5", {"capture_delay_word": {"value": 4, "unit": "word"}}) == {
+        "capture_delay_word.yaml"
+    }
+    assert type(YAML().load(path.read_text())["data"][1]) is int
+
+
+def test_equal_non_mux_value_keeps_existing_yaml(updater, tmp_path):
+    before = (tmp_path / "frequency.yaml").read_text()
+
+    assert updater.update("4", {"frequency": {"value": 4}}) == set()
+
+    assert (tmp_path / "frequency.yaml").read_text() == before

@@ -1,0 +1,6 @@
+meta:
+  description: Average photon number n_bar used in the dispersive readout, which depends on the readout amplitude specified in readout_amplitude.yaml during the CKP measurement
+  unit: a.u.
+  default: null
+  scope: qubit
+data: {}

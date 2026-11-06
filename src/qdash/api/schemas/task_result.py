@@ -6,8 +6,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
-from qdash.copilot.config import ModelConfig
-from qdash.datamodel.note import AiReviewModel
 from qdash.datamodel.task import (
     ParameterModel,
     TaskResultInputParameter,
@@ -38,7 +36,6 @@ class TaskResult(BaseModel):
     elapsed_time: timedelta | None = None
     task_type: str | None = None
     default_view: bool = True
-    ai_review: AiReviewModel | None = None
 
     @field_validator("elapsed_time", mode="before")
     @classmethod
@@ -84,7 +81,6 @@ class TaskResultListItem(BaseModel):
     start_at: datetime | None = None
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None
-    ai_review_status: str = ""
 
     @field_validator("elapsed_time", mode="before")
     @classmethod
@@ -143,116 +139,8 @@ class TaskResultExcludeResponse(BaseModel):
     excluded_at: datetime | None
 
 
-class BulkAiReviewRequest(BaseModel):
-    """Request body for bulk AI review."""
-
-    model_config = ConfigDict(protected_namespaces=())
-
-    chip_id: str
-    task: str
-    entity_type: str = "qubit"
-    date: str | None = None
-    task_ids: list[str] | None = None
-    model_override: ModelConfig | None = None
-
-
-class BulkAiReviewResponse(BaseModel):
-    """Response after enqueueing bulk AI review."""
-
-    review_run_id: str = ""
-    chip_id: str
-    task: str
-    entity_type: str
-    date: str | None = None
-    requested_count: int
-    task_ids: list[str]
-    skipped_reason: str | None = None
-
-
-class AiReviewListItem(BaseModel):
-    """One AI review record extracted from a task result."""
-
-    task_id: str
-    review_run_id: str
-    task_name: str
-    chip_id: str
-    qid: str
-    target: str
-    execution_id: str
-    task_status: str
-    review_status: str
-    decision: str
-    human_label: str
-    accepted_parameters: str
-    needs_review: str
-    primary_reason: str
-    suggested_labels: str
-    recommended_action: str
-    model: str
-    requested_by: str
-    requested_at: datetime | None
-    completed_at: datetime | None
-    note_updated_at: datetime | None
-    start_at: datetime | None
-    figure_path: list[str]
-    json_figure_path: list[str]
-    review_markdown: str
-    format_ok: bool
-
-
-class AiReviewListResponse(BaseModel):
-    """Paginated AI review list response."""
-
-    items: list[AiReviewListItem]
-    total: int
-    skip: int
-    limit: int
-    decision_counts: dict[str, int]
-    status_counts: dict[str, int]
-
-
-class AiReviewRunSummary(BaseModel):
-    """Summary for one bulk AI review run."""
-
-    review_run_id: str
-    trigger_type: str
-    chip_id: str
-    task_name: str
-    entity_type: str
-    execution_ids: list[str]
-    requested_by: str
-    requested_at: datetime | None
-    completed_at: datetime | None
-    model: str
-    total: int
-    completed_count: int
-    failed_count: int
-    running_count: int
-    requested_count: int
-    decision_counts: dict[str, int]
-    status_counts: dict[str, int]
-
-
-class AiReviewRunListResponse(BaseModel):
-    """Paginated AI review run list response."""
-
-    items: list[AiReviewRunSummary]
-    total: int
-    skip: int
-    limit: int
-
-
-class AiReviewRunDetailResponse(BaseModel):
-    """Detail response for one AI review run."""
-
-    run: AiReviewRunSummary
-    items: list[AiReviewListItem]
-
-
 class DownloadFiguresAsZipRequest(BaseModel):
     """Request body for downloading task-result artifacts as a ZIP archive."""
 
     paths: list[str] = []
     filename: str = "figures.zip"
-    ai_review_task_ids: list[str] = []
-    ai_review_bundle_task_ids: list[str] = []

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
+from qdash.workflow.engine.task_parameters import normalize_task_parameters
 from qdash.workflow.service.results import OneQubitResult, normalize_metric_value
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import BRINGUP_TASKS
@@ -32,7 +33,7 @@ class BringUp(CalibrationStep):
 
     Executes BRINGUP_TASKS:
     - CheckResonatorSpectroscopy (MUX-level): Estimates readout_frequency
-    - CheckQubitSpectroscopy: Estimates coarse_qubit_frequency, anharmonicity, coarse_control_amplitude
+    - CheckQubitSpectroscopy: Estimates coarse_qubit_frequency and coarse_control_amplitude
     - CheckControlAmplitude: Refines coarse_control_amplitude via sqrt-Lorentzian fit
     - CheckAdaptiveChevron: Adaptive rough/fine search for qubit_frequency
     - CheckRabi: Refines control_amplitude (Rabi-rate-derived)
@@ -49,8 +50,8 @@ class BringUp(CalibrationStep):
     Metrics extracted:
     - readout_frequency (GHz): From resonator spectroscopy
     - readout_amplitude (a.u.): From resonator spectroscopy optimal power
-    - qubit_frequency (GHz): f01 transition frequency from qubit spectroscopy
-    - anharmonicity (GHz): alpha = f12 - f01 (typically negative for transmon)
+    - coarse_qubit_frequency (GHz): f01 estimate from qubit spectroscopy
+    - qubit_frequency (GHz): Refined f01 transition frequency from adaptive Chevron
 
     Example:
         # Basic usage
@@ -132,14 +133,13 @@ class BringUp(CalibrationStep):
         if self.resonator_assignment_order is None:
             return
 
-        task_run_parameters = copy.deepcopy(service.task_run_parameters)
-        task_params = task_run_parameters.setdefault("CheckResonatorSpectroscopy", {})
-        task_params["resonator_assignment_order"] = {
-            "value": self.resonator_assignment_order,
-            "value_type": "list",
-        }
-        service.task_run_parameters.clear()
-        service.task_run_parameters.update(task_run_parameters)
+        task_parameters = copy.deepcopy(service.task_parameters)
+        task_settings = task_parameters.setdefault(
+            "CheckResonatorSpectroscopy", {"run": {}, "input": {}}
+        )
+        task_settings["run"]["resonator_assignment_order"] = self.resonator_assignment_order
+        service.task_parameters.clear()
+        service.task_parameters.update(normalize_task_parameters(task_parameters))
 
     def _execute_direct(
         self,
@@ -160,7 +160,8 @@ class BringUp(CalibrationStep):
             "execution_id": service.execution_id,
             "project_id": service.project_id,
             "default_run_parameters": service.default_run_parameters,
-            "task_run_parameters": service.task_run_parameters,
+            "task_parameters": service.task_parameters,
+            "configuration_mode": getattr(service, "configuration_mode", None),
             "tags": service.tags,
             "flow_name": service.flow_name,
             "note": service.note,
@@ -222,7 +223,7 @@ class BringUp(CalibrationStep):
             if (value := normalize_metric_value(amp_param)) is not None:
                 metrics["readout_amplitude"] = value
 
-        # Coarse qubit frequency and anharmonicity from CheckQubitSpectroscopy
+        # Coarse qubit frequency from CheckQubitSpectroscopy
         qubit_result = raw.get("CheckQubitSpectroscopy", {})
         if qubit_result and not qubit_result.get("skipped", False):
             # Coarse qubit frequency (f01) — proper qubit_frequency comes from
@@ -230,11 +231,6 @@ class BringUp(CalibrationStep):
             qubit_freq_param = qubit_result.get("coarse_qubit_frequency")
             if (value := normalize_metric_value(qubit_freq_param)) is not None:
                 metrics["coarse_qubit_frequency"] = value
-
-            # Anharmonicity (α = f12 - f01)
-            anharm_param = qubit_result.get("anharmonicity")
-            if (value := normalize_metric_value(anharm_param)) is not None:
-                metrics["anharmonicity"] = value
 
         # Proper qubit frequency from the adaptive Chevron search.
         chevron_result = raw.get("CheckAdaptiveChevron", {})

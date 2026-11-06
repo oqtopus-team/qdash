@@ -1,0 +1,6 @@
+meta:
+  description: Anharmonicity of the qubit
+  unit: GHz
+  default: null
+  scope: qubit
+data: {}

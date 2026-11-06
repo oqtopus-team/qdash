@@ -4,34 +4,41 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from functools import partial
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.security import (
+    HTTPAuthorizationCredentials,  # noqa: TC002 - FastAPI resolves annotations
+)
 
 from qdash.api.dependencies import get_forum_service
-from qdash.api.lib.ai_labels import STATUS_LABELS as _AI_STATUS_LABELS
-from qdash.api.lib.ai_labels import TOOL_LABELS as _AI_TOOL_LABELS
+from qdash.api.lib.auth import bearer_scheme
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
+    get_project_context_editor,
     get_project_context_owner,
 )
-from qdash.api.lib.sse import SSETaskBridge, sse_event
+from qdash.api.lib.sse import sse_event
 from qdash.api.schemas.forum import (
     ForumAiReplyRequest,
     ForumCategoryCreate,
     ForumCategoryResponse,
     ForumCategoryUpdate,
     ForumImageUploadResponse,
+    ForumLabelCreate,
+    ForumLabelResponse,
+    ForumLabelUpdate,
     ForumPostCreate,
     ForumPostResponse,
     ForumPostUpdate,
     ListForumCategoriesResponse,
+    ListForumLabelsResponse,
     ListForumPostsResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
+from qdash.api.services import pi_chat_service
 from qdash.api.services.forum_service import ForumService
 
 if TYPE_CHECKING:
@@ -125,6 +132,78 @@ def delete_forum_category(
 
 
 @router.get(
+    "/forum/labels",
+    summary="List forum labels",
+    operation_id="listForumLabels",
+    response_model=ListForumLabelsResponse,
+)
+def list_forum_labels(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ForumService, Depends(get_forum_service)],
+) -> ListForumLabelsResponse:
+    """List forum labels for the active project."""
+    return service.list_labels(project_id=ctx.project_id)
+
+
+@router.post(
+    "/forum/labels",
+    summary="Create a forum label",
+    operation_id="createForumLabel",
+    response_model=ForumLabelResponse,
+    status_code=201,
+)
+def create_forum_label(
+    body: ForumLabelCreate,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[ForumService, Depends(get_forum_service)],
+) -> ForumLabelResponse:
+    """Create a forum label. Only project owners and editors can manage labels; the key is server-generated."""
+    return service.create_label(
+        project_id=ctx.project_id,
+        name=body.name,
+        description=body.description,
+        color=body.color,
+    )
+
+
+@router.patch(
+    "/forum/labels/{label_key}",
+    summary="Update a forum label",
+    operation_id="updateForumLabel",
+    response_model=ForumLabelResponse,
+)
+def update_forum_label(
+    label_key: str,
+    body: ForumLabelUpdate,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[ForumService, Depends(get_forum_service)],
+) -> ForumLabelResponse:
+    """Update a forum label. Only project owners and editors can manage labels."""
+    return service.update_label(
+        project_id=ctx.project_id,
+        key=label_key,
+        name=body.name,
+        description=body.description,
+        color=body.color,
+    )
+
+
+@router.delete(
+    "/forum/labels/{label_key}",
+    summary="Delete a forum label",
+    operation_id="deleteForumLabel",
+    response_model=SuccessResponse,
+)
+def delete_forum_label(
+    label_key: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[ForumService, Depends(get_forum_service)],
+) -> SuccessResponse:
+    """Delete a forum label. Only project owners and editors can manage labels."""
+    return service.delete_label(project_id=ctx.project_id, key=label_key)
+
+
+@router.get(
     "/forum/posts",
     summary="List forum threads",
     operation_id="listForumPosts",
@@ -169,6 +248,10 @@ def list_forum_posts(
         str | None,
         Query(max_length=128, description="Filter by linked cool-down ID"),
     ] = None,
+    task_id: Annotated[
+        str | None,
+        Query(max_length=128, description="Only threads about this task result"),
+    ] = None,
     number: Annotated[
         int | None,
         Query(ge=1, description="Filter by project-scoped forum thread number"),
@@ -176,11 +259,8 @@ def list_forum_posts(
     status: Annotated[
         str | None,
         Query(
-            pattern=r"^(open|investigating|identified|resolved)$",
-            description=(
-                "Filter by workflow status. Default open. "
-                "Use null/omit at the client layer for all."
-            ),
+            pattern=r"^(open|investigating|identified|resolved|all)$",
+            description="Filter by workflow status. Default open; 'all' lists every status.",
         ),
     ] = "open",
     q: Annotated[
@@ -201,6 +281,7 @@ def list_forum_posts(
         target_type=target_type,
         target_id=target_id,
         cooldown_id=cooldown_id,
+        task_id=task_id,
         number=number,
         status=status,
         q=q,
@@ -234,6 +315,7 @@ def create_forum_post(
         target_type=body.target_type,
         target_id=body.target_id,
         cooldown_id=body.cooldown_id,
+        task_id=body.task_id,
         assignee_username=body.assignee_username,
         status=body.status,
         background_tasks=background_tasks,
@@ -300,12 +382,20 @@ def get_forum_image(filename: str) -> FileResponse:
     return FileResponse(filepath, media_type=media_type)
 
 
+_FORUM_REPLY_INSTRUCTION = """\
+You are replying inside a QDash forum thread of a quantum calibration team.
+Answer the latest post as a reply: concise markdown, grounded in the thread and in
+QDash data (use your tools when the question needs data that is not in the thread).
+Do not repeat the thread or restate the question."""
+
+
 @router.post("/forum/posts/{post_id}/ai-reply/stream", include_in_schema=False)
 async def forum_ai_reply_stream(
     post_id: str,
     body: ForumAiReplyRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[ForumService, Depends(get_forum_service)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
 ) -> StreamingResponse:
     """SSE endpoint that generates an AI reply in a forum thread."""
 
@@ -336,57 +426,28 @@ async def forum_ai_reply_stream(
             body.user_message,
         )
 
-        from qdash.copilot.runtime import CopilotRuntime
-
-        copilot_data_svc = CopilotRuntime()
-        tool_executors = copilot_data_svc.build_tool_executors()
-
         clean_message = ForumService.strip_mention(body.user_message)
         if not clean_message:
             clean_message = "この Forum スレッドについてコメントしてください"
         logger.info("Forum AI reply: original=%r, clean=%r", body.user_message, clean_message)
 
         yield sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
-        bridge = SSETaskBridge(
-            tool_labels=_AI_TOOL_LABELS,
-            status_labels=_AI_STATUS_LABELS,
-        )
-
-        try:
-            from qdash.copilot.agent import run_chat
-
-            coro = partial(
-                run_chat,
-                user_message=clean_message,
-                config=config,
-                chip_id=None,
-                qid=None,
-                qubit_params=None,
-                conversation_history=conversation_history,
-                tool_executors=tool_executors,
-            )
-
-            result: dict[str, Any] = {}
-            async for event in bridge.drain(coro):
-                if isinstance(event, str):
-                    yield event
-                else:
-                    result = event
-        except ImportError:
-            yield sse_event(
-                "error",
-                {
-                    "step": "run_chat",
-                    "detail": "openai is not installed. Install with: pip install openai",
-                },
-            )
-            return
-        except Exception as e:
-            logger.exception("Forum AI reply failed")
-            yield sse_event(
-                "error",
-                {"step": "run_chat", "detail": f"AI reply failed: {e}"},
-            )
+        result: dict[str, Any] | None = None
+        async for event in pi_chat_service.thread_reply(
+            username=ctx.user.username,
+            auth=pi_chat_service.QDashAuth(credentials.credentials, ctx.project_id),
+            config=config,
+            scope="forum",
+            instruction=_FORUM_REPLY_INSTRUCTION,
+            history=conversation_history,
+            user_message=clean_message,
+        ):
+            if isinstance(event, dict):
+                result = event
+            else:
+                yield event
+        if result is None:
+            # The runtime's error event has already been forwarded.
             return
 
         yield sse_event("status", {"step": "save_reply", "message": "返信を保存中..."})

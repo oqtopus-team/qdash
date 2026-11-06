@@ -1,0 +1,6 @@
+meta:
+  description: Dispersive shift χ of the qubit-resonator system
+  unit: MHz
+  default: null
+  scope: qubit
+data: {}

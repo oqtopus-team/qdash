@@ -173,7 +173,7 @@ export function WorkflowListPageSkeleton() {
       {/* Grid of cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="card bg-base-100 shadow-xl">
+          <div key={i} className="card bg-base-100 shadow-sm">
             <div className="card-body p-4 sm:p-6">
               <div className="skeleton h-6 w-3/4 mb-2" />
               <div className="skeleton h-4 w-full mb-4" />
@@ -200,7 +200,7 @@ export function WorkflowListPageSkeleton() {
  */
 export function WorkflowEditorPageSkeleton() {
   return (
-    <div className="h-screen flex flex-col bg-base-300">
+    <div className="flex h-full min-h-0 flex-col bg-base-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
         <div className="flex items-center gap-2 sm:gap-4">
@@ -251,7 +251,7 @@ export function AdminPageSkeleton() {
       </div>
 
       {/* Content Card */}
-      <div className="card bg-base-200 shadow-lg">
+      <div className="card bg-base-200 shadow-sm">
         <div className="card-body">
           <div className="flex justify-between items-center mb-4">
             <div className="skeleton h-6 w-32" />

@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 530" role="img" aria-label="One node visit in AgentPlanRunner.run_plan. The runner first checks the node budget, both the plan-wide execution limit and the per-node visit limit; a visit past either ends in human_escalation. It runs the node with the carried values, the node's own overrides, and any one-shot planner overrides. A retry outcome before any operation exists re-runs the node with the same idempotency key; a retry after an operation exists or a human_escalation stops the plan. Pass carries the accepted candidate and rollback carries nothing; both are shown to the planner. The planner answers $default (follow the node's on_pass or on_rollback rule), a node id with optional one-shot overrides, $complete after a pass, or $escalate. The evaluation planner fills that decision by evaluating the task result, looking the status up in the task knowledge's next_actions table, and escalating on a status without an entry, the same status three times, two unreliable fits in a row, a node past max_rounds_per_target, an override outside the session bounds, or an evaluation that did not complete.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-colhead { fill: var(--vp-c-text-1, #1f2328); font-size: 12px; font-weight: 600; }
+    .qd-section { fill: var(--vp-c-text-2, #59636e); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-step { fill: rgba(110, 118, 129, 0.08); stroke: var(--vp-c-text-3, #8c959f); stroke-width: 1.5; }
+    .qd-client { fill: rgba(46, 160, 67, 0.12); stroke: #2ea043; stroke-width: 1.5; }
+    .qd-stop { fill: rgba(229, 72, 77, 0.08); stroke: #e5484d; stroke-width: 1.5; }
+    .qd-ext { fill: none; stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; stroke-dasharray: 5 4; }
+    .qd-reject { stroke: #e5484d; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+    .qd-reject-head { fill: #e5484d; }
+  </style>
+  <defs>
+    <marker id="qd-agplan-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+    <marker id="qd-agplan-reject" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-reject-head"/>
+    </marker>
+  </defs>
+
+  <g class="qd-root">
+    <text x="20" y="16" class="qd-section">ONE NODE VISIT IN AgentPlanRunner.run_plan</text>
+
+    <!-- Loops back to the top -->
+    <path d="M935,60 V30 H100 V58" class="qd-edge" marker-end="url(#qd-agplan-arrow)"/>
+    <text x="925" y="26" class="qd-label" text-anchor="end">next node</text>
+    <path d="M725,60 V48 H290 V58" class="qd-edge" marker-end="url(#qd-agplan-arrow)"/>
+    <text x="507" y="44" class="qd-label" text-anchor="middle">node id + one-shot overrides</text>
+
+    <!-- Row 1 -->
+    <rect x="25" y="60" width="150" height="70" rx="8" class="qd-client"/>
+    <text x="100" y="85" class="qd-title">Node budget</text>
+    <text x="100" y="103" class="qd-sub">executions &lt; limit</text>
+    <text x="100" y="119" class="qd-sub">visits &lt; max_node_visits</text>
+
+    <rect x="205" y="60" width="170" height="70" rx="8" class="qd-client"/>
+    <text x="290" y="85" class="qd-title">Run node</text>
+    <text x="290" y="103" class="qd-sub">carried + node +</text>
+    <text x="290" y="119" class="qd-sub">planner overrides</text>
+
+    <rect x="405" y="60" width="190" height="70" rx="8" class="qd-client"/>
+    <text x="500" y="85" class="qd-title">Step outcome</text>
+    <text x="500" y="103" class="qd-sub">pass · rollback go on</text>
+    <text x="500" y="119" class="qd-sub">retry · escalation stop</text>
+
+    <rect x="625" y="60" width="200" height="70" rx="8" class="qd-client"/>
+    <text x="725" y="85" class="qd-title">Planner decision</text>
+    <text x="725" y="103" class="qd-sub">$default · node id</text>
+    <text x="725" y="119" class="qd-sub">$complete · $escalate</text>
+
+    <rect x="855" y="60" width="160" height="70" rx="8" class="qd-client"/>
+    <text x="935" y="85" class="qd-title">Node rule</text>
+    <text x="935" y="103" class="qd-sub">on_pass · on_rollback</text>
+    <text x="935" y="119" class="qd-sub">else the next node</text>
+
+    <line x1="175" y1="95" x2="203" y2="95" class="qd-edge" marker-end="url(#qd-agplan-arrow)"/>
+    <text x="189" y="87" class="qd-label" text-anchor="middle">yes</text>
+    <line x1="375" y1="95" x2="403" y2="95" class="qd-edge" marker-end="url(#qd-agplan-arrow)"/>
+    <line x1="595" y1="95" x2="623" y2="95" class="qd-edge" marker-end="url(#qd-agplan-arrow)"/>
+    <line x1="825" y1="95" x2="853" y2="95" class="qd-edge" marker-end="url(#qd-agplan-arrow)"/>
+
+    <!-- Retry before an operation exists -->
+    <path d="M245,130 V165 H305 V132" class="qd-edge" marker-end="url(#qd-agplan-arrow)"/>
+    <text x="290" y="181" class="qd-sub">retry before an operation exists:</text>
+    <text x="290" y="196" class="qd-sub">same idempotency key, max_pre_dispatch_retries</text>
+
+    <!-- Row 2: how a visit ends -->
+    <line x1="100" y1="130" x2="100" y2="208" class="qd-reject" marker-end="url(#qd-agplan-reject)"/>
+    <text x="108" y="172" class="qd-label">no</text>
+    <rect x="25" y="210" width="150" height="88" rx="8" class="qd-stop"/>
+    <text x="100" y="236" class="qd-title">human_escalation</text>
+    <text x="100" y="254" class="qd-sub">max_node_executions or</text>
+    <text x="100" y="270" class="qd-sub">max_node_visits reached</text>
+
+    <line x1="500" y1="130" x2="500" y2="208" class="qd-reject" marker-end="url(#qd-agplan-reject)"/>
+    <rect x="395" y="210" width="210" height="88" rx="8" class="qd-stop"/>
+    <text x="500" y="236" class="qd-title">stopped, returned as is</text>
+    <text x="500" y="254" class="qd-sub">retry: an operation exists</text>
+    <text x="500" y="270" class="qd-sub">escalation: rejected action</text>
+
+    <line x1="715" y1="130" x2="715" y2="208" class="qd-reject" marker-end="url(#qd-agplan-reject)"/>
+    <rect x="625" y="210" width="180" height="88" rx="8" class="qd-stop"/>
+    <text x="715" y="236" class="qd-title">human_escalation</text>
+    <text x="715" y="254" class="qd-sub">$escalate · planner error</text>
+    <text x="715" y="270" class="qd-sub">unknown node · $complete</text>
+    <text x="715" y="286" class="qd-sub">after a rollback</text>
+
+    <path d="M818,130 V236 H853" class="qd-edge" marker-end="url(#qd-agplan-arrow)"/>
+    <text x="826" y="180" class="qd-label">$complete</text>
+    <line x1="935" y1="130" x2="935" y2="208" class="qd-edge" marker-end="url(#qd-agplan-arrow)"/>
+    <rect x="855" y="210" width="160" height="88" rx="8" class="qd-step"/>
+    <text x="935" y="236" class="qd-title">Plan ends</text>
+    <text x="935" y="254" class="qd-sub">pass: commit the</text>
+    <text x="935" y="270" class="qd-sub">candidate set</text>
+    <text x="935" y="286" class="qd-sub">rollback: no on_rollback</text>
+
+    <!-- Evaluation planner -->
+    <rect x="25" y="336" width="990" height="176" rx="8" class="qd-ext"/>
+    <text x="45" y="360" class="qd-colhead">Evaluation planner fills the decision (run-plan --planner evaluation, session autonomy auto)</text>
+
+    <text x="45" y="386" class="qd-colhead">After each node</text>
+    <text x="45" y="406" class="qd-label">1. POST /evaluations/runs for the node's task result</text>
+    <text x="45" y="424" class="qd-label">2. read status · suggested_range · fit_reliability</text>
+    <text x="45" y="442" class="qd-label">3. look the status up in the task's next_actions</text>
+    <text x="45" y="460" class="qd-label">4. check overrides against the session bounds</text>
+    <text x="45" y="478" class="qd-label">5. check node visits against max_rounds_per_target</text>
+
+    <text x="400" y="386" class="qd-colhead">next_actions entry → decision</text>
+    <text x="400" y="406" class="qd-label">continue → $default (after pass only)</text>
+    <text x="400" y="424" class="qd-label">retry → same node, overrides or the midpoint</text>
+    <text x="400" y="442" class="qd-label">of the suggested range</text>
+    <text x="400" y="460" class="qd-label">run_task → the plan node that runs that task</text>
+    <text x="400" y="478" class="qd-label">request_human → $escalate</text>
+
+    <text x="730" y="386" class="qd-colhead">$escalate instead</text>
+    <text x="730" y="406" class="qd-label">status without an entry</text>
+    <text x="730" y="424" class="qd-label">same status 3 times · fit unreliable 2 times</text>
+    <text x="730" y="442" class="qd-label">node past max_rounds_per_target</text>
+    <text x="730" y="460" class="qd-label">override outside the session bounds</text>
+    <text x="730" y="478" class="qd-label">evaluation skipped, failed, or timed out</text>
+  </g>
+</svg>

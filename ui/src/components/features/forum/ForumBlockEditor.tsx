@@ -47,7 +47,7 @@ function cloneBlocks(blocks: Record<string, unknown>[]): Record<string, unknown>
   return JSON.parse(JSON.stringify(blocks)) as Record<string, unknown>[];
 }
 
-export type ForumBlockSnapshot = {
+type ForumBlockSnapshot = {
   blocks: Record<string, unknown>[];
   markdown: string;
 };
@@ -88,6 +88,7 @@ interface ForumBlockEditorProps {
   editable?: boolean;
 }
 
+/** Read-only BlockNote rendering of a forum post's blocks, used for previews. */
 export function ForumBlockViewer({ blocks }: { blocks: Record<string, unknown>[] }) {
   const colorScheme = useThemeScheme();
   const editor = useCreateBlockNote(

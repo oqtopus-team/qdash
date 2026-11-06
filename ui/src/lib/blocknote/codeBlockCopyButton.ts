@@ -1,4 +1,5 @@
 import { createCodeBlockSpec } from "@blocknote/core";
+import { toast } from "sonner";
 
 type CodeBlockSpec = ReturnType<typeof createCodeBlockSpec>;
 type CodeBlockRender = CodeBlockSpec["implementation"]["render"];
@@ -25,18 +26,26 @@ function createCopyButton(getCode: () => string): {
 
   let resetTimer: ReturnType<typeof setTimeout> | undefined;
 
+  /** Prevents the button from stealing editor focus/selection on mousedown. */
   const onMouseDown = (event: MouseEvent) => {
     event.preventDefault();
   };
 
-  const onClick = () => {
-    void navigator.clipboard.writeText(getCode()).then(() => {
+  /** Copies the current code to the clipboard, showing a check mark on success or an error toast on failure. */
+  const onClick = async () => {
+    try {
+      await navigator.clipboard.writeText(getCode());
       if (resetTimer) clearTimeout(resetTimer);
       button.innerHTML = CHECK_ICON_SVG;
       resetTimer = setTimeout(() => {
         button.innerHTML = COPY_ICON_SVG;
       }, COPIED_RESET_MS);
-    });
+    } catch {
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = undefined;
+      button.innerHTML = COPY_ICON_SVG;
+      toast.error("Failed to copy code");
+    }
   };
 
   button.addEventListener("mousedown", onMouseDown);
@@ -44,6 +53,7 @@ function createCopyButton(getCode: () => string): {
 
   return {
     button,
+    /** Removes the button's event listeners and clears any pending reset timer. */
     destroy: () => {
       if (resetTimer) clearTimeout(resetTimer);
       button.removeEventListener("mousedown", onMouseDown);
@@ -56,6 +66,7 @@ function createCopyButton(getCode: () => string): {
 export function withCodeBlockCopyButton(spec: CodeBlockSpec): CodeBlockSpec {
   const originalRender = spec.implementation.render;
 
+  /** Calls the original render, then appends a copy button to its resulting dom. */
   function render(
     this: ThisParameterType<CodeBlockRender>,
     block: Parameters<CodeBlockRender>[0],
@@ -71,6 +82,7 @@ export function withCodeBlockCopyButton(spec: CodeBlockSpec): CodeBlockSpec {
     const originalDestroy = result.destroy;
     return {
       ...result,
+      /** Destroys the copy button, then chains to the original destroy, if any. */
       destroy: () => {
         destroyButton();
         originalDestroy?.();

@@ -7,8 +7,6 @@ from typing import TYPE_CHECKING, Any, cast
 from bunnet import SortDirection
 
 if TYPE_CHECKING:
-    from qdash.copilot.services.heatmap_service import TaskResultHistoryRepositoryProtocol
-    from qdash.copilot.services.provenance_context_service import ProvenanceServiceProtocol
     from qdash.dbmodel.calibration_note import CalibrationNoteDocument
     from qdash.dbmodel.chip import ChipDocument
     from qdash.dbmodel.coupling import CouplingDocument
@@ -78,31 +76,6 @@ class CopilotDataAccess:
             .limit(last_n)
             .run(),
         )
-
-    def build_provenance_service(self) -> ProvenanceServiceProtocol:
-        from qdash.repository.provenance import (
-            MongoParameterVersionRepository,
-            MongoProvenanceRelationRepository,
-        )
-
-        class _ProvenanceAdapter:
-            def __init__(self) -> None:
-                self.parameter_version_repo = MongoParameterVersionRepository()
-                self.provenance_relation_repo = MongoProvenanceRelationRepository()
-
-            def get_lineage(self, *, project_id: str, entity_id: str, max_depth: int) -> Any:
-                return self.provenance_relation_repo.get_lineage(
-                    project_id=project_id,
-                    entity_id=entity_id,
-                    max_depth=max_depth,
-                )
-
-        return cast("ProvenanceServiceProtocol", _ProvenanceAdapter())
-
-    def create_task_result_history_repository(self) -> TaskResultHistoryRepositoryProtocol:
-        from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
-
-        return cast("TaskResultHistoryRepositoryProtocol", MongoTaskResultHistoryRepository())
 
     def load_parameter_timeseries_docs(
         self, parameter_name: str, chip_id: str, qid: str, last_n: int

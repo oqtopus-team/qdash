@@ -1,74 +1,108 @@
 # Running Calibrations
 
-QDash supports reusable project workflows and a task workbench for one-off calibration runs.
+Use **Workflow** for a repeatable sequence of tasks, or use **Tasks** to run one calibration task
+against a selected qubit or coupling.
+
+Both routes use the active project and chip. Confirm both before starting because a run can update
+the calibration values used by later tasks.
 
 ## Choose a Run Mode
 
-Use a workflow when tasks must run as a repeatable graph, on a schedule, or with dependencies. Use
-the Tasks workbench when you need to run one calibration task against selected targets and inspect
-the result immediately.
+| Goal | Start from |
+| --- | --- |
+| Run a saved task graph or schedule | **Workflow** |
+| Run one task and inspect its result immediately | **Tasks** |
+| Repeat a previous run with selected values restored | The source execution or task result |
 
-Both modes require an active chip and project edit permission. The selected project determines the
-workflow files, calibration state, execution history, and generated artifacts used by the run.
+Running a workflow or task requires project edit permission.
 
 ## Run a Workflow
 
-1. Open **Workflow** and select an existing project workflow, or create one.
-2. Review the workflow source and properties. Save any edits before running it.
-3. Select the chip and other run options required by the workflow.
-4. Start the run. QDash registers the flow with the deployment service and Prefect.
-5. Open **Execution** to monitor status and task progress.
+1. Open **Workflow** and select a workflow. Follow [Creating Workflows](./creating-workflows.md)
+   first if you need to create or change one.
+2. Select **Edit** before changing the source, then select **Save**.
+3. Select **Execute**.
+4. Review the flow name, username, chip, and tags in the confirmation dialog.
+5. Under **Calibration targets**, review the defaults from the saved workflow. To change them
+   for this run, select **MUX IDs** or **Qubit IDs** and enter IDs separated by commas or spaces.
+   For MUX targets, use **Excluded qubit IDs** to omit individual qubits.
+6. Confirm the run, then open **Execution** to follow its progress.
 
-The workflow editor also supports schedules. Manage schedules in QDash so the project workflow
-metadata and Prefect deployment remain aligned. The Prefect dashboard is useful for operational
-inspection, but it is not the primary editor for QDash workflows.
+Leaving the target fields unchanged preserves the workflow's code settings. **Use code defaults**
+discards target edits. An explicit change replaces the initial calibration targets throughout the
+current flow run; later filtering steps still apply. The saved workflow and schedules are unchanged.
+A workflow that targets all MUXes or couplings stops with an error when you change its targets.
+
+If targets depend on runtime calculations or differ within the workflow, the dialog cannot show a
+single default. Leave the fields unchanged to use the code, or enter an explicit selection for the
+run. Separate nested workflow runs retain their own targets.
+
+Use the workflow schedule panel when the same flow must run automatically. Manage schedules in
+QDash so the workflow and its Prefect deployment remain aligned.
 
 ## Run One Task
 
-1. Open **Tasks** and choose a calibration task.
-2. Select the chip and the qubit or coupling targets accepted by that task.
-3. Review the resolved input and run parameters. Reload current values if calibration state has
-   changed since the task was selected.
-4. Submit the task and follow the resulting execution.
-5. Inspect input, output, run parameters, figures, and raw data from the result.
+<!-- MEDIA PLACEHOLDER
+File: /images/guides/task-workbench.gif
+Start: Tasks with no task or target selected.
+Sequence: Select a task, chip, and target; select Reload; then show resolved inputs and run options without starting hardware.
+Alt: Task workbench ready to run one calibration task with resolved inputs and run options.
+-->
 
-The workbench resolves current calibration values for convenience, but the displayed values
-should still be reviewed before submission.
+1. Open **Tasks** and select a task.
+2. Under **Setup**, select **Chip** and enter a **Qubit or coupling** such as `0` or `0-1`.
+3. Select **Reload** to check hardware availability and load the current input values.
+4. Review **Input parameter overrides** and **Run parameters**. Leave an input override blank to
+   use the current calibration value.
+5. Enable **Reconfigure hardware first** when the current calibration configuration must be
+   applied before the task starts.
+6. Enable **Save calibrated outputs to DB** only when successful outputs should become the current
+   calibration values.
+7. Select **Run task** and follow the status in **Results**.
 
-## Monitor Executions
+The run button stays disabled while another execution holds the same hardware or until **Reload**
+has checked a changed target. See [Task Parameters](./task-parameters.md) before overriding inputs
+or saving outputs.
 
-The **Execution** page lists workflow runs and their current status. Open an execution to inspect
-its task topology and select a node for parameters, output, and artifacts. The topology view can
-show task dependencies, use a grid layout, and expand to full screen for larger runs.
+## Monitor a Run
 
-Use **Task Duration Breakdown** from the execution area to compare task timing across selected
-executions. Duration analysis requires timestamped task results.
+Open **Execution** to inspect a run's status, task topology, timing, parameters, output, and
+artifacts. Select a task in the topology to open its details, or select a node in the execution
+flow to preview its result in the same side panel that **Task Results** uses; open the full
+result from there. While a run is in progress, its details and its page show how many tasks have
+finished and which one is being measured, and the running task shows its measurement progress.
 
-Cancelling a running execution requests cancellation through Prefect. QDash then synchronizes the
-execution and task statuses and releases the execution lock. A cancellation can take time to reach
-the worker if a task is inside an operation that cannot be interrupted immediately.
+Cancelling a run sends a cancellation request to the worker. A task that is inside an operation
+that cannot be interrupted can take time to stop.
 
-## Inspect Results
+The activity chart at the top of the page counts the chip's runs for the last **7d**, **30d** or
+**90d** as blocks stacked by status; it opens on 30 days. The 30- and 90-day views show one column
+per day (**Executions per day**). The 7-day view shows **Executions per 6 hours**: 28 columns that
+start at 00:00, 06:00, 12:00 and 18:00 in the deployment's time zone, ending with the 6 hours
+that include the current time. Days and periods without runs keep an empty column.
 
-Use **Task Results** to filter across executions by chip, execution, task, and status. Open a result
-to inspect:
+Each block represents one execution, and the axis on the left shows execution counts. For busy
+periods, the chart labels how many executions a full block represents; the top block of a column
+is only partly filled when it holds fewer. Hover over or focus a column to see its exact counts.
+Select a column to limit the list below to its day; in the 7-day view, a 6-hour column selects
+its whole day, because the list filters by day. Select a column of that day again to return to
+the latest runs.
 
-- execution and target context;
-- input, output, and run parameters;
-- figures and downloadable raw data;
-- user notes and linked issues;
-- re-execution and exclusion controls when available.
+## Inspect a Result
 
-Use the Execution detail when the dependency graph matters. Use Task Results when you know the
-task, status, or target you want to investigate.
+Open **Task Results** when you know the chip, execution, task, target, or status you want to find.
+Open an item to inspect its effective parameters, figures, raw data, notes, and linked discussion.
 
-## Files and Artifacts
+Use an execution detail when the dependency graph matters. Use **Task Results** when one
+measurement or failure is the focus. See [Reviewing and Sharing Results](./reviewing-results.md)
+for the review workflow.
 
-Workflow definitions and project configuration are managed from **Files**. The editor tracks
-unsaved changes and provides project Git operations. Save before requesting an AI review or
-creating a pull request. Pulling can replace the working copy, so resolve or discard unsaved edits
-first.
+## Edit Workflow Configuration
 
-Execution figures and raw data are stored under the configured calibration data path and remain
-associated with the project, chip, execution, and task result. See
-[Calibration Data Sharing](./calibration-data-sharing.md) for storage and migration behavior.
+Open **Config** to edit the active project's Qubex configuration files. Save local changes before
+pulling or creating a pull request; pulling can replace the working copy.
+
+Figures and raw data stay associated with the project, chip, execution, and task result that
+produced them. See
+[Share and Hand Off a Result](./reviewing-results.md#share-and-hand-off-a-result) before handing a
+run over to another project member.

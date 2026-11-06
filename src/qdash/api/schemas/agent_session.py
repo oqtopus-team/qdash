@@ -105,7 +105,15 @@ class ListAgentActionsResponse(BaseModel):
 class ExecuteAgentActionRequest(BaseModel):
     """Dispatch one authorized run-task action as a staged measurement."""
 
-    source_execution_id: str = Field(min_length=1, max_length=200)
+    source_execution_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description=(
+            "Execution the action was decided from, kept for provenance. The run reads the "
+            "current calibration state, as a Task Workbench run does."
+        ),
+    )
     update_params: bool = False
     reconfigure: bool = False
 
@@ -173,20 +181,20 @@ class CommitAgentCandidateRequest(BaseModel):
     task_id: str = Field(min_length=1, max_length=200)
 
 
-class AgentCampaignCandidateReference(BaseModel):
-    """Identify one authoritative accepted candidate for campaign finalization."""
+class AgentCandidateReference(BaseModel):
+    """Identify one authoritative accepted candidate for plan finalization."""
 
     action_id: str = Field(min_length=1, max_length=200)
     parameter_name: str = Field(min_length=1, max_length=200)
     task_id: str = Field(min_length=1, max_length=200)
 
 
-class CommitAgentCampaignRequest(BaseModel):
-    """Commit the final accepted candidate set for one same-qubit campaign."""
+class CommitAgentCandidateSetRequest(BaseModel):
+    """Commit the final accepted candidate set for one same-qubit plan."""
 
     idempotency_key: str = Field(min_length=1, max_length=128)
     expected_state_version: int = Field(ge=0)
-    candidates: list[AgentCampaignCandidateReference] = Field(min_length=1, max_length=100)
+    candidates: list[AgentCandidateReference] = Field(min_length=1, max_length=100)
 
 
 class ApplyAgentCandidateRequest(BaseModel):
@@ -232,8 +240,8 @@ class AgentCandidateCommitResponse(BaseModel):
     backend_applied_at: datetime | None = None
 
 
-class AgentCampaignCommitResponse(BaseModel):
-    """Audited all-at-once QDash commit of final campaign candidates."""
+class AgentCandidateSetCommitResponse(BaseModel):
+    """Audited all-at-once QDash commit of the final candidate set."""
 
     commit_id: str
     session_id: str

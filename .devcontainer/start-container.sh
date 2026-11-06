@@ -7,6 +7,12 @@ mkdir -p \
   /commandhistory \
   /home/vscode/.cache/pip \
   /home/vscode/.cache/uv \
+  /home/vscode/.cache/ruff \
+  /home/vscode/.cache/mypy \
+  /home/vscode/.cache/pytest \
+  /home/vscode/.cache/coverage \
+  /workspace/qdash/.venv \
+  /workspace/qdash/ui/.next \
   /home/vscode/.claude \
   /home/vscode/.codex \
   /home/vscode/.local \
@@ -15,6 +21,8 @@ mkdir -p \
 chown -R vscode:vscode \
   /commandhistory \
   /home/vscode/.cache \
+  /workspace/qdash/.venv \
+  /workspace/qdash/ui/.next \
   /home/vscode/.claude \
   /home/vscode/.codex \
   /home/vscode/.local \

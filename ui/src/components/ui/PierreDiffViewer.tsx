@@ -9,9 +9,15 @@ interface PierreDiffViewerProps {
   filename: string;
   newContent: string;
   oldContent: string;
+  layout?: "unified" | "split";
 }
 
-export function PierreDiffViewer({ filename, newContent, oldContent }: PierreDiffViewerProps) {
+export function PierreDiffViewer({
+  filename,
+  newContent,
+  oldContent,
+  layout = "unified",
+}: PierreDiffViewerProps) {
   const { theme } = useTheme();
   const themeType = DARK_THEMES.includes(theme) ? "dark" : "light";
 
@@ -21,7 +27,7 @@ export function PierreDiffViewer({ filename, newContent, oldContent }: PierreDif
       oldFile={{ contents: oldContent, name: filename }}
       options={{
         diffIndicators: "bars",
-        diffStyle: "unified",
+        diffStyle: layout,
         expandUnchanged: false,
         overflow: "wrap",
         themeType,

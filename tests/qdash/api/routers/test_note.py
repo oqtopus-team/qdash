@@ -95,7 +95,6 @@ def _create_task_result(
     task_id: str,
     qid: str = "63",
     note: NoteModel | None = None,
-    ai_review_note: NoteModel | None = None,
 ) -> None:
     TaskResultHistoryDocument(
         project_id="note_project",
@@ -110,7 +109,6 @@ def _create_task_result(
         output_parameter_names=[],
         note={},
         user_note=note or NoteModel(),
-        ai_review_note=ai_review_note or NoteModel(),
         figure_path=[],
         json_figure_path=[],
         raw_data_path=[],
@@ -613,7 +611,7 @@ def test_time_range_scope_infers_later_cooldown_document(test_client, init_db):
     assert metric_note.scope_source == "inferred_from_range"
 
 
-def test_notes_summary_classifies_old_ai_triage_task_notes(test_client, init_db):
+def test_notes_summary_drops_legacy_ai_triage_task_notes(test_client, init_db):
     headers = _create_project_user()
     _create_chip(cooldown_id=None)
     _create_task_result(
@@ -632,9 +630,7 @@ def test_notes_summary_classifies_old_ai_triage_task_notes(test_client, init_db)
     response = test_client.get("/chips/chip-1/notes-summary", headers=headers)
 
     assert response.status_code == 200
-    task_note = response.json()["task_notes"][0]
-    assert task_note["note"]["content"] == ""
-    assert task_note["ai_review_note"]["content"].startswith("## AI triage")
+    assert [note["task_id"] for note in response.json()["task_notes"]] == []
 
 
 def test_notes_summary_keeps_user_part_when_ai_review_prefix_exists(test_client, init_db):
@@ -654,28 +650,7 @@ def test_notes_summary_keeps_user_part_when_ai_review_prefix_exists(test_client,
     assert response.status_code == 200
     task_note = response.json()["task_notes"][0]
     assert task_note["note"]["content"] == "operator follow-up"
-    assert task_note["ai_review_note"]["content"].startswith("## AI review")
-
-
-def test_notes_summary_includes_task_results_with_only_ai_review_note(test_client, init_db):
-    headers = _create_project_user()
-    _create_chip(cooldown_id=None)
-    _create_task_result(
-        task_id="task-ai-review-note",
-        ai_review_note=NoteModel(
-            content="## AI review\n\n- Decision: `REVIEW`\n",
-            updated_by="qdash-ai",
-            updated_at=datetime(2026, 5, 19, tzinfo=UTC),
-        ),
-    )
-
-    response = test_client.get("/chips/chip-1/notes-summary", headers=headers)
-
-    assert response.status_code == 200
-    task_note = response.json()["task_notes"][0]
-    assert task_note["task_id"] == "task-ai-review-note"
-    assert task_note["note"]["content"] == ""
-    assert task_note["ai_review_note"]["content"].startswith("## AI review")
+    assert "ai_review_note" not in task_note
 
 
 def test_qubit_note_creates_missing_topology_target(test_client, init_db):

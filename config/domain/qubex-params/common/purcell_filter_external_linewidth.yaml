@@ -1,0 +1,6 @@
+meta:
+  description: External linewidth of the Purcell filter
+  unit: MHz
+  default: null
+  scope: qubit
+data: {}

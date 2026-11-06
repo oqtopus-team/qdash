@@ -64,7 +64,7 @@ function setIfPresent(target: Record<string, unknown>, key: string, value: unkno
 }
 
 function resolveThreadTitle(post: ForumPostResponse): string {
-  return post.title?.trim() ? post.title : "Untitled topic";
+  return post.title?.trim() ? post.title : "Untitled thread";
 }
 
 function resourceUrl(path: string): string {

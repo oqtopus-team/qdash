@@ -1,0 +1,6 @@
+meta:
+  description: Quantum efficiency η estimated from quantum_efficiency_measurement for the dispersive readout chain
+  unit: '%'
+  default: null
+  scope: qubit
+data: {}

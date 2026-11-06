@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" role="img" aria-label="UI request paths: generated hooks call customInstance, which adds the bearer token and project header and sends requests through the Next.js /api rewrite to FastAPI, or directly when NEXT_PUBLIC_API_URL is set. proxy.ts guards page requests, the Copilot stream uses its own route handler, and orval generates the hooks from the OpenAPI document.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-group-title { fill: var(--vp-c-text-2, #59636e); font-size: 12px; font-weight: 600; }
+    .qd-group { fill: none; stroke: var(--vp-c-divider, #d0d7de); stroke-width: 1.2; }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-dash { stroke-dasharray: 5 4; }
+    .qd-ui { fill: rgba(46, 160, 67, 0.12); stroke: #2ea043; stroke-width: 1.5; }
+    .qd-api { fill: rgba(219, 109, 40, 0.12); stroke: #db6d28; stroke-width: 1.5; }
+    .qd-data { fill: rgba(9, 105, 218, 0.10); stroke: #0969da; stroke-width: 1.5; }
+  </style>
+  <defs>
+    <marker id="qd-uiflow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+  </defs>
+
+  <g class="qd-root">
+    <!-- Groups -->
+    <rect x="40" y="40" width="375" height="415" rx="12" class="qd-group"/>
+    <text x="56" y="64" class="qd-group-title">Browser</text>
+    <rect x="440" y="40" width="260" height="415" rx="12" class="qd-group"/>
+    <text x="456" y="64" class="qd-group-title">Next.js server</text>
+    <rect x="440" y="500" width="535" height="100" rx="12" class="qd-group"/>
+    <text x="456" y="524" class="qd-group-title">Build time (task generate)</text>
+
+    <!-- Browser, column 1: main request chain -->
+    <rect x="55" y="80" width="160" height="56" rx="8" class="qd-ui"/>
+    <text x="135" y="104" class="qd-title">Component</text>
+    <text x="135" y="122" class="qd-sub">feature page or panel</text>
+
+    <rect x="55" y="180" width="160" height="56" rx="8" class="qd-ui"/>
+    <text x="135" y="204" class="qd-title">Generated hook</text>
+    <text x="135" y="222" class="qd-sub">TanStack Query cache</text>
+
+    <rect x="55" y="280" width="160" height="56" rx="8" class="qd-ui"/>
+    <text x="135" y="304" class="qd-title">customInstance</text>
+    <text x="135" y="322" class="qd-sub">Bearer · X-Project-Id</text>
+
+    <!-- Browser, column 2 -->
+    <rect x="260" y="80" width="140" height="56" rx="8" class="qd-ui"/>
+    <text x="330" y="104" class="qd-title">Navigation</text>
+    <text x="330" y="122" class="qd-sub">page request</text>
+
+    <rect x="260" y="180" width="140" height="56" rx="8" class="qd-ui"/>
+    <text x="330" y="204" class="qd-title">ProjectContext</text>
+    <text x="330" y="222" class="qd-sub">switchProject()</text>
+
+    <rect x="260" y="380" width="140" height="56" rx="8" class="qd-ui"/>
+    <text x="330" y="404" class="qd-title">Copilot chat</text>
+    <text x="330" y="422" class="qd-sub">POST, reads SSE</text>
+
+    <!-- Next.js server -->
+    <rect x="455" y="80" width="230" height="56" rx="8" class="qd-ui"/>
+    <text x="570" y="104" class="qd-title">proxy.ts</text>
+    <text x="570" y="122" class="qd-sub">no access_token → /login</text>
+
+    <rect x="455" y="280" width="230" height="56" rx="8" class="qd-ui"/>
+    <text x="570" y="304" class="qd-title">/api/:path* rewrite</text>
+    <text x="570" y="322" class="qd-sub">to INTERNAL_API_URL</text>
+
+    <rect x="455" y="380" width="230" height="56" rx="8" class="qd-ui"/>
+    <text x="570" y="404" class="qd-title">Stream route handler</text>
+    <text x="570" y="422" class="qd-sub">/api/copilot/chat/stream</text>
+
+    <!-- API -->
+    <rect x="790" y="280" width="170" height="156" rx="8" class="qd-api"/>
+    <text x="875" y="352" class="qd-title">FastAPI</text>
+    <text x="875" y="370" class="qd-sub">QDash API</text>
+
+    <!-- Build time -->
+    <rect x="455" y="535" width="230" height="50" rx="8" class="qd-ui"/>
+    <text x="570" y="556" class="qd-title">orval</text>
+    <text x="570" y="573" class="qd-sub">orval.config.cjs</text>
+
+    <path d="M790,541 h158 l12,12 v32 h-170 z" class="qd-data"/>
+    <text x="875" y="556" class="qd-title">openapi.json</text>
+    <text x="875" y="573" class="qd-sub">docs/oas</text>
+
+    <!-- Edges: browser -->
+    <line x1="135" y1="136" x2="135" y2="178" class="qd-edge" marker-end="url(#qd-uiflow-arrow)"/>
+    <text x="145" y="162" class="qd-label">calls hook</text>
+
+    <line x1="135" y1="236" x2="135" y2="278" class="qd-edge" marker-end="url(#qd-uiflow-arrow)"/>
+    <text x="127" y="262" class="qd-label" text-anchor="end">mutator</text>
+
+    <line x1="260" y1="222" x2="217" y2="222" class="qd-edge" marker-end="url(#qd-uiflow-arrow)"/>
+    <text x="238" y="258" class="qd-label" text-anchor="middle">invalidateQueries()</text>
+
+    <!-- Edges: to Next.js server -->
+    <line x1="400" y1="108" x2="453" y2="108" class="qd-edge" marker-end="url(#qd-uiflow-arrow)"/>
+
+    <line x1="215" y1="308" x2="453" y2="308" class="qd-edge" marker-end="url(#qd-uiflow-arrow)"/>
+    <text x="335" y="300" class="qd-label" text-anchor="middle">/api/* (default)</text>
+
+    <line x1="400" y1="408" x2="453" y2="408" class="qd-edge" marker-end="url(#qd-uiflow-arrow)"/>
+
+    <!-- Edges: to API -->
+    <line x1="685" y1="308" x2="788" y2="308" class="qd-edge" marker-end="url(#qd-uiflow-arrow)"/>
+    <text x="737" y="300" class="qd-label" text-anchor="middle">proxied</text>
+
+    <line x1="685" y1="408" x2="788" y2="408" class="qd-edge" marker-start="url(#qd-uiflow-arrow)"/>
+    <text x="737" y="400" class="qd-label" text-anchor="middle">SSE chunks</text>
+
+    <polyline points="135,336 135,478 830,478 830,438" class="qd-edge qd-dash" marker-end="url(#qd-uiflow-arrow)"/>
+    <text x="480" y="471" class="qd-label" text-anchor="middle">direct when NEXT_PUBLIC_API_URL is set</text>
+
+    <!-- Edges: build time -->
+    <line x1="920" y1="436" x2="920" y2="539" class="qd-edge" marker-end="url(#qd-uiflow-arrow)"/>
+    <text x="912" y="522" class="qd-label" text-anchor="end">exports schema</text>
+
+    <line x1="790" y1="560" x2="687" y2="560" class="qd-edge" marker-end="url(#qd-uiflow-arrow)"/>
+    <text x="738" y="552" class="qd-label" text-anchor="middle">input</text>
+
+    <polyline points="455,560 22,560 22,208 53,208" class="qd-edge" marker-end="url(#qd-uiflow-arrow)"/>
+    <text x="240" y="552" class="qd-label" text-anchor="middle">generates src/client hooks</text>
+  </g>
+</svg>

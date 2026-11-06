@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 from io import StringIO
 from typing import TYPE_CHECKING, cast
 
@@ -178,6 +179,104 @@ def test_capture_qubex_progress_patches_measurement_service() -> None:
 
     assert events[-1].current == 2
     assert events[-1].description == "Sweeping parameters"
+
+
+def test_capture_qubex_progress_patches_filtered_ckp() -> None:
+    """Contrib experiments should forward their own tqdm loops as well."""
+    from qubex.contrib.experiment import ckp_characterization
+
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(events.append, task_name="CheckCKP"):
+        list(_service_tqdm(ckp_characterization)(range(2), file=StringIO()))
+
+    assert events[0].current == 0
+    assert events[-1].current == 2
+    assert events[-1].total == 2
+    assert {event.description for event in events} == {"Filtered CKP sweep"}
+    assert events[-1].has_multiple_phases is True
+
+
+def test_capture_qubex_progress_patches_quantum_efficiency() -> None:
+    """Quantum efficiency's combined sweep should be visible in QDash."""
+    import importlib
+
+    module = importlib.import_module("qubex.contrib.experiment.quantum_efficiency_measurement")
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(events.append, task_name="CheckQuantumEfficiency"):
+        progress = _service_tqdm(module)(
+            total=4,
+            desc="Quantum efficiency: Q00",
+            file=StringIO(),
+        )
+        progress.update(4)
+        progress.close()
+
+    assert events[0].current == 0
+    assert events[-1].current == 4
+    assert events[-1].total == 4
+    assert {event.description for event in events} == {"Quantum efficiency: Q00"}
+
+
+def test_capture_qubex_progress_patches_spin_lock_spectroscopy() -> None:
+    """Spin-lock's outer frequency sweep should be visible in QDash."""
+    spin_lock = importlib.import_module("qubex.contrib.experiment.spin_lock_relaxation")
+
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(events.append, task_name="CheckSpinLockSpectroscopy"):
+        list(
+            _service_tqdm(spin_lock)(
+                range(2),
+                desc="Spin-lock spectroscopy: Q00",
+                file=StringIO(),
+            )
+        )
+
+    assert events[0].current == 0
+    assert events[-1].current == 2
+    assert events[-1].total == 2
+    assert {event.description for event in events} == {"Spin-lock spectroscopy: Q00"}
+
+
+def test_readout_mist_progress_labels_both_acquisition_phases() -> None:
+    """MIST should expose its calibration and population sweeps as two phases."""
+    from qubex.experiment.services import measurement_service
+
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(
+        events.append,
+        task_name="CheckReadoutMIST",
+        plan=ProgressPlan(2, 2),
+    ):
+        list(
+            _service_tqdm(measurement_service)(
+                range(2), desc="Sweeping parameters", disable=True, file=StringIO()
+            )
+        )
+        list(
+            _service_tqdm(measurement_service)(
+                range(3), desc="Sweeping parameters", disable=True, file=StringIO()
+            )
+        )
+
+    assert events[0].phase == 1
+    assert events[-1].phase == 2
+    assert all(event.has_multiple_phases for event in events)
+    assert {event.description for event in events} == {"Readout MIST acquisition"}
+
+
+def test_capture_qubex_progress_selects_cpmg_frequency_sweep() -> None:
+    """CPMG progress should follow frequencies instead of the outer repeat loop."""
+    cpmg = importlib.import_module("qubex.contrib.experiment.cpmg_noise_spectroscopy")
+
+    events: list[TaskProgress] = []
+    with capture_qubex_progress(events.append, task_name="CheckCPMGNoiseSpectroscopy"):
+        list(_service_tqdm(cpmg)(range(1), desc="CPMG repetitions", file=StringIO()))
+        list(_service_tqdm(cpmg)(range(3), desc="Q00 frequencies", file=StringIO()))
+
+    assert events[0].current == 0
+    assert events[-1].current == 3
+    assert events[-1].total == 3
+    assert {event.description for event in events} == {"Q00 frequencies"}
 
 
 def test_rabi_progress_labels_disabled_qubex_sweep() -> None:

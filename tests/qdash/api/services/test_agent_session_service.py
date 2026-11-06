@@ -2,25 +2,28 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
 
 if TYPE_CHECKING:
     from qdash.api.services.flow_service import FlowService
+    from qdash.api.services.task_file_service import TaskFileService
 from fastapi import HTTPException
 from pydantic import ValidationError
 
 from qdash.api.schemas.agent_session import (
-    AgentCampaignCandidateReference,
+    AgentCandidateReference,
     ApplyAgentCandidateRequest,
-    CommitAgentCampaignRequest,
     CommitAgentCandidateRequest,
+    CommitAgentCandidateSetRequest,
     CreateAgentSessionRequest,
     EvaluateCandidateGateRequest,
     ExecuteAgentActionRequest,
     SubmitAgentActionRequest,
 )
+from qdash.api.schemas.task_file import ListTaskInfoResponse, TaskInfo
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.datamodel.agent_session import (
     AgentActionDecision,
@@ -62,6 +65,7 @@ def _create_session(
     *,
     max_actions: int = 10,
     quality_gates: dict[str, NumericBounds] | None = None,
+    allowed_overrides: dict[str, NumericBounds] | None = None,
 ):
     return service.create_session(
         project_id="project-1",
@@ -71,7 +75,8 @@ def _create_session(
             policy=AgentSessionPolicy(
                 qids=["Q00", "Q01"],
                 allowed_tasks=["CheckQubitSpectroscopy"],
-                allowed_overrides={
+                allowed_overrides=allowed_overrides
+                or {
                     "drive_amplitude": NumericBounds(minimum=0.01, maximum=0.2),
                     "qubit_frequency": NumericBounds(minimum=3.0, maximum=6.0),
                 },
@@ -105,6 +110,35 @@ def _run_task_action(
     )
 
 
+def _catalog(monkeypatch: pytest.MonkeyPatch) -> TaskFileService:
+    """A task catalog holding the task the agent actions run."""
+    monkeypatch.setattr("qdash.api.services.catalog_task_run.get_default_backend", lambda: "qubex")
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["qubex"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: True
+    )
+    task = TaskInfo(
+        name="CheckQubitSpectroscopy",
+        class_name="CheckQubitSpectroscopy",
+        task_type="qubit",
+        file_path="qubex/check_qubit_spectroscopy.py",
+        input_parameters={
+            "drive_amplitude": {"user_override": "allowed", "value_type": "float"},
+            "shots": {"user_override": "allowed", "value_type": "int"},
+            "qubit_frequency": {"user_override": "forbidden", "value_type": "float"},
+        },
+        run_parameters={"readout_duration": {"value_type": "float"}},
+    )
+    return cast(
+        "TaskFileService",
+        SimpleNamespace(
+            list_task_info=lambda *_args, **_kwargs: ListTaskInfoResponse(tasks=[task])
+        ),
+    )
+
+
 def test_create_session_persists_bounded_scope(service: AgentSessionService) -> None:
     """Creating a session preserves the approved scope and starts at version zero."""
     session = _create_session(service)
@@ -134,6 +168,45 @@ def test_submit_action_authorizes_allowed_task(service: AgentSessionService) -> 
     assert action.state_version_after == 1
     assert updated.state_version == 1
     assert updated.action_count == 1
+
+
+def test_get_action_resolves_actions_that_stored_the_qdash_execution_id(
+    service: AgentSessionService,
+) -> None:
+    """Actions dispatched before the fix kept the QDash execution ID as operation_id."""
+    session = _create_session(service)
+    submitted = service.submit_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        body=_run_task_action(),
+    )
+    action = AgentActionDocument.find_one({"action_id": submitted.action_id}).run()
+    assert action is not None
+    action.operation_id = "20260713-001"
+    action.execution_status = "queued"
+    action.save()
+    ExecutionHistoryDocument(
+        project_id="project-1",
+        username="tester",
+        name="agent execution",
+        execution_id="20260713-001",
+        calib_data_path="",
+        note={"flow_run_id": "prefect-flow-run-1"},
+        status="completed",
+        tags=[],
+        chip_id="chip-001",
+        message="",
+        system_info=SystemInfoModel(),
+    ).insert()
+
+    resolved = service.get_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        action_id=submitted.action_id,
+    )
+
+    assert resolved.execution_id == "20260713-001"
+    assert resolved.execution_status == "completed"
 
 
 def test_get_action_resolves_prefect_operation_to_qdash_execution(
@@ -440,10 +513,10 @@ def test_commit_action_candidate_revalidates_and_audits_parameter_write(
     assert qubit.data["drive_amplitude"]["execution_id"] == "execution-1"
 
 
-def test_commit_campaign_candidates_updates_final_set_once(
+def test_commit_candidate_set_updates_final_set_once(
     service: AgentSessionService,
 ) -> None:
-    """All accepted final candidates are persisted in one audited campaign commit."""
+    """All accepted final candidates are persisted in one audited candidate set commit."""
     session = _create_session(service, max_actions=2)
     first = service.submit_action(
         project_id="project-1",
@@ -466,16 +539,16 @@ def test_commit_campaign_candidates_updates_final_set_once(
         output_parameters={"qubit_frequency": {"value": 4.8, "unit": "GHz"}},
         sequence=2,
     )
-    body = CommitAgentCampaignRequest(
-        idempotency_key="campaign-commit-1",
+    body = CommitAgentCandidateSetRequest(
+        idempotency_key="candidate-set-commit-1",
         expected_state_version=2,
         candidates=[
-            AgentCampaignCandidateReference(
+            AgentCandidateReference(
                 action_id=first.action_id,
                 parameter_name="drive_amplitude",
                 task_id="task-result-1",
             ),
-            AgentCampaignCandidateReference(
+            AgentCandidateReference(
                 action_id=second.action_id,
                 parameter_name="qubit_frequency",
                 task_id="task-result-2",
@@ -483,13 +556,13 @@ def test_commit_campaign_candidates_updates_final_set_once(
         ],
     )
 
-    committed = service.commit_campaign_candidates(
+    committed = service.commit_candidate_set(
         project_id="project-1",
         session_id=session.session_id,
         username="reviewer",
         body=body,
     )
-    retried = service.commit_campaign_candidates(
+    retried = service.commit_candidate_set(
         project_id="project-1",
         session_id=session.session_id,
         username="reviewer",
@@ -523,7 +596,7 @@ def test_commit_campaign_candidates_updates_final_set_once(
     assert qubit.data["qubit_frequency"]["value"] == 4.8
 
 
-def test_commit_campaign_candidates_rejects_set_before_any_write(
+def test_commit_candidate_set_rejects_set_before_any_write(
     service: AgentSessionService,
 ) -> None:
     """One rejected candidate prevents the complete final set from being persisted."""
@@ -551,20 +624,20 @@ def test_commit_campaign_candidates_rejects_set_before_any_write(
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        service.commit_campaign_candidates(
+        service.commit_candidate_set(
             project_id="project-1",
             session_id=session.session_id,
             username="reviewer",
-            body=CommitAgentCampaignRequest(
-                idempotency_key="campaign-commit-rejected",
+            body=CommitAgentCandidateSetRequest(
+                idempotency_key="candidate-set-commit-rejected",
                 expected_state_version=2,
                 candidates=[
-                    AgentCampaignCandidateReference(
+                    AgentCandidateReference(
                         action_id=first.action_id,
                         parameter_name="drive_amplitude",
                         task_id="task-result-1",
                     ),
-                    AgentCampaignCandidateReference(
+                    AgentCandidateReference(
                         action_id=second.action_id,
                         parameter_name="qubit_frequency",
                         task_id="task-result-2",
@@ -842,6 +915,7 @@ def test_execute_action_request_rejects_direct_parameter_update() -> None:
 @pytest.mark.asyncio
 async def test_execute_action_rejects_ungranted_hardware_reconfiguration(
     service: AgentSessionService,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Configure cannot be inserted unless the session explicitly grants it."""
     session = _create_session(service)
@@ -861,6 +935,7 @@ async def test_execute_action_rejects_ungranted_hardware_reconfiguration(
                 reconfigure=True,
             ),
             flow_service=cast("FlowService", object()),
+            task_file_service=_catalog(monkeypatch),
         )
 
     assert exc_info.value.status_code == 409
@@ -868,26 +943,29 @@ async def test_execute_action_rejects_ungranted_hardware_reconfiguration(
 
 
 @pytest.mark.asyncio
-async def test_execute_authorized_action_dispatches_single_task(
+async def test_execute_authorized_action_runs_like_the_task_workbench(
     service: AgentSessionService,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An authorized action is dispatched once and stores the Prefect operation ID."""
+    """An action is a catalog run: current inputs, and a session matching the task.
+
+    Restoring a past execution's snapshot opened the Qubex session with its default
+    readout_duration while the task kept the snapshot's, so CheckRabi refused to run.
+    """
     session = _create_session(service)
     action = service.submit_action(
         project_id="project-1",
         session_id=session.session_id,
         body=_run_task_action(),
     )
+    sent: dict[str, object] = {}
 
     class FakeFlowService:
         async def execute_single_task_from_snapshot(self, **kwargs: object) -> object:
-            assert kwargs["task_name"] == "CheckQubitSpectroscopy"
-            assert kwargs["qid"] == "Q00"
-            assert kwargs["source_execution_id"] == "execution-1"
-            assert kwargs["execution_name"] == "agent:CheckQubitSpectroscopy"
-            assert kwargs["parameter_overrides"] == {"input": {"drive_amplitude": 0.1}}
-            assert kwargs["persist_output_parameters"] is False
-            return type("Operation", (), {"execution_id": "operation-1"})()
+            sent.update(kwargs)
+            return type(
+                "Operation", (), {"execution_id": "20260713-002", "flow_run_id": "operation-1"}
+            )()
 
     result = await service.execute_action(
         project_id="project-1",
@@ -895,11 +973,108 @@ async def test_execute_authorized_action_dispatches_single_task(
         action_id=action.action_id,
         body=ExecuteAgentActionRequest(source_execution_id="execution-1"),
         flow_service=cast("FlowService", FakeFlowService()),
+        task_file_service=_catalog(monkeypatch),
     )
 
+    assert sent["task_name"] == "CheckQubitSpectroscopy"
+    assert sent["qid"] == "Q00"
+    # No snapshot: inputs come from the current calibration state.
+    assert sent["source_execution_id"] is None
+    assert sent["source_task_id"] is None
+    assert sent["parameter_overrides"] == {"input": {"drive_amplitude": 0.1}}
+    # The session opens with the readout_duration the task runs with.
+    assert sent["default_run_parameters"] == {
+        "readout_duration": {"value": 1024, "value_type": "float"}
+    }
+    assert sent["task_run_parameters"] == {"CheckQubitSpectroscopy": {}}
+    assert sent["execution_name"] == "agent:CheckQubitSpectroscopy"
+    assert sent["tags"] == [f"agent-session:{session.session_id}"]
+    assert sent["persist_output_parameters"] is False
+    assert sent["update_params"] is False
     assert result.execution_status == "queued"
     assert result.operation_id == "operation-1"
+    stored = AgentActionDocument.find_one({"action_id": action.action_id}).run()
+    assert stored is not None
+    assert stored.metadata["source_execution_id"] == "execution-1"
     assert (
         service.get_session(project_id="project-1", session_id=session.session_id).state_version
         == 1
     )
+
+
+@pytest.mark.asyncio
+async def test_execute_action_gives_integer_inputs_whole_numbers(
+    service: AgentSessionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Agent overrides are floats; an integer input still passes the catalog check."""
+    session = _create_session(
+        service, allowed_overrides={"shots": NumericBounds(minimum=256, maximum=8192)}
+    )
+    action = service.submit_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        body=SubmitAgentActionRequest(
+            idempotency_key="action-shots",
+            expected_state_version=0,
+            action_type=AgentActionType.RUN_TASK,
+            task_name="CheckQubitSpectroscopy",
+            qids=["Q00"],
+            parameter_overrides={"shots": 2048.0},
+            diagnosis="More shots to resolve the peak.",
+        ),
+    )
+    sent: dict[str, object] = {}
+
+    class FakeFlowService:
+        async def execute_single_task_from_snapshot(self, **kwargs: object) -> object:
+            sent.update(kwargs)
+            return type("Operation", (), {"execution_id": "e", "flow_run_id": "op"})()
+
+    await service.execute_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        action_id=action.action_id,
+        body=ExecuteAgentActionRequest(),
+        flow_service=cast("FlowService", FakeFlowService()),
+        task_file_service=_catalog(monkeypatch),
+    )
+
+    assert sent["parameter_overrides"] == {"input": {"shots": 2048}}
+
+
+@pytest.mark.asyncio
+async def test_execute_action_applies_the_workbench_override_rules(
+    service: AgentSessionService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An input the task forbids overriding is refused, and the action is marked failed."""
+    session = _create_session(service)
+    action = service.submit_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        body=SubmitAgentActionRequest(
+            idempotency_key="action-forbidden",
+            expected_state_version=0,
+            action_type=AgentActionType.RUN_TASK,
+            task_name="CheckQubitSpectroscopy",
+            qids=["Q00"],
+            parameter_overrides={"qubit_frequency": 4.5},
+            diagnosis="Try a different frequency.",
+        ),
+    )
+
+    with pytest.raises(HTTPException, match="do not allow overrides") as exc_info:
+        await service.execute_action(
+            project_id="project-1",
+            session_id=session.session_id,
+            action_id=action.action_id,
+            body=ExecuteAgentActionRequest(),
+            flow_service=cast("FlowService", object()),
+            task_file_service=_catalog(monkeypatch),
+        )
+
+    assert exc_info.value.status_code == 400
+    stored = AgentActionDocument.find_one({"action_id": action.action_id}).run()
+    assert stored is not None
+    assert stored.execution_status == "failed"

@@ -14,6 +14,8 @@ Extracted from TaskExecutor to isolate MUX distribution concerns.
 import logging
 from typing import TYPE_CHECKING
 
+from qdash.workflow.engine.task.backend_saver import resolve_publish_targets
+
 if TYPE_CHECKING:
     from qdash.repository import FilesystemCalibDataSaver
     from qdash.workflow.calibtasks.results import RunResult
@@ -153,7 +155,11 @@ class MuxDistributor:
                         task_model.task_id,
                     )
                     self._state_manager.put_output_parameters(
-                        task_name, processed_params, task_type, target_qid
+                        task_name,
+                        processed_params,
+                        task_type,
+                        target_qid,
+                        publish_targets=resolve_publish_targets(task, processed_params),
                     )
 
                 if postprocess_result.figures:

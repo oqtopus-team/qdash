@@ -1,6 +1,9 @@
 \.betterleaks\.toml
 \.gitleaks\.toml
 docs/design/api-testing-guidelines\.md
+docs/developer-guide/api/testing-endpoints\.md
+docs/developer-guide/api/testing\.md
+docs/developer-guide/conventions/credential-scan\.md
 docs/development/api/testing\.md
 docs/development/credential-scan\.md
 poetry\.lock

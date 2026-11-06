@@ -20,10 +20,10 @@ If you have a new feature request, please create an issue following the [Feature
 
 ## Coding Guidelines
 
-For developer information, please refer to the [Development Flow](/development/development-flow).
+For developer information, please refer to the [Development Flow](/developer-guide/development-flow).
 
 ## Commit Message Guidelines
 
-For how to write commit messages, please refer to the [Commit Message Format](/development/development-flow#commit-message-format).
+For how to write commit messages, please refer to the [Commit Message Format](/developer-guide/development-flow#commit-message-format).
 
 Thank you for your contributions!

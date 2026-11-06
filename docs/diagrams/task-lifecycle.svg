@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 470" role="img" aria-label="TaskExecutor.execute() runs seven phases for one target. TaskStateManager holds task state in memory throughout; TaskHistoryRecorder writes the initial and final history records; FilesystemCalibDataSaver writes raw data before postprocessing and figures afterwards; BackendSaver promotes outputs only in phase six and is skipped when persist_output_parameters is False. Execution state is persisted separately through ExecutionService.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-dash { stroke-dasharray: 5 4; }
+    .qd-ui { fill: rgba(46, 160, 67, 0.12); stroke: #2ea043; stroke-width: 1.5; }
+    .qd-api { fill: rgba(219, 109, 40, 0.12); stroke: #db6d28; stroke-width: 1.5; }
+    .qd-wf { fill: rgba(130, 80, 223, 0.12); stroke: #8250df; stroke-width: 1.5; }
+    .qd-data { fill: rgba(9, 105, 218, 0.10); stroke: #0969da; stroke-width: 1.5; }
+    .qd-ext { fill: none; stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; stroke-dasharray: 5 4; }
+      .qd-tl-name { fill: var(--vp-c-text-1, #1f2328); font-size: 13px; font-weight: 600; }
+    .qd-tl-sink { fill: var(--vp-c-text-2, #59636e); font-size: 11px; }
+    .qd-tl-phase { fill: var(--vp-c-text-1, #1f2328); font-size: 12.5px; font-weight: 600; text-anchor: middle; }
+    .qd-tl-mark { fill: var(--vp-c-text-2, #59636e); font-size: 11px; text-anchor: middle; }
+    .qd-tl-section { fill: var(--vp-c-text-2, #59636e); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; }
+    .qd-tl-guide { stroke: var(--vp-c-text-3, #8c959f); stroke-width: 1; stroke-dasharray: 2 4; }
+    .qd-tl-mem { fill: rgba(110, 118, 129, 0.08); stroke: var(--vp-c-text-3, #8c959f); stroke-width: 1; stroke-dasharray: 4 3; }
+    .qd-tl-store { fill: rgba(9, 105, 218, 0.06); stroke: rgba(9, 105, 218, 0.45); stroke-width: 1; }
+    .qd-tl-dot-mem { fill: var(--vp-c-text-2, #59636e); }
+    .qd-tl-dot-store { fill: #0969da; }
+  </style>
+  <defs>
+    <marker id="qd-tl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+  </defs>
+  <g class="qd-root">
+    <text x="20" y="18" class="qd-tl-section">TASKEXECUTOR.EXECUTE() — ONE TARGET</text>
+    <line x1="293" y1="86" x2="293" y2="332" class="qd-tl-guide"/>
+    <line x1="407" y1="86" x2="407" y2="332" class="qd-tl-guide"/>
+    <line x1="521" y1="86" x2="521" y2="332" class="qd-tl-guide"/>
+    <line x1="635" y1="86" x2="635" y2="332" class="qd-tl-guide"/>
+    <line x1="749" y1="86" x2="749" y2="332" class="qd-tl-guide"/>
+    <line x1="863" y1="86" x2="863" y2="332" class="qd-tl-guide"/>
+    <line x1="977" y1="86" x2="977" y2="332" class="qd-tl-guide"/>
+    <text x="20" y="54" class="qd-tl-name">Phase</text>
+    <text x="20" y="71" class="qd-tl-sink">writers below, aligned by phase</text>
+    <rect x="244" y="30" width="98" height="56" rx="8" class="qd-wf"/>
+    <text x="293" y="54" class="qd-tl-phase">1 Resolve</text>
+    <text x="293" y="71" class="qd-tl-phase">inputs</text>
+    <line x1="342" y1="58" x2="357" y2="58" class="qd-edge" marker-end="url(#qd-tl-arrow)"/>
+    <rect x="358" y="30" width="98" height="56" rx="8" class="qd-wf"/>
+    <text x="407" y="54" class="qd-tl-phase">2 Validate,</text>
+    <text x="407" y="71" class="qd-tl-phase">start</text>
+    <line x1="456" y1="58" x2="471" y2="58" class="qd-edge" marker-end="url(#qd-tl-arrow)"/>
+    <rect x="472" y="30" width="98" height="56" rx="8" class="qd-wf"/>
+    <text x="521" y="54" class="qd-tl-phase">3 Run</text>
+    <text x="521" y="71" class="qd-tl-phase">task</text>
+    <line x1="570" y1="58" x2="585" y2="58" class="qd-edge" marker-end="url(#qd-tl-arrow)"/>
+    <rect x="586" y="30" width="98" height="56" rx="8" class="qd-wf"/>
+    <text x="635" y="54" class="qd-tl-phase">4 Save</text>
+    <text x="635" y="71" class="qd-tl-phase">raw data</text>
+    <line x1="684" y1="58" x2="699" y2="58" class="qd-edge" marker-end="url(#qd-tl-arrow)"/>
+    <rect x="700" y="30" width="98" height="56" rx="8" class="qd-wf"/>
+    <text x="749" y="54" class="qd-tl-phase">5 Validate</text>
+    <text x="749" y="71" class="qd-tl-phase">outputs</text>
+    <line x1="798" y1="58" x2="813" y2="58" class="qd-edge" marker-end="url(#qd-tl-arrow)"/>
+    <rect x="814" y="30" width="98" height="56" rx="8" class="qd-wf"/>
+    <text x="863" y="54" class="qd-tl-phase">6 Save</text>
+    <text x="863" y="71" class="qd-tl-phase">results</text>
+    <line x1="912" y1="58" x2="927" y2="58" class="qd-edge" marker-end="url(#qd-tl-arrow)"/>
+    <rect x="928" y="30" width="98" height="56" rx="8" class="qd-wf"/>
+    <text x="977" y="54" class="qd-tl-phase">7 Complete</text>
+    <text x="977" y="71" class="qd-tl-phase">or fail</text>
+    <rect x="20" y="120" width="1016" height="44" rx="6" class="qd-tl-mem"/>
+    <text x="32" y="139" class="qd-tl-name">TaskStateManager</text>
+    <text x="32" y="155" class="qd-tl-sink">in memory · source of truth</text>
+    <circle cx="407" cy="135" r="5" class="qd-tl-dot-mem"/>
+    <text x="407" y="156" class="qd-tl-mark">running</text>
+    <circle cx="749" cy="135" r="5" class="qd-tl-dot-mem"/>
+    <text x="749" y="156" class="qd-tl-mark">outputs</text>
+    <circle cx="977" cy="135" r="5" class="qd-tl-dot-mem"/>
+    <text x="977" y="156" class="qd-tl-mark">final status</text>
+    <rect x="20" y="176" width="1016" height="44" rx="6" class="qd-tl-store"/>
+    <text x="32" y="195" class="qd-tl-name">TaskHistoryRecorder</text>
+    <text x="32" y="211" class="qd-tl-sink">task_result_history · provenance</text>
+    <circle cx="407" cy="191" r="5" class="qd-tl-dot-store"/>
+    <text x="407" y="212" class="qd-tl-mark">initial record</text>
+    <circle cx="977" cy="191" r="5" class="qd-tl-dot-store"/>
+    <text x="977" y="212" class="qd-tl-mark">final record</text>
+    <rect x="20" y="232" width="1016" height="44" rx="6" class="qd-tl-store"/>
+    <text x="32" y="251" class="qd-tl-name">FilesystemCalibDataSaver</text>
+    <text x="32" y="267" class="qd-tl-sink">project/chip calib directory</text>
+    <circle cx="635" cy="247" r="5" class="qd-tl-dot-store"/>
+    <text x="635" y="268" class="qd-tl-mark">raw data</text>
+    <circle cx="863" cy="247" r="5" class="qd-tl-dot-store"/>
+    <text x="863" y="268" class="qd-tl-mark">figures</text>
+    <rect x="20" y="288" width="1016" height="44" rx="6" class="qd-tl-store"/>
+    <text x="32" y="307" class="qd-tl-name">BackendSaver</text>
+    <text x="32" y="323" class="qd-tl-sink">qubit · coupling accepted state</text>
+    <circle cx="863" cy="303" r="5" class="qd-tl-dot-store"/>
+    <text x="863" y="324" class="qd-tl-mark">promote outputs</text>
+    <text x="801" y="314" class="qd-tl-mark" text-anchor="end" style="text-anchor: end">skipped when persist_output_parameters=False</text>
+    <text x="20" y="372" class="qd-tl-section">EXECUTION STATE — PERSISTED SEPARATELY</text>
+    <rect x="20" y="384" width="230" height="56" rx="8" class="qd-tl-mem"/>
+    <text x="135" y="408" class="qd-title">ExecutionStateManager</text>
+    <text x="135" y="426" class="qd-sub">status · timing · calib_data</text>
+    <rect x="330" y="384" width="200" height="56" rx="8" class="qd-wf"/>
+    <text x="430" y="408" class="qd-title">ExecutionService</text>
+    <text x="430" y="426" class="qd-sub">optimistic lock for notes</text>
+    <rect x="610" y="384" width="200" height="56" rx="8" class="qd-data"/>
+    <text x="710" y="408" class="qd-title">ExecutionRepository</text>
+    <text x="710" y="426" class="qd-sub">execution document</text>
+    <line x1="250" y1="412" x2="328" y2="412" class="qd-edge" marker-end="url(#qd-tl-arrow)"/>
+    <text x="289" y="404" class="qd-label" text-anchor="middle" style="text-anchor: middle">state</text>
+    <line x1="530" y1="412" x2="608" y2="412" class="qd-edge" marker-end="url(#qd-tl-arrow)"/>
+    <text x="569" y="404" class="qd-label" text-anchor="middle" style="text-anchor: middle">save()</text>
+    <text x="836" y="406" class="qd-label">merge_calib_data() changes</text>
+    <text x="836" y="422" class="qd-label">memory only; calib_data is</text>
+    <text x="836" y="438" class="qd-label">not durable through this path</text>
+  </g>
+</svg>

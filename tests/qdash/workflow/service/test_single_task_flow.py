@@ -203,8 +203,45 @@ def test_single_task_executor_accepts_quick_run_parameters(monkeypatch, source_t
     assert captured["kwargs"]["source_task_id"] == source_task_id
     assert captured["kwargs"]["snapshot_exempt_tasks"] == {"CheckRabi"}
     assert captured["kwargs"]["backend_name"] == "fake"
-    assert captured["kwargs"]["task_run_parameters"] == defaults
+    assert captured["kwargs"]["task_parameters"] == {
+        "CheckRabi": {"run": {"shots": {"value": 100}}, "input": {}}
+    }
     assert captured["kwargs"]["persist_output_parameters"] is False
+
+
+def test_single_task_executor_scopes_request_overrides_to_the_task(monkeypatch):
+    from qdash.workflow.service.single_task_flow import single_task_executor
+
+    captured: dict[str, Any] = {}
+
+    class FakeCalibService:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            captured["kwargs"] = kwargs
+
+        def execute_task(self, task_name: str, qid: str) -> dict[str, Any]:
+            return {"task_name": task_name, "qid": qid}
+
+        def finish_calibration(self) -> None:
+            pass
+
+    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", FakeCalibService)
+
+    single_task_executor(
+        username="alice",
+        chip_id="chip-1",
+        qid="0",
+        task_name="CheckRabi",
+        source_execution_id="exec-1",
+        source_task_id="source-task",
+        project_id="project-1",
+        backend_name="fake",
+        parameter_overrides={"input": {"control_amplitude": 0.05}, "run": {"shots": 2000}},
+    )
+
+    assert "parameter_overrides" not in captured["kwargs"]
+    assert captured["kwargs"]["task_parameters"] == {
+        "CheckRabi": {"run": {"shots": {"value": 2000}}, "input": {"control_amplitude": 0.05}}
+    }
 
 
 @pytest.mark.parametrize(

@@ -11,7 +11,11 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
-from qdash.api.dependencies import get_flow_service, get_task_result_service
+from qdash.api.dependencies import (
+    get_flow_service,
+    get_task_file_service,
+    get_task_result_service,
+)
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
@@ -19,11 +23,6 @@ from qdash.api.lib.project import (
 )
 from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task_result import (
-    AiReviewListResponse,
-    AiReviewRunDetailResponse,
-    AiReviewRunListResponse,
-    BulkAiReviewRequest,
-    BulkAiReviewResponse,
     DownloadFiguresAsZipRequest,
     LatestTaskResultResponse,
     TaskHistoryResponse,
@@ -32,7 +31,9 @@ from qdash.api.schemas.task_result import (
     TaskResultListResponse,
     TimeSeriesData,
 )
+from qdash.api.services.catalog_task_run import resolve_catalog_task, validate_overrides
 from qdash.api.services.flow_service import FlowService
+from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 
 router = APIRouter()
@@ -48,6 +49,46 @@ def _parameter_value(parameters: dict[str, Any] | None, name: str) -> Any:
     if isinstance(value, dict):
         return value.get("value")
     return getattr(value, "value", value)
+
+
+def _validated_reexecution_overrides(
+    task_file_service: TaskFileService,
+    task_name: str,
+    parameter_overrides: dict[str, dict[str, Any]] | None,
+) -> dict[str, dict[str, Any]] | None:
+    """Check re-execution overrides against the task definition before starting a run.
+
+    ``readout_duration`` configures the Qubex session, so it is kept as a run
+    override only for tasks that declare it.
+    """
+    if not parameter_overrides:
+        return parameter_overrides
+    unknown_keys = set(parameter_overrides) - {"input", "run"}
+    if unknown_keys:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid parameter overrides: unknown keys {sorted(unknown_keys)}",
+        )
+    task, _ = resolve_catalog_task(task_file_service, task_name, None)
+    input_overrides = dict(parameter_overrides.get("input") or {})
+    run_overrides = dict(parameter_overrides.get("run") or {})
+    declares_readout_duration = "readout_duration" in task.run_parameters
+    if not declares_readout_duration and "readout_duration" in run_overrides:
+        # The duration still configures the Qubex session for tasks that do not
+        # expose it as a task-level run parameter. Add temporary metadata so the
+        # shared override validator rejects non-numeric or non-finite values.
+        task = task.model_copy(
+            update={
+                "run_parameters": {
+                    **task.run_parameters,
+                    "readout_duration": {"value_type": "float"},
+                }
+            }
+        )
+    validate_overrides(task, input_overrides, run_overrides)
+    if not declares_readout_duration:
+        run_overrides.pop("readout_duration", None)
+    return {"input": input_overrides, "run": run_overrides}
 
 
 def _reexecution_readout_duration(
@@ -534,110 +575,6 @@ def get_timeseries_task_results(
 
 
 # =============================================================================
-# AI Review
-# =============================================================================
-
-
-@router.get(
-    "/task-results/ai-review/runs",
-    response_model=AiReviewRunListResponse,
-    summary="List bulk AI review runs",
-    operation_id="listTaskResultAiReviewRuns",
-)
-def list_task_result_ai_review_runs(
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
-    service: Annotated[TaskResultService, Depends(get_task_result_service)],
-    chip_id: Annotated[str | None, Query(description="Optional chip ID filter")] = None,
-    task_name: Annotated[str | None, Query(description="Optional task name filter")] = None,
-    skip: Annotated[int, Query(ge=0, description="Number of rows to skip")] = 0,
-    limit: Annotated[int, Query(ge=1, le=200, description="Maximum rows to return")] = 50,
-) -> AiReviewRunListResponse:
-    """Return bulk AI review runs for run-oriented browsing."""
-    return service.list_ai_review_runs(
-        project_id=ctx.project_id,
-        chip_id=chip_id,
-        task_name=task_name,
-        skip=skip,
-        limit=limit,
-    )
-
-
-@router.get(
-    "/task-results/ai-review/runs/{review_run_id}",
-    response_model=AiReviewRunDetailResponse,
-    summary="Get one bulk AI review run",
-    operation_id="getTaskResultAiReviewRun",
-)
-def get_task_result_ai_review_run(
-    review_run_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
-    service: Annotated[TaskResultService, Depends(get_task_result_service)],
-) -> AiReviewRunDetailResponse:
-    """Return one bulk AI review run and its task-result review rows."""
-    return service.get_ai_review_run(
-        project_id=ctx.project_id,
-        review_run_id=review_run_id,
-    )
-
-
-@router.get(
-    "/task-results/ai-review",
-    response_model=AiReviewListResponse,
-    summary="List task-result AI reviews",
-    operation_id="listTaskResultAiReviews",
-)
-def list_task_result_ai_reviews(
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
-    service: Annotated[TaskResultService, Depends(get_task_result_service)],
-    chip_id: Annotated[str | None, Query(description="Optional chip ID filter")] = None,
-    task_name: Annotated[str | None, Query(description="Optional task name filter")] = None,
-    status: Annotated[str | None, Query(description="Optional AI review status filter")] = None,
-    decision: Annotated[str | None, Query(description="Optional AI review decision filter")] = None,
-    latest_only: Annotated[
-        bool,
-        Query(description="If true, keep only the latest review per chip, task, and target"),
-    ] = False,
-    skip: Annotated[int, Query(ge=0, description="Number of rows to skip")] = 0,
-    limit: Annotated[int, Query(ge=1, le=200, description="Maximum rows to return")] = 50,
-) -> AiReviewListResponse:
-    """Return task-result AI reviews for review queue style browsing."""
-    return service.list_ai_reviews(
-        project_id=ctx.project_id,
-        chip_id=chip_id,
-        task_name=task_name,
-        status=status,
-        decision=decision,
-        latest_only=latest_only,
-        skip=skip,
-        limit=limit,
-    )
-
-
-@router.post(
-    "/task-results/ai-review/bulk",
-    response_model=BulkAiReviewResponse,
-    summary="Request bulk AI review for latest task results",
-    operation_id="requestBulkAiReview",
-)
-def request_bulk_ai_review(
-    body: BulkAiReviewRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
-    service: Annotated[TaskResultService, Depends(get_task_result_service)],
-) -> BulkAiReviewResponse:
-    """Enqueue AI review for the current latest task result per entity."""
-    return service.request_bulk_ai_review(
-        project_id=ctx.project_id,
-        chip_id=body.chip_id,
-        task=body.task,
-        entity_type=body.entity_type,
-        date=body.date,
-        task_ids=body.task_ids,
-        model_override=body.model_override,
-        requested_by=ctx.user.username,
-    )
-
-
-# =============================================================================
 # Single-Task Re-execution
 # =============================================================================
 
@@ -653,6 +590,7 @@ async def re_execute_task_result(
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
+    task_file_service: Annotated[TaskFileService, Depends(get_task_file_service)],
     parameter_overrides: Annotated[
         dict[str, dict[str, Any]] | None,
         Body(
@@ -720,6 +658,9 @@ async def re_execute_task_result(
         )
 
     readout_duration = _reexecution_readout_duration(doc, parameter_overrides)
+    parameter_overrides = _validated_reexecution_overrides(
+        task_file_service, doc.name, parameter_overrides
+    )
     default_run_parameters = (
         {
             "readout_duration": {
@@ -841,13 +782,7 @@ def download_figures_as_zip(
         400 if no paths are provided or if any path does not exist
 
     """
-    archive_path, safe_filename = TaskResultService.create_figures_zip(
-        body.paths,
-        body.filename,
-        project_id=ctx.project_id,
-        ai_review_task_ids=body.ai_review_task_ids,
-        ai_review_bundle_task_ids=body.ai_review_bundle_task_ids,
-    )
+    archive_path, safe_filename = TaskResultService.create_figures_zip(body.paths, body.filename)
 
     return FileResponse(
         archive_path,

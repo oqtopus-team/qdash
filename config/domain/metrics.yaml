@@ -1,6 +1,17 @@
 # Metrics Configuration
 # This file defines display metadata for calibration metrics.
 # Backend Pydantic models define the actual fields, this file only provides UI metadata.
+#
+# Optional per-metric `color_range` sets the default interval the dashboard
+# heatmap maps onto the color scale, in raw (unscaled) units like `threshold`.
+# Without it the heatmap spans the data's min and max. Users can still adjust
+# the range on the dashboard; that adjustment is remembered per browser.
+#
+#   t1:
+#     ...
+#     color_range:
+#       min: 20
+#       max: 150
 
 qubit_metrics:
   readout_frequency:
@@ -16,6 +27,15 @@ qubit_metrics:
         min: 6.0
         max: 10.0
         step: 0.01
+
+  resonator_frequency:
+    title: Resonator Frequency
+    unit: GHz
+    scale: 1
+    description: Ground-state readout-resonator frequency
+    evaluation:
+      mode: none
+
   qubit_frequency:
     title: Qubit Frequency
     unit: GHz
@@ -30,7 +50,23 @@ qubit_metrics:
         max: 6.0
         step: 0.01
 
-  anharmonicity:
+  ef_frequency:
+    title: EF Frequency
+    unit: GHz
+    scale: 1
+    description: Measured e-to-f transition frequency
+    evaluation:
+      mode: none
+
+  fh_frequency:
+    title: FH Frequency
+    unit: GHz
+    scale: 1
+    description: Measured f-to-h transition frequency
+    evaluation:
+      mode: none
+
+  qubit_anharmonicity:
     title: Qubit Anharmonicity
     unit: MHz
     scale: 1000 # Convert GHz to MHz
@@ -218,6 +254,62 @@ qubit_metrics:
     evaluation:
       mode: maximize
 
+  thermal_excitation_probability:
+    title: Thermal Excitation Probability
+    unit: "%"
+    scale: 100
+    description: Estimated thermal excited-state population
+    evaluation:
+      mode: minimize
+
+  quantum_efficiency:
+    title: Quantum Efficiency
+    unit: "%"
+    scale: 100
+    description: Readout-chain quantum measurement efficiency
+    evaluation:
+      mode: maximize
+
+  purcell_filter_frequency:
+    title: Purcell Filter Frequency
+    unit: GHz
+    scale: 1
+    description: Purcell-filter resonance frequency
+    evaluation:
+      mode: none
+
+  resonator_purcell_filter_coupling:
+    title: Resonator–Purcell Filter Coupling
+    unit: MHz
+    scale: 1
+    description: Coupling strength between the readout resonator and Purcell filter
+    evaluation:
+      mode: none
+
+  purcell_filter_linewidth:
+    title: Purcell Filter Linewidth
+    unit: MHz
+    scale: 1
+    description: Total Purcell-filter linewidth
+    evaluation:
+      mode: none
+
+  dispersive_shift:
+    title: Dispersive Shift
+    unit: MHz
+    scale: 1
+    description: Qubit-state-dependent readout-resonator frequency shift
+    evaluation:
+      mode: none
+
+  critical_photon_number:
+    title: Critical Photon Number
+    unit: a.u.
+    scale: 1
+    description: Estimated critical intracavity photon number
+    evaluation:
+      mode: none
+
 coupling_metrics:
   zx90_gate_fidelity:
     title: ZX90 Gate Fidelity
@@ -273,11 +365,19 @@ coupling_metrics:
 
   static_zz_interaction:
     title: Static ZZ Interaction
-    unit: MHz
-    scale: 1000 # Convert GHz to MHz
+    unit: KHz
+    scale: 1
     description: Static ZZ coupling strength between qubits
     evaluation:
       mode: minimize
+
+  qubit_qubit_coupling_strength:
+    title: Coupling Strength
+    unit: MHz
+    scale: 1
+    description: Qubit coupling strength estimated from JAZZ and qubit anharmonicities
+    evaluation:
+      mode: none
 
 # CDF chart grouping configuration
 # Metrics in the same group will be displayed together in a single CDF chart

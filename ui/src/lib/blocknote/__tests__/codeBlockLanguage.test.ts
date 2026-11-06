@@ -1,6 +1,7 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { supportedLanguages } from "../codeBlock";
 import {
   changedCodeBlockIds,
   useCodeBlockLanguageDetection,
@@ -14,6 +15,7 @@ type Change = {
 };
 type OnChangeCallback = (editor: unknown, context: { getChanges: () => Change[] }) => void;
 
+/** Returns a mock editor over `document` with spies for the methods `useCodeBlockLanguageDetection` uses. */
 function createMockEditor(document: Record<string, unknown>[]) {
   let onChangeCallback: OnChangeCallback | null = null;
   const updateBlock = vi.fn((id: string, update: { props: Record<string, unknown> }) => {
@@ -41,18 +43,22 @@ function createMockEditor(document: Record<string, unknown>[]) {
   };
 }
 
+/** Returns an `insert` change for `block`. */
 function insertChange(block: Record<string, unknown>): Change {
   return { type: "insert", block };
 }
 
+/** Returns an `update` change from `prevBlock` to `block`. */
 function updateChange(block: Record<string, unknown>, prevBlock: Record<string, unknown>): Change {
   return { type: "update", block, prevBlock };
 }
 
+/** Returns an inline content array containing a single unstyled text node. */
 function textContent(text: string) {
   return [{ type: "text", text, styles: {} }];
 }
 
+/** Returns a codeBlock block with the given id, text, language, and children. */
 function codeBlock(
   id: string,
   text: string,
@@ -68,6 +74,7 @@ function codeBlock(
   };
 }
 
+/** Returns a paragraph block with the given id, text, and children. */
 function paragraph(id: string, text: string, children: Record<string, unknown>[] = []) {
   return {
     id,
@@ -77,6 +84,13 @@ function paragraph(id: string, text: string, children: Record<string, unknown>[]
     children,
   };
 }
+
+describe("supportedLanguages", () => {
+  it("has a separate entry for Auto (text) and Plain Text (txt)", () => {
+    expect(supportedLanguages.text.name).toBe("Auto");
+    expect(supportedLanguages.txt.name).toBe("Plain Text");
+  });
+});
 
 describe("withDetectedCodeLanguages", () => {
   it("fills in the language of a code block with no explicit language", () => {
@@ -135,6 +149,24 @@ GROUP BY chip_id;
     expect((result[0].props as Record<string, unknown>).language).toBe("sql");
   });
 
+  it("leaves a code block explicitly set to Plain Text (txt) unchanged, even when detection would be confident", () => {
+    const blocks = [
+      codeBlock(
+        "1",
+        `SELECT chip_id, avg(t1)
+FROM calibration_results
+WHERE created_at > '2026-01-01'
+GROUP BY chip_id;
+`,
+        "txt",
+      ),
+    ];
+
+    const result = withDetectedCodeLanguages(blocks);
+
+    expect((result[0].props as Record<string, unknown>).language).toBe("txt");
+  });
+
   it("leaves a code block with an explicit non-text language unchanged", () => {
     const blocks = [
       codeBlock(
@@ -179,6 +211,27 @@ GROUP BY chip_id;
 
     const child = (result[0].children as Record<string, unknown>[])[0];
     expect((child.props as Record<string, unknown>).language).toBe("yaml");
+  });
+
+  it("leaves a nested code block explicitly set to Plain Text (txt) unchanged", () => {
+    const nestedCode = codeBlock(
+      "2",
+      `chip:
+  id: chip-64
+  qubits:
+    - id: 1
+      t1: 12.3
+    - id: 2
+      t1: 15.1
+`,
+      "txt",
+    );
+    const blocks = [paragraph("1", "see below", [nestedCode])];
+
+    const result = withDetectedCodeLanguages(blocks);
+
+    const child = (result[0].children as Record<string, unknown>[])[0];
+    expect((child.props as Record<string, unknown>).language).toBe("txt");
   });
 
   it("does not mutate its input", () => {
@@ -307,7 +360,7 @@ def calibrate(qubit_id: str, shots: int = 1000) -> float:
 
   it("does not re-detect a prop-only update, such as choosing Plain Text", () => {
     const prevBlock = codeBlock("1", PYTHON_CODE, "python");
-    const block = codeBlock("1", PYTHON_CODE, "text");
+    const block = codeBlock("1", PYTHON_CODE, "txt");
     const blocks = [block];
     const { editor, updateBlock, triggerChange } = createMockEditor(blocks);
 
@@ -321,6 +374,19 @@ def calibrate(qubit_id: str, shots: int = 1000) -> float:
   it("does not update a code block that already has an explicit non-auto language", () => {
     const prevBlock = codeBlock("1", "hello", "yaml");
     const block = codeBlock("1", "hello world", "yaml");
+    const blocks = [block];
+    const { editor, updateBlock, triggerChange } = createMockEditor(blocks);
+
+    renderHook(() => useCodeBlockLanguageDetection(editor));
+    triggerChange([updateChange(block, prevBlock)]);
+    vi.advanceTimersByTime(500);
+
+    expect(updateBlock).not.toHaveBeenCalled();
+  });
+
+  it("does not detect the language of an edited code block explicitly set to Plain Text (txt)", () => {
+    const prevBlock = codeBlock("1", "import numpy as np", "txt");
+    const block = codeBlock("1", PYTHON_CODE, "txt");
     const blocks = [block];
     const { editor, updateBlock, triggerChange } = createMockEditor(blocks);
 

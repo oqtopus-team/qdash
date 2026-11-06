@@ -46,6 +46,19 @@ def test_create_app_applies_api_metadata() -> None:
     assert app.title == "QDash API"
     assert openapi_schema["info"]["license"]["name"] == "Apache 2.0"
     assert "/agent-sessions" in openapi_schema["paths"]
+    assert openapi_schema["components"]["schemas"]
+    assert (
+        openapi_schema["components"]["securitySchemes"]["BearerAuth"]
+        == OPENAPI_EXTRA["components"]["securitySchemes"]["BearerAuth"]
+    )
+    assert "HTTPBearer" in openapi_schema["components"]["securitySchemes"]
+    assert openapi_schema["security"] == [{"BearerAuth": []}]
+    assert app.openapi() is openapi_schema
+    assert openapi_schema["security"] == [{"BearerAuth": []}]
+
+    # Regenerating the schema must preserve security metadata without duplication.
+    app.openapi_schema = None
+    assert app.openapi() == openapi_schema
 
 
 def test_openapi_extra_defines_bearer_auth() -> None:

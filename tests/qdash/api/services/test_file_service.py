@@ -113,6 +113,26 @@ def test_download_zip_file_maps_config_parent_to_qubex_config(tmp_path: Path) ->
         shutil.rmtree(Path(response.path).parent, ignore_errors=True)
 
 
+def test_download_zip_file_preserves_tree_for_relative_root(tmp_path: Path) -> None:
+    """Zipping the relative root (".") keeps each file's chip-relative directory tree."""
+    config_dir = tmp_path / "qubex-config"
+    first_file = config_dir / "64Q" / "config" / "wiring.yaml"
+    second_file = config_dir / "16Qtest" / "config" / "chip.yaml"
+    first_file.parent.mkdir(parents=True)
+    second_file.parent.mkdir(parents=True)
+    first_file.write_text("wiring: test\n", encoding="utf-8")
+    second_file.write_text("chip: test\n", encoding="utf-8")
+
+    response = FileService(config_base_path=config_dir).download_zip_file(".")
+
+    try:
+        with zipfile.ZipFile(response.path) as archive:
+            file_names = sorted(name for name in archive.namelist() if not name.endswith("/"))
+            assert file_names == ["16Qtest/config/chip.yaml", "64Q/config/wiring.yaml"]
+    finally:
+        shutil.rmtree(Path(response.path).parent, ignore_errors=True)
+
+
 def test_download_zip_file_rejects_paths_outside_qubex_config(tmp_path: Path) -> None:
     config_dir = tmp_path / "config" / "qubex-config"
     outside_dir = tmp_path / "outside"
@@ -126,3 +146,96 @@ def test_download_zip_file_rejects_paths_outside_qubex_config(tmp_path: Path) ->
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Path outside config directory"
+
+
+# --- Workspaces: the same service serves config and knowledge ---
+
+
+def _workspace_repo(tmp_path: Path) -> Path:
+    repo_dir = tmp_path / "knowledge"
+    repo_dir.mkdir()
+    (repo_dir / "a").mkdir()
+    (repo_dir / "a" / "index.md").write_text("# A\n", encoding="utf-8")
+    (repo_dir / "task-knowledge.json").write_text("{}", encoding="utf-8")
+    repo = Repo.init(repo_dir)
+    repo.index.add(["a/index.md", "task-knowledge.json"])
+    repo.index.commit("Initial knowledge")
+    return repo_dir
+
+
+def test_push_leaves_out_excluded_generated_files(tmp_path: Path) -> None:
+    service = FileService(
+        _workspace_repo(tmp_path), label="knowledge", push_exclude=("task-knowledge.json",)
+    )
+
+    assert [p.as_posix() for p in service._workspace_files()] == ["a/index.md"]
+
+
+def test_save_runs_the_after_save_hook(tmp_path: Path) -> None:
+    calls: list[str] = []
+    service = FileService(_workspace_repo(tmp_path), after_save=lambda: calls.append("ran"))
+
+    service.save_file_content("a/index.md", "# A edited\n")
+
+    assert calls == ["ran"]
+    assert (tmp_path / "knowledge" / "a" / "index.md").read_text() == "# A edited\n"
+
+
+def test_failing_after_save_hook_keeps_the_file_and_reports(tmp_path: Path) -> None:
+    def boom() -> None:
+        raise RuntimeError("generator exploded")
+
+    service = FileService(_workspace_repo(tmp_path), label="knowledge", after_save=boom)
+
+    with pytest.raises(HTTPException) as exc_info:
+        service.save_file_content("a/index.md", "# A edited\n")
+
+    assert exc_info.value.status_code == 500
+    assert "generator exploded" in exc_info.value.detail
+    assert (tmp_path / "knowledge" / "a" / "index.md").read_text() == "# A edited\n"
+
+
+def test_workspace_messages_name_the_workspace_and_its_repo_variable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("KNOWLEDGE_REPO_URL", raising=False)
+    plain_dir = tmp_path / "plain"
+    plain_dir.mkdir()
+    service = FileService(plain_dir, label="knowledge", repo_url_env="KNOWLEDGE_REPO_URL")
+
+    assert service.get_git_status()["message"] == "Knowledge directory is not a Git repository"
+    with pytest.raises(HTTPException) as exc_info:
+        service.git_pull_config()
+    assert "KNOWLEDGE_REPO_URL" in exc_info.value.detail
+
+
+def test_git_env_marks_the_mount_safe_and_keeps_the_token_out_of_urls(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # The bind-mounted repo is owned by the host user; the service must not
+    # need a global safe.directory entry to read it, and credentials go through
+    # a helper rather than the remote URL that .git/config would keep.
+    monkeypatch.setenv("GITHUB_USER", "bot")
+    monkeypatch.setenv("GITHUB_TOKEN", "s3cret")
+    service = FileService(_workspace_repo(tmp_path))
+
+    env = service._git_env()
+    repo = service._open_repo()
+
+    assert env["GIT_CONFIG_KEY_0"] == "safe.directory"
+    assert env["GIT_CONFIG_KEY_1"] == "credential.helper"
+    assert "s3cret" not in env["GIT_CONFIG_VALUE_1"]
+    assert env["QDASH_GIT_TOKEN"] == "s3cret"  # noqa: S105 -- test value
+    assert repo.git.environment()["GIT_CONFIG_COUNT"] == "2"
+    assert service.get_git_status()["branch"] in {"main", "master"}
+    assert [r.url for r in repo.remotes] == []
+
+
+def test_git_env_without_credentials_only_marks_the_mount_safe(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("GITHUB_USER", raising=False)
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+
+    env = FileService(_workspace_repo(tmp_path))._git_env()
+
+    assert env["GIT_CONFIG_COUNT"] == "1"
+    assert "QDASH_GIT_TOKEN" not in env

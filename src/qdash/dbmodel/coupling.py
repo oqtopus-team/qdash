@@ -108,6 +108,44 @@ class CouplingDocument(Document):
         return coupling_doc
 
     @classmethod
+    def delete_calib_parameter(
+        cls,
+        username: str,
+        qid: str,
+        chip_id: str,
+        parameter_name: str,
+        project_id: str | None,
+    ) -> "CouplingDocument":
+        """Delete one current calibration parameter and record a history snapshot."""
+        query = (
+            {"project_id": project_id, "qid": qid, "chip_id": chip_id}
+            if project_id is not None
+            else {"username": username, "qid": qid, "chip_id": chip_id}
+        )
+        coupling_doc = cls.find_one(query).run()
+        if coupling_doc is None:
+            raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
+        if parameter_name not in coupling_doc.data:
+            raise ValueError(f"Parameter {parameter_name} not found for coupling {qid}")
+
+        coupling_doc.user_id = cls._user_id_for_username(username)
+        coupling_doc.username = username
+        coupling_doc.data.pop(parameter_name)
+        coupling_doc.system_info.update_time()
+        coupling_doc.save()
+        CouplingHistoryDocument.create_history(
+            CouplingModel(
+                project_id=coupling_doc.project_id,
+                user_id=coupling_doc.user_id,
+                qid=qid,
+                chip_id=chip_id,
+                data=coupling_doc.data,
+                username=username,
+            )
+        )
+        return coupling_doc
+
+    @classmethod
     def update_status(cls, qid: str, chip_id: str, status: str) -> "CouplingDocument":
         """Update the CouplingDocument's status."""
         coupling_doc = cls.find_one({"qid": qid, "chip_id": chip_id}).run()

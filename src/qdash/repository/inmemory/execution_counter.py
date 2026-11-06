@@ -4,6 +4,8 @@ This module provides a mock implementation that stores data in memory,
 useful for unit testing without requiring a MongoDB instance.
 """
 
+from threading import Lock
+
 
 class InMemoryExecutionCounterRepository:
     """In-memory implementation of ExecutionCounterRepository for testing.
@@ -23,6 +25,7 @@ class InMemoryExecutionCounterRepository:
 
     def __init__(self) -> None:
         """Initialize with empty storage."""
+        self._lock = Lock()
         self._counters: dict[str, int] = {}
         self._dates: dict[str, list[str]] = {}  # key: "{project_id}:{chip_id}"
 
@@ -56,19 +59,20 @@ class InMemoryExecutionCounterRepository:
             msg = "project_id is required to generate an execution index"
             raise ValueError(msg)
 
-        counter_key = f"{date}:{chip_id}:{project_id}"
-        current = self._counters.get(counter_key, -1)
-        next_index = current + 1
-        self._counters[counter_key] = next_index
+        with self._lock:
+            counter_key = f"{date}:{project_id}"
+            current = self._counters.get(counter_key, -1)
+            next_index = current + 1
+            self._counters[counter_key] = next_index
 
-        # Track dates for chip
-        dates_key = f"{project_id}:{chip_id}"
-        if dates_key not in self._dates:
-            self._dates[dates_key] = []
-        if date not in self._dates[dates_key]:
-            self._dates[dates_key].append(date)
+            # Track dates for chip
+            dates_key = f"{project_id}:{chip_id}"
+            if dates_key not in self._dates:
+                self._dates[dates_key] = []
+            if date not in self._dates[dates_key]:
+                self._dates[dates_key].append(date)
 
-        return next_index
+            return next_index
 
     def get_dates_for_chip(
         self,

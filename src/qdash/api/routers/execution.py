@@ -27,6 +27,8 @@ from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
     ArtifactPreviewResponse,
     CancelExecutionResponse,
+    ExecutionActivityGranularity,
+    ExecutionActivityResponse,
     ExecutionAvailabilityRequest,
     ExecutionAvailabilityResponse,
     ExecutionLockStatusResponse,
@@ -34,13 +36,35 @@ from qdash.api.schemas.execution import (
     ListExecutionsResponse,
 )
 from qdash.api.services.artifact_preview_service import preview_netcdf
-from qdash.api.services.execution_service import ExecutionService
+from qdash.api.services.execution_service import (
+    MAX_SIX_HOUR_ACTIVITY_DAYS,
+    ExecutionService,
+)
 from qdash.api.services.flow_service import FlowService
-from qdash.common.config.path_resolver import resolve_calib_data_path
+from qdash.common.config.path_resolver import (
+    PathOutsideCalibData,
+    resolve_served_calib_data_path,
+)
 
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+
+def _served_file(path: str) -> Path:
+    """Resolve a requested calibration data file, or 404.
+
+    These endpoints are reachable without a token (``<img>`` and download links
+    cannot send one), so a path outside the calibration data tree is reported
+    exactly like a missing file.
+    """
+    try:
+        resolved_path = resolve_served_calib_data_path(path)
+    except PathOutsideCalibData:
+        raise HTTPException(status_code=404, detail=f"File not found: {path}") from None
+    if not resolved_path.is_file():
+        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    return resolved_path
 
 
 @router.get(
@@ -72,12 +96,7 @@ def get_figure_by_path(path: str) -> FileResponse:
         404 if the file does not exist at the specified path
 
     """
-    resolved_path = resolve_calib_data_path(path)
-    if not resolved_path.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"File not found: {path}",
-        )
+    resolved_path = _served_file(path)
     # FileResponse sets Content-Length, avoiding chunked encoding
     return FileResponse(resolved_path, media_type="image/png")
 
@@ -91,9 +110,7 @@ def get_figure_by_path(path: str) -> FileResponse:
 )
 def download_artifact_by_path(path: str) -> FileResponse:
     """Download a calibration artifact such as figure JSON or raw NetCDF data."""
-    resolved_path = resolve_calib_data_path(path)
-    if not resolved_path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    resolved_path = _served_file(path)
     return FileResponse(resolved_path, filename=resolved_path.name)
 
 
@@ -124,10 +141,7 @@ def download_artifacts_as_archive(
     """Download multiple figure JSON and raw NetCDF artifacts as one ZIP file."""
     resolved_paths: list[Path] = []
     for path in paths:
-        resolved_path = resolve_calib_data_path(path)
-        if not resolved_path.exists():
-            raise HTTPException(status_code=404, detail=f"File not found: {path}")
-        resolved_paths.append(resolved_path)
+        resolved_paths.append(_served_file(path))
 
     with NamedTemporaryFile(delete=False, suffix=".zip") as temporary_file:
         archive_path = Path(temporary_file.name)
@@ -161,9 +175,7 @@ def download_artifacts_as_archive(
 )
 def preview_artifact_by_path(path: str) -> ArtifactPreviewResponse:
     """Return a size-limited table preview of a NetCDF calibration artifact."""
-    resolved_path = resolve_calib_data_path(path)
-    if not resolved_path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+    resolved_path = _served_file(path)
     if resolved_path.suffix.lower() != ".nc":
         raise HTTPException(status_code=400, detail="Only NetCDF (.nc) artifacts can be previewed")
     try:
@@ -234,8 +246,15 @@ def list_executions(
     chip_id: Annotated[str, Query(description="Chip ID to filter executions")],
     skip: Annotated[int, Query(ge=0, description="Number of items to skip")] = 0,
     limit: Annotated[int, Query(ge=1, le=100, description="Number of items to return")] = 20,
+    date: Annotated[
+        str | None,
+        Query(pattern=r"^\d{8}$", description="Only executions started on this day, YYYYMMDD"),
+    ] = None,
+    timezone: Annotated[
+        str, Query(description="IANA time zone that defines the day for ``date``")
+    ] = "UTC",
 ) -> ListExecutionsResponse:
-    """List executions for a given chip with pagination.
+    """List executions for a given chip with pagination, optionally for one calendar day.
 
     Parameters
     ----------
@@ -268,16 +287,68 @@ def list_executions(
         chip_id=chip_id,
         skip=skip,
         limit=limit,
+        date=date,
+        timezone=timezone,
     )
     total = execution_service.count_executions(
         project_id=ctx.project_id,
         chip_id=chip_id,
+        date=date,
+        timezone=timezone,
     )
     return ListExecutionsResponse(
         executions=executions,
         total=total,
         skip=skip,
         limit=limit,
+    )
+
+
+@router.get(
+    "/executions/activity",
+    response_model=ExecutionActivityResponse,
+    summary="Count executions per day or per 6-hour slot",
+    operation_id="getExecutionActivity",
+)
+def get_execution_activity(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    execution_service: Annotated[ExecutionService, Depends(get_execution_service)],
+    chip_id: Annotated[
+        str | None,
+        Query(
+            description="Chip ID to count executions for; omit to count every chip in the project"
+        ),
+    ] = None,
+    days: Annotated[int, Query(ge=1, le=365, description="Trailing window in calendar days")] = 30,
+    timezone: Annotated[
+        str, Query(description="IANA time zone used to assign executions to buckets")
+    ] = "UTC",
+    granularity: Annotated[
+        ExecutionActivityGranularity,
+        Query(
+            description=(
+                "Bucket length: `day` (default) or `6h`. `6h` returns `days` x 4 buckets "
+                f"and accepts at most {MAX_SIX_HOUR_ACTIVITY_DAYS} days"
+            )
+        ),
+    ] = "day",
+) -> ExecutionActivityResponse:
+    """Count executions per bucket, by status, over a trailing window.
+
+    With ``chip_id`` only that chip's executions count; without it, every execution in the
+    caller's current project counts. Executions of other projects are never included.
+    Every bucket of the window is returned, empty ones included, so a chart can draw a
+    continuous axis. Buckets follow wall-clock time in ``timezone`` so they match what the
+    user sees: one per calendar day ending today, or with ``granularity=6h`` four per day
+    (local 00:00, 06:00, 12:00, 18:00) ending with the slot that contains the current time.
+    Each bucket carries its ``start`` and exclusive ``end``.
+    """
+    return execution_service.get_execution_activity(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        days=days,
+        timezone=timezone,
+        granularity=granularity,
     )
 
 
