@@ -89,8 +89,8 @@ Set `QDASH_WEB_URL` when the web UI is not at the API base URL minus `/api`.
 
 | Tool | Operation |
 | --- | --- |
-| `qdash_get_pipeline_catalog` | List supported pipeline steps, dependencies, default tasks, and backend tasks. |
-| `qdash_plan_pipeline` | Validate a pipeline spec and return problems with paths and the tasks each step will run; does not execute. |
+| `qdash_get_pipeline_catalog` | List supported pipeline steps, dependencies, default task calls, step metrics, backend tasks, and the accepted spec version. |
+| `qdash_plan_pipeline` | Validate a version 2 pipeline spec and return problems with paths, warnings, and the calls each step will run with their call ids and effective settings; for a version 1 spec it points to the converted spec. Does not execute. |
 | `qdash_run_pipeline` (confirmation-gated) | Start a validated spec as one QDash execution. A 422 with problems is returned as text. Completed tasks persist parameters directly, without an agent candidate gate. |
 | `qdash_save_flow` (confirmation-gated) | Validate, format, save, and register a Prefect `@flow` workflow. |
 | `qdash_execute_flow` (confirmation-gated) | Run a saved flow with parameters. |

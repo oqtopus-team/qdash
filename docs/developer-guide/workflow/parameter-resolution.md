@@ -96,7 +96,8 @@ parameter set in both.
 
 Task construction resolves Run parameters in this order, from highest to lowest precedence:
 
-1. `run` in the call-level `parameters` of `CalibService.execute_task()`
+1. `run` in the call-level `parameters` of `CalibService.execute_task()`; a step passes each
+   `TaskCall`'s own settings here, see [Task Calls](./task-calls.md#settings)
 2. `task_parameters[task_name]["run"]`
 3. Legacy per-task entries in `CalibConfig.default_run_parameters`
 4. Shared entries in `CalibConfig.default_run_parameters`
@@ -230,6 +231,8 @@ flowchart LR
 ### Re-execution behavior
 
 For a single-task re-execution, `CalibService` passes `source_task_id` to `SnapshotParameterLoader`, which loads that exact task result. `task_name` and `qid` then validate that the selected history record matches the requested task. This avoids resolving an already identified task indirectly through its execution.
+
+For an execution re-execution (`source_execution_id`), the loader keeps every source result and matches each new call by task name, qid, and the `step_id` and `call_id` of its `invocation`, so repeated calls of one task restore their own records. A source result without `invocation`, written before task calls existed, is used when it is the only one for its task and qid; several raise `SnapshotAmbiguityError`, and the task fails rather than restore an arbitrary record.
 
 `TaskExecutor` applies parameters in this sequence:
 
