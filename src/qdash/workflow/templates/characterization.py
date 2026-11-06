@@ -30,7 +30,7 @@ from typing import Any
 
 from prefect import flow
 
-from qdash.workflow import sweep
+from qdash.workflow import TaskCall, sweep
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -49,39 +49,39 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
-GE_CALIBRATION_TASKS: list[str] = [
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CreatePIPulse",
-    "CreateDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "ReadoutClassification",
+GE_CALIBRATION_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckRabi"),
+    TaskCall(name="CreateHPIPulse"),
+    TaskCall(name="CreatePIPulse"),
+    TaskCall(name="CreateDRAGHPIPulse"),
+    TaskCall(name="CreateDRAGPIPulse"),
+    TaskCall(name="ReadoutClassification"),
 ]
 
-GE_CHARACTERIZATION_TASKS: list[str] = [
-    "CheckT1Average",
-    "CheckT2EchoAverage",
-    "CheckCKP",
-    "CheckQuantumEfficiency",
-    "CheckCPMGNoiseSpectroscopy",
-    "CheckSpinLockSpectroscopy",
+GE_CHARACTERIZATION_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckT1Average"),
+    TaskCall(name="CheckT2EchoAverage"),
+    TaskCall(name="CheckCKP"),
+    TaskCall(name="CheckQuantumEfficiency"),
+    TaskCall(name="CheckCPMGNoiseSpectroscopy"),
+    TaskCall(name="CheckSpinLockSpectroscopy"),
 ]
 
-EF_CALIBRATION_TASKS: list[str] = [
-    "CheckAdaptiveEFChevron",
-    "CheckEFRabi",
-    "CreateEFHPIPulse",
-    "CreateEFPIPulse",
-    "EFReadoutClassification",
+EF_CALIBRATION_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckAdaptiveEFChevron"),
+    TaskCall(name="CheckEFRabi"),
+    TaskCall(name="CreateEFHPIPulse"),
+    TaskCall(name="CreateEFPIPulse"),
+    TaskCall(name="EFReadoutClassification"),
 ]
 
-EF_CHARACTERIZATION_TASKS: list[str] = [
-    "CheckThermalExcitation",
-    "CheckReadoutMIST",
-    "CheckAdaptiveFHChevron",
+EF_CHARACTERIZATION_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckThermalExcitation"),
+    TaskCall(name="CheckReadoutMIST"),
+    TaskCall(name="CheckAdaptiveFHChevron"),
 ]
 
-COUPLING_CHARACTERIZATION_TASKS: list[str] = ["CheckCouplingStrength"]
+COUPLING_CHARACTERIZATION_TASKS: list[TaskCall] = [TaskCall(name="CheckCouplingStrength")]
 
 SHORT_INTERVAL = 256 * 1024
 STANDARD_INTERVAL = 384 * 1024
@@ -148,7 +148,8 @@ def characterization(
 
     # FH Chevron requires the GE/EF/FH layout. GE and JAZZ remain available in it,
     # so the full workflow can keep one configuration from start to finish.
-    configuration_mode = "ge-ef-fh" if "CheckAdaptiveFHChevron" in enabled_tasks else "ge-cr-cr"
+    enabled_names = {call.name for call in enabled_tasks}
+    configuration_mode = "ge-ef-fh" if "CheckAdaptiveFHChevron" in enabled_names else "ge-cr-cr"
 
     # Configure the selected MUXes once; isolated workers inherit the same logical layout.
     steps: list[Step] = [

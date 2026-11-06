@@ -3,6 +3,9 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
+from qdash.datamodel.task_call import TaskCall
+from tests.qdash.workflow.task_call_helpers import names
+
 two_qubit_module = importlib.import_module("qdash.workflow.templates.two_qubit")
 two_qubit_scheduled_module = importlib.import_module("qdash.workflow.templates.two_qubit_scheduled")
 
@@ -25,7 +28,7 @@ def test_two_qubit_template_passes_template_task_list(monkeypatch) -> None:
         qids=["0", "1"],
     )
 
-    assert result["steps"][1].tasks == two_qubit_module.TWO_QUBIT_TASKS
+    assert names(result["steps"][1].tasks) == names(two_qubit_module.TWO_QUBIT_TASKS)
 
 
 def test_two_qubit_template_keeps_custom_tasks(monkeypatch) -> None:
@@ -35,10 +38,10 @@ def test_two_qubit_template_keeps_custom_tasks(monkeypatch) -> None:
         username="alice",
         chip_id="64Q",
         qids=["0", "1"],
-        tasks=["CheckCrossResonance"],
+        tasks=[TaskCall(name="CheckCrossResonance")],
     )
 
-    assert result["steps"][1].tasks == ["CheckCrossResonance"]
+    assert names(result["steps"][1].tasks) == ["CheckCrossResonance"]
 
 
 def test_two_qubit_scheduled_template_passes_template_task_list(monkeypatch) -> None:
@@ -50,7 +53,9 @@ def test_two_qubit_scheduled_template_passes_template_task_list(monkeypatch) -> 
         schedule=[[("0", "1")]],
     )
 
-    assert result["steps"][1].tasks == two_qubit_scheduled_module.TWO_QUBIT_SCHEDULED_TASKS
+    assert names(result["steps"][1].tasks) == names(
+        two_qubit_scheduled_module.TWO_QUBIT_SCHEDULED_TASKS
+    )
 
 
 def test_two_qubit_scheduled_template_keeps_custom_tasks(monkeypatch) -> None:
@@ -60,7 +65,7 @@ def test_two_qubit_scheduled_template_keeps_custom_tasks(monkeypatch) -> None:
         username="alice",
         chip_id="64Q",
         schedule=[[("0", "1")]],
-        tasks=["CheckCrossResonance"],
+        tasks=[TaskCall(name="CheckCrossResonance")],
     )
 
-    assert result["steps"][1].tasks == ["CheckCrossResonance"]
+    assert names(result["steps"][1].tasks) == ["CheckCrossResonance"]

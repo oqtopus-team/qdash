@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
+from qdash.datamodel.task_invocation import TaskInvocation
 
 
 class ArtifactPreviewResponse(BaseModel):
@@ -70,6 +71,10 @@ class Task(BaseModel):
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None
     task_type: str | None = None
+    invocation: TaskInvocation | None = Field(
+        default=None,
+        description="Planned step and call this result executed; null for older results.",
+    )
     default_view: bool = True
 
     @field_validator("elapsed_time", mode="before")
@@ -133,6 +138,9 @@ class PipelineStepProgress(BaseModel):
 
     index: int = Field(description="1-based position in the pipeline spec")
     name: str
+    step_id: str | None = Field(
+        default=None, description="Plan-scoped step id; null for transforms and older runs"
+    )
     type: str = ""
     kind: str = Field(default="calibration", description='"calibration" or "transform"')
     execution_id: str | None = Field(

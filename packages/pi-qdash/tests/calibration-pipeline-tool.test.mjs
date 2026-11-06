@@ -9,25 +9,39 @@ import {
 } from "../.test-dist/tools/calibration-pipeline.js";
 
 const SPEC = {
+  spec_version: 2,
   name: "coarse-then-coherence",
   targets: { qids: ["0", "1"] },
   steps: [
     { type: "OneQubitCheck", mode: "scheduled" },
     { type: "FilterByStatus" },
-    { type: "CustomOneQubit", step_name: "coherence", tasks: ["CheckT1", "CheckT2Echo"] },
+    {
+      type: "CustomOneQubit",
+      step_name: "coherence",
+      tasks: [
+        { name: "CheckRamsey", call_id: "ramsey_coarse" },
+        { name: "CheckRamsey", call_id: "ramsey_fine", run: { detuning: 0.0002 } },
+      ],
+    },
   ],
 };
 
+const call = (name, callId = name) => ({ call_id: callId, name, on_failure: "stop", settings: { run: {}, input: {} } });
+const CHECK_TASKS = ["CheckRabi", "CheckRabi", "CreateHPIPulse", "CheckHPIPulse", "CheckRabi", "CreateHPIPulse", "CheckHPIPulse", "CheckT1", "CheckT2Echo", "CheckRamsey"];
+
 const STEPS = [
-  { index: 1, type: "OneQubitCheck", name: "one_qubit_check", kind: "calibration", tasks: ["CheckRabi", "CheckRabi", "CreateHPIPulse", "CheckHPIPulse", "CheckRabi", "CreateHPIPulse", "CheckHPIPulse", "CheckT1", "CheckT2Echo", "CheckRamsey"] },
-  { index: 2, type: "FilterByStatus", name: "filter_by_status", kind: "transform", tasks: [] },
-  { index: 3, type: "CustomOneQubit", name: "coherence", kind: "calibration", tasks: ["CheckT1", "CheckT2Echo"] },
+  { index: 1, type: "OneQubitCheck", name: "one_qubit_check", step_id: "one_qubit_check", kind: "calibration", tasks: CHECK_TASKS, calls: CHECK_TASKS.map((name, i) => call(name, `${name}_${i}`)) },
+  { index: 2, type: "FilterByStatus", name: "filter_by_status", step_id: null, kind: "transform", tasks: [], calls: [] },
+  { index: 3, type: "CustomOneQubit", name: "coherence", step_id: "coherence", kind: "calibration", tasks: ["CheckRamsey", "CheckRamsey"], calls: [call("CheckRamsey", "ramsey_coarse"), call("CheckRamsey", "ramsey_fine")] },
+  { index: 4, type: "FilterByMetric", name: "filter_by_t2_star", step_id: null, kind: "transform", tasks: [], calls: [], reference: { step: "coherence", call_id: "ramsey_fine" } },
 ];
 
 const VALID = {
   valid: true,
   problems: [],
+  warnings: [],
   backend_name: "qubex",
+  spec_version: 2,
   spec: { ...SPEC },
   targets: { qids: ["0", "1"], mux_ids: [], exclude_qids: [] },
   steps: STEPS,
@@ -58,10 +72,40 @@ test("plan validates on the resolved chip and lists the resolved steps", async (
   const text = result.content[0].text;
   assert.match(text, /Pipeline 'coarse-then-coherence' on chip 64Qv3 \(backend qubex\)/);
   assert.match(text, /Targets: qubits 0, 1/);
-  assert.match(text, /Valid\. 12 task runs per target/);
-  assert.match(text, /1\. one_qubit_check \(OneQubitCheck\) — 10 tasks: CheckRabi, .*\+2 more/);
+  assert.match(text, /Valid\. 12 task calls per target/);
+  assert.match(text, /1\. one_qubit_check \(OneQubitCheck\) — 10 calls: CheckRabi_0=CheckRabi, .*\+2 more/);
   assert.match(text, /2\. filter_by_status \(FilterByStatus\) — no tasks \(transform\)/);
-  assert.match(text, /3\. coherence \(CustomOneQubit\) — 2 tasks: CheckT1, CheckT2Echo/);
+  assert.match(text, /3\. coherence \(CustomOneQubit\) — 2 calls: ramsey_coarse=CheckRamsey, ramsey_fine=CheckRamsey/);
+  assert.match(text, /4\. filter_by_t2_star \(FilterByMetric\) — reads coherence\.ramsey_fine/);
+  assert.doesNotMatch(text, /Warnings/);
+});
+
+test("plan shows warnings without calling the spec invalid, and points to a migrated spec", async () => {
+  const tools = registeredTools({
+    async validateCalibrationPipeline() {
+      return { ...VALID, warnings: [{ path: "steps[3]", message: "FilterByStatus has no step reference" }] };
+    },
+  });
+  const warned = await tools.get("qdash_plan_pipeline").execute("t", { spec: SPEC });
+  assert.match(warned.content[0].text, /Valid\./);
+  assert.match(warned.content[0].text, /Warnings \(the spec is still valid\):\n- steps\[3\]: FilterByStatus has no step reference/);
+
+  const legacy = registeredTools({
+    async validateCalibrationPipeline() {
+      return {
+        valid: false,
+        problems: [{ path: "spec_version", message: "this is a version 1 spec" }],
+        backend_name: "qubex",
+        spec_version: 1,
+        migrated_spec: { spec_version: 2, steps: [] },
+        steps: [],
+      };
+    },
+  });
+  const result = await legacy.get("qdash_plan_pipeline").execute("t", { spec: { steps: [{ type: "OneQubitCheck" }] } });
+  assert.equal(result.details.valid, false);
+  assert.match(result.content[0].text, /version 1 spec\. details\.data\.migrated_spec holds the same pipeline as spec_version 2/);
+  assert.equal(result.details.data.migrated_spec.spec_version, 2);
 });
 
 test("plan reports problems without throwing and passes an explicit chip and backend", async () => {
@@ -120,7 +164,7 @@ test("run requires confirmation, then reports the execution", async () => {
   assert.equal(result.details.started, true);
   assert.equal(result.details.executionId, "20261006-012");
   assert.match(result.content[0].text, /execution_id 20261006-012/);
-  assert.match(result.content[0].text, /3 steps, 12 task runs per target/);
+  assert.match(result.content[0].text, /4 steps, 12 task calls per target/);
   assert.match(result.content[0].text, /qdash_wait_execution/);
 
   const viaUi = await run.execute("t", { chipId: "64Qv3", spec: SPEC }, undefined, undefined, uiContext(true));
@@ -162,11 +206,12 @@ test("catalog lists step types and tasks by type and keeps the schema in details
   const catalog = {
     backend_name: "qubex",
     step_types: [
-      { type: "OneQubitCheck", kind: "calibration", description: "Coarse one-qubit characterization.", requires: [], provides: ["one_qubit_check", "candidate_qids"], task_scope: "qubit", default_tasks: ["CheckRabi", "CheckT1"] },
+      { type: "OneQubitCheck", kind: "calibration", description: "Coarse one-qubit characterization.", requires: [], provides: ["one_qubit_check", "candidate_qids"], task_scope: "qubit", default_step_id: "one_qubit_check", default_tasks: [{ name: "CheckRabi" }, { name: "CheckT1" }], step_metrics: ["t1_average"] },
       { type: "FilterByStatus", kind: "transform", description: "Keep the qubits whose latest one-qubit step succeeded.", requires: ["one_qubit_check", "one_qubit_fine_tune"], provides: ["candidate_qids"], task_scope: null, default_tasks: [] },
     ],
     one_qubit_modes: ["synchronized", "scheduled"],
     tasks: { qubit: ["CheckRabi", "CheckT1"], coupling: ["CheckCrossResonance"] },
+    spec_version: 2,
     spec_schema: { title: "CalibrationPipelineSpec" },
   };
   const calls = [];
@@ -177,7 +222,9 @@ test("catalog lists step types and tasks by type and keeps the schema in details
 
   assert.deepEqual(calls, [{ backend_name: "qubex" }]);
   const text = result.content[0].text;
-  assert.match(text, /- OneQubitCheck \[calibration qubit tasks\]: Coarse one-qubit characterization\.; default 2 tasks/);
+  assert.match(text, /- OneQubitCheck \[calibration qubit tasks\]: Coarse one-qubit characterization\.; default 2 calls/);
+  assert.match(text, /Specs need spec_version: 2\./);
+  assert.match(text, /every occurrence has its own call_id/);
   assert.match(text, /- FilterByStatus \[transform\]: .* needs one_qubit_check or one_qubit_fine_tune;/);
   assert.match(text, /- qubit \(2\): CheckRabi, CheckT1/);
   assert.doesNotMatch(text, /CalibrationPipelineSpec/);

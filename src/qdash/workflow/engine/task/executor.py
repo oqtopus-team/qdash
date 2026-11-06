@@ -851,7 +851,8 @@ class TaskExecutor:
         )
 
         assert self._snapshot_loader is not None
-        snapshot = self._snapshot_loader.get_snapshot(task_name, qid)
+        invocation = self.state_manager.get_task(task_name, task_type, qid).invocation
+        snapshot = self._snapshot_loader.get_snapshot(task_name, qid, invocation)
         if snapshot is None:
             if self._snapshot_loader.requires_snapshot(task_name):
                 raise ValueError(

@@ -9,6 +9,7 @@ import type { TaskElapsedTime } from './taskElapsedTime';
 import type { TaskEndAt } from './taskEndAt';
 import type { TaskFigurePath } from './taskFigurePath';
 import type { TaskInputParameters } from './taskInputParameters';
+import type { TaskInvocationProperty } from './taskInvocationProperty';
 import type { TaskJsonFigurePath } from './taskJsonFigurePath';
 import type { TaskMessage } from './taskMessage';
 import type { TaskNote } from './taskNote';
@@ -47,5 +48,7 @@ export interface Task {
   end_at?: TaskEndAt;
   elapsed_time?: TaskElapsedTime;
   task_type?: TaskTaskType;
+  /** Planned step and call this result executed; null for older results. */
+  invocation?: TaskInvocationProperty;
   default_view?: boolean;
 }

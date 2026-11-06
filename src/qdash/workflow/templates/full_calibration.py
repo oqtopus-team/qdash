@@ -24,7 +24,7 @@ from typing import Any
 
 from prefect import flow
 
-from qdash.workflow import sweep  # noqa: F401  # used by commented range overrides below
+from qdash.workflow import TaskCall, sweep  # noqa: F401  # used by commented range overrides below
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -42,46 +42,48 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import MuxTargets
 
-FULL_1Q_CHECK_TASKS: list[str] = [
-    "CheckRabi",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    # "CheckOptimalReadoutFrequency",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CheckT1",
-    "CheckT2Echo",
-    "CheckRamsey",
+FULL_1Q_CHECK_TASKS: list[TaskCall] = [
+    # Update control amplitude, then measure again at the updated amplitude.
+    TaskCall(name="CheckRabi", call_id="rabi_amplitude_update"),
+    TaskCall(name="CheckRabi", call_id="rabi_at_updated_amplitude"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_first"),
+    TaskCall(name="CheckHPIPulse", call_id="hpi_check_first"),
+    # TaskCall(name="CheckOptimalReadoutFrequency"),
+    # Second pass at the settings the first pass produced.
+    TaskCall(name="CheckRabi", call_id="rabi_second_pass"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_second"),
+    TaskCall(name="CheckHPIPulse", call_id="hpi_check_second"),
+    TaskCall(name="CheckT1"),
+    TaskCall(name="CheckT2Echo"),
+    TaskCall(name="CheckRamsey"),
 ]
 
-FULL_1Q_FINE_TUNE_TASKS: list[str] = [
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "ReadoutClassification",
-    "CheckT1Average",
-    "CheckT2EchoAverage",
-    "Check1QGateCoherenceLimit",
-    "RandomizedBenchmarking",
-    "X90InterleavedRandomizedBenchmarking",
+FULL_1Q_FINE_TUNE_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckRabi"),
+    TaskCall(name="CreateHPIPulse"),
+    TaskCall(name="CheckHPIPulse"),
+    TaskCall(name="CreatePIPulse"),
+    TaskCall(name="CheckPIPulse"),
+    TaskCall(name="CreateDRAGHPIPulse"),
+    TaskCall(name="CheckDRAGHPIPulse"),
+    TaskCall(name="CreateDRAGPIPulse"),
+    TaskCall(name="CheckDRAGPIPulse"),
+    TaskCall(name="ReadoutClassification"),
+    TaskCall(name="CheckT1Average"),
+    TaskCall(name="CheckT2EchoAverage"),
+    TaskCall(name="Check1QGateCoherenceLimit"),
+    TaskCall(name="RandomizedBenchmarking"),
+    TaskCall(name="X90InterleavedRandomizedBenchmarking"),
 ]
 
-FULL_2Q_TASKS: list[str] = [
-    "CheckCrossResonance",
-    "CreateZX90",
-    "CheckZX90",
-    "CheckBellState",
-    "CheckBellStateTomography",
-    "Check2QGateCoherenceLimit",
-    "ZX90InterleavedRandomizedBenchmarking",
+FULL_2Q_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckCrossResonance"),
+    TaskCall(name="CreateZX90"),
+    TaskCall(name="CheckZX90"),
+    TaskCall(name="CheckBellState"),
+    TaskCall(name="CheckBellStateTomography"),
+    TaskCall(name="Check2QGateCoherenceLimit"),
+    TaskCall(name="ZX90InterleavedRandomizedBenchmarking"),
 ]
 
 

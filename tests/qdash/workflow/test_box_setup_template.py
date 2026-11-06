@@ -11,6 +11,7 @@ from qdash.workflow.calibtasks.qubex import CorrectCaptureDelay
 from qdash.workflow.engine.task_parameters import normalize_task_parameters
 from qdash.workflow.service.steps import BringUp
 from qdash.workflow.service.targets import MuxTargets
+from tests.qdash.workflow.task_call_helpers import names
 
 box_setup_module = importlib.import_module("qdash.workflow.templates.box_setup")
 
@@ -37,7 +38,7 @@ def test_box_setup_corrects_each_mux() -> None:
     assert result["targets"] == MuxTargets(mux_ids=[0, 1], exclude_qids=[])
     (correct,) = result["steps"]
     assert isinstance(correct, BringUp)
-    assert correct.tasks == ["CorrectCaptureDelay"]
+    assert names(correct.tasks) == ["CorrectCaptureDelay"]
     assert correct.mode == "serial"
 
 

@@ -14,6 +14,7 @@ from qdash.workflow.service.steps import (
     OneQubitFineTune,
     TwoQubitCalibration,
 )
+from tests.qdash.workflow.task_call_helpers import names
 
 full_module = importlib.import_module("qdash.workflow.templates.full_calibration")
 
@@ -42,9 +43,9 @@ def test_full_calibration_passes_template_task_lists(monkeypatch) -> None:
         GenerateCRSchedule,
         TwoQubitCalibration,
     ]
-    assert steps[1].tasks == full_module.FULL_1Q_CHECK_TASKS
-    assert steps[3].tasks == full_module.FULL_1Q_FINE_TUNE_TASKS
-    assert steps[6].tasks == full_module.FULL_2Q_TASKS
+    assert names(steps[1].tasks) == names(full_module.FULL_1Q_CHECK_TASKS)
+    assert names(steps[3].tasks) == names(full_module.FULL_1Q_FINE_TUNE_TASKS)
+    assert names(steps[6].tasks) == names(full_module.FULL_2Q_TASKS)
 
 
 def test_full_calibration_requires_explicit_mux_ids(monkeypatch) -> None:

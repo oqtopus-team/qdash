@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.calib_service import (
     CalibService,
     _is_cancellation,
@@ -1181,10 +1182,11 @@ def test_pipeline_owns_one_execution_per_calibration_step(
     env = pipeline_execution_env
     worker_ids = []
 
-    def run_workers(*, tasks, qids=None, mux_groups=None, session_config=None):
+    def run_workers(*, plan, qids=None, mux_groups=None, session_config=None):
         session = get_session()
         assert env.lock.owner == "exec-reserved"
         assert all(record.status == "completed" for record in env.records[:-1])
+        assert plan.step_id in {"one_qubit_check", "one_qubit_fine_tune"}
         worker_ids.append(
             session_config["execution_id"] if session_config else session.execution_id
         )
@@ -1196,8 +1198,18 @@ def test_pipeline_owns_one_execution_per_calibration_step(
         "_calibrate_mux_qubits",
     ):
         monkeypatch.setattr(f"qdash.workflow.service.strategy.{method}", run_workers)
-    monkeypatch.setattr(
-        CalibService, "execute_task_batch", lambda self, name, qids: run_workers(tasks=[name])
+
+    def run_batch(self, name, qids, **kwargs):
+        invocation = kwargs["invocation"]
+        run_workers(plan=SimpleNamespace(step_id=invocation.step_id))
+        return {qid: {"status": "success", "task_id": f"{name}-{qid}"} for qid in qids}
+
+    monkeypatch.setattr(CalibService, "execute_task_batch", run_batch)
+    # The batch path runs only tasks that implement batch_run.
+    check_task, fine_task = (
+        ("CheckQubitSpectroscopy", "CheckResonatorSpectroscopy")
+        if mode == "simultaneous_spectroscopy"
+        else ("CheckRabi", "CheckRamsey")
     )
     session = CalibService(
         "alice",
@@ -1213,9 +1225,9 @@ def test_pipeline_owns_one_execution_per_calibration_step(
     session.run(
         QubitTargets(["0", "1"]),
         steps=[
-            OneQubitCheck(mode=mode, tasks=["CheckRabi"]),
+            OneQubitCheck(mode=mode, tasks=[TaskCall(name=check_task)]),
             FilterByStatus(),
-            OneQubitFineTune(mode=mode, tasks=["CheckRamsey"]),
+            OneQubitFineTune(mode=mode, tasks=[TaskCall(name=fine_task)]),
         ],
     )
 
@@ -1311,7 +1323,7 @@ def test_single_step_without_api_reservation_creates_one_execution(
         lock_repo=env.lock,
         counter_repo=FakeExecutionCounterRepository(2),
     )
-    session.run(QubitTargets(["0"]), steps=[CustomOneQubit(tasks=["CheckRabi"])])
+    session.run(QubitTargets(["0"]), steps=[CustomOneQubit(tasks=[TaskCall(name="CheckRabi")])])
 
     assert len(env.records) == 1
     assert env.records[0].status == "completed"
@@ -1349,7 +1361,7 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
     session.run(
         QubitTargets(["0", "1"]),
         steps=[
-            CustomTwoQubit(tasks=["CheckCrossResonance"]),
+            CustomTwoQubit(tasks=[TaskCall(name="CheckCrossResonance")]),
             TwoQubitCalibration(),
         ],
     )
