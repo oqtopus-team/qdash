@@ -183,6 +183,7 @@ export function FlowExecuteConfirmModal({
           <button
             type="button"
             className="btn btn-primary"
+            data-coachmark="flow-execute-confirm"
             disabled={Boolean(disabledReason || error)}
             aria-describedby={disabledReason ? disabledReasonId : error ? errorId : undefined}
             onClick={() => {

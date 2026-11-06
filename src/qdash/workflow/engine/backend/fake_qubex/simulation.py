@@ -16,6 +16,15 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from qdash.common.fake_device import (
+    FAKE_CONTROL_AMPLITUDE,
+    FAKE_QUBIT_ANHARMONICITIES,
+    FAKE_QUBIT_FREQUENCIES,
+    FAKE_READOUT_AMPLITUDE,
+    FAKE_READOUT_FREQUENCIES,
+    fake_device_value,
+)
+
 _QUBIT_LABEL_PATTERN = re.compile(r"^Q(\d+)$")
 
 
@@ -730,7 +739,7 @@ class _FakeControlParams:
         self._experiment = experiment
 
     def get_readout_amplitude(self, target: str) -> float:
-        return float(self._experiment.params.readout_amplitude.get(target, 0.2))
+        return float(self._experiment.params.readout_amplitude.get(target, FAKE_READOUT_AMPLITUDE))
 
     def get_control_amplitude(self, target: str) -> float:
         return float(
@@ -747,14 +756,9 @@ class FakeExperiment:
     name: str = "fake-qubex-two-qubit-system"
     device_id: str = "fake-qubex-two-qubit-system"
     qubit_labels: tuple[str, ...] = ("Q00", "Q01", "Q02", "Q03")
-    qubit_frequencies: tuple[float, ...] = (7.157231, 8.032295, 7.812112, 6.944337)
-    qubit_anharmonicities: tuple[float, ...] = (
-        -0.393715,
-        -0.487412,
-        -0.421337,
-        -0.365884,
-    )
-    readout_frequencies: tuple[float, ...] = (6.752, 6.903, 6.844, 6.711)
+    qubit_frequencies: tuple[float, ...] = FAKE_QUBIT_FREQUENCIES
+    qubit_anharmonicities: tuple[float, ...] = FAKE_QUBIT_ANHARMONICITIES
+    readout_frequencies: tuple[float, ...] = FAKE_READOUT_FREQUENCIES
     coupling_strength: float = 0.005
     qubit_lifetime: tuple[float, float] = (20.0, 20.0)
     qubit_lifetimes: tuple[tuple[float, float], ...] | None = None
@@ -849,20 +853,16 @@ class FakeExperiment:
         self.qubit_labels = labels
         self._mux_labels = mux_labels or self._infer_mux_labels(labels)
         self._qubit_muxes = self._assign_qubit_muxes(labels, self._mux_labels)
-        self.qubit_frequencies = self._pad_float_tuple(
-            qubit_frequencies,
-            (7.157231, 8.032295, 7.812112, 6.944337),
-            n_qubits,
+        # Without explicit values each qubit takes the shared fake device's parameters for its
+        # physical number, so a session on any subset of qubits simulates the same device.
+        self.qubit_frequencies = self._device_float_tuple(
+            qubit_frequencies, FAKE_QUBIT_FREQUENCIES, labels
         )
-        self.qubit_anharmonicities = self._pad_float_tuple(
-            qubit_anharmonicities,
-            (-0.393715, -0.487412, -0.421337, -0.365884),
-            n_qubits,
+        self.qubit_anharmonicities = self._device_float_tuple(
+            qubit_anharmonicities, FAKE_QUBIT_ANHARMONICITIES, labels
         )
-        self.readout_frequencies = self._pad_float_tuple(
-            readout_frequencies,
-            (6.752, 6.903, 6.844, 6.711),
-            n_qubits,
+        self.readout_frequencies = self._device_float_tuple(
+            readout_frequencies, FAKE_READOUT_FREQUENCIES, labels
         )
         self.coupling_strength = coupling_strength
         self.qubit_lifetime = qubit_lifetime
@@ -906,7 +906,7 @@ class FakeExperiment:
         self.readout_assignment_errors = {}
         self.properties = {}
         self._params = SimpleNamespace(
-            readout_amplitude={label: 0.2 for label in labels},
+            readout_amplitude={label: FAKE_READOUT_AMPLITUDE for label in labels},
             control_amplitude={label: self.CONTROL_AMPLITUDE_SCALE for label in labels},
         )
         self._control_params = _FakeControlParams(self)
@@ -1452,7 +1452,7 @@ class FakeExperiment:
 
     # Control amplitude that drives a pi rotation in ``pi_duration``; it is also the default
     # control amplitude the simulator reports, so the seeded device is self-consistent.
-    CONTROL_AMPLITUDE_SCALE: ClassVar[float] = 0.0125
+    CONTROL_AMPLITUDE_SCALE: ClassVar[float] = FAKE_CONTROL_AMPLITUDE
     # Decay time of the driven (Rabi) oscillation, shorter than T2 as on hardware.
     RABI_DECAY_NS: ClassVar[float] = 2000.0
 
@@ -4611,6 +4611,24 @@ class FakeExperiment:
             for index, qubit in enumerate(qubits)
             if inferred
         }
+
+    @classmethod
+    def _device_float_tuple(
+        cls,
+        values: Collection[float] | None,
+        device: tuple[float, ...],
+        labels: Collection[str],
+    ) -> tuple[float, ...]:
+        """Explicit ``values`` padded to ``labels``, or the device's value of each label."""
+        if values:
+            return cls._pad_float_tuple(values, device, len(labels))
+        physical = []
+        for position, label in enumerate(labels):
+            try:
+                physical.append(_label_to_qid(label))
+            except ValueError:
+                physical.append(position)
+        return tuple(fake_device_value(device, qubit) for qubit in physical)
 
     @staticmethod
     def _pad_float_tuple(

@@ -5032,7 +5032,7 @@
           "chip"
         ],
         "summary": "Create a new chip",
-        "description": "Create a new chip in the current project.\n\nBesides the database records, this creates ``<chip_id>/`` in the Qubex\nconfiguration tree (``system_id == chip_id``) unless ``config.create`` is\nfalse or the directory already exists. Wiring and hardware files are copied\nfrom ``config.source_system_id`` when given; parameter files always start\nfrom QDash's templates.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id, size and configuration options\nctx : ProjectContext\n    Project context with editor permission\nscaffolder : ChipConfigScaffolder\n    Writer of the chip's configuration directory\n\nReturns\n-------\nCreateChipResponse\n    Created chip information and the configuration outcome\n\nRaises\n------\nHTTPException\n    If chip_id already exists, size is invalid, or the configuration\n    source cannot be used",
+        "description": "Create a new chip in the current project.\n\nBesides the database records, this creates ``<chip_id>/`` in the Qubex\nconfiguration tree (``system_id == chip_id``) unless ``config.create`` is\nfalse or the directory already exists. Wiring and hardware files are copied\nfrom ``config.source_system_id`` when given; parameter files always start\nfrom QDash's templates. ``config.preset`` writes a complete virtual\nconfiguration instead; the ``fake`` preset is accepted only when the\ndeployment backend is fake and the chip uses the preset's topology.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id, size and configuration options\nctx : ProjectContext\n    Project context with editor permission\nscaffolder : ChipConfigScaffolder\n    Writer of the chip's configuration directory\n\nReturns\n-------\nCreateChipResponse\n    Created chip information and the configuration outcome\n\nRaises\n------\nHTTPException\n    If chip_id already exists, size is invalid, or the configuration\n    source cannot be used",
         "operationId": "createChip",
         "security": [
           {
@@ -10829,7 +10829,7 @@
           "flow"
         ],
         "summary": "Save a flow",
-        "description": "Save a Flow to file system and MongoDB.",
+        "description": "Save a Flow to file system and MongoDB.\n\nBy default the save creates the flow or overwrites an existing one. With\n``create_only`` it only creates a new flow, and an existing name returns 409\nwithout changing the stored flow.",
         "operationId": "saveFlow",
         "security": [
           {
@@ -10871,6 +10871,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SaveFlowResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "create_only is set and a flow with this name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
                 }
               }
             }
@@ -18492,6 +18502,19 @@
             ],
             "title": "Backend",
             "description": "Backend of the new system; taken from the source system when one is given"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "fake"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset",
+            "description": "Write a complete virtual configuration instead of hardware files. 'fake' is offered only when the deployment backend is fake and needs its preset topology"
           }
         },
         "type": "object",
@@ -18534,6 +18557,17 @@
               }
             ],
             "title": "Backend"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
           },
           "files": {
             "items": {
@@ -18928,6 +18962,52 @@
         ],
         "title": "Condition",
         "description": "Condition for filtering device topology."
+      },
+      "ConfigPresetResponse": {
+        "properties": {
+          "preset_id": {
+            "type": "string",
+            "title": "Preset Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "topology_id": {
+            "type": "string",
+            "title": "Topology Id",
+            "description": "Topology the chip must use with this preset"
+          },
+          "n_qubits": {
+            "type": "integer",
+            "title": "N Qubits"
+          },
+          "mux_count": {
+            "type": "integer",
+            "title": "Mux Count"
+          },
+          "workflow_template_id": {
+            "type": "string",
+            "title": "Workflow Template Id",
+            "description": "Flow template that brings up and calibrates a chip created from the preset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "preset_id",
+          "name",
+          "description",
+          "topology_id",
+          "n_qubits",
+          "mux_count",
+          "workflow_template_id"
+        ],
+        "title": "ConfigPresetResponse",
+        "description": "A complete configuration a new chip can start from."
       },
       "ConfigReloadResponse": {
         "properties": {
@@ -24295,6 +24375,26 @@
             },
             "type": "array",
             "title": "Sources"
+          },
+          "deployment_backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Backend",
+            "description": "Backend this deployment calibrates with (DEFAULT_BACKEND), e.g. qubex or fake"
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigPresetResponse"
+            },
+            "type": "array",
+            "title": "Presets",
+            "description": "Presets of the deployment backend, listed even when no tree is mounted; the fake preset only on the fake backend"
           }
         },
         "type": "object",
@@ -28508,6 +28608,12 @@
             ],
             "title": "Folder",
             "description": "Folder path inside the creator's space, e.g. \"daily/t1\"; \"\" is the root. Omitted keeps an existing flow's folder (a new flow goes to the root)."
+          },
+          "create_only": {
+            "type": "boolean",
+            "title": "Create Only",
+            "description": "Create a new flow only. When a flow or flow file with this name already exists in the project, the request fails with 409 and changes nothing. False (the default) creates the flow or overwrites an existing one.",
+            "default": false
           }
         },
         "type": "object",

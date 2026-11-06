@@ -435,6 +435,152 @@ class TestChipRouter:
         assert data["available"] is True
         assert [source["system_id"] for source in data["sources"]] == ["64Qv3"]
 
+    def test_list_chip_config_sources_offers_no_preset_on_hardware_backend(
+        self, test_client, test_project, auth_headers, monkeypatch
+    ):
+        """The fake preset stays hidden unless the deployment backend is fake."""
+        monkeypatch.setenv("DEFAULT_BACKEND", "qubex")
+        response = test_client.get("/chips/config-sources", headers=auth_headers)
+
+        assert response.status_code == 200
+        assert response.json()["presets"] == []
+        assert response.json()["deployment_backend"] == "qubex"
+
+    def test_list_chip_config_sources_offers_fake_preset_on_fake_backend(
+        self, test_client, test_project, auth_headers, monkeypatch
+    ):
+        monkeypatch.setenv("DEFAULT_BACKEND", "fake")
+        response = test_client.get("/chips/config-sources", headers=auth_headers)
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["deployment_backend"] == "fake"
+        [preset] = body["presets"]
+        assert preset["preset_id"] == "fake"
+        assert preset["topology_id"] == "square-lattice-mux-64"
+        assert preset["n_qubits"] == 64
+        assert preset["mux_count"] == 16
+        assert preset["workflow_template_id"] == "fake_calibration"
+
+    def test_create_chip_with_fake_preset(
+        self, test_client, test_project, auth_headers, config_tree, monkeypatch
+    ):
+        monkeypatch.setenv("DEFAULT_BACKEND", "fake")
+        response = test_client.post(
+            "/chips",
+            headers=auth_headers,
+            json={
+                "chip_id": "fake-64q",
+                "size": 64,
+                "topology_id": "square-lattice-mux-64",
+                "config": {"preset": "fake"},
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["topology_id"] == "square-lattice-mux-64"
+        assert data["size"] == 64
+        assert data["config"]["status"] == "created"
+        assert data["config"]["preset"] == "fake"
+        wiring = yaml.safe_load((config_tree / "fake-64q/config/wiring.yaml").read_text())
+        assert [row["mux"] for row in wiring["fake-64q"]] == list(range(16))
+        assert (
+            QubitDocument.find({"project_id": "test_project", "chip_id": "fake-64q"}).count() == 64
+        )
+
+    def test_create_chip_with_fake_preset_on_hardware_backend_is_rejected(
+        self, test_client, test_project, auth_headers, config_tree, monkeypatch
+    ):
+        monkeypatch.setenv("DEFAULT_BACKEND", "qubex")
+        response = test_client.post(
+            "/chips",
+            headers=auth_headers,
+            json={
+                "chip_id": "fake-64q",
+                "size": 64,
+                "topology_id": "square-lattice-mux-64",
+                "config": {"preset": "fake"},
+            },
+        )
+
+        assert response.status_code == 400
+        assert "deployment backend" in response.json()["detail"]
+        assert not (config_tree / "fake-64q").exists()
+        assert ChipDocument.find_one({"chip_id": "fake-64q"}).run() is None
+
+    @pytest.mark.parametrize(
+        ("size", "topology_id"),
+        [(64, "square-lattice-mux-64-x"), (16, "square-lattice-mux-16"), (144, None)],
+    )
+    def test_create_chip_with_fake_preset_needs_preset_topology(
+        self, test_client, test_project, auth_headers, config_tree, monkeypatch, size, topology_id
+    ):
+        monkeypatch.setenv("DEFAULT_BACKEND", "fake")
+        payload = {"chip_id": "fake-chip", "size": size, "config": {"preset": "fake"}}
+        if topology_id:
+            payload["topology_id"] = topology_id
+        response = test_client.post("/chips", headers=auth_headers, json=payload)
+
+        assert response.status_code == 400
+        assert not (config_tree / "fake-chip").exists()
+        assert ChipDocument.find_one({"chip_id": "fake-chip"}).run() is None
+
+    def test_create_chip_with_fake_preset_without_config_tree_is_rejected(
+        self, test_client, test_project, auth_headers, monkeypatch, tmp_path
+    ):
+        """A fake chip is never created without its configuration."""
+        from qdash.api.dependencies import get_chip_config_scaffolder
+        from qdash.api.main import app
+        from qdash.api.services.chip import ChipConfigScaffolder
+
+        monkeypatch.setenv("DEFAULT_BACKEND", "fake")
+        app.dependency_overrides[get_chip_config_scaffolder] = lambda: ChipConfigScaffolder(
+            config_base=tmp_path / "missing"
+        )
+        try:
+            sources = test_client.get("/chips/config-sources", headers=auth_headers).json()
+            assert sources["available"] is False
+            assert [preset["preset_id"] for preset in sources["presets"]] == ["fake"]
+
+            response = test_client.post(
+                "/chips",
+                headers=auth_headers,
+                json={
+                    "chip_id": "fake-64q",
+                    "size": 64,
+                    "topology_id": "square-lattice-mux-64",
+                    "config": {"preset": "fake"},
+                },
+            )
+        finally:
+            app.dependency_overrides.pop(get_chip_config_scaffolder, None)
+
+        assert response.status_code == 400
+        assert "No Qubex configuration tree is mounted" in response.json()["detail"]
+        assert ChipDocument.find_one({"chip_id": "fake-64q"}).run() is None
+
+    @pytest.mark.parametrize(
+        "config",
+        [
+            {"preset": "fake", "source_system_id": "64Qv3"},
+            {"preset": "fake", "backend": "quel1"},
+            {"preset": "fake", "create": False},
+        ],
+    )
+    def test_create_chip_rejects_preset_combined_with_other_options(
+        self, test_client, test_project, auth_headers, config_tree, monkeypatch, config
+    ):
+        monkeypatch.setenv("DEFAULT_BACKEND", "fake")
+        response = test_client.post(
+            "/chips",
+            headers=auth_headers,
+            json={"chip_id": "fake-64q", "size": 64, "config": config},
+        )
+
+        assert response.status_code == 422
+        assert not (config_tree / "fake-64q").exists()
+
     def test_create_chip_invalid_size(self, test_client, test_project, auth_headers):
         """Test creating a chip with invalid size returns 400."""
         response = test_client.post(

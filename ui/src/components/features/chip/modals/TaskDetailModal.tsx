@@ -408,7 +408,10 @@ export function TaskDetailModal({
                                   typeof value === "object" && value !== null && "value" in value
                                     ? value
                                     : { value }
-                                ) as { value: number | string; unit?: string };
+                                ) as {
+                                  value: number | string;
+                                  unit?: string;
+                                };
                                 return (
                                   <div key={key} className="flex justify-between">
                                     <span className="font-medium">{key}:</span>

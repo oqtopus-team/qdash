@@ -365,3 +365,131 @@ def test_skew_template_is_only_created_for_quel1(scaffolder, tree, backend):
     assert settings["box_setting"]["BOX_A"]["port_wait"] == {1: 0}
     assert settings["target_port"] == {"BOX_A-1", "BOX_B-8"}
     assert settings["reference_port"] == "BOX_A-1"
+
+
+# ------------------------------------------------------------------ fake preset
+
+
+def _fake_scaffolder(tree: Path, backend: str = "fake") -> ChipConfigScaffolder:
+    return ChipConfigScaffolder(
+        config_base=tree,
+        templates_dir=TEMPLATES,
+        config_templates_dir=CONFIG_TEMPLATES,
+        deployment_backend=lambda: backend,
+    )
+
+
+def test_fake_preset_is_offered_only_on_a_fake_deployment(tree, tmp_path):
+    assert [preset.preset_id for preset in _fake_scaffolder(tree).list_presets()] == ["fake"]
+    assert _fake_scaffolder(tree, backend="qubex").list_presets() == []
+    # Listed without a mounted tree too, so the client can tell the deployment is fake.
+    unmounted = _fake_scaffolder(tmp_path / "missing")
+    assert not unmounted.available
+    assert [preset.preset_id for preset in unmounted.list_presets()] == ["fake"]
+    assert unmounted.deployment_backend == "fake"
+
+
+def test_fake_preset_describes_the_64_qubit_16_mux_device():
+    from qdash.api.services.chip.config_scaffold import FAKE_PRESET
+    from qdash.common import fake_device
+
+    assert FAKE_PRESET.topology_id == "square-lattice-mux-64"
+    assert FAKE_PRESET.n_qubits == fake_device.FAKE_DEVICE_QUBITS == 64
+    assert FAKE_PRESET.mux_count == fake_device.FAKE_DEVICE_MUXES == 16
+
+
+def test_fake_preset_writes_a_complete_virtual_configuration(tree):
+    from qdash.common import fake_device
+
+    result = _fake_scaffolder(tree).scaffold(chip_id="fake-64q", n_qubits=64, preset="fake")
+
+    assert result.status == "created"
+    assert result.preset == "fake"
+    assert result.backend == "quel1"
+    config = tree / "fake-64q" / "config"
+    assert _load(config / "chip.yaml") == {"fake-64q": {"name": "fake-64q", "n_qubits": 64}}
+    system = _load(config / "system.yaml")["fake-64q"]
+    assert system["backend"] == "quel1"
+    assert system["quel1"]["clock_master"].startswith("192.0.2.")
+
+    rows = _load(config / "wiring.yaml")["fake-64q"]
+    assert [row["mux"] for row in rows] == list(range(16))
+    boxes = _load(config / "box.yaml")
+    assert len(boxes) == 16
+    specifiers: set[str] = set()
+    for row in rows:
+        ports = [*row["ctrl"], row["read_out"], row["read_in"]]
+        assert len(row["ctrl"]) == 4
+        # Each MUX is served by one box of its own, which box.yaml defines.
+        [box_id] = {port.rsplit("-", 1)[0] for port in ports}
+        assert box_id in boxes
+        assert box_id.endswith("A")
+        specifiers.update(ports)
+    assert len(specifiers) == 16 * 6
+    addresses = [box["address"] for box in boxes.values()]
+    assert len(set(addresses)) == 16
+    assert all(address.startswith("192.0.2.") for address in addresses)
+    assert all("fake backend" in box["name"] and box["type"] == "quel1-a" for box in boxes.values())
+    skew = _load(config / "skew.yaml")["box_setting"]
+    assert set(skew) == set(boxes)
+    assert sorted(setting["slot"] for setting in skew.values()) == list(range(16))
+    for name in ("chip.yaml", "system.yaml", "wiring.yaml", "box.yaml", "skew.yaml"):
+        assert "VIRTUAL HARDWARE" in (config / name).read_text()
+
+    params = tree / "fake-64q" / "params"
+    labels = [f"Q{index:02d}" for index in range(64)]
+    readout = _load(params / "readout_frequency.yaml")["data"]
+    control = _load(params / "control_frequency.yaml")["data"]
+    assert list(readout) == labels
+    assert list(control) == labels
+    for index, label in enumerate(labels):
+        # The four-value device pattern repeats by physical qubit number.
+        assert readout[label] == fake_device.FAKE_READOUT_FREQUENCIES[index % 4]
+        assert control[label] == fake_device.FAKE_QUBIT_FREQUENCIES[index % 4]
+    assert set(_load(params / "control_amplitude.yaml")["data"].values()) == {
+        fake_device.FAKE_CONTROL_AMPLITUDE
+    }
+    assert len(_load(params / "readout_amplitude.yaml")["data"]) == 64
+    # Measured values are left for FakeBringUp and the calibration chain.
+    assert _load(params / "qubit_frequency.yaml")["data"] == {}
+    assert _load(params / "t1.yaml")["data"] == {}
+    assert (tree / "fake-64q/calibration/calib_note.json").read_text().strip() == "{}"
+    assert not list(tree.glob(".fake-64q.*"))
+
+
+def test_fake_preset_is_rejected_outside_a_fake_deployment(tree):
+    with pytest.raises(ChipConfigError, match="deployment backend is 'fake'"):
+        _fake_scaffolder(tree, backend="qubex").scaffold(
+            chip_id="fake-64q", n_qubits=64, preset="fake"
+        )
+    assert not (tree / "fake-64q").exists()
+
+
+@pytest.mark.parametrize("n_qubits", [4, 16, 144])
+def test_fake_preset_needs_its_qubit_count(tree, n_qubits):
+    with pytest.raises(ChipConfigError, match="64-qubit"):
+        _fake_scaffolder(tree).scaffold(chip_id="fake-chip", n_qubits=n_qubits, preset="fake")
+    assert not (tree / "fake-chip").exists()
+
+
+def test_fake_preset_without_a_mounted_tree_is_an_error(tmp_path):
+    with pytest.raises(ChipConfigError, match="No Qubex configuration tree is mounted"):
+        _fake_scaffolder(tmp_path / "missing").scaffold(
+            chip_id="fake-64q", n_qubits=64, preset="fake"
+        )
+
+
+def test_fake_preset_keeps_an_existing_directory(tree):
+    before = {path: path.read_bytes() for path in (tree / "64Qv3").rglob("*") if path.is_file()}
+
+    result = _fake_scaffolder(tree).scaffold(chip_id="64Qv3", n_qubits=64, preset="fake")
+
+    assert result.status == "existing"
+    assert "preset was not applied" in result.message
+    after = {path: path.read_bytes() for path in (tree / "64Qv3").rglob("*") if path.is_file()}
+    assert after == before
+
+
+def test_unknown_preset_is_rejected(tree):
+    with pytest.raises(ChipConfigError, match="Unknown configuration preset"):
+        _fake_scaffolder(tree).scaffold(chip_id="x-chip", n_qubits=64, preset="nope")
