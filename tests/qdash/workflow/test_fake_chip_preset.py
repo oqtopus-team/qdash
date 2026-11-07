@@ -269,6 +269,24 @@ def test_fake_chip_runs_bring_up_and_the_fake_calibration_chain(
             assert stored[name]["value"] is not None, (qid, name)
 
 
+def test_qubex_fits_never_open_a_browser_during_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Qubex's fits show their figure by default; tests must not wait on a browser to fetch it."""
+    import numpy as np
+    from plotly.io import _base_renderers
+    from qubex.analysis import fitting
+
+    opened: list[Any] = []
+    monkeypatch.setattr(
+        _base_renderers, "open_html_in_browser", lambda *args, **kwargs: opened.append(args)
+    )
+    times = np.arange(0, 200, 4, dtype=np.float64)
+    data = (0.5 * np.cos(2 * np.pi * 0.0125 * times) + 0.5j).astype(np.complex64)
+
+    fitting.fit_rabi(target="Q00", times=times, data=data)
+
+    assert opened == []
+
+
 class _RecordingStageService:
     """The parts of CalibService the scheduled one-qubit strategy reads."""
 

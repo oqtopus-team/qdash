@@ -19,6 +19,7 @@ from qdash.datamodel.calibration_pipeline import (
     pipeline_spec_json_schema,
     pipeline_warnings,
     step_calls,
+    step_id,
     step_tasks,
 )
 from qdash.datamodel.task_call import TaskCall, normalize_calls
@@ -390,6 +391,37 @@ def test_plan_lists_resolved_calls_and_digest_is_stable() -> None:
     assert parsed.plan_digest() != parse(steps=[{"type": "OneQubitCheck"}]).plan_digest()
 
 
+@pytest.mark.parametrize("step_type", ["OneQubitCheck", "OneQubitFineTune"])
+@pytest.mark.parametrize(
+    "tasks",
+    [
+        [{"name": "Configure"}],
+        [{"name": "Configure", "call_id": "explicit"}],
+        [{"name": "CheckRabi", "call_id": "Configure"}],
+    ],
+)
+def test_configure_flag_rejects_a_conflicting_call(
+    step_type: str, tasks: list[dict[str, Any]]
+) -> None:
+    # configure=True prepends Configure with call_id "Configure"; a step that
+    # also lists Configure, or reuses that id, is a validation problem of the step.
+    with pytest.raises(ValidationError, match="configure=True already runs Configure"):
+        parse(steps=[{"type": step_type, "configure": True, "tasks": tasks}])
+    without_flag = parse(steps=[{"type": step_type, "tasks": tasks}])
+    assert [call.resolved_call_id for call in step_calls(without_flag.steps[0])] == [
+        task.get("call_id", task["name"]) for task in tasks
+    ]
+
+
+@pytest.mark.parametrize("step_type", ["OneQubitCheck", "OneQubitFineTune"])
+def test_configure_flag_prepends_one_configure_call(step_type: str) -> None:
+    parsed = parse(steps=[{"type": step_type, "configure": True, "tasks": [{"name": "CheckRabi"}]}])
+    assert [(call.name, call.call_id) for _, call in parsed.all_calls()] == [
+        ("Configure", "Configure"),
+        ("CheckRabi", "CheckRabi"),
+    ]
+
+
 def test_version_1_spec_migrates_without_changing_what_runs() -> None:
     v1 = {
         "name": "legacy",
@@ -423,6 +455,71 @@ def test_version_1_spec_migrates_without_changing_what_runs() -> None:
     # The input is not modified, and the conversion is deterministic.
     assert v1["steps"][0]["tasks"] == ["CheckRabi", "CreateHPIPulse"]  # type: ignore[index]
     assert migrate_pipeline_spec(v1).spec == migration.spec
+
+
+def test_migration_call_ids_skip_ids_the_step_already_uses() -> None:
+    v1 = {
+        "targets": {"qids": ["0"]},
+        "steps": [
+            {
+                "type": "CustomOneQubit",
+                "step_name": "x",
+                "tasks": [
+                    "CheckT1",
+                    "CheckT1",
+                    "CheckT1_2",
+                    {"name": "CheckRabi", "call_id": "CheckT1_3"},
+                ],
+            }
+        ],
+    }
+    migration = migrate_pipeline_spec(v1)
+    migrated = CalibrationPipelineSpec.model_validate(migration.spec)
+    assert [call.call_id for call in step_calls(migrated.steps[0])] == [
+        "CheckT1",
+        "CheckT1_4",
+        "CheckT1_2",
+        "CheckT1_3",
+    ]
+    assert any("CheckT1, CheckT1_4" in note for note in migration.notes)
+
+
+def test_migration_gives_repeated_builtin_steps_unique_step_ids() -> None:
+    v1 = {
+        "targets": {"qids": ["0"]},
+        "steps": [
+            {"type": "OneQubitCheck"},
+            {"type": "CustomOneQubit", "step_name": "one_qubit_check_2", "tasks": ["CheckT1"]},
+            {"type": "OneQubitCheck", "tasks": ["CheckRabi"]},
+            {"type": "FilterByStatus"},
+            {"type": "OneQubitCheck"},
+            {"type": "FilterByMetric", "metric": "t1_average", "threshold": 0.0},
+        ],
+    }
+    migration = migrate_pipeline_spec(v1)
+    migrated = CalibrationPipelineSpec.model_validate(migration.spec)
+    assert [step_id(step) for step in migrated.steps] == [
+        "one_qubit_check",
+        "one_qubit_check_2",
+        "one_qubit_check_3",
+        None,
+        "one_qubit_check_4",
+        None,
+    ]
+    # Filters keep reading the latest built-in one-qubit step, as in version 1.
+    assert migrated.steps[3].step is None  # type: ignore[union-attr]
+    assert sum("assigned step_id" in note for note in migration.notes) == 2
+    assert migrate_pipeline_spec(v1).spec == migration.spec
+
+
+def test_migration_keeps_unique_builtin_steps_on_their_default_ids() -> None:
+    v1 = {
+        "targets": {"qids": ["0"]},
+        "steps": [{"type": "OneQubitCheck"}, {"type": "OneQubitFineTune"}],
+    }
+    migration = migrate_pipeline_spec(v1)
+    assert all("step_id" not in step for step in migration.spec["steps"])
+    assert migration.notes == []
 
 
 def test_version_2_spec_is_returned_unchanged() -> None:

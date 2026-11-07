@@ -114,6 +114,34 @@ FULL_2Q_TASKS: list[TaskCall] = [
 
 CONFIGURE_CALL = TaskCall(name="Configure")
 
+
+def calls_with_configure(
+    calls: Sequence[Any], *, configure: bool, where: str = "tasks"
+) -> tuple[TaskCall, ...]:
+    """A one-qubit step's calls, with the Configure call ``configure=True`` prepends.
+
+    The prepended call has call_id ``Configure``. A step that also lists a
+    Configure call, or another call with that call_id, is rejected rather than
+    renamed, so a call_id never depends on the ``configure`` flag. Paths in the
+    error refer to the step's own ``tasks`` list.
+    """
+    own = normalize_calls(calls, where=where)
+    if not configure:
+        return own
+    implicit = CONFIGURE_CALL.model_copy(update={"call_id": CONFIGURE_CALL.name})
+    conflicts = [
+        f"{where}[{index}]"
+        for index, call in enumerate(own)
+        if call.name == implicit.name or call.resolved_call_id == implicit.call_id
+    ]
+    if conflicts:
+        raise ValueError(
+            f"configure=True already runs Configure first with call_id {implicit.call_id!r}; "
+            f"remove configure or the conflicting call at {', '.join(conflicts)}"
+        )
+    return (implicit, *own)
+
+
 ONE_QUBIT_MODES: tuple[str, ...] = (
     "synchronized",
     "scheduled",
@@ -178,6 +206,13 @@ def _calls(value: Any) -> Any:
     return list(normalize_calls(value))
 
 
+def _check_configure_call(step: Any) -> Any:
+    # Resolve the complete call list here so a conflicting implicit Configure
+    # call is a validation problem of this step, not an error at plan time.
+    step_calls(step)
+    return step
+
+
 _STEP_ID_DESCRIPTION = (
     "Identifier of this step, unique within the pipeline; filters reference it. "
     "Defaults to the step's name. Set it when a pipeline runs the same step type twice."
@@ -230,6 +265,7 @@ class OneQubitCheckStep(_StepBase):
     configure: bool = Field(default=False, description="Run Configure before the first task.")
 
     _normalize_tasks = field_validator("tasks", mode="before")(_calls_or_none)
+    _check_configure = model_validator(mode="after")(_check_configure_call)
 
 
 class OneQubitFineTuneStep(_StepBase):
@@ -247,6 +283,7 @@ class OneQubitFineTuneStep(_StepBase):
     configure: bool = Field(default=False, description="Run Configure before the first task.")
 
     _normalize_tasks = field_validator("tasks", mode="before")(_calls_or_none)
+    _check_configure = model_validator(mode="after")(_check_configure_call)
 
 
 class CustomOneQubitStep(_StepBase):
@@ -523,9 +560,7 @@ def step_calls(step: PipelineStep) -> list[TaskCall]:
         return []
     own = getattr(step, "tasks", None)
     calls = list(own) if own is not None else list(entry.default_tasks)
-    if getattr(step, "configure", False):
-        calls.insert(0, CONFIGURE_CALL)
-    return list(normalize_calls(calls))
+    return list(calls_with_configure(calls, configure=bool(getattr(step, "configure", False))))
 
 
 def step_tasks(step: PipelineStep) -> list[str]:
@@ -743,6 +778,7 @@ class SpecMigration(BaseModel):
         return self.from_version != SPEC_VERSION
 
 
+_V1_CUSTOM_STEPS = frozenset({"CustomOneQubit", "CustomTwoQubit"})
 _V1_TASK_STEPS = frozenset(
     {
         "BringUp",
@@ -755,29 +791,86 @@ _V1_TASK_STEPS = frozenset(
 )
 
 
+def _unique_id(base: str, taken: set[str]) -> str:
+    """``base`` with the lowest ``_<n>`` suffix (n >= 2) not in ``taken``."""
+    nth = 2
+    while f"{base}_{nth}" in taken:
+        nth += 1
+    return f"{base}_{nth}"
+
+
 def _migrate_task_list(tasks: Sequence[Any], where: str, notes: list[str]) -> list[dict[str, Any]]:
     counts = Counter(task for task in tasks if isinstance(task, str))
-    occurrence: Counter[str] = Counter()
+    # Ids already claimed: explicit call_ids and the default id (the task name)
+    # of every task listed once, so a generated suffix never collides with them.
+    taken: set[str] = {task for task, count in counts.items() if count == 1}
+    for task in tasks:
+        if isinstance(task, Mapping):
+            claimed = task.get("call_id") or task.get("name")
+            if isinstance(claimed, str):
+                taken.add(claimed)
+    assigned: dict[str, list[str]] = {}
     converted: list[dict[str, Any]] = []
     for task in tasks:
         if not isinstance(task, str):
             # Already a call; keep it so validation reports anything wrong with it.
             converted.append(dict(task) if isinstance(task, Mapping) else task)
             continue
-        occurrence[task] += 1
         call: dict[str, Any] = {"name": task}
         if counts[task] > 1:
-            nth = occurrence[task]
-            call["call_id"] = task if nth == 1 else f"{task}_{nth}"
+            call_id = task if task not in taken else _unique_id(task, taken)
+            taken.add(call_id)
+            assigned.setdefault(task, []).append(call_id)
+            call["call_id"] = call_id
         converted.append(call)
-    for task, count in counts.items():
-        if count > 1:
-            ids = [task, *(f"{task}_{nth}" for nth in range(2, count + 1))]
-            notes.append(
-                f"{where}: {task!r} runs {count} times; assigned call_ids {', '.join(ids)}. "
-                "Rename them to describe each call."
-            )
+    for task, ids in assigned.items():
+        notes.append(
+            f"{where}: {task!r} runs {len(ids)} times; assigned call_ids {', '.join(ids)}. "
+            "Rename them to describe each call."
+        )
     return converted
+
+
+def _migrate_step_ids(steps: list[Any], notes: list[str]) -> None:
+    """Give repeated built-in calibration steps unique step_ids.
+
+    Version 1 allowed the same built-in step twice; version 2 identifies each
+    calibration step by a unique step_id that defaults to the step's name. The
+    first step keeps its default, later ones get ``<name>_2``, ... skipping ids a
+    custom step's name or an explicit step_id already uses. Filters without a
+    step reference still read the latest OneQubitFineTune/OneQubitCheck result,
+    so renaming does not change what they read.
+    """
+    taken: set[str] = set()
+    for step in steps:
+        if not isinstance(step, Mapping) or step.get("type") not in STEP_CATALOG:
+            continue
+        entry = STEP_CATALOG[step["type"]]
+        if entry.kind != "calibration":
+            continue
+        own = step.get("step_name") if step["type"] in _V1_CUSTOM_STEPS else step.get("step_id")
+        if isinstance(own, str):
+            taken.add(own)
+        elif step["type"] in _V1_CUSTOM_STEPS:
+            taken.add(entry.name)
+    for index, step in enumerate(steps):
+        if not isinstance(step, dict) or step.get("type") not in STEP_CATALOG:
+            continue
+        if step["type"] in _V1_CUSTOM_STEPS or step.get("step_id") is not None:
+            continue
+        entry = STEP_CATALOG[step["type"]]
+        if entry.kind != "calibration":
+            continue
+        if entry.name not in taken:
+            taken.add(entry.name)
+            continue
+        new_id = _unique_id(entry.name, taken)
+        taken.add(new_id)
+        step["step_id"] = new_id
+        notes.append(
+            f"steps[{index}]: {step['type']} repeats step_id {entry.name!r}; assigned "
+            f"step_id {new_id!r}. Rename it to describe the step."
+        )
 
 
 def migrate_pipeline_spec(spec: Mapping[str, Any]) -> SpecMigration:
@@ -786,7 +879,9 @@ def migrate_pipeline_spec(spec: Mapping[str, Any]) -> SpecMigration:
     Version 1 (no ``spec_version``) listed task names and kept run overrides in
     ``task_run_parameters`` keyed by task name. The conversion turns every name
     into a ``TaskCall`` (a task listed more than once in one step gets
-    ``call_id`` values ``<Task>``, ``<Task>_2``, ...), and moves
+    ``call_id`` values ``<Task>``, ``<Task>_2``, ..., skipping ids the step
+    already uses), gives a repeated built-in calibration step a unique
+    ``step_id`` (``<name>_2``, ...), and moves
     ``task_run_parameters`` into ``task_parameters`` with the same effect, since
     version 1 overrides applied to every occurrence of the task. A version 2 spec
     is returned unchanged. The function is pure and deterministic; it does not
@@ -809,6 +904,7 @@ def migrate_pipeline_spec(spec: Mapping[str, Any]) -> SpecMigration:
             tasks = step.get("tasks")
             if isinstance(tasks, list):
                 step["tasks"] = _migrate_task_list(tasks, f"steps[{index}].tasks", notes)
+        _migrate_step_ids(steps, notes)
     run_overrides = converted.pop("task_run_parameters", None)
     if run_overrides:
         canonical = task_parameters_from_run_parameters(run_overrides)
