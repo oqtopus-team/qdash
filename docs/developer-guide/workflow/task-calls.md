@@ -166,10 +166,16 @@ python -m qdash.common.migration.task_calls --write-to /tmp/converted user_flows
 ```
 
 With `--write-to` it writes converted copies to that directory and leaves the originals unchanged.
+It reads every file before it writes, and writes nothing when a copy would replace an input file
+(also through a symlink), when two inputs map to the same copy, or when a different file already
+exists at a destination; it then lists each conflict and exits with status 2.
 It converts a literal task-name list passed to a step into `TaskCall` entries, and so does it for
 a variable assigned such a list once and used only as `tasks=` arguments; a name repeated in one
-list gets `call_id` values `<Task>`, `<Task>_2`, and so on, which you should rename to describe
-each call. It turns `stop_on_failure_tasks` on the same step into `on_failure="stop"`. Names
+list gets `call_id` values `<Task>`, `<Task>_2`, and so on, skipping ids the list already uses,
+which you should rename to describe each call. It turns `stop_on_failure_tasks` on the same step
+into `on_failure="stop"` and adds `from qdash.workflow import TaskCall` before the first converted
+line. A file is not converted when `TaskCall` already names an import from outside `qdash`, or
+when the result would not parse; its findings are reported as manual changes instead. Names
 resolve with Python's scoping rules, so a function-local variable that shadows a module-level
 list is judged by its own assignment.
 
@@ -180,7 +186,7 @@ annotated `list[str]` or not annotated at all. It also reports a task-name list 
 outside `tasks=` or shared by steps with different `stop_on_failure_tasks`, step-level
 `task_parameters`, and the deprecated `CalibService(task_run_parameters=...)`. The exit status is
 0 when nothing needs attention, 1 when a file needs conversion or manual changes, and 2 when a
-file cannot be read.
+file cannot be read or `--write-to` would overwrite a file.
 
 ## Testing
 

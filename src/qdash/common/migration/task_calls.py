@@ -4,21 +4,29 @@ Since pipeline spec version 2, every step lists its work as ``TaskCall``
 entries; ``CustomOneQubit(tasks=["CheckT1"])`` raises at construction. This
 module inventories flow files and converts the cases it can prove safe.
 
-It only reads source text and parses it with :mod:`ast`; it never imports,
-executes, or evaluates a flow. Conversion writes converted copies to a
-separate directory and leaves the originals untouched.
+It only reads source text and parses it with :mod:`ast` and :mod:`tokenize`;
+it never imports, executes, or evaluates a flow. Conversion writes converted
+copies to a separate directory and leaves the originals untouched: every file
+is read before anything is written, and nothing is written when a copy would
+replace an input file or any other existing file.
 
 What it converts, keeping comments and formatting elsewhere:
 
 * a list or tuple literal of task-name strings passed as ``tasks=`` to a step,
   or assigned once to a variable that is passed as ``tasks=`` and used nowhere
   else: each string becomes ``TaskCall(name="...")``. A name repeated in one
-  list gets explicit call ids ``<Task>``, ``<Task>_2``, ... (rename them to
-  describe the calls);
+  list gets explicit call ids ``<Task>``, ``<Task>_2``, ..., skipping ids the
+  list already uses (rename them to describe the calls);
 * ``stop_on_failure_tasks=(...)`` on the same step, when the step's list is a
   literal it converts: the named calls get ``on_failure="stop"`` and the
   keyword is removed;
-* the ``from qdash.workflow import TaskCall`` import, when a conversion needs it.
+* the ``from qdash.workflow import TaskCall`` import, when a conversion needs it,
+  placed after the module docstring and ``__future__`` imports and before the
+  first converted line.
+
+A file whose conversion cannot be applied safely (for example, ``TaskCall``
+already names something outside qdash) is not converted; its findings are
+reported for a person instead.
 
 What it reports for a person to change: any ``tasks=`` value it cannot prove
 holds ``TaskCall`` entries (lists built at run time, variables that are
@@ -41,12 +49,18 @@ from __future__ import annotations
 
 import argparse
 import ast
+import itertools
 import json
+import os
+import re
 import sys
+import tokenize
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from qdash.datamodel.task_call import CALL_ID_PATTERN, TASK_NAME_PATTERN
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -61,7 +75,8 @@ STEP_CLASSES = frozenset(
         "TwoQubitCalibration",
     }
 )
-TASK_CALL_IMPORT = "from qdash.workflow import TaskCall\n"
+TASK_CALL_IMPORT = "from qdash.workflow import TaskCall"
+_CALL_ID_MAX_LENGTH = 64
 
 
 @dataclass
@@ -119,15 +134,36 @@ def _string_items(node: ast.AST) -> list[ast.Constant] | None:
     return items
 
 
-def _call_texts(names: list[str], stop: set[str]) -> list[str]:
+def _call_ids(names: list[str]) -> list[str | None]:
+    """Explicit call ids for a task list: None for a name listed once.
+
+    A repeated name gets ``<Task>``, ``<Task>_2``, ...; a generated id skips ids
+    the list already uses (another task listed once under that name) and stays
+    within the call_id length limit.
+    """
     counts = Counter(names)
-    seen: Counter[str] = Counter()
-    texts: list[str] = []
+    taken = {name for name, count in counts.items() if count == 1}
+    ids: list[str | None] = []
     for name in names:
-        seen[name] += 1
+        if counts[name] == 1:
+            ids.append(None)
+            continue
+        candidate = name[:_CALL_ID_MAX_LENGTH]
+        nth = 1
+        while candidate in taken or not re.fullmatch(CALL_ID_PATTERN, candidate):
+            nth += 1
+            suffix = f"_{nth}"
+            candidate = f"{name[: _CALL_ID_MAX_LENGTH - len(suffix)]}{suffix}"
+        taken.add(candidate)
+        ids.append(candidate)
+    return ids
+
+
+def _call_texts(names: list[str], stop: set[str]) -> list[str]:
+    texts: list[str] = []
+    for name, call_id in zip(names, _call_ids(names), strict=True):
         arguments = [f'name="{name}"']
-        if counts[name] > 1:
-            call_id = name if seen[name] == 1 else f"{name}_{seen[name]}"
+        if call_id is not None:
             arguments.append(f'call_id="{call_id}"')
         if name in stop:
             arguments.append('on_failure="stop"')
@@ -621,10 +657,22 @@ class _Analyzer:
 
     # Conversion -------------------------------------------------------------
 
-    def _convert_literal(self, node: ast.expr, stop: set[str], where: str) -> None:
+    def _convert_literal(self, node: ast.expr, stop: set[str], where: str) -> bool:
+        """Convert a task-name literal; False when a name is not a valid task name."""
         items = _string_items(node)
         assert items is not None
         names = [str(item.value) for item in items]
+        invalid = [name for name in names if not re.fullmatch(TASK_NAME_PATTERN, name)]
+        if invalid:
+            self.findings.append(
+                Finding(
+                    node.lineno,
+                    "task_names",
+                    f"{where} lists {', '.join(repr(name) for name in invalid)}, which "
+                    "is not a task name; write the TaskCall entries by hand",
+                )
+            )
+            return False
         for item, text in zip(items, _call_texts(names, stop), strict=True):
             assert item.end_lineno is not None and item.end_col_offset is not None
             self.edits.append(
@@ -635,25 +683,7 @@ class _Analyzer:
         self.findings.append(
             Finding(node.lineno, "task_names", f"{where}: task names became TaskCall{note}", True)
         )
-
-    def _remove_keyword(
-        self, call: ast.Call, keyword: ast.keyword, source_lines: list[str]
-    ) -> None:
-        index = call.keywords.index(keyword)
-        value = keyword.value
-        assert value.end_lineno is not None and value.end_col_offset is not None
-        start = (keyword.lineno, keyword.col_offset)
-        end = (value.end_lineno, value.end_col_offset)
-        line = source_lines[end[0] - 1]
-        rest = line[end[1] :]
-        stripped = rest.lstrip()
-        if stripped.startswith(","):
-            end = (end[0], end[1] + (len(rest) - len(stripped)) + 1)
-        elif index > 0:
-            previous = call.keywords[index - 1].value
-            assert previous.end_lineno is not None and previous.end_col_offset is not None
-            start = (previous.end_lineno, previous.end_col_offset)
-        self.edits.append(_Edit(start, end, ""))
+        return True
 
     @staticmethod
     def _stop_names(step: _StepUse) -> tuple[ast.keyword | None, set[str] | None]:
@@ -690,8 +720,8 @@ class _Analyzer:
             value = step.keywords["tasks"].value
             if _string_items(value) is not None:
                 _, stop = self._stop_names(step)
-                self._convert_literal(value, stop or set(), f"{step.name}(tasks=[...])")
-                self._finish_stop(step, converted=True)
+                converted = self._convert_literal(value, stop or set(), f"{step.name}(tasks=[...])")
+                self._finish_stop(step, converted=converted)
                 continue
             found = self._convertible_binding(step)
             if found is not None:
@@ -807,7 +837,10 @@ class _Analyzer:
             return
         assert binding.value is not None and stops[0] is not None
         steps = ", ".join(sorted({step.name for step in uses}))
-        self._convert_literal(binding.value, stops[0], f"{name} (used by {steps})")
+        if not self._convert_literal(binding.value, stops[0], f"{name} (used by {steps})"):
+            for step in uses:
+                self._finish_stop(step, converted=False)
+            return
         statement = binding.statement
         if (
             isinstance(statement, ast.AnnAssign)
@@ -826,44 +859,243 @@ class _Analyzer:
             self._finish_stop(step, converted=True)
 
 
-def _offset(lines: list[str], position: tuple[int, int]) -> int:
-    line, column = position
-    return sum(len(text) for text in lines[: line - 1]) + len(
-        lines[line - 1].encode()[:column].decode()
+_NEWLINE = re.compile(r"\r\n|\r|\n")
+_LINES = re.compile(r"[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+$")
+_HEADER_COMMENT = re.compile(r"#!|[ \t\f]*#.*coding[:=]")
+_TRIVIA = frozenset({tokenize.COMMENT, tokenize.NL, tokenize.NEWLINE, tokenize.INDENT})
+
+
+class ConversionError(ValueError):
+    """A conversion this module could not apply safely; the file is left to a person."""
+
+
+class _SourceMap:
+    """Positions in source text, counted the way the Python tokenizer counts them.
+
+    Only ``\r\n``, ``\r`` and ``\n`` end a line, unlike ``str.splitlines``, which
+    also splits on form feeds and other Unicode separators. ``ast`` columns are
+    UTF-8 byte offsets; ``tokenize`` columns are character offsets.
+    """
+
+    def __init__(self, source: str) -> None:
+        self.source = source
+        self.starts = [0, *(match.end() for match in _NEWLINE.finditer(source))]
+
+    def line(self, lineno: int) -> str:
+        start = self.starts[lineno - 1]
+        end = self.starts[lineno] if lineno < len(self.starts) else len(self.source)
+        return self.source[start:end]
+
+    def offset(self, lineno: int, byte_column: int) -> int:
+        """The character offset of an ``ast`` (line, UTF-8 byte column) position."""
+        prefix = self.line(lineno).encode("utf-8")[:byte_column]
+        return self.starts[lineno - 1] + len(prefix.decode("utf-8"))
+
+    def token_offset(self, position: tuple[int, int]) -> int:
+        """The character offset of a ``tokenize`` (line, character column) position."""
+        lineno, column = position
+        return self.starts[lineno - 1] + column
+
+    def tokens(self) -> list[tokenize.TokenInfo]:
+        lines = iter(_LINES.findall(self.source))
+        try:
+            return list(tokenize.generate_tokens(lambda: next(lines, "")))
+        except (tokenize.TokenError, SyntaxError) as exc:
+            raise ConversionError(f"cannot tokenize the file: {exc}") from exc
+
+    def newline(self) -> str:
+        match = _NEWLINE.search(self.source)
+        return match.group() if match else "\n"
+
+
+@dataclass
+class _Span:
+    start: int
+    end: int
+    text: str
+
+
+def _keyword_removal(
+    source: _SourceMap, tokens: list[tokenize.TokenInfo], call: ast.Call, keyword: ast.keyword
+) -> list[_Span]:
+    """Spans that delete one keyword argument and one separating comma.
+
+    Comments around the argument stay. The keyword's extent runs from its name
+    to the last token before the next top-level ``,`` or the call's ``)``, so a
+    parenthesized value is removed whole.
+    """
+    assert keyword.arg is not None
+    start = source.offset(keyword.lineno, keyword.col_offset)
+    index = next(
+        (i for i, token in enumerate(tokens) if source.token_offset(token.start) == start), None
     )
+    if index is None or tokens[index].string != keyword.arg:
+        raise ConversionError(f"cannot locate {keyword.arg}= in the source")
+    depth = 0
+    last = index
+    stop = None
+    for position in range(index, len(tokens)):
+        token = tokens[position]
+        if token.type in _TRIVIA:
+            continue
+        if token.type == tokenize.OP and token.string in "([{":
+            depth += 1
+        elif token.type == tokenize.OP and token.string in ")]}":
+            if depth == 0:
+                stop = position
+                break
+            depth -= 1
+        elif token.type == tokenize.OP and token.string == "," and depth == 0:
+            stop = position
+            break
+        last = position
+    if stop is None:
+        raise ConversionError(f"cannot find the end of {keyword.arg}=")
+    end = source.token_offset(tokens[last].end)
+    text = source.source
+    line_start = source.starts[keyword.lineno - 1]
+    own_line = not text[line_start:start].strip()
+
+    def blanks_after(position: int) -> int:
+        while position < len(text) and text[position] in " \t":
+            position += 1
+        return position
+
+    def line_end(position: int) -> int:
+        match = _NEWLINE.search(text, position)
+        return match.end() if match else len(text)
+
+    def argument_span() -> _Span:
+        # An argument alone on its line(s) takes the lines with it.
+        if own_line and not text[end : line_end(end)].strip():
+            return _Span(line_start, line_end(end), "")
+        return _Span(start, end, "")
+
+    separator = tokens[stop]
+    if separator.string == ",":
+        comma_start = source.token_offset(separator.start)
+        comma_end = source.token_offset(separator.end)
+        between = text[end:comma_start]
+        if between.strip() or _NEWLINE.search(between):
+            # The comma is on a later line: remove both, keep what is between.
+            return [argument_span(), _Span(comma_start, blanks_after(comma_end), "")]
+        if own_line and not text[comma_end : line_end(comma_end)].strip():
+            return [_Span(line_start, line_end(comma_end), "")]
+        return [_Span(start, blanks_after(comma_end), "")]
+    # The last argument: drop the comma before it, if any.
+    previous = index - 1
+    while previous >= 0 and tokens[previous].type in _TRIVIA:
+        previous -= 1
+    if previous < 0 or tokens[previous].string != ",":
+        return [argument_span()]
+    comma_start = source.token_offset(tokens[previous].start)
+    comma_end = source.token_offset(tokens[previous].end)
+    if not text[comma_end:start].strip():
+        return [_Span(comma_start, end, "")]
+    # Comments sit between the comma and the argument; keep them.
+    return [_Span(comma_start, comma_end, ""), argument_span()]
 
 
-def _apply(source: str, edits: list[_Edit]) -> str:
-    lines = source.splitlines(keepends=True)
+def _apply(source: str, spans: list[_Span]) -> str:
+    ordered = sorted(spans, key=lambda span: (span.start, span.end))
+    for earlier, later in itertools.pairwise(ordered):
+        if later.start < earlier.end:
+            raise ConversionError("two conversions overlap")
     result = source
-    for edit in sorted(edits, key=lambda item: item.start, reverse=True):
-        start = _offset(lines, edit.start)
-        end = _offset(lines, edit.end)
-        result = result[:start] + edit.text + result[end:]
+    for span in reversed(ordered):
+        result = result[: span.start] + span.text + result[span.end :]
     return result
 
 
-def _with_import(source: str, tree: ast.Module) -> str:
-    # Only a module-level import binds the name for module-level and function code.
+def _is_docstring(node: ast.stmt) -> bool:
+    return (
+        isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    )
+
+
+def _import_edit(source: _SourceMap, tree: ast.Module, first_use: int) -> _Span | None:
+    """Where to add the ``TaskCall`` import, or None when the module already has it.
+
+    It goes after the module docstring, ``from __future__`` imports, and any
+    other top-level imports that end before the first converted line, so it
+    always precedes its first use. A ``TaskCall`` name bound at module level by
+    anything other than a qdash import makes the conversion unsafe.
+    """
+    has_task_call_import = False
     for node in tree.body:
-        if isinstance(node, ast.ImportFrom) and any(
-            alias.name == "TaskCall" and alias.asname in (None, "TaskCall") for alias in node.names
+        if isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                if (alias.asname or alias.name) != "TaskCall":
+                    continue
+                module = node.module or ""
+                if node.level == 0 and alias.name == "TaskCall" and module.split(".")[0] == "qdash":
+                    if node.end_lineno is None or node.end_lineno >= first_use:
+                        raise ConversionError(
+                            f"TaskCall import at line {node.lineno} must precede the first "
+                            f"converted use at line {first_use}; move the import before converting"
+                        )
+                    has_task_call_import = True
+                    continue
+                raise ConversionError(
+                    f"TaskCall is imported from {'.' * node.level + module} at line "
+                    f"{node.lineno}, not from qdash"
+                )
+        elif isinstance(node, ast.Import):
+            if any((alias.asname or alias.name) == "TaskCall" for alias in node.names):
+                raise ConversionError(f"TaskCall is bound by an import at line {node.lineno}")
+    if has_task_call_import:
+        return None
+    after = 0
+    for position, node in enumerate(tree.body):
+        assert node.end_lineno is not None
+        if node.end_lineno >= first_use:
+            break
+        if (position == 0 and _is_docstring(node)) or isinstance(node, ast.Import | ast.ImportFrom):
+            after = node.end_lineno
+        elif after:
+            # Keep the import with the leading block rather than after later code.
+            break
+    if after >= first_use:
+        raise ConversionError("no place for the TaskCall import before its first use")
+    newline = source.newline()
+    if after == 0:
+        # Keep a shebang or encoding declaration on the first lines.
+        while after < min(2, first_use - 1, len(source.starts)) and _HEADER_COMMENT.match(
+            source.line(after + 1)
         ):
-            return source
-    imports = [node for node in tree.body if isinstance(node, ast.Import | ast.ImportFrom)]
-    lines = source.splitlines(keepends=True)
-    if imports:
-        last = imports[-1]
-        assert last.end_lineno is not None
-        index = last.end_lineno
-    else:
-        index = 0
-        if tree.body and isinstance(tree.body[0], ast.Expr):
-            docstring = tree.body[0]
-            assert docstring.end_lineno is not None
-            index = docstring.end_lineno
-    lines.insert(index, TASK_CALL_IMPORT)
-    return "".join(lines)
+            after += 1
+        if after == 0:
+            return _Span(0, 0, TASK_CALL_IMPORT + newline)
+    line_end = source.starts[after] if after < len(source.starts) else len(source.source)
+    text = TASK_CALL_IMPORT + newline
+    if not _NEWLINE.search(source.line(after)):
+        text = newline + TASK_CALL_IMPORT + newline
+    return _Span(line_end, line_end, text)
+
+
+def _convert(source: str, tree: ast.Module, analyzer: _Analyzer) -> str:
+    """The converted source; raises ConversionError when it cannot be done safely."""
+    positions = _SourceMap(source)
+    spans = [
+        _Span(positions.offset(*edit.start), positions.offset(*edit.end), edit.text)
+        for edit in analyzer.edits
+    ]
+    if analyzer.pending_keyword_removals:
+        tokens = positions.tokens()
+        for call, keyword in analyzer.pending_keyword_removals:
+            spans.extend(_keyword_removal(positions, tokens, call, keyword))
+    first_use = min(edit.start[0] for edit in analyzer.edits if "TaskCall" in edit.text)
+    import_span = _import_edit(positions, tree, first_use)
+    if import_span is not None:
+        spans.append(import_span)
+    converted = _apply(source, spans)
+    try:
+        ast.parse(converted)
+    except (SyntaxError, ValueError) as exc:
+        raise ConversionError(f"the converted source does not parse: {exc}") from exc
+    return converted
 
 
 def analyze_source(source: str, path: str = "<source>") -> FileReport:
@@ -871,21 +1103,29 @@ def analyze_source(source: str, path: str = "<source>") -> FileReport:
     report = FileReport(path=path)
     try:
         tree = ast.parse(source, filename=path)
-    except SyntaxError as exc:
+    except (SyntaxError, ValueError, RecursionError) as exc:
+        # ValueError: null bytes on Python 3.11; RecursionError: deeply nested code.
         report.error = f"cannot parse: {exc}"
         return report
     analyzer = _Analyzer(tree)
     analyzer.analyze()
-    source_lines = source.splitlines(keepends=True)
-    for call, keyword in analyzer.pending_keyword_removals:
-        analyzer._remove_keyword(call, keyword, source_lines)
-    unique = {(f.line, f.kind, f.message, f.converted): f for f in analyzer.findings}
-    report.findings = sorted(unique.values(), key=lambda finding: finding.line)
+    findings = analyzer.findings
     if analyzer.edits:
-        converted = _apply(source, analyzer.edits)
-        converted = _with_import(converted, ast.parse(converted))
-        ast.parse(converted)  # the conversion must stay valid Python
-        report.converted_source = converted
+        try:
+            report.converted_source = _convert(source, tree, analyzer)
+        except ConversionError as exc:
+            # Nothing is converted; every finding is left for a person.
+            findings = [
+                Finding(
+                    finding.line,
+                    finding.kind,
+                    f"convert by hand: {finding.message}" if finding.converted else finding.message,
+                )
+                for finding in findings
+            ]
+            findings.append(Finding(1, "conversion_failed", f"not converted automatically: {exc}"))
+    unique = {(f.line, f.kind, f.message, f.converted): f for f in findings}
+    report.findings = sorted(unique.values(), key=lambda finding: finding.line)
     return report
 
 
@@ -905,26 +1145,89 @@ def _default_paths() -> list[Path]:
     return [resolve_user_flows_dir()]
 
 
+class WriteConflictError(ValueError):
+    """``--write-to`` would overwrite a flow or another file; nothing was written."""
+
+
+def _destination_conflicts(
+    planned: list[tuple[Path, Path, str]], inputs: list[Path], write_to: Path
+) -> list[str]:
+    conflicts: list[str] = []
+    input_paths = {os.path.normcase(path.resolve()): path for path in inputs}
+    claimed: dict[str, Path] = {}
+    root = write_to.resolve()
+    for file, destination, text in planned:
+        resolved = destination.resolve()
+        if os.path.normcase(resolved) in input_paths:
+            conflicts.append(f"{file} -> {destination} would overwrite the input {resolved}")
+            continue
+        # Case-folded, since a case-insensitive file system maps both to one file.
+        key = os.path.normcase(str(resolved)).casefold()
+        if key in claimed:
+            conflicts.append(f"{file} and {claimed[key]} would both be written to {destination}")
+            continue
+        claimed[key] = file
+        if not resolved.is_relative_to(root):
+            conflicts.append(f"{file} -> {destination} leaves {write_to} through a link")
+            continue
+        for parent in resolved.relative_to(root).parents:
+            directory = root / parent
+            if directory.exists() and not directory.is_dir():
+                conflicts.append(f"{file} -> {destination} needs {directory} to be a directory")
+                break
+        else:
+            if destination.is_symlink() or destination.is_dir():
+                conflicts.append(f"{file} -> {destination} is a link or directory")
+            elif destination.exists() and destination.read_text(encoding="utf-8") != text:
+                conflicts.append(f"{file} -> {destination} would overwrite an existing file")
+    return conflicts
+
+
 def run(paths: list[Path], write_to: Path | None) -> list[FileReport]:
-    """Analyze flow files and, with ``write_to``, write converted copies there."""
+    """Analyze flow files and, with ``write_to``, write converted copies there.
+
+    Every file is read and analyzed before anything is written. Writing only
+    creates files: it refuses, before writing any copy, when a destination is
+    one of the input files (also through a symlink), when two inputs map to the
+    same destination, or when a different file already exists there, and
+    raises :class:`WriteConflictError` listing every conflict. A destination
+    that already holds the same converted text is left as it is.
+    """
     reports: list[FileReport] = []
-    files = _flow_files(paths)
+    files: list[Path] = []
+    seen: set[str] = set()
+    for file in _flow_files(paths):
+        key = os.path.normcase(file.resolve())
+        if key not in seen:
+            seen.add(key)
+            files.append(file)
     roots = [path if path.is_dir() else path.parent for path in paths]
+    planned: list[tuple[Path, Path, str]] = []
     for file in files:
         try:
             source = file.read_text(encoding="utf-8")
-        except OSError as exc:
+        except (OSError, UnicodeDecodeError) as exc:
             reports.append(FileReport(path=str(file), error=str(exc)))
             continue
         report = analyze_source(source, str(file))
         reports.append(report)
         if write_to is not None and report.converted_source is not None:
             root = next((root for root in roots if file.is_relative_to(root)), file.parent)
-            destination = write_to / file.relative_to(root)
-            if destination.resolve() == file.resolve():
-                raise ValueError(f"--write-to would overwrite {file}; choose another directory")
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_text(report.converted_source, encoding="utf-8")
+            planned.append((file, write_to / file.relative_to(root), report.converted_source))
+    if write_to is None or not planned:
+        return reports
+    conflicts = _destination_conflicts(planned, files, write_to)
+    if conflicts:
+        raise WriteConflictError(
+            "--write-to would overwrite existing files, so nothing was written: "
+            + "; ".join(conflicts)
+        )
+    for _, destination, text in planned:
+        if destination.exists():
+            continue  # already holds this converted text
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("x", encoding="utf-8", newline="") as handle:
+            handle.write(text)
     return reports
 
 
@@ -956,7 +1259,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="Print the report as JSON")
     args = parser.parse_args(argv)
     paths = args.paths or _default_paths()
-    reports = run(paths, args.write_to)
+    try:
+        reports = run(paths, args.write_to)
+    except WriteConflictError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     if args.json:
         payload = [
             {
