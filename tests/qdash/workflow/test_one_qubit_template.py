@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.task_call_helpers import call_ids, names
 
 one_qubit_module = importlib.import_module("qdash.workflow.templates.one_qubit")
 
@@ -64,9 +65,9 @@ def test_one_qubit_template_passes_template_task_lists(monkeypatch) -> None:
 
     steps = result["steps"]
     assert len(steps) == 3
-    assert steps[0].tasks == COARSE_ONE_TASKS
+    assert names(steps[0].tasks) == names(COARSE_ONE_TASKS)
     assert isinstance(steps[1], FilterByStatus)
-    assert steps[2].tasks == FINE_ONE_TASKS
+    assert names(steps[2].tasks) == names(FINE_ONE_TASKS)
 
 
 @pytest.mark.parametrize("check_only", [False, True])
@@ -78,7 +79,7 @@ def test_one_qubit_template_check_calibrates_and_checks_all_pulses(monkeypatch, 
     )
 
     assert len(result["steps"]) == (1 if check_only else 3)
-    assert result["steps"][0].tasks == [
+    assert names(result["steps"][0].tasks) == [
         "Configure",
         "CheckCoarseReadoutParams",
         "Configure",
@@ -129,8 +130,10 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     step = result["steps"][0]
     assert isinstance(step, OneQubitFineTune)
     assert step.mode == "synchronized"
-    tasks = step.tasks
-    assert tasks is not None
+    assert step.tasks is not None
+    tasks = names(step.tasks)
+    # Every repeated pulse calibration is its own call, named after its round.
+    assert len(set(call_ids(step.calls()))) == len(step.tasks)
     assert tasks[0] == "Configure"
     optimization_indices = [
         i for i, name in enumerate(tasks) if name.startswith("CheckOptimalReadout")

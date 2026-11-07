@@ -6,6 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
+from qdash.workflow.service._internal.call_runner import (
+    batch_preflight_problems,
+    run_batch_calls,
+)
 from qdash.workflow.service._internal.scheduling_tasks import (
     run_mux_calibrations_parallel,
     run_qubit_batch_calibration_isolated,
@@ -13,7 +17,22 @@ from qdash.workflow.service._internal.scheduling_tasks import (
 from qdash.workflow.service.calib_service import get_session
 
 if TYPE_CHECKING:
+    from qdash.datamodel.task_call import StepCalls
     from qdash.workflow.service.calib_service import CalibService
+
+
+def batch_capable_tasks(backend_name: str) -> dict[str, bool]:
+    """Task name -> whether the task implements ``batch_run`` on this backend."""
+    from qdash.workflow.calibtasks.base import BaseTask
+
+    capable: dict[str, bool] = {}
+    for name, task_class in BaseTask.registry.get(backend_name, {}).items():
+        owner = next(
+            (klass for klass in task_class.__mro__ if "batch_run" in vars(klass)), task_class
+        )
+        # BaseTask declares batch_run abstract and QubexTask raises NotImplementedError.
+        capable[name] = owner.__name__ not in {"BaseTask", "QubexTask"}
+    return capable
 
 
 class OneQubitStageRunner:
@@ -59,11 +78,23 @@ class OneQubitStageRunner:
             qids.extend(self._filter_qids(step.parallel_qids, allowed_qids))
         return list(dict.fromkeys(qids))
 
+    def preflight_batch(self, plan: StepCalls) -> None:
+        """Raise before any hardware work when the batch path cannot run ``plan``."""
+        problems = batch_preflight_problems(
+            plan,
+            self.cal_service.task_parameters,
+            batch_capable_tasks(self.cal_service.backend_name),
+        )
+        if problems:
+            raise ValueError(
+                "simultaneous_spectroscopy cannot run this step: " + "; ".join(problems)
+            )
+
     def execute_scheduled_mux_schedule(
         self,
         schedule: Any,
         *,
-        tasks: list[str],
+        plan: StepCalls,
         session_config: dict[str, Any],
         allowed_qids: list[str] | None = None,
     ) -> dict[str, Any]:
@@ -84,7 +115,7 @@ class OneQubitStageRunner:
                     continue
                 mux_results = run_mux_calibrations_parallel(
                     mux_groups=parallel_groups,
-                    tasks=tasks,
+                    plan=plan,
                     session_config=session_config,
                 )
                 stage_results.update(mux_results)
@@ -96,11 +127,15 @@ class OneQubitStageRunner:
         self,
         schedule: Any,
         *,
-        tasks: list[str],
+        plan: StepCalls,
         allowed_qids: list[str] | None = None,
         session_config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Run simultaneous spectroscopy batches under the current execution."""
+        """Run simultaneous spectroscopy batches under the current execution.
+
+        Every call runs once per schedule step over that step's qubits, so each
+        call is a barrier for its batch; schedule steps run one after another.
+        """
         logger = get_run_logger()
         all_results: dict[str, Any] = {}
         for step in schedule.steps:
@@ -115,18 +150,13 @@ class OneQubitStageRunner:
             if session_config is not None:
                 all_results[f"step_{step.step_index}"] = run_qubit_batch_calibration_isolated(
                     qids=step_qids,
-                    tasks=tasks,
+                    plan=plan,
                     session_config=session_config,
                 )
                 continue
-
-            session = get_session()
-            step_results: dict[str, dict[str, Any]] = {qid: {} for qid in step_qids}
-            for task_name in tasks:
-                task_results = session.execute_task_batch(task_name, step_qids)
-                for qid, task_result in task_results.items():
-                    step_results.setdefault(qid, {})[task_name] = task_result
-            all_results[f"step_{step.step_index}"] = step_results
+            all_results[f"step_{step.step_index}"] = run_batch_calls(
+                get_session(), step_qids, plan, logger
+            )
         return all_results
 
     @staticmethod

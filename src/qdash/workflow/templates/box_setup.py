@@ -21,7 +21,7 @@ from typing import Any
 
 from prefect import flow
 
-from qdash.workflow import sweep
+from qdash.workflow import TaskCall, sweep
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -92,7 +92,7 @@ def box_setup(
             },
         },
     }
-    steps = [BringUp(mode=mode, tasks=["CorrectCaptureDelay"])]
+    steps = [BringUp(mode=mode, tasks=[TaskCall(name="CorrectCaptureDelay")])]
 
     cal = CalibService(
         username,

@@ -1,18 +1,22 @@
 """Qubit coherence check template.
 
 This template applies the current hardware configuration, records a coarse
-Chevron measurement without updating calibration parameters, then runs Rabi, T1,
-T2Echo, and Ramsey checks for explicitly selected MUXes or qubits.
+Chevron measurement without updating calibration parameters, then runs two
+coherence-check passes for explicitly selected MUXes or qubits: Rabi, T1,
+T2Echo, and Ramsey, then a second step that applies the configuration again,
+re-measures Rabi, and runs Ramsey on a five times longer time scale with a
+smaller detuning.
 
 Example:
     coherence_check(username="alice", chip_id="64Qv3", mux_ids=[0, 1])
 """
 
+import math
 from typing import Any
 
 from prefect import flow
 
-from qdash.workflow import sweep
+from qdash.workflow import TaskCall, sweep
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -22,13 +26,30 @@ from qdash.workflow.service.calib_service import (
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
-COHERENCE_CHECK_TASKS: list[str] = [
-    "Configure",
-    "CheckChevron",
-    "CheckRabi",
-    "CheckT1",
-    "CheckT2Echo",
-    "CheckRamsey",
+COHERENCE_CHECK_TASKS: list[TaskCall] = [
+    TaskCall(name="Configure"),
+    TaskCall(name="CheckChevron"),
+    TaskCall(name="CheckRabi"),
+    TaskCall(name="CheckT1"),
+    TaskCall(name="CheckT2Echo"),
+    TaskCall(name="CheckRamsey"),
+]
+
+# The second pass is its own step: Configure and CheckRabi run again on fresh
+# hardware state before the long Ramsey, and the step boundary keeps every
+# target's first pass complete before any second pass starts.
+LONG_RAMSEY_CHECK_TASKS: list[TaskCall] = [
+    TaskCall(name="Configure"),
+    TaskCall(name="CheckRabi"),
+    TaskCall(
+        name="CheckRamsey",
+        call_id="ramsey_long",
+        run={
+            # Keep 101 points while extending the time scale by 5x.
+            "time_range": sweep.arange(0, 50_001, 500),
+            "detuning": 0.0002,
+        },
+    ),
 ]
 
 
@@ -75,7 +96,12 @@ def coherence_check(
             step_name="coherence_check",
             tasks=COHERENCE_CHECK_TASKS,
             mode="synchronized",
-        )
+        ),
+        CustomOneQubit(
+            step_name="long_ramsey_check",
+            tasks=LONG_RAMSEY_CHECK_TASKS,
+            mode="synchronized",
+        ),
     ]
 
     cal = CalibService(
@@ -95,10 +121,26 @@ def coherence_check(
                 },
                 "update_calibration_parameters": False,
             },
+            "CheckT1": {
+                "run": {
+                    "time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51),
+                },
+            },
+            "CheckT2Echo": {
+                "run": {
+                    "time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51),
+                },
+            },
+            "CheckRamsey": {
+                "run": {
+                    "time_range": sweep.arange(0, 10_001, 100),
+                    "detuning": 0.001,
+                },
+            },
         },
         default_run_parameters={
             "readout_duration": 1024,
-            "interval": 150 * 1024,
+            "interval": 256 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

@@ -17,6 +17,7 @@ from qdash.workflow.service.steps import (
     OneQubitFineTune,
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.task_call_helpers import names
 
 characterization_module = importlib.import_module("qdash.workflow.templates.characterization")
 
@@ -54,16 +55,16 @@ def test_characterization_builds_full_pipeline_in_dependency_order() -> None:
         CustomOneQubit,
         CustomTwoQubit,
     ]
-    assert steps[1].tasks == characterization_module.GE_CALIBRATION_TASKS
+    assert names(steps[1].tasks) == names(characterization_module.GE_CALIBRATION_TASKS)
     assert steps[3].inverse is False
-    assert steps[4].tasks == characterization_module.GE_CHARACTERIZATION_TASKS
+    assert names(steps[4].tasks) == names(characterization_module.GE_CHARACTERIZATION_TASKS)
     assert steps[4].continue_on_failure is True
-    assert steps[4].stop_on_failure_tasks == ()
-    assert steps[5].tasks == characterization_module.EF_CALIBRATION_TASKS
-    assert steps[7].tasks == characterization_module.EF_CHARACTERIZATION_TASKS
+    assert all(call.on_failure is None for call in steps[4].tasks)
+    assert names(steps[5].tasks) == names(characterization_module.EF_CALIBRATION_TASKS)
+    assert names(steps[7].tasks) == names(characterization_module.EF_CHARACTERIZATION_TASKS)
     assert steps[7].continue_on_failure is True
-    assert steps[7].stop_on_failure_tasks == ()
-    assert steps[8].tasks == ["CheckCouplingStrength"]
+    assert all(call.on_failure is None for call in steps[7].tasks)
+    assert names(steps[8].tasks) == ["CheckCouplingStrength"]
     assert steps[8].step_name == "coupling_characterization"
     assert steps[8].continue_on_failure is True
     assert result["kwargs"]["configuration_mode"] == "ge-ef-fh"
@@ -90,9 +91,9 @@ def test_ge_only_characterization_uses_ge_configuration() -> None:
         FilterByStatus,
         CustomOneQubit,
     ]
-    assert steps[1].tasks == characterization_module.GE_CALIBRATION_TASKS
-    assert steps[3].tasks == characterization_module.GE_CHARACTERIZATION_TASKS
-    assert steps[3].stop_on_failure_tasks == ()
+    assert names(steps[1].tasks) == names(characterization_module.GE_CALIBRATION_TASKS)
+    assert names(steps[3].tasks) == names(characterization_module.GE_CHARACTERIZATION_TASKS)
+    assert all(call.on_failure is None for call in steps[3].tasks)
     assert result["kwargs"]["configuration_mode"] == "ge-cr-cr"
     assert (
         result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
@@ -120,10 +121,10 @@ def test_coupling_characterization_does_not_imply_ef_calibration() -> None:
         GenerateCRSchedule,
         CustomTwoQubit,
     ]
-    assert steps[1].tasks == characterization_module.GE_CALIBRATION_TASKS
+    assert names(steps[1].tasks) == names(characterization_module.GE_CALIBRATION_TASKS)
     assert steps[3].inverse is True
     assert steps[3].max_parallel_ops == 3
-    assert steps[4].tasks == ["CheckCouplingStrength"]
+    assert names(steps[4].tasks) == ["CheckCouplingStrength"]
     assert steps[4].step_name == "coupling_characterization"
     assert steps[4].max_parallel_ops == 3
     assert result["kwargs"]["configuration_mode"] == "ge-cr-cr"
@@ -168,11 +169,11 @@ def test_characterization_exposes_primary_task_parameters() -> None:
     parameters = result["kwargs"]["task_parameters"]
     expected_tasks = {
         "ConfigureAll",
-        *characterization_module.GE_CALIBRATION_TASKS,
-        *characterization_module.GE_CHARACTERIZATION_TASKS,
-        *characterization_module.EF_CALIBRATION_TASKS,
-        *characterization_module.EF_CHARACTERIZATION_TASKS,
-        *characterization_module.COUPLING_CHARACTERIZATION_TASKS,
+        *names(characterization_module.GE_CALIBRATION_TASKS),
+        *names(characterization_module.GE_CHARACTERIZATION_TASKS),
+        *names(characterization_module.EF_CALIBRATION_TASKS),
+        *names(characterization_module.EF_CHARACTERIZATION_TASKS),
+        *names(characterization_module.COUPLING_CHARACTERIZATION_TASKS),
     }
     assert parameters.keys() == expected_tasks
     assert parameters["ConfigureAll"]["run"]["configuration_mode"] == "ge-ef-fh"

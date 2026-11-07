@@ -15,6 +15,7 @@ from qdash.workflow.service.steps import (
     TwoQubitCalibration,
 )
 from qdash.workflow.service.targets import MuxTargets
+from tests.qdash.workflow.task_call_helpers import names
 
 fast_full_module = importlib.import_module("qdash.workflow.templates.fast_full_calibration")
 
@@ -52,17 +53,17 @@ def test_fast_full_calibration_uses_shortened_one_qubit_steps(monkeypatch) -> No
     ]
 
     one_qubit_check = steps[1]
-    assert one_qubit_check.tasks == ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]
+    assert names(one_qubit_check.tasks) == ["CheckRabi", "CreateHPIPulse", "CheckHPIPulse"]
 
     one_qubit_fine_tune = steps[3]
-    assert "X90InterleavedRandomizedBenchmarking" in one_qubit_fine_tune.tasks
-    assert "CheckT1Average" not in one_qubit_fine_tune.tasks
-    assert "CheckT2EchoAverage" not in one_qubit_fine_tune.tasks
-    assert "Check1QGateCoherenceLimit" not in one_qubit_fine_tune.tasks
+    assert "X90InterleavedRandomizedBenchmarking" in names(one_qubit_fine_tune.tasks)
+    assert "CheckT1Average" not in names(one_qubit_fine_tune.tasks)
+    assert "CheckT2EchoAverage" not in names(one_qubit_fine_tune.tasks)
+    assert "Check1QGateCoherenceLimit" not in names(one_qubit_fine_tune.tasks)
 
     # The fast template keeps its explicit order while omitting the expensive coherence task.
-    assert steps[6].tasks == fast_full_module.FAST_2Q_TASKS
-    assert "Check2QGateCoherenceLimit" not in steps[6].tasks
+    assert names(steps[6].tasks) == names(fast_full_module.FAST_2Q_TASKS)
+    assert "Check2QGateCoherenceLimit" not in names(steps[6].tasks)
 
 
 def test_fast_full_calibration_requires_explicit_mux_ids(monkeypatch) -> None:

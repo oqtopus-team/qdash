@@ -38,7 +38,7 @@ Example:
         chip_id="64Q",
         mux_ids=[0],
         backend_name="fake",
-        tasks=["CheckHPIPulse", "CheckPIPulse"],
+        tasks=[TaskCall(name="CheckHPIPulse"), TaskCall(name="CheckPIPulse")],
     )
 """
 
@@ -46,6 +46,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -57,15 +58,15 @@ from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 # Tasks the template runs when none are given; every name is listed for the fake backend in
 # config/app/backend.yaml and resolves its inputs from the tasks before it.
-FAKE_CALIBRATION_TASKS: list[str] = [
-    "FakeBringUp",
-    "CheckChevron",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CreatePIPulse",
-    "CheckT1",
-    "CheckT2Echo",
-    "CheckRamsey",
+FAKE_CALIBRATION_TASKS: list[TaskCall] = [
+    TaskCall(name="FakeBringUp"),
+    TaskCall(name="CheckChevron"),
+    TaskCall(name="CheckRabi"),
+    TaskCall(name="CreateHPIPulse"),
+    TaskCall(name="CreatePIPulse"),
+    TaskCall(name="CheckT1"),
+    TaskCall(name="CheckT2Echo"),
+    TaskCall(name="CheckRamsey"),
 ]
 
 # MUXes the template calibrates when neither mux_ids nor qids is given: MUX 0 to 15 is the
@@ -86,7 +87,7 @@ def fake_calibration(
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
     mode: str = "scheduled",
-    tasks: list[str] | None = None,
+    tasks: list[TaskCall] | None = None,
     backend_name: str | None = None,
     tags: list[str] | None = None,
     flow_name: str | None = None,
@@ -105,7 +106,8 @@ def fake_calibration(
             - "scheduled": Box-based parallelism with hardware constraints (default)
             - "synchronized": Step-based synchronized execution
             - "serial": One MUX at a time
-        tasks: Task names to run. Default: FAKE_CALIBRATION_TASKS.
+        tasks: Task calls to run, e.g. [TaskCall(name="CheckRabi")]; flow runs pass
+            [{"name": "CheckRabi"}]. Default: FAKE_CALIBRATION_TASKS.
         backend_name: Backend to use ("fake" for testing, "qubex" for production,
                       None for default from config/app/backend.yaml)
         tags: Flow tags

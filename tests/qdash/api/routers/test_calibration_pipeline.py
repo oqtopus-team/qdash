@@ -105,6 +105,7 @@ def chip(test_project):
 
 def good_spec() -> dict[str, Any]:
     return {
+        "spec_version": 2,
         "name": "coarse-then-coherence",
         "targets": {"qids": ["0", "1"]},
         "steps": [
@@ -113,10 +114,14 @@ def good_spec() -> dict[str, Any]:
             {
                 "type": "CustomOneQubit",
                 "step_name": "coherence",
-                "tasks": ["CheckT1", "CheckT2Echo"],
+                "tasks": [
+                    {"name": "CheckT1", "call_id": "t1_short"},
+                    {"name": "CheckT1", "call_id": "t1_long", "run": {"shots": 4096}},
+                    {"name": "CheckT2Echo"},
+                ],
             },
         ],
-        "task_run_parameters": {"CheckT1": {"shots": 2048}},
+        "task_parameters": {"CheckT1": {"run": {"shots": 2048}}},
     }
 
 
@@ -128,7 +133,10 @@ class TestCatalog:
         assert data["backend_name"] == "qubex"
         types = {entry["type"]: entry for entry in data["step_types"]}
         assert types["FilterByStatus"]["requires"] == ["one_qubit_check", "one_qubit_fine_tune"]
-        assert types["OneQubitCheck"]["default_tasks"][0] == "CheckRabi"
+        assert types["OneQubitCheck"]["default_tasks"][0]["name"] == "CheckRabi"
+        assert types["OneQubitCheck"]["default_step_id"] == "one_qubit_check"
+        assert "x90_fidelity" in types["OneQubitFineTune"]["step_metrics"]
+        assert data["spec_version"] == 2
         assert "CheckT1" in data["tasks"]["qubit"]
         assert "CheckCrossResonance" in data["tasks"]["coupling"]
         assert "scheduled" in data["one_qubit_modes"]
@@ -155,17 +163,137 @@ class TestValidate:
             "coherence",
         ]
         assert data["steps"][1]["tasks"] == []
-        assert data["steps"][2]["tasks"] == ["CheckT1", "CheckT2Echo"]
+        assert data["steps"][2]["tasks"] == ["CheckT1", "CheckT1", "CheckT2Echo"]
+        assert [step["step_id"] for step in data["steps"]] == [
+            "one_qubit_check",
+            None,
+            "coherence",
+        ]
+        # Each call shows its effective settings: the call over task_parameters.
+        calls = data["steps"][2]["calls"]
+        assert [(call["call_id"], call["on_failure"]) for call in calls] == [
+            ("t1_short", "stop"),
+            ("t1_long", "stop"),
+            ("CheckT2Echo", "stop"),
+        ]
+        assert calls[0]["settings"]["run"] == {"shots": {"value": 2048}}
+        assert calls[1]["settings"]["run"] == {"shots": {"value": 4096}}
         assert data["targets"] == {"qids": ["0", "1"], "mux_ids": [], "exclude_qids": []}
-        assert data["task_run_count"] == 5
+        assert data["task_run_count"] == 6
+        assert data["spec_version"] == 2
+        assert isinstance(data["plan_digest"], str)
+        assert data["warnings"] == []
         # The normalized spec carries the defaults the worker will use.
         assert data["spec"]["steps"][0]["configure"] is False
+
+    def test_version_1_spec_is_rejected_with_a_converted_spec(
+        self, test_client, chip, auth_headers
+    ):
+        legacy = {
+            "name": "legacy",
+            "targets": {"qids": ["0", "1"]},
+            "steps": [
+                {"type": "OneQubitCheck"},
+                {"type": "CustomOneQubit", "step_name": "t1", "tasks": ["CheckT1", "CheckT1"]},
+            ],
+            "task_run_parameters": {"CheckT1": {"shots": 2048}},
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": legacy},
+        )
+        data = response.json()
+        assert data["valid"] is False
+        assert data["spec_version"] == 1
+        [problem] = data["problems"]
+        assert problem["path"] == "spec_version"
+        assert "migrated_spec" in problem["message"]
+        migrated = data["migrated_spec"]
+        assert migrated["spec_version"] == 2
+        assert migrated["steps"][1]["tasks"] == [
+            {"name": "CheckT1", "call_id": "CheckT1"},
+            {"name": "CheckT1", "call_id": "CheckT1_2"},
+        ]
+        # Resubmitting the converted spec validates.
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": migrated},
+        )
+        assert response.json()["valid"] is True, response.json()["problems"]
+
+    def test_version_1_repeated_builtin_steps_convert_to_unique_step_ids(
+        self, test_client, chip, auth_headers
+    ):
+        legacy = {
+            "targets": {"qids": ["0", "1"]},
+            "steps": [
+                {"type": "OneQubitCheck"},
+                {"type": "FilterByStatus"},
+                {"type": "OneQubitCheck"},
+            ],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": legacy},
+        )
+        migrated = response.json()["migrated_spec"]
+        assert [step.get("step_id") for step in migrated["steps"]] == [
+            None,
+            None,
+            "one_qubit_check_2",
+        ]
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": migrated},
+        )
+        assert response.json()["valid"] is True, response.json()["problems"]
+
+    @pytest.mark.parametrize("step_type", ["OneQubitCheck", "OneQubitFineTune"])
+    def test_configure_flag_conflict_is_a_problem_not_500(
+        self, test_client, chip, auth_headers, step_type
+    ):
+        spec = good_spec()
+        spec["steps"][0] = {
+            "type": step_type,
+            "configure": True,
+            "tasks": [{"name": "Configure", "call_id": "explicit"}],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        problems = {problem["path"]: problem["message"] for problem in data["problems"]}
+        assert "configure=True already runs Configure" in problems["steps[0]"]
+
+    def test_warnings_do_not_make_a_spec_invalid(self, test_client, chip, auth_headers):
+        spec = good_spec()
+        spec["steps"].append({"type": "FilterByStatus"})
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is True, data["problems"]
+        assert [warning["path"] for warning in data["warnings"]] == ["steps[3]"]
 
     def test_problems_carry_paths(self, test_client, chip, auth_headers):
         spec = good_spec()
         spec["targets"] = {"qids": ["0", "99"]}
-        spec["steps"][2]["tasks"] = ["CheckT1", "CheckCrossResonance", "NoSuchTask"]
-        spec["task_run_parameters"] = {"CheckDRAGPIPulse": {"shots": 1}}
+        spec["steps"][2]["tasks"] = [
+            {"name": "CheckT1"},
+            {"name": "CheckCrossResonance"},
+            {"name": "NoSuchTask"},
+        ]
+        spec["task_parameters"] = {"CheckDRAGPIPulse": {"run": {"shots": 1}}}
         response = test_client.post(
             "/calibration-pipelines/validate",
             headers=auth_headers,
@@ -178,7 +306,7 @@ class TestValidate:
         assert "not on chip" in problems["targets.qids[1]"]
         assert "coupling task" in problems["steps[2].tasks[1]"]
         assert "not available" in problems["steps[2].tasks[2]"]
-        assert "does not run" in problems["task_run_parameters.CheckDRAGPIPulse"]
+        assert "does not run" in problems["task_parameters.CheckDRAGPIPulse"]
         # Still resolved so the agent sees what it wrote.
         assert len(data["steps"]) == 3
 
@@ -188,7 +316,11 @@ class TestValidate:
             headers=auth_headers,
             json={
                 "chip_id": CHIP,
-                "spec": {"targets": {"qids": ["0"]}, "steps": [{"type": "FilterByStatus"}]},
+                "spec": {
+                    "spec_version": 2,
+                    "targets": {"qids": ["0"]},
+                    "steps": [{"type": "FilterByStatus"}],
+                },
             },
         )
         assert response.status_code == 200
@@ -261,6 +393,12 @@ class TestExecute:
         # The worker gets the normalized spec, not the raw request body.
         assert parameters["spec"]["steps"][0]["configure"] is False
         assert parameters["spec"]["steps"][2]["mode"] == "synchronized"
+        assert parameters["spec"]["spec_version"] == 2
+        assert [call["call_id"] for call in parameters["spec"]["steps"][2]["tasks"]] == [
+            "t1_short",
+            "t1_long",
+            "CheckT2Echo",
+        ]
 
     def test_execute_rejects_invalid_spec_before_dispatch(self, test_client, chip, auth_headers):
         _, create_flow_run = prefect_gateway_mocks()
@@ -311,8 +449,11 @@ class TestPreflight:
 
     def test_missing_calibration_data_is_a_problem(self, test_client, chip, auth_headers):
         spec = {
+            "spec_version": 2,
             "targets": {"qids": ["0", "1"]},
-            "steps": [{"type": "CustomOneQubit", "step_name": "t1", "tasks": ["CheckT1"]}],
+            "steps": [
+                {"type": "CustomOneQubit", "step_name": "t1", "tasks": [{"name": "CheckT1"}]}
+            ],
         }
         response = test_client.post(
             "/calibration-pipelines/validate",
@@ -353,7 +494,7 @@ class TestPreflight:
 
     def test_task_readout_duration_must_match_the_session(self, test_client, chip, auth_headers):
         spec = good_spec()
-        spec["task_run_parameters"] = {"CheckT1": {"readout_duration": 2048}}
+        spec["task_parameters"] = {"CheckT1": {"run": {"readout_duration": 2048}}}
         response = test_client.post(
             "/calibration-pipelines/validate",
             headers=auth_headers,
@@ -361,7 +502,7 @@ class TestPreflight:
         )
         assert response.status_code == 200
         problems = {p["path"]: p["message"] for p in response.json()["problems"]}
-        assert "session-scoped" in problems["task_run_parameters.CheckT1.readout_duration"]
+        assert "session-scoped" in problems["task_parameters.CheckT1.run.readout_duration"]
 
         spec["default_run_parameters"] = {"readout_duration": 2048}
         response = test_client.post(
@@ -378,6 +519,7 @@ class TestPreflight:
         assert qubit is not None
         qubit.set({"data": {}})
         spec = {
+            "spec_version": 2,
             "targets": {"mux_ids": [1], "exclude_qids": ["7"]},
             "steps": [{"type": "OneQubitCheck"}],
         }
