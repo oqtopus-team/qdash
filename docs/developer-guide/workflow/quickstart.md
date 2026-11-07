@@ -141,7 +141,8 @@ the current calibration database when each task preprocesses.
 | Remaining qubits | `StepContext.candidate_qids` | Filters, scheduling, and calibration steps |
 | Candidate coupling IDs | `StepContext.candidate_couplings` | Steps that consume coupling candidates |
 | CR parallel groups | `StepContext.metadata["cr_schedule"]` | `CustomTwoQubit` and `TwoQubitCalibration` |
-| Typed step results | `StepContext.one_qubit_check`, `one_qubit_fine_tune`, `two_qubit`, and every step by `step_id` in `step_results` | Filters and pipeline results |
+| Typed step results | `StepContext.one_qubit_check`, `one_qubit_fine_tune`, `two_qubit`, and each bring-up, one-qubit, and two-qubit step's result by `step_id` in `step_results` | Filters and pipeline results |
+| Filter outcomes | `StepContext.filters` | Pipeline results |
 | Accepted calibration values | MongoDB qubit and coupling calibration records | Declared task inputs |
 | Experiment settings and overrides | `CalibService.default_run_parameters` and `task_parameters` | Task construction and isolated worker sessions |
 

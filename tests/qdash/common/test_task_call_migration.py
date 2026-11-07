@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import ast
+import re
 import textwrap
 from pathlib import Path
 
 import pytest
 
-from qdash.common.migration.task_calls import analyze_source, main, run
+from qdash.common.migration.task_calls import WriteConflictError, analyze_source, main, run
 
 LEGACY_FLOW = textwrap.dedent(
     '''
@@ -161,7 +162,7 @@ def test_run_writes_converted_copies_only_to_another_directory(tmp_path: Path) -
     converted = out / "alice" / "legacy.py"
     assert "TaskCall" in converted.read_text(encoding="utf-8")
     assert not (out / "alice" / "current.py").exists()
-    with pytest.raises(ValueError, match="would overwrite"):
+    with pytest.raises(WriteConflictError, match="would overwrite"):
         run([flows], flows)
 
 
@@ -403,3 +404,274 @@ def test_the_task_call_import_is_added_when_only_a_function_imports_it() -> None
         node for node in ast.parse(converted).body if isinstance(node, ast.ImportFrom)
     ]
     assert any(alias.name == "TaskCall" for node in module_imports for alias in node.names)
+
+
+# ------------------------------------------------------------------ write safety
+
+
+def test_run_refuses_a_destination_that_is_another_input(tmp_path: Path) -> None:
+    # Converting a/flow.py into b/ would replace b's own original before b is read.
+    first = tmp_path / "a"
+    second = tmp_path / "b"
+    first.mkdir()
+    second.mkdir()
+    (first / "flow.py").write_text(LEGACY_FLOW, encoding="utf-8")
+    second_source = LEGACY_FLOW.replace("coherence", "other")
+    (second / "flow.py").write_text(second_source, encoding="utf-8")
+
+    with pytest.raises(WriteConflictError, match="would overwrite the input") as error:
+        run([first, second], second)
+
+    assert "nothing was written" in str(error.value)
+    assert (first / "flow.py").read_text(encoding="utf-8") == LEGACY_FLOW
+    assert (second / "flow.py").read_text(encoding="utf-8") == second_source
+    assert sorted(path.name for path in second.iterdir()) == ["flow.py"]
+
+
+def test_run_refuses_a_destination_reached_through_a_symlink(tmp_path: Path) -> None:
+    flows = tmp_path / "flows"
+    flows.mkdir()
+    (flows / "flow.py").write_text(LEGACY_FLOW, encoding="utf-8")
+    alias = tmp_path / "alias"
+    alias.symlink_to(flows, target_is_directory=True)
+
+    with pytest.raises(WriteConflictError, match="would overwrite the input"):
+        run([flows], alias)
+    assert (flows / "flow.py").read_text(encoding="utf-8") == LEGACY_FLOW
+
+
+def test_run_refuses_two_inputs_with_one_destination_and_writes_nothing(tmp_path: Path) -> None:
+    for root in ("a", "b"):
+        (tmp_path / root).mkdir()
+        (tmp_path / root / "flow.py").write_text(LEGACY_FLOW, encoding="utf-8")
+    (tmp_path / "a" / "only_a.py").write_text(LEGACY_FLOW, encoding="utf-8")
+    out = tmp_path / "out"
+
+    with pytest.raises(WriteConflictError, match="would both be written to"):
+        run([tmp_path / "a", tmp_path / "b"], out)
+    assert not out.exists()
+
+
+def test_run_does_not_clobber_an_unrelated_file(tmp_path: Path) -> None:
+    flows = tmp_path / "flows"
+    flows.mkdir()
+    (flows / "flow.py").write_text(LEGACY_FLOW, encoding="utf-8")
+    out = tmp_path / "out"
+    out.mkdir()
+    unrelated = out / "flow.py"
+    unrelated.write_text("keep me\n", encoding="utf-8")
+
+    with pytest.raises(WriteConflictError, match="would overwrite an existing file"):
+        run([flows], out)
+    assert unrelated.read_text(encoding="utf-8") == "keep me\n"
+
+    # Re-running into a directory that already holds the same conversion is fine.
+    unrelated.unlink()
+    run([flows], out)
+    first = unrelated.read_text(encoding="utf-8")
+    run([flows], out)
+    assert unrelated.read_text(encoding="utf-8") == first
+
+
+def test_cli_reports_a_write_conflict_with_status_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    flows = tmp_path / "flows"
+    flows.mkdir()
+    (flows / "flow.py").write_text(LEGACY_FLOW, encoding="utf-8")
+    assert main([str(flows), "--write-to", str(flows)]) == 2
+    assert "nothing was written" in capsys.readouterr().err
+    assert (flows / "flow.py").read_text(encoding="utf-8") == LEGACY_FLOW
+
+
+def test_run_reports_undecodable_files_and_continues(tmp_path: Path) -> None:
+    (tmp_path / "binary.py").write_bytes(b"\xff\xfe\x00")
+    (tmp_path / "legacy.py").write_text(LEGACY_FLOW, encoding="utf-8")
+    reports = {Path(report.path).name: report for report in run([tmp_path], None)}
+    assert reports["binary.py"].error is not None
+    assert reports["legacy.py"].converted_source is not None
+
+
+# --------------------------------------------------------------- source handling
+
+
+def _converted(source: str) -> str:
+    report = analyze_source(source)
+    assert report.error is None
+    assert report.converted_source is not None, report.findings
+    ast.parse(report.converted_source)
+    return report.converted_source
+
+
+def _first_line(source: str, text: str) -> int:
+    return next(index for index, line in enumerate(source.splitlines()) if text in line)
+
+
+def test_the_import_precedes_the_first_use() -> None:
+    converted = _converted('NAMES = ["CheckT1"]\nimport os\nCustomOneQubit(tasks=NAMES)\n')
+    assert _first_line(converted, "import TaskCall") < _first_line(converted, "TaskCall(name=")
+
+
+def test_the_import_follows_the_docstring_and_future_imports() -> None:
+    converted = _converted(
+        '"""Flow."""\nfrom __future__ import annotations\n\nCustomOneQubit(tasks=["CheckT1"])'
+    )
+    assert converted.startswith(
+        '"""Flow."""\nfrom __future__ import annotations\nfrom qdash.workflow import TaskCall\n'
+    )
+
+
+def test_an_expression_first_statement_is_not_a_docstring() -> None:
+    converted = _converted('CustomOneQubit(tasks=["CheckT1"])')
+    assert converted == (
+        'from qdash.workflow import TaskCall\nCustomOneQubit(tasks=[TaskCall(name="CheckT1")])'
+    )
+
+
+def test_the_import_keeps_a_shebang_and_encoding_line_first() -> None:
+    converted = _converted(
+        '#!/usr/bin/env python\n# -*- coding: utf-8 -*-\nX = ["CheckT1"]\nCustomOneQubit(tasks=X)\n'
+    )
+    assert converted.splitlines()[:3] == [
+        "#!/usr/bin/env python",
+        "# -*- coding: utf-8 -*-",
+        "from qdash.workflow import TaskCall",
+    ]
+
+
+def test_a_decorated_use_gets_the_import_before_the_decorator() -> None:
+    converted = _converted(
+        'import os\n\n@register(CustomOneQubit(tasks=["CheckT1"]))\ndef flow():\n    pass\n'
+    )
+    assert _first_line(converted, "import TaskCall") < _first_line(converted, "@register")
+
+
+def test_a_taskcall_from_another_module_is_left_for_a_person() -> None:
+    report = analyze_source('from mylib import TaskCall\nCustomOneQubit(tasks=["CheckT1"])\n')
+    assert report.converted_source is None
+    assert ("conversion_failed", False) in _kinds(report)
+    assert all(not finding.converted for finding in report.findings)
+
+
+@pytest.mark.parametrize("separator", ["\n", "; "])
+def test_a_late_taskcall_import_is_left_for_a_person(separator: str) -> None:
+    source = (
+        "from qdash.workflow import CustomOneQubit\n"
+        'step = CustomOneQubit(tasks=["CheckT1"])'
+        + separator
+        + "from qdash.workflow import TaskCall\n"
+    )
+    report = analyze_source(source)
+    assert report.converted_source is None
+    assert ("conversion_failed", False) in _kinds(report)
+    assert all(not finding.converted for finding in report.findings)
+    assert any("must precede" in finding.message for finding in report.findings)
+
+
+def test_an_early_taskcall_import_is_reused() -> None:
+    converted = _converted(
+        'from qdash.workflow import TaskCall\nCustomOneQubit(tasks=["CheckT1"])\n'
+    )
+    assert converted.count("import TaskCall") == 1
+    assert _first_line(converted, "import TaskCall") < _first_line(converted, "TaskCall(name=")
+
+
+@pytest.mark.parametrize(
+    ("names", "ids"),
+    [
+        (["X", "X", "X_2"], ["X", "X_3", "X_2"]),
+        (["X_2", "X", "X"], ["X_2", "X", "X_3"]),
+        (["X", "X", "X"], ["X", "X_2", "X_3"]),
+    ],
+)
+def test_generated_call_ids_are_unique(names: list[str], ids: list[str]) -> None:
+    from qdash.datamodel.task_call import TaskCall, normalize_calls
+
+    literal = ", ".join(f'"{name}"' for name in names)
+    converted = _converted(f"CustomOneQubit(tasks=[{literal}])\n")
+    call = ast.parse(converted).body[-1].value  # type: ignore[attr-defined]
+    calls = eval(  # noqa: S307 - evaluating the converted literal only, in the test
+        compile(ast.Expression(call.keywords[0].value), "<converted>", "eval"),
+        {"TaskCall": TaskCall},
+    )
+    assert [c.resolved_call_id for c in normalize_calls(calls)] == ids
+
+
+def test_long_repeated_names_get_call_ids_within_the_limit() -> None:
+    from qdash.datamodel.task_call import CALL_ID_PATTERN
+
+    name = "C" + "x" * 80
+    converted = _converted(f'CustomOneQubit(tasks=["{name}", "{name}"])\n')
+    ids = re.findall(r'call_id="([^"]+)"', converted)
+    assert len(set(ids)) == 2
+    assert all(re.fullmatch(CALL_ID_PATTERN, call_id) for call_id in ids)
+
+
+@pytest.mark.parametrize(
+    "header",
+    ["# comment\ftext\n", "# a\u2028b\n", "# a\x1cb\n", "# caf\u00e9\n"],
+)
+def test_line_separators_python_does_not_split_on(header: str) -> None:
+    converted = _converted(header + 'CustomOneQubit(step_name="\u00e9", tasks=["X", "X"])\n')
+    assert header in converted
+    assert 'TaskCall(name="X", call_id="X_2")' in converted
+
+
+def test_crlf_line_endings_are_kept() -> None:
+    source = (
+        "from qdash.workflow.service.steps import CustomOneQubit\r\n"
+        'CustomOneQubit(\r\n    tasks=["X"],\r\n    stop_on_failure_tasks=["X"],\r\n)\r\n'
+    )
+    converted = _converted(source)
+    assert "\n" not in converted.replace("\r\n", "")
+    assert "stop_on_failure_tasks" not in converted
+    assert "from qdash.workflow import TaskCall\r\n" in converted
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (
+            'CustomOneQubit(\n stop_on_failure_tasks=["X"]\n , tasks=["X"]\n)\n',
+            'CustomOneQubit(\n tasks=[TaskCall(name="X", on_failure="stop")]\n)\n',
+        ),
+        (
+            'CustomOneQubit(tasks=["X"], stop_on_failure_tasks=(["X"]))\n',
+            'CustomOneQubit(tasks=[TaskCall(name="X", on_failure="stop")])\n',
+        ),
+        (
+            'CustomOneQubit(\n    tasks=["X"],\n    stop_on_failure_tasks=("X",),  # why\n'
+            "    continue_on_failure=True,\n)\n",
+            'CustomOneQubit(\n    tasks=[TaskCall(name="X", on_failure="stop")],\n    # why\n'
+            "    continue_on_failure=True,\n)\n",
+        ),
+        (
+            'CustomOneQubit(\n    tasks=["X"],\n    stop_on_failure_tasks=("X",)\n)\n',
+            'CustomOneQubit(\n    tasks=[TaskCall(name="X", on_failure="stop")]\n)\n',
+        ),
+        (
+            'CustomOneQubit(stop_on_failure_tasks=["X"], tasks=["X"])\n',
+            'CustomOneQubit(tasks=[TaskCall(name="X", on_failure="stop")])\n',
+        ),
+    ],
+)
+def test_stop_on_failure_tasks_removal_keeps_valid_syntax(source: str, expected: str) -> None:
+    converted = _converted(source)
+    assert converted == "from qdash.workflow import TaskCall\n" + expected
+
+
+def test_a_conversion_failure_is_reported_per_file(tmp_path: Path) -> None:
+    (tmp_path / "foreign.py").write_text(
+        'from mylib import TaskCall\nCustomOneQubit(tasks=["X"])\n', encoding="utf-8"
+    )
+    (tmp_path / "legacy.py").write_text(LEGACY_FLOW, encoding="utf-8")
+    out = tmp_path / "out"
+    reports = {Path(report.path).name: report for report in run([tmp_path], out)}
+    assert reports["foreign.py"].converted_source is None
+    assert not (out / "foreign.py").exists()
+    assert (out / "legacy.py").exists()
+
+
+def test_null_bytes_are_a_parse_error_not_a_crash() -> None:
+    report = analyze_source("x = 1\x00\n")
+    assert report.error is not None
