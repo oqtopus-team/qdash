@@ -34,6 +34,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -43,7 +44,11 @@ from qdash.workflow.service.calib_service import (
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
-TASKS = ["Configure", "CheckT1", "CheckRamsey"]
+TASKS = [
+    TaskCall(name="Configure"),
+    TaskCall(name="CheckT1"),
+    TaskCall(name="CheckRamsey"),
+]
 
 
 @flow(
@@ -120,8 +125,10 @@ flowchart LR
 
 Keep task lists in the template rather than importing them from another template or relying on a
 step's default list. The visible order is part of the flow contract: repeated measurements and
-configuration checkpoints must remain reviewable in the saved source. If two templates must stay
-aligned, compare their lists in template tests.
+configuration checkpoints must remain reviewable in the saved source. A task that runs more than
+once in one step, such as a second `Configure` or a fine `CheckRamsey`, needs its own `call_id`
+on every occurrence; see [Task Calls](./task-calls.md) for ids, per-call settings, and the
+failure policy. If two templates must stay aligned, compare their lists in template tests.
 
 ## State Between Steps
 
@@ -134,7 +141,8 @@ the current calibration database when each task preprocesses.
 | Remaining qubits | `StepContext.candidate_qids` | Filters, scheduling, and calibration steps |
 | Candidate coupling IDs | `StepContext.candidate_couplings` | Steps that consume coupling candidates |
 | CR parallel groups | `StepContext.metadata["cr_schedule"]` | `CustomTwoQubit` and `TwoQubitCalibration` |
-| Typed step results | `StepContext.one_qubit_check`, `one_qubit_fine_tune`, `two_qubit` | Filters and pipeline results |
+| Typed step results | `StepContext.one_qubit_check`, `one_qubit_fine_tune`, `two_qubit`, and each bring-up, one-qubit, and two-qubit step's result by `step_id` in `step_results` | Filters and pipeline results |
+| Filter outcomes | `StepContext.filters` | Pipeline results |
 | Accepted calibration values | MongoDB qubit and coupling calibration records | Declared task inputs |
 | Experiment settings and overrides | `CalibService.default_run_parameters` and `task_parameters` | Task construction and isolated worker sessions |
 
@@ -178,8 +186,9 @@ For the user-facing procedure, see
 
 ## Set Task Parameters
 
-Pass shared run-parameter fallbacks through `default_run_parameters` and settings for one task
-through `task_parameters`:
+Pass shared run-parameter fallbacks through `default_run_parameters` and the defaults for every
+call of one task through `task_parameters`. Settings for a single call go on its `TaskCall` and
+take precedence over both:
 
 ```python
 from qdash.workflow import sweep
