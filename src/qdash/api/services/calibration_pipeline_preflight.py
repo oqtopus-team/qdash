@@ -26,10 +26,11 @@ from qdash.api.services.catalog_task_run import matches_parameter_type, run_over
 from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
 from qdash.datamodel.calibration_pipeline import STEP_CATALOG, step_calls
 from qdash.datamodel.task import compatible_value_type
+from qdash.datamodel.task_settings import UPDATE_CALIBRATION_PARAMETERS
 
 if TYPE_CHECKING:
     from qdash.api.schemas.task_file import TaskInfo
-    from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec
+    from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec, PipelineStep
 
 # Inputs that ``required_rabi_normalization_inputs`` declares; restoring them
 # requires the source CheckRabi to have run under the session's readout duration.
@@ -78,6 +79,24 @@ class PreflightTask:
 
 def _problem(path: str, message: str) -> PipelineProblem:
     return PipelineProblem(path=path, message=message)
+
+
+def _call_path(step_index: int, step: PipelineStep, call_index: int) -> str:
+    """The spec path of a call from ``step_calls``, which may start with Configure."""
+    offset = 1 if getattr(step, "configure", False) else 0
+    if call_index < offset:
+        return f"steps[{step_index}].configure"
+    return f"steps[{step_index}].tasks[{call_index - offset}]"
+
+
+def _persists_outputs(effective: Mapping[str, Any]) -> bool:
+    """Whether a call publishes its outputs to the calibration data.
+
+    Mirrors ``CalibOrchestrator._should_update_calibration_parameters`` for a
+    pipeline, whose workflow policy persists outputs: the call's own setting,
+    then ``task_parameters``, then True.
+    """
+    return effective.get(UPDATE_CALIBRATION_PARAMETERS, True) is not False
 
 
 def _format_qids(qids: Iterable[str]) -> str:
@@ -296,7 +315,7 @@ def batch_input_problems(spec: CalibrationPipelineSpec) -> list[PipelineProblem]
             if not effective.get("input"):
                 continue
             path = (
-                f"steps[{step_index}].tasks[{task_index}]"
+                _call_path(step_index, step, task_index)
                 if own is not None
                 else f"steps[{step_index}]"
             )
@@ -363,8 +382,13 @@ def prerequisite_problems(
     """Problems with the calibration data the pipeline's qubit tasks need.
 
     Walks the calibration steps' calls in order. A ``database_required`` input of a task
-    is satisfied when an earlier task in the pipeline writes it, or when every
-    target qubit already has it in its calibration data. Tasks that restore Rabi
+    is satisfied when an earlier call in the pipeline publishes it, or when every
+    target qubit already has it in its calibration data. A call publishes its
+    outputs only when its effective ``update_calibration_parameters`` (the call's
+    own setting over ``task_parameters``) is not False; a call that records
+    history only leaves the calibration data, and the Rabi provenance it carries,
+    as they were. Input overrides do not satisfy a requirement: the task loads
+    database-required inputs before it applies overrides. Tasks that restore Rabi
     parameters are also checked against the readout duration those parameters
     were measured with, since the task rejects a mismatch with the session.
 
@@ -375,6 +399,7 @@ def prerequisite_problems(
     if not target_qids:
         return problems
     session_duration = effective_readout_duration(spec)
+    defaults = spec.canonical_task_parameters()
     data_cache: dict[str, Mapping[str, Any]] = {}
 
     def data_for(qid: str) -> Mapping[str, Any]:
@@ -392,7 +417,7 @@ def prerequisite_problems(
             task = tasks.get(task_name)
             if task is None:
                 continue
-            path = f"steps[{step_index}].tasks[{task_index}]"
+            path = _call_path(step_index, step, task_index)
             missing: dict[str, list[str]] = {}
             restores_rabi = False
             for name, metadata in task.input_parameters.items():
@@ -455,5 +480,6 @@ def prerequisite_problems(
                             f"{source_duration:g}",
                         )
                     )
-            produced.update(task.output_parameters)
+            if _persists_outputs(call.effective_settings(defaults)):
+                produced.update(task.output_parameters)
     return problems

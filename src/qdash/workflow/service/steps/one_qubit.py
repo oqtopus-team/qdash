@@ -18,9 +18,9 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from prefect import get_run_logger
 
 from qdash.datamodel.calibration_pipeline import (
-    CONFIGURE_CALL,
     ONE_QUBIT_CHECK_METRICS,
     ONE_QUBIT_FINE_TUNE_METRICS,
+    calls_with_configure,
 )
 from qdash.datamodel.task_call import StepCalls, TaskCall, normalize_calls
 from qdash.workflow.service._internal.call_runner import latest_call_output
@@ -299,9 +299,7 @@ class OneQubitCheck(CalibrationStep):
 
     def _normalize(self) -> tuple[TaskCall, ...]:
         calls = list(self.tasks if self.tasks is not None else CHECK_1Q_TASKS)
-        if self.configure:
-            calls.insert(0, CONFIGURE_CALL)
-        return normalize_calls(calls, where=f"{self.name}.tasks")
+        return calls_with_configure(calls, configure=self.configure, where=f"{self.name}.tasks")
 
     @property
     def name(self) -> str:
@@ -407,9 +405,9 @@ class OneQubitFineTune(CalibrationStep):
 
     def __post_init__(self) -> None:
         calls = list(self.tasks if self.tasks is not None else FULL_1Q_TASKS_AFTER_CHECK)
-        if self.configure:
-            calls.insert(0, CONFIGURE_CALL)
-        self._calls = normalize_calls(calls, where=f"{self.name}.tasks")
+        self._calls = calls_with_configure(
+            calls, configure=self.configure, where=f"{self.name}.tasks"
+        )
 
     @property
     def name(self) -> str:

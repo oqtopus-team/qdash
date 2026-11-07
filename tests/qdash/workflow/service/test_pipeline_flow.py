@@ -29,6 +29,7 @@ from qdash.workflow.service.steps import (
     FilterByStatus,
     GenerateCRSchedule,
     OneQubitCheck,
+    OneQubitFineTune,
     Pipeline,
     TwoQubitCalibration,
 )
@@ -175,6 +176,41 @@ def test_queued_version_1_spec_is_converted_at_the_flow_boundary() -> None:
         "CheckRabi": {"run": {"shots": {"value": 512}}, "input": {}}
     }
     logger.warning.assert_called_once()
+
+
+def test_queued_version_1_spec_with_repeated_builtin_steps_builds() -> None:
+    logger = MagicMock()
+    parsed = parse_dispatched_spec(
+        {
+            "targets": {"qids": ["0"]},
+            "steps": [
+                {"type": "OneQubitCheck"},
+                {"type": "FilterByStatus"},
+                {"type": "OneQubitCheck", "tasks": ["CheckRabi"]},
+                {"type": "FilterByStatus"},
+            ],
+        },
+        logger,
+    )
+    built = build_steps(parsed)
+    assert [step.name for step in built] == [
+        "one_qubit_check",
+        "filter_by_status",
+        "one_qubit_check_2",
+        "filter_by_status",
+    ]
+    # Reference-free filters still read the latest built-in one-qubit result.
+    assert all(step.step is None for step in built if isinstance(step, FilterByStatus))
+    Pipeline(built)  # the worker's own step-chain validation accepts the plan
+    assert "one_qubit_check_2" in logger.warning.call_args.args[0]
+
+
+@pytest.mark.parametrize("step_class", [OneQubitCheck, OneQubitFineTune])
+def test_python_steps_share_the_configure_call_policy(step_class: Any) -> None:
+    with pytest.raises(ValueError, match="configure=True already runs Configure"):
+        step_class(configure=True, tasks=[TaskCall(name="Configure", call_id="explicit")])
+    step = step_class(configure=True, tasks=[TaskCall(name="CheckRabi")])
+    assert [call.call_id for call in step.calls()] == ["Configure", "CheckRabi"]
 
 
 def test_version_2_spec_is_not_converted() -> None:

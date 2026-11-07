@@ -223,6 +223,56 @@ class TestValidate:
         )
         assert response.json()["valid"] is True, response.json()["problems"]
 
+    def test_version_1_repeated_builtin_steps_convert_to_unique_step_ids(
+        self, test_client, chip, auth_headers
+    ):
+        legacy = {
+            "targets": {"qids": ["0", "1"]},
+            "steps": [
+                {"type": "OneQubitCheck"},
+                {"type": "FilterByStatus"},
+                {"type": "OneQubitCheck"},
+            ],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": legacy},
+        )
+        migrated = response.json()["migrated_spec"]
+        assert [step.get("step_id") for step in migrated["steps"]] == [
+            None,
+            None,
+            "one_qubit_check_2",
+        ]
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": migrated},
+        )
+        assert response.json()["valid"] is True, response.json()["problems"]
+
+    @pytest.mark.parametrize("step_type", ["OneQubitCheck", "OneQubitFineTune"])
+    def test_configure_flag_conflict_is_a_problem_not_500(
+        self, test_client, chip, auth_headers, step_type
+    ):
+        spec = good_spec()
+        spec["steps"][0] = {
+            "type": step_type,
+            "configure": True,
+            "tasks": [{"name": "Configure", "call_id": "explicit"}],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        problems = {problem["path"]: problem["message"] for problem in data["problems"]}
+        assert "configure=True already runs Configure" in problems["steps[0]"]
+
     def test_warnings_do_not_make_a_spec_invalid(self, test_client, chip, auth_headers):
         spec = good_spec()
         spec["steps"].append({"type": "FilterByStatus"})

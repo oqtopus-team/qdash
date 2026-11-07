@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
+from qdash.api.schemas.task_file import TaskInfo
 from qdash.api.services.calibration_pipeline_preflight import (
     PreflightTask,
     batch_input_problems,
@@ -430,3 +433,106 @@ def test_no_target_qubits_means_no_prerequisite_problems() -> None:
     assert (
         prerequisite_problems(spec([custom("CheckT1")]), [], TASKS, calibrated_lookup(), None) == []
     )
+
+
+# ------------------------------------------------- persistence policy of earlier calls
+
+TASK_CATALOG_PATH = (
+    Path(__file__).resolve().parents[4] / "src/qdash/workflow/calibtasks/task_catalog.json"
+)
+
+
+def catalog_tasks(*names: str) -> dict[str, PreflightTask]:
+    """Task metadata as the API serves it, from the generated qubex catalog."""
+    catalog = json.loads(TASK_CATALOG_PATH.read_text(encoding="utf-8"))
+    infos = {task["name"]: task for task in catalog["backends"]["qubex"]}
+    return {
+        name: PreflightTask.from_task_info(TaskInfo.model_validate(infos[name])) for name in names
+    }
+
+
+# A qubit that has spectroscopy results but has never had CheckRabi persisted.
+NO_RABI = {
+    "qubit_frequency": {"value": 7.5},
+    "resonator_frequency": {"value": 10.1},
+    "readout_amplitude": {"value": 0.02},
+}
+
+
+def rabi_problems(steps: list[dict[str, Any]], **extra: Any) -> list[Any]:
+    return prerequisite_problems(
+        spec(steps, qids=("0",), **extra),
+        ["0"],
+        catalog_tasks("CheckRabi", "CreateHPIPulse"),
+        calibrated_lookup(**{"0": NO_RABI}),
+        None,
+    )
+
+
+def missing_parameters(problems: list[Any]) -> set[str]:
+    return {
+        problem.message.split("'")[3]
+        for problem in problems
+        if "needs calibrated" in problem.message
+    }
+
+
+def test_history_only_call_does_not_satisfy_later_inputs() -> None:
+    omitted = rabi_problems([custom("CreateHPIPulse")])
+    history_only = rabi_problems(
+        [custom({"name": "CheckRabi", "update_calibration_parameters": False}, "CreateHPIPulse")]
+    )
+    assert "rabi_amplitude" in missing_parameters(omitted)
+    assert missing_parameters(history_only) == missing_parameters(omitted)
+    assert {problem.path for problem in history_only} == {"steps[0].tasks[1]"}
+
+    persisted = rabi_problems([custom("CheckRabi", "CreateHPIPulse")])
+    assert persisted == []
+
+
+def test_call_persistence_setting_overrides_the_task_default() -> None:
+    no_update = {"CheckRabi": {"update_calibration_parameters": False}}
+    defaulted = rabi_problems([custom("CheckRabi", "CreateHPIPulse")], task_parameters=no_update)
+    assert "rabi_amplitude" in missing_parameters(defaulted)
+
+    forced = rabi_problems(
+        [custom({"name": "CheckRabi", "update_calibration_parameters": True}, "CreateHPIPulse")],
+        task_parameters=no_update,
+    )
+    assert forced == []
+
+
+def test_repeated_calls_count_only_the_persisting_one() -> None:
+    steps = [
+        custom(
+            {"name": "CheckRabi", "call_id": "rabi_probe", "update_calibration_parameters": False},
+            {"name": "CreateHPIPulse", "call_id": "hpi_early"},
+            {"name": "CheckRabi", "call_id": "rabi"},
+            {"name": "CreateHPIPulse", "call_id": "hpi"},
+        )
+    ]
+    problems = rabi_problems(steps)
+    assert {problem.path for problem in problems} == {"steps[0].tasks[1]"}
+
+
+def test_input_overrides_do_not_satisfy_database_required_inputs() -> None:
+    # The task loads database-required inputs before it applies overrides.
+    problems = rabi_problems([custom({"name": "CreateHPIPulse", "input": {"rabi_amplitude": 0.1}})])
+    assert "rabi_amplitude" in missing_parameters(problems)
+
+
+def test_history_only_check_rabi_keeps_the_persisted_rabi_provenance_check() -> None:
+    pipeline = spec(
+        [custom({"name": "CheckRabi", "update_calibration_parameters": False}, "CheckT1")]
+    )
+    stale = source_lookup(**{"rabi-task": {"readout_duration": {"value": 384.0}}})
+    problems = prerequisite_problems(pipeline, ["0"], TASKS, calibrated_lookup(), stale)
+    assert [problem.path for problem in problems] == ["steps[0].tasks[1]"]
+    assert "384 ns" in problems[0].message
+
+
+def test_problem_paths_skip_the_implicit_configure_call() -> None:
+    pipeline = spec([{"type": "OneQubitCheck", "configure": True, "tasks": [{"name": "CheckT1"}]}])
+    problems = prerequisite_problems(pipeline, ["0"], TASKS, calibrated_lookup(**{"0": {}}), None)
+    assert problems
+    assert {problem.path for problem in problems} == {"steps[0].tasks[0]"}
