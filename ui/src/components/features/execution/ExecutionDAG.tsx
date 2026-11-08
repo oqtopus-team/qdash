@@ -154,21 +154,31 @@ function FlowContent({
   const { fitView } = useReactFlow();
   const [isLocked, setIsLocked] = useState(false);
 
-  // Re-fit whenever the container size (fullscreen toggle) changes.
+  // Unlocked, the viewport is the user's pan/zoom: only the locked canvas refits when its
+  // container size changes, so the user's view survives fullscreen and preview toggles.
+  const isLockedRef = useRef(isLocked);
   useEffect(() => {
+    isLockedRef.current = isLocked;
+  }, [isLocked]);
+
+  // Fit once on mount, then re-fit the locked canvas whenever fullscreen changes its size.
+  // The ref is set when the fit runs so a cancelled frame (Strict Mode re-run) is retried.
+  const fittedFullscreen = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (fittedFullscreen.current === isFullscreen) return;
+    if (fittedFullscreen.current !== null && !isLockedRef.current) {
+      fittedFullscreen.current = isFullscreen;
+      return;
+    }
     const frame = requestAnimationFrame(() => {
+      fittedFullscreen.current = isFullscreen;
       fitView({ ...FIT_VIEW_OPTIONS, duration: 0 });
     });
     return () => cancelAnimationFrame(frame);
   }, [isFullscreen, fitView]);
 
   // The canvas gives up width to the preview sidebar with a CSS transition; once that has
-  // finished, glide the graph into the space that is left. The initial fit is handled above.
-  // Only the locked canvas refits: unlocked, the viewport is the user's pan/zoom and survives.
-  const isLockedRef = useRef(isLocked);
-  useEffect(() => {
-    isLockedRef.current = isLocked;
-  }, [isLocked]);
+  // finished, glide the locked graph into the space that is left.
   const previousPreviewOpen = useRef(isPreviewOpen);
   useEffect(() => {
     if (previousPreviewOpen.current === isPreviewOpen) return;

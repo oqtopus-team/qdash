@@ -225,6 +225,48 @@ describe("ExecutionDAG fullscreen", () => {
 
     expect(container.firstChild).not.toHaveClass("fixed");
   });
+
+  it("fits on mount but keeps the user's viewport when fullscreen toggles unlocked", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      act(() => {
+        vi.runAllTimers();
+      });
+      expect(mocks.fitView).toHaveBeenCalledWith(expect.objectContaining({ duration: 0 }));
+      mocks.fitView.mockClear();
+
+      fireEvent.click(screen.getByRole("button", { name: "Fullscreen" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("re-fits the locked graph when fullscreen toggles", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      fireEvent.click(screen.getByTestId("controls-interactive"));
+      act(() => {
+        vi.runAllTimers();
+      });
+      mocks.fitView.mockClear();
+
+      fireEvent.click(screen.getByRole("button", { name: "Fullscreen" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).toHaveBeenCalledWith(expect.objectContaining({ duration: 0 }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("ExecutionDAG node interaction", () => {
