@@ -149,6 +149,7 @@ describe("ExecutionDAG lock control", () => {
       showFitView: true,
       fitViewOptions: { padding: 0.05, minZoom: 0.1, maxZoom: 1.5 },
     });
+    expect(screen.getByTitle("Fit to view")).toBeTruthy();
   });
 
   it("locks pan/zoom and dragging when the lock control is toggled", () => {
@@ -179,6 +180,7 @@ describe("ExecutionDAG lock control", () => {
       showZoom: false,
       showFitView: false,
     });
+    expect(screen.queryByTitle("Fit to view")).toBeNull();
   });
 
   it("restores pan/zoom and the Controls buttons when unlocked again", () => {
@@ -196,6 +198,7 @@ describe("ExecutionDAG lock control", () => {
       showZoom: true,
       showFitView: true,
     });
+    expect(screen.getByTitle("Fit to view")).toBeTruthy();
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: true,
       panOnDrag: true,

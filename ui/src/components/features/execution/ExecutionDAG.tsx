@@ -235,27 +235,29 @@ function FlowContent({
       />
       <Panel position="top-left" className="bg-base-100 p-2 rounded flex items-center gap-2">
         <div className="text-sm">Select a node to preview its result</div>
-        <button
-          type="button"
-          onClick={() => fitView({ ...FIT_VIEW_OPTIONS, duration: 300 })}
-          className="btn btn-sm btn-ghost"
-          title="Fit to view"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+        {!isLocked && (
+          <button
+            type="button"
+            onClick={() => fitView({ ...FIT_VIEW_OPTIONS, duration: 300 })}
+            className="btn btn-sm btn-ghost"
+            title="Fit to view"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m-4 0h4m0 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-            />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m-4 0h4m0 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+              />
+            </svg>
+          </button>
+        )}
       </Panel>
     </ReactFlow>
   );
