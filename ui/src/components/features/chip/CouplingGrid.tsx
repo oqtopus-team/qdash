@@ -10,7 +10,8 @@ import {
   Minimize,
   ZoomIn,
 } from "lucide-react";
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
@@ -61,6 +62,51 @@ const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
   jsonFigures: false,
   rawData: true,
 };
+
+interface CouplingStatusDotProps {
+  label: string;
+  className: string;
+  style: CSSProperties;
+  onClick: () => void;
+}
+
+// Status dot whose hover tooltip is portaled to document.body so the grid's
+// overflow-hidden container and pan/zoom transform cannot clip it.
+function CouplingStatusDot({ label, className, style, onClick }: CouplingStatusDotProps) {
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+      }}
+      onMouseLeave={() => setTooltipPos(null)}
+      style={style}
+      className={className}
+    >
+      {tooltipPos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            role="tooltip"
+            className="px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg whitespace-nowrap pointer-events-none border border-base-300"
+            style={{
+              position: "fixed",
+              left: tooltipPos.x,
+              top: tooltipPos.y - 8,
+              transform: "translate(-50%, -100%)",
+              zIndex: 9999,
+            }}
+          >
+            {label}
+          </div>,
+          document.body,
+        )}
+    </button>
+  );
+}
 
 function toPathList(paths: string[] | string | null | undefined): string[] {
   if (!paths) return [];
@@ -573,8 +619,9 @@ export function CouplingGrid({
           // Zoomed-out: status-colored dot
           if (!showFigures) {
             return (
-              <button
+              <CouplingStatusDot
                 key={task.couplingId}
+                label={`${task.couplingId}: ${task.status}`}
                 onClick={() => {
                   if (downloadSelectionEnabled) {
                     if (canBeDownloaded) toggleDownloadSelection(task.couplingId);
@@ -592,16 +639,12 @@ export function CouplingGrid({
                   width: displayCellSize * 0.45,
                   height: displayCellSize * 0.45,
                 }}
-                className={`rounded-md shadow-sm group cursor-pointer -translate-x-1/2 -translate-y-1/2 ${statusColor} ${
+                className={`rounded-md shadow-sm cursor-pointer -translate-x-1/2 -translate-y-1/2 ${statusColor} ${
                   downloadSelectionEnabled && isSelectedForDownload
                     ? "ring-2 ring-primary ring-offset-1"
                     : ""
                 }`}
-              >
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                  {task.couplingId}: {task.status}
-                </div>
-              </button>
+              />
             );
           }
 
