@@ -72,7 +72,7 @@ interface CouplingStatusDotProps {
 
 // Status dot whose hover tooltip is portaled to document.body so the grid's
 // overflow-hidden container and pan/zoom transform cannot clip it.
-function CouplingStatusDot({ label, className, style, onClick }: CouplingStatusDotProps) {
+export function CouplingStatusDot({ label, className, style, onClick }: CouplingStatusDotProps) {
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
   return (
