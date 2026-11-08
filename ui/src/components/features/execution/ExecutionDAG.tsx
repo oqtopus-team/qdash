@@ -164,10 +164,16 @@ function FlowContent({
 
   // The canvas gives up width to the preview sidebar with a CSS transition; once that has
   // finished, glide the graph into the space that is left. The initial fit is handled above.
+  // Only the locked canvas refits: unlocked, the viewport is the user's pan/zoom and survives.
+  const isLockedRef = useRef(isLocked);
+  useEffect(() => {
+    isLockedRef.current = isLocked;
+  }, [isLocked]);
   const previousPreviewOpen = useRef(isPreviewOpen);
   useEffect(() => {
     if (previousPreviewOpen.current === isPreviewOpen) return;
     previousPreviewOpen.current = isPreviewOpen;
+    if (!isLockedRef.current) return;
     const timer = setTimeout(() => {
       fitView({ ...FIT_VIEW_OPTIONS, duration: PREVIEW_TRANSITION_MS });
     }, PREVIEW_TRANSITION_MS + 50);

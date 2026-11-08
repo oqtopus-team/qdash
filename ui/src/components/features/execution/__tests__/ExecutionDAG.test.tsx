@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ExecutionDAG } from "@/components/features/execution/ExecutionDAG";
@@ -249,8 +249,31 @@ describe("ExecutionDAG node interaction", () => {
     expect(screen.queryByRole("link", { name: /^Execution$/ })).toBeNull();
   });
 
-  it("gives the canvas up to the preview and re-fits the graph afterwards", async () => {
+  it("keeps the user's viewport when the preview opens on the unlocked canvas", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      const canvas = screen.getByTestId("execution-flow-canvas");
+      act(() => {
+        vi.runAllTimers();
+      });
+      mocks.fitView.mockClear();
+
+      fireEvent.click(screen.getByTestId("node-task-1"));
+      expect(canvas).toHaveClass("lg:mr-[calc(40vw-2.5rem)]");
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives the canvas up to the preview and re-fits the locked graph afterwards", async () => {
     render(<ExecutionDAG tasks={tasks} />);
+    fireEvent.click(screen.getByTestId("controls-interactive"));
     const canvas = screen.getByTestId("execution-flow-canvas");
     expect(canvas).not.toHaveClass("lg:mr-[calc(40vw-2.5rem)]");
     const fitCallsBefore = mocks.fitView.mock.calls.length;

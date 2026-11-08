@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/TaskTileStatus";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
@@ -277,6 +278,7 @@ export function ExecutionTopologyView({
   onToggleFullscreen,
 }: ExecutionTopologyViewProps) {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const panClickGuard = usePanClickGuard();
   const [currentScale, setCurrentScale] = useState(1);
   const lodTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -587,6 +589,7 @@ export function ExecutionTopologyView({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{
                 width: "100%",
                 height: isFullscreen ? "100%" : undefined,
