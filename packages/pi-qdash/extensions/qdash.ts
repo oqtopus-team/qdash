@@ -25,10 +25,12 @@ import { toFigureToolResult, toTextToolResult, toToolResult } from "./lib/result
 import { ansi, boxLinesToWidth, boxed, formatNumber, textComponent } from "./lib/render.js";
 import { plotSeriesLines, timeseriesPlotComponent, timeseriesPoints } from "./lib/timeseries-plot.js";
 import { installQDashWriteGate } from "./lib/write-gate.js";
+import { errorStatus, fileContentSourceGuidance, filesTreeSourceGuidance, looksLikeSourcePath } from "./lib/source-guidance.js";
 import { withAbort } from "./lib/abort.js";
 import { qcalContextText, recordedParameters, sweepsOf, type RecordedParameter, type Sweep } from "./lib/qcal-evidence.js";
 import { registerCalibrationPipelineTools } from "./tools/calibration-pipeline.js";
 import { registerFlowAuthoringTools } from "./tools/flow-authoring.js";
+import { registerSourceCodeTools } from "./tools/source-code.js";
 import { registerTaskKnowledgeTool } from "./tools/task-knowledge.js";
 import { registerTimeseriesComparisonTool } from "./tools/timeseries.js";
 import { analyzeWiringMarkdown, wiringInsightLines, type WiringInsights } from "./lib/wiring-analysis.js";
@@ -349,7 +351,7 @@ const querySchema = Type.Object({
   taskName: Type.Optional(Type.String()),
   task: Type.Optional(Type.String({ description: "Task parameter used by latest/history endpoints." })),
   projectId: Type.Optional(Type.String()),
-  path: Type.Optional(Type.String({ description: "Project file path for file_content." })),
+  path: Type.Optional(Type.String({ description: "file_content only: a file path relative to the calibration config directory. Not source code; read QDash or qubex source with qdash_read_source. files_tree takes no path." })),
   flowName: Type.Optional(Type.String()),
   templateId: Type.Optional(Type.String()),
   filename: Type.Optional(Type.String()),
@@ -1479,9 +1481,31 @@ async function executeQuery(params: QDashQueryParams) {
   }
 }
 
+/**
+ * A source-code request sent to the config file actions, answered with the source
+ * tool call to make instead. files_tree takes no path, so a path is never ignored
+ * silently; file_content keeps its config semantics and only a config miss (400 or
+ * 404) on a source-looking path becomes guidance. Other errors propagate.
+ */
+function filesTreeWithPath(params: QDashQueryParams) {
+  const path = params.path?.trim();
+  if (params.action !== "files_tree" || !path) return undefined;
+  return toTextToolResult(filesTreeSourceGuidance(path), { error: "files_tree takes no path" }, { action: params.action, path, misdirected: true });
+}
+
+function fileContentSourceMiss(params: QDashQueryParams, error: unknown) {
+  const path = params.path?.trim();
+  if (params.action !== "file_content" || !path || !looksLikeSourcePath(path)) return undefined;
+  const status = errorStatus(error);
+  if (status !== 400 && status !== 404) return undefined;
+  const reason = `config file API: ${error instanceof Error ? error.message : String(error)}`;
+  return toTextToolResult(fileContentSourceGuidance(path, reason), { error: reason }, { action: params.action, path, misdirected: true });
+}
+
 export default function qdashExtension(pi: ExtensionAPI) {
   installQDashWriteGate(pi);
   registerTaskKnowledgeTool(pi, { makeClient });
+  registerSourceCodeTools(pi, { makeClient });
   registerCalibrationPipelineTools(pi, {
     makeClient,
     resolveChipId: (client, chipId) => defaultChipId(client as QDashClient, chipId),
@@ -1518,12 +1542,22 @@ export default function qdashExtension(pi: ExtensionAPI) {
     promptGuidelines: [
       "Prefer dedicated QDash tools such as qdash_list_chips, qdash_get_chip_metrics, qdash_list_task_results, qdash_list_forum_posts, qdash_list_flows, and qdash_list_executions when they match the task.",
       "Use qdash_query for read-only QDash data access not covered by a dedicated tool, instead of curl or scraping the UI.",
+      "files_tree and file_content cover only the calibration config directory; for QDash or qubex source code use qdash_list_source_roots, qdash_search_source and qdash_read_source (for example qdash_read_source {\"path\":\"qdash/workflow/engine/task/executor.py\"}).",
       "Ask for confirmation before using operational or write APIs; qdash_query intentionally exposes read-only operations only.",
       "Never expose QDash tokens, passwords, or Cloudflare Access secrets.",
     ],
     parameters: querySchema,
     async execute(_toolCallId, params: QDashQueryParams) {
-      const data = await executeQuery(params);
+      const misdirected = filesTreeWithPath(params);
+      if (misdirected) return misdirected;
+      let data: unknown;
+      try {
+        data = await executeQuery(params);
+      } catch (error) {
+        const guidance = fileContentSourceMiss(params, error);
+        if (guidance) return guidance;
+        throw error;
+      }
       const client = await makeClient(params);
       return toToolResult(withQDashLinks(client, data), { action: params.action, webBaseUrl: qdashWebBaseUrl(client) });
     },

@@ -17,10 +17,12 @@ import { ExecutionRunSummary } from "./ExecutionRunSummary";
 import type { ExecutionResponseDetail } from "@/schemas";
 
 import { useGetExecution, useCancelExecution } from "@/client/execution/execution";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
@@ -221,7 +223,10 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
         </Link>
 
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div
+            className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"
+            data-coachmark="execution-header"
+          >
             <h1 className="text-xl font-medium break-all">{execution.name}</h1>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
               {isCancellable && (
@@ -267,10 +272,18 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
             </div>
           </div>
           <ExecutionRunSummary status={execution.status} tasks={execution.task ?? []} />
-          {execution.status === "failed" && execution.message && (
-            <div className="alert alert-error items-start">
-              <span className="break-words whitespace-pre-wrap">{execution.message}</span>
-            </div>
+          {execution.status === "failed" && (
+            <TaskMessagePanel
+              status="failed"
+              message={execution.message}
+              showEmptyFallback
+              action={
+                <InvestigateWithAiButton
+                  target={{ executionId, chipId: execution.chip_id || chipId }}
+                  surface="mini"
+                />
+              }
+            />
           )}
         </div>
 

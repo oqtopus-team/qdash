@@ -19,7 +19,11 @@ import { isExecutionCancellable } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { DEFAULT_TIMEZONE, formatDateTime } from "@/lib/utils/datetime";
 
-import { type ActivityWindow, ExecutionActivityChart } from "./ExecutionActivityChart";
+import {
+  type ActivityWindow,
+  DEFAULT_ACTIVITY_WINDOW,
+  ExecutionActivityChart,
+} from "./ExecutionActivityChart";
 
 import type { ExecutionResponseSummary } from "@/schemas";
 
@@ -32,6 +36,7 @@ import {
   getGetExecutionQueryKey,
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionRunSummary } from "@/components/features/execution/ExecutionRunSummary";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
@@ -41,6 +46,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useToast } from "@/components/ui/Toast";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
@@ -127,7 +133,7 @@ export function ExecutionPageContent() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [activityDays, setActivityDays] = useState<ActivityWindow>(90);
+  const [activityDays, setActivityDays] = useState<ActivityWindow>(DEFAULT_ACTIVITY_WINDOW);
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const executionCards = useRef(new Map<string, HTMLDivElement>());
@@ -573,15 +579,25 @@ export function ExecutionPageContent() {
                 </div>
               )}
               {isDetailError && <div>Error loading details.</div>}
-              {executionDetailData?.data.status === "failed" &&
-                executionDetailData.data.message && (
-                  <div className="alert alert-error mb-4 items-start text-sm">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span className="break-words whitespace-pre-wrap">
-                      {executionDetailData.data.message}
-                    </span>
-                  </div>
-                )}
+              {executionDetailData?.data.status === "failed" && selectedExecutionId && (
+                // This panel is already a right-hand drawer, so the investigation
+                // opens in the floating window instead of a second docked sidebar.
+                <TaskMessagePanel
+                  status="failed"
+                  message={executionDetailData.data.message}
+                  showEmptyFallback
+                  className="mb-4"
+                  action={
+                    <InvestigateWithAiButton
+                      target={{
+                        executionId: selectedExecutionId,
+                        chipId: executionDetailData.data.chip_id || null,
+                      }}
+                      surface="mini"
+                    />
+                  }
+                />
+              )}
               {executionDetailData &&
                 executionDetailData.data.task &&
                 executionDetailData.data.task.map((detailTask, idx) => {

@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -184,6 +185,16 @@ def _seed_execution(
     ).insert()
 
 
+def _utc(moment: datetime) -> str:
+    """A bucket boundary as the API renders it: UTC with a Z suffix."""
+    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _hours(bucket: dict[str, Any]) -> float:
+    span = datetime.fromisoformat(bucket["end"]) - datetime.fromisoformat(bucket["start"])
+    return span.total_seconds() / 3600
+
+
 class TestExecutionActivity:
     """GET /executions/activity buckets a chip's executions per calendar day."""
 
@@ -219,9 +230,13 @@ class TestExecutionActivity:
         assert body["until"] == today.date().isoformat()
         assert body["buckets"][-1]["date"] == body["until"]
         assert body["buckets"][0]["date"] == body["since"]
+        assert body["granularity"] == "day"
         last = body["buckets"][-1]
+        midnight = today.replace(hour=0)
         assert last == {
             "date": today.date().isoformat(),
+            "start": _utc(midnight),
+            "end": _utc(midnight + timedelta(days=1)),
             "completed": 2,
             "failed": 0,
             "running": 1,
@@ -384,6 +399,207 @@ class TestExecutionActivity:
         response = test_client.get("/executions/activity", headers={"X-Project-Id": "test_project"})
 
         assert response.status_code in (401, 403)
+
+
+TOKYO = ZoneInfo("Asia/Tokyo")
+NEW_YORK = ZoneInfo("America/New_York")
+
+
+@pytest.fixture
+def pin_activity_now(monkeypatch: pytest.MonkeyPatch):
+    """Pin the clock the activity window is computed from."""
+
+    def pin(moment: datetime) -> None:
+        monkeypatch.setattr(
+            "qdash.api.services.execution_service._activity_now",
+            moment.astimezone,
+        )
+
+    return pin
+
+
+def _activity(test_client, auth_headers, **params: Any) -> Any:
+    return test_client.get(
+        "/executions/activity", params={"chip_id": "chip-1", **params}, headers=auth_headers
+    )
+
+
+class TestExecutionActivityBuckets:
+    """Bucket boundaries of GET /executions/activity, daily and 6-hour, with a pinned clock."""
+
+    def test_six_hour_window_ends_with_the_current_slot(
+        self, test_client, test_project, auth_headers, pin_activity_now
+    ) -> None:
+        pin_activity_now(datetime(2026, 11, 4, 14, 30, tzinfo=TOKYO))
+
+        response = _activity(
+            test_client, auth_headers, days=7, timezone="Asia/Tokyo", granularity="6h"
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["granularity"] == "6h"
+        assert body["days"] == 7
+        buckets = body["buckets"]
+        assert len(buckets) == 28
+        # Current slot (12:00-18:00) is last; nothing later is padded with zeros.
+        assert buckets[-1]["start"] == _utc(datetime(2026, 11, 4, 12, tzinfo=TOKYO))
+        assert buckets[-1]["end"] == _utc(datetime(2026, 11, 4, 18, tzinfo=TOKYO))
+        # 27 preceding slots reach back to 18:00 eight calendar days earlier.
+        assert buckets[0]["start"] == _utc(datetime(2026, 10, 28, 18, tzinfo=TOKYO))
+        assert (body["since"], body["until"]) == ("2026-10-28", "2026-11-04")
+        assert [b["date"] for b in buckets[:2]] == ["2026-10-28", "2026-10-29"]
+        for earlier, later in pairwise(buckets):
+            assert earlier["end"] == later["start"]
+        hours = {datetime.fromisoformat(b["start"]).astimezone(TOKYO).hour for b in buckets}
+        assert hours == {0, 6, 12, 18}
+
+    def test_six_hour_boundaries_count_each_execution_once(
+        self, test_client, test_project, auth_headers, pin_activity_now
+    ) -> None:
+        pin_activity_now(datetime(2026, 11, 4, 14, 30, tzinfo=TOKYO))
+        seeds = {
+            "before-window": (datetime(2026, 10, 28, 17, 59, 59, tzinfo=TOKYO), "completed"),
+            "window-start": (datetime(2026, 10, 28, 18, 0, tzinfo=TOKYO), "completed"),
+            "late-evening": (datetime(2026, 11, 3, 23, 59, 59, tzinfo=TOKYO), "failed"),
+            "local-midnight": (datetime(2026, 11, 4, 0, 0, tzinfo=TOKYO), "completed"),
+            "before-noon": (datetime(2026, 11, 4, 11, 59, 59, tzinfo=TOKYO), "running"),
+            "noon": (datetime(2026, 11, 4, 12, 0, tzinfo=TOKYO), "completed"),
+            "noon-failed": (datetime(2026, 11, 4, 12, 0, tzinfo=TOKYO), "failed"),
+            "noon-pending": (datetime(2026, 11, 4, 13, 0, tzinfo=TOKYO), "pending"),
+            "noon-odd": (datetime(2026, 11, 4, 14, 0, tzinfo=TOKYO), "mystery"),
+        }
+        for execution_id, (start_at, status) in seeds.items():
+            _seed_execution(execution_id=execution_id, status=status, start_at=start_at)
+
+        body = _activity(
+            test_client, auth_headers, days=7, timezone="Asia/Tokyo", granularity="6h"
+        ).json()
+
+        by_start = {b["start"]: b for b in body["buckets"]}
+        assert by_start[_utc(datetime(2026, 10, 28, 18, tzinfo=TOKYO))]["total"] == 1
+        assert by_start[_utc(datetime(2026, 11, 3, 18, tzinfo=TOKYO))]["failed"] == 1
+        assert by_start[_utc(datetime(2026, 11, 4, 0, tzinfo=TOKYO))]["completed"] == 1
+        assert by_start[_utc(datetime(2026, 11, 4, 6, tzinfo=TOKYO))]["running"] == 1
+        noon = by_start[_utc(datetime(2026, 11, 4, 12, tzinfo=TOKYO))]
+        assert {key: noon[key] for key in ("completed", "failed", "scheduled", "other")} == {
+            "completed": 1,
+            "failed": 1,
+            "scheduled": 1,
+            "other": 1,
+        }
+        assert noon["total"] == 4
+        for bucket in body["buckets"]:
+            statuses = ("completed", "failed", "running", "scheduled", "cancelled", "other")
+            assert bucket["total"] == sum(bucket[key] for key in statuses)
+        # Everything but the execution before the window is counted, exactly once.
+        assert sum(b["total"] for b in body["buckets"]) == len(seeds) - 1
+        empty = [b for b in body["buckets"] if b["total"] == 0]
+        assert len(empty) == 28 - 5
+
+    def test_six_hour_buckets_add_up_to_the_daily_counts(
+        self, test_client, test_project, auth_headers, pin_activity_now
+    ) -> None:
+        pin_activity_now(datetime(2026, 11, 4, 20, 0, tzinfo=TOKYO))
+        # Every 5 hours from 19:00 today back to 2026-10-29 00:00, the window's first instant.
+        offsets = range(0, 6 * 24 + 20, 5)
+        for offset in offsets:
+            _seed_execution(
+                execution_id=f"e-{offset}",
+                status="failed" if offset % 3 else "completed",
+                start_at=datetime(2026, 11, 4, 19, 0, tzinfo=TOKYO) - timedelta(hours=offset),
+            )
+
+        daily = _activity(test_client, auth_headers, days=7, timezone="Asia/Tokyo").json()
+        six_hour = _activity(
+            test_client, auth_headers, days=7, timezone="Asia/Tokyo", granularity="6h"
+        ).json()
+
+        # At 20:00 the current slot is the day's last, so both windows cover the same days.
+        assert six_hour["buckets"][0]["start"] == daily["buckets"][0]["start"]
+        assert six_hour["buckets"][-1]["end"] == daily["buckets"][-1]["end"]
+        for day in daily["buckets"]:
+            slots = [b for b in six_hour["buckets"] if b["date"] == day["date"]]
+            assert len(slots) == 4
+            for key in ("completed", "failed", "total"):
+                assert sum(slot[key] for slot in slots) == day[key]
+        assert sum(day["total"] for day in daily["buckets"]) == len(offsets)
+
+    def test_buckets_follow_local_wall_clock_across_a_dst_change(
+        self, test_client, test_project, auth_headers, pin_activity_now
+    ) -> None:
+        """New York leaves DST at 02:00 on 2026-11-01, so that day lasts 25 hours."""
+        pin_activity_now(datetime(2026, 11, 2, 10, 0, tzinfo=NEW_YORK))
+        # 01:30 after the clocks fell back, 06:30 UTC; still the day's first 6-hour slot.
+        _seed_execution(
+            execution_id="repeated-hour",
+            status="completed",
+            start_at=datetime(2026, 11, 1, 6, 30, tzinfo=timezone.utc),
+        )
+
+        daily = _activity(test_client, auth_headers, days=3, timezone="America/New_York").json()
+        six_hour = _activity(
+            test_client, auth_headers, days=2, timezone="America/New_York", granularity="6h"
+        ).json()
+
+        sunday = next(b for b in daily["buckets"] if b["date"] == "2026-11-01")
+        assert sunday["start"] == _utc(datetime(2026, 11, 1, 0, tzinfo=NEW_YORK))
+        assert sunday["end"] == _utc(datetime(2026, 11, 2, 0, tzinfo=NEW_YORK))
+        assert sunday["start"] == "2026-11-01T04:00:00Z"
+        assert _hours(sunday) == 25
+        assert sunday["total"] == 1
+        first_slot = next(
+            b
+            for b in six_hour["buckets"]
+            if b["start"] == _utc(datetime(2026, 11, 1, 0, tzinfo=NEW_YORK))
+        )
+        assert first_slot["end"] == _utc(datetime(2026, 11, 1, 6, tzinfo=NEW_YORK))
+        assert _hours(first_slot) == 7
+        assert first_slot["total"] == 1
+
+    def test_daily_buckets_start_at_local_midnight(
+        self, test_client, test_project, auth_headers, pin_activity_now
+    ) -> None:
+        pin_activity_now(datetime(2026, 11, 4, 0, 5, tzinfo=TOKYO))
+        _seed_execution(
+            execution_id="just-before-midnight",
+            status="completed",
+            start_at=datetime(2026, 11, 3, 23, 59, 59, tzinfo=TOKYO),
+        )
+        _seed_execution(
+            execution_id="midnight",
+            status="failed",
+            start_at=datetime(2026, 11, 4, 0, 0, tzinfo=TOKYO),
+        )
+
+        body = _activity(test_client, auth_headers, days=2, timezone="Asia/Tokyo").json()
+
+        assert [(b["date"], b["start"], b["completed"], b["failed"]) for b in body["buckets"]] == [
+            ("2026-11-03", _utc(datetime(2026, 11, 3, 0, tzinfo=TOKYO)), 1, 0),
+            ("2026-11-04", _utc(datetime(2026, 11, 4, 0, tzinfo=TOKYO)), 0, 1),
+        ]
+        assert body["buckets"][-1]["end"] == _utc(datetime(2026, 11, 5, 0, tzinfo=TOKYO))
+
+    def test_rejects_an_unknown_granularity(self, test_client, test_project, auth_headers) -> None:
+        response = _activity(test_client, auth_headers, granularity="1h")
+
+        assert response.status_code == 422
+
+    def test_rejects_six_hour_buckets_over_more_than_31_days(
+        self, test_client, test_project, auth_headers
+    ) -> None:
+        assert _activity(test_client, auth_headers, days=31, granularity="6h").status_code == 200
+
+        response = _activity(test_client, auth_headers, days=32, granularity="6h")
+
+        assert response.status_code == 400
+        assert "at most 31 days" in response.json()["detail"]
+
+    @pytest.mark.parametrize("days", [0, 366])
+    def test_rejects_a_window_outside_one_to_365_days(
+        self, test_client, test_project, auth_headers, days: int
+    ) -> None:
+        assert _activity(test_client, auth_headers, days=days).status_code == 422
 
 
 def test_get_execution_lock_status_includes_latest_execution(

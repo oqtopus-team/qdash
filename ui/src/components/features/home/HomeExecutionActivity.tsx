@@ -8,9 +8,11 @@ import {
   getGetExecutionActivityQueryKey,
   useGetExecutionActivity,
 } from "@/client/execution/execution";
+import { ActivityBlockStack } from "@/components/features/execution/ActivityBlockStack";
 import {
   activityBlockScale,
   activityBlockStyler,
+  activityScaleNote,
   activityStatusTotals,
   describeActivityDay,
   longActivityDate,
@@ -142,7 +144,7 @@ export function HomeExecutionActivity() {
                 <span
                   aria-hidden="true"
                   className="size-2 rounded-xs"
-                  style={blockStyle(item.key, false)}
+                  style={blockStyle(item.key)}
                 />
                 <span>
                   {item.label} <span className="font-mono">{item.count}</span>
@@ -158,7 +160,6 @@ export function HomeExecutionActivity() {
         className="flex min-w-full gap-px sm:gap-0.5"
       >
         {columns.map((column, index) => {
-          const empties = rows - column.blocks.length;
           return (
             <Tooltip key={column.date}>
               <TooltipTrigger asChild>
@@ -174,24 +175,13 @@ export function HomeExecutionActivity() {
                   onKeyDown={(event) => handleKeyDown(event, index)}
                   className="flex h-24 min-w-1 flex-1 justify-center rounded-sm px-px py-0.5 transition-colors hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
                 >
-                  <span className="flex h-full w-full max-w-3 flex-col-reverse gap-px">
-                    {column.blocks.map((block, blockIndex) => (
-                      <span
-                        key={blockIndex}
-                        data-status={block.status}
-                        data-executions={block.executions}
-                        data-partial={block.partial || undefined}
-                        className="min-h-0 flex-1 rounded-xs"
-                        style={blockStyle(block.status, block.partial)}
-                      />
-                    ))}
-                    {Array.from({ length: empties }, (_, emptyIndex) => (
-                      <span
-                        key={`empty-${emptyIndex}`}
-                        className="min-h-0 flex-1 rounded-xs bg-base-content/5"
-                      />
-                    ))}
-                  </span>
+                  <ActivityBlockStack
+                    column={column}
+                    rows={rows}
+                    scale={scale}
+                    blockStyle={blockStyle}
+                    className="max-w-3"
+                  />
                 </Link>
               </TooltipTrigger>
               <TooltipContent side="top">
@@ -208,7 +198,7 @@ export function HomeExecutionActivity() {
                           <span
                             aria-hidden="true"
                             className="size-2 rounded-xs"
-                            style={blockStyle(item.key, false)}
+                            style={blockStyle(item.key)}
                           />
                           <span>{item.label}</span>
                           <span className="ml-auto pl-3 font-mono">{item.count}</span>
@@ -243,9 +233,7 @@ export function HomeExecutionActivity() {
         })}
       </div>
       <p className="mt-2 text-xs text-base-content/60" data-testid="home-activity-scale">
-        {scale === 1
-          ? "1 block = 1 execution"
-          : `1 block = ${scale} executions, a lighter block holds fewer`}
+        {activityScaleNote(scale)}
       </p>
     </div>
   );

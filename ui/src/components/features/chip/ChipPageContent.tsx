@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
 import { Bot, Plus } from "lucide-react";
@@ -11,7 +11,6 @@ import { dateToDateTimeLocal, formatDateTime, toIsoSeconds } from "@/lib/utils/d
 import { CouplingGrid } from "./CouplingGrid";
 import { QubitGrid } from "./QubitGrid";
 import { ChipManageModal } from "./ChipManageModal";
-import { ChipCreationTour } from "./ChipCreationTour";
 import { CreateChipModal } from "./modals/CreateChipModal";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
@@ -20,6 +19,7 @@ import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
 import { useListTaskInfo, useGetTaskFileSettings } from "@/client/task-file/task-file";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
+import { useChipPageJourney } from "@/components/features/first-calibration/useChipPageJourney";
 import {
   EvaluationRequestModal,
   evaluationTargets,
@@ -59,12 +59,11 @@ function dateKeyToRange(dateKey: string): { start: string; end: string } {
  */
 export function ChipPageContent() {
   const router = useRouter();
+  const { canEdit, projectId } = useProject();
   const searchParams = useSearchParams();
-  const { canEdit } = useProject();
-  const tutorialActive = canEdit && searchParams.get("tutorial") === "create-chip";
   // URL state management
   const {
-    selectedChip,
+    selectedChip: urlChip,
     selectedDate: legacySelectedDate,
     selectedTask,
     selectedCooldownId,
@@ -82,6 +81,25 @@ export function ChipPageContent() {
     setViewMode,
     isInitialized,
   } = useChipUrlState();
+
+  const {
+    data: chipsData,
+    isLoading: isChipsLoading,
+    isFetching: isChipsFetching,
+  } = useListChips();
+  const projectChips = chipsData?.data?.chips;
+  // The chip the page shows: the URL's chip once the current project's list holds it. A chip of
+  // another project (a link kept across a project switch, or an ID both projects use whose list
+  // has not answered yet) is never asked for.
+  const selectedChip =
+    urlChip && projectChips?.some((chip) => chip.chip_id === urlChip) ? urlChip : "";
+  // The list answers for the project the URL names; during Back to another project's entry the
+  // URL already names it while the list still holds the previous project's chips.
+  const chipListSettled =
+    projectChips !== undefined &&
+    !isChipsFetching &&
+    projectId !== null &&
+    searchParams.get("project") === projectId;
 
   const [gridSize, setGridSize] = useState<number>(8);
   const [isEvaluateOpen, setIsEvaluateOpen] = useState(false);
@@ -115,34 +133,51 @@ export function ChipPageContent() {
   );
 
   // Use lightweight endpoints (~0.3KB vs ~300KB with embedded data)
-  const { data: chipData } = useGetChip(selectedChip);
-  const { data: chipsData, isLoading: isChipsLoading } = useListChips();
+  const { data: chipData } = useGetChip(selectedChip, { query: { enabled: !!selectedChip } });
 
   // Get topology config to check if MUX is enabled
   const topologyId =
     chipData?.data?.topology_id ?? `square-lattice-mux-${chipData?.data?.size ?? 64}`;
   const { hasMux = true } = useTopologyConfig(topologyId) ?? {};
 
-  // Set default chip only when URL is initialized and no chip is selected from URL
+  const [isCreateChipModalOpen, setIsCreateChipModalOpen] = useState(false);
+  const openJourneyCreateChip = useCallback(() => setIsCreateChipModalOpen(true), []);
+  const journey = useChipPageJourney({
+    selectedChip,
+    openCreateChip: openJourneyCreateChip,
+  });
+
+  // Select the most recent chip when the URL names none, or names one the current project does
+  // not have; with no chips, drop the stale one. Only once the project's list has answered: a chip
+  // just created is selected while the list refetches, and must not be replaced before it arrives.
+  // Not while the guide leaves for the editor: writing the Chip page URL then would cancel
+  // the navigation that the created chip started.
   useEffect(() => {
-    if (
-      isInitialized &&
-      !selectedChip &&
-      chipsData?.data?.chips &&
-      chipsData.data.chips.length > 0
-    ) {
-      // Sort chips by installation date and select the most recent one
-      const sortedChips = [...chipsData.data.chips].sort((a, b) => {
-        const statusA = a.activity_status === "inactive" ? 1 : 0;
-        const statusB = b.activity_status === "inactive" ? 1 : 0;
-        if (statusA !== statusB) return statusA - statusB;
-        const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
-        const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
-        return dateB - dateA;
-      });
-      setSelectedChip(sortedChips[0].chip_id);
+    if (journey.leavingForGuide) return;
+    if (!isInitialized || !chipListSettled || !projectChips) return;
+    if (urlChip && projectChips.some((chip) => chip.chip_id === urlChip)) return;
+    if (projectChips.length === 0) {
+      if (urlChip) setSelectedChip("");
+      return;
     }
-  }, [isInitialized, selectedChip, chipsData, setSelectedChip]);
+    // Sort chips by installation date and select the most recent one
+    const sortedChips = [...projectChips].sort((a, b) => {
+      const statusA = a.activity_status === "inactive" ? 1 : 0;
+      const statusB = b.activity_status === "inactive" ? 1 : 0;
+      if (statusA !== statusB) return statusA - statusB;
+      const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
+      const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
+      return dateB - dateA;
+    });
+    setSelectedChip(sortedChips[0].chip_id);
+  }, [
+    isInitialized,
+    urlChip,
+    projectChips,
+    chipListSettled,
+    setSelectedChip,
+    journey.leavingForGuide,
+  ]);
 
   useEffect(() => {
     if (chipData?.data?.size) {
@@ -161,25 +196,7 @@ export function ChipPageContent() {
     [key: string]: boolean;
   }>({});
   const [selectedTaskInfo, setSelectedTaskInfo] = useState<SelectedTaskInfo | null>(null);
-  const [isCreateChipModalOpen, setIsCreateChipModalOpen] = useState(false);
   const [isManageChipModalOpen, setIsManageChipModalOpen] = useState(false);
-  const [tutorialCompleted, setTutorialCompleted] = useState(false);
-  const [tutorialRestartKey, setTutorialRestartKey] = useState(0);
-  const tutorialJustCompleted = useRef(false);
-
-  useEffect(() => {
-    if (tutorialActive) {
-      setTutorialCompleted(false);
-      setTutorialRestartKey(0);
-    }
-  }, [tutorialActive]);
-
-  const finishTutorial = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("tutorial");
-    const query = params.toString();
-    router.replace(query ? `/chip?${query}` : "/chip", { scroll: false });
-  }, [router, searchParams]);
 
   const openCreateChipModal = () => {
     setIsCreateChipModalOpen(true);
@@ -187,11 +204,7 @@ export function ChipPageContent() {
 
   const closeCreateChipModal = () => {
     setIsCreateChipModalOpen(false);
-    if (tutorialJustCompleted.current) {
-      tutorialJustCompleted.current = false;
-    } else if (tutorialActive) {
-      setTutorialRestartKey((current) => current + 1);
-    }
+    journey.onCreateChipClosed();
   };
 
   // Track previous date to distinguish modal navigation from external navigation
@@ -254,8 +267,9 @@ export function ChipPageContent() {
     data: muxData,
     isLoading: isLoadingMux,
     isError: isMuxError,
-  } = useListChipMuxes(selectedChip || "", {
+  } = useListChipMuxes(selectedChip, {
     query: {
+      enabled: !!selectedChip,
       placeholderData: keepPreviousData,
       staleTime: 30000, // 30 seconds
     },
@@ -464,7 +478,7 @@ export function ChipPageContent() {
                   <button
                     className="btn btn-primary btn-sm w-fit"
                     onClick={openCreateChipModal}
-                    data-tour="create-chip"
+                    data-coachmark="create-chip"
                   >
                     <Plus size={20} />
                     Create Chip
@@ -500,50 +514,55 @@ export function ChipPageContent() {
           </div>
 
           {/* Selection Controls */}
-          <PageFiltersBar>
-            <PageFiltersBar.Group>
-              <PageFiltersBar.Item className="sm:w-64">
-                <ChipSelector selectedChip={selectedChip} onChipSelect={handleChipSelect} />
-              </PageFiltersBar.Item>
-              <PageFiltersBar.Item className="sm:w-56">
-                <CooldownSelector
-                  chipId={selectedChip}
-                  selectedCooldownId={selectedCooldownId}
-                  autoPickActive={!selectedCooldownId && !hasTimeRangeParams}
-                  onPick={(cd) => {
-                    // Jump to the most recent day within the cool-down so the
-                    // chip page shows its end-of-cool-down state.
-                    const target = cd.ended_at ? new Date(cd.ended_at) : new Date();
-                    setSelectedCooldownId(cd.cooldown_id);
-                    setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
-                    setEndDate(dateToDateTimeLocal(target));
-                  }}
-                />
-              </PageFiltersBar.Item>
-              <PageFiltersBar.Item className="sm:w-96">
-                <TaskSelector
-                  tasks={filteredTasks}
-                  selectedTask={selectedTask}
-                  onTaskSelect={setSelectedTask}
-                  disabled={viewMode === "mux"}
-                />
-              </PageFiltersBar.Item>
-              {canEdit && (
-                <PageFiltersBar.Item>
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline gap-1"
-                    onClick={() => setIsEvaluateOpen(true)}
-                    disabled={!selectedChip || !selectedTask || viewMode === "mux"}
-                    title="Evaluate the latest result of this task for every qubit or coupling with the calibration evaluation model"
-                  >
-                    <Bot className="h-4 w-4" />
-                    Evaluate
-                  </button>
+          <div
+            data-coachmark="chip-overview"
+            data-chip-id={muxData?.data && selectedChip ? selectedChip : undefined}
+          >
+            <PageFiltersBar>
+              <PageFiltersBar.Group>
+                <PageFiltersBar.Item className="sm:w-64">
+                  <ChipSelector selectedChip={selectedChip} onChipSelect={handleChipSelect} />
                 </PageFiltersBar.Item>
-              )}
-            </PageFiltersBar.Group>
-          </PageFiltersBar>
+                <PageFiltersBar.Item className="sm:w-56">
+                  <CooldownSelector
+                    chipId={selectedChip}
+                    selectedCooldownId={selectedCooldownId}
+                    autoPickActive={!selectedCooldownId && !hasTimeRangeParams}
+                    onPick={(cd) => {
+                      // Jump to the most recent day within the cool-down so the
+                      // chip page shows its end-of-cool-down state.
+                      const target = cd.ended_at ? new Date(cd.ended_at) : new Date();
+                      setSelectedCooldownId(cd.cooldown_id);
+                      setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
+                      setEndDate(dateToDateTimeLocal(target));
+                    }}
+                  />
+                </PageFiltersBar.Item>
+                <PageFiltersBar.Item className="sm:w-96">
+                  <TaskSelector
+                    tasks={filteredTasks}
+                    selectedTask={selectedTask}
+                    onTaskSelect={setSelectedTask}
+                    disabled={viewMode === "mux"}
+                  />
+                </PageFiltersBar.Item>
+                {canEdit && (
+                  <PageFiltersBar.Item>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline gap-1"
+                      onClick={() => setIsEvaluateOpen(true)}
+                      disabled={!selectedChip || !selectedTask || viewMode === "mux"}
+                      title="Evaluate the latest result of this task for every qubit or coupling with the calibration evaluation model"
+                    >
+                      <Bot className="h-4 w-4" />
+                      Evaluate
+                    </button>
+                  </PageFiltersBar.Item>
+                )}
+              </PageFiltersBar.Group>
+            </PageFiltersBar>
+          </div>
 
           <TimeRangeSelector
             startDate={startDate}
@@ -798,24 +817,16 @@ export function ChipPageContent() {
       <CreateChipModal
         isOpen={isCreateChipModalOpen}
         onClose={closeCreateChipModal}
-        onSuccess={(chipId) => {
+        guidedByJourney={journey.adoptsCreatedChip}
+        captureSubmission={journey.captureCreateSubmission}
+        onSuccess={(chipId, _config, submission) => {
+          // The guide may take the user on to the editor; the Chip page URL it leaves behind
+          // already selects the new chip, and updating it here would overwrite the new route.
+          if (journey.onChipCreated(chipId, submission) === "navigate") return;
           // Automatically select the newly created chip
           setSelectedChip(chipId);
-          if (tutorialActive) {
-            tutorialJustCompleted.current = true;
-            setTutorialCompleted(true);
-          }
         }}
       />
-
-      {tutorialActive && (
-        <ChipCreationTour
-          active
-          completed={tutorialCompleted}
-          restartKey={tutorialRestartKey}
-          onDismiss={finishTutorial}
-        />
-      )}
 
       {selectedChip && selectedTask && viewMode !== "mux" && (
         <EvaluationRequestModal

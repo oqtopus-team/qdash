@@ -7,7 +7,9 @@ results, discussions, and files.
 
 Use the project selector to switch between projects. The active project determines which chips,
 workflows, executions, task results, notes, forum threads, and files QDash displays or changes.
-Confirm it before starting a calibration or editing shared state.
+Confirm it before starting a calibration or editing shared state. Switching project drops the
+previous project's chip, cooldown, and execution from the page address, so **Chip** opens the new
+project's most recent chip; the browser's Back button returns to the previous project and chip.
 
 Every new account receives a default project owned by that user. Users may also belong to other
 projects and switch between them without copying data.

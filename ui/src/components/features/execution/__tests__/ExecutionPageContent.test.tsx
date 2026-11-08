@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExecutionPageContent } from "@/components/features/execution/ExecutionPageContent";
 
 let loadingNextPage = false;
+const DEFAULT_DETAIL = { note: { flow_run_id: "flow-123" }, task: [] };
+let executionDetail: Record<string, unknown> = DEFAULT_DETAIL;
+const mockInvestigate = vi.fn();
 const mockCancelMutate = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
@@ -76,12 +79,7 @@ vi.mock("@/client/execution/execution", () => ({
     isLoading: skip > 0 && loadingNextPage,
   }),
   useGetExecution: () => ({
-    data: {
-      data: {
-        note: { flow_run_id: "flow-123" },
-        task: [],
-      },
-    },
+    data: { data: executionDetail },
     isLoading: false,
     isError: false,
   }),
@@ -94,6 +92,10 @@ vi.mock("@/client/execution/execution", () => ({
   }),
   getListExecutionsQueryKey: () => ["/executions"],
   getGetExecutionQueryKey: (executionId: string) => [`/executions/${executionId}`],
+}));
+
+vi.mock("@/contexts/ChatDockContext", () => ({
+  useOptionalChatDock: () => ({ investigate: mockInvestigate }),
 }));
 
 vi.mock("@/hooks/useDateNavigation", () => ({
@@ -123,6 +125,7 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("@/components/features/execution/ExecutionActivityChart", () => ({
+  DEFAULT_ACTIVITY_WINDOW: 30,
   ExecutionActivityChart: ({
     days,
     selectedDate,
@@ -191,6 +194,7 @@ describe("ExecutionPageContent cancel confirmation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     loadingNextPage = false;
+    executionDetail = DEFAULT_DETAIL;
     // Reset the mutate implementation so callback-driven tests don't leak into others.
     mockCancelMutate.mockReset();
   });
@@ -217,7 +221,7 @@ describe("ExecutionPageContent cancel confirmation", () => {
   it("shows the activity chart and lets it pick the day filter", () => {
     render(<ExecutionPageContent />);
 
-    expect(screen.getByText("ActivityChart 90d")).toBeTruthy();
+    expect(screen.getByText("ActivityChart 30d")).toBeTruthy();
     expect(screen.getByText("selected:latest")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "pick-day" }));
@@ -425,5 +429,57 @@ describe("ExecutionPageContent cancel confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel Execution" }));
 
     expect(mockToastError).toHaveBeenCalledWith("Failed to cancel execution");
+  });
+});
+
+describe("ExecutionPageContent failure investigation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+  });
+
+  afterEach(() => {
+    cleanup();
+    executionDetail = DEFAULT_DETAIL;
+  });
+
+  it("opens the investigation in the floating chat, not a second sidebar", () => {
+    const log = `Traceback (most recent call last):\n${"/app/qdash/workflow/calibtasks/qubex/".repeat(20)}base.py`;
+    executionDetail = { status: "failed", chip_id: "chip-1", message: log, task: [] };
+    render(<ExecutionPageContent />);
+
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    // The log sits in a scrolling block beside the action, not in a squeezed alert.
+    const body = within(panel).getByText((_, element) => element?.textContent === log);
+    expect(body.tagName).toBe("PRE");
+    expect(body.className).toContain("overflow-auto");
+    expect(within(panel).getByText("Error Log").parentElement).toContainElement(
+      within(panel).getByRole("button", { name: "Investigate with AI" }),
+    );
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Investigate with AI" }));
+
+    expect(mockInvestigate).toHaveBeenCalledWith(
+      { executionId: "exec-1", chipId: "chip-1" },
+      "mini",
+    );
+    // The details panel stays open underneath the floating window.
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+  });
+
+  it("still offers an investigation when the failure recorded no message", () => {
+    executionDetail = { status: "failed", chip_id: "chip-1", message: "", task: [] };
+    render(<ExecutionPageContent />);
+
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    expect(within(panel).getByText("No error message recorded.")).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("button", { name: "Investigate with AI" }));
+
+    expect(mockInvestigate).toHaveBeenCalledWith(
+      { executionId: "exec-1", chipId: "chip-1" },
+      "mini",
+    );
   });
 });

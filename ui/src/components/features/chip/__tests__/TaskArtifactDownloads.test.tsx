@@ -12,7 +12,11 @@ describe("TaskArtifactDownloads", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /Figure JSON.*figure\.json.*Preview/ })).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: /Figure JSON.*figure\.json.*Preview/,
+      }),
+    ).toBeTruthy();
     expect(screen.getByRole("link", { name: "Download figure.json" }).getAttribute("href")).toBe(
       "/api/executions/artifact?path=%2Fdata%2Ffigure.json",
     );
@@ -33,7 +37,11 @@ describe("TaskArtifactDownloads", () => {
     );
 
     expect(
-      (screen.getByRole("button", { name: "Download all (.zip)" }) as HTMLButtonElement).disabled,
+      (
+        screen.getByRole("button", {
+          name: "Download all (.zip)",
+        }) as HTMLButtonElement
+      ).disabled,
     ).toBe(true);
     expect(screen.getByText(/Download all supports up to 100 files/)).toBeTruthy();
   }, 15_000);

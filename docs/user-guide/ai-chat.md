@@ -64,6 +64,34 @@ chat model: QDash's system prompt, your instructions as they are appended to it,
 chat offers. It is the running text, so it reflects the current skills, tools, and language
 settings; the application's part is edited in the deployment, not in Settings.
 
+### Investigate a failure
+
+Use **Investigate with AI** when an execution or a task failed and you want to know why. The
+button appears in the **Error Log** of a failed execution on the **Execution** page and on its
+detail page, in the **Error Log** of a failed task result, and on a failed task in an execution's
+task details. It works when the execution failed before any task result was recorded.
+
+1. Select **Investigate with AI** in the **Error Log** header.
+2. The chat opens and sends the investigation for you. On the **Execution** pages, in task
+   details, and in a task result preview, it opens in the floating chat window, so the details
+   panel stays in view; on a task result's own page it opens in the chat sidebar. QDash adds the recorded error message and
+   stack trace, and the execution, task, qubit, and chip identifiers to the chat.
+3. Read the answer, then ask follow-up questions in the same chat.
+
+The assistant reads available source code,
+starting from the code that raised the error. The answer is short: the likely cause, the evidence
+(a quoted log line and cited code locations), and one next step to check or a fix
+to review. The assistant reads more code only when the evidence is unclear; ask a follow-up
+question for a deeper analysis. It does not apply fixes or re-run anything.
+
+QDash does not record which source revision an execution ran with. The answer names the revision
+of the source it read, or says it is unknown, and says that it cannot confirm that this source
+matches the failed run. When the logs are missing or too long, the answer says what is missing.
+
+Selecting the button again for the same failure reopens that chat instead of starting a new one.
+To run the investigation again from the start, select **New chat** while the investigation chat is
+open, then select **Investigate with AI**. The earlier chat stays in your chat history.
+
 ### Run a calibration pipeline from chat
 
 The assistant can compose a calibration from QDash's step catalog and run it as one execution

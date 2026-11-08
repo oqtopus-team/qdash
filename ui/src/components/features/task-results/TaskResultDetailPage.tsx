@@ -9,6 +9,7 @@ import { TaskLineageSection } from "@/components/features/provenance/TaskLineage
 import { FigureStrip } from "@/components/charts/FigureStrip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
+import { useRecordJourneyResultView } from "@/components/features/first-calibration/useRecordJourneyResultView";
 import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
@@ -19,6 +20,8 @@ import type { CalibrationGitHubSync } from "@/schemas";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
+import { failedTaskInvestigation } from "@/lib/copilotInvestigation";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import { QubitTile } from "@/components/ui/QubitTile";
@@ -63,6 +66,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
     },
   });
   const taskResult = taskResultResponse?.data;
+  useRecordJourneyResultView(taskResult);
   const { data: taskFileSettings } = useGetTaskFileSettings();
   const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
@@ -311,7 +315,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {/* Figure */}
       {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
         (taskResult.json_figure_path && taskResult.json_figure_path.length > 0)) && (
-        <div className="mb-4">
+        <div className="mb-4" data-coachmark="task-result-figure" data-task-id={taskId}>
           <FigureStrip className="h-[280px] gap-3 overflow-y-hidden">
             {(taskResult.figure_path ?? []).map((fig, i) => (
               <TaskFigure
@@ -337,10 +341,12 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         )}
 
         {taskResult.output_parameters && Object.keys(taskResult.output_parameters).length > 0 && (
-          <ParametersTable
-            title="Output Parameters"
-            parameters={taskResult.output_parameters as Record<string, unknown>}
-          />
+          <div data-coachmark="task-result-metrics" data-task-id={taskId}>
+            <ParametersTable
+              title="Output Parameters"
+              parameters={taskResult.output_parameters as Record<string, unknown>}
+            />
+          </div>
         )}
 
         {taskResult.chip_id && REANALYZABLE_TASKS.has(taskResult.task_name) && (
@@ -349,9 +355,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             qid={taskResult.qid}
             taskId={taskResult.task_id}
             taskName={taskResult.task_name}
-            taskStatus={taskResult.status}
             outputParameters={(taskResult.output_parameters ?? {}) as Record<string, unknown>}
-            outputParameterNames={taskResult.output_parameter_names ?? []}
             jsonFigurePaths={taskResult.json_figure_path ?? []}
           />
         )}
@@ -375,6 +379,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           status={taskResult.status}
           message={taskResult.message}
           stackTrace={taskResult.stack_trace}
+          showEmptyFallback
+          action={<InvestigateWithAiButton target={failedTaskInvestigation(taskResult)} />}
         />
       </div>
 

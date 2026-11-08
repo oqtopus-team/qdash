@@ -1,5 +1,8 @@
 """Tests for the flow application service."""
 
+import asyncio
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -7,6 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from fastapi import HTTPException
+from pymongo.errors import DuplicateKeyError
 
 from qdash.api.schemas.execution import ExecutionAvailabilityRequest
 from qdash.api.schemas.flow import ExecuteFlowRequest, SaveFlowRequest
@@ -938,6 +942,243 @@ async def test_save_flow_restores_old_source_when_update_registration_fails(
     assert file_path.exists()
     assert file_path.read_text(encoding="utf-8") == FLOW_CODE
     assert repo.updated == []
+
+
+class _StatefulFlowRepository(_FakeFlowRepository):
+    """Flow repository stub whose lookups see the flows it created."""
+
+    def find_by_project_and_name(self, project_id: str, name: str) -> SimpleNamespace | None:
+        """Return the flow created under this name, if any."""
+        for created in self.created:
+            if created["project_id"] == project_id and created["name"] == name:
+                return SimpleNamespace(**created)
+        return self.flow
+
+
+class _SlowDeploymentClient(_StubDeploymentClient):
+    """Deployment client stub that yields to the event loop while registering."""
+
+    async def register(self, **kwargs: Any) -> str:
+        """Pause, so a concurrent save can run while this one is in flight."""
+        await asyncio.sleep(0.05)
+        return await super().register(**kwargs)
+
+
+@pytest.mark.asyncio
+async def test_create_only_save_creates_a_new_flow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A create-only save of a free name stores and registers the flow."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    repo = _FakeFlowRepository()
+    service = _service(tmp_path, repo=repo)
+
+    response = await service.save_flow(
+        SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1", create_only=True),
+        "operator",
+        "project-1",
+    )
+
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    assert file_path.read_text(encoding="utf-8") == FLOW_CODE
+    assert repo.created[0]["name"] == "my_flow"
+    assert response.message == "Flow 'my_flow' created successfully"
+
+
+@pytest.mark.asyncio
+async def test_create_only_save_rejects_an_existing_flow_without_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A create-only save of a taken name returns 409 and leaves the flow as it was."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text(FLOW_CODE, encoding="utf-8")
+    repo = _FakeFlowRepository(flow=_make_flow(file_path))
+    deployment = _StubDeploymentClient()
+    service = _service(tmp_path, repo=repo, deployment=deployment)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.save_flow(
+            SaveFlowRequest(
+                name="my_flow", code=FLOW_CODE + "# new\n", chip_id="chip-2", create_only=True
+            ),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "Flow 'my_flow' already exists. Choose another name."
+    assert file_path.read_text(encoding="utf-8") == FLOW_CODE
+    assert deployment.calls == []
+    assert repo.created == []
+    assert repo.updated == []
+
+
+@pytest.mark.asyncio
+async def test_create_only_save_never_replaces_a_source_without_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A flow file left without metadata still blocks a create-only save of its name."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text("# someone else's work\n", encoding="utf-8")
+    repo = _FakeFlowRepository()
+    deployment = _StubDeploymentClient()
+    service = _service(tmp_path, repo=repo, deployment=deployment)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.save_flow(
+            SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1", create_only=True),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 409
+    assert file_path.read_text(encoding="utf-8") == "# someone else's work\n"
+    assert deployment.calls == []
+    assert repo.created == []
+
+
+@pytest.mark.asyncio
+async def test_create_only_save_reports_a_concurrent_metadata_insert_as_conflict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A unique-index violation on insert is a 409 and removes the file this save wrote."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    repo = _FakeFlowRepository()
+    repo.create_failure = DuplicateKeyError("E11000 duplicate key")
+    service = _service(tmp_path, repo=repo)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.save_flow(
+            SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1", create_only=True),
+            "operator",
+            "project-1",
+        )
+
+    assert exc_info.value.status_code == 409
+    assert not (tmp_path / "user_flows" / "project-1" / "my_flow.py").exists()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_create_only_saves_create_the_flow_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Of two concurrent create-only saves of one name, one wins and the other gets 409."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    repo = _StatefulFlowRepository()
+    deployment = _SlowDeploymentClient()
+    service = _service(tmp_path, repo=repo, deployment=deployment)
+    first = FLOW_CODE + "# first\n"
+    second = FLOW_CODE + "# second\n"
+
+    results = await asyncio.gather(
+        service.save_flow(
+            SaveFlowRequest(name="my_flow", code=first, chip_id="chip-1", create_only=True),
+            "operator",
+            "project-1",
+        ),
+        service.save_flow(
+            SaveFlowRequest(name="my_flow", code=second, chip_id="chip-2", create_only=True),
+            "operator",
+            "project-1",
+        ),
+        return_exceptions=True,
+    )
+
+    conflicts = [r for r in results if isinstance(r, HTTPException) and r.status_code == 409]
+    successes = [r for r in results if not isinstance(r, BaseException)]
+    assert len(successes) == 1
+    assert len(conflicts) == 1
+    assert len(repo.created) == 1
+    assert len(deployment.calls) == 1
+    winner = first if repo.created[0]["chip_id"] == "chip-1" else second
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    assert file_path.read_text(encoding="utf-8") == winner
+
+
+@pytest.mark.asyncio
+async def test_create_only_save_waits_for_a_save_in_another_process(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A save holding the lock in another process finishes first; the create-only save then 409s."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    project_dir = tmp_path / "user_flows" / "project-1"
+    project_dir.mkdir(parents=True)
+    file_path = project_dir / "my_flow.py"
+    ready = tmp_path / "ready"
+    holder = subprocess.Popen(  # noqa: S603
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys, time\n"
+                "from pathlib import Path\n"
+                "from filelock import FileLock\n"
+                "lock_path, flow_path, ready = map(Path, sys.argv[1:4])\n"
+                "with FileLock(lock_path):\n"
+                "    ready.write_text('1')\n"
+                "    time.sleep(0.5)\n"
+                "    flow_path.write_text('# other process\\n')\n"
+            ),
+            str(project_dir / ".my_flow.py.lock"),
+            str(file_path),
+            str(ready),
+        ],
+    )
+    try:
+        for _ in range(200):
+            if ready.exists():
+                break
+            await asyncio.sleep(0.025)
+        assert ready.exists()
+        deployment = _StubDeploymentClient()
+        service = _service(tmp_path, deployment=deployment)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await service.save_flow(
+                SaveFlowRequest(name="my_flow", code=FLOW_CODE, chip_id="chip-1", create_only=True),
+                "operator",
+                "project-1",
+            )
+    finally:
+        holder.wait(timeout=10)
+
+    assert exc_info.value.status_code == 409
+    assert file_path.read_text(encoding="utf-8") == "# other process\n"
+    assert deployment.calls == []
+
+
+@pytest.mark.asyncio
+async def test_save_without_create_only_still_overwrites_an_existing_flow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The default save keeps its overwrite behavior for the flow editor."""
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    file_path = tmp_path / "user_flows" / "project-1" / "my_flow.py"
+    file_path.parent.mkdir(parents=True)
+    file_path.write_text(FLOW_CODE, encoding="utf-8")
+    repo = _FakeFlowRepository(flow=_make_flow(file_path))
+    service = _service(tmp_path, repo=repo)
+
+    new_code = FLOW_CODE + "# edited\n"
+    response = await service.save_flow(
+        SaveFlowRequest(name="my_flow", code=new_code, chip_id="chip-1"),
+        "operator",
+        "project-1",
+    )
+
+    assert file_path.read_text(encoding="utf-8") == new_code
+    assert response.message == "Flow 'my_flow' updated successfully"
 
 
 @pytest.mark.asyncio

@@ -1,10 +1,13 @@
 """Tests for flow router endpoints."""
 
 from datetime import datetime
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from qdash.api.services.flow_service.deployment_client import DeploymentServiceClient
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.flow import FlowDocument
@@ -446,3 +449,118 @@ class TestFlowTemplates:
         assert "Shortened full calibration" in data["description"]
         fine_tune_tasks_block = data["code"].split("FAST_1Q_FINE_TUNE_TASKS", 1)[1].split("]", 1)[0]
         assert "CheckT1Average" not in fine_tune_tasks_block
+
+
+class _RecordingDeploymentClient(DeploymentServiceClient):
+    """Deployment client stub that records registrations instead of calling the service."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls: list[dict[str, str | None]] = []
+
+    async def register(
+        self,
+        *,
+        file_path: str,
+        flow_function_name: str,
+        deployment_name: str,
+        old_deployment_id: str | None = None,
+    ) -> str:
+        """Record the registration."""
+        self.calls.append(
+            {
+                "file_path": file_path,
+                "flow_function_name": flow_function_name,
+                "deployment_name": deployment_name,
+                "old_deployment_id": old_deployment_id,
+            }
+        )
+        return f"deployment-{len(self.calls)}"
+
+
+@pytest.fixture
+def flow_service_on_tmp(tmp_path, monkeypatch):
+    """Route /flows saves to a real flow service on a temporary flow tree."""
+    from qdash.api.dependencies import get_flow_repository, get_flow_service
+    from qdash.api.main import app
+    from qdash.api.services.flow_service import service as flow_service_module
+    from qdash.api.services.flow_service.service import FlowService
+    from qdash.api.services.flow_service.source_store import FlowSourceStore
+
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    deployment = _RecordingDeploymentClient()
+    store = FlowSourceStore(tmp_path / "user_flows")
+    previous_overrides = app.dependency_overrides.copy()
+    app.dependency_overrides[get_flow_service] = lambda: FlowService(
+        flow_repository=get_flow_repository(),
+        source_store=store,
+        deployment_client=deployment,
+    )
+    try:
+        yield SimpleNamespace(deployment=deployment, store=store)
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
+
+
+FLOW_SOURCE = "from prefect import flow\n\n\n@flow\ndef first_calibration():\n    pass\n"
+
+
+class TestFlowCreateOnly:
+    """Tests for create-only saves used when a new flow is created."""
+
+    def _request(self, **overrides):
+        body = {
+            "name": "first_calibration",
+            "code": FLOW_SOURCE,
+            "chip_id": "chip-1",
+            "create_only": True,
+        }
+        body.update(overrides)
+        return body
+
+    def test_second_create_only_save_returns_409_and_keeps_the_flow(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        """Repeating a create-only save conflicts and leaves the first flow untouched."""
+        first = test_client.post("/flows", json=self._request(), headers=auth_headers)
+        assert first.status_code == 200
+        stored = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert stored is not None
+        file_path = Path(stored.file_path)
+
+        second = test_client.post(
+            "/flows",
+            json=self._request(code=FLOW_SOURCE + "# overwrite\n", chip_id="chip-2"),
+            headers=auth_headers,
+        )
+
+        assert second.status_code == 409
+        assert second.json() == {
+            "detail": "Flow 'first_calibration' already exists. Choose another name."
+        }
+        after = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert after is not None
+        assert after.chip_id == "chip-1"
+        assert after.deployment_id == stored.deployment_id
+        assert file_path.read_text(encoding="utf-8") == FLOW_SOURCE
+        assert len(flow_service_on_tmp.deployment.calls) == 1
+
+    def test_save_without_create_only_overwrites_as_before(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        """The flow editor's save keeps overwriting an existing flow."""
+        assert (
+            test_client.post("/flows", json=self._request(), headers=auth_headers).status_code
+            == 200
+        )
+        legacy = self._request(code=FLOW_SOURCE + "# edited\n", chip_id="chip-2")
+        del legacy["create_only"]
+
+        response = test_client.post("/flows", json=legacy, headers=auth_headers)
+
+        assert response.status_code == 200
+        after = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert after is not None
+        assert after.chip_id == "chip-2"
+        assert Path(after.file_path).read_text(encoding="utf-8").endswith("# edited\n")

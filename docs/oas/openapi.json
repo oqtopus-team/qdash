@@ -1997,8 +1997,8 @@
         "tags": [
           "execution"
         ],
-        "summary": "Count executions per day",
-        "description": "Count executions per calendar day, by status, over a trailing window.\n\nWith ``chip_id`` only that chip's executions count; without it, every execution in the\ncaller's current project counts. Executions of other projects are never included.\nEvery day of the window is returned, empty days included, so a chart can draw a\ncontinuous axis. Days follow ``timezone`` so they match what the user sees.",
+        "summary": "Count executions per day or per 6-hour slot",
+        "description": "Count executions per bucket, by status, over a trailing window.\n\nWith ``chip_id`` only that chip's executions count; without it, every execution in the\ncaller's current project counts. Executions of other projects are never included.\nEvery bucket of the window is returned, empty ones included, so a chart can draw a\ncontinuous axis. Buckets follow wall-clock time in ``timezone`` so they match what the\nuser sees: one per calendar day ending today, or with ``granularity=6h`` four per day\n(local 00:00, 06:00, 12:00, 18:00) ending with the slot that contains the current time.\nEach bucket carries its ``start`` and exclusive ``end``.",
         "operationId": "getExecutionActivity",
         "security": [
           {
@@ -2044,11 +2044,27 @@
             "required": false,
             "schema": {
               "type": "string",
-              "description": "IANA time zone used to assign executions to days",
+              "description": "IANA time zone used to assign executions to buckets",
               "default": "UTC",
               "title": "Timezone"
             },
-            "description": "IANA time zone used to assign executions to days"
+            "description": "IANA time zone used to assign executions to buckets"
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day",
+                "6h"
+              ],
+              "type": "string",
+              "description": "Bucket length: `day` (default) or `6h`. `6h` returns `days` x 4 buckets and accepts at most 31 days",
+              "default": "day",
+              "title": "Granularity"
+            },
+            "description": "Bucket length: `day` (default) or `6h`. `6h` returns `days` x 4 buckets and accepts at most 31 days"
           },
           {
             "name": "X-Project-Id",
@@ -4592,6 +4608,245 @@
         }
       }
     },
+    "/copilot/source/roots": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "List the source trees the Copilot can read",
+        "description": "QDash and allowlisted dependency source served read-only, with known revisions.",
+        "operationId": "listCopilotSourceRoots",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSourceRootsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/copilot/source/search": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Search the source the Copilot can read",
+        "description": "Literal search in file contents or file paths; read-only and size-limited.",
+        "operationId": "searchCopilotSource",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Query"
+            }
+          },
+          {
+            "name": "root",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Root"
+            }
+          },
+          {
+            "name": "path_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path Prefix"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(content|path)$",
+              "default": "content",
+              "title": "Mode"
+            }
+          },
+          {
+            "name": "case_sensitive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Case Sensitive"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchSourceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/copilot/source/file": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Read a line range of a source file",
+        "description": "Read up to 400 numbered lines; without ``root`` the path is matched as a traceback prints it.",
+        "operationId": "getCopilotSourceFile",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "title": "Path"
+            }
+          },
+          {
+            "name": "root",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Root"
+            }
+          },
+          {
+            "name": "start_line",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Start Line"
+            }
+          },
+          {
+            "name": "end_line",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Line"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceFileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/copilot/preferences": {
       "get": {
         "tags": [
@@ -4777,7 +5032,7 @@
           "chip"
         ],
         "summary": "Create a new chip",
-        "description": "Create a new chip in the current project.\n\nBesides the database records, this creates ``<chip_id>/`` in the Qubex\nconfiguration tree (``system_id == chip_id``) unless ``config.create`` is\nfalse or the directory already exists. Wiring and hardware files are copied\nfrom ``config.source_system_id`` when given; parameter files always start\nfrom QDash's templates.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id, size and configuration options\nctx : ProjectContext\n    Project context with editor permission\nscaffolder : ChipConfigScaffolder\n    Writer of the chip's configuration directory\n\nReturns\n-------\nCreateChipResponse\n    Created chip information and the configuration outcome\n\nRaises\n------\nHTTPException\n    If chip_id already exists, size is invalid, or the configuration\n    source cannot be used",
+        "description": "Create a new chip in the current project.\n\nBesides the database records, this creates ``<chip_id>/`` in the Qubex\nconfiguration tree (``system_id == chip_id``) unless ``config.create`` is\nfalse or the directory already exists. Wiring and hardware files are copied\nfrom ``config.source_system_id`` when given; parameter files always start\nfrom QDash's templates. ``config.preset`` writes a complete virtual\nconfiguration instead; the ``fake`` preset is accepted only when the\ndeployment backend is fake and the chip uses the preset's topology.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id, size and configuration options\nctx : ProjectContext\n    Project context with editor permission\nscaffolder : ChipConfigScaffolder\n    Writer of the chip's configuration directory\n\nReturns\n-------\nCreateChipResponse\n    Created chip information and the configuration outcome\n\nRaises\n------\nHTTPException\n    If chip_id already exists, size is invalid, or the configuration\n    source cannot be used",
         "operationId": "createChip",
         "security": [
           {
@@ -10574,7 +10829,7 @@
           "flow"
         ],
         "summary": "Save a flow",
-        "description": "Save a Flow to file system and MongoDB.",
+        "description": "Save a Flow to file system and MongoDB.\n\nBy default the save creates the flow or overwrites an existing one. With\n``create_only`` it only creates a new flow, and an existing name returns 409\nwithout changing the stored flow.",
         "operationId": "saveFlow",
         "security": [
           {
@@ -10616,6 +10871,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SaveFlowResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "create_only is set and a flow with this name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
                 }
               }
             }
@@ -18237,6 +18502,19 @@
             ],
             "title": "Backend",
             "description": "Backend of the new system; taken from the source system when one is given"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "fake"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset",
+            "description": "Write a complete virtual configuration instead of hardware files. 'fake' is offered only when the deployment backend is fake and needs its preset topology"
           }
         },
         "type": "object",
@@ -18279,6 +18557,17 @@
               }
             ],
             "title": "Backend"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
           },
           "files": {
             "items": {
@@ -18673,6 +18962,52 @@
         ],
         "title": "Condition",
         "description": "Condition for filtering device topology."
+      },
+      "ConfigPresetResponse": {
+        "properties": {
+          "preset_id": {
+            "type": "string",
+            "title": "Preset Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "topology_id": {
+            "type": "string",
+            "title": "Topology Id",
+            "description": "Topology the chip must use with this preset"
+          },
+          "n_qubits": {
+            "type": "integer",
+            "title": "N Qubits"
+          },
+          "mux_count": {
+            "type": "integer",
+            "title": "Mux Count"
+          },
+          "workflow_template_id": {
+            "type": "string",
+            "title": "Workflow Template Id",
+            "description": "Flow template that brings up and calibrates a chip created from the preset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "preset_id",
+          "name",
+          "description",
+          "topology_id",
+          "n_qubits",
+          "mux_count",
+          "workflow_template_id"
+        ],
+        "title": "ConfigPresetResponse",
+        "description": "A complete configuration a new chip can start from."
       },
       "ConfigReloadResponse": {
         "properties": {
@@ -21550,7 +21885,19 @@
           "date": {
             "type": "string",
             "title": "Date",
-            "description": "Calendar day in the requested time zone, YYYY-MM-DD"
+            "description": "Calendar day in the requested time zone, YYYY-MM-DD; for a 6-hour bucket, the day the bucket starts on"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start",
+            "description": "Start of the bucket, inclusive, in UTC; local midnight, or local 00:00, 06:00, 12:00, or 18:00 for a 6-hour bucket, in the requested time zone"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End",
+            "description": "End of the bucket, exclusive, in UTC; the next bucket's start. Boundaries are local wall-clock hours, so a bucket that spans a DST change is an hour shorter or longer"
           },
           "completed": {
             "type": "integer",
@@ -21593,10 +21940,12 @@
         },
         "type": "object",
         "required": [
-          "date"
+          "date",
+          "start",
+          "end"
         ],
         "title": "ExecutionActivityDay",
-        "description": "Executions started on one calendar day, counted by status."
+        "description": "Executions started in one bucket (a calendar day or a 6-hour slot), counted by status."
       },
       "ExecutionActivityResponse": {
         "properties": {
@@ -21622,15 +21971,24 @@
             "title": "Timezone",
             "description": "IANA time zone the days are bucketed in"
           },
+          "granularity": {
+            "type": "string",
+            "enum": [
+              "day",
+              "6h"
+            ],
+            "title": "Granularity",
+            "description": "Bucket length: `day` for one bucket per calendar day, `6h` for four buckets per day starting at local 00:00, 06:00, 12:00, and 18:00"
+          },
           "since": {
             "type": "string",
             "title": "Since",
-            "description": "First day of the window, YYYY-MM-DD"
+            "description": "Day the first bucket starts on, YYYY-MM-DD"
           },
           "until": {
             "type": "string",
             "title": "Until",
-            "description": "Last day of the window (today), YYYY-MM-DD"
+            "description": "Day the last bucket starts on (today), YYYY-MM-DD"
           },
           "buckets": {
             "items": {
@@ -21638,7 +21996,7 @@
             },
             "type": "array",
             "title": "Buckets",
-            "description": "One entry per calendar day, oldest first, including empty days"
+            "description": "One entry per bucket, oldest first, including empty buckets. Daily: one per calendar day ending today. 6-hour: `days` x 4 slots ending with the slot that contains the current time, so no bucket lies entirely in the future"
           }
         },
         "type": "object",
@@ -21646,12 +22004,13 @@
           "chip_id",
           "days",
           "timezone",
+          "granularity",
           "since",
           "until",
           "buckets"
         ],
         "title": "ExecutionActivityResponse",
-        "description": "Daily execution counts for a chip, or a whole project, over a trailing window of days."
+        "description": "Execution counts for a chip, or a whole project, over a trailing window of days."
       },
       "ExecutionAvailabilityRequest": {
         "properties": {
@@ -24016,6 +24375,26 @@
             },
             "type": "array",
             "title": "Sources"
+          },
+          "deployment_backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Backend",
+            "description": "Backend this deployment calibrates with (DEFAULT_BACKEND), e.g. qubex or fake"
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigPresetResponse"
+            },
+            "type": "array",
+            "title": "Presets",
+            "description": "Presets of the deployment backend, listed even when no tree is mounted; the fake preset only on the fake backend"
           }
         },
         "type": "object",
@@ -24418,6 +24797,37 @@
         "title": "ListQubitsResponse",
         "description": "Response model for listing qubits with pagination."
       },
+      "ListSourceRootsResponse": {
+        "properties": {
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRootResponse"
+            },
+            "type": "array",
+            "title": "Roots"
+          },
+          "missing_dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Dependencies",
+            "description": "Allowlisted dependencies whose source is not installed here"
+          },
+          "execution_revision_recorded": {
+            "type": "boolean",
+            "title": "Execution Revision Recorded",
+            "description": "Whether executions record the source revision they ran with. QDash does not record it, so a match between served source and an execution cannot be established.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "roots"
+        ],
+        "title": "ListSourceRootsResponse",
+        "description": "The source trees available to this QDash API."
+      },
       "ListTagResponse": {
         "properties": {
           "tags": {
@@ -24645,7 +25055,7 @@
           "source_task_id"
         ],
         "title": "ManualParameterUpdateRequest",
-        "description": "Request to manually correct calibration parameters from a task result.\n\nCorrections must reference a supported source task result, and only that\nresult's output parameters can be written. Parameters are written to the DB\nand provenance is recorded.\nThe qid format determines target type: \"0\" for qubit, \"0-1\" for coupling."
+        "description": "Request to manually correct calibration parameters from a task result.\n\nCorrections must reference a supported spectroscopy result, and only the\noperational parameters mapped for that task can be written: readout\nfrequency and amplitude for resonator spectroscopy, control frequency and\ncoarse control amplitude for qubit spectroscopy. Measured frequencies are\nnever corrected by hand. Parameters are written to the DB and provenance\nis recorded.\nThe qid format determines target type: \"0\" for qubit, \"0-1\" for coupling."
       },
       "ManualParameterUpdateResponse": {
         "properties": {
@@ -28198,6 +28608,12 @@
             ],
             "title": "Folder",
             "description": "Folder path inside the creator's space, e.g. \"daily/t1\"; \"\" is the root. Omitted keeps an existing flow's folder (a new flow goes to the root)."
+          },
+          "create_only": {
+            "type": "boolean",
+            "title": "Create Only",
+            "description": "Create a new flow only. When a flow or flow file with this name already exists in the project, the request fails with 409 and changes nothing. False (the default) creates the flow or overwrites an existing one.",
+            "default": false
           }
         },
         "type": "object",
@@ -28390,6 +28806,39 @@
         ],
         "title": "ScheduleFlowResponse",
         "description": "Response after scheduling a flow."
+      },
+      "SearchSourceResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSearchMatch"
+            },
+            "type": "array",
+            "title": "Matches"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "The search stopped at the result or file limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "mode",
+          "matches",
+          "truncated"
+        ],
+        "title": "SearchSourceResponse",
+        "description": "Matches of a literal source search."
       },
       "SeedImportRequest": {
         "properties": {
@@ -28736,6 +29185,172 @@
         ],
         "title": "SettingsResponse",
         "description": "Settings for the QDash application."
+      },
+      "SourceFileResponse": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "title": "Root"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "start_line": {
+            "type": "integer",
+            "title": "Start Line"
+          },
+          "end_line": {
+            "type": "integer",
+            "title": "End Line"
+          },
+          "total_lines": {
+            "type": "integer",
+            "title": "Total Lines"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "More lines follow the returned range"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root",
+          "path",
+          "start_line",
+          "end_line",
+          "total_lines",
+          "content",
+          "truncated"
+        ],
+        "title": "SourceFileResponse",
+        "description": "A line range of one source file, each line prefixed with its number."
+      },
+      "SourceRootResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Root name used by search and read, such as qdash or qubex"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "qdash or dependency"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Installed package version, if known"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision",
+            "description": "Commit of the served source, when it can be established"
+          },
+          "revision_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Source",
+            "description": "Where the revision came from: git, direct_url.json or QDASH_SOURCE_REVISION"
+          },
+          "dirty": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dirty",
+            "description": "The git checkout has uncommitted changes (git revisions only)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "SourceRootResponse",
+        "description": "One source tree the Copilot can search and read."
+      },
+      "SourceSearchMatch": {
+        "properties": {
+          "root": {
+            "type": "string",
+            "title": "Root"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "root",
+          "path"
+        ],
+        "title": "SourceSearchMatch",
+        "description": "One search hit; ``line`` and ``text`` are null for a path search."
       },
       "SubmitAgentActionRequest": {
         "properties": {

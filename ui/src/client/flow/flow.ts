@@ -27,6 +27,7 @@ import type {
 import type {
   DeleteFlow200,
   DeleteScheduleResponse,
+  Detail,
   ExecuteFlowRequest,
   ExecuteFlowResponse,
   FlowTemplate,
@@ -72,6 +73,10 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 
 /**
  * Save a Flow to file system and MongoDB.
+ *
+ * By default the save creates the flow or overwrites an existing one. With
+ * ``create_only`` it only creates a new flow, and an existing name returns 409
+ * without changing the stored flow.
  * @summary Save a flow
  */
 export const saveFlow = (
@@ -91,7 +96,7 @@ export const saveFlow = (
 
 
 
-export const getSaveFlowMutationOptions = <TError = HTTPValidationError,
+export const getSaveFlowMutationOptions = <TError = Detail | HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext> => {
 
@@ -120,12 +125,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SaveFlowMutationResult = NonNullable<Awaited<ReturnType<typeof saveFlow>>>
     export type SaveFlowMutationBody = SaveFlowRequest
-    export type SaveFlowMutationError = HTTPValidationError
+    export type SaveFlowMutationError = Detail | HTTPValidationError
 
     /**
  * @summary Save a flow
  */
-export const useSaveFlow = <TError = HTTPValidationError,
+export const useSaveFlow = <TError = Detail | HTTPValidationError,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof saveFlow>>,

@@ -8,9 +8,12 @@ import { useGetTaskResult } from "@/client/task/task";
 import { FigureStrip } from "@/components/charts/FigureStrip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
+import { useRecordJourneyResultView } from "@/components/features/first-calibration/useRecordJourneyResultView";
 import { TaskLineageSection } from "@/components/features/provenance/TaskLineageSection";
 import { QubitTile } from "@/components/ui/QubitTile";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
+import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
+import { failedTaskInvestigation } from "@/lib/copilotInvestigation";
 import { useEscapeLayer } from "@/hooks/useFullscreenPanel";
 import { formatDateTime } from "@/lib/utils/datetime";
 import { getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
@@ -159,6 +162,7 @@ export function TaskResultPreviewSidebar({
     },
   });
   const taskResult = response?.data;
+  useRecordJourneyResultView(isOpen ? taskResult : null);
   const { data: taskFileSettings } = useGetTaskFileSettings({ query: { enabled: isOpen } });
   const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
   const { data: taskInfoData } = useListTaskInfo(
@@ -241,7 +245,7 @@ export function TaskResultPreviewSidebar({
           ) : (
             <div className="space-y-4">
               {(figures.length > 0 || jsonFigures.length > 0) && (
-                <div>
+                <div data-coachmark="task-result-figure" data-task-id={taskId}>
                   <h3 className="mb-2 text-xs font-medium text-base-content/60">Figures</h3>
                   <FigureStrip className="h-56 gap-3 rounded-lg bg-base-200/60 p-3">
                     {figures.length > 0 ? (
@@ -312,12 +316,20 @@ export function TaskResultPreviewSidebar({
                 message={taskResult.message}
                 stackTrace={taskResult.stack_trace}
                 showEmptyFallback
+                action={
+                  <InvestigateWithAiButton
+                    target={failedTaskInvestigation(taskResult)}
+                    surface="mini"
+                  />
+                }
               />
 
-              <ParameterPreview
-                title="Output Parameters"
-                parameters={taskResult.output_parameters as Record<string, unknown> | undefined}
-              />
+              <div data-coachmark="task-result-metrics" data-task-id={taskId}>
+                <ParameterPreview
+                  title="Output Parameters"
+                  parameters={taskResult.output_parameters as Record<string, unknown> | undefined}
+                />
+              </div>
               <ParameterPreview
                 title="Input Parameters"
                 parameters={taskResult.input_parameters as Record<string, unknown> | undefined}
