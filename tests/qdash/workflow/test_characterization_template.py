@@ -64,6 +64,7 @@ def test_characterization_builds_full_pipeline_in_dependency_order() -> None:
     assert all(call.on_failure is None for call in steps[4].tasks)
     assert names(steps[5].tasks) == names(characterization_module.EF_CALIBRATION_TASKS)
     assert names(steps[7].tasks) == names(characterization_module.EF_CHARACTERIZATION_TASKS)
+    assert steps[7].tasks[0].name == "CheckGEFRelaxation"
     assert steps[7].continue_on_failure is True
     assert all(call.on_failure is None for call in steps[7].tasks)
     assert names(steps[8].tasks) == ["CheckCouplingStrength"]
@@ -100,6 +101,34 @@ def test_ge_only_characterization_uses_ge_configuration() -> None:
     assert (
         result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
         == result["kwargs"]["configuration_mode"]
+    )
+
+
+def test_ef_characterization_without_fh_chevron_uses_ef_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        characterization_module,
+        "EF_CHARACTERIZATION_TASKS",
+        [
+            call
+            for call in characterization_module.EF_CHARACTERIZATION_TASKS
+            if call.name != "CheckAdaptiveFHChevron"
+        ],
+    )
+
+    result = characterization_module.characterization(
+        username="alice",
+        chip_id="64Q",
+        qids=["0"],
+        run_ge_characterization=False,
+        run_coupling_characterization=False,
+    )
+
+    assert result["kwargs"]["configuration_mode"] == "ge-ef-cr"
+    assert (
+        result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
+        == "ge-ef-cr"
     )
 
 
@@ -247,6 +276,14 @@ def test_characterization_calls_carry_their_acquisition_settings() -> None:
             "time_range": sweep.arange(0, 20_001, 400),
             "shots": 1024,
             "interval": characterization_module.STANDARD_INTERVAL,
+        }
+    )
+    assert runs["CheckGEFRelaxation"] == settings(
+        run={
+            "time_range": sweep.logspace(math.log10(200), math.log10(200_000), 18),
+            "shots": 4096,
+            "calibration_shots": 8192,
+            "interval": characterization_module.LONG_INTERVAL,
         }
     )
 

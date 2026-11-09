@@ -94,6 +94,22 @@ qubit_metrics:
         max: 200
         step: 1
 
+  t1_fe:
+    title: T1 F to E
+    unit: μs
+    scale: 1
+    description: Inverse direct f-to-e transition rate from the continuous-time GEF model
+    evaluation:
+      mode: maximize
+
+  t1_fg:
+    title: T1 F to G
+    unit: μs
+    scale: 1
+    description: Inverse direct f-to-g transition rate from the continuous-time GEF model
+    evaluation:
+      mode: maximize
+
   t1_average:
     title: T1 Average
     unit: μs
@@ -398,6 +414,8 @@ cdf_groups:
       unit: μs
       metrics:
         - t1
+        - t1_fe
+        - t1_fg
         - t1_average
         - t2_echo
         - t2_echo_average
