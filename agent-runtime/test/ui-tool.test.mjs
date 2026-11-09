@@ -2,8 +2,16 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { validateToolArguments } from "@earendil-works/pi-ai/utils/validation";
+
 import { toNdjsonEvents } from "../src/events.ts";
-import { UI_SPEC_LIMITS, uiBlockFromDetails, uiTool, validateUiSpec } from "../src/ui-tool.ts";
+import {
+  UI_SPEC_LIMITS,
+  prepareUiArguments,
+  uiBlockFromDetails,
+  uiTool,
+  validateUiSpec,
+} from "../src/ui-tool.ts";
 
 const metric = (props = {}) => ({
   type: "Metric",
@@ -51,6 +59,86 @@ test("render_ui fails the call with the problems listed so the model can correct
     uiTool.execute({ spec: { root: "m", elements: { m: metric({ value: undefined }) } } }),
     /render_ui spec is invalid:\n- elements\.m \(Metric\) props: value/,
   );
+});
+
+/** Runs a call the way the harness does: prepareArguments, schema validation, then execute. */
+async function callAsHarness(args) {
+  const prepared = uiTool.prepareArguments(args);
+  const validated = validateToolArguments(uiTool, {
+    type: "toolCall",
+    id: "c1",
+    name: uiTool.name,
+    arguments: prepared,
+  });
+  return uiTool.execute(validated);
+}
+
+test("render_ui handles a spec sent as a JSON string like the same spec sent as an object", async () => {
+  const fromObject = await callAsHarness({ spec: valid });
+  const fromString = await callAsHarness({ spec: JSON.stringify(valid) });
+  const fromPretty = await callAsHarness({ spec: JSON.stringify(valid, null, 2) });
+  assert.deepEqual(fromString.details, fromObject.details);
+  assert.deepEqual(fromPretty.details, fromObject.details);
+});
+
+test("prepareArguments leaves object specs and non-string specs to schema validation", async () => {
+  const args = { spec: valid };
+  assert.equal(prepareUiArguments(args), args);
+  const numeric = { spec: 3 };
+  assert.equal(prepareUiArguments(numeric), numeric);
+  await assert.rejects(callAsHarness(numeric), /Validation failed for tool "render_ui"/);
+  const original = JSON.stringify(valid);
+  const stringArgs = { spec: original };
+  prepareUiArguments(stringArgs);
+  assert.equal(stringArgs.spec, original, "the call's arguments are not modified");
+});
+
+test("a malformed JSON string spec is rejected with its location, not repaired", () => {
+  // An extra "}" after the Table's props closes `elements` early, so the Table's
+  // children and the later elements fall outside it.
+  const malformed =
+    '{"root":"s","elements":{"s":{"type":"Stack","props":{},"children":["fails","links"]},' +
+    '"fails":{"type":"Table","props":{"columns":[{"key":"t","label":"タスク"}],"rows":[{"t":"CheckT1"}]}}},"children":[]},' +
+    '"links":{"type":"Stack","props":{"direction":"horizontal"},"children":["l1"]},' +
+    '"l1":{"type":"Link","props":{"label":"q37","href":"/chip/144Qv2/qubit/37"},"children":[]}}}';
+  assert.throws(() => JSON.parse(malformed));
+  let message = "";
+  try {
+    prepareUiArguments({ spec: malformed });
+  } catch (error) {
+    message = error.message;
+  }
+  assert.match(message, /render_ui spec was sent as a string that is not valid JSON/);
+  assert.match(message, /top-level object closes at character \d+ but text continues/);
+  assert.match(message, /⟨here⟩,"links":\{"type":"Stack"/);
+  assert.match(message, /Send `spec` as a JSON object, not a string\./);
+});
+
+test("other malformed or non-object JSON string specs are rejected with a reason", () => {
+  const reject = (spec, pattern) => assert.throws(() => prepareUiArguments({ spec }), pattern);
+  reject('{"root":"s","elements":{"s":{"type":"Text","props":{"text":"hi"}}', /2 bracket\(s\) are not closed/);
+  reject('{"root":"s","elements":{"s":[}}}', /"\}" at character \d+ where "\]" was expected/);
+  reject('{"root":"s', /a string is not terminated/);
+  reject("", /not valid JSON/);
+  reject("[1, 2]", /must hold a JSON object with root and elements/);
+  reject('"{}"', /must hold a JSON object/);
+  reject("x".repeat(UI_SPEC_LIMITS.maxBytes * 2 + 1), /the limit is 100000 characters/);
+});
+
+test("a valid JSON string spec is still checked against the catalog and limits", async () => {
+  const unknown = JSON.stringify({ root: "x", elements: { x: { type: "Html", props: {} } } });
+  await assert.rejects(callAsHarness({ spec: unknown }), /Validation failed for tool "render_ui"/);
+  const extraProp = JSON.stringify({ root: "m", elements: { m: metric({ onClick: "alert(1)" }) } });
+  await assert.rejects(callAsHarness({ spec: extraProp }), /render_ui spec is invalid:[\s\S]*Unrecognized key/);
+  const badLink = JSON.stringify({
+    root: "l",
+    elements: { l: { type: "Link", props: { label: "x", href: "https://evil.example" }, children: [] } },
+  });
+  await assert.rejects(callAsHarness({ spec: badLink }), /render_ui spec is invalid/);
+});
+
+test("the tool description asks for spec as an object", () => {
+  assert.match(uiTool.description, /Pass `spec` as a JSON object, not as a string holding JSON\./);
 });
 
 test("render_ui offers the catalog types as a plain enum", () => {
