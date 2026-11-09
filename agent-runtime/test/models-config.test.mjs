@@ -192,6 +192,37 @@ test("Qwen thinking format stays on the Qwen model in a mixed provider", () => {
   assert.equal(providers["openai-compatible-chat"].compat.thinkingFormat, undefined);
 });
 
+test("strict tool schemas are enabled only on endpoints that declare them", () => {
+  const yaml = `${OPENAI_COMPATIBLE_YAML}
+  - provider: openai-compatible-chat
+    name: gemma4:31b
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    strict_tool_schemas: true
+  - provider: openai-compatible-chat
+    name: other
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    strict_tool_schemas: "yes"
+  - provider: openai
+    name: gpt-5.4
+    api_style: responses
+    max_output_tokens: 4096
+    strict_tool_schemas: true
+`;
+  const { providers } = buildModelsConfig(yaml, undefined, {
+    OPENAI_COMPATIBLE_BASE_URL_CHAT: "https://gateway.example/v1",
+  });
+
+  const [qwen, gemma, other] = providers["openai-compatible-chat"].models;
+  assert.deepEqual(qwen.compat, { thinkingFormat: "qwen-chat-template" });
+  assert.deepEqual(gemma.compat, { supportsStrictMode: true });
+  assert.equal(other.compat, undefined, "only a literal true opts in");
+  assert.equal(providers["openai-compatible-chat"].compat.supportsStrictMode, undefined);
+  // Catalog models keep pi's own capability data.
+  assert.deepEqual(providers.openai.modelOverrides["gpt-5.4"], { maxTokens: 4096 });
+});
+
 test("suffixed OpenAI-compatible providers keep endpoints separate", () => {
   const evaluationYaml = `
 evaluation_models:

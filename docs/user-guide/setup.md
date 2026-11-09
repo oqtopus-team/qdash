@@ -63,6 +63,27 @@ Set the `OPENAI_COMPATIBLE_BASE_URL_CHAT` and `OPENAI_COMPATIBLE_API_KEY_CHAT` p
 for chat, and the corresponding `EVALUATION` pair for figure analysis. Base URLs must include
 `/v1`. Select models in `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml`.
 
+A classifier model chooses how the chat lays out the values it found: a calibration summary, an
+execution comparison, or a failure list. The chat uses it whenever a classifier is available. No
+classifier endpoint is preconfigured: you supply its URL and token. Until both are set, the chat
+composes its own views as before.
+
+1. Set the endpoint's URL, up to the API version, and its token in `.env`:
+
+   ```dotenv
+   CLASSIFIER_BASE_URL=https://classifier.example/v1
+   CLASSIFIER_API_KEY=<api-token>
+   ```
+
+2. Recreate the runtime, as at the end of this section. Its log reports
+   `present_results: classifier system-one-classifier/ZefanCai/Open-Jev-2B`, or why
+   it is not offered, such as an unset variable.
+
+The model is declared in `config/copilot/classifier.yaml`. To turn the layouts off, leave the
+variables unset or remove the model from that file.
+
+How this works: [Copilot architecture](../developer-guide/copilot/architecture.md#presentation-classifier).
+
 Copilot can propose supported write operations without an extra enable setting. The signed-in
 user must approve each proposed write in the chat, and their project permissions still apply.
 The retired `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` variable has no effect and can be removed from
@@ -84,7 +105,9 @@ CF_ACCESS_CLIENT_SECRET=<service-token-client-secret>
 Keep the existing `OPENAI_COMPATIBLE_BASE_URL_CHAT` and `OPENAI_COMPATIBLE_BASE_URL_EVALUATION`
 settings pointed at the protected HTTPS URLs, including `/v1`. The shared token is sent to every
 endpoint configured through `base_url: env:OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>`, including custom
-suffixes. Literal URLs and built-in providers do not receive it.
+suffixes, and to a classifier configured through `base_url: env:CLASSIFIER_BASE_URL` or
+`env:CLASSIFIER_BASE_URL_<SUFFIX>`.
+Literal URLs and built-in providers do not receive it.
 
 Keep each endpoint's API key if the model server requires it. If authentication is handled only
 by Cloudflare Access, leave that API key empty. Both Access values must be set together; leave
