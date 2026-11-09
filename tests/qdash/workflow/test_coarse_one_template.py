@@ -9,7 +9,7 @@ import pytest
 
 from qdash.workflow.service.steps import OneQubitCheck
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
-from tests.qdash.workflow.task_call_helpers import names
+from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
 
 coarse_one_module = importlib.import_module("qdash.workflow.templates.coarse_one")
 
@@ -92,30 +92,24 @@ def test_coarse_one_forwards_execution_context_and_preserves_task_scan_defaults(
         "project_id": "project-1",
         "flow_name": "coarse-check",
         "tags": ["coarse"],
-        "task_parameters": {
-            "CreateHPIPulse": {
-                "run": {
-                    "hpi_duration": 32,
-                },
-            },
-            "CreatePIPulse": {
-                "run": {
-                    "pi_duration": 32,
-                },
-            },
-            "CreateDRAGHPIPulse": {
-                "run": {
-                    "drag_hpi_duration": 16,
-                },
-            },
-            "CreateDRAGPIPulse": {
-                "run": {
-                    "drag_pi_duration": 24,
-                },
-            },
-        },
         "default_run_parameters": {
             "readout_duration": 1024,
             "interval": 150 * 1024,
         },
+    }
+
+
+def test_coarse_one_sets_pulse_durations_on_each_pulse_call() -> None:
+    result = coarse_one_module.coarse_one(username="alice", chip_id="64Q", qids=["0"])
+
+    durations = {
+        call_id: call_settings["run"]
+        for call_id, call_settings in effective_settings(result["steps"][0].tasks)
+        if call_settings["run"]
+    }
+    assert durations == {
+        "CreateHPIPulse": settings(run={"hpi_duration": 32})["run"],
+        "CreatePIPulse": settings(run={"pi_duration": 32})["run"],
+        "CreateDRAGHPIPulse": settings(run={"drag_hpi_duration": 16})["run"],
+        "CreateDRAGPIPulse": settings(run={"drag_pi_duration": 24})["run"],
     }

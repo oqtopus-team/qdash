@@ -14,8 +14,8 @@ The selected MUXes are configured once before calibration. Calibration stages st
 qubit after the first failed task, while characterization stages record each measurement failure
 and continue with the remaining measurements.
 
-Edit the task lists below to change measurement order, and _build_task_parameters() to tune
-sweeps, shots, pulse durations, and intervals.
+Edit the task calls below to change measurement order and to tune sweeps, shots, pulse
+durations, and intervals. Time values are in ns and frequency values are in GHz.
 
 Example:
     characterization(
@@ -49,43 +49,152 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
-GE_CALIBRATION_TASKS: list[TaskCall] = [
-    TaskCall(name="CheckRabi"),
-    TaskCall(name="CreateHPIPulse"),
-    TaskCall(name="CreatePIPulse"),
-    TaskCall(name="CreateDRAGHPIPulse"),
-    TaskCall(name="CreateDRAGPIPulse"),
-    TaskCall(name="ReadoutClassification"),
-]
-
-GE_CHARACTERIZATION_TASKS: list[TaskCall] = [
-    TaskCall(name="CheckT1Average"),
-    TaskCall(name="CheckT2EchoAverage"),
-    TaskCall(name="CheckCKP"),
-    TaskCall(name="CheckQuantumEfficiency"),
-    TaskCall(name="CheckCPMGNoiseSpectroscopy"),
-    TaskCall(name="CheckSpinLockSpectroscopy"),
-]
-
-EF_CALIBRATION_TASKS: list[TaskCall] = [
-    TaskCall(name="CheckAdaptiveEFChevron"),
-    TaskCall(name="CheckEFRabi"),
-    TaskCall(name="CreateEFHPIPulse"),
-    TaskCall(name="CreateEFPIPulse"),
-    TaskCall(name="EFReadoutClassification"),
-]
-
-EF_CHARACTERIZATION_TASKS: list[TaskCall] = [
-    TaskCall(name="CheckThermalExcitation"),
-    TaskCall(name="CheckReadoutMIST"),
-    TaskCall(name="CheckAdaptiveFHChevron"),
-]
-
-COUPLING_CHARACTERIZATION_TASKS: list[TaskCall] = [TaskCall(name="CheckCouplingStrength")]
-
 SHORT_INTERVAL = 256 * 1024
 STANDARD_INTERVAL = 384 * 1024
 LONG_INTERVAL = 512 * 1024
+
+GE_CALIBRATION_TASKS: list[TaskCall] = [
+    TaskCall(
+        name="CheckRabi",
+        run={"time_range": sweep.range(0, 401, 8), "shots": 2048, "interval": SHORT_INTERVAL},
+    ),
+    TaskCall(
+        name="CreateHPIPulse",
+        run={"hpi_duration": 32, "shots": 2048, "interval": SHORT_INTERVAL},
+    ),
+    TaskCall(
+        name="CreatePIPulse",
+        run={"pi_duration": 32, "shots": 2048, "interval": SHORT_INTERVAL},
+    ),
+    TaskCall(
+        name="CreateDRAGHPIPulse",
+        run={"drag_hpi_duration": 16, "shots": 2048, "interval": STANDARD_INTERVAL},
+    ),
+    TaskCall(
+        name="CreateDRAGPIPulse",
+        run={"drag_pi_duration": 24, "shots": 2048, "interval": STANDARD_INTERVAL},
+    ),
+    TaskCall(name="ReadoutClassification", run={"shots": 2048, "interval": LONG_INTERVAL}),
+]
+
+GE_CHARACTERIZATION_TASKS: list[TaskCall] = [
+    TaskCall(
+        name="CheckT1Average",
+        run={
+            "time_range": sweep.logspace(math.log10(100), math.log10(500_000), 51),
+            "shots": 1024,
+            "interval": STANDARD_INTERVAL,
+            "n_runs": 8,
+        },
+    ),
+    TaskCall(
+        name="CheckT2EchoAverage",
+        run={
+            "time_range": sweep.logspace(math.log10(300), math.log10(100_000), 51),
+            "shots": 1024,
+            "interval": STANDARD_INTERVAL,
+            "n_runs": 8,
+        },
+    ),
+    TaskCall(
+        name="CheckCKP",
+        run={
+            # Set qubit_detuning_range/resonator_detuning_range to explicit lists
+            # here when the Qubex target-specific defaults are not appropriate.
+            "shots": 1024,
+            "interval": STANDARD_INTERVAL,
+            "target_min_qubit_detuning": -0.02,
+        },
+    ),
+    TaskCall(
+        name="CheckQuantumEfficiency",
+        run={
+            # Add amplitude_range=[...] to replace Qubex's target-specific sweep.
+            "shots": 1024,
+            "interval": STANDARD_INTERVAL,
+        },
+    ),
+    TaskCall(
+        name="CheckCPMGNoiseSpectroscopy",
+        run={
+            "frequency_range": sweep.linspace(0.0005, 0.004, 20),
+            "time_range": sweep.logspace(math.log10(200.0), math.log10(200_000.0), 31),
+            "shots": 1024,
+            "interval": STANDARD_INTERVAL,
+            "pi_pulse_pattern": "++++",
+        },
+    ),
+    TaskCall(
+        name="CheckSpinLockSpectroscopy",
+        run={
+            "spin_lock_frequency_range": sweep.linspace(0.004, 0.1, 25),
+            # Add duration_range=[...] to replace the T1/T2-derived sweep.
+            "shots": 1024,
+            "interval": STANDARD_INTERVAL,
+        },
+    ),
+]
+
+EF_CALIBRATION_TASKS: list[TaskCall] = [
+    TaskCall(
+        name="CheckAdaptiveEFChevron",
+        run={
+            "detuning_range": sweep.linspace(-0.05, 0.05, 41),
+            "time_range": sweep.range(0, 257, 8),
+            "shots": 256,
+            "interval": SHORT_INTERVAL,
+            "minimum_peak_background_rms_ratio": 5.0,
+        },
+    ),
+    TaskCall(
+        name="CheckEFRabi",
+        run={"time_range": sweep.range(0, 401, 8), "shots": 2048, "interval": SHORT_INTERVAL},
+    ),
+    TaskCall(
+        name="CreateEFHPIPulse",
+        run={"ef_hpi_duration": 32, "shots": 2048, "interval": SHORT_INTERVAL},
+    ),
+    TaskCall(
+        name="CreateEFPIPulse",
+        run={"ef_pi_duration": 32, "shots": 2048, "interval": SHORT_INTERVAL},
+    ),
+    TaskCall(name="EFReadoutClassification", run={"shots": 2048, "interval": LONG_INTERVAL}),
+]
+
+EF_CHARACTERIZATION_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckThermalExcitation", run={"shots": 256 * 1024, "interval": LONG_INTERVAL}),
+    TaskCall(
+        name="CheckReadoutMIST",
+        run={
+            "cycle_gap": 0.0,
+            "measure_reference": True,
+            "shots": 4096,
+            "calibration_shots": 8192,
+            "interval": LONG_INTERVAL,
+        },
+    ),
+    TaskCall(
+        name="CheckAdaptiveFHChevron",
+        run={
+            "detuning_range": sweep.linspace(-0.05, 0.05, 41),
+            "time_range": sweep.range(0, 257, 8),
+            "shots": 256,
+            "interval": STANDARD_INTERVAL,
+            "minimum_peak_background_rms_ratio": 5.0,
+        },
+    ),
+]
+
+COUPLING_CHARACTERIZATION_TASKS: list[TaskCall] = [
+    TaskCall(
+        name="CheckCouplingStrength",
+        run={
+            "time_range": sweep.arange(0, 20_001, 400),
+            "shots": 1024,
+            "interval": STANDARD_INTERVAL,
+        },
+    ),
+]
 
 
 @flow(
@@ -217,7 +326,9 @@ def characterization(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters=_build_task_parameters(configuration_mode),
+        # ConfigureAll runs as its own step rather than a call in a task list, so its
+        # run-dependent configuration mode stays a per-task default.
+        task_parameters={"ConfigureAll": {"run": {"configuration_mode": configuration_mode}}},
         configuration_mode=configuration_mode,
         default_run_parameters={
             "readout_duration": 1024,
@@ -225,170 +336,3 @@ def characterization(
         },
     )
     return cal.run(targets, steps=steps)
-
-
-def _build_task_parameters(configuration_mode: str) -> dict[str, dict[str, Any]]:
-    """Create editable task defaults grouped in pipeline order for each flow run.
-
-    Tune sweeps, shots, durations, and intervals for the device under test.
-    Time values are in ns and frequency values are in GHz.
-    """
-    return {
-        # Push the full selected-MUX layout once before any calibration stage.
-        "ConfigureAll": {
-            "run": {"configuration_mode": configuration_mode},
-        },
-        # GE calibration
-        "CheckRabi": {
-            "run": {
-                "time_range": sweep.range(0, 401, 8),
-                "shots": 2048,
-                "interval": SHORT_INTERVAL,
-            },
-        },
-        "CreateHPIPulse": {
-            "run": {
-                "hpi_duration": 32,
-                "shots": 2048,
-                "interval": SHORT_INTERVAL,
-            },
-        },
-        "CreatePIPulse": {
-            "run": {
-                "pi_duration": 32,
-                "shots": 2048,
-                "interval": SHORT_INTERVAL,
-            },
-        },
-        "CreateDRAGHPIPulse": {
-            "run": {
-                "drag_hpi_duration": 16,
-                "shots": 2048,
-                "interval": STANDARD_INTERVAL,
-            },
-        },
-        "CreateDRAGPIPulse": {
-            "run": {
-                "drag_pi_duration": 24,
-                "shots": 2048,
-                "interval": STANDARD_INTERVAL,
-            },
-        },
-        "ReadoutClassification": {
-            "run": {"shots": 2048, "interval": LONG_INTERVAL},
-        },
-        # GE characterization
-        "CheckT1Average": {
-            "run": {
-                "time_range": sweep.logspace(math.log10(100), math.log10(500_000), 51),
-                "shots": 1024,
-                "interval": STANDARD_INTERVAL,
-                "n_runs": 8,
-            },
-        },
-        "CheckT2EchoAverage": {
-            "run": {
-                "time_range": sweep.logspace(math.log10(300), math.log10(100_000), 51),
-                "shots": 1024,
-                "interval": STANDARD_INTERVAL,
-                "n_runs": 8,
-            },
-        },
-        "CheckCKP": {
-            "run": {
-                # Set qubit_detuning_range/resonator_detuning_range to explicit lists
-                # here when the Qubex target-specific defaults are not appropriate.
-                "shots": 1024,
-                "interval": STANDARD_INTERVAL,
-                "target_min_qubit_detuning": -0.02,
-            },
-        },
-        "CheckQuantumEfficiency": {
-            "run": {
-                # Add amplitude_range=[...] to replace Qubex's target-specific sweep.
-                "shots": 1024,
-                "interval": STANDARD_INTERVAL,
-            },
-        },
-        "CheckCPMGNoiseSpectroscopy": {
-            "run": {
-                "frequency_range": sweep.linspace(0.0005, 0.004, 20),
-                "time_range": sweep.logspace(math.log10(200.0), math.log10(200_000.0), 31),
-                "shots": 1024,
-                "interval": STANDARD_INTERVAL,
-                "pi_pulse_pattern": "++++",
-            },
-        },
-        "CheckSpinLockSpectroscopy": {
-            "run": {
-                "spin_lock_frequency_range": sweep.linspace(0.004, 0.1, 25),
-                # Add duration_range=[...] to replace the T1/T2-derived sweep.
-                "shots": 1024,
-                "interval": STANDARD_INTERVAL,
-            },
-        },
-        # EF calibration
-        "CheckAdaptiveEFChevron": {
-            "run": {
-                "detuning_range": sweep.linspace(-0.05, 0.05, 41),
-                "time_range": sweep.range(0, 257, 8),
-                "shots": 256,
-                "interval": SHORT_INTERVAL,
-                "minimum_peak_background_rms_ratio": 5.0,
-            },
-        },
-        "CheckEFRabi": {
-            "run": {
-                "time_range": sweep.range(0, 401, 8),
-                "shots": 2048,
-                "interval": SHORT_INTERVAL,
-            },
-        },
-        "CreateEFHPIPulse": {
-            "run": {
-                "ef_hpi_duration": 32,
-                "shots": 2048,
-                "interval": SHORT_INTERVAL,
-            },
-        },
-        "CreateEFPIPulse": {
-            "run": {
-                "ef_pi_duration": 32,
-                "shots": 2048,
-                "interval": SHORT_INTERVAL,
-            },
-        },
-        "EFReadoutClassification": {
-            "run": {"shots": 2048, "interval": LONG_INTERVAL},
-        },
-        # EF characterization
-        "CheckThermalExcitation": {
-            "run": {"shots": 256 * 1024, "interval": LONG_INTERVAL},
-        },
-        "CheckReadoutMIST": {
-            "run": {
-                "cycle_gap": 0.0,
-                "measure_reference": True,
-                "shots": 4096,
-                "calibration_shots": 8192,
-                "interval": LONG_INTERVAL,
-            },
-        },
-        "CheckAdaptiveFHChevron": {
-            "run": {
-                "detuning_range": sweep.linspace(-0.05, 0.05, 41),
-                "time_range": sweep.range(0, 257, 8),
-                "shots": 256,
-                "interval": STANDARD_INTERVAL,
-                "minimum_peak_background_rms_ratio": 5.0,
-            },
-        },
-        # Coupling characterization
-        "CheckCouplingStrength": {
-            "run": {
-                "time_range": sweep.arange(0, 20_001, 400),
-                "shots": 1024,
-                "interval": STANDARD_INTERVAL,
-            },
-        },
-    }

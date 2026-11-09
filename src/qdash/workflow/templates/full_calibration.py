@@ -46,27 +46,35 @@ FULL_1Q_CHECK_TASKS: list[TaskCall] = [
     # Update control amplitude, then measure again at the updated amplitude.
     TaskCall(name="CheckRabi", call_id="rabi_amplitude_update"),
     TaskCall(name="CheckRabi", call_id="rabi_at_updated_amplitude"),
-    TaskCall(name="CreateHPIPulse", call_id="hpi_create_first"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_first", run={"hpi_duration": 32}),
     TaskCall(name="CheckHPIPulse", call_id="hpi_check_first"),
     # TaskCall(name="CheckOptimalReadoutFrequency"),
     # Second pass at the settings the first pass produced.
     TaskCall(name="CheckRabi", call_id="rabi_second_pass"),
-    TaskCall(name="CreateHPIPulse", call_id="hpi_create_second"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_second", run={"hpi_duration": 32}),
     TaskCall(name="CheckHPIPulse", call_id="hpi_check_second"),
-    TaskCall(name="CheckT1"),
-    TaskCall(name="CheckT2Echo"),
+    TaskCall(
+        name="CheckT1",
+        # Uncomment to make the sweep range explicit (100 ns to 500 us).
+        # run={"time_range": sweep.logspace(math.log10(100), math.log10(500_000), 51)},
+    ),
+    TaskCall(
+        name="CheckT2Echo",
+        # Uncomment to make the sweep range explicit (300 ns to 100 us).
+        # run={"time_range": sweep.logspace(math.log10(300), math.log10(100_000), 51)},
+    ),
     TaskCall(name="CheckRamsey"),
 ]
 
 FULL_1Q_FINE_TUNE_TASKS: list[TaskCall] = [
     TaskCall(name="CheckRabi"),
-    TaskCall(name="CreateHPIPulse"),
+    TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
     TaskCall(name="CheckHPIPulse"),
-    TaskCall(name="CreatePIPulse"),
+    TaskCall(name="CreatePIPulse", run={"pi_duration": 32}),
     TaskCall(name="CheckPIPulse"),
-    TaskCall(name="CreateDRAGHPIPulse"),
+    TaskCall(name="CreateDRAGHPIPulse", run={"drag_hpi_duration": 16}),
     TaskCall(name="CheckDRAGHPIPulse"),
-    TaskCall(name="CreateDRAGPIPulse"),
+    TaskCall(name="CreateDRAGPIPulse", run={"drag_pi_duration": 24}),
     TaskCall(name="CheckDRAGPIPulse"),
     TaskCall(name="ReadoutClassification"),
     TaskCall(name="CheckT1Average"),
@@ -77,7 +85,15 @@ FULL_1Q_FINE_TUNE_TASKS: list[TaskCall] = [
 ]
 
 FULL_2Q_TASKS: list[TaskCall] = [
-    TaskCall(name="CheckCrossResonance"),
+    TaskCall(
+        name="CheckCrossResonance",
+        # Uncomment to tune the CR parameter search.
+        # run={
+        #     "adiabatic_safe_factor": 0.65,
+        #     "max_amplitude": 0.85,
+        #     "max_time_range": 8192,
+        # },
+    ),
     TaskCall(name="CreateZX90"),
     TaskCall(name="CheckZX90"),
     TaskCall(name="CheckBellState"),
@@ -171,51 +187,6 @@ def full_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            "CreateHPIPulse": {
-                "run": {
-                    "hpi_duration": 32,
-                },
-            },
-            "CreatePIPulse": {
-                "run": {
-                    "pi_duration": 32,
-                },
-            },
-            "CreateDRAGHPIPulse": {
-                "run": {
-                    "drag_hpi_duration": 16,
-                },
-            },
-            "CreateDRAGPIPulse": {
-                "run": {
-                    "drag_pi_duration": 24,
-                },
-            },
-            # Per-task overrides — uncomment to tune the CR parameter search.
-            # "CheckCrossResonance": {
-            #     "run": {
-            #         "adiabatic_safe_factor": 0.65,
-            #         "max_amplitude": 0.85,
-            #         "max_time_range": 8192,
-            #     },
-            # },
-            # Per-task overrides — uncomment to make coherence sweep ranges explicit.
-            # "CheckT1": {
-            #     "run": {
-            #         "time_range": sweep.logspace(
-            #             math.log10(100), math.log10(500_000), 51
-            #         ),  # 100 ns 〜 500 μs
-            #     },
-            # },
-            # "CheckT2Echo": {
-            #     "run": {
-            #         "time_range": sweep.logspace(
-            #             math.log10(300), math.log10(100_000), 51
-            #         ),  # 300 ns 〜 100 μs
-            #     },
-            # },
-        },
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,

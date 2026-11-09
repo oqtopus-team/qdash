@@ -4,7 +4,7 @@ import importlib
 from typing import Any
 
 from qdash.datamodel.task_call import TaskCall
-from tests.qdash.workflow.task_call_helpers import names
+from tests.qdash.workflow.task_call_helpers import names, settings
 
 two_qubit_module = importlib.import_module("qdash.workflow.templates.two_qubit")
 two_qubit_scheduled_module = importlib.import_module("qdash.workflow.templates.two_qubit_scheduled")
@@ -16,7 +16,7 @@ class FakeCalibService:
         self.kwargs = kwargs
 
     def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps}
+        return {"targets": targets, "steps": steps, "kwargs": self.kwargs}
 
 
 def test_two_qubit_template_passes_template_task_list(monkeypatch) -> None:
@@ -29,6 +29,9 @@ def test_two_qubit_template_passes_template_task_list(monkeypatch) -> None:
     )
 
     assert names(result["steps"][1].tasks) == names(two_qubit_module.TWO_QUBIT_TASKS)
+    # The CR search example is commented out, so every call uses the task defaults.
+    assert all(call.effective_settings({}) == settings() for call in result["steps"][1].tasks)
+    assert "task_parameters" not in result["kwargs"]
 
 
 def test_two_qubit_template_keeps_custom_tasks(monkeypatch) -> None:
@@ -56,6 +59,8 @@ def test_two_qubit_scheduled_template_passes_template_task_list(monkeypatch) -> 
     assert names(result["steps"][1].tasks) == names(
         two_qubit_scheduled_module.TWO_QUBIT_SCHEDULED_TASKS
     )
+    assert all(call.effective_settings({}) == settings() for call in result["steps"][1].tasks)
+    assert "task_parameters" not in result["kwargs"]
 
 
 def test_two_qubit_scheduled_template_keeps_custom_tasks(monkeypatch) -> None:

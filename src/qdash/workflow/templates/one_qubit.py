@@ -44,16 +44,24 @@ ONE_QUBIT_CHECK_TASKS: list[TaskCall] = [
     TaskCall(name="CheckRabi", call_id="rabi_amplitude_update"),
     # Measure again at the updated amplitude for HPI creation.
     TaskCall(name="CheckRabi", call_id="rabi_at_updated_amplitude"),
-    TaskCall(name="CreateHPIPulse"),
+    TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
     TaskCall(name="CheckHPIPulse"),
-    TaskCall(name="CreatePIPulse"),
+    TaskCall(name="CreatePIPulse", run={"pi_duration": 32}),
     TaskCall(name="CheckPIPulse"),
-    TaskCall(name="CreateDRAGHPIPulse"),
+    TaskCall(name="CreateDRAGHPIPulse", run={"drag_hpi_duration": 16}),
     TaskCall(name="CheckDRAGHPIPulse"),
-    TaskCall(name="CreateDRAGPIPulse"),
+    TaskCall(name="CreateDRAGPIPulse", run={"drag_pi_duration": 24}),
     TaskCall(name="CheckDRAGPIPulse"),
-    TaskCall(name="CheckT1"),
-    TaskCall(name="CheckT2Echo"),
+    TaskCall(
+        name="CheckT1",
+        # Uncomment to make the sweep range explicit (100 ns to 500 us).
+        # run={"time_range": sweep.logspace(math.log10(100), math.log10(500_000), 51)},
+    ),
+    TaskCall(
+        name="CheckT2Echo",
+        # Uncomment to make the sweep range explicit (300 ns to 100 us).
+        # run={"time_range": sweep.logspace(math.log10(300), math.log10(100_000), 51)},
+    ),
     TaskCall(name="CheckRamsey"),
 ]
 
@@ -62,13 +70,17 @@ ONE_QUBIT_FINE_TUNE_TASKS: list[TaskCall] = [
     TaskCall(name="Configure", call_id="configure_round1"),
     # Round 1: calibrate HPI -> PI -> DRAG HPI -> DRAG PI, then tune amplitude/frequency.
     TaskCall(name="CheckRabi", call_id="rabi_round1"),
-    TaskCall(name="CreateHPIPulse", call_id="hpi_create_round1"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_round1", run={"hpi_duration": 32}),
     TaskCall(name="CheckHPIPulse", call_id="hpi_check_round1"),
-    TaskCall(name="CreatePIPulse", call_id="pi_create_round1"),
+    TaskCall(name="CreatePIPulse", call_id="pi_create_round1", run={"pi_duration": 32}),
     TaskCall(name="CheckPIPulse", call_id="pi_check_round1"),
-    TaskCall(name="CreateDRAGHPIPulse", call_id="drag_hpi_create_round1"),
+    TaskCall(
+        name="CreateDRAGHPIPulse", call_id="drag_hpi_create_round1", run={"drag_hpi_duration": 16}
+    ),
     TaskCall(name="CheckDRAGHPIPulse", call_id="drag_hpi_check_round1"),
-    TaskCall(name="CreateDRAGPIPulse", call_id="drag_pi_create_round1"),
+    TaskCall(
+        name="CreateDRAGPIPulse", call_id="drag_pi_create_round1", run={"drag_pi_duration": 24}
+    ),
     TaskCall(name="CheckDRAGPIPulse", call_id="drag_pi_check_round1"),
     TaskCall(name="CheckOptimalReadoutAmplitude", call_id="readout_amplitude_round1"),
     TaskCall(name="CheckOptimalReadoutFrequency", call_id="readout_frequency_round1"),
@@ -77,13 +89,17 @@ ONE_QUBIT_FINE_TUNE_TASKS: list[TaskCall] = [
     ),  # Apply round 1's readout frequency before recalibrating pulses.
     # Round 2: recalibrate all four pulse types at the updated settings, then repeat the pair.
     TaskCall(name="CheckRabi", call_id="rabi_round2"),
-    TaskCall(name="CreateHPIPulse", call_id="hpi_create_round2"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_round2", run={"hpi_duration": 32}),
     TaskCall(name="CheckHPIPulse", call_id="hpi_check_round2"),
-    TaskCall(name="CreatePIPulse", call_id="pi_create_round2"),
+    TaskCall(name="CreatePIPulse", call_id="pi_create_round2", run={"pi_duration": 32}),
     TaskCall(name="CheckPIPulse", call_id="pi_check_round2"),
-    TaskCall(name="CreateDRAGHPIPulse", call_id="drag_hpi_create_round2"),
+    TaskCall(
+        name="CreateDRAGHPIPulse", call_id="drag_hpi_create_round2", run={"drag_hpi_duration": 16}
+    ),
     TaskCall(name="CheckDRAGHPIPulse", call_id="drag_hpi_check_round2"),
-    TaskCall(name="CreateDRAGPIPulse", call_id="drag_pi_create_round2"),
+    TaskCall(
+        name="CreateDRAGPIPulse", call_id="drag_pi_create_round2", run={"drag_pi_duration": 24}
+    ),
     TaskCall(name="CheckDRAGPIPulse", call_id="drag_pi_check_round2"),
     TaskCall(name="CheckOptimalReadoutAmplitude", call_id="readout_amplitude_round2"),
     TaskCall(name="CheckOptimalReadoutFrequency", call_id="readout_frequency_round2"),
@@ -92,13 +108,17 @@ ONE_QUBIT_FINE_TUNE_TASKS: list[TaskCall] = [
     ),  # Apply the final readout frequency before final pulse calibration.
     # Calibrate all pulses at the final readout settings before classification and RB.
     TaskCall(name="CheckRabi", call_id="rabi_final"),
-    TaskCall(name="CreateHPIPulse", call_id="hpi_create_final"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_final", run={"hpi_duration": 32}),
     TaskCall(name="CheckHPIPulse", call_id="hpi_check_final"),
-    TaskCall(name="CreatePIPulse", call_id="pi_create_final"),
+    TaskCall(name="CreatePIPulse", call_id="pi_create_final", run={"pi_duration": 32}),
     TaskCall(name="CheckPIPulse", call_id="pi_check_final"),
-    TaskCall(name="CreateDRAGHPIPulse", call_id="drag_hpi_create_final"),
+    TaskCall(
+        name="CreateDRAGHPIPulse", call_id="drag_hpi_create_final", run={"drag_hpi_duration": 16}
+    ),
     TaskCall(name="CheckDRAGHPIPulse", call_id="drag_hpi_check_final"),
-    TaskCall(name="CreateDRAGPIPulse", call_id="drag_pi_create_final"),
+    TaskCall(
+        name="CreateDRAGPIPulse", call_id="drag_pi_create_final", run={"drag_pi_duration": 24}
+    ),
     TaskCall(name="CheckDRAGPIPulse", call_id="drag_pi_check_final"),
     TaskCall(name="ReadoutClassification"),
     TaskCall(name="RandomizedBenchmarking"),
@@ -168,43 +188,6 @@ def one_qubit(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            "CreateHPIPulse": {
-                "run": {
-                    "hpi_duration": 32,
-                },
-            },
-            "CreatePIPulse": {
-                "run": {
-                    "pi_duration": 32,
-                },
-            },
-            "CreateDRAGHPIPulse": {
-                "run": {
-                    "drag_hpi_duration": 16,
-                },
-            },
-            "CreateDRAGPIPulse": {
-                "run": {
-                    "drag_pi_duration": 24,
-                },
-            },
-            # Per-task overrides — uncomment to make coherence sweep ranges explicit.
-            # "CheckT1": {
-            #     "run": {
-            #         "time_range": sweep.logspace(
-            #             math.log10(100), math.log10(500_000), 51
-            #         ),  # 100 ns 〜 500 μs
-            #     },
-            # },
-            # "CheckT2Echo": {
-            #     "run": {
-            #         "time_range": sweep.logspace(
-            #             math.log10(300), math.log10(100_000), 51
-            #         ),  # 300 ns 〜 100 μs
-            #     },
-            # },
-        },
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,

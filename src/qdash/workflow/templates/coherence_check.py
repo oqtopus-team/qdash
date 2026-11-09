@@ -28,11 +28,33 @@ from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 COHERENCE_CHECK_TASKS: list[TaskCall] = [
     TaskCall(name="Configure"),
-    TaskCall(name="CheckChevron"),
+    TaskCall(
+        name="CheckChevron",
+        run={
+            # Keep the measurement grid explicit so users can inspect and
+            # tune the coherence-check acquisition condition here.
+            "detuning_range": sweep.linspace(-0.05, 0.05, 41),
+            "time_range": sweep.linspace(0, 250, 26),
+            "shots": 256,
+        },
+        update_calibration_parameters=False,
+    ),
     TaskCall(name="CheckRabi"),
-    TaskCall(name="CheckT1"),
-    TaskCall(name="CheckT2Echo"),
-    TaskCall(name="CheckRamsey"),
+    TaskCall(
+        name="CheckT1",
+        run={"time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51)},
+    ),
+    TaskCall(
+        name="CheckT2Echo",
+        run={"time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51)},
+    ),
+    TaskCall(
+        name="CheckRamsey",
+        run={
+            "time_range": sweep.arange(0, 10_001, 100),
+            "detuning": 0.001,
+        },
+    ),
 ]
 
 # The second pass is its own step: Configure and CheckRabi run again on fresh
@@ -110,34 +132,6 @@ def coherence_check(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            "CheckChevron": {
-                "run": {
-                    # Keep the measurement grid explicit so users can inspect and
-                    # tune the coherence-check acquisition condition here.
-                    "detuning_range": sweep.linspace(-0.05, 0.05, 41),
-                    "time_range": sweep.linspace(0, 250, 26),
-                    "shots": 256,
-                },
-                "update_calibration_parameters": False,
-            },
-            "CheckT1": {
-                "run": {
-                    "time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51),
-                },
-            },
-            "CheckT2Echo": {
-                "run": {
-                    "time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51),
-                },
-            },
-            "CheckRamsey": {
-                "run": {
-                    "time_range": sweep.arange(0, 10_001, 100),
-                    "detuning": 0.001,
-                },
-            },
-        },
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 256 * 1024,

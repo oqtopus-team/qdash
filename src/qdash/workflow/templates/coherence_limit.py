@@ -88,7 +88,7 @@ def coherence_limit(
         # 1Q coherence limit
         CustomOneQubit(
             step_name="coherence_limit_1q",
-            tasks=[TaskCall(name="Check1QGateCoherenceLimit")],
+            tasks=[TaskCall(name="Check1QGateCoherenceLimit", run={"drag_hpi_duration": 16})],
             mode=mode,
         ),
         # 2Q coherence limit
@@ -108,12 +108,5 @@ def coherence_limit(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            "Check1QGateCoherenceLimit": {
-                "run": {
-                    "drag_hpi_duration": 16,
-                },
-            },
-        },
     )
     return cal.run(targets, steps=steps)

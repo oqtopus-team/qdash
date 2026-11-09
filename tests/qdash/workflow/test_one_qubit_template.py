@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
-from tests.qdash.workflow.task_call_helpers import call_ids, names
+from tests.qdash.workflow.task_call_helpers import call_ids, effective_settings, names, settings
 
 one_qubit_module = importlib.import_module("qdash.workflow.templates.one_qubit")
 
@@ -65,9 +65,37 @@ def test_one_qubit_template_passes_template_task_lists(monkeypatch) -> None:
 
     steps = result["steps"]
     assert len(steps) == 3
-    assert names(steps[0].tasks) == names(COARSE_ONE_TASKS)
+    # The stages match coarse_one and fine_one call for call, settings included.
+    assert effective_settings(steps[0].tasks) == effective_settings(COARSE_ONE_TASKS)
     assert isinstance(steps[1], FilterByStatus)
-    assert names(steps[2].tasks) == names(FINE_ONE_TASKS)
+    assert effective_settings(steps[2].tasks) == effective_settings(FINE_ONE_TASKS)
+    assert "task_parameters" not in result["kwargs"]
+
+
+PULSE_DURATIONS = {
+    "CreateHPIPulse": {"hpi_duration": 32},
+    "CreatePIPulse": {"pi_duration": 32},
+    "CreateDRAGHPIPulse": {"drag_hpi_duration": 16},
+    "CreateDRAGPIPulse": {"drag_pi_duration": 24},
+}
+
+
+@pytest.mark.parametrize("check_only", [False, True])
+def test_one_qubit_template_sets_durations_on_every_pulse_call(monkeypatch, check_only) -> None:
+    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+
+    result = one_qubit_module.one_qubit(
+        username="alice", chip_id="64Q", mux_ids=[0], check_only=check_only
+    )
+
+    pulse_calls = 0
+    for step in result["steps"]:
+        for call in getattr(step, "tasks", None) or ():
+            expected = settings(run=PULSE_DURATIONS.get(call.name, {}))
+            assert call.effective_settings({}) == expected, call.resolved_call_id
+            pulse_calls += call.name in PULSE_DURATIONS
+    # Four pulse types in the coarse stage, plus three rounds of them in the fine stage.
+    assert pulse_calls == (4 if check_only else 16)
 
 
 @pytest.mark.parametrize("check_only", [False, True])
@@ -180,7 +208,8 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     ]
     full = one_qubit_module.one_qubit(username="alice", chip_id="64Q", qids=["8"])
     assert result["kwargs"]["default_run_parameters"] == full["kwargs"]["default_run_parameters"]
-    assert result["kwargs"]["task_parameters"] == full["kwargs"]["task_parameters"]
+    assert "task_parameters" not in result["kwargs"]
+    assert effective_settings(step.tasks) == effective_settings(full["steps"][2].tasks)
     assert result["kwargs"]["flow_name"] == "fine-check"
     assert result["kwargs"]["project_id"] == "project-1"
     assert result["kwargs"]["tags"] == ["fine"]
