@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from qdash.workflow.engine.task.backend_saver import resolve_publish_targets
 
 if TYPE_CHECKING:
+    from qdash.datamodel.task_invocation import TaskInvocation
     from qdash.repository import FilesystemCalibDataSaver
     from qdash.workflow.calibtasks.results import RunResult
     from qdash.workflow.engine.backend.base import BaseBackend
@@ -103,11 +104,22 @@ class MuxDistributor:
             )
             return
 
+        # Distributed results belong to the same planned call as the representative.
+        representative = self._state_manager.get_task(
+            task.get_name(), task.get_task_type(), representative_qid
+        )
         for pos_in_mux in range(4):
             target_qid = str(mux_base_qid + pos_in_mux)
             if target_qid == representative_qid:
                 continue
-            self._distribute_to_qid(task, backend, execution_service, run_result, target_qid)
+            self._distribute_to_qid(
+                task,
+                backend,
+                execution_service,
+                run_result,
+                target_qid,
+                invocation=representative.invocation,
+            )
 
     def _distribute_to_qid(
         self,
@@ -116,6 +128,7 @@ class MuxDistributor:
         execution_service: "ExecutionService",
         run_result: "RunResult",
         target_qid: str,
+        invocation: "TaskInvocation | None" = None,
     ) -> None:
         """Postprocess, save, and record a MUX task result for a single qubit.
 
@@ -137,7 +150,8 @@ class MuxDistributor:
         logger.debug("Processing MUX result for qid=%s (task=%s)", target_qid, task_name)
 
         try:
-            self._state_manager.ensure_task_exists(task_name, task_type, target_qid)
+            distributed = self._state_manager.ensure_task_exists(task_name, task_type, target_qid)
+            distributed.invocation = invocation
             self._state_manager.start_task(task_name, task_type, target_qid)
 
             postprocess_result = task.postprocess(

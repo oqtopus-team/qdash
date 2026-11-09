@@ -2613,6 +2613,9 @@ const listTaskInfo = (
 
 /**
  * List task results for cross-task investigation.
+ *
+ * ``step_id`` and ``call_id`` return the results of one planned call, so two
+ * calls of the same task in one step can be read separately.
  * @summary List task results
  */
 const listTaskResults = (

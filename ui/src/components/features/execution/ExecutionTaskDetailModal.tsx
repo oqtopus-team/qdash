@@ -8,6 +8,7 @@ import type { Task } from "@/schemas";
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
+import { distinctCallId } from "@/components/features/execution/executionTopologyTasks";
 import {
   ExecutionHistoryModalContent,
   type ExecutionHistoryMobileTab,
@@ -163,6 +164,11 @@ export function ExecutionTaskDetailModal({
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-sm truncate">{task.name || "Unnamed"}</div>
+                      {distinctCallId(task) && (
+                        <div className="text-xs font-mono opacity-70 truncate">
+                          {distinctCallId(task)}
+                        </div>
+                      )}
                       <div className="text-xs opacity-70 mt-1">
                         {task.start_at ? formatDateTimeCompact(String(task.start_at)) : ""}
                       </div>
@@ -259,6 +265,16 @@ export function ExecutionTaskDetailModal({
             <div className="flex items-center gap-2">
               <span className="font-medium">Task Name:</span>
               <span className="font-mono">{selectedTask.name}</span>
+            </div>
+          )}
+          {selectedTask.invocation?.call_id && (
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Call:</span>
+              <span className="font-mono truncate">
+                {selectedTask.invocation.step_id
+                  ? `${selectedTask.invocation.step_id}.${selectedTask.invocation.call_id}`
+                  : selectedTask.invocation.call_id}
+              </span>
             </div>
           )}
           <div className="flex items-center gap-2">

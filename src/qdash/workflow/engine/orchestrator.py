@@ -8,6 +8,7 @@ This module handles the lifecycle of a calibration session:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import math
@@ -35,12 +36,28 @@ from qdash.workflow.engine.task_parameters import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from qdash.datamodel.task_invocation import TaskInvocation
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.config import CalibConfig
     from qdash.workflow.engine.task.snapshot_loader import SnapshotParameterLoader
     from qdash.workflow.service.github import GitHubIntegration
 
 logger = logging.getLogger(__name__)
+
+
+def _attach_task_ids(exc: Exception, task_ids: Mapping[str, str]) -> None:
+    """Record the failed runs' task ids on the exception for the call result."""
+    # Some builtin exceptions reject attributes; the result then lacks the id.
+    with contextlib.suppress(AttributeError, TypeError):
+        exc.qdash_task_ids = dict(task_ids)  # type: ignore[attr-defined]
+
+
+def _workflow_key(
+    task_name: str, invocation: TaskInvocation | None
+) -> tuple[str, str | None, str | None]:
+    if invocation is None:
+        return (task_name, None, None)
+    return (task_name, invocation.step_id, invocation.call_id)
 
 
 class CalibOrchestrator:
@@ -393,6 +410,7 @@ class CalibOrchestrator:
         qid: str,
         parameters: Mapping[str, Any] | None = None,
         upstream_id: str | None = None,
+        invocation: TaskInvocation | None = None,
     ) -> dict[str, Any]:
         """Run a calibration task.
 
@@ -410,16 +428,19 @@ class CalibOrchestrator:
                 ``update_calibration_parameters``). They take precedence over the
                 service's ``task_parameters`` for this call only.
             upstream_id: Optional upstream task_id for dependency tracking
+            invocation: The planned step and call this run executes. It is recorded
+                on the task result; each run still gets its own ``task_id``.
 
         Returns:
-            Task output parameters including task_id
+            Task output parameters including task_id. When the task fails, the
+            raised exception carries the failed run's id as ``qdash_task_id``.
         """
         # Step 1: Create task instance
         task_instance = self._create_task_instance(task_name, parameters)
         task_type = task_instance.get_task_type()
 
         # Step 2: Register task in workflow
-        self._ensure_task_in_workflow(task_name, task_type, qid)
+        self._ensure_task_in_workflow(task_name, task_type, qid, invocation)
 
         # Step 3: Prepare execution context
         update_calibration_parameters = self._should_update_calibration_parameters(
@@ -431,8 +452,15 @@ class CalibOrchestrator:
             persist_output_parameters=update_calibration_parameters,
         )
 
+        planned = exec_context.state.ensure_task_exists(task_name, task_type, qid)
+        planned.invocation = invocation
+
         # Step 4: Execute via Prefect
-        executed_context = self._run_prefect_task(task_instance, exec_context, qid)
+        try:
+            executed_context = self._run_prefect_task(task_instance, exec_context, qid)
+        except Exception as exc:
+            _attach_task_ids(exc, {qid: planned.task_id})
+            raise
 
         # Step 5: Merge results and return
         return self._merge_and_extract_results(
@@ -449,6 +477,7 @@ class CalibOrchestrator:
         qids: list[str],
         parameters: Mapping[str, Any] | None = None,
         upstream_id: str | None = None,
+        invocation: TaskInvocation | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Run one calibration task for a batch of qubits.
 
@@ -463,7 +492,7 @@ class CalibOrchestrator:
         task_type = task_instance.get_task_type()
 
         for qid in qids:
-            self._ensure_task_in_workflow(task_name, task_type, qid)
+            self._ensure_task_in_workflow(task_name, task_type, qid, invocation)
 
         update_calibration_parameters = self._should_update_calibration_parameters(
             task_name, parameters
@@ -473,7 +502,16 @@ class CalibOrchestrator:
             upstream_id,
             persist_output_parameters=update_calibration_parameters,
         )
-        executed_context = self._run_prefect_batch_task(task_instance, exec_context, qids)
+        planned_ids: dict[str, str] = {}
+        for qid in qids:
+            planned = exec_context.state.ensure_task_exists(task_name, task_type, qid)
+            planned.invocation = invocation
+            planned_ids[qid] = planned.task_id
+        try:
+            executed_context = self._run_prefect_batch_task(task_instance, exec_context, qids)
+        except Exception as exc:
+            _attach_task_ids(exc, planned_ids)
+            raise
 
         return self._merge_and_extract_batch_results(
             executed_context,
@@ -832,8 +870,18 @@ class CalibOrchestrator:
             self._published_name_owner[(task_type, qid, name)] = task_key
         self._published_names_by_task[task_key] = published_names
 
-    def _ensure_task_in_workflow(self, task_name: str, task_type: str, qid: str) -> None:
-        """Ensure task exists in TaskContext's workflow structure."""
+    def _ensure_task_in_workflow(
+        self,
+        task_name: str,
+        task_type: str,
+        qid: str,
+        invocation: TaskInvocation | None = None,
+    ) -> None:
+        """Register a planned call in the session's workflow structure.
+
+        Entries are keyed by task name and call identity, so repeated calls of
+        one task in a step are each listed; repeated runs of the same call are not.
+        """
         from qdash.datamodel.task import (
             CouplingTaskModel,
             GlobalTaskModel,
@@ -855,16 +903,15 @@ class CalibOrchestrator:
 
         model_cls, attr, uses_qid_key = entry
         collection = getattr(self.task_context.task_result, attr)
-
+        key = _workflow_key(task_name, invocation)
+        existing = collection.get(qid, []) if uses_qid_key else collection
+        if key in {_workflow_key(t.name, t.invocation) for t in existing}:
+            return
         if uses_qid_key:
-            if qid in collection and task_name in [t.name for t in collection[qid]]:
-                return
-            new_task = model_cls(name=task_name, upstream_id="", qid=qid)
+            new_task = model_cls(name=task_name, upstream_id="", qid=qid, invocation=invocation)
             collection.setdefault(qid, []).append(new_task)
         else:
-            if task_name in [t.name for t in collection]:
-                return
-            new_task = model_cls(name=task_name, upstream_id="")
+            new_task = model_cls(name=task_name, upstream_id="", invocation=invocation)
             collection.append(new_task)
 
         # Save updated workflow

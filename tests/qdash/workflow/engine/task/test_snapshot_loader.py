@@ -3,12 +3,21 @@
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from qdash.datamodel.task_invocation import TaskInvocation
 from qdash.workflow.engine.task.snapshot_loader import (
     DEFAULT_SNAPSHOT_LIMIT,
+    SnapshotAmbiguityError,
     SnapshotParameterLoader,
 )
 
-_CacheType = dict[tuple[str, str], tuple[dict[str, Any], dict[str, Any]]]
+_Record = tuple[TaskInvocation | None, dict[str, Any], dict[str, Any]]
+_CacheType = dict[tuple[str, str], list[_Record]]
+
+
+def _invocation(call_id: str, step_id: str = "coherence") -> TaskInvocation:
+    return TaskInvocation(step_id=step_id, call_id=call_id, plan_digest="plan-1")
 
 
 class TestSnapshotParameterLoaderInit:
@@ -67,12 +76,14 @@ class TestSnapshotParameterLoaderLoad:
         doc.qid = qid
         doc.input_parameters = input_params
         doc.run_parameters = run_params
+        doc.invocation = None
         return doc
 
     @patch("qdash.workflow.engine.task.snapshot_loader.TaskResultHistoryDocument")
     def test_source_task_id_loads_exact_task(self, mock_doc_cls: MagicMock) -> None:
         """Single-task re-execution uses its stable task result ID."""
         doc = self._make_doc("CheckRabi", "0", {"freq": {"value": 5.0}}, {"shots": {"value": 1024}})
+        doc.invocation = _invocation("rabi_first")
         mock_doc_cls.find_one.return_value.run.return_value = doc
 
         loader = SnapshotParameterLoader(
@@ -173,6 +184,7 @@ class TestSnapshotParameterLoaderLoad:
         doc.qid = "0"
         doc.input_parameters = None
         doc.run_parameters = None
+        doc.invocation = None
 
         mock_query = MagicMock()
         mock_query.sort.return_value = mock_query
@@ -184,7 +196,7 @@ class TestSnapshotParameterLoaderLoad:
         loader._load()
 
         assert loader._cache is not None
-        assert loader._cache[("TaskA", "0")] == ({}, {})
+        assert loader._cache[("TaskA", "0")] == [(None, {}, {})]
 
 
 class TestSnapshotParameterLoaderGetSnapshot:
@@ -197,10 +209,13 @@ class TestSnapshotParameterLoaderGetSnapshot:
 
     def test_get_snapshot_returns_cached_data(self) -> None:
         cache: _CacheType = {
-            ("CheckRabi", "0"): (
-                {"freq": {"value": 5.0, "unit": "GHz"}},
-                {"shots": {"value": 1024}},
-            )
+            ("CheckRabi", "0"): [
+                (
+                    None,
+                    {"freq": {"value": 5.0, "unit": "GHz"}},
+                    {"shots": {"value": 1024}},
+                )
+            ]
         }
         loader = self._make_loader_with_cache(cache)
 
@@ -230,3 +245,112 @@ class TestSnapshotParameterLoaderGetSnapshot:
 
         mock_load.assert_called_once()
         assert result is None
+
+
+class TestSnapshotCallIdentity:
+    """Execution replay restores each repeated call's own record."""
+
+    def _loader(self, cache: _CacheType) -> SnapshotParameterLoader:
+        loader = SnapshotParameterLoader("exec-001", "proj-1")
+        loader._cache = cache
+        return loader
+
+    def test_repeated_calls_restore_their_own_records(self) -> None:
+        loader = self._loader(
+            {
+                ("CheckRamsey", "0"): [
+                    (
+                        _invocation("ramsey_coarse"),
+                        {"f": {"value": 1}},
+                        {"detuning": {"value": 1e-3}},
+                    ),
+                    (
+                        _invocation("ramsey_fine"),
+                        {"f": {"value": 2}},
+                        {"detuning": {"value": 2e-4}},
+                    ),
+                ]
+            }
+        )
+
+        assert loader.get_snapshot("CheckRamsey", "0", _invocation("ramsey_fine")) == (
+            {"f": {"value": 2}},
+            {"detuning": {"value": 2e-4}},
+        )
+        assert loader.get_snapshot("CheckRamsey", "0", _invocation("ramsey_coarse")) == (
+            {"f": {"value": 1}},
+            {"detuning": {"value": 1e-3}},
+        )
+
+    def test_call_identity_includes_the_step(self) -> None:
+        loader = self._loader(
+            {("CheckRamsey", "0"): [(_invocation("ramsey", step_id="first"), {}, {})]}
+        )
+
+        assert loader.get_snapshot("CheckRamsey", "0", _invocation("ramsey", "second")) is None
+
+    def test_unknown_call_is_missing_rather_than_another_call(self) -> None:
+        loader = self._loader(
+            {("CheckRamsey", "0"): [(_invocation("ramsey_coarse"), {"f": {"value": 1}}, {})]}
+        )
+
+        assert loader.get_snapshot("CheckRamsey", "0", _invocation("ramsey_fine")) is None
+
+    def test_one_legacy_record_without_identity_is_still_used(self) -> None:
+        loader = self._loader({("CheckRabi", "0"): [(None, {"amp": {"value": 0.1}}, {})]})
+
+        assert loader.get_snapshot("CheckRabi", "0", _invocation("CheckRabi")) == (
+            {"amp": {"value": 0.1}},
+            {},
+        )
+        assert loader.get_snapshot("CheckRabi", "0") == ({"amp": {"value": 0.1}}, {})
+
+    def test_repeated_legacy_records_are_ambiguous(self) -> None:
+        loader = self._loader(
+            {
+                ("CheckRabi", "0"): [
+                    (None, {"amp": {"value": 0.1}}, {}),
+                    (None, {"amp": {"value": 0.2}}, {}),
+                ]
+            }
+        )
+
+        with pytest.raises(SnapshotAmbiguityError, match="2 times without call identities"):
+            loader.get_snapshot("CheckRabi", "0", _invocation("rabi_second"))
+
+    def test_identified_records_need_an_identified_request(self) -> None:
+        loader = self._loader(
+            {
+                ("CheckRamsey", "0"): [
+                    (_invocation("ramsey_coarse"), {}, {}),
+                    (_invocation("ramsey_fine"), {}, {}),
+                ]
+            }
+        )
+
+        with pytest.raises(SnapshotAmbiguityError, match="no call identity"):
+            loader.get_snapshot("CheckRamsey", "0")
+
+    @patch("qdash.workflow.engine.task.snapshot_loader.TaskResultHistoryDocument")
+    def test_load_keeps_every_record_in_order(self, mock_doc_cls: MagicMock) -> None:
+        docs = []
+        for call_id in ("ramsey_coarse", "ramsey_fine"):
+            doc = MagicMock()
+            doc.name = "CheckRamsey"
+            doc.qid = "0"
+            doc.input_parameters = {"call": {"value": call_id}}
+            doc.run_parameters = {}
+            doc.invocation = _invocation(call_id)
+            docs.append(doc)
+        mock_query = MagicMock()
+        mock_query.sort.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.run.return_value = docs
+        mock_doc_cls.find.return_value = mock_query
+
+        loader = SnapshotParameterLoader("exec-001", "proj-1")
+
+        assert loader.get_snapshot("CheckRamsey", "0", _invocation("ramsey_coarse")) == (
+            {"call": {"value": "ramsey_coarse"}},
+            {},
+        )

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_valid
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.evaluation import EvaluationExampleModel
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
+from qdash.datamodel.task_invocation import TaskInvocation
 
 
 class InputParameterModel(BaseModel):
@@ -292,6 +293,10 @@ class TaskResultResponse(BaseModel):
     output_parameters: dict[str, TaskResultOutputParameter]
     output_parameter_names: list[str] = Field(default_factory=list)
     run_parameters: dict[str, Any] = {}
+    invocation: TaskInvocation | None = Field(
+        default=None,
+        description="Planned step and call this result executed; null for older results.",
+    )
     note: dict[str, Any] = {}
     tags: list[str] = []
     message: str = ""
