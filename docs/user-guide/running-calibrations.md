@@ -56,8 +56,8 @@ Alt: Task workbench ready to run one calibration task with resolved inputs and r
    use the current calibration value.
 5. Enable **Reconfigure hardware first** when the current calibration configuration must be
    applied before the task starts.
-6. Enable **Save calibrated outputs to DB** only when successful outputs should become the current
-   calibration values.
+6. Enable **Update calibration values** only when successful outputs should become the current
+   calibration values. The run is saved in task history either way.
 7. Select **Run task** and follow the status in **Results**.
 
 The run button stays disabled while another execution holds the same hardware or until **Reload**

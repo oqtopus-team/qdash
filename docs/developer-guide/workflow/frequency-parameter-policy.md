@@ -261,7 +261,7 @@ the calibration database. It cannot import `qubit_frequency.yaml` or
 
 ## Execution Controls and Results
 
-The Task Workbench starts with **Save calibrated outputs to DB** disabled. A run still records its
+The Task Workbench starts with **Update calibration values** disabled. A run still records its
 measurements and artifacts, but its outputs do not become current calibration values. Enabling the
 control publishes validated outputs to every destination declared by the task and can update mapped
 YAML files when that integration is configured.

@@ -365,6 +365,67 @@ def test_batch_mode_rejects_input_overrides_before_any_batch(
     assert recorder.log == []
 
 
+@pytest.mark.parametrize("mode", ["synchronized", "scheduled"])
+def test_isolated_workers_receive_each_calls_input_and_writeback(
+    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    """Call settings travel with the plan; workers have no session-wide write-back policy."""
+    _schedule(monkeypatch)
+    measure = TaskCall(
+        name="CheckRabi",
+        call_id="rabi_measure",
+        input={"control_frequency": 5.0},
+        update_calibration_parameters=False,
+    )
+    calibrate = TaskCall(name="CheckRabi", call_id="rabi_calibrate")
+    configs: list[dict[str, Any]] = []
+    isolated = scheduling_tasks._create_isolated_session
+
+    def capture(session_config: dict[str, Any], qids: list[str]) -> Any:
+        configs.append(session_config)
+        return isolated(session_config, qids)
+
+    monkeypatch.setattr(scheduling_tasks, "_create_isolated_session", capture)
+    step = CustomOneQubit(step_name="rabi", mode=mode, tasks=[measure, calibrate])
+
+    step.execute(_service(), QubitTargets(["0", "1", "4", "5"]), StepContext())
+
+    assert recorder.sessions
+    for session in recorder.sessions:
+        assert session.parameters["rabi_measure"] == {
+            "run": {},
+            "input": {"control_frequency": 5.0},
+            "update_calibration_parameters": False,
+        }
+        # A call that does not set it leaves the decision to the worker's defaults (True).
+        assert "update_calibration_parameters" not in session.parameters["rabi_calibrate"]
+    assert configs
+    assert all("persist_output_parameters" not in config for config in configs)
+
+
+def test_stage_runner_batch_carries_measurement_only_calls(
+    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _schedule(monkeypatch)
+    parent = RecordingSession(recorder.log, recorder.fail)
+    monkeypatch.setattr("qdash.workflow.service.one_qubit_stage_runner.get_session", lambda: parent)
+    step = CustomOneQubit(
+        step_name="spectroscopy",
+        mode="simultaneous_spectroscopy",
+        tasks=[
+            TaskCall(
+                name="CheckQubitSpectroscopy",
+                call_id="spec_measure",
+                update_calibration_parameters=False,
+            )
+        ],
+    )
+
+    step.execute(_service(), QubitTargets(["0", "1"]), StepContext())
+
+    assert parent.parameters["spec_measure"]["update_calibration_parameters"] is False
+
+
 def test_two_qubit_calls_carry_identity_per_coupling(recorder: SimpleNamespace) -> None:
     recorder.fail.add(("zx90_check_coarse", "0-1"))
     calls = [

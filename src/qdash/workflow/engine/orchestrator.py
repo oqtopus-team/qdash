@@ -207,7 +207,6 @@ class CalibOrchestrator:
                 calib_dir=config.calib_data_path,
                 history_recorder=self._create_history_recorder(),
                 force_update_params=config.force_update_params,
-                persist_output_parameters=config.persist_output_parameters,
             )
 
             # Initialize Backend
@@ -449,7 +448,7 @@ class CalibOrchestrator:
         exec_context = self._prepare_execution_context(
             qid,
             upstream_id,
-            persist_output_parameters=update_calibration_parameters,
+            update_calibration_parameters=update_calibration_parameters,
         )
 
         planned = exec_context.state.ensure_task_exists(task_name, task_type, qid)
@@ -500,7 +499,7 @@ class CalibOrchestrator:
         exec_context = self._prepare_batch_execution_context(
             qids,
             upstream_id,
-            persist_output_parameters=update_calibration_parameters,
+            update_calibration_parameters=update_calibration_parameters,
         )
         planned_ids: dict[str, str] = {}
         for qid in qids:
@@ -613,12 +612,17 @@ class CalibOrchestrator:
         task_name: str,
         parameters: Mapping[str, Any] | None,
     ) -> bool:
-        """Return whether one task should update the current calibration parameters."""
+        """Return whether one task should update the current calibration parameters.
+
+        The call's own setting wins, then the task's entry in ``task_parameters``
+        (the per-task defaults isolated workers inherit), then ``True``. There is
+        no session-wide fallback, so a worker resolves the same value as its parent.
+        """
         explicit = normalize_task_settings(task_name, parameters)
         configured = normalize_task_settings(task_name, self.config.task_parameters.get(task_name))
         value = explicit.get(
             UPDATE_CALIBRATION_PARAMETERS,
-            configured.get(UPDATE_CALIBRATION_PARAMETERS, self.config.persist_output_parameters),
+            configured.get(UPDATE_CALIBRATION_PARAMETERS, True),
         )
         if not isinstance(value, bool):
             raise ValueError(f"update_calibration_parameters for {task_name} must be a boolean")
@@ -629,7 +633,7 @@ class CalibOrchestrator:
         qid: str,
         upstream_id: str | None,
         *,
-        persist_output_parameters: bool,
+        update_calibration_parameters: bool,
     ) -> TaskContext:
         """Prepare a TaskContext for task execution."""
         from copy import deepcopy
@@ -648,7 +652,7 @@ class CalibOrchestrator:
             snapshot_loader=self._snapshot_loader,
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
-            persist_output_parameters=persist_output_parameters,
+            update_calibration_parameters=update_calibration_parameters,
         )
 
         # Copy relevant calibration data
@@ -679,7 +683,7 @@ class CalibOrchestrator:
         qids: list[str],
         upstream_id: str | None,
         *,
-        persist_output_parameters: bool,
+        update_calibration_parameters: bool,
     ) -> TaskContext:
         """Prepare a TaskContext for batch task execution."""
         from copy import deepcopy
@@ -696,7 +700,7 @@ class CalibOrchestrator:
             snapshot_loader=self._snapshot_loader,
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
-            persist_output_parameters=persist_output_parameters,
+            update_calibration_parameters=update_calibration_parameters,
         )
 
         relevant_qids: list[str] = []

@@ -989,7 +989,7 @@ async def test_execute_authorized_action_runs_like_the_task_workbench(
     assert sent["task_run_parameters"] == {"CheckQubitSpectroscopy": {}}
     assert sent["execution_name"] == "agent:CheckQubitSpectroscopy"
     assert sent["tags"] == [f"agent-session:{session.session_id}"]
-    assert sent["persist_output_parameters"] is False
+    assert sent["update_calibration_parameters"] is False
     assert sent["update_params"] is False
     assert result.execution_status == "queued"
     assert result.operation_id == "operation-1"

@@ -1,14 +1,30 @@
 """Schema definitions for task router."""
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.evaluation import EvaluationExampleModel
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 from qdash.datamodel.task_invocation import TaskInvocation
+from qdash.datamodel.task_settings import (
+    LEGACY_UPDATE_CALIBRATION_PARAMETERS,
+    LEGACY_UPDATE_CALIBRATION_PARAMETERS_DEPRECATION,
+    UPDATE_CALIBRATION_PARAMETERS,
+    resolve_update_calibration_parameters_alias,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class InputParameterModel(BaseModel):
@@ -58,8 +74,40 @@ class QuickRunTaskRequest(BaseModel):
         ),
     )
     reconfigure: bool = False
-    persist_output_parameters: bool = False
+    update_calibration_parameters: bool = Field(
+        default=False,
+        description=(
+            "Replace the current calibration values with the task's validated outputs. "
+            "When false, the run still saves its task history, figures and raw data."
+        ),
+    )
     update_params: bool = False
+    persist_output_parameters: bool | None = Field(
+        default=None,
+        deprecated=True,
+        exclude=True,
+        description=(
+            "Deprecated alias of update_calibration_parameters; it will be removed. "
+            "A value that differs from update_calibration_parameters is rejected."
+        ),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_writeback(cls, data: Any) -> Any:
+        """Map the deprecated alias onto ``update_calibration_parameters``."""
+        if not isinstance(data, dict) or LEGACY_UPDATE_CALIBRATION_PARAMETERS not in data:
+            return data
+        data = dict(data)
+        legacy = data.pop(LEGACY_UPDATE_CALIBRATION_PARAMETERS)
+        if legacy is None:
+            return data
+        resolved = resolve_update_calibration_parameters_alias(
+            data.get(UPDATE_CALIBRATION_PARAMETERS), legacy
+        )
+        logger.warning(LEGACY_UPDATE_CALIBRATION_PARAMETERS_DEPRECATION)
+        data[UPDATE_CALIBRATION_PARAMETERS] = resolved
+        return data
 
 
 class KnowledgeFigureResponse(BaseModel):

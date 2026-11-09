@@ -385,6 +385,49 @@ class TestCalibServiceInitialization:
         assert session._orchestrator is not None
         assert session._orchestrator.config.configuration_mode == "ge-ef-fh"
 
+    def test_session_wide_persistence_argument_is_removed(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+    ):
+        """The removed argument fails instead of being ignored and leaving writes enabled."""
+        with pytest.raises(TypeError, match="persist_output_parameters"):
+            CalibService(  # type: ignore[call-arg]
+                username="test_user",
+                execution_id="20240101-001",
+                chip_id="chip_1",
+                qids=["0"],
+                backend_name="fake",
+                project_id="test_project",
+                lock_repo=mock_lock_repo,
+                user_repo=mock_user_repo,
+                persist_output_parameters=False,
+            )
+
+    def test_isolated_worker_resolves_writeback_like_its_parent(self, mock_flow_session_deps):
+        """Per-task write-back defaults reach the worker; calls still decide for themselves."""
+        from qdash.workflow.engine.orchestrator import CalibOrchestrator
+        from qdash.workflow.service._internal.scheduling_tasks import _create_isolated_session
+
+        session = _create_isolated_session(
+            {
+                "username": "test_user",
+                "chip_id": "chip_1",
+                "execution_id": "20240101-001",
+                "backend_name": "fake",
+                "project_id": "test_project",
+                "task_parameters": {"CheckRabi": {"update_calibration_parameters": False}},
+            },
+            ["0"],
+        )
+
+        assert session._orchestrator is not None
+        resolve = CalibOrchestrator(
+            session._orchestrator.config
+        )._should_update_calibration_parameters
+        assert resolve("CheckRabi", None) is False
+        assert resolve("CheckRabi", {"update_calibration_parameters": True}) is True
+        assert resolve("CheckT1", None) is True
+        assert resolve("CheckT1", {"update_calibration_parameters": False}) is False
+
     def test_flow_session_default_tags(
         self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
     ):

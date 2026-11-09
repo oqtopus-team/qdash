@@ -673,6 +673,7 @@ export * from './qubitResponseMetricNotes';
 export * from './quickRunTaskRequest';
 export * from './quickRunTaskRequestBackendName';
 export * from './quickRunTaskRequestInputParameterOverrides';
+export * from './quickRunTaskRequestPersistOutputParameters';
 export * from './quickRunTaskRequestRunParameterOverrides';
 export * from './quickRunTaskRequestSourceTaskId';
 export * from './reanalyzeOutputParameter';
