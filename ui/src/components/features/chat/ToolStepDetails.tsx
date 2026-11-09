@@ -8,6 +8,7 @@ import {
   FileDiff,
   FilePenLine,
   LineChart,
+  Tags,
   Terminal,
   Wrench,
 } from "lucide-react";
@@ -25,6 +26,9 @@ type ToolStep = Extract<TraceStep, { kind: "tool" }>;
 
 const WORKSPACE_TOOLS = new Set(["bash", "read", "write", "edit"]);
 
+/** The tool that asks the configured classifier model (agent-runtime classify-tool.ts). */
+const CLASSIFY_TOOL = "classify";
+
 export function isWorkspaceTool(tool: string): boolean {
   return WORKSPACE_TOOLS.has(tool);
 }
@@ -34,6 +38,7 @@ export function toolIcon(tool: string) {
   if (tool === "read") return FileCode;
   if (tool === "write") return FilePenLine;
   if (tool === "edit") return FileDiff;
+  if (tool === CLASSIFY_TOOL) return Tags;
   if (tool.includes("python") || tool.endsWith("_flow")) return Code2;
   if (tool.includes("chart") || tool.includes("timeseries") || tool.includes("plot")) {
     return LineChart;
@@ -106,6 +111,10 @@ export function stepPreview(step: ToolStep): string | null {
   if (step.tool === "qdash_save_flow" || step.tool === "qdash_execute_flow") {
     const name = text(args.name);
     return name ? `flow ${name}` : null;
+  }
+  if (step.tool === CLASSIFY_TOOL) {
+    const question = text(args.question);
+    return question ? firstLine(question) : null;
   }
   return argsPreview(args);
 }
@@ -207,6 +216,18 @@ export function stepTitle(step: ToolStep): string {
       return `${step.status === "done" || step.status === "error" ? "Read" : "Reading"}${path ? ` ${path}` : ""}`;
     case "qdash_save_flow":
       return drafting ? `Writing flow${name ? ` ${name}` : ""}` : step.label;
+    case CLASSIFY_TOOL: {
+      if (drafting) return "Writing a classification question";
+      if (step.status === "running") return "Classifying";
+      if (step.status === "error") return "Classification failed";
+      const outcome = step.classification?.outcome;
+      const category = step.classification?.category;
+      if (step.status === "done" && outcome === "classified" && category) {
+        return `Classified as ${category}`;
+      }
+      if (step.status === "done" && outcome === "ambiguous") return "Classification unclear";
+      return step.status === "done" ? "Classified" : step.label;
+    }
     default:
       return drafting ? `Writing a ${step.label.toLowerCase()} call` : step.label;
   }
@@ -341,6 +362,37 @@ function ArgsView({ args }: { args: unknown }) {
   );
 }
 
+/** What the assistant asked the classifier: the question, the candidates and the context. */
+function ClassifyArgsView({ args }: { args: Record<string, unknown> }) {
+  const question = text(args.question);
+  const context = text(args.context);
+  const categories = (Array.isArray(args.categories) ? args.categories : []).flatMap((entry) => {
+    const category = record(entry);
+    const name = text(category?.name);
+    return name ? [{ name, description: text(category?.description) }] : [];
+  });
+  return (
+    <div className="space-y-1.5 text-xs">
+      {question && <p className="text-base-content/75">{question}</p>}
+      {categories.length > 0 && (
+        <dl className="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-3 gap-y-0.5">
+          {categories.map((category) => (
+            <div key={category.name} className="contents">
+              <dt className="font-mono text-base-content/60">{category.name}</dt>
+              <dd className="m-0 min-w-0 text-base-content/55">{category.description}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {context && (
+        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-base-200/60 p-2 font-mono leading-relaxed text-base-content/65">
+          {context}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 /** Whether a step has anything to show under its row. */
 export function hasDetails(step: ToolStep): boolean {
   if (step.status === "drafting") return true;
@@ -387,6 +439,9 @@ export function ToolDetails({ step }: { step: ToolStep }) {
         <OutputPanel step={step} />
       </div>
     );
+  }
+  if (step.tool === CLASSIFY_TOOL && args) {
+    return <ClassifyArgsView args={args} />;
   }
   if (step.tool === "read") {
     const offset = args?.offset;

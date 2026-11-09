@@ -109,6 +109,61 @@ class TestTranslate:
         assert "evaluation" not in ends[1]
 
     @pytest.mark.asyncio
+    async def test_tool_end_carries_a_classify_decision(self) -> None:
+        decided = {
+            "classifier": "system-one-classifier/Open-Jev",
+            "outcome": "classified",
+            "category": "readout_problem",
+            "probability": 0.8,
+            "margin": 0.65,
+            "probabilities": [
+                {"category": "readout_problem", "probability": 0.8},
+                {"category": "drive_problem", "probability": 0.2},
+            ],
+        }
+        many = [{"category": f"c{i}", "probability": 0.05} for i in range(20)]
+        events = await _collect(
+            {"type": "tool_start", "name": "classify", "id": "k1"},
+            {
+                "type": "tool_end",
+                "name": "classify",
+                "id": "k1",
+                "isError": False,
+                "classification": {**decided, "state": {"context": "secret"}},
+            },
+            {
+                "type": "tool_end",
+                "name": "classify",
+                "isError": True,
+                "classification": {
+                    "classifier": "c/m",
+                    "outcome": "failed",
+                    "reason": "x" * 1000,
+                    "probability": True,
+                    "probabilities": [*many, "bogus", {"category": "a", "probability": 2}],
+                },
+            },
+            {
+                "type": "tool_end",
+                "name": "classify",
+                "isError": False,
+                "classification": {"classifier": "c/m", "outcome": "template"},
+            },
+            {"type": "done", "text": "ok"},
+        )
+        ends = [data for name, data in events if name == "tool_end"]
+        # Only the known fields pass: never what the classifier was sent.
+        assert ends[0]["classification"] == decided
+        assert ends[1]["classification"] == {
+            "classifier": "c/m",
+            "outcome": "failed",
+            "reason": "x" * 200,
+            "probabilities": many[:8],
+        }
+        assert ends[1]["is_error"] is True
+        assert "classification" not in ends[2]
+
+    @pytest.mark.asyncio
     async def test_tool_end_carries_a_workspace_tools_answer(self) -> None:
         events = await _collect(
             {"type": "tool_start", "name": "bash", "id": "c9"},

@@ -42,6 +42,77 @@ describe("copilotChatStream", () => {
     expect(tool(steps)).toMatchObject({ status: "done", output: "Wrote 19 bytes", exitCode: 0 });
   });
 
+  it("keeps a classify decision on its step through a reload", () => {
+    const classification = {
+      classifier: "system-one-classifier/Open-Jev",
+      outcome: "classified",
+      category: "readout_problem",
+      probability: 0.8,
+      margin: 0.65,
+      probabilities: [
+        { category: "readout_problem", probability: 0.8 },
+        { category: "drive_problem", probability: 0.2 },
+      ],
+    };
+    let steps = startTool([], {
+      id: "k1",
+      tool: "classify",
+      label: "Classify",
+      args: { question: "Why?", categories: [], context: "Q04 fit failed" },
+    });
+    steps = endTool(steps, { id: "k1", tool: "classify", classification });
+    expect(tool(steps)).toMatchObject({ status: "done", classification });
+
+    const trace = toPersistedTrace(
+      { steps: [...steps, { kind: "text", text: "ok" }], startedAt: 0 },
+      10,
+    );
+    const stored = JSON.parse(JSON.stringify(trace)) as typeof trace;
+    expect(tool(stored!.steps, 0).classification).toEqual(classification);
+  });
+
+  it("keeps a failed classification as an error step and drops malformed ones", () => {
+    const started = startTool([], { id: "k1", tool: "classify", label: "Classify" });
+    const failed = endTool(started, {
+      id: "k1",
+      tool: "classify",
+      is_error: true,
+      classification: { classifier: "c/m", outcome: "failed", reason: "timed out after 5 s" },
+    });
+    expect(tool(failed)).toMatchObject({
+      status: "error",
+      classification: { classifier: "c/m", outcome: "failed", reason: "timed out after 5 s" },
+    });
+    for (const classification of [
+      "bogus",
+      { classifier: "c/m", outcome: "template" },
+      { outcome: "failed" },
+    ]) {
+      expect(
+        tool(endTool(started, { id: "k1", tool: "classify", classification })),
+      ).not.toHaveProperty("classification");
+    }
+    const partial = endTool(started, {
+      id: "k1",
+      tool: "classify",
+      classification: {
+        classifier: "c/m",
+        outcome: "ambiguous",
+        probability: 3,
+        probabilities: [
+          "x",
+          { category: "a", probability: 0.5 },
+          { category: "b", probability: -1 },
+        ],
+      },
+    });
+    expect(tool(partial).classification).toEqual({
+      classifier: "c/m",
+      outcome: "ambiguous",
+      probabilities: [{ category: "a", probability: 0.5 }],
+    });
+  });
+
   it("opens a new step for a call that was never drafted", () => {
     const steps = startTool([], { id: "c1", tool: "qdash_list_chips", label: "List chips" });
     expect(tool(steps)).toMatchObject({ status: "running", id: "c1" });

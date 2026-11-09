@@ -4,6 +4,7 @@ import { defineTool } from "@earendil-works/pi-durable";
 import { Type, type Static } from "typebox";
 
 import { classifierLabel, selectClassifierModel, type ClassifierModels, type Log } from "./classifier-models.ts";
+import { classifyWithin } from "./classify-tool.ts";
 // See ui-tool.ts for why this path resolves in the image too.
 import {
   UI_BLOCK_VERSION,
@@ -481,41 +482,13 @@ function buildClassifyTool(config: PresentationConfig) {
           isError: true,
         };
       }
-      const timeout = AbortSignal.timeout(config.timeoutMs);
-      const signal = context.abortSignal ? AbortSignal.any([timeout, context.abortSignal]) : timeout;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      // `classify()` never rejects and honours `signal`; the race also bounds an
-      // implementation that ignores it.
-      const late = new Promise<ClassifierResult>((resolve) => {
-        timer = setTimeout(
-          () =>
-            resolve({
-              api: model.api,
-              provider: model.provider,
-              model: model.id,
-              answers: {},
-              stopReason: "aborted",
-              errorMessage: `timed out after ${config.timeoutMs} ms`,
-              timestamp: Date.now(),
-            }),
-          config.timeoutMs + 50,
-        );
-      });
-      let result: ClassifierResult;
-      try {
-        result = await Promise.race([
-          api.models.classify(model, classifierContext(args.state as JsonObject), {
-            signal,
-            ...(context.telemetry ? { telemetry: context.telemetry } : {}),
-          }),
-          late,
-        ]);
-      } finally {
-        clearTimeout(timer);
-      }
-      if (result.stopReason === "aborted" && timeout.aborted && !result.errorMessage?.includes("timed out")) {
-        result = { ...result, errorMessage: `timed out after ${config.timeoutMs} ms` };
-      }
+      const { result } = await classifyWithin(
+        api.models,
+        model,
+        classifierContext(args.state as JsonObject),
+        config.timeoutMs,
+        context,
+      );
       const ok = result.stopReason === "stop";
       return {
         output: [{ type: "text" as const, text: ok ? `classified with ${label}` : `classifier ${result.stopReason}` }],
