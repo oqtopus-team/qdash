@@ -40,6 +40,7 @@ from qdash.datamodel.calibration_pipeline import (
     SPEC_VERSION,
     STEP_CATALOG,
     CalibrationPipelineSpec,
+    ConfigureAllStep,
     FilterByMetricStep,
     FilterByStatusStep,
     PipelineStep,
@@ -228,7 +229,12 @@ class CalibrationPipelineService:
             plan_digest=parsed.plan_digest(),
             targets=targets,
             steps=steps,
-            task_run_count=len(parsed.all_tasks()),
+            # ConfigureAll runs once for its MUXes, not once per target.
+            task_run_count=sum(
+                len(step_calls(step))
+                for step in parsed.steps
+                if not isinstance(step, ConfigureAllStep)
+            ),
         )
 
     @staticmethod
@@ -417,8 +423,21 @@ class CalibrationPipelineService:
         spec: CalibrationPipelineSpec,
         problems: list[PipelineProblem],
     ) -> None:
+        """Report explicit calls whose task the backend lacks or whose type the step cannot run.
+
+        Default task lists are the templates' own and are not judged.
+        """
         types = self.task_types(project_id, backend)
         for step_index, step in enumerate(spec.steps):
+            if isinstance(step, ConfigureAllStep) and step.call is not None:
+                if step.call.name not in types:
+                    problems.append(
+                        _problem(
+                            f"steps[{step_index}].call",
+                            f"task {step.call.name!r} is not available on backend {backend!r}",
+                        )
+                    )
+                continue
             scope = STEP_CATALOG[step.type].task_scope
             if scope is None:
                 continue

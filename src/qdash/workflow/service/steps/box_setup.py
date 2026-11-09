@@ -8,12 +8,13 @@ from typing import TYPE_CHECKING
 
 from prefect import get_run_logger
 
-from qdash.datamodel.task_call import TaskCall
+from qdash.datamodel.calibration_pipeline import configure_all_call
 from qdash.datamodel.task_settings import merge_task_parameters, normalize_task_settings
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.targets import MuxTargets
 
 if TYPE_CHECKING:
+    from qdash.datamodel.task_call import TaskCall
     from qdash.workflow.service.calib_service import CalibService
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
@@ -32,18 +33,16 @@ class ConfigureAll(CalibrationStep):
     call: TaskCall | None = None
 
     def __post_init__(self) -> None:
-        if self.call is not None and self.call.name != "ConfigureAll":
-            raise ValueError(f"ConfigureAll call must name ConfigureAll, got {self.call.name!r}")
+        """Reject a call that does not name the ConfigureAll task."""
+        configure_all_call(self.call)
 
     @property
     def name(self) -> str:
         return self.step_id or "configure_all"
 
     def calls(self) -> tuple[TaskCall, ...]:
-        # mux_ids is resolved from the targets when the step runs.
-        if self.call is None:
-            return (TaskCall(name="ConfigureAll", call_id="ConfigureAll"),)
-        return (self.call.model_copy(update={"call_id": self.call.resolved_call_id}),)
+        """The one ConfigureAll call; ``execute`` sets its mux_ids from the targets."""
+        return (configure_all_call(self.call),)
 
     @property
     def provides(self) -> set[str]:
@@ -104,6 +103,7 @@ class ConfigureAll(CalibrationStep):
         return ctx
 
     def _resolve_mux_ids(self, service: CalibService, targets: Target) -> list[int]:
+        """The MUXes to configure: the step's own, the targets', or the session's."""
         if self.mux_ids is not None:
             return list(self.mux_ids)
         if isinstance(targets, MuxTargets):

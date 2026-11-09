@@ -64,9 +64,9 @@ Beyond the spec's shape, `validate` reports what a task would reject before it m
 
 | Check | Problem path | What it catches |
 | --- | --- | --- |
-| Run parameter names | `task_parameters.<task>.run.<name>`, `steps[i].tasks[j].run.<name>` | A name the task does not declare, or a calibration input set under `run` |
-| Input names | `task_parameters.<task>.input.<name>`, `steps[i].tasks[j].input.<name>` | A name the task does not declare, or a run parameter set under `input` |
-| Run parameter types | `task_parameters.<task>.run.<name>`, `steps[i].tasks[j].run.<name>`, `default_run_parameters.<name>` | A value whose type the declaration cannot take, such as a sweep for `shots`; a shared value is checked against every pipeline task that declares it, and one that no task declares is reported because it would be ignored |
+| Run parameter names | `task_parameters.<task>.run.<name>`, `steps[i].tasks[j].run.<name>`, `steps[i].call.run.<name>` | A name the task does not declare, or a calibration input set under `run` |
+| Input names | `task_parameters.<task>.input.<name>`, `steps[i].tasks[j].input.<name>`, `steps[i].call.input.<name>` | A name the task does not declare, or a run parameter set under `input` |
+| Run parameter types | `task_parameters.<task>.run.<name>`, `steps[i].tasks[j].run.<name>`, `steps[i].call.run.<name>`, `default_run_parameters.<name>` | A value whose type the declaration cannot take, such as a sweep for `shots`; a shared value is checked against every pipeline task that declares it, and one that no task declares is reported because it would be ignored |
 | Session readout duration | `default_run_parameters.readout_duration`, `task_parameters.<task>.run.readout_duration`, `steps[i].tasks[j].run.readout_duration` | A non-positive shared value, or a per-task or per-call value that differs from the session (`readout_duration` is session-scoped in Qubex; the session uses the shared value, or 1024 ns when none is set) |
 | Batch inputs | `steps[i].tasks[j]` or `steps[i]` | A `simultaneous_spectroscopy` step whose calls set calibration inputs, which batch execution does not support |
 | Required inputs | `steps[i].tasks[j]` | A `database_required` input of a qubit task that no earlier call in the pipeline publishes and that a target qubit lacks in its calibration data, such as `CheckT1` without Rabi parameters. A call publishes its outputs unless its effective `update_calibration_parameters` (the call's own value, else `task_parameters.<task>`) is `false`. An `input` override does not satisfy the requirement, because the task loads required inputs from the database before it applies overrides |
@@ -78,7 +78,7 @@ Coupling steps are not checked for required inputs; their inputs span two qubits
 
 | Type | Kind | Runs | Needs before it |
 | --- | --- | --- | --- |
-| `ConfigureAll` | calibration | ConfigureAll for the targets' MUXes | nothing |
+| `ConfigureAll` | calibration | one `ConfigureAll` call, or `call`, for `mux_ids` or the targets' MUXes | nothing |
 | `BringUp` | calibration | `BRINGUP_TASKS` or `tasks` | nothing |
 | `OneQubitCheck` | calibration | `CHECK_1Q_TASKS` or `tasks` | nothing |
 | `OneQubitFineTune` | calibration | `FULL_1Q_TASKS_AFTER_CHECK` or `tasks` | nothing |
@@ -89,7 +89,7 @@ Coupling steps are not checked for required inputs; their inputs span two qubits
 | `TwoQubitCalibration` | calibration | `FULL_2Q_TASKS` or `tasks` | candidate qubits |
 | `CustomTwoQubit` | calibration | `tasks` (coupling tasks) | candidate qubits |
 
-One-qubit steps take `mode` (`synchronized`, `scheduled`, `simultaneous_spectroscopy`, `serial`). Custom steps take a `step_name` and `continue_on_failure`. Every calibration step has a `step_id`: a custom step's `step_name`, a built-in step's `step_id` field, or the catalog name (`one_qubit_check`); it must be unique within the pipeline, so a spec that runs `OneQubitCheck` twice sets `step_id` on at least one of them. `configure: true` on `OneQubitCheck` or `OneQubitFineTune` runs a `Configure` call with `call_id` `Configure` before the step's calls; a step that sets it and also lists a `Configure` call, or another call with that `call_id`, is invalid at `steps[i]`. Targets are either `qids` or `mux_ids` with optional `exclude_qids`.
+One-qubit steps take `mode` (`synchronized`, `scheduled`, `simultaneous_spectroscopy`, `serial`). Custom steps take a `step_name` and `continue_on_failure`. Every calibration step has a `step_id`: a custom step's `step_name`, a built-in step's `step_id` field, or the catalog name (`one_qubit_check`); it must be unique within the pipeline, so a spec that runs `OneQubitCheck` twice sets `step_id` on at least one of them. `configure: true` on `OneQubitCheck` or `OneQubitFineTune` runs a `Configure` call with `call_id` `Configure` before the step's calls; a step that sets it and also lists a `Configure` call, or another call with that `call_id`, is invalid at `steps[i]`. `ConfigureAll` takes an optional `call`, a task call that must name `ConfigureAll`, such as `{"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr"}}`; it replaces a `task_parameters.ConfigureAll` entry, and without it the step runs a call with no settings of its own. The step's `mux_ids`, or the targets' MUXes when it is unset, replace any `run.mux_ids` from the call or `task_parameters`, so `validate` warns at that value. Targets are either `qids` or `mux_ids` with optional `exclude_qids`.
 
 A filter with `step` reads that earlier step, and with `call_id` one of its calls; a failed or missing call removes the qubit without falling back to another call of the same task. A metric filter on a step without `call_id` reads the step-level metrics the catalog lists for it; custom steps have none. A filter without `step` reads the latest `OneQubitFineTune` or `OneQubitCheck`, as in version 1. [Task Calls](./task-calls.md#results) describes the selection in full.
 

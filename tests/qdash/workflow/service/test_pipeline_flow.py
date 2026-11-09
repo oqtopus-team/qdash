@@ -24,6 +24,7 @@ from qdash.workflow.service.pipeline_flow import (
 )
 from qdash.workflow.service.steps import (
     CalibrationStep,
+    ConfigureAll,
     CustomOneQubit,
     FilterByMetric,
     FilterByStatus,
@@ -37,7 +38,11 @@ from qdash.workflow.service.targets import MuxTargets, QubitTargets
 
 # One instance of every step type the spec allows, with explicit fields.
 EVERY_STEP: list[dict[str, object]] = [
-    {"type": "ConfigureAll", "mux_ids": [0]},
+    {
+        "type": "ConfigureAll",
+        "mux_ids": [0],
+        "call": {"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr"}},
+    },
     {"type": "BringUp", "tasks": [{"name": "CheckResonatorSpectroscopy"}]},
     {"type": "OneQubitCheck", "mode": "scheduled", "configure": True},
     {"type": "FilterByStatus"},
@@ -88,9 +93,8 @@ def test_catalog_matches_the_step_classes() -> None:
         provided = set(built.provides)
         if isinstance(built, CalibrationStep):
             provided.add(built.resolved_step_id)
-            if entry.task_scope is not None:
-                # The API resolves the same calls, in the same order, as the worker runs.
-                assert list(built.calls()) == step_calls(spec_step), spec_step.type
+            # The API resolves the same calls, in the same order, as the worker runs.
+            assert list(built.calls()) == step_calls(spec_step), spec_step.type
             if entry.one_qubit_result:
                 metrics = getattr(built, "step_metrics", ())
                 assert tuple(metrics) == entry.step_metrics, spec_step.type
@@ -211,6 +215,60 @@ def test_python_steps_share_the_configure_call_policy(step_class: Any) -> None:
         step_class(configure=True, tasks=[TaskCall(name="Configure", call_id="explicit")])
     step = step_class(configure=True, tasks=[TaskCall(name="CheckRabi")])
     assert [call.call_id for call in step.calls()] == ["Configure", "CheckRabi"]
+
+
+def test_configure_all_call_reaches_the_plan_and_the_task(monkeypatch: Any) -> None:
+    """A spec ConfigureAll call runs with its settings; the targets' MUXes replace run.mux_ids."""
+    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service.steps import StepContext
+
+    call = {"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr", "mux_ids": [9]}}
+    parsed = CalibrationPipelineSpec.model_validate(
+        {
+            "spec_version": 2,
+            "targets": {"mux_ids": [2, 3]},
+            "steps": [{"type": "ConfigureAll", "call": call}],
+        }
+    )
+    [built] = build_steps(parsed)
+    assert isinstance(built, ConfigureAll)
+    assert list(built.calls()) == step_calls(parsed.steps[0])
+
+    service = MagicMock()
+    service._initialized = True
+    service.task_parameters = {}
+    service.default_run_parameters = {}
+    plan = CalibService.calibration_plan(service, [built])
+    assert plan["steps"][0]["calls"] == [
+        {
+            "name": "ConfigureAll",
+            "call_id": "ConfigureAll",
+            "run": {"configuration_mode": {"value": "ge-ef-cr"}, "mux_ids": {"value": [9]}},
+        }
+    ]
+    service.plan_digest = plan["digest"]
+
+    monkeypatch.setattr("qdash.workflow.service.steps.box_setup.get_run_logger", MagicMock)
+    built.execute(service, build_targets(parsed), StepContext())
+    _, kwargs = service.execute_task.call_args
+    assert kwargs["parameters"]["run"] == {
+        "configuration_mode": {"value": "ge-ef-cr"},
+        "mux_ids": {"value": [2, 3]},
+    }
+    invocation = kwargs["invocation"]
+    assert (invocation.step_id, invocation.call_id, invocation.plan_digest) == (
+        "configure_all",
+        "ConfigureAll",
+        plan["digest"],
+    )
+
+
+def test_configure_all_without_call_builds_the_default_call() -> None:
+    parsed = spec([{"type": "ConfigureAll", "mux_ids": [1]}])
+    [built] = build_steps(parsed)
+    assert isinstance(built, ConfigureAll)
+    assert (built.mux_ids, built.call) == ([1], None)
+    assert built.calls() == (TaskCall(name="ConfigureAll", call_id="ConfigureAll"),)
 
 
 def test_version_2_spec_is_not_converted() -> None:

@@ -74,6 +74,7 @@ def build_step(step: PipelineStep) -> Step:
     if isinstance(step, ConfigureAllStep):
         return ConfigureAll(
             mux_ids=list(step.mux_ids) if step.mux_ids is not None else None,
+            call=step.call,
             step_id=step.step_id,
         )
     if isinstance(step, BringUpStep):

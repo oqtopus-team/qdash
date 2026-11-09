@@ -602,3 +602,60 @@ def test_json_schema_lists_every_step_type_and_task_call() -> None:
     # task_parameters is deprecated in the schema but stays optional and accepted.
     assert schema["properties"]["task_parameters"]["deprecated"] is True
     assert schema["properties"]["task_parameters"]["description"].startswith("Deprecated")
+
+
+def test_configure_all_step_runs_the_default_call_without_changing_its_digest() -> None:
+    parsed = parse(targets={"mux_ids": [0]}, steps=[{"type": "ConfigureAll"}])
+    assert step_calls(parsed.steps[0]) == [TaskCall(name="ConfigureAll", call_id="ConfigureAll")]
+    assert parsed.all_tasks() == ["ConfigureAll"]
+    assert parsed.plan()["steps"][0]["calls"] == [
+        {"name": "ConfigureAll", "call_id": "ConfigureAll"}
+    ]
+    # An unset call is left out of the dump, so existing specs keep their plan digest.
+    assert "call" not in parsed.model_dump(mode="json")["steps"][0]
+
+
+def test_configure_all_step_call_carries_configuration_mode() -> None:
+    call = {"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr"}}
+    default = parse(targets={"mux_ids": [0]}, steps=[{"type": "ConfigureAll"}])
+    parsed = parse(targets={"mux_ids": [0]}, steps=[{"type": "ConfigureAll", "call": call}])
+    assert step_calls(parsed.steps[0]) == [
+        TaskCall(
+            name="ConfigureAll",
+            call_id="ConfigureAll",
+            run={"configuration_mode": "ge-ef-cr"},
+        )
+    ]
+    assert parsed.plan()["steps"][0]["calls"] == [
+        {
+            "name": "ConfigureAll",
+            "call_id": "ConfigureAll",
+            "run": {"configuration_mode": {"value": "ge-ef-cr"}},
+        }
+    ]
+    assert parsed.plan_digest() != default.plan_digest()
+    assert pipeline_warnings(parsed) == []
+
+
+@pytest.mark.parametrize(
+    ("call", "message"),
+    [
+        ({"name": "Configure"}, "must name ConfigureAll, got 'Configure'"),
+        ({"name": "ConfigureAll", "nonsense": 1}, "Extra inputs are not permitted"),
+        ("ConfigureAll", "valid dictionary or instance of TaskCall"),
+    ],
+)
+def test_configure_all_step_rejects_invalid_calls(call: Any, message: str) -> None:
+    with pytest.raises(ValidationError, match=message):
+        parse(targets={"mux_ids": [0]}, steps=[{"type": "ConfigureAll", "call": call}])
+
+
+def test_configure_all_mux_ids_settings_warn_that_the_step_replaces_them() -> None:
+    parsed = parse(
+        targets={"mux_ids": [0]},
+        steps=[{"type": "ConfigureAll", "call": {"name": "ConfigureAll", "run": {"mux_ids": [5]}}}],
+        task_parameters={"ConfigureAll": {"run": {"mux_ids": [6]}}},
+    )
+    warned = dict(pipeline_warnings(parsed))
+    assert "replaces this value" in warned["steps[0].call.run.mux_ids"]
+    assert "replaces this value" in warned["task_parameters.ConfigureAll.run.mux_ids"]

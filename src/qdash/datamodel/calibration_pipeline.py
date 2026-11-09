@@ -114,6 +114,23 @@ FULL_2Q_TASKS: list[TaskCall] = [
 
 CONFIGURE_CALL = TaskCall(name="Configure")
 
+CONFIGURE_ALL_CALL = TaskCall(name="ConfigureAll")
+
+
+def configure_all_call(call: TaskCall | None) -> TaskCall:
+    """The single call a ConfigureAll step runs, with its call_id filled in.
+
+    ``None`` means the default call without settings of its own. An explicit call
+    must name the ConfigureAll task; its ``run.mux_ids`` is replaced at run time
+    by the step's MUXes, which come from the step's ``mux_ids`` or its targets.
+    """
+    chosen = CONFIGURE_ALL_CALL if call is None else call
+    if chosen.name != CONFIGURE_ALL_CALL.name:
+        raise ValueError(
+            f"a ConfigureAll step's call must name {CONFIGURE_ALL_CALL.name}, got {chosen.name!r}"
+        )
+    return chosen.model_copy(update={"call_id": chosen.resolved_call_id})
+
 
 def calls_with_configure(
     calls: Sequence[Any], *, configure: bool, where: str = "tasks"
@@ -235,6 +252,25 @@ class ConfigureAllStep(_StepBase):
     mux_ids: list[int] | None = Field(
         default=None, description="MUXes to configure; defaults to the targets' MUXes."
     )
+    # Omitted from dumps when unset so a spec without it keeps its plan digest.
+    call: TaskCall | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Settings of the ConfigureAll call, e.g. "
+            '{"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr"}}. '
+            "Its name must be ConfigureAll. The step's mux_ids, or the targets' MUXes, "
+            "replace any run.mux_ids. Defaults to a call without settings of its own."
+        ),
+    )
+
+    @field_validator("call")
+    @classmethod
+    def _check_call(cls, value: TaskCall | None) -> TaskCall | None:
+        """Reject a call that names another task, as a problem at ``steps[i].call``."""
+        if value is not None:
+            configure_all_call(value)
+        return value
 
 
 class BringUpStep(_StepBase):
@@ -555,6 +591,8 @@ def step_id(step: PipelineStep) -> str | None:
 
 def step_calls(step: PipelineStep) -> list[TaskCall]:
     """The calls a step will run on every target, with call ids filled in."""
+    if isinstance(step, ConfigureAllStep):
+        return [configure_all_call(step.call)]
     entry = STEP_CATALOG[step.type]
     if entry.task_scope is None:
         return []
@@ -740,6 +778,9 @@ def pipeline_warnings(spec: CalibrationPipelineSpec) -> list[tuple[str, str]]:
 
     A non-empty ``task_parameters`` is deprecated in favor of settings on each call.
 
+    A ``run.mux_ids`` for ConfigureAll, on a step's call or in ``task_parameters``,
+    is replaced by the step's MUXes at run time, so it has no effect.
+
     A filter without a step reference reads the latest built-in one-qubit step
     (OneQubitFineTune, else OneQubitCheck), as in version 1; custom one-qubit
     steps between that step and the filter are not read.
@@ -755,6 +796,7 @@ def pipeline_warnings(spec: CalibrationPipelineSpec) -> list[tuple[str, str]]:
                 "(default_run_parameters for run values every task shares)",
             )
         )
+    found.extend(_ignored_mux_ids_warnings(spec))
     custom_since_builtin: list[str] = []
     for index, step in enumerate(spec.steps):
         if isinstance(step, OneQubitCheckStep | OneQubitFineTuneStep):
@@ -771,6 +813,24 @@ def pipeline_warnings(spec: CalibrationPipelineSpec) -> list[tuple[str, str]]:
                         f"{', '.join(custom_since_builtin)}; set step to choose explicitly",
                     )
                 )
+    return found
+
+
+def _ignored_mux_ids_warnings(spec: CalibrationPipelineSpec) -> list[tuple[str, str]]:
+    """Warnings for ConfigureAll ``run.mux_ids`` values that the step replaces."""
+    message = (
+        "ConfigureAll runs on the step's mux_ids, or the targets' MUXes when unset, "
+        "and replaces this value; set mux_ids on the ConfigureAll step instead"
+    )
+    found: list[tuple[str, str]] = []
+    defaults = spec.task_parameters.get(CONFIGURE_ALL_CALL.name)
+    has_configure_all = any(isinstance(step, ConfigureAllStep) for step in spec.steps)
+    if has_configure_all and defaults is not None and "mux_ids" in (defaults.run or {}):
+        found.append((f"task_parameters.{CONFIGURE_ALL_CALL.name}.run.mux_ids", message))
+    for index, step in enumerate(spec.steps):
+        if isinstance(step, ConfigureAllStep) and step.call is not None:
+            if "mux_ids" in (step.call.run or {}):
+                found.append((f"steps[{index}].call.run.mux_ids", message))
     return found
 
 

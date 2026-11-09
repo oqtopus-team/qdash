@@ -311,8 +311,10 @@ cal = CalibService(username, chip_id, default_run_parameters={"interval": 150 * 
 
 A task that runs as its own step rather than from a `tasks` list takes its call on the step; for
 example `ConfigureAll(call=TaskCall(name="ConfigureAll", run={"configuration_mode": "ge-ef-cr"}))`
-replaces a `task_parameters` entry for `ConfigureAll`. The step still adds `mux_ids` from its
-targets. Compare each call's effective settings under **Execution** before and after the change.
+replaces a `task_parameters` entry for `ConfigureAll`; in a pipeline spec, the `ConfigureAll`
+step's `call` field does the same. The step still sets `mux_ids` from its own `mux_ids` or its
+targets, replacing any `run.mux_ids` in the call. Compare each call's effective settings under
+**Execution** before and after the change.
 
 A pipeline spec's top-level `task_parameters` is deprecated in the same way; see
 [Calibration Pipeline Spec](./calibration-pipeline.md).
