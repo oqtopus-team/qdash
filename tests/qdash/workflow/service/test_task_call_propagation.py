@@ -407,3 +407,73 @@ def test_pipeline_filter_reads_the_custom_step_call(
         service, QubitTargets(["0", "1"]), ctx
     )
     assert ctx.candidate_qids == ["0", "1"]
+
+
+def test_coherence_check_second_ramsey_settings_reach_only_its_call(
+    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both coherence-check steps run per target, and only the long Ramsey carries overrides."""
+    import importlib
+
+    from qdash.workflow.engine.task_parameters import normalize_task_parameters
+
+    template = importlib.import_module("qdash.workflow.templates.coherence_check")
+    captured: dict[str, Any] = {}
+
+    class CapturingCalibService:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            captured["task_parameters"] = kwargs["task_parameters"]
+
+        def run(self, targets: Any, *, steps: list[Any]) -> None:
+            captured["targets"] = targets
+            captured["steps"] = steps
+
+    monkeypatch.setattr(template, "CalibService", CapturingCalibService)
+    template.coherence_check(username="alice", chip_id="64Q", qids=["0", "1", "4", "5"])
+    _schedule(monkeypatch)
+
+    ctx = StepContext()
+    for step in captured["steps"]:
+        ctx = step.execute(_service(), captured["targets"], ctx)
+
+    for qid in ("0", "1", "4", "5"):
+        assert [
+            (step_id, call_id) for step_id, call_id, _, target in recorder.log if target == qid
+        ] == [
+            ("coherence_check", "Configure"),
+            ("coherence_check", "CheckChevron"),
+            ("coherence_check", "CheckRabi"),
+            ("coherence_check", "CheckT1"),
+            ("coherence_check", "CheckT2Echo"),
+            ("coherence_check", "CheckRamsey"),
+            ("long_ramsey_check", "Configure"),
+            ("long_ramsey_check", "CheckRabi"),
+            ("long_ramsey_check", "ramsey_long"),
+        ]
+    # The step boundary keeps every first pass complete before any second pass starts.
+    step_ids = [step_id for step_id, *_ in recorder.log]
+    assert step_ids == sorted(step_ids, key=["coherence_check", "long_ramsey_check"].index)
+    for step_id in ("coherence_check", "long_ramsey_check"):
+        assert all(
+            data.status == "success"
+            for data in ctx.get_step_result(step_id).qubits.values()  # type: ignore[union-attr]
+        )
+
+    # Workers receive call-level settings only; the first Ramsey has none, so it
+    # keeps the service-wide defaults, while the long Ramsey overrides them.
+    defaults = normalize_task_parameters(captured["task_parameters"])
+    first_ramsey = captured["steps"][0].tasks[-1]
+    long_ramsey = captured["steps"][1].tasks[-1]
+    for session in recorder.sessions:
+        if "CheckRamsey" in session.parameters:
+            assert session.parameters["CheckRamsey"] == first_ramsey.settings()
+        if "ramsey_long" in session.parameters:
+            assert session.parameters["ramsey_long"]["run"] == {
+                "time_range": {"value": (0, 50_001, 500), "value_type": "np.arange"},
+                "detuning": {"value": 0.0002},
+            }
+    assert first_ramsey.effective_settings(defaults)["run"] == defaults["CheckRamsey"]["run"]
+    assert long_ramsey.effective_settings(defaults)["run"] == {
+        "time_range": {"value": (0, 50_001, 500), "value_type": "np.arange"},
+        "detuning": {"value": 0.0002},
+    }
