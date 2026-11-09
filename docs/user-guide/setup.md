@@ -64,9 +64,10 @@ for chat, and the corresponding `EVALUATION` pair for figure analysis. Base URLs
 `/v1`. Select models in `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml`.
 
 A classifier model chooses how the chat lays out the values it found: a calibration summary, an
-execution comparison, or a failure list. The chat also asks it when an answer depends on a
-judgment between a few categories, such as which kind of problem a failure points to; the
-chat's steps then show **Classifying** and the category the classifier chose. No classifier endpoint
+execution comparison, or a failure list. The chat also asks it when its next step depends on a
+judgment between a few categories: what kind of request a message is, which kind of problem a
+failure points to, which check to run next, or which other view suits the values. The chat's
+steps then show **Classifying** and the category the classifier chose. No classifier endpoint
 is preconfigured: you supply its URL and token. Until both are set, the chat composes its own
 views and makes such judgments itself, as before.
 
