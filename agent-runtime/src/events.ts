@@ -5,6 +5,7 @@
  */
 
 import { recordFromDetails, type EvaluateResult } from "./evaluate.ts";
+import { uiBlockFromDetails, type UiBlockPayload } from "./ui-tool.ts";
 
 export type NdjsonEvent =
   | { type: "tool_start"; name: string; id?: string; args?: unknown }
@@ -29,6 +30,8 @@ export type NdjsonEvent =
   /** Text appended to one argument (`path`, such as `["content"]`) of the call being written. */
   | { type: "tool_args_delta"; index: number; path: Array<string | number>; delta: string }
   | { type: "chart"; chart: { data: unknown[]; layout: unknown } }
+  /** A read-only UI composed with render_ui: a validated json-render spec and its plain-text fallback. */
+  | { type: "ui"; ui: UiBlockPayload }
   | { type: "ask"; ask: unknown }
   | { type: "approval"; approval: unknown }
   /** A change the model proposes to the editor the user has open (propose_code_edit). */
@@ -189,6 +192,8 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
     const durableResult = event.entry?.model?.[0];
     const chart = chartFromDetails(event.result?.details) ?? chartFromDetails(durableResult?.details);
     if (chart) out.push({ type: "chart", chart });
+    const ui = uiBlockFromDetails(event.result?.details) ?? uiBlockFromDetails(durableResult?.details);
+    if (ui) out.push({ type: "ui", ui });
     // Interactive requests end the turn; the UI renders them as cards.
     const details = (event.result?.details ?? durableResult?.details) as
       | Record<string, unknown>

@@ -22,6 +22,12 @@ def blocks_to_markdown(result: dict[str, Any]) -> str:
         # `is not None`: an empty string is falsy but still valid content.
         if block_type == "text" and content is not None and content != "":
             parts.append(str(content))
+        elif block_type == "ui":
+            # A composed UI keeps a plain-text rendering of itself for readers like this one.
+            ui = block.get("ui")
+            fallback = ui.get("fallback") if isinstance(ui, dict) else None
+            if isinstance(fallback, str) and fallback:
+                parts.append(fallback)
         elif block_type == "chart" and block.get("chart"):
             chart = block["chart"]
             title = chart.get("layout", {}).get("title", "Chart")

@@ -263,6 +263,7 @@ services:
     volumes:
       - ./agent-runtime/src:/app/agent-runtime/src
       - ./agent-runtime/exec:/app/agent-runtime/exec # Hello protocol shared with agent-exec
+      - ./ui/src/lib/copilotUiSpec.ts:/app/ui/src/lib/copilotUiSpec.ts:ro # render_ui catalog shared with the chat
       - ./config:/app/config # Read for copilot language and model settings only
       # Local pi extension checkouts for development (gitignored, empty in
       # production); the runtime trusts whatever package directories it finds.

@@ -1,5 +1,7 @@
 /** Shared types for every Copilot chat surface (page, sidebar, floating window). */
 
+import type { UiBlockPayload } from "@/lib/copilotUiSpec";
+
 /** The task result a chat is about; its first turn opens with the result's context and figures. */
 export interface TaskChatContext {
   taskName: string;
@@ -82,8 +84,9 @@ export interface PageContext {
   flow?: FlowEditorContext;
 }
 
-interface ContentBlock {
-  type: "text" | "chart" | "ask" | "approval" | "edit";
+export interface ContentBlock {
+  type: "text" | "chart" | "ui" | "ask" | "approval" | "edit";
+  /** Markdown for `text`; for `ui`, the block's plain-text fallback. */
   content: string | null;
   chart: {
     data: Record<string, unknown>[];
@@ -92,6 +95,11 @@ interface ContentBlock {
   ask?: AskRequest;
   approval?: ApprovalRequest;
   edit?: EditProposal;
+  /**
+   * A read-only UI the assistant composed (`render_ui`). Validated again
+   * before rendering; an unknown version or invalid spec shows `ui.fallback`.
+   */
+  ui?: UiBlockPayload;
 }
 
 export interface BlocksResult {
@@ -169,4 +177,6 @@ export type CopilotBlocksResult = BlocksResult & {
 export interface LiveTurn {
   steps: TraceStep[];
   startedAt: number;
+  /** UI blocks finished so far (`render_ui`), shown live and kept if the user stops. */
+  blocks?: ContentBlock[];
 }

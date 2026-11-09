@@ -35,6 +35,7 @@ import {
 } from "./allowed-tools.ts";
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
+import { uiTool } from "./ui-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { ExecWorkspace, execConfigFromEnv, removeWorkspace, WORKSPACE_TOOL_NAMES } from "./exec-env.ts";
 import { askUserTool } from "./ask-tool.ts";
@@ -309,7 +310,7 @@ export class SharedRuntime {
     const copilotExtension = defineExtension({
       name: "qdash-copilot",
       sections: [section("qdash-copilot", () => systemPrompt, { tag: false })],
-      tools: [chartTool, askUserTool, ...(skills.length ? [buildSkillTool(skills)] : [])],
+      tools: [chartTool, uiTool, askUserTool, ...(skills.length ? [buildSkillTool(skills)] : [])],
     });
     const buildChatRegistry = (
       connection: QDashConnection,
@@ -358,6 +359,7 @@ export class SharedRuntime {
     const toolNames = [
       ...qdashToolNames,
       "render_chart",
+      "render_ui",
       "ask_user",
       ...(EXEC_CONFIG ? WORKSPACE_TOOL_NAMES : []),
       ...(skills.length ? ["read_skill"] : []),

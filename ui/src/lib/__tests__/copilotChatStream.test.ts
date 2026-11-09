@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   appendArgsDelta,
+  appendDelta,
+  appendLiveBlock,
   endTool,
   startDraft,
   startTool,
+  stoppedBlocks,
   toPersistedTrace,
 } from "@/lib/copilotChatStream";
-import type { TraceStep } from "@/types/copilotChat";
+import type { LiveTurn, TraceStep } from "@/types/copilotChat";
 
 function tool(steps: TraceStep[], i = steps.length - 1) {
   const step = steps[i];
@@ -97,5 +100,24 @@ describe("copilotChatStream", () => {
     const output = tool(trace!.steps, 1).output!;
     expect(output.length).toBe(2001);
     expect(output.endsWith("END")).toBe(true);
+  });
+
+  it("keeps finished UI blocks when the user stops, before the partial text", () => {
+    const ui = { version: 1, spec: { root: "m", elements: {} }, fallback: "- T1: 42" };
+    let turn: LiveTurn = { steps: [], startedAt: 0 };
+    turn = appendLiveBlock(turn, { type: "ui", content: "- T1: 42", chart: null, ui });
+    turn = appendLiveBlock(turn, { type: "text", content: "fallback only", chart: null });
+    // Anything else the stream might carry is ignored.
+    turn = appendLiveBlock(turn, null);
+    turn = appendLiveBlock(turn, { type: "ui" });
+    turn = appendLiveBlock(turn, { type: "chart", chart: {} });
+    turn = { ...turn, steps: appendDelta(turn.steps, "text", "T1 is") };
+
+    expect(stoppedBlocks(turn)).toEqual([
+      { type: "ui", content: "- T1: 42", chart: null, ui },
+      { type: "text", content: "fallback only", chart: null },
+      { type: "text", content: "T1 is", chart: null },
+    ]);
+    expect(stoppedBlocks({ steps: [], startedAt: 0 })).toEqual([]);
   });
 });

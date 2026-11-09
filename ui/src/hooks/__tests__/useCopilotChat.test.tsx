@@ -238,6 +238,32 @@ describe("useCopilotChat streaming", () => {
     });
   });
 
+  it("shows a composed UI as soon as its tool finishes and keeps it when stopped", async () => {
+    const result = await renderChat();
+    const ui = {
+      version: 1,
+      spec: {
+        root: "m",
+        elements: { m: { type: "Metric", props: { label: "T1", value: 45 }, children: [] } },
+      },
+      fallback: "- T1: 45",
+    };
+    const block = { type: "ui", content: "- T1: 45", chart: null, ui };
+
+    act(() => result.current.chat.send("Summarize Q00"));
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+    stream.push(sse("ui", block));
+    stream.push(sse("delta", { text: "T1 looks" }));
+    await waitFor(() => expect(result.current.chat.liveTurn?.blocks).toEqual([block]));
+
+    act(() => result.current.chat.stop());
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(false));
+
+    const saved = lastAssistant(result);
+    expect(saved.stopped).toBe(true);
+    expect(saved.blocks).toEqual([block, { type: "text", content: "T1 looks", chart: null }]);
+  });
+
   it("edits a sent message by resending it with the history before it", async () => {
     const result = await renderChat();
 
