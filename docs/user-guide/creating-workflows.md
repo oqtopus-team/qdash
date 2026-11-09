@@ -96,14 +96,26 @@ for the active backend, then replace the default list in the template:
 ```python
 if tasks is None:
     tasks = [
-        "Configure",
-        "CheckT1",
-        "CheckRamsey",
+        TaskCall(name="Configure"),
+        TaskCall(name="CheckT1"),
+        TaskCall(name="CheckRamsey"),
     ]
 ```
 
 Keep configuration tasks and measurement tasks in their required order. A later task reads the
 calibration state produced or applied by earlier tasks.
+
+To run a task twice in the same step, for example a coarse and a fine Ramsey measurement, give
+each occurrence its own `call_id` and its own settings:
+
+```python
+TaskCall(name="CheckRamsey", call_id="ramsey_coarse", run={"detuning": 0.001}),
+TaskCall(name="CheckRamsey", call_id="ramsey_fine", run={"detuning": 0.0002}),
+```
+
+Each call appears as its own task in the execution, labeled with its call ID. A list of plain task
+names such as `"CheckT1"` stops the flow before it measures; see
+[Update a flow saved before task calls](#update-a-flow-saved-before-task-calls).
 
 The `mode` value controls how one-qubit work is arranged:
 
@@ -176,6 +188,11 @@ calibration input for every selected target in that task. Set `update_calibratio
 `False` for an exploratory measurement whose outputs must remain in history without becoming the
 current calibration values.
 
+The same `run`, `input`, and `update_calibration_parameters` settings can be set on one
+`TaskCall` instead; they then apply to that call only and take priority over `task_parameters`.
+Anything a call leaves out comes from `task_parameters`, so a call does not reset its task's
+output-saving behavior.
+
 QDash rejects a parameter placed in the wrong section, a parameter the task does not declare, or
 an input the task does not allow users to override. See [Task Parameters](./task-parameters.md)
 before overriding calibration inputs or allowing outputs to update shared state.
@@ -194,6 +211,24 @@ An explicit input override takes priority over either value.
 
 Review the effective inputs in **Execution** to confirm what the later task actually used.
 How this works: [State Between Steps](../developer-guide/workflow/quickstart.md#state-between-steps).
+
+## Update a Flow Saved Before Task Calls
+
+A flow saved before task calls lists tasks by name, such as `tasks=["Configure", "CheckT1"]`, and
+stops before it measures. Edit the flow in **Workflow**:
+
+1. Add `from qdash.workflow import TaskCall` to the imports.
+2. Replace each task name with `TaskCall(name="...")`. Where the same task appears more than once
+   in one list, add a `call_id` that describes each occurrence, for example
+   `call_id="configure_readout"`.
+3. Replace `stop_on_failure_tasks=("Configure",)` with `on_failure="stop"` on the listed calls.
+4. Save the flow and run it on a small target.
+
+Check the call IDs and settings of the run in **Execution** before running the flow on more
+targets. Results recorded before the update stay readable in **Execution**; they show the task
+name without a call ID. Flows that read results by task name, filter on one call, or set
+per-occurrence settings need further edits:
+[Migrate Saved Flows](../developer-guide/workflow/task-calls.md#migrate-saved-flows).
 
 ## Save and Test the Workflow
 

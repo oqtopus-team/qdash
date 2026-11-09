@@ -88,6 +88,24 @@ Use the ports from `.env` if the deployment overrides the defaults. Follow servi
 described in [Operations](./operations.md#inspect-logs) when a container is unhealthy or a page is
 unavailable.
 
+## Check Saved Workflows
+
+Workflows saved before task calls list tasks by name and stop before they measure on a release
+that requires task calls. QDash does not convert them; each workflow owner updates their own.
+Before anyone edits them, copy the saved workflows from the checkout so every owner can compare
+against the original:
+
+```bash
+cp -a src/qdash/workflow/user_flows user_flows-backup
+```
+
+After the update, each owner edits their workflows as described in
+[Update a flow saved before task calls](./creating-workflows.md#update-a-flow-saved-before-task-calls)
+and tests each one on the Fake backend before it measures on hardware again. Pipeline specs queued
+before the update run after conversion, and a new version 1 spec is rejected with a converted
+spec to submit instead. The full list of edits:
+[Migrate Saved Flows](../developer-guide/workflow/task-calls.md#migrate-saved-flows).
+
 ## Recover from a Failed Update
 
 Follow the target release notes when deployment fails after stored data changes. Moving the Git
