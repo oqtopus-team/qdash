@@ -51,7 +51,6 @@ class CalibConfig:
     skip_execution: bool = False  # Isolated worker borrowing its step's Execution
     connect_backend: bool = True  # Parent may delegate all hardware work to isolated workers
     force_update_params: bool = False  # Force backend params update regardless of R² validation
-    persist_output_parameters: bool = True  # Write task outputs to calibration/backend stores
     configuration_mode: str | None = field(
         default_factory=lambda: os.environ.get("QUBEX_CONFIGURATION_MODE")
     )

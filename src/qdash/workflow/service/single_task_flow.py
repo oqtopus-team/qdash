@@ -22,6 +22,7 @@ from prefect import flow, get_run_logger
 from qdash.common.config.backend import get_default_backend
 from qdash.common.config.loader import ConfigLoader
 from qdash.workflow.engine.task_parameters import (
+    UPDATE_CALIBRATION_PARAMETERS,
     merge_task_parameters,
     normalize_task_parameters,
     task_parameters_from_run_parameters,
@@ -33,6 +34,30 @@ from qdash.workflow.service.calib_service import (
     on_flow_failure,
 )
 from qdash.workflow.service.github import GitHubPushConfig
+
+
+def _single_task_defaults(
+    task_name: str,
+    *,
+    parameter_overrides: dict[str, dict[str, Any]] | None,
+    task_run_parameters: dict[str, dict[str, Any]] | None,
+    persist_output_parameters: bool,
+) -> dict[str, dict[str, Any]]:
+    """Return the per-task defaults of one single-task run.
+
+    ``persist_output_parameters`` is the request's write-back control. It becomes
+    the requested task's fallback ``update_calibration_parameters``. Explicit
+    per-task settings take precedence, preserving the former session fallback.
+    """
+    writeback = normalize_task_parameters(
+        {task_name: {UPDATE_CALIBRATION_PARAMETERS: persist_output_parameters}}
+    )
+    requested = [
+        task_parameters_from_run_parameters(task_run_parameters),
+        # Request overrides ({"input": ..., "run": ...}) apply to the requested task.
+        normalize_task_parameters({task_name: parameter_overrides or {}}),
+    ]
+    return merge_task_parameters(writeback, *requested)
 
 
 @flow(
@@ -78,6 +103,10 @@ def single_task_executor(
         parameter_overrides: Overrides for the requested task, shaped as
             ``{"input": {...}, "run": {...}}``. They become that task's entry in
             ``task_parameters`` and are applied on top of the source snapshot.
+        update_params: Force backend parameter updates regardless of quality checks.
+        persist_output_parameters: Fallback write-back setting for the requested
+            task and optional Configure call. Explicit per-task settings override
+            it. False also disables GitHub push independently of those settings.
         default_run_parameters: Shared fallback run parameters for compatibility.
         task_run_parameters: Explicit run parameters keyed by task name.
 
@@ -108,6 +137,12 @@ def single_task_executor(
         # Catalog runs can keep a source result for provenance without restoring its parameters.
         snapshot_exempt_tasks.add(task_name)
 
+    task_defaults = _single_task_defaults(
+        task_name,
+        parameter_overrides=parameter_overrides,
+        task_run_parameters=task_run_parameters,
+        persist_output_parameters=persist_output_parameters,
+    )
     cal = CalibService(
         username,
         chip_id,
@@ -118,11 +153,7 @@ def single_task_executor(
         project_id=project_id,
         backend_name=backend_name,
         default_run_parameters=default_run_parameters,
-        _task_defaults=merge_task_parameters(
-            task_parameters_from_run_parameters(task_run_parameters),
-            # Request overrides ({"input": ..., "run": ...}) apply to the requested task.
-            normalize_task_parameters({task_name: parameter_overrides or {}}),
-        ),
+        _task_defaults=task_defaults,
         enable_github_pull=github_enabled,
         enable_github=push_config.enabled,
         github_push_config=push_config,
@@ -130,13 +161,21 @@ def single_task_executor(
         source_task_id=source_task_id,
         snapshot_exempt_tasks=snapshot_exempt_tasks or None,
         force_update_params=update_params,
-        persist_output_parameters=persist_output_parameters,
     )
 
     try:
         if reconfigure:
             logger.info(f"Reconfiguring hardware for qid={qid} before executing {task_name}")
-            cal.execute_task("Configure", qid)
+            # Resolve the fallback at the call so a backend without Configure
+            # still fails here, rather than while validating service defaults.
+            configure_writeback = task_defaults.get("Configure", {}).get(
+                UPDATE_CALIBRATION_PARAMETERS, persist_output_parameters
+            )
+            cal.execute_task(
+                "Configure",
+                qid,
+                parameters={UPDATE_CALIBRATION_PARAMETERS: configure_writeback},
+            )
 
         result = cal.execute_task(task_name, qid)
         cal.finish_calibration()

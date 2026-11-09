@@ -331,7 +331,7 @@ The Tasks page **Reload** action is client-side preparation only. It reads the s
 
 ## Output persistence
 
-`persist_output_parameters` controls authoritative write-back. When false, task history, execution state, figures, raw data, and in-memory output processing still occur, but `BackendSaver` skips calibration database and backend parameter writes.
+`update_calibration_parameters` controls authoritative write-back for one task call. When the resolved value is false, task history, execution state, figures, raw data, and in-memory output processing still occur, but `BackendSaver` skips calibration database and backend parameter writes.
 
 Normal workflows apply validated task outputs by default. A workflow template can make one call
 measurement-only by setting `update_calibration_parameters` on its `TaskCall`:
@@ -341,9 +341,24 @@ TaskCall(name="CheckChevron", update_calibration_parameters=False)
 ```
 
 The key is an execution policy and is not passed to the task or recorded as a Run parameter. A
-direct `execute_task` call can also put the key in its `parameters`; a call-level value takes
-precedence over the per-task defaults. When both are omitted, the task inherits the execution-level value: normal
-workflows default to `True`, while Tasks quick runs default to `False`.
+direct `execute_task` call can also put the key in its `parameters`. The value resolves in this
+order:
+
+1. The call's own value, from `TaskCall` or `execute_task(parameters=...)`
+2. The task's per-task default: a pipeline spec's `task_parameters`, or the deprecated
+   `CalibService` `task_parameters` and `task_run_parameters` arguments
+3. `True`
+
+No session-wide value exists. Isolated workers receive each call's settings with the plan and the
+per-task defaults with their session configuration, so a worker resolves the same value as the
+parent session. `CalibService` no longer accepts `persist_output_parameters`; passing it raises a
+`TypeError`. [Task Calls](./task-calls.md#migrate-session-write-back) shows the migration.
+
+Tasks quick runs, agent actions, and task re-executions keep their `persist_output_parameters`
+request field. `single-task-executor` turns it into `update_calibration_parameters` for the
+requested task as a fallback; explicit per-task settings take precedence. The optional
+`Configure` call resolves its setting the same way. A `false` request disables GitHub push
+even when an explicit task setting enables calibration write-back.
 
 A successful measurement-only task keeps its outputs in task history and metrics but does not
 replace current calibration values, update the workflow's in-memory calibration state, or update

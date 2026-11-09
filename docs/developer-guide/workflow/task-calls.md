@@ -90,8 +90,8 @@ For one call, run and input values resolve from highest to lowest precedence:
 `run` takes plain values, `{"value": ..., "value_type": ...}`, or the `sweep` helpers; `input`
 takes plain values. Normalization is `qdash.datamodel.task_settings`, the same code
 per-task defaults use. A field that is absent or `None` inherits from the next layer, so
-`update_calibration_parameters=None` keeps the per-task or workflow policy instead of resetting
-it. Engine and session constraints still apply to every layer; for example a call cannot set a
+`update_calibration_parameters=None` keeps the per-task policy, or `True` without one, instead of
+resetting it. Engine and session constraints still apply to every layer; for example a call cannot set a
 `readout_duration` that differs from the Qubex session. See
 [Parameter Resolution](./parameter-resolution.md) for how each layer reaches the task.
 
@@ -318,6 +318,36 @@ targets, replacing any `run.mux_ids` in the call. Compare each call's effective 
 
 A pipeline spec's top-level `task_parameters` is deprecated in the same way; see
 [Calibration Pipeline Spec](./calibration-pipeline.md).
+
+## Migrate session write-back
+
+`CalibService(persist_output_parameters=...)` is removed, and passing it raises a `TypeError`.
+The argument set one write-back value for the whole session, but isolated workers did not inherit
+it, so a parallel step could write calibration parameters that the session had disabled. Set
+`update_calibration_parameters=False` on each call that must stay measurement-only instead; a call
+that leaves it unset writes back:
+
+```python
+# Before
+cal = CalibService(username, chip_id, persist_output_parameters=False)
+cal.run(targets, steps=[CustomOneQubit(tasks=[TaskCall(name="CheckRabi")])])
+
+# After
+cal = CalibService(username, chip_id)
+cal.run(
+    targets,
+    steps=[
+        CustomOneQubit(
+            tasks=[TaskCall(name="CheckRabi", update_calibration_parameters=False)],
+        )
+    ],
+)
+```
+
+For the low-level API, pass the setting with each call:
+`cal.execute_task("CheckRabi", qid, parameters={"update_calibration_parameters": False})`.
+[Parameter Resolution](./parameter-resolution.md#output-persistence) gives the full precedence and
+how Tasks quick runs map their `persist_output_parameters` request field.
 
 ## Testing
 

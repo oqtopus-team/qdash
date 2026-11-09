@@ -77,7 +77,9 @@ QDash keeps execution state and task state separate.
   calibration database and the finish-time params YAML selection sees the same names.
 - `TaskHistoryRecorder` writes task-result history and optional provenance records.
 - `BackendSaver` decides which validated outputs update the backend and accepted calibration
-  state. `persist_output_parameters=False` records the task without promoting its outputs.
+  state. When the call's resolved `update_calibration_parameters` is `False`, the orchestrator
+  creates it with `persist_output_parameters=False`, which records the task without promoting its
+  outputs.
 - `FilesystemCalibDataSaver` writes artifacts beneath the execution's project- and chip-scoped
   calibration directory.
 

@@ -377,7 +377,6 @@ class CalibService:
         source_task_id: str | None = None,
         snapshot_exempt_tasks: set[str] | None = None,
         force_update_params: bool = False,
-        persist_output_parameters: bool = True,
         *,
         task_parameters: dict[str, dict[str, Any]] | None = None,
         configuration_mode: str | None = None,
@@ -440,6 +439,10 @@ class CalibService:
                 ``update_calibration_parameters``. Set the same fields on each
                 ``TaskCall`` instead, and keep shared values in local variables. Still
                 applied, below each call's own settings, with a ``DeprecationWarning``.
+                Whether validated outputs update calibration parameters is set the
+                same way: ``TaskCall(..., update_calibration_parameters=False)`` runs
+                a call measurement-only. The session-wide
+                ``persist_output_parameters`` argument was removed.
             configuration_mode: Qubex control layout inherited by parent and isolated
                 worker sessions. If omitted, the backend default is used.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
@@ -488,7 +491,6 @@ class CalibService:
         self._source_task_id = source_task_id
         self._snapshot_exempt_tasks = snapshot_exempt_tasks or set()
         self._force_update_params = force_update_params
-        self._persist_output_parameters = persist_output_parameters
 
         # Store injected repositories for later use
         self._user_repo = user_repo
@@ -776,7 +778,6 @@ class CalibService:
                 default_run_parameters=self.default_run_parameters,
                 task_parameters=self.task_parameters,
                 force_update_params=self._force_update_params,
-                persist_output_parameters=self._persist_output_parameters,
             )
             if self.configuration_mode is not None:
                 config.configuration_mode = self.configuration_mode

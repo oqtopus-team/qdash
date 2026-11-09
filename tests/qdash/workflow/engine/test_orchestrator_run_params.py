@@ -528,7 +528,7 @@ class TestTaskCalibrationParameterUpdates:
 
         assert update_parameters is True
 
-    def test_call_parameters_override_measurement_only_session_default(self) -> None:
+    def test_call_parameters_keep_measurement_only_over_task_parameter_policy(self) -> None:
         config = CalibConfig(
             username="alice",
             chip_id="chip-1",
@@ -536,16 +536,32 @@ class TestTaskCalibrationParameterUpdates:
             execution_id="exec-1",
             project_id="project-1",
             backend_name=BACKEND,
-            persist_output_parameters=False,
+            task_parameters=normalize_task_parameters(
+                {TASK_NAME: {"update_calibration_parameters": True}}
+            ),
         )
         orchestrator = CalibOrchestrator(config)
 
         update_parameters = orchestrator._should_update_calibration_parameters(
             TASK_NAME,
-            {"update_calibration_parameters": True},
+            {"update_calibration_parameters": False},
         )
 
-        assert update_parameters is True
+        assert update_parameters is False
+
+    def test_session_wide_persistence_setting_is_removed(self) -> None:
+        # Write-back is resolved per task and call only; there is no session fallback
+        # that an isolated worker could fail to inherit.
+        with pytest.raises(TypeError, match="persist_output_parameters"):
+            CalibConfig(  # type: ignore[call-arg]
+                username="alice",
+                chip_id="chip-1",
+                qids=["0"],
+                execution_id="exec-1",
+                project_id="project-1",
+                backend_name=BACKEND,
+                persist_output_parameters=False,
+            )
 
     def test_calibration_parameter_update_setting_requires_boolean(self) -> None:
         config = CalibConfig(
