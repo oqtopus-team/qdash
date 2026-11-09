@@ -28,12 +28,13 @@ if TYPE_CHECKING:
 DEFAULT_MEASUREMENT_SHOTS = 4096
 DEFAULT_CALIBRATION_SHOTS = 8192
 _NS_TO_US = 1e-3
-# QDash canonical output names mapped to upstream Qubex ``derived_times_ns`` keys.
-# The stored GEFRelaxationData artifact keeps the upstream Qubex key names.
+# QDash metric names mapped to the Qubex ``derived_times_ns`` keys they publish.
+# Qubex names directional times ``t1_<from>_to_<to>``; QDash keeps the existing ``t1``
+# metric and uses ``t1_fe``/``t1_fg``. The stored artifact keeps the Qubex key names.
 _OUTPUT_TO_QUBEX = {
     "t1": "t1_e_to_g",
-    "t1_f2e": "t1_f_to_e",
-    "t1_f2g": "t1_f_to_g",
+    "t1_fe": "t1_f_to_e",
+    "t1_fg": "t1_f_to_g",
 }
 
 
@@ -140,11 +141,11 @@ class CheckGEFRelaxation(QubexTask):
             unit="μs",
             description="Directional e-to-g relaxation time from the GEF model",
         ),
-        "t1_f2e": OutputParameterSpec(
+        "t1_fe": OutputParameterSpec(
             unit="μs",
             description="Inverse direct f-to-e transition rate",
         ),
-        "t1_f2g": OutputParameterSpec(
+        "t1_fg": OutputParameterSpec(
             unit="μs",
             description="Inverse direct f-to-g transition rate",
         ),

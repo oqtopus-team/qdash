@@ -210,10 +210,10 @@ def test_postprocess_publishes_directional_times_in_microseconds() -> None:
     assert processed.validation_error is None
     assert processed.output_parameters["t1"].value == 100.0
     assert processed.output_parameters["t1"].error == 2.0
-    assert processed.output_parameters["t1_f2e"].value == 60.0
-    assert processed.output_parameters["t1_f2e"].error == 1.5
-    assert processed.output_parameters["t1_f2g"].value == 240.0
-    assert processed.output_parameters["t1_f2g"].error == 5.0
+    assert processed.output_parameters["t1_fe"].value == 60.0
+    assert processed.output_parameters["t1_fe"].error == 1.5
+    assert processed.output_parameters["t1_fg"].value == 240.0
+    assert processed.output_parameters["t1_fg"].error == 5.0
     assert all(
         parameter.execution_id == "exec" for parameter in processed.output_parameters.values()
     )
@@ -228,9 +228,9 @@ def test_postprocess_publishes_directional_times_in_microseconds() -> None:
     [
         (_result(success=False), "fit failed"),
         (_result(non_estimable="t1_e_to_g"), "t1 (Qubex t1_e_to_g) is not estimable"),
-        (_result(non_estimable="t1_f_to_e"), "t1_f2e (Qubex t1_f_to_e) is not estimable"),
-        (_result(non_estimable="t1_f_to_g"), "t1_f2g (Qubex t1_f_to_g) is not estimable"),
-        (_result(invalid="t1_f_to_e"), "t1_f2e (Qubex t1_f_to_e) is non-finite"),
+        (_result(non_estimable="t1_f_to_e"), "t1_fe (Qubex t1_f_to_e) is not estimable"),
+        (_result(non_estimable="t1_f_to_g"), "t1_fg (Qubex t1_f_to_g) is not estimable"),
+        (_result(invalid="t1_f_to_e"), "t1_fe (Qubex t1_f_to_e) is non-finite"),
     ],
 )
 def test_postprocess_rejects_failed_or_unusable_estimates(result: Any, message: str) -> None:
@@ -270,7 +270,7 @@ def test_task_dependencies_defaults_registration_and_metrics() -> None:
         "calibration_shots",
         "interval",
     }
-    assert set(CheckGEFRelaxation.output_spec) == {"t1", "t1_f2e", "t1_f2g"}
+    assert set(CheckGEFRelaxation.output_spec) == {"t1", "t1_fe", "t1_fg"}
     assert CheckGEFRelaxation.run_spec["time_range"].value_type == "np.logspace"
     np.testing.assert_allclose(
         CheckGEFRelaxation.run_spec["time_range"].create_model().get_value(),
@@ -282,9 +282,9 @@ def test_task_dependencies_defaults_registration_and_metrics() -> None:
     assert CheckGEFRelaxation().get_progress_plan().maximum_phases == 2
 
     metrics = load_metrics_config()
-    assert metrics.qubit_metrics["t1_f2e"].unit == "μs"
-    assert metrics.qubit_metrics["t1_f2g"].unit == "μs"
+    assert metrics.qubit_metrics["t1_fe"].unit == "μs"
+    assert metrics.qubit_metrics["t1_fg"].unit == "μs"
     coherence = next(group for group in metrics.cdf_groups.qubit if group.id == "coherence")
-    assert {"t1_f2e", "t1_f2g"} <= set(coherence.metrics)
+    assert {"t1_fe", "t1_fg"} <= set(coherence.metrics)
     assert not {"t1_f_to_e", "t1_f_to_g"} & set(metrics.qubit_metrics)
     assert not {"t1_f_to_e", "t1_f_to_g"} & set(coherence.metrics)

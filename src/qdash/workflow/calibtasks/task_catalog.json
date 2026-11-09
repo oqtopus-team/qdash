@@ -4385,8 +4385,8 @@
         "name": "CheckGEFRelaxation",
         "output_parameters": [
           "t1",
-          "t1_f2e",
-          "t1_f2g"
+          "t1_fe",
+          "t1_fg"
         ],
         "run_parameters": {
           "calibration_shots": {
