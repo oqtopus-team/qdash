@@ -14,7 +14,12 @@ from qdash.workflow import sweep
 from qdash.workflow.calibtasks.qubex import CheckChevron
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
-from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
+from tests.qdash.workflow.task_call_helpers import (
+    call_ids,
+    effective_settings,
+    names,
+    settings,
+)
 
 coherence_check_module = importlib.import_module("qdash.workflow.templates.coherence_check")
 
@@ -33,49 +38,76 @@ def fake_calibration_service(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(coherence_check_module, "CalibService", FakeCalibService)
 
 
-def test_coherence_check_runs_expected_tasks_in_order() -> None:
+def test_coherence_check_runs_expected_calls_in_one_step() -> None:
     result = coherence_check_module.coherence_check(
         username="alice",
         chip_id="64Q",
         qids=["0"],
     )
 
-    assert len(result["steps"]) == 2
-    first_step, second_step = result["steps"]
-    assert isinstance(first_step, CustomOneQubit)
-    assert first_step.name == "coherence_check"
-    assert first_step.mode == "synchronized"
-    assert names(first_step.tasks) == [
+    assert len(result["steps"]) == 1
+    (step,) = result["steps"]
+    assert isinstance(step, CustomOneQubit)
+    assert step.name == "coherence_check"
+    assert step.mode == "synchronized"
+    # The default per-target fail-fast policy applies to every call.
+    assert step.continue_on_failure is False
+    assert all(call.on_failure is None for call in step.tasks)
+    assert names(step.tasks) == [
         "Configure",
         "CheckChevron",
         "CheckRabi",
         "CheckT1",
         "CheckT2Echo",
         "CheckRamsey",
+        # The long Ramsey keeps its own Configure/Rabi measurement before it.
+        "Configure",
+        "CheckRabi",
+        "CheckRamsey",
     ]
-    # The second pass keeps its own Configure/Rabi measurement before the long Ramsey.
-    assert isinstance(second_step, CustomOneQubit)
-    assert second_step.name == "long_ramsey_check"
-    assert second_step.mode == "synchronized"
-    assert names(second_step.tasks) == ["Configure", "CheckRabi", "CheckRamsey"]
 
 
-def test_coherence_check_scales_second_ramsey_range_and_detuning_on_its_call() -> None:
+def test_coherence_check_gives_every_repeated_task_an_explicit_call_id() -> None:
     result = coherence_check_module.coherence_check(
         username="alice",
         chip_id="64Q",
         qids=["0"],
     )
 
-    first_ramsey = result["steps"][0].tasks[-1]
-    second_ramsey = result["steps"][1].tasks[-1]
-    assert first_ramsey.resolved_call_id == "CheckRamsey"
-    assert second_ramsey.call_id == "ramsey_long"
-    # Each pass carries its own Ramsey settings on its call.
-    assert first_ramsey.effective_settings({}) == settings(
+    tasks = result["steps"][0].tasks
+    assert call_ids(tasks) == [
+        "configure_initial",
+        "CheckChevron",
+        "rabi_initial",
+        "CheckT1",
+        "CheckT2Echo",
+        "ramsey_short",
+        "configure_long_ramsey",
+        "rabi_long_ramsey",
+        "ramsey_long",
+    ]
+    repeated = {name for name in names(tasks) if names(tasks).count(name) > 1}
+    assert repeated == {"Configure", "CheckRabi", "CheckRamsey"}
+    assert all(call.call_id is not None for call in tasks if call.name in repeated)
+
+
+def test_coherence_check_scales_long_ramsey_range_and_detuning_on_its_call() -> None:
+    result = coherence_check_module.coherence_check(
+        username="alice",
+        chip_id="64Q",
+        qids=["0"],
+    )
+
+    tasks = result["steps"][0].tasks
+    short_ramsey = tasks[5]
+    long_ramsey = tasks[-1]
+    assert short_ramsey.call_id == "ramsey_short"
+    assert long_ramsey.call_id == "ramsey_long"
+    # Each Ramsey carries its own settings on its call.
+    assert short_ramsey.effective_settings({}) == settings(
         run={"time_range": sweep.arange(0, 10_001, 100), "detuning": 0.001}
     )
-    assert second_ramsey.effective_settings({}) == settings(
+    assert long_ramsey.effective_settings({}) == settings(
         # Keep 101 points while extending the time scale by 5x.
         run={"time_range": sweep.arange(0, 50_001, 500), "detuning": 0.0002}
     )
@@ -103,10 +135,10 @@ def test_coherence_check_calls_carry_every_measurement_setting() -> None:
 
     # No per-task defaults: every setting is visible on the call it applies to.
     assert "task_parameters" not in result["kwargs"]
-    first_step, second_step = result["steps"]
+    (step,) = result["steps"]
     coherence_range = sweep.logspace(math.log10(300), math.log10(500_000), 51)
-    assert effective_settings(first_step.tasks) == [
-        ("Configure", settings()),
+    assert effective_settings(step.tasks) == [
+        ("configure_initial", settings()),
         (
             "CheckChevron",
             settings(
@@ -118,17 +150,15 @@ def test_coherence_check_calls_carry_every_measurement_setting() -> None:
                 update_calibration_parameters=False,
             ),
         ),
-        ("CheckRabi", settings()),
+        ("rabi_initial", settings()),
         ("CheckT1", settings(run={"time_range": coherence_range})),
         ("CheckT2Echo", settings(run={"time_range": coherence_range})),
         (
-            "CheckRamsey",
+            "ramsey_short",
             settings(run={"time_range": sweep.arange(0, 10_001, 100), "detuning": 0.001}),
         ),
-    ]
-    assert effective_settings(second_step.tasks) == [
-        ("Configure", settings()),
-        ("CheckRabi", settings()),
+        ("configure_long_ramsey", settings()),
+        ("rabi_long_ramsey", settings()),
         (
             "ramsey_long",
             settings(run={"time_range": sweep.arange(0, 50_001, 500), "detuning": 0.0002}),

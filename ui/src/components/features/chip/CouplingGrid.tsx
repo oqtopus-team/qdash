@@ -10,7 +10,7 @@ import {
   Minimize,
   ZoomIn,
 } from "lucide-react";
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect, type CSSProperties } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -61,6 +62,32 @@ const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
   jsonFigures: false,
   rawData: true,
 };
+
+interface CouplingStatusDotProps {
+  label: string;
+  className: string;
+  style: CSSProperties;
+  onClick: () => void;
+}
+
+// Status dot using the shared Tooltip primitive, whose portal keeps the tooltip from being
+// clipped by the grid's overflow-hidden container and pan/zoom transform.
+export function CouplingStatusDot({ label, className, style, onClick }: CouplingStatusDotProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={label}
+          style={style}
+          className={className}
+        />
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 function toPathList(paths: string[] | string | null | undefined): string[] {
   if (!paths) return [];
@@ -573,8 +600,9 @@ export function CouplingGrid({
           // Zoomed-out: status-colored dot
           if (!showFigures) {
             return (
-              <button
+              <CouplingStatusDot
                 key={task.couplingId}
+                label={`${task.couplingId}: ${task.status}`}
                 onClick={() => {
                   if (downloadSelectionEnabled) {
                     if (canBeDownloaded) toggleDownloadSelection(task.couplingId);
@@ -592,16 +620,12 @@ export function CouplingGrid({
                   width: displayCellSize * 0.45,
                   height: displayCellSize * 0.45,
                 }}
-                className={`rounded-md shadow-sm group cursor-pointer -translate-x-1/2 -translate-y-1/2 ${statusColor} ${
+                className={`rounded-md shadow-sm cursor-pointer -translate-x-1/2 -translate-y-1/2 ${statusColor} ${
                   downloadSelectionEnabled && isSelectedForDownload
                     ? "ring-2 ring-primary ring-offset-1"
                     : ""
                 }`}
-              >
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                  {task.couplingId}: {task.status}
-                </div>
-              </button>
+              />
             );
           }
 

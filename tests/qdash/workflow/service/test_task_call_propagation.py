@@ -409,10 +409,10 @@ def test_pipeline_filter_reads_the_custom_step_call(
     assert ctx.candidate_qids == ["0", "1"]
 
 
-def test_coherence_check_second_ramsey_settings_reach_only_its_call(
+def test_coherence_check_runs_one_step_with_per_target_fail_fast(
     recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Both coherence-check steps run per target, and only the long Ramsey carries overrides."""
+    """The coherence check runs all nine calls in one step without a global barrier."""
     import importlib
 
     template = importlib.import_module("qdash.workflow.templates.coherence_check")
@@ -429,59 +429,56 @@ def test_coherence_check_second_ramsey_settings_reach_only_its_call(
     monkeypatch.setattr(template, "CalibService", CapturingCalibService)
     template.coherence_check(username="alice", chip_id="64Q", qids=["0", "1", "4", "5"])
     _schedule(monkeypatch)
+    # Qubit 4 fails its first Rabi; the default policy stops only that target.
+    recorder.fail.add(("rabi_initial", "4"))
 
-    ctx = StepContext()
-    for step in captured["steps"]:
-        ctx = step.execute(_service(), captured["targets"], ctx)
+    (step,) = captured["steps"]
+    ctx = step.execute(_service(), captured["targets"], StepContext())
 
-    for qid in ("0", "1", "4", "5"):
-        assert [
-            (step_id, call_id) for step_id, call_id, _, target in recorder.log if target == qid
-        ] == [
-            ("coherence_check", "Configure"),
-            ("coherence_check", "CheckChevron"),
-            ("coherence_check", "CheckRabi"),
-            ("coherence_check", "CheckT1"),
-            ("coherence_check", "CheckT2Echo"),
-            ("coherence_check", "CheckRamsey"),
-            ("long_ramsey_check", "Configure"),
-            ("long_ramsey_check", "CheckRabi"),
-            ("long_ramsey_check", "ramsey_long"),
-        ]
-    # The step boundary keeps every first pass complete before any second pass starts.
-    step_ids = [step_id for step_id, *_ in recorder.log]
-    assert step_ids == sorted(step_ids, key=["coherence_check", "long_ramsey_check"].index)
-    for step_id in ("coherence_check", "long_ramsey_check"):
-        assert all(
-            data.status == "success"
-            for data in ctx.get_step_result(step_id).qubits.values()  # type: ignore[union-attr]
-        )
+    full_sequence = [
+        "configure_initial",
+        "CheckChevron",
+        "rabi_initial",
+        "CheckT1",
+        "CheckT2Echo",
+        "ramsey_short",
+        "configure_long_ramsey",
+        "rabi_long_ramsey",
+        "ramsey_long",
+    ]
+    assert {step_id for step_id, *_ in recorder.log} == {"coherence_check"}
+    for qid in ("0", "1", "5"):
+        assert _per_target(recorder.log, qid) == full_sequence
+    assert _per_target(recorder.log, "4") == full_sequence[:3]
 
-    # Templates carry every setting on its call, so no per-task defaults exist
-    # that could leak one Ramsey's settings into the other call.
+    result = ctx.get_step_result("coherence_check")
+    assert isinstance(result, OneQubitResult)
+    for qid in ("0", "1", "5"):
+        data = result.get_qubit(qid)
+        assert data is not None
+        assert data.status == "success"
+        assert [call.status for call in data.calls] == ["success"] * 9
+    failed = result.get_qubit("4")
+    assert failed is not None
+    assert failed.status == "failed"
+    assert [call.status for call in failed.calls] == ["success", "success", "failed"] + [
+        "skipped"
+    ] * 6
+
+    # No global barrier: the first synchronized round (qubits 0 and 4) finishes
+    # its long Ramsey before the second round (qubits 1 and 5) starts its short pass.
+    order = [(call_id, qid) for _, call_id, _, qid in recorder.log]
+    assert order.index(("ramsey_long", "0")) < order.index(("configure_initial", "1"))
+
+    # Workers receive call-level settings only, keyed by each call's own id.
+    tasks = {call.resolved_call_id: call for call in step.tasks}
     assert "task_parameters" not in captured["kwargs"]
-    first_ramsey = captured["steps"][0].tasks[-1]
-    long_ramsey = captured["steps"][1].tasks[-1]
-    first_run = {
-        "time_range": {"value": (0, 10_001, 100), "value_type": "np.arange"},
-        "detuning": {"value": 0.001},
-    }
-    long_run = {
-        "time_range": {"value": (0, 50_001, 500), "value_type": "np.arange"},
-        "detuning": {"value": 0.0002},
-    }
-    assert first_ramsey.settings()["run"] == first_run
-    assert long_ramsey.settings()["run"] == long_run
-
-    # Workers receive each call's own settings keyed by its call id, and the
-    # long Ramsey overrides never reach the first Ramsey call (or vice versa).
-    first_sessions = [s for s in recorder.sessions if "CheckRamsey" in s.parameters]
-    long_sessions = [s for s in recorder.sessions if "ramsey_long" in s.parameters]
-    assert first_sessions
-    assert long_sessions
-    for session in first_sessions:
-        assert session.parameters["CheckRamsey"] == first_ramsey.settings()
-        assert session.parameters["CheckRamsey"]["run"] == first_run
-    for session in long_sessions:
-        assert session.parameters["ramsey_long"] == long_ramsey.settings()
-        assert session.parameters["ramsey_long"]["run"] == long_run
+    for session in recorder.sessions:
+        for call_id in ("ramsey_short", "ramsey_long", "CheckChevron"):
+            if call_id in session.parameters:
+                assert session.parameters[call_id] == tasks[call_id].settings()
+        if "ramsey_long" in session.parameters:
+            assert session.parameters["ramsey_long"]["run"] == {
+                "time_range": {"value": (0, 50_001, 500), "value_type": "np.arange"},
+                "detuning": {"value": 0.0002},
+            }
