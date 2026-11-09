@@ -98,8 +98,21 @@ neither. `service.run()` closes every Execution it opens, so the flow calls noth
 Outside Prefect, resolve the context first and pass it to `CalibService.from_context()`:
 
 ```python
-from qdash.workflow import CalibService, resolve_calib_context
+from qdash.workflow import CalibService, TaskCall, resolve_calib_context
+from qdash.workflow.service.steps import CustomOneQubit
+from qdash.workflow.service.targets import QubitTargets
 
+steps = [
+    CustomOneQubit(
+        step_name="coherence_sample",
+        tasks=[
+            TaskCall(name="Configure"),
+            TaskCall(name="CheckT1"),
+            TaskCall(name="CheckRamsey"),
+        ],
+        mode="synchronized",
+    )
+]
 context = resolve_calib_context("alice", "64Qv3", project_id="my-project")
 CalibService.from_context(context, flow_name="manual_check").run(QubitTargets(["0"]), steps)
 ```
