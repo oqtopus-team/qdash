@@ -415,14 +415,12 @@ def test_coherence_check_second_ramsey_settings_reach_only_its_call(
     """Both coherence-check steps run per target, and only the long Ramsey carries overrides."""
     import importlib
 
-    from qdash.workflow.engine.task_parameters import normalize_task_parameters
-
     template = importlib.import_module("qdash.workflow.templates.coherence_check")
     captured: dict[str, Any] = {}
 
     class CapturingCalibService:
         def __init__(self, *args: Any, **kwargs: Any) -> None:
-            captured["task_parameters"] = kwargs["task_parameters"]
+            captured["kwargs"] = kwargs
 
         def run(self, targets: Any, *, steps: list[Any]) -> None:
             captured["targets"] = targets
@@ -459,21 +457,31 @@ def test_coherence_check_second_ramsey_settings_reach_only_its_call(
             for data in ctx.get_step_result(step_id).qubits.values()  # type: ignore[union-attr]
         )
 
-    # Workers receive call-level settings only; the first Ramsey has none, so it
-    # keeps the service-wide defaults, while the long Ramsey overrides them.
-    defaults = normalize_task_parameters(captured["task_parameters"])
+    # Templates carry every setting on its call, so no per-task defaults exist
+    # that could leak one Ramsey's settings into the other call.
+    assert "task_parameters" not in captured["kwargs"]
     first_ramsey = captured["steps"][0].tasks[-1]
     long_ramsey = captured["steps"][1].tasks[-1]
-    for session in recorder.sessions:
-        if "CheckRamsey" in session.parameters:
-            assert session.parameters["CheckRamsey"] == first_ramsey.settings()
-        if "ramsey_long" in session.parameters:
-            assert session.parameters["ramsey_long"]["run"] == {
-                "time_range": {"value": (0, 50_001, 500), "value_type": "np.arange"},
-                "detuning": {"value": 0.0002},
-            }
-    assert first_ramsey.effective_settings(defaults)["run"] == defaults["CheckRamsey"]["run"]
-    assert long_ramsey.effective_settings(defaults)["run"] == {
+    first_run = {
+        "time_range": {"value": (0, 10_001, 100), "value_type": "np.arange"},
+        "detuning": {"value": 0.001},
+    }
+    long_run = {
         "time_range": {"value": (0, 50_001, 500), "value_type": "np.arange"},
         "detuning": {"value": 0.0002},
     }
+    assert first_ramsey.settings()["run"] == first_run
+    assert long_ramsey.settings()["run"] == long_run
+
+    # Workers receive each call's own settings keyed by its call id, and the
+    # long Ramsey overrides never reach the first Ramsey call (or vice versa).
+    first_sessions = [s for s in recorder.sessions if "CheckRamsey" in s.parameters]
+    long_sessions = [s for s in recorder.sessions if "ramsey_long" in s.parameters]
+    assert first_sessions
+    assert long_sessions
+    for session in first_sessions:
+        assert session.parameters["CheckRamsey"] == first_ramsey.settings()
+        assert session.parameters["CheckRamsey"]["run"] == first_run
+    for session in long_sessions:
+        assert session.parameters["ramsey_long"] == long_ramsey.settings()
+        assert session.parameters["ramsey_long"]["run"] == long_run

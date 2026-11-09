@@ -4300,6 +4300,133 @@
         "task_type": "qubit"
       },
       {
+        "class_name": "CheckGEFRelaxation",
+        "description": "Characterize continuous-time transitions in the GEF manifold.",
+        "file_path": "measurement/check_gef_relaxation.py",
+        "input_parameters": {
+          "control_frequency": {
+            "default_value": null,
+            "description": "Calibrated GE control frequency",
+            "fallback_parameter_names": [
+              "qubit_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "control_frequency_ef": {
+            "default_value": null,
+            "description": "Calibrated EF control frequency",
+            "fallback_parameter_names": [
+              "ef_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          },
+          "ef_pi_amplitude": {
+            "default_value": null,
+            "description": "Calibrated EF pi-pulse amplitude",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "ef_pi_duration": {
+            "default_value": null,
+            "description": "Calibrated EF pi-pulse duration",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "pi_amplitude": {
+            "default_value": null,
+            "description": "Calibrated GE pi-pulse amplitude",
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "pi_duration": {
+            "default_value": null,
+            "description": "Calibrated GE pi-pulse duration",
+            "greater_than": 0,
+            "parameter_aliases": [
+              "pi_length"
+            ],
+            "resolution": "database_required",
+            "unit": "ns",
+            "user_override": "allowed"
+          },
+          "readout_amplitude": {
+            "default_value": null,
+            "description": "Calibrated readout amplitude",
+            "greater_than": 0,
+            "less_than_or_equal": 1,
+            "resolution": "database_required",
+            "unit": "a.u.",
+            "user_override": "allowed"
+          },
+          "readout_frequency": {
+            "default_value": null,
+            "description": "Calibrated readout frequency",
+            "fallback_parameter_names": [
+              "resonator_frequency"
+            ],
+            "greater_than": 0,
+            "resolution": "database_required",
+            "unit": "GHz",
+            "user_override": "allowed"
+          }
+        },
+        "name": "CheckGEFRelaxation",
+        "output_parameters": [
+          "t1",
+          "t1_f2e",
+          "t1_f2g"
+        ],
+        "run_parameters": {
+          "calibration_shots": {
+            "description": "Shots for each shared GEF calibration configuration",
+            "unit": "a.u.",
+            "value": 8192,
+            "value_type": "int"
+          },
+          "interval": {
+            "description": "Interval between shots",
+            "unit": "ns",
+            "value": 153600.0,
+            "value_type": "float"
+          },
+          "readout_duration": {
+            "description": "Readout pulse duration shared by the Qubex calibration session.",
+            "unit": "ns",
+            "value": 1024,
+            "value_type": "float"
+          },
+          "shots": {
+            "description": "Shots for each GEF population measurement",
+            "unit": "a.u.",
+            "value": 4096,
+            "value_type": "int"
+          },
+          "time_range": {
+            "description": "Positive GEF relaxation delays; zero is added automatically",
+            "unit": "ns",
+            "value": [
+              2.3010299956639813,
+              5.301029995663981,
+              18
+            ],
+            "value_type": "np.logspace"
+          }
+        },
+        "task_type": "qubit"
+      },
+      {
         "class_name": "CheckHPIPulse",
         "description": "Task to check the HPI pulse.",
         "file_path": "one_qubit_coarse/check_hpi_pulse.py",
