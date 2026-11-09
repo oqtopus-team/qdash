@@ -40,7 +40,6 @@
           packages = with pkgs; [
             bashInteractive
             bun
-            caddy
             curl
             docker-client
             docker-compose

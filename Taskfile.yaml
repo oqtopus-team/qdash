@@ -174,7 +174,6 @@ tasks:
 
         stop_pidfile "$pid_dir/dev-api-local.pid" "API" "uvicorn src.qdash.api.main:app"
         stop_pidfile "$pid_dir/dev-ui-local.pid" "UI" "bun run dev"
-        stop_pidfile "$pid_dir/dev-proxy-local.pid" "Caddy" "caddy run --config config/caddy/Caddyfile"
       - docker compose -f compose.yaml -f compose.host.yaml down
 
   dev-local-setup:
@@ -212,7 +211,7 @@ tasks:
         MONGO_HOST="$mongo_host" PREFECT_API_URL="$prefect_api_url" DEPLOYMENT_SERVICE_URL="$deployment_service_url" FORWARDED_ALLOW_IPS="$forwarded_allow_ips" python3 scripts/run-with-pidfile.py "$pid_dir/dev-api-local.pid" uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
 
   dev-ui-local:
-    desc: Start the UI on the host against the local API
+    desc: Start the UI on UI_PORT and proxy /api and /prefect through the Next.js dev server
     dir: ui
     dotenv: [../.env]
     silent: true
@@ -221,38 +220,36 @@ tasks:
         pid_dir="${QDASH_DEV_PID_DIR:-.tmp}"
         case "$pid_dir" in /*) ;; *) pid_dir="../$pid_dir" ;; esac
         mkdir -p "$pid_dir"
-        PORT="${UI_INTERNAL_PORT:-5716}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" python3 ../scripts/run-with-pidfile.py "$pid_dir/dev-ui-local.pid" bun run dev --hostname 127.0.0.1
-
-  dev-proxy-local:
-    desc: Start Caddy as the shared local browser entry point
-    dotenv: [.env]
-    silent: true
-    cmds:
-      - |
-        pid_dir="${QDASH_DEV_PID_DIR:-.tmp}"
-        mkdir -p "$pid_dir"
+        ui_port="${UI_PORT:-5714}"
         if [ "${QDASH_DEV_CONTAINER:-}" = "1" ]; then
-          site_address_default="http://:${UI_PORT:-5714}"
-          bind_address_default="0.0.0.0"
-          prefect_upstream_default="prefect-server:4200"
+          ui_hostname="0.0.0.0"
+          prefect_url_default="http://prefect-server:4200"
         else
-          site_address_default="http://localhost:${UI_PORT:-5714}"
-          bind_address_default="127.0.0.1"
-          prefect_upstream_default="127.0.0.1:${PREFECT_PORT:-4200}"
+          ui_hostname="127.0.0.1"
+          prefect_url_default="http://127.0.0.1:${PREFECT_PORT:-4200}"
         fi
-        CADDY_SITE_ADDRESS="${CADDY_LOCAL_SITE_ADDRESS:-$site_address_default}" \
-        CADDY_BIND_ADDRESS="${CADDY_LOCAL_BIND_ADDRESS:-$bind_address_default}" \
-        CADDY_UI_UPSTREAM="${CADDY_UI_UPSTREAM:-127.0.0.1:${UI_INTERNAL_PORT:-5716}}" \
-        CADDY_API_UPSTREAM="${CADDY_API_UPSTREAM:-127.0.0.1:${API_PORT:-5715}}" \
-        CADDY_PREFECT_UPSTREAM="${CADDY_PREFECT_UPSTREAM:-$prefect_upstream_default}" \
-        CADDY_TRUSTED_PROXIES="${CADDY_TRUSTED_PROXIES:-127.0.0.1/32 ::1/128}" \
-        python3 scripts/run-with-pidfile.py "$pid_dir/dev-proxy-local.pid" caddy run --config config/caddy/Caddyfile --adapter caddyfile
+        # An old listener on *:PORT (IPv6 dual-stack) does not stop a new bind on 127.0.0.1:PORT,
+        # so localhost would keep serving the old UI. Check both loopback addresses first.
+        if ! python3 -c 'import socket, sys
+        port = int(sys.argv[1])
+        for host in ("127.0.0.1", "::1"):
+            try:
+                with socket.create_connection((host, port), timeout=0.5):
+                    sys.exit(1)
+            except OSError:
+                pass
+        ' "$ui_port"; then
+          echo "Port ${ui_port} is already in use on localhost; the UI cannot start." >&2
+          echo "Stop the old stack first: run 'task dev-local-down', or 'docker compose down' for a Docker Compose stack." >&2
+          exit 1
+        fi
+        PORT="$ui_port" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" INTERNAL_PREFECT_URL="${INTERNAL_PREFECT_URL:-$prefect_url_default}" python3 ../scripts/run-with-pidfile.py "$pid_dir/dev-ui-local.pid" bun run dev --hostname "$ui_hostname"
 
   dev-local:
-    desc: Start lightweight local development services, API, UI, and Caddy
+    desc: Start lightweight local development services, API, and UI (no Caddy)
     cmds:
       - task: dev-services
-      - task --parallel dev-api-local dev-ui-local dev-proxy-local
+      - task --parallel dev-api-local dev-ui-local
 
   # =============================================================================
   # Python Tests (all tests run in-memory, no MongoDB required)
@@ -599,7 +596,7 @@ tasks:
     dir: ui
     dotenv: [../.env]
     cmds:
-      - INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" PORT="${UI_INTERNAL_PORT:-5716}" bun run dev --hostname 127.0.0.1
+      - INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" INTERNAL_PREFECT_URL="${INTERNAL_PREFECT_URL:-http://127.0.0.1:${PREFECT_PORT:-4200}}" PORT="${UI_PORT:-5714}" bun run dev --hostname 127.0.0.1
     desc: Start the UI development server
 
   deploy:

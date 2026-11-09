@@ -9,15 +9,15 @@ task -l                  # list tasks
 task dev-local-setup     # install host-side Python/UI dependencies
 task dev-services        # Docker services with loopback ports for host development
 task dev-api-local       # host API on API_PORT (default 5715)
-task dev-ui-local        # host UI on UI_INTERNAL_PORT (default 5716)
-task dev-proxy-local     # Caddy browser entry point on UI_PORT (default 5714)
-task dev-local           # Docker services + host API/UI/Caddy
+task dev-ui-local        # host UI on UI_PORT (default 5714), proxies /api and /prefect
+task dev-local           # Docker services + host API/UI (no Caddy)
 task dev-local-down      # stop host processes and the compose.host.yaml stack
 task deploy-local        # full Docker Compose stack
 ```
 
-Open the host development stack at `http://localhost:5714`; its API and Prefect destinations are
-`/api` and `/prefect`. Use the same Compose file list when managing an override stack.
+Open the host development stack at `http://localhost:5714`; the Next.js development server proxies
+`/api` and `/prefect`. Only the Compose stack runs Caddy. `task dev-ui-local` exits with an error
+when `UI_PORT` is already in use. Use the same Compose file list when managing an override stack.
 
 ## Checks
 

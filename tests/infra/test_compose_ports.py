@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import socket
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -203,14 +204,15 @@ def test_https_override_rejects_non_origin_urls(client_url: str, tmp_path: Path)
     )
 
 
-def run_task_with_stub(
+def run_task_process(
     task_name: str,
     executable_name: str,
     script: str,
     devcontainer: bool,
     tmp_path: Path,
-) -> list[str]:
-    """Run one long-running dev task against a stub executable and capture its environment."""
+    overrides: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run one long-running dev task against a stub executable without checking its status."""
     task_cli = shutil.which("task")
     if task_cli is None:
         pytest.skip("Task CLI is not installed")
@@ -220,82 +222,130 @@ def run_task_with_stub(
     stub = stub_bin / executable_name
     stub.write_text(script)
     stub.chmod(0o755)
-    capture = tmp_path / "task-environment.txt"
     environment = os.environ.copy()
     environment.update(
         {
             "QDASH_DEV_CONTAINER": "1" if devcontainer else "0",
-            "TASK_CAPTURE": str(capture),
+            "TASK_CAPTURE": str(tmp_path / "task-environment.txt"),
             "QDASH_DEV_PID_DIR": str(tmp_path / "pids"),
             "PATH": f"{stub_bin}:{os.environ['PATH']}",
             "UI_PORT": "5714",
-            "UI_INTERNAL_PORT": "5716",
             "API_PORT": "5715",
             "PREFECT_PORT": "4200",
             "DEPLOYMENT_SERVICE_PORT": "4006",
             "MONGO_HOST": "",
             "PREFECT_API_URL": "",
             "DEPLOYMENT_SERVICE_URL": "",
-            "CADDY_LOCAL_SITE_ADDRESS": "",
-            "CADDY_LOCAL_BIND_ADDRESS": "",
-            "CADDY_SITE_ADDRESS": "",
-            "CADDY_BIND_ADDRESS": "",
-            "CADDY_UI_UPSTREAM": "",
-            "CADDY_API_UPSTREAM": "",
-            "CADDY_PREFECT_UPSTREAM": "",
-            "CADDY_TRUSTED_PROXIES": "",
+            "INTERNAL_API_URL": "",
+            "INTERNAL_PREFECT_URL": "",
             "FORWARDED_ALLOW_IPS": "",
         }
     )
-    result = subprocess.run(  # noqa: S603
+    environment.update(overrides or {})
+    return subprocess.run(  # noqa: S603
         [task_cli, task_name],
-        check=True,
+        check=False,
         capture_output=True,
         cwd=REPO_ROOT,
         env=environment,
         text=True,
         timeout=10,
     )
-    assert result.returncode == 0
+
+
+def run_task_with_stub(
+    task_name: str,
+    executable_name: str,
+    script: str,
+    devcontainer: bool,
+    tmp_path: Path,
+    overrides: dict[str, str] | None = None,
+) -> list[str]:
+    """Run one long-running dev task against a stub executable and capture its environment."""
+    result = run_task_process(task_name, executable_name, script, devcontainer, tmp_path, overrides)
+    assert result.returncode == 0, result.stderr
     assert (tmp_path / "pids").is_dir()
-    return capture.read_text().splitlines()
+    return (tmp_path / "task-environment.txt").read_text().splitlines()
+
+
+def unused_local_port() -> int:
+    """Return a TCP port that nothing on 127.0.0.1 is listening on right now."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+UI_STUB_SCRIPT = (
+    '#!/bin/sh\nprintf "%s\\n" "$PORT" "$4" "$INTERNAL_API_URL" "$INTERNAL_PREFECT_URL"'
+    ' > "$TASK_CAPTURE"\n'
+)
 
 
 @pytest.mark.parametrize(
-    ("devcontainer", "expected"),
+    ("devcontainer", "expected_hostname", "expected_prefect"),
     [
-        (
-            False,
-            [
-                "http://localhost:5714",
-                "127.0.0.1",
-                "127.0.0.1:5716",
-                "127.0.0.1:5715",
-                "127.0.0.1:4200",
-                "127.0.0.1/32 ::1/128",
-            ],
-        ),
-        (
-            True,
-            [
-                "http://:5714",
-                "0.0.0.0",  # noqa: S104
-                "127.0.0.1:5716",
-                "127.0.0.1:5715",
-                "prefect-server:4200",
-                "127.0.0.1/32 ::1/128",
-            ],
-        ),
+        (False, "127.0.0.1", "http://127.0.0.1:4200"),
+        (True, "0.0.0.0", "http://prefect-server:4200"),  # noqa: S104
     ],
 )
-def test_dev_proxy_task_uses_context_upstreams(
-    devcontainer: bool, expected: list[str], tmp_path: Path
+def test_dev_ui_task_serves_ui_port_directly(
+    devcontainer: bool, expected_hostname: str, expected_prefect: str, tmp_path: Path
 ) -> None:
-    """The actual proxy task selects host or devcontainer settings."""
-    script = '#!/bin/sh\nprintf "%s\\n" "$CADDY_SITE_ADDRESS" "$CADDY_BIND_ADDRESS" "$CADDY_UI_UPSTREAM" "$CADDY_API_UPSTREAM" "$CADDY_PREFECT_UPSTREAM" "$CADDY_TRUSTED_PROXIES" > "$TASK_CAPTURE"\n'
-    actual = run_task_with_stub("dev-proxy-local", "caddy", script, devcontainer, tmp_path)
+    """The UI task listens on UI_PORT and points its rewrites at the API and Prefect."""
+    port = str(unused_local_port())
+    actual = run_task_with_stub(
+        "dev-ui-local", "bun", UI_STUB_SCRIPT, devcontainer, tmp_path, {"UI_PORT": port}
+    )
 
-    assert actual == expected
+    assert actual == [port, expected_hostname, "http://127.0.0.1:5715", expected_prefect]
+
+
+def test_dev_ui_task_defaults_to_port_5714(tmp_path: Path) -> None:
+    """Without UI_PORT the UI task uses the documented browser port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        if sock.connect_ex(("127.0.0.1", 5714)) == 0:
+            pytest.skip("Port 5714 is in use on this machine")
+    actual = run_task_with_stub("dev-ui-local", "bun", UI_STUB_SCRIPT, False, tmp_path)
+
+    assert actual[0] == "5714"
+
+
+def test_dev_ui_task_keeps_existing_prefect_url(tmp_path: Path) -> None:
+    """An explicit INTERNAL_PREFECT_URL overrides the context default."""
+    overrides = {
+        "UI_PORT": str(unused_local_port()),
+        "INTERNAL_PREFECT_URL": "http://prefect.internal:4300",
+    }
+    actual = run_task_with_stub("dev-ui-local", "bun", UI_STUB_SCRIPT, True, tmp_path, overrides)
+
+    assert actual[3] == "http://prefect.internal:4300"
+
+
+@pytest.mark.parametrize(
+    ("family", "address"),
+    [(socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")],
+)
+def test_dev_ui_task_fails_when_port_is_in_use(
+    family: socket.AddressFamily, address: str, tmp_path: Path
+) -> None:
+    """The UI task refuses to start when either loopback address already accepts connections."""
+    if family == socket.AF_INET6 and not socket.has_ipv6:
+        pytest.skip("IPv6 is not available")
+    with socket.socket(family, socket.SOCK_STREAM) as listener:
+        try:
+            listener.bind((address, 0))
+        except OSError:
+            pytest.skip(f"Cannot bind {address}")
+        listener.listen()
+        port = str(listener.getsockname()[1])
+        result = run_task_process(
+            "dev-ui-local", "bun", UI_STUB_SCRIPT, False, tmp_path, {"UI_PORT": port}
+        )
+
+    assert result.returncode != 0
+    assert f"Port {port} is already in use" in result.stderr
+    assert "task dev-local-down" in result.stderr
+    assert not (tmp_path / "task-environment.txt").exists()
 
 
 @pytest.mark.parametrize(

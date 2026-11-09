@@ -25,11 +25,22 @@ const nextConfig = {
     // Proxy /api/* to backend API server
     // This allows UI-only deployment without exposing API port
     const apiUrl = process.env.INTERNAL_API_URL || "http://127.0.0.1:5715";
+    // Development only: `task dev-local` runs without Caddy, so the Next.js dev server proxies
+    // /prefect as well. Production images never set INTERNAL_PREFECT_URL, so the production UI
+    // never serves Prefect without Caddy's /auth/prefect-access gate.
+    const prefectUrl = process.env.INTERNAL_PREFECT_URL;
+    const prefectRewrites = prefectUrl
+      ? [
+          { source: "/prefect", destination: `${prefectUrl}/prefect` },
+          { source: "/prefect/:path*", destination: `${prefectUrl}/prefect/:path*` },
+        ]
+      : [];
     return [
       {
         source: "/api/:path*",
         destination: `${apiUrl}/:path*`,
       },
+      ...prefectRewrites,
     ];
   },
   transpilePackages: ["react-plotly.js", "plotly.js-dist-min"],

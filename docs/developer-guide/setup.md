@@ -20,7 +20,6 @@ the project toolchain.
 | --- | --- | --- |
 | [Python](https://www.python.org/downloads/) | 3.11-3.12 | Backend development |
 | [Bun](https://bun.sh/) | 1.4.0+ | Frontend package manager and runtime |
-| [Caddy](https://caddyserver.com/docs/install) | 2.10.2 | Host-side browser gateway (`task dev-proxy-local`) |
 | [Node.js](https://nodejs.org/) | 24.22.1+ (24.x) or 26.12.1+ | Next.js production runtime |
 
 ## Clone the Repository
@@ -101,7 +100,7 @@ files are readable in both environments. Git credentials and global identity are
 environment. A repository-local Git setting is shared because `.git/config` is in the bind mount.
 
 The DevContainer Compose service publishes `UI_PORT` on the host as soon as it starts, even before
-its Caddy process runs. Stop the DevContainer before starting the full Compose stack at the same
+its UI process runs. Stop the DevContainer before starting the full Compose stack at the same
 default `UI_PORT=5714`, or assign a different `UI_PORT` to one of the modes.
 
 The DevContainer keeps its Python `.venv` in a Docker volume mounted at the usual workspace path.
@@ -139,7 +138,7 @@ Install [Nix](https://nixos.org/download/) with flakes enabled, then enter the d
 nix develop
 ```
 
-The shell provides Python 3.11, uv, Bun, Node.js 24, go-task, Caddy, Docker CLI/Compose, jq,
+The shell provides Python 3.11, uv, Bun, Node.js 24, go-task, Docker CLI/Compose, jq,
 PostgreSQL client tools, and the secret scanning tools used by the project. It also sets
 `UV_PYTHON` to the Nix-provided Python 3.11 so `uv sync` does not accidentally select Python
 3.12 on macOS, where some workflow backend dependencies may fail to build. It does not start
@@ -159,12 +158,10 @@ task dev-local
 ```
 
 This starts MongoDB, PostgreSQL, Prefect, the deployment service, and the user flow worker with
-the `compose.host.yaml` override, then runs the API, UI, and Caddy on the host. Caddy is the
-browser entry point at <http://localhost:5714>; the UI and API listen behind it on ports `5716`
-and `5715`. The Prefect host port is `4200` for service-to-service development, while browser
-access uses `/prefect` through Caddy. Caddy must be available on `PATH`; DevContainers install
-Caddy 2.10.2 and the Nix shell provides it. Install Caddy on the host when running these tasks
-outside either environment.
+the `compose.host.yaml` override, then runs the API and UI on the host. The UI is the browser
+entry point at <http://localhost:5714>, and the Next.js development server proxies `/api` to the
+API on port `5715` and `/prefect` to Prefect on port `4200`. This stack does not run Caddy, so you
+do not need to install it on the host.
 
 Stop the host API/UI processes and Docker Compose services:
 
@@ -192,20 +189,35 @@ task dev-local
 ```
 
 This starts the supporting services in Docker Compose with loopback-only development ports and
-runs the API, UI, and Caddy on the host. Use this flow when editing backend or frontend code
-frequently. Open the browser through Caddy at `http://localhost:5714`; do not use the service
-ports as browser entry points.
+runs the API and UI on the host. Use this flow when editing backend or frontend code
+frequently. Open the browser at `http://localhost:5714`; do not use the service ports as browser
+entry points.
+
+The Next.js development server listens directly on `UI_PORT` and forwards `/api` to the API
+(`INTERNAL_API_URL`) and `/prefect` to Prefect (`INTERNAL_PREFECT_URL`). Only the Compose stack
+puts Caddy in front of QDash. As a result, host development skips the Caddy security headers and
+the `/auth/prefect-access` check on `/prefect`; verify changes to either through the Compose stack.
 
 The component tasks are:
 
 - `task dev-services`: start MongoDB, PostgreSQL, Prefect, deployment-service, and user-flow-worker
 - `task dev-api-local`: run the FastAPI app on the host against Docker services
-- `task dev-ui-local`: run the Next.js app on the host against the local API
-- `task dev-proxy-local`: run Caddy as the browser entry point
+- `task dev-ui-local`: run the Next.js app on `UI_PORT`, proxying `/api` and `/prefect`
 
-The host task defaults are `UI_PORT=5714`, `API_PORT=5715`, `UI_INTERNAL_PORT=5716`, and
-`PREFECT_PORT=4200`. Browser traffic enters at `5714`; the other listeners serve the host
-development processes and are not browser entry points.
+The host task defaults are `UI_PORT=5714`, `API_PORT=5715`, and `PREFECT_PORT=4200`. Browser
+traffic enters at `5714`; the other listeners serve the host development processes and are not
+browser entry points.
+
+`task dev-ui-local` listens on `127.0.0.1` on the host and on `0.0.0.0` in the DevContainer, where
+Compose publishes the port on loopback. `INTERNAL_PREFECT_URL` defaults to
+`http://127.0.0.1:<PREFECT_PORT>` on the host and `http://prefect-server:4200` in the DevContainer;
+set it in the environment only to override that default.
+
+Before it starts the UI, `task dev-ui-local` checks whether anything already accepts connections on
+`UI_PORT` at `127.0.0.1` or `::1`, and exits with an error if so. An old UI that listens on all
+interfaces does not block a new listener on `127.0.0.1`, so without this check `localhost` could
+keep serving the old UI. Stop the old stack with `task dev-local-down`, or with
+`docker compose down` for a Compose stack, and start again.
 
 The example `.env` leaves `PREFECT_API_URL` blank so `task dev-api-local` can choose its context:
 host tasks use `http://127.0.0.1:<PREFECT_PORT>/prefect/api`, while DevContainer tasks use
@@ -215,10 +227,8 @@ address. Set an explicit `PREFECT_API_URL` only when overriding that context def
 
 ### Caddy Settings
 
-Compose and `task dev-proxy-local` pass every Caddy setting to `config/caddy/Caddyfile`, which has
-no defaults of its own. The example `.env` files set no `CADDY_*` variable; add one to `.env` only
-to override its default. Both modes read `.env`, so an upstream or trusted-proxy override applies
-to Compose and to the host task alike.
+Compose passes every Caddy setting to `config/caddy/Caddyfile`, which has no defaults of its own.
+The example `.env` files set no `CADDY_*` variable; add one to `.env` only to override its default.
 
 Compose (`compose.yaml`) reads these variables:
 
@@ -231,20 +241,6 @@ Compose (`compose.yaml`) reads these variables:
 | `CADDY_PREFECT_UPSTREAM` | Prefect server address | `prefect-server:4200` |
 | `CADDY_TRUSTED_PROXIES` | Proxies trusted to supply forwarded client headers | `127.0.0.1/32 ::1/128` |
 
-`task dev-proxy-local` ignores `CADDY_SITE_ADDRESS` and `CADDY_BIND_ADDRESS` and reads
-`CADDY_LOCAL_SITE_ADDRESS` and `CADDY_LOCAL_BIND_ADDRESS` instead, so a Compose site address in
-`.env` does not change host development. It reads the other four Compose variables with its own
-defaults:
-
-| Variable | Host default | DevContainer default |
-| --- | --- | --- |
-| `CADDY_LOCAL_SITE_ADDRESS` | `http://localhost:<UI_PORT>` | `http://:<UI_PORT>` |
-| `CADDY_LOCAL_BIND_ADDRESS` | `127.0.0.1` | `0.0.0.0` |
-| `CADDY_UI_UPSTREAM` | `127.0.0.1:<UI_INTERNAL_PORT>` | `127.0.0.1:<UI_INTERNAL_PORT>` |
-| `CADDY_API_UPSTREAM` | `127.0.0.1:<API_PORT>` | `127.0.0.1:<API_PORT>` |
-| `CADDY_PREFECT_UPSTREAM` | `127.0.0.1:<PREFECT_PORT>` | `prefect-server:4200` |
-| `CADDY_TRUSTED_PROXIES` | `127.0.0.1/32 ::1/128` | `127.0.0.1/32 ::1/128` |
-
 Only trust the addresses of an actual TLS-terminating proxy in `CADDY_TRUSTED_PROXIES`.
 
 ### Access Points
@@ -255,8 +251,8 @@ Only trust the addresses of an actual TLS-terminating proxy in `CADDY_TRUSTED_PR
 | API documentation | `http://localhost:5714/api/docs` |
 | Prefect dashboard | `http://localhost:5714/prefect/dashboard` |
 
-The local API and UI listeners use `API_PORT` (default `5715`) and `UI_INTERNAL_PORT` (default
-`5716`). The host override also binds MongoDB, Prefect, and the deployment service to loopback for
+The local API and UI listeners use `API_PORT` (default `5715`) and `UI_PORT` (default `5714`).
+The host override also binds MongoDB, Prefect, and the deployment service to loopback for
 the development processes. `task dev-local-down` stops the host processes and the Compose stack
 using the same `compose.yaml` and `compose.host.yaml` files.
 
