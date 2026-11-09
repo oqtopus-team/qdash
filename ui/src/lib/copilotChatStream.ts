@@ -2,7 +2,13 @@
  * Pure helpers that fold Copilot SSE events into a live transcript.
  */
 
-import type { ChatTrace, LiveTurn, ToolEvaluation, TraceStep } from "@/types/copilotChat";
+import type {
+  ChatTrace,
+  ContentBlock,
+  LiveTurn,
+  ToolEvaluation,
+  TraceStep,
+} from "@/types/copilotChat";
 
 // Bound what a single message adds to the stored session document.
 const MAX_PERSISTED_THINKING = 20_000;
@@ -198,7 +204,36 @@ export function answerStartIndex(steps: TraceStep[]): number {
   return i;
 }
 
-export function streamedAnswer(turn: LiveTurn): string {
+/**
+ * A `ui` SSE event: the block a `render_ui` call produced, added to the turn
+ * as soon as its tool finished. The API sends a text block instead when the
+ * runtime's payload was malformed but had a fallback.
+ */
+export function appendLiveBlock(turn: LiveTurn, payload: unknown): LiveTurn {
+  if (!payload || typeof payload !== "object") return turn;
+  const block = payload as Partial<ContentBlock>;
+  if (block.type === "ui" && block.ui && typeof block.ui === "object") {
+    return { ...turn, blocks: [...(turn.blocks ?? []), block as ContentBlock] };
+  }
+  if (block.type === "text" && typeof block.content === "string" && block.content) {
+    return {
+      ...turn,
+      blocks: [...(turn.blocks ?? []), { type: "text", content: block.content, chart: null }],
+    };
+  }
+  return turn;
+}
+
+/** The blocks kept when the user stops a turn: finished UI blocks, then the text so far. */
+export function stoppedBlocks(turn: LiveTurn): ContentBlock[] {
+  const partial = streamedAnswer(turn);
+  return [
+    ...(turn.blocks ?? []),
+    ...(partial ? [{ type: "text" as const, content: partial, chart: null }] : []),
+  ];
+}
+
+function streamedAnswer(turn: LiveTurn): string {
   return turn.steps
     .slice(answerStartIndex(turn.steps))
     .map((step) => (step.kind === "text" ? step.text : ""))

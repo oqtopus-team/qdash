@@ -213,7 +213,12 @@ function TraceSteps({ steps, live }: { steps: TraceStep[]; live: boolean }) {
         }
         return (
           <ChainOfThoughtStep key={`text-${i}`} marker={null} defaultOpen>
-            <ChatMarkdown className="text-xs text-base-content/70">{step.text}</ChatMarkdown>
+            <ChatMarkdown
+              className="text-xs text-base-content/70"
+              streaming={live && i === steps.length - 1}
+            >
+              {step.text}
+            </ChatMarkdown>
           </ChainOfThoughtStep>
         );
       })}

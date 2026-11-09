@@ -14,10 +14,11 @@ import type { ModelOverride } from "@/lib/copilotModels";
 import {
   appendArgsDelta,
   appendDelta,
+  appendLiveBlock,
   endTool,
   startDraft,
   startTool,
-  streamedAnswer,
+  stoppedBlocks,
   toPersistedTrace,
 } from "@/lib/copilotChatStream";
 import { buildHeaders, consumeSSEEvents, readErrorResponse } from "@/lib/sse-utils";
@@ -701,6 +702,8 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
                 updateTurn((t) => ({ ...t, steps: startTool(t.steps, payload) }));
               } else if (evt.event === "tool_end") {
                 updateTurn((t) => ({ ...t, steps: endTool(t.steps, payload) }));
+              } else if (evt.event === "ui") {
+                updateTurn((t) => appendLiveBlock(t, payload));
               } else if (evt.event === "status") {
                 setRun(sessionId, (run) => ({ ...run, statusMessage: payload.message ?? null }));
               } else if (evt.event === "result") {
@@ -718,9 +721,8 @@ export function CopilotChatSessionProvider({ children }: { children: React.React
           if (controller.signal.aborted) {
             // Keep whatever had streamed, like ChatGPT/Claude do on Stop.
             if (controller.signal.reason === "stop") {
-              const partial = streamedAnswer(turn);
               finish({
-                blocks: partial ? [{ type: "text", content: partial, chart: null }] : [],
+                blocks: stoppedBlocks(turn),
                 assessment: null,
                 stopped: true,
               });

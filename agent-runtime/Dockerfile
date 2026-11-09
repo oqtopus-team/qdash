@@ -21,6 +21,8 @@ WORKDIR /app/agent-runtime
 COPY agent-runtime/src ./src
 # exec/protocol.ts is shared with the Copilot workspace's server (exec/Dockerfile).
 COPY agent-runtime/exec ./exec
+# The render_ui catalog and validation, shared with the chat UI (src/ui-tool.ts).
+COPY ui/src/lib/copilotUiSpec.ts /app/ui/src/lib/copilotUiSpec.ts
 # The agent dir and workspace are written at runtime (models.json, agent files),
 # so hand /app to the unprivileged user the base image ships before dropping root.
 RUN mkdir -p $PI_CODING_AGENT_DIR $AGENT_WORK_DIR /app/state && chown -R bun:bun /app

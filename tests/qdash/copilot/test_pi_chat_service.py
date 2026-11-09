@@ -12,6 +12,7 @@ from qdash.api.services.pi_chat_service import (
     build_blocks_result,
     tool_label,
     translate,
+    ui_block,
 )
 
 
@@ -285,6 +286,79 @@ class TestTranslate:
         assert events == [
             ("error", {"step": "run_chat", "detail": "Agent runtime sent malformed data"})
         ]
+
+
+_UI = {
+    "version": 1,
+    "spec": {
+        "root": "m",
+        "elements": {
+            "m": {"type": "Metric", "props": {"label": "T1", "value": 42}, "children": []}
+        },
+    },
+    "fallback": "- T1: 42",
+}
+
+
+class TestUiBlocks:
+    @pytest.mark.asyncio
+    async def test_a_ui_streams_live_and_keeps_its_place_among_charts(self) -> None:
+        chart = {"data": [{"y": [1]}], "layout": {}}
+        events = await _collect(
+            {"type": "chart", "chart": chart},
+            {"type": "ui", "ui": _UI},
+            {"type": "tool_end", "name": "render_ui", "isError": False},
+            {"type": "done", "text": "T1 is fine."},
+        )
+
+        ui_block = {"type": "ui", "content": "- T1: 42", "chart": None, "ui": _UI}
+        assert ("ui", ui_block) in events
+        blocks = events[-1][1]["blocks"]
+        assert [b["type"] for b in blocks] == ["chart", "ui", "text"]
+        assert blocks[1] == ui_block
+
+    @pytest.mark.asyncio
+    async def test_a_ui_alone_is_a_real_answer(self) -> None:
+        events = await _collect({"type": "ui", "ui": _UI}, {"type": "done", "text": ""})
+
+        assert events[-1][0] == "result"
+
+    @pytest.mark.asyncio
+    async def test_a_malformed_ui_keeps_only_its_fallback_text(self) -> None:
+        events = await _collect(
+            {"type": "ui", "ui": {"version": "1", "spec": [], "fallback": "- T1: 42"}},
+            {"type": "ui", "ui": {"version": 1, "spec": "nope"}},
+            {"type": "ui", "ui": "not a block"},
+            {"type": "done", "text": "Done."},
+        )
+
+        assert events[-1][1]["blocks"] == [
+            {"type": "text", "content": "- T1: 42", "chart": None},
+            {"type": "text", "content": "Done.", "chart": None},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_an_oversized_ui_is_not_stored(self) -> None:
+        huge = {**_UI, "spec": {"root": "m", "elements": {"m": {"text": "x" * 300_000}}}}
+        events = await _collect({"type": "ui", "ui": huge}, {"type": "done", "text": "Done."})
+
+        assert [b["type"] for b in events[-1][1]["blocks"]] == ["text", "text"]
+
+    @pytest.mark.asyncio
+    async def test_a_ui_event_without_its_payload_is_malformed(self) -> None:
+        events = await _collect({"type": "ui"})
+
+        assert events == [
+            ("error", {"step": "run_chat", "detail": "Agent runtime sent malformed data"})
+        ]
+
+    def test_forum_markdown_uses_the_ui_fallback(self) -> None:
+        from qdash.copilot.blocks import blocks_to_markdown
+
+        block = ui_block(_UI)
+        assert block is not None
+        result = build_blocks_result("Summary.", [block])
+        assert blocks_to_markdown(result) == "- T1: 42\n\nSummary."
 
 
 class TestBuildBlocksResult:
