@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import importlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from qdash.workflow import sweep
 from qdash.workflow.service.steps import (
     ConfigureAll,
     CustomOneQubit,
@@ -17,6 +19,7 @@ from qdash.workflow.service.steps import (
     OneQubitFineTune,
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
 
 characterization_module = importlib.import_module("qdash.workflow.templates.characterization")
 
@@ -54,23 +57,21 @@ def test_characterization_builds_full_pipeline_in_dependency_order() -> None:
         CustomOneQubit,
         CustomTwoQubit,
     ]
-    assert steps[1].tasks == characterization_module.GE_CALIBRATION_TASKS
+    assert names(steps[1].tasks) == names(characterization_module.GE_CALIBRATION_TASKS)
     assert steps[3].inverse is False
-    assert steps[4].tasks == characterization_module.GE_CHARACTERIZATION_TASKS
+    assert names(steps[4].tasks) == names(characterization_module.GE_CHARACTERIZATION_TASKS)
     assert steps[4].continue_on_failure is True
-    assert steps[4].stop_on_failure_tasks == ()
-    assert steps[5].tasks == characterization_module.EF_CALIBRATION_TASKS
-    assert steps[7].tasks == characterization_module.EF_CHARACTERIZATION_TASKS
+    assert all(call.on_failure is None for call in steps[4].tasks)
+    assert names(steps[5].tasks) == names(characterization_module.EF_CALIBRATION_TASKS)
+    assert names(steps[7].tasks) == names(characterization_module.EF_CHARACTERIZATION_TASKS)
+    assert steps[7].tasks[0].name == "CheckGEFRelaxation"
     assert steps[7].continue_on_failure is True
-    assert steps[7].stop_on_failure_tasks == ()
-    assert steps[8].tasks == ["CheckCouplingStrength"]
+    assert all(call.on_failure is None for call in steps[7].tasks)
+    assert names(steps[8].tasks) == ["CheckCouplingStrength"]
     assert steps[8].step_name == "coupling_characterization"
     assert steps[8].continue_on_failure is True
     assert result["kwargs"]["configuration_mode"] == "ge-ef-fh"
-    assert (
-        result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
-        == result["kwargs"]["configuration_mode"]
-    )
+    assert _configure_all_mode(result) == result["kwargs"]["configuration_mode"]
 
 
 def test_ge_only_characterization_uses_ge_configuration() -> None:
@@ -90,14 +91,36 @@ def test_ge_only_characterization_uses_ge_configuration() -> None:
         FilterByStatus,
         CustomOneQubit,
     ]
-    assert steps[1].tasks == characterization_module.GE_CALIBRATION_TASKS
-    assert steps[3].tasks == characterization_module.GE_CHARACTERIZATION_TASKS
-    assert steps[3].stop_on_failure_tasks == ()
+    assert names(steps[1].tasks) == names(characterization_module.GE_CALIBRATION_TASKS)
+    assert names(steps[3].tasks) == names(characterization_module.GE_CHARACTERIZATION_TASKS)
+    assert all(call.on_failure is None for call in steps[3].tasks)
     assert result["kwargs"]["configuration_mode"] == "ge-cr-cr"
-    assert (
-        result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
-        == result["kwargs"]["configuration_mode"]
+    assert _configure_all_mode(result) == result["kwargs"]["configuration_mode"]
+
+
+def test_ef_characterization_without_fh_chevron_uses_ef_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        characterization_module,
+        "EF_CHARACTERIZATION_TASKS",
+        [
+            call
+            for call in characterization_module.EF_CHARACTERIZATION_TASKS
+            if call.name != "CheckAdaptiveFHChevron"
+        ],
     )
+
+    result = characterization_module.characterization(
+        username="alice",
+        chip_id="64Q",
+        qids=["0"],
+        run_ge_characterization=False,
+        run_coupling_characterization=False,
+    )
+
+    assert result["kwargs"]["configuration_mode"] == "ge-ef-cr"
+    assert _configure_all_mode(result) == "ge-ef-cr"
 
 
 def test_coupling_characterization_does_not_imply_ef_calibration() -> None:
@@ -120,10 +143,10 @@ def test_coupling_characterization_does_not_imply_ef_calibration() -> None:
         GenerateCRSchedule,
         CustomTwoQubit,
     ]
-    assert steps[1].tasks == characterization_module.GE_CALIBRATION_TASKS
+    assert names(steps[1].tasks) == names(characterization_module.GE_CALIBRATION_TASKS)
     assert steps[3].inverse is True
     assert steps[3].max_parallel_ops == 3
-    assert steps[4].tasks == ["CheckCouplingStrength"]
+    assert names(steps[4].tasks) == ["CheckCouplingStrength"]
     assert steps[4].step_name == "coupling_characterization"
     assert steps[4].max_parallel_ops == 3
     assert result["kwargs"]["configuration_mode"] == "ge-cr-cr"
@@ -158,38 +181,109 @@ def test_characterization_requires_targets_and_an_enabled_stage() -> None:
         characterization_module.characterization(username="alice", chip_id="64Q")
 
 
-def test_characterization_exposes_primary_task_parameters() -> None:
+def _template_calls(result: dict[str, Any]) -> list[Any]:
+    return [call for step in result["steps"] for call in getattr(step, "tasks", None) or ()]
+
+
+def _configure_all_mode(result: dict[str, Any]) -> Any:
+    (call,) = result["steps"][0].calls()
+    return call.run["configuration_mode"]["value"]
+
+
+@pytest.mark.parametrize(
+    ("run_ef_characterization", "configuration_mode"),
+    [(True, "ge-ef-fh"), (False, "ge-cr-cr")],
+)
+def test_characterization_sets_the_configure_all_mode_on_its_call(
+    run_ef_characterization: bool, configuration_mode: str
+) -> None:
+    result = characterization_module.characterization(
+        username="alice",
+        chip_id="64Q",
+        qids=["0", "1"],
+        run_ef_characterization=run_ef_characterization,
+    )
+
+    configure_all = result["steps"][0]
+    assert isinstance(configure_all, ConfigureAll)
+    assert [call.resolved_call_id for call in configure_all.calls()] == ["ConfigureAll"]
+    assert _configure_all_mode(result) == configuration_mode
+    # Every setting lives on a call; the template no longer passes per-task defaults.
+    assert "task_parameters" not in result["kwargs"]
+    assert result["kwargs"]["configuration_mode"] == configuration_mode
+    assert result["kwargs"]["default_run_parameters"] == {
+        "readout_duration": 1024,
+        "interval": characterization_module.STANDARD_INTERVAL,
+    }
+
+
+def test_characterization_calls_carry_their_acquisition_settings() -> None:
     result = characterization_module.characterization(
         username="alice",
         chip_id="64Q",
         qids=["0", "1"],
     )
 
-    parameters = result["kwargs"]["task_parameters"]
-    expected_tasks = {
-        "ConfigureAll",
-        *characterization_module.GE_CALIBRATION_TASKS,
-        *characterization_module.GE_CHARACTERIZATION_TASKS,
-        *characterization_module.EF_CALIBRATION_TASKS,
-        *characterization_module.EF_CHARACTERIZATION_TASKS,
-        *characterization_module.COUPLING_CHARACTERIZATION_TASKS,
-    }
-    assert parameters.keys() == expected_tasks
-    assert parameters["ConfigureAll"]["run"]["configuration_mode"] == "ge-ef-fh"
+    calls = _template_calls(result)
+    assert names(calls) == [
+        *names(characterization_module.GE_CALIBRATION_TASKS),
+        *names(characterization_module.GE_CHARACTERIZATION_TASKS),
+        *names(characterization_module.EF_CALIBRATION_TASKS),
+        *names(characterization_module.EF_CHARACTERIZATION_TASKS),
+        *names(characterization_module.COUPLING_CHARACTERIZATION_TASKS),
+    ]
+    runs = dict(effective_settings(calls))
+    # Every call sets its own shots and interval instead of inheriting the shared interval.
+    for call_id, call_settings in runs.items():
+        assert {"shots", "interval"} <= call_settings["run"].keys(), call_id
     assert (
         characterization_module.SHORT_INTERVAL
         < characterization_module.STANDARD_INTERVAL
         < characterization_module.LONG_INTERVAL
     )
-    assert (
-        parameters["ReadoutClassification"]["run"]["interval"]
-        == characterization_module.LONG_INTERVAL
+    assert runs["CheckRabi"] == settings(
+        run={
+            "time_range": sweep.range(0, 401, 8),
+            "shots": 2048,
+            "interval": characterization_module.SHORT_INTERVAL,
+        }
     )
-    assert (
-        parameters["CheckThermalExcitation"]["run"]["interval"]
-        == characterization_module.LONG_INTERVAL
+    assert runs["CreateDRAGPIPulse"] == settings(
+        run={
+            "drag_pi_duration": 24,
+            "shots": 2048,
+            "interval": characterization_module.STANDARD_INTERVAL,
+        }
     )
-    assert parameters["CheckThermalExcitation"]["run"]["shots"] > 0
+    assert runs["ReadoutClassification"] == settings(
+        run={"shots": 2048, "interval": characterization_module.LONG_INTERVAL}
+    )
+    assert runs["CheckT1Average"] == settings(
+        run={
+            "time_range": sweep.logspace(math.log10(100), math.log10(500_000), 51),
+            "shots": 1024,
+            "interval": characterization_module.STANDARD_INTERVAL,
+            "n_runs": 8,
+        }
+    )
+    assert runs["CheckThermalExcitation"] == settings(
+        run={"shots": 256 * 1024, "interval": characterization_module.LONG_INTERVAL}
+    )
+    assert runs["CheckCouplingStrength"] == settings(
+        run={
+            "time_range": sweep.arange(0, 20_001, 400),
+            "shots": 1024,
+            "interval": characterization_module.STANDARD_INTERVAL,
+        }
+    )
+    assert runs["CheckGEFRelaxation"] == settings(
+        run={
+            "time_range": sweep.logspace(math.log10(200), math.log10(200_000), 18),
+            "shots": 4096,
+            "calibration_shots": 8192,
+            "interval": characterization_module.LONG_INTERVAL,
+        }
+    )
 
 
 def test_characterization_task_parameters_match_task_specs() -> None:
@@ -207,14 +301,14 @@ def test_characterization_task_parameters_match_task_specs() -> None:
     )
 
     registry = BaseTask.registry["qubex"]
-    for task_name, settings in result["kwargs"]["task_parameters"].items():
-        normalized = normalize_task_settings(task_name, settings)
-        validate_task_settings(
-            registry[task_name],
-            task_name,
-            normalized,
-            source=f"task_parameters[{task_name!r}]",
-        )
+    calls = [*result["steps"][0].calls(), *_template_calls(result)]
+    checked = [
+        (f"call {call_id!r}", call.name, call_settings)
+        for call, (call_id, call_settings) in zip(calls, effective_settings(calls), strict=True)
+    ]
+    for source, task_name, task_settings in checked:
+        normalized = normalize_task_settings(task_name, task_settings)
+        validate_task_settings(registry[task_name], task_name, normalized, source=source)
         instances = generate_task_instances(
             [task_name],
             {

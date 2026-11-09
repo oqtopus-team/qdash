@@ -21,6 +21,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -86,11 +87,15 @@ def coherence_limit(
     steps = [
         # 1Q coherence limit
         CustomOneQubit(
-            step_name="coherence_limit_1q", tasks=["Check1QGateCoherenceLimit"], mode=mode
+            step_name="coherence_limit_1q",
+            tasks=[TaskCall(name="Check1QGateCoherenceLimit", run={"drag_hpi_duration": 16})],
+            mode=mode,
         ),
         # 2Q coherence limit
         GenerateCRSchedule(),
-        CustomTwoQubit(step_name="coherence_limit_2q", tasks=["Check2QGateCoherenceLimit"]),
+        CustomTwoQubit(
+            step_name="coherence_limit_2q", tasks=[TaskCall(name="Check2QGateCoherenceLimit")]
+        ),
     ]
 
     # =========================================================================
@@ -103,12 +108,5 @@ def coherence_limit(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            "Check1QGateCoherenceLimit": {
-                "run": {
-                    "drag_hpi_duration": 16,
-                },
-            },
-        },
     )
     return cal.run(targets, steps=steps)

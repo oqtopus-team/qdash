@@ -2,7 +2,14 @@
  * Pure helpers that fold Copilot SSE events into a live transcript.
  */
 
-import type { ChatTrace, LiveTurn, ToolEvaluation, TraceStep } from "@/types/copilotChat";
+import type {
+  ChatTrace,
+  ContentBlock,
+  LiveTurn,
+  ToolClassification,
+  ToolEvaluation,
+  TraceStep,
+} from "@/types/copilotChat";
 
 // Bound what a single message adds to the stored session document.
 const MAX_PERSISTED_THINKING = 20_000;
@@ -153,6 +160,42 @@ function toolEvaluation(value: unknown): ToolEvaluation | undefined {
   };
 }
 
+const CLASSIFICATION_OUTCOMES = new Set<ToolClassification["outcome"]>([
+  "classified",
+  "ambiguous",
+  "failed",
+]);
+
+const isProbability = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+
+/** The classifier decision of a tool_end payload (classify), when it is well-formed. */
+function toolClassification(value: unknown): ToolClassification | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const { classifier, outcome, category, probability, margin, probabilities, reason } =
+    value as Record<string, unknown>;
+  if (typeof classifier !== "string" || !classifier) return undefined;
+  if (!CLASSIFICATION_OUTCOMES.has(outcome as ToolClassification["outcome"])) return undefined;
+  const ranked = Array.isArray(probabilities)
+    ? probabilities.flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [];
+        const { category: name, probability: p } = entry as Record<string, unknown>;
+        return typeof name === "string" && name && isProbability(p)
+          ? [{ category: name, probability: p }]
+          : [];
+      })
+    : [];
+  return {
+    classifier,
+    outcome: outcome as ToolClassification["outcome"],
+    ...(typeof category === "string" && category ? { category } : {}),
+    ...(isProbability(probability) ? { probability } : {}),
+    ...(typeof margin === "number" && Number.isFinite(margin) ? { margin } : {}),
+    ...(ranked.length ? { probabilities: ranked } : {}),
+    ...(typeof reason === "string" && reason ? { reason } : {}),
+  };
+}
+
 export function endTool(
   steps: TraceStep[],
   payload: {
@@ -161,6 +204,7 @@ export function endTool(
     is_error?: boolean;
     figures?: unknown;
     evaluation?: unknown;
+    classification?: unknown;
     output?: unknown;
     exit_code?: unknown;
   },
@@ -178,6 +222,7 @@ export function endTool(
     ? payload.figures.filter((p): p is string => typeof p === "string" && p.length > 0)
     : [];
   const evaluation = toolEvaluation(payload.evaluation);
+  const classification = toolClassification(payload.classification);
   const next = [...steps];
   next[idx] = {
     ...step,
@@ -185,6 +230,7 @@ export function endTool(
     endedAt: Date.now(),
     ...(figures.length ? { figures } : {}),
     ...(evaluation ? { evaluation } : {}),
+    ...(classification ? { classification } : {}),
     ...(typeof payload.output === "string" && payload.output ? { output: payload.output } : {}),
     ...(typeof payload.exit_code === "number" ? { exitCode: payload.exit_code } : {}),
   };
@@ -198,7 +244,36 @@ export function answerStartIndex(steps: TraceStep[]): number {
   return i;
 }
 
-export function streamedAnswer(turn: LiveTurn): string {
+/**
+ * A `ui` SSE event: the block a `render_ui` call produced, added to the turn
+ * as soon as its tool finished. The API sends a text block instead when the
+ * runtime's payload was malformed but had a fallback.
+ */
+export function appendLiveBlock(turn: LiveTurn, payload: unknown): LiveTurn {
+  if (!payload || typeof payload !== "object") return turn;
+  const block = payload as Partial<ContentBlock>;
+  if (block.type === "ui" && block.ui && typeof block.ui === "object") {
+    return { ...turn, blocks: [...(turn.blocks ?? []), block as ContentBlock] };
+  }
+  if (block.type === "text" && typeof block.content === "string" && block.content) {
+    return {
+      ...turn,
+      blocks: [...(turn.blocks ?? []), { type: "text", content: block.content, chart: null }],
+    };
+  }
+  return turn;
+}
+
+/** The blocks kept when the user stops a turn: finished UI blocks, then the text so far. */
+export function stoppedBlocks(turn: LiveTurn): ContentBlock[] {
+  const partial = streamedAnswer(turn);
+  return [
+    ...(turn.blocks ?? []),
+    ...(partial ? [{ type: "text" as const, content: partial, chart: null }] : []),
+  ];
+}
+
+function streamedAnswer(turn: LiveTurn): string {
   return turn.steps
     .slice(answerStartIndex(turn.steps))
     .map((step) => (step.kind === "text" ? step.text : ""))

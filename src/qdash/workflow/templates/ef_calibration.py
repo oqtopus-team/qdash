@@ -17,6 +17,7 @@ from typing import Any, Literal
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -26,16 +27,25 @@ from qdash.workflow.service.calib_service import (
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
-EF_CALIBRATION_TASKS: list[str] = [
-    "ConfigureEF",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckAdaptiveEFChevron",
-    "CheckEFRabi",
-    "CreateEFHPIPulse",
-    "CreateEFPIPulse",
-    "EFReadoutClassification",
-]
+ConfigurationMode = Literal["ge-ef-cr", "ge-ef-fh"]
+
+
+def ef_calibration_tasks(configuration_mode: ConfigurationMode) -> list[TaskCall]:
+    """Build the EF calibration calls for one flow run.
+
+    ConfigureEF takes the run's configuration mode, so the list is built per run
+    instead of shared as a module constant.
+    """
+    return [
+        TaskCall(name="ConfigureEF", run={"configuration_mode": configuration_mode}),
+        TaskCall(name="CheckRabi"),
+        TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
+        TaskCall(name="CheckAdaptiveEFChevron", run={"shots": 256}),
+        TaskCall(name="CheckEFRabi"),
+        TaskCall(name="CreateEFHPIPulse", run={"ef_hpi_duration": 32}),
+        TaskCall(name="CreateEFPIPulse", run={"ef_pi_duration": 32}),
+        TaskCall(name="EFReadoutClassification"),
+    ]
 
 
 @flow(
@@ -49,7 +59,7 @@ def ef_calibration(
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
-    configuration_mode: Literal["ge-ef-cr", "ge-ef-fh"] = "ge-ef-cr",
+    configuration_mode: ConfigurationMode = "ge-ef-cr",
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
@@ -81,7 +91,7 @@ def ef_calibration(
     steps = [
         CustomOneQubit(
             step_name="ef_calibration",
-            tasks=EF_CALIBRATION_TASKS,
+            tasks=ef_calibration_tasks(configuration_mode),
             mode="synchronized",
         )
     ]
@@ -92,33 +102,6 @@ def ef_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            "ConfigureEF": {
-                "run": {
-                    "configuration_mode": configuration_mode,
-                },
-            },
-            "CreateHPIPulse": {
-                "run": {
-                    "hpi_duration": 32,
-                },
-            },
-            "CheckAdaptiveEFChevron": {
-                "run": {
-                    "shots": 256,
-                },
-            },
-            "CreateEFHPIPulse": {
-                "run": {
-                    "ef_hpi_duration": 32,
-                },
-            },
-            "CreateEFPIPulse": {
-                "run": {
-                    "ef_pi_duration": 32,
-                },
-            },
-        },
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,

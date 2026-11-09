@@ -51,7 +51,7 @@ Or try it without installing:
 pi -e npm:@oqtopus-team/pi-qcaleval
 ```
 
-The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.4.0.
+The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.5.0.
 Use the `beta` dist-tag to try changes merged into QDash's `develop` branch:
 
 ```bash

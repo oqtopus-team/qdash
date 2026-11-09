@@ -19,19 +19,35 @@ type ConnectionParams = { profile?: string; configPath?: string; useEnv?: boolea
 
 export type PipelineProblem = { path: string; message: string };
 
+/** One call as QDash will run it: identity, failure policy, effective settings. */
+export type ResolvedTaskCall = {
+  call_id: string;
+  name: string;
+  on_failure: string;
+  settings: Record<string, unknown>;
+};
+
 export type ResolvedPipelineStep = {
   index: number;
   type: string;
   name: string;
+  step_id?: string | null;
   kind: string;
+  /** Task names in call order, with repeats. */
   tasks: string[];
+  calls?: ResolvedTaskCall[];
+  reference?: { step?: string | null; call_id?: string | null } | null;
 };
 
 export type PipelineValidation = {
   valid: boolean;
   problems?: PipelineProblem[];
+  warnings?: PipelineProblem[];
   backend_name: string;
+  spec_version?: number | null;
   spec?: Record<string, unknown> | null;
+  migrated_spec?: Record<string, unknown> | null;
+  plan_digest?: string | null;
   targets?: { qids?: string[]; mux_ids?: number[]; exclude_qids?: string[] } | null;
   steps?: ResolvedPipelineStep[];
   task_run_count?: number;
@@ -56,10 +72,13 @@ export type PipelineCatalog = {
     requires: string[];
     provides: string[];
     task_scope?: string | null;
-    default_tasks: string[];
+    default_step_id?: string | null;
+    default_tasks: Array<{ name: string; call_id?: string | null }>;
+    step_metrics?: string[];
   }>;
   one_qubit_modes: string[];
   tasks: Record<string, string[]>;
+  spec_version?: number;
   spec_schema: Record<string, unknown>;
   example?: Record<string, unknown>;
 };
@@ -93,18 +112,30 @@ function describeTargets(targets: PipelineValidation["targets"]): string {
   return "targets unknown";
 }
 
-function taskList(tasks: string[]): string {
-  if (tasks.length === 0) return "no tasks (transform)";
-  const shown = tasks.slice(0, TASK_PREVIEW).join(", ");
-  const rest = tasks.length - TASK_PREVIEW;
-  return rest > 0 ? `${tasks.length} tasks: ${shown}, +${rest} more` : `${tasks.length} task${tasks.length === 1 ? "" : "s"}: ${shown}`;
+/** A call's label: the task name, plus its call_id when the two differ. */
+function callLabel(call: { name: string; call_id: string }): string {
+  return call.call_id === call.name ? call.name : `${call.call_id}=${call.name}`;
+}
+
+function callList(step: ResolvedPipelineStep): string {
+  const labels = step.calls?.length ? step.calls.map(callLabel) : step.tasks;
+  if (labels.length === 0) {
+    if (!step.reference?.step) return "no tasks (transform)";
+    const source = step.reference.call_id ? `${step.reference.step}.${step.reference.call_id}` : step.reference.step;
+    return `reads ${source}`;
+  }
+  const shown = labels.slice(0, TASK_PREVIEW).join(", ");
+  const rest = labels.length - TASK_PREVIEW;
+  const noun = labels.length === 1 ? "call" : "calls";
+  return rest > 0 ? `${labels.length} calls: ${shown}, +${rest} more` : `${labels.length} ${noun}: ${shown}`;
 }
 
 export function stepLines(steps: ResolvedPipelineStep[] | undefined): string[] {
   if (!steps?.length) return ["- (no steps resolved)"];
   return steps.map((step) => {
+    const id = step.step_id && step.step_id !== step.name ? ` [${step.step_id}]` : "";
     const label = step.name === step.type ? step.type : `${step.name} (${step.type})`;
-    return `${step.index}. ${label} — ${taskList(step.tasks)}`;
+    return `${step.index}. ${label}${id} — ${callList(step)}`;
   });
 }
 
@@ -120,21 +151,29 @@ export function formatPipelinePlan(result: PipelineValidation, chipId: string): 
   const problems = problemLines(result.problems);
   const lines = [header, `Targets: ${describeTargets(result.targets)}`, ""];
   if (result.valid) {
-    lines.push(`Valid. ${result.task_run_count ?? 0} task runs per target.`);
+    lines.push(`Valid. ${result.task_run_count ?? 0} task calls per target.`);
   } else {
     lines.push(`Not valid: ${problems.length} problem${problems.length === 1 ? "" : "s"}. Fix the spec and validate again.`, ...problems);
   }
+  if (result.migrated_spec) {
+    lines.push(
+      "",
+      `This is a version ${result.spec_version ?? 1} spec. details.data.migrated_spec holds the same pipeline as spec_version 2; review it (rename generated call_ids if useful) and plan it instead.`,
+    );
+  }
+  const warnings = problemLines(result.warnings);
+  if (warnings.length) lines.push("", "Warnings (the spec is still valid):", ...warnings);
   if (result.steps?.length) lines.push("", "Steps:", ...stepLines(result.steps));
   return lines.join("\n");
 }
 
 export function formatPipelineExecution(result: PipelineExecution, chipId: string): string {
   const stepCount = result.steps?.length ?? 0;
-  const taskRuns = (result.steps ?? []).reduce((count, step) => count + step.tasks.length, 0);
+  const taskRuns = (result.steps ?? []).reduce((count, step) => count + (step.calls?.length ?? step.tasks.length), 0);
   return [
     `Started: ${result.message}`,
     `execution_id ${result.execution_id}`,
-    `chip ${chipId}, ${describeTargets(result.targets)}, ${stepCount} step${stepCount === 1 ? "" : "s"}, ${taskRuns} task runs per target`,
+    `chip ${chipId}, ${describeTargets(result.targets)}, ${stepCount} step${stepCount === 1 ? "" : "s"}, ${taskRuns} task calls per target`,
     `qdash ${result.qdash_ui_url}`,
     `prefect ${result.flow_run_url}`,
     "",
@@ -147,7 +186,7 @@ export function formatPipelineCatalog(catalog: PipelineCatalog): string {
   for (const step of catalog.step_types) {
     const needs = step.requires.length ? ` needs ${step.requires.join(" or ")};` : "";
     const scope = step.task_scope ? ` ${step.task_scope} tasks` : "";
-    const defaults = step.default_tasks.length ? `; default ${step.default_tasks.length} tasks` : "";
+    const defaults = step.default_tasks.length ? `; default ${step.default_tasks.length} calls` : "";
     lines.push(`- ${step.type} [${step.kind}${scope}]: ${step.description}${needs}${defaults}`);
   }
   lines.push("", `One-qubit modes: ${catalog.one_qubit_modes.join(", ")}`, "", "Tasks by type:");
@@ -156,7 +195,9 @@ export function formatPipelineCatalog(catalog: PipelineCatalog): string {
   }
   lines.push(
     "",
-    "Targets are either {qids: [...]} or {mux_ids: [...], exclude_qids?: [...]}.",
+    `Specs need spec_version: ${catalog.spec_version ?? 2}. Targets are either {qids: [...]} or {mux_ids: [...], exclude_qids?: [...]}.`,
+    'A step\'s tasks are calls: {"name": "CheckRamsey", "call_id"?, "run"?, "input"?, "update_calibration_parameters"?, "on_failure"?}. A task may run more than once in one step when every occurrence has its own call_id.',
+    "Filters read the latest OneQubitCheck/OneQubitFineTune unless they set step (a step_id) and optionally call_id.",
     "The full spec JSON schema is in details.data.spec_schema; validate with qdash_plan_pipeline.",
   );
   return lines.join("\n");
@@ -190,7 +231,7 @@ const connectionParams = {
 // and a union-heavy schema here would be ignored by vLLM guided decoding anyway.
 const specParam = Type.Object({}, {
   additionalProperties: true,
-  description: "CalibrationPipelineSpec: {name?, targets: {qids} | {mux_ids, exclude_qids?}, steps: [{type, ...}], task_run_parameters?, default_run_parameters?, tags?}. Get step types and tasks from qdash_get_pipeline_catalog.",
+  description: "CalibrationPipelineSpec: {spec_version: 2, name?, targets: {qids} | {mux_ids, exclude_qids?}, steps: [{type, step_id?, tasks?: [{name, call_id?, run?, input?, update_calibration_parameters?, on_failure?}], ...}], default_run_parameters?, tags?}. Put per-call settings on each task call; task_parameters (per-task defaults) is deprecated and only kept so existing specs still run. Get step types and tasks from qdash_get_pipeline_catalog.",
 });
 
 export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registerTool">, deps: CalibrationPipelineDependencies): void {
@@ -222,7 +263,8 @@ export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registe
     promptSnippet: "Validate a QDash calibration pipeline spec and preview the tasks it will run",
     promptGuidelines: [
       "Use qdash_plan_pipeline after composing a spec and after every edit; a spec with problems is not an error, fix it and plan again.",
-      "Show the user the resolved steps and task counts before running.",
+      "When the plan returns migrated_spec, the spec was version 1; plan the migrated spec instead of editing the old shape.",
+      "Show the user the resolved steps, their call ids and settings, and any warnings before running.",
     ],
     parameters: Type.Object({
       ...connectionParams,

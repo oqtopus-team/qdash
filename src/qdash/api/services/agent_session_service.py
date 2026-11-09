@@ -1185,7 +1185,7 @@ class AgentSessionService:
                 project_id=project_id,
                 input_overrides=input_overrides,
                 run_overrides={},
-                persist_output_parameters=False,
+                update_calibration_parameters=False,
                 update_params=body.update_params,
                 reconfigure=body.reconfigure,
                 execution_name=f"agent:{action.task_name}",

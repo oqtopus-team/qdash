@@ -8,10 +8,13 @@ from typing import TYPE_CHECKING
 
 from prefect import get_run_logger
 
+from qdash.datamodel.calibration_pipeline import configure_all_call
+from qdash.datamodel.task_settings import merge_task_parameters, normalize_task_settings
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.targets import MuxTargets
 
 if TYPE_CHECKING:
+    from qdash.datamodel.task_call import TaskCall
     from qdash.workflow.service.calib_service import CalibService
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
@@ -19,13 +22,27 @@ if TYPE_CHECKING:
 
 @dataclass
 class ConfigureAll(CalibrationStep):
-    """Configure all boxes for the selected MUXes once as a pipeline step."""
+    """Configure all boxes for the selected MUXes once as a pipeline step.
+
+    ``call`` sets the ConfigureAll call's own settings, for example
+    ``TaskCall(name="ConfigureAll", run={"configuration_mode": "ge-ef-cr"})``.
+    ``mux_ids`` always comes from the step or its targets.
+    """
 
     mux_ids: list[int] | None = None
+    call: TaskCall | None = None
+
+    def __post_init__(self) -> None:
+        """Reject a call that does not name the ConfigureAll task."""
+        configure_all_call(self.call)
 
     @property
     def name(self) -> str:
-        return "configure_all"
+        return self.step_id or "configure_all"
+
+    def calls(self) -> tuple[TaskCall, ...]:
+        """The one ConfigureAll call; ``execute`` sets its mux_ids from the targets."""
+        return (configure_all_call(self.call),)
 
     @property
     def provides(self) -> set[str]:
@@ -45,15 +62,18 @@ class ConfigureAll(CalibrationStep):
         if owns_session:
             service._initialize([])
 
+        plan = self.step_calls(service)
+        call = plan.calls[0]
+        parameters = merge_task_parameters(
+            {call.name: call.settings()},
+            {call.name: normalize_task_settings(call.name, {"run": {"mux_ids": mux_ids}})},
+        )[call.name]
         try:
             raw_result = service.execute_task(
                 "ConfigureAll",
                 qid="",
-                parameters={
-                    "run": {
-                        "mux_ids": mux_ids,
-                    },
-                },
+                parameters=parameters,
+                invocation=plan.invocation(call),
             )
             ctx.metadata[self.name] = raw_result
             if owns_session:
@@ -83,6 +103,7 @@ class ConfigureAll(CalibrationStep):
         return ctx
 
     def _resolve_mux_ids(self, service: CalibService, targets: Target) -> list[int]:
+        """The MUXes to configure: the step's own, the targets', or the session's."""
         if self.mux_ids is not None:
             return list(self.mux_ids)
         if isinstance(targets, MuxTargets):

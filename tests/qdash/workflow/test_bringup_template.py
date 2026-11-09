@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from qdash.workflow.calibtasks.qubex import CheckAdaptiveChevron
+from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
 
 bringup_module = importlib.import_module("qdash.workflow.templates.bringup")
 
@@ -65,41 +66,30 @@ def test_bringup_template_passes_template_task_list(monkeypatch) -> None:
 
     result = bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
 
-    assert result["steps"][0].tasks == bringup_module.BRINGUP_TASKS
+    assert names(result["steps"][0].tasks) == names(bringup_module.BRINGUP_TASKS)
 
 
 def test_bringup_template_preserves_task_specific_acquisition_settings(monkeypatch) -> None:
     monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
 
-    bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
+    result = bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
 
     assert FakeCalibService.last_kwargs is not None
-    assert FakeCalibService.last_kwargs["task_parameters"] == {
-        "CheckResonatorSpectroscopy": {
-            "run": {
-                "shots": 1024,
-                "interval": 0,
-            },
-        },
-        "CheckQubitSpectroscopy": {
-            "run": {
-                "shots": 1024,
-                "interval": 1024,
-            },
-        },
-        "CheckControlAmplitude": {
-            "run": {
-                "shots": 8192,
-            },
-        },
-        "CheckAdaptiveChevron": {
-            "run": {
-                "shots": 256,
-            },
-        },
+    assert "task_parameters" not in FakeCalibService.last_kwargs
+    assert FakeCalibService.last_kwargs["default_run_parameters"] == {
+        "readout_duration": 1024,
+        "interval": 150 * 1024,
     }
-    adaptive_settings = FakeCalibService.last_kwargs["task_parameters"]["CheckAdaptiveChevron"]
-    assert adaptive_settings["run"]["shots"] == CheckAdaptiveChevron.run_spec["shots"].default
+    # Call settings take precedence over the shared interval default.
+    assert effective_settings(result["steps"][0].tasks) == [
+        ("CheckResonatorSpectroscopy", settings(run={"shots": 1024, "interval": 0})),
+        ("CheckQubitSpectroscopy", settings(run={"shots": 1024, "interval": 1024})),
+        ("CheckControlAmplitude", settings(run={"shots": 8192})),
+        ("CheckAdaptiveChevron", settings(run={"shots": 256})),
+    ]
+    adaptive = result["steps"][0].tasks[-1]
+    assert adaptive.run is not None
+    assert adaptive.run["shots"]["value"] == CheckAdaptiveChevron.run_spec["shots"].default
 
 
 def test_bringup_template_requires_explicit_mux_ids(monkeypatch) -> None:

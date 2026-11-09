@@ -1,5 +1,7 @@
 /** Shared types for every Copilot chat surface (page, sidebar, floating window). */
 
+import type { UiBlockPayload } from "@/lib/copilotUiSpec";
+
 /** The task result a chat is about; its first turn opens with the result's context and figures. */
 export interface TaskChatContext {
   taskName: string;
@@ -82,8 +84,9 @@ export interface PageContext {
   flow?: FlowEditorContext;
 }
 
-interface ContentBlock {
-  type: "text" | "chart" | "ask" | "approval" | "edit";
+export interface ContentBlock {
+  type: "text" | "chart" | "ui" | "ask" | "approval" | "edit";
+  /** Markdown for `text`; for `ui`, the block's plain-text fallback. */
   content: string | null;
   chart: {
     data: Record<string, unknown>[];
@@ -92,6 +95,11 @@ interface ContentBlock {
   ask?: AskRequest;
   approval?: ApprovalRequest;
   edit?: EditProposal;
+  /**
+   * A read-only UI the assistant composed (`render_ui`). Validated again
+   * before rendering; an unknown version or invalid spec shows `ui.fallback`.
+   */
+  ui?: UiBlockPayload;
 }
 
 export interface BlocksResult {
@@ -116,6 +124,27 @@ export interface ToolEvaluation {
   /** The run the evaluation was recorded under, when the figure belonged to a task result. */
   runId?: string;
   evaluationId?: string;
+}
+
+/**
+ * What the classifier model decided for a `classify` call: the assistant asked
+ * it to pick one of the categories it defined. Never the classifier's input.
+ */
+export interface ToolClassification {
+  /** `provider/model` of the classifier model (classifier.yaml). */
+  classifier: string;
+  /** `classified`: a clear answer; `ambiguous`: no clear winner; `failed`: no answer. */
+  outcome: "classified" | "ambiguous" | "failed";
+  /** The chosen category, as the assistant named it. */
+  category?: string;
+  /** The chosen category's probability. */
+  probability?: number;
+  /** Its lead over the runner-up. */
+  margin?: number;
+  /** Every category's probability, highest first. */
+  probabilities?: { category: string; probability: number }[];
+  /** Why there is no answer, when `failed`. */
+  reason?: string;
 }
 
 export type TraceStep =
@@ -145,6 +174,8 @@ export type TraceStep =
       figures?: string[];
       /** What an evaluation tool sent its model (qcal_evaluate). */
       evaluation?: ToolEvaluation;
+      /** What the classifier decided (classify). */
+      classification?: ToolClassification;
     }
   | { kind: "text"; text: string };
 
@@ -169,4 +200,6 @@ export type CopilotBlocksResult = BlocksResult & {
 export interface LiveTurn {
   steps: TraceStep[];
   startedAt: number;
+  /** UI blocks finished so far (`render_ui`), shown live and kept if the user stops. */
+  blocks?: ContentBlock[];
 }

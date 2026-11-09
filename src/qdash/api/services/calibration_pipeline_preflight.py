@@ -24,12 +24,14 @@ from typing import TYPE_CHECKING, Any
 from qdash.api.schemas.calibration_pipeline import PipelineProblem
 from qdash.api.services.catalog_task_run import matches_parameter_type, run_override_parts
 from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
-from qdash.datamodel.calibration_pipeline import STEP_CATALOG, step_tasks
+from qdash.datamodel.calibration_pipeline import STEP_CATALOG, ConfigureAllStep, step_calls
 from qdash.datamodel.task import compatible_value_type
+from qdash.datamodel.task_settings import UPDATE_CALIBRATION_PARAMETERS
 
 if TYPE_CHECKING:
     from qdash.api.schemas.task_file import TaskInfo
-    from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec
+    from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec, PipelineStep
+    from qdash.datamodel.task_call import TaskCall
 
 # Inputs that ``required_rabi_normalization_inputs`` declares; restoring them
 # requires the source CheckRabi to have run under the session's readout duration.
@@ -80,6 +82,47 @@ def _problem(path: str, message: str) -> PipelineProblem:
     return PipelineProblem(path=path, message=message)
 
 
+def _call_path(step_index: int, step: PipelineStep, call_index: int) -> str:
+    """The spec path of a call from ``step_calls``.
+
+    The calls may start with the implicit Configure call, and a ConfigureAll
+    step's only call is its ``call`` field, or the step itself when that is unset.
+    """
+    if isinstance(step, ConfigureAllStep):
+        return f"steps[{step_index}].call" if step.call is not None else f"steps[{step_index}]"
+    offset = 1 if getattr(step, "configure", False) else 0
+    if call_index < offset:
+        return f"steps[{step_index}].configure"
+    return f"steps[{step_index}].tasks[{call_index - offset}]"
+
+
+def _explicit_calls(spec: CalibrationPipelineSpec) -> list[tuple[str, TaskCall]]:
+    """Every call the spec spells out, with its spec path.
+
+    These are the entries of a step's ``tasks`` and a ConfigureAll step's
+    ``call``; default and implicit calls carry no settings of their own.
+    """
+    found: list[tuple[str, TaskCall]] = []
+    for step_index, step in enumerate(spec.steps):
+        if isinstance(step, ConfigureAllStep):
+            if step.call is not None:
+                found.append((f"steps[{step_index}].call", step.call))
+            continue
+        for task_index, call in enumerate(getattr(step, "tasks", None) or []):
+            found.append((f"steps[{step_index}].tasks[{task_index}]", call))
+    return found
+
+
+def _persists_outputs(effective: Mapping[str, Any]) -> bool:
+    """Whether a call publishes its outputs to the calibration data.
+
+    Mirrors ``CalibOrchestrator._should_update_calibration_parameters`` for a
+    pipeline, whose workflow policy persists outputs: the call's own setting,
+    then ``task_parameters``, then True.
+    """
+    return effective.get(UPDATE_CALIBRATION_PARAMETERS, True) is not False
+
+
 def _format_qids(qids: Iterable[str]) -> str:
     return ", ".join(sorted(set(qids), key=lambda qid: (len(qid), qid)))
 
@@ -122,16 +165,57 @@ def _value_type_problem(declared: Mapping[str, Any], override: object) -> tuple[
     return None, value
 
 
+def _run_value_problems(
+    path: str,
+    task_name: str,
+    name: str,
+    override: object,
+    declared_task: PreflightTask,
+    session_duration: float | None,
+) -> list[PipelineProblem]:
+    declared = declared_task.run_parameters.get(name)
+    if declared is None:
+        if name in declared_task.input_parameters:
+            return [
+                _problem(
+                    path,
+                    f"{name!r} is a calibration input of task {task_name!r}; set it under "
+                    "input instead of run",
+                )
+            ]
+        return [_problem(path, f"task {task_name!r} does not declare run parameter {name!r}")]
+    message, value = _value_type_problem(declared, override)
+    if message:
+        return [_problem(path, f"task {task_name!r} {message}")]
+    if name != "readout_duration" or value is None or session_duration is None:
+        return []
+    requested_duration = _numeric(value)
+    if requested_duration is None:
+        return [_problem(path, "readout_duration must be a finite positive number")]
+    if not math.isclose(requested_duration, session_duration):
+        return [
+            _problem(
+                path,
+                "readout_duration is session-scoped in Qubex: "
+                f"task {task_name!r} asks for {requested_duration:g} ns but the session "
+                f"runs at {session_duration:g} ns; set it through "
+                "default_run_parameters.readout_duration instead",
+            )
+        ]
+    return []
+
+
 def run_parameter_problems(
     spec: CalibrationPipelineSpec,
     tasks: Mapping[str, PreflightTask],
 ) -> list[PipelineProblem]:
-    """Problems with ``task_run_parameters`` and ``default_run_parameters``.
+    """Problems with run values in default_run_parameters, task_parameters and calls.
 
     Mirrors what task creation and ``QubexTask.resolve_run_parameters`` reject:
     undeclared names, values of an incompatible type, a non-positive readout
-    duration, and a per-task ``readout_duration`` that differs from the session.
-    Tasks without metadata are skipped; an unavailable task is reported elsewhere.
+    duration, and a per-task or per-call ``readout_duration`` that differs from
+    the session. Tasks without metadata are skipped; an unavailable task is
+    reported elsewhere.
     """
     problems: list[PipelineProblem] = []
     pipeline_tasks = list(dict.fromkeys(spec.all_tasks()))
@@ -159,37 +243,107 @@ def run_parameter_problems(
             if message:
                 problems.append(_problem(path, f"task {task!r} {message}"))
 
-    for task_name, parameters in spec.task_run_parameters.items():
+    for task_name, settings in spec.task_parameters.items():
         declared_task = tasks.get(task_name)
         if declared_task is None:
             continue
-        for name, override in parameters.items():
-            path = f"task_run_parameters.{task_name}.{name}"
-            declared = declared_task.run_parameters.get(name)
-            if declared is None:
-                problems.append(
-                    _problem(path, f"task {task_name!r} does not declare run parameter {name!r}")
+        for name, override in (settings.run or {}).items():
+            problems.extend(
+                _run_value_problems(
+                    f"task_parameters.{task_name}.run.{name}",
+                    task_name,
+                    name,
+                    override,
+                    declared_task,
+                    session_duration,
                 )
-                continue
-            message, value = _value_type_problem(declared, override)
-            if message:
-                problems.append(_problem(path, f"task {task_name!r} {message}"))
-                continue
-            if name != "readout_duration" or value is None or session_duration is None:
-                continue
-            requested_duration = _numeric(value)
-            if requested_duration is None:
-                problems.append(_problem(path, "readout_duration must be a finite positive number"))
-            elif not math.isclose(requested_duration, session_duration):
-                problems.append(
-                    _problem(
-                        path,
-                        "readout_duration is session-scoped in Qubex: "
-                        f"task {task_name!r} asks for {requested_duration:g} ns but the session "
-                        f"runs at {session_duration:g} ns; set it through "
-                        "default_run_parameters.readout_duration instead",
-                    )
+            )
+
+    for call_path, call in _explicit_calls(spec):
+        declared_task = tasks.get(call.name)
+        if declared_task is None:
+            continue
+        for name, override in (call.run or {}).items():
+            problems.extend(
+                _run_value_problems(
+                    f"{call_path}.run.{name}",
+                    call.name,
+                    name,
+                    override,
+                    declared_task,
+                    session_duration,
                 )
+            )
+    return problems
+
+
+def _input_name_problems(
+    path: str, task_name: str, names: Iterable[str], declared_task: PreflightTask
+) -> list[PipelineProblem]:
+    problems: list[PipelineProblem] = []
+    for name in names:
+        if name in declared_task.input_parameters:
+            continue
+        if name in declared_task.run_parameters:
+            message = f"{name!r} is a run parameter of task {task_name!r}; set it under run"
+        else:
+            message = f"task {task_name!r} does not declare calibration input {name!r}"
+        problems.append(_problem(f"{path}.{name}", message))
+    return problems
+
+
+def input_parameter_problems(
+    spec: CalibrationPipelineSpec,
+    tasks: Mapping[str, PreflightTask],
+) -> list[PipelineProblem]:
+    """Input override names a task does not declare, from task_parameters and calls."""
+    problems: list[PipelineProblem] = []
+    for task_name, settings in spec.task_parameters.items():
+        declared_task = tasks.get(task_name)
+        if declared_task is not None and settings.input:
+            problems.extend(
+                _input_name_problems(
+                    f"task_parameters.{task_name}.input", task_name, settings.input, declared_task
+                )
+            )
+    for call_path, call in _explicit_calls(spec):
+        declared_task = tasks.get(call.name)
+        if declared_task is not None and call.input:
+            problems.extend(
+                _input_name_problems(f"{call_path}.input", call.name, call.input, declared_task)
+            )
+    return problems
+
+
+def batch_input_problems(spec: CalibrationPipelineSpec) -> list[PipelineProblem]:
+    """Input overrides that the batch (simultaneous_spectroscopy) path cannot apply.
+
+    Batch execution measures every qubit of a batch together and rejects
+    calibration input overrides, from the call or from the per-task defaults.
+    """
+    problems: list[PipelineProblem] = []
+    defaults = spec.canonical_task_parameters()
+    for step_index, step in enumerate(spec.steps):
+        if getattr(step, "mode", None) != "simultaneous_spectroscopy":
+            continue
+        own = getattr(step, "tasks", None)
+        for task_index, call in enumerate(step_calls(step)):
+            effective = call.effective_settings(defaults)
+            if not effective.get("input"):
+                continue
+            path = (
+                _call_path(step_index, step, task_index)
+                if own is not None
+                else f"steps[{step_index}]"
+            )
+            problems.append(
+                _problem(
+                    path,
+                    f"call {call.resolved_call_id!r} ({call.name}) sets calibration inputs "
+                    f"{', '.join(sorted(effective['input']))}, which simultaneous_spectroscopy "
+                    "batch execution does not support; use another mode or drop the inputs",
+                )
+            )
     return problems
 
 
@@ -244,9 +398,14 @@ def prerequisite_problems(
 ) -> list[PipelineProblem]:
     """Problems with the calibration data the pipeline's qubit tasks need.
 
-    Walks the calibration steps in order. A ``database_required`` input of a task
-    is satisfied when an earlier task in the pipeline writes it, or when every
-    target qubit already has it in its calibration data. Tasks that restore Rabi
+    Walks the calibration steps' calls in order. A ``database_required`` input of a task
+    is satisfied when an earlier call in the pipeline publishes it, or when every
+    target qubit already has it in its calibration data. A call publishes its
+    outputs only when its effective ``update_calibration_parameters`` (the call's
+    own setting over ``task_parameters``) is not False; a call that records
+    history only leaves the calibration data, and the Rabi provenance it carries,
+    as they were. Input overrides do not satisfy a requirement: the task loads
+    database-required inputs before it applies overrides. Tasks that restore Rabi
     parameters are also checked against the readout duration those parameters
     were measured with, since the task rejects a mismatch with the session.
 
@@ -257,6 +416,7 @@ def prerequisite_problems(
     if not target_qids:
         return problems
     session_duration = effective_readout_duration(spec)
+    defaults = spec.canonical_task_parameters()
     data_cache: dict[str, Mapping[str, Any]] = {}
 
     def data_for(qid: str) -> Mapping[str, Any]:
@@ -269,11 +429,12 @@ def prerequisite_problems(
         entry = STEP_CATALOG[step.type]
         if entry.kind != "calibration" or entry.task_scope != "qubit":
             continue
-        for task_index, task_name in enumerate(step_tasks(step)):
+        for task_index, call in enumerate(step_calls(step)):
+            task_name = call.name
             task = tasks.get(task_name)
             if task is None:
                 continue
-            path = f"steps[{step_index}].tasks[{task_index}]"
+            path = _call_path(step_index, step, task_index)
             missing: dict[str, list[str]] = {}
             restores_rabi = False
             for name, metadata in task.input_parameters.items():
@@ -336,5 +497,6 @@ def prerequisite_problems(
                             f"{source_duration:g}",
                         )
                     )
-            produced.update(task.output_parameters)
+            if _persists_outputs(call.effective_settings(defaults)):
+                produced.update(task.output_parameters)
     return problems

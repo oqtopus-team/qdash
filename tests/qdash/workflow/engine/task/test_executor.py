@@ -315,6 +315,59 @@ class TestTaskExecutorExecuteTask:
             "admin", chip_id="chip-1", project_id="proj-1"
         )
 
+    @pytest.mark.parametrize("update_calibration_parameters", [False, True])
+    def test_execute_keeps_history_and_artifacts_when_updates_are_disabled(
+        self,
+        mock_state_manager: MagicMock,
+        mock_result_processor: MagicMock,
+        mock_data_saver: MagicMock,
+        update_calibration_parameters: bool,
+    ) -> None:
+        """Disabling updates suppresses write-back only; the run is still recorded."""
+        from unittest.mock import patch
+
+        import plotly.graph_objects as go
+
+        model = mock_state_manager.get_task.return_value
+        model.output_parameters = {"qubit_frequency": ParameterModel(value=5.0)}
+        executor = TaskExecutor(
+            state_manager=mock_state_manager,
+            calib_dir="/tmp/calib",
+            execution_id="exec-001",
+            task_manager_id="tm-001",
+            result_processor=mock_result_processor,
+            data_saver=mock_data_saver,
+            update_calibration_parameters=update_calibration_parameters,
+        )
+        executor.history_recorder = MagicMock()
+        execution_service = MagicMock(project_id="proj-1", chip_id="chip-1")
+        execution_service.merge_calib_data.return_value = execution_service
+        backend: Any = MagicMock()
+        backend.name = "fake"
+
+        with (
+            patch("qdash.repository.MongoQubitCalibrationRepository") as qubit_repo,
+            patch("qdash.repository.MongoCouplingCalibrationRepository"),
+            patch("qdash.workflow.engine.task.backend_saver.get_params_updater"),
+        ):
+            task = MockTask()
+            task.postprocess = MagicMock(  # type: ignore[method-assign]
+                return_value=PostProcessResult(
+                    output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)},
+                    figures=[go.Figure()],
+                    raw_data=[],
+                )
+            )
+            executor.execute(task, backend, "0", execution_service)
+
+        # Start and end records, the chip snapshot and the artifacts are saved either way.
+        assert executor.history_recorder.record_task_result.call_count == 2
+        executor.history_recorder.create_chip_history_snapshot.assert_called_once()
+        mock_data_saver.save_figures.assert_called_once()
+        assert qubit_repo.return_value.update_calib_data.called is update_calibration_parameters
+        if not update_calibration_parameters:
+            assert model.output_parameters["qubit_frequency"]["database_updated"] is False
+
     def test_execute_batch_calls_batch_run_once(
         self, executor: TaskExecutor, mock_state_manager: MagicMock
     ) -> None:

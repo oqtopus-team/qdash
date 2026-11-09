@@ -25,6 +25,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -42,35 +43,43 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import MuxTargets
 
-FAST_1Q_CHECK_TASKS: list[str] = [
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
+FAST_1Q_CHECK_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckRabi"),
+    TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
+    TaskCall(name="CheckHPIPulse"),
 ]
 
-FAST_1Q_FINE_TUNE_TASKS: list[str] = [
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "ReadoutClassification",
-    "RandomizedBenchmarking",
-    "X90InterleavedRandomizedBenchmarking",
+FAST_1Q_FINE_TUNE_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckRabi"),
+    TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
+    TaskCall(name="CheckHPIPulse"),
+    TaskCall(name="CreatePIPulse", run={"pi_duration": 32}),
+    TaskCall(name="CheckPIPulse"),
+    TaskCall(name="CreateDRAGHPIPulse", run={"drag_hpi_duration": 16}),
+    TaskCall(name="CheckDRAGHPIPulse"),
+    TaskCall(name="CreateDRAGPIPulse", run={"drag_pi_duration": 24}),
+    TaskCall(name="CheckDRAGPIPulse"),
+    TaskCall(name="ReadoutClassification"),
+    TaskCall(name="RandomizedBenchmarking"),
+    TaskCall(name="X90InterleavedRandomizedBenchmarking"),
 ]
 
 # Final step: calibrate and validate each scheduled coupling, then benchmark it.
-FAST_2Q_TASKS: list[str] = [
-    "CheckCrossResonance",
-    "CreateZX90",
-    "CheckZX90",
-    "CheckBellState",
-    "CheckBellStateTomography",
-    "ZX90InterleavedRandomizedBenchmarking",
+FAST_2Q_TASKS: list[TaskCall] = [
+    TaskCall(
+        name="CheckCrossResonance",
+        # Uncomment to tune the CR parameter search.
+        # run={
+        #     "adiabatic_safe_factor": 0.65,
+        #     "max_amplitude": 0.85,
+        #     "max_time_range": 8192,
+        # },
+    ),
+    TaskCall(name="CreateZX90"),
+    TaskCall(name="CheckZX90"),
+    TaskCall(name="CheckBellState"),
+    TaskCall(name="CheckBellStateTomography"),
+    TaskCall(name="ZX90InterleavedRandomizedBenchmarking"),
 ]
 
 
@@ -135,36 +144,6 @@ def fast_full_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            "CreateHPIPulse": {
-                "run": {
-                    "hpi_duration": 32,
-                },
-            },
-            "CreatePIPulse": {
-                "run": {
-                    "pi_duration": 32,
-                },
-            },
-            "CreateDRAGHPIPulse": {
-                "run": {
-                    "drag_hpi_duration": 16,
-                },
-            },
-            "CreateDRAGPIPulse": {
-                "run": {
-                    "drag_pi_duration": 24,
-                },
-            },
-            # Per-task overrides — uncomment to tune the CR parameter search.
-            # "CheckCrossResonance": {
-            #     "run": {
-            #         "adiabatic_safe_factor": 0.65,
-            #         "max_amplitude": 0.85,
-            #         "max_time_range": 8192,
-            #     },
-            # },
-        },
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,

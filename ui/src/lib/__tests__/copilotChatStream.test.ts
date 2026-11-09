@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   appendArgsDelta,
+  appendDelta,
+  appendLiveBlock,
   endTool,
   startDraft,
   startTool,
+  stoppedBlocks,
   toPersistedTrace,
 } from "@/lib/copilotChatStream";
-import type { TraceStep } from "@/types/copilotChat";
+import type { LiveTurn, TraceStep } from "@/types/copilotChat";
 
 function tool(steps: TraceStep[], i = steps.length - 1) {
   const step = steps[i];
@@ -37,6 +40,77 @@ describe("copilotChatStream", () => {
 
     steps = endTool(steps, { id: "call_1", tool: "write", output: "Wrote 19 bytes", exit_code: 0 });
     expect(tool(steps)).toMatchObject({ status: "done", output: "Wrote 19 bytes", exitCode: 0 });
+  });
+
+  it("keeps a classify decision on its step through a reload", () => {
+    const classification = {
+      classifier: "system-one-classifier/Open-Jev",
+      outcome: "classified",
+      category: "readout_problem",
+      probability: 0.8,
+      margin: 0.65,
+      probabilities: [
+        { category: "readout_problem", probability: 0.8 },
+        { category: "drive_problem", probability: 0.2 },
+      ],
+    };
+    let steps = startTool([], {
+      id: "k1",
+      tool: "classify",
+      label: "Classify",
+      args: { question: "Why?", categories: [], context: "Q04 fit failed" },
+    });
+    steps = endTool(steps, { id: "k1", tool: "classify", classification });
+    expect(tool(steps)).toMatchObject({ status: "done", classification });
+
+    const trace = toPersistedTrace(
+      { steps: [...steps, { kind: "text", text: "ok" }], startedAt: 0 },
+      10,
+    );
+    const stored = JSON.parse(JSON.stringify(trace)) as typeof trace;
+    expect(tool(stored!.steps, 0).classification).toEqual(classification);
+  });
+
+  it("keeps a failed classification as an error step and drops malformed ones", () => {
+    const started = startTool([], { id: "k1", tool: "classify", label: "Classify" });
+    const failed = endTool(started, {
+      id: "k1",
+      tool: "classify",
+      is_error: true,
+      classification: { classifier: "c/m", outcome: "failed", reason: "timed out after 5 s" },
+    });
+    expect(tool(failed)).toMatchObject({
+      status: "error",
+      classification: { classifier: "c/m", outcome: "failed", reason: "timed out after 5 s" },
+    });
+    for (const classification of [
+      "bogus",
+      { classifier: "c/m", outcome: "template" },
+      { outcome: "failed" },
+    ]) {
+      expect(
+        tool(endTool(started, { id: "k1", tool: "classify", classification })),
+      ).not.toHaveProperty("classification");
+    }
+    const partial = endTool(started, {
+      id: "k1",
+      tool: "classify",
+      classification: {
+        classifier: "c/m",
+        outcome: "ambiguous",
+        probability: 3,
+        probabilities: [
+          "x",
+          { category: "a", probability: 0.5 },
+          { category: "b", probability: -1 },
+        ],
+      },
+    });
+    expect(tool(partial).classification).toEqual({
+      classifier: "c/m",
+      outcome: "ambiguous",
+      probabilities: [{ category: "a", probability: 0.5 }],
+    });
   });
 
   it("opens a new step for a call that was never drafted", () => {
@@ -97,5 +171,24 @@ describe("copilotChatStream", () => {
     const output = tool(trace!.steps, 1).output!;
     expect(output.length).toBe(2001);
     expect(output.endsWith("END")).toBe(true);
+  });
+
+  it("keeps finished UI blocks when the user stops, before the partial text", () => {
+    const ui = { version: 1, spec: { root: "m", elements: {} }, fallback: "- T1: 42" };
+    let turn: LiveTurn = { steps: [], startedAt: 0 };
+    turn = appendLiveBlock(turn, { type: "ui", content: "- T1: 42", chart: null, ui });
+    turn = appendLiveBlock(turn, { type: "text", content: "fallback only", chart: null });
+    // Anything else the stream might carry is ignored.
+    turn = appendLiveBlock(turn, null);
+    turn = appendLiveBlock(turn, { type: "ui" });
+    turn = appendLiveBlock(turn, { type: "chart", chart: {} });
+    turn = { ...turn, steps: appendDelta(turn.steps, "text", "T1 is") };
+
+    expect(stoppedBlocks(turn)).toEqual([
+      { type: "ui", content: "- T1: 42", chart: null, ui },
+      { type: "text", content: "fallback only", chart: null },
+      { type: "text", content: "T1 is", chart: null },
+    ]);
+    expect(stoppedBlocks({ steps: [], startedAt: 0 })).toEqual([]);
   });
 });

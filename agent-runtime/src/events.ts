@@ -4,7 +4,9 @@
  * Pure functions only, so they can be tested without a running agent.
  */
 
+import { CLASSIFY_CHAT_TOOL, CLASSIFY_LIMITS, type ClassificationDetails } from "./classify-tool.ts";
 import { recordFromDetails, type EvaluateResult } from "./evaluate.ts";
+import { uiBlockFromDetails, type UiBlockPayload } from "./ui-tool.ts";
 
 export type NdjsonEvent =
   | { type: "tool_start"; name: string; id?: string; args?: unknown }
@@ -17,6 +19,8 @@ export type NdjsonEvent =
       figures?: string[];
       /** What an evaluation tool sent its model, for the chat to show on request. */
       evaluation?: EvaluationSummary;
+      /** What `classify` decided, for the chat to show under the step; bounded, never its input. */
+      classification?: ClassificationDetails;
       /** What a workspace tool printed or answered, for the chat to show under the step; bounded. */
       output?: string;
       /** A command's exit status (`bash`). */
@@ -29,6 +33,8 @@ export type NdjsonEvent =
   /** Text appended to one argument (`path`, such as `["content"]`) of the call being written. */
   | { type: "tool_args_delta"; index: number; path: Array<string | number>; delta: string }
   | { type: "chart"; chart: { data: unknown[]; layout: unknown } }
+  /** A read-only UI composed with render_ui: a validated json-render spec and its plain-text fallback. */
+  | { type: "ui"; ui: UiBlockPayload }
   | { type: "ask"; ask: unknown }
   | { type: "approval"; approval: unknown }
   /** A change the model proposes to the editor the user has open (propose_code_edit). */
@@ -66,8 +72,8 @@ export interface EvaluationSummary {
   record?: EvaluateResult;
 }
 
-/** Minimal shape of the Pi events we care about. */
-type SessionEventLike = {
+/** Minimal shape of the session events the stream maps; `ViewEventTranslator` produces them. */
+export type SessionEventLike = {
   type: string;
   toolName?: string;
   toolCallId?: string;
@@ -189,6 +195,8 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
     const durableResult = event.entry?.model?.[0];
     const chart = chartFromDetails(event.result?.details) ?? chartFromDetails(durableResult?.details);
     if (chart) out.push({ type: "chart", chart });
+    const ui = uiBlockFromDetails(event.result?.details) ?? uiBlockFromDetails(durableResult?.details);
+    if (ui) out.push({ type: "ui", ui });
     // Interactive requests end the turn; the UI renders them as cards.
     const details = (event.result?.details ?? durableResult?.details) as
       | Record<string, unknown>
@@ -200,11 +208,14 @@ export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
     }
     const figures = figuresFromDetails(details);
     const evaluation = evaluationFromDetails(details);
+    const classification =
+      event.toolName === CLASSIFY_CHAT_TOOL ? classificationFromDetails(details) : undefined;
     out.push({
       type: "tool_end",
       name: event.toolName ?? "unknown",
       ...(figures.length ? { figures } : {}),
       ...(evaluation ? { evaluation } : {}),
+      ...(classification ? { classification } : {}),
       ...toolOutput(event),
       isError: event.isError === true || durableResult?.isError === true,
       ...(event.toolCallId ? { id: event.toolCallId } : {}),
@@ -254,6 +265,52 @@ function evaluationFromDetails(
     ...(model ? { model } : {}),
     ...(details.fallback === true ? { fallback: true } : {}),
     ...(record ? { record } : {}),
+  };
+}
+
+const CLASSIFICATION_OUTCOMES = new Set<ClassificationDetails["outcome"]>(["classified", "ambiguous", "failed"]);
+/** Longest category name, classifier label or failure reason a tool_end line carries. */
+export const MAX_CLASSIFICATION_TEXT_CHARS = 200;
+
+const probability = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+const shortText = (value: unknown): string | undefined =>
+  typeof value === "string" && value ? value.slice(0, MAX_CLASSIFICATION_TEXT_CHARS) : undefined;
+
+/**
+ * The classification `classify` recorded in its details
+ * (`details.classification`), when well-formed: only the known fields,
+ * bounded.
+ */
+export function classificationFromDetails(
+  details: Record<string, unknown> | undefined,
+): ClassificationDetails | undefined {
+  const raw = details?.classification;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const fields = raw as Record<string, unknown>;
+  const classifier = shortText(fields.classifier);
+  const outcome = fields.outcome as ClassificationDetails["outcome"];
+  if (!classifier || !CLASSIFICATION_OUTCOMES.has(outcome)) return undefined;
+  const category = shortText(fields.category);
+  const reason = shortText(fields.reason);
+  const probabilities = Array.isArray(fields.probabilities)
+    ? fields.probabilities
+        .flatMap((entry) => {
+          if (!entry || typeof entry !== "object") return [];
+          const name = shortText((entry as Record<string, unknown>).category);
+          const value = (entry as Record<string, unknown>).probability;
+          return name && probability(value) ? [{ category: name, probability: value }] : [];
+        })
+        .slice(0, CLASSIFY_LIMITS.maxCategories)
+    : [];
+  return {
+    classifier,
+    outcome,
+    ...(category ? { category } : {}),
+    ...(probability(fields.probability) ? { probability: fields.probability } : {}),
+    ...(typeof fields.margin === "number" && Number.isFinite(fields.margin) ? { margin: fields.margin } : {}),
+    ...(probabilities.length ? { probabilities } : {}),
+    ...(reason ? { reason } : {}),
   };
 }
 

@@ -12,6 +12,7 @@ from qdash.api.services.pi_chat_service import (
     build_blocks_result,
     tool_label,
     translate,
+    ui_block,
 )
 
 
@@ -106,6 +107,61 @@ class TestTranslate:
         ends = [data for name, data in events if name == "tool_end"]
         assert ends[0]["evaluation"] == evaluation
         assert "evaluation" not in ends[1]
+
+    @pytest.mark.asyncio
+    async def test_tool_end_carries_a_classify_decision(self) -> None:
+        decided = {
+            "classifier": "system-one-classifier/Open-Jev",
+            "outcome": "classified",
+            "category": "readout_problem",
+            "probability": 0.8,
+            "margin": 0.65,
+            "probabilities": [
+                {"category": "readout_problem", "probability": 0.8},
+                {"category": "drive_problem", "probability": 0.2},
+            ],
+        }
+        many = [{"category": f"c{i}", "probability": 0.05} for i in range(20)]
+        events = await _collect(
+            {"type": "tool_start", "name": "classify", "id": "k1"},
+            {
+                "type": "tool_end",
+                "name": "classify",
+                "id": "k1",
+                "isError": False,
+                "classification": {**decided, "state": {"context": "secret"}},
+            },
+            {
+                "type": "tool_end",
+                "name": "classify",
+                "isError": True,
+                "classification": {
+                    "classifier": "c/m",
+                    "outcome": "failed",
+                    "reason": "x" * 1000,
+                    "probability": True,
+                    "probabilities": [*many, "bogus", {"category": "a", "probability": 2}],
+                },
+            },
+            {
+                "type": "tool_end",
+                "name": "classify",
+                "isError": False,
+                "classification": {"classifier": "c/m", "outcome": "template"},
+            },
+            {"type": "done", "text": "ok"},
+        )
+        ends = [data for name, data in events if name == "tool_end"]
+        # Only the known fields pass: never what the classifier was sent.
+        assert ends[0]["classification"] == decided
+        assert ends[1]["classification"] == {
+            "classifier": "c/m",
+            "outcome": "failed",
+            "reason": "x" * 200,
+            "probabilities": many[:8],
+        }
+        assert ends[1]["is_error"] is True
+        assert "classification" not in ends[2]
 
     @pytest.mark.asyncio
     async def test_tool_end_carries_a_workspace_tools_answer(self) -> None:
@@ -285,6 +341,79 @@ class TestTranslate:
         assert events == [
             ("error", {"step": "run_chat", "detail": "Agent runtime sent malformed data"})
         ]
+
+
+_UI = {
+    "version": 1,
+    "spec": {
+        "root": "m",
+        "elements": {
+            "m": {"type": "Metric", "props": {"label": "T1", "value": 42}, "children": []}
+        },
+    },
+    "fallback": "- T1: 42",
+}
+
+
+class TestUiBlocks:
+    @pytest.mark.asyncio
+    async def test_a_ui_streams_live_and_keeps_its_place_among_charts(self) -> None:
+        chart = {"data": [{"y": [1]}], "layout": {}}
+        events = await _collect(
+            {"type": "chart", "chart": chart},
+            {"type": "ui", "ui": _UI},
+            {"type": "tool_end", "name": "render_ui", "isError": False},
+            {"type": "done", "text": "T1 is fine."},
+        )
+
+        ui_block = {"type": "ui", "content": "- T1: 42", "chart": None, "ui": _UI}
+        assert ("ui", ui_block) in events
+        blocks = events[-1][1]["blocks"]
+        assert [b["type"] for b in blocks] == ["chart", "ui", "text"]
+        assert blocks[1] == ui_block
+
+    @pytest.mark.asyncio
+    async def test_a_ui_alone_is_a_real_answer(self) -> None:
+        events = await _collect({"type": "ui", "ui": _UI}, {"type": "done", "text": ""})
+
+        assert events[-1][0] == "result"
+
+    @pytest.mark.asyncio
+    async def test_a_malformed_ui_keeps_only_its_fallback_text(self) -> None:
+        events = await _collect(
+            {"type": "ui", "ui": {"version": "1", "spec": [], "fallback": "- T1: 42"}},
+            {"type": "ui", "ui": {"version": 1, "spec": "nope"}},
+            {"type": "ui", "ui": "not a block"},
+            {"type": "done", "text": "Done."},
+        )
+
+        assert events[-1][1]["blocks"] == [
+            {"type": "text", "content": "- T1: 42", "chart": None},
+            {"type": "text", "content": "Done.", "chart": None},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_an_oversized_ui_is_not_stored(self) -> None:
+        huge = {**_UI, "spec": {"root": "m", "elements": {"m": {"text": "x" * 300_000}}}}
+        events = await _collect({"type": "ui", "ui": huge}, {"type": "done", "text": "Done."})
+
+        assert [b["type"] for b in events[-1][1]["blocks"]] == ["text", "text"]
+
+    @pytest.mark.asyncio
+    async def test_a_ui_event_without_its_payload_is_malformed(self) -> None:
+        events = await _collect({"type": "ui"})
+
+        assert events == [
+            ("error", {"step": "run_chat", "detail": "Agent runtime sent malformed data"})
+        ]
+
+    def test_forum_markdown_uses_the_ui_fallback(self) -> None:
+        from qdash.copilot.blocks import blocks_to_markdown
+
+        block = ui_block(_UI)
+        assert block is not None
+        result = build_blocks_result("Summary.", [block])
+        assert blocks_to_markdown(result) == "- T1: 42\n\nSummary."
 
 
 class TestBuildBlocksResult:

@@ -70,8 +70,9 @@ class BackendSaver:
         The unique TaskManager ID (used for note files)
     force_update_params : bool, default=False
         Whether to update backend parameters when R² validation fails
-    persist_output_parameters : bool, default=True
-        Whether to persist output parameters to the database and backend
+    update_calibration_parameters : bool, default=True
+        Whether validated outputs replace the current calibration values in the
+        database and backend. Task history, figures and raw data are saved either way.
     """
 
     def __init__(
@@ -81,14 +82,14 @@ class BackendSaver:
         calib_dir: str,
         task_manager_id: str,
         force_update_params: bool = False,
-        persist_output_parameters: bool = True,
+        update_calibration_parameters: bool = True,
     ) -> None:
         self._state_manager = state_manager
         self._username = username
         self._calib_dir = calib_dir
         self._task_manager_id = task_manager_id
         self._force_update_params = force_update_params
-        self._persist_output_parameters = persist_output_parameters
+        self._update_calibration_parameters = update_calibration_parameters
 
     def save(
         self,
@@ -150,7 +151,7 @@ class BackendSaver:
 
         if not output_parameters:
             return
-        if not self._persist_output_parameters:
+        if not self._update_calibration_parameters:
             self._mark_database_not_updated(task_model, output_parameters, publish_targets)
             return
 
@@ -227,7 +228,7 @@ class BackendSaver:
                 qid=note_qid,
             )
 
-        if not self._persist_output_parameters:
+        if not self._update_calibration_parameters:
             logger.info(
                 "Staging output parameters for %s without calibration/backend write-back",
                 task_name,

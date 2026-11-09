@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
+    from qdash.datamodel.task_invocation import TaskInvocation
     from qdash.repository.protocols import (
         ExecutionCounterRepository,
         ExecutionLockRepository,
@@ -79,6 +80,15 @@ logger = logging.getLogger(__name__)
 
 _CANCELLATION_EXC_NAMES = frozenset({"CancelledRun", "CancelledError"})
 _EXTERNAL_TERMINATION_EXC_NAMES = frozenset({"TerminationSignal", "ExternalSignal"})
+
+
+def _with_settings(
+    invocation: TaskInvocation | None, settings: dict[str, Any]
+) -> TaskInvocation | None:
+    """Record the effective call settings on a planned call's invocation."""
+    if invocation is None:
+        return None
+    return invocation.model_copy(update={"settings": settings})
 
 
 def _iter_exception_chain(exc: BaseException) -> Iterator[BaseException]:
@@ -323,7 +333,15 @@ class CalibService:
 
         ```python
         cal = CalibService("alice", "64Qv3")
-        results = cal.run(qids=["0", "1"], tasks=["CheckRabi", "CreateHPIPulse"])
+        results = cal.run(
+            QubitTargets(["0", "1"]),
+            steps=[
+                CustomOneQubit(
+                    step_name="rabi_and_hpi",
+                    tasks=[TaskCall(name="CheckRabi"), TaskCall(name="CreateHPIPulse")],
+                )
+            ],
+        )
         ```
 
         Advanced low-level access:
@@ -359,7 +377,6 @@ class CalibService:
         source_task_id: str | None = None,
         snapshot_exempt_tasks: set[str] | None = None,
         force_update_params: bool = False,
-        persist_output_parameters: bool = True,
         *,
         task_parameters: dict[str, dict[str, Any]] | None = None,
         configuration_mode: str | None = None,
@@ -367,6 +384,7 @@ class CalibService:
         lock_repo: ExecutionLockRepository | None = None,
         counter_repo: ExecutionCounterRepository | None = None,
         resource_scope: ExecutionResourceScope | None = None,
+        _task_defaults: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         """Initialize the calibration service.
 
@@ -375,7 +393,10 @@ class CalibService:
         1. High-level API (lazy initialization):
            ```python
            cal = CalibService("alice", "64Qv3")
-           cal.run(qids=["0", "1"], tasks=["CheckRabi"])
+           cal.run(
+               QubitTargets(["0", "1"]),
+               steps=[CustomOneQubit(tasks=[TaskCall(name="CheckRabi")])],
+           )
            ```
 
         2. Low-level API (immediate initialization):
@@ -409,21 +430,28 @@ class CalibService:
             default_run_parameters: Shared fallback run parameters applied to all tasks.
                 Values use the same plain, sweep, or wrapped form as task-specific
                 ``run`` values.
-            task_run_parameters: Deprecated flat form of ``task_parameters`` that holds
-                only run parameters and ``update_calibration_parameters``.
-            task_parameters: Settings keyed by task name. Each entry may contain
-                ``run`` (run parameters declared in the task's ``run_spec``), ``input``
-                (overrides for calibration inputs declared in its ``input_spec``), and
-                ``update_calibration_parameters`` (``False`` keeps the output as
-                measurement history without updating current calibration parameters).
-                For example: ``{"CheckAdaptiveChevron": {"run": {"shots": 256},
-                "input": {"coarse_control_amplitude": 0.05}}}``. An input override
-                applies to every qid the task runs on.
+            task_run_parameters: Deprecated. Flat per-task run parameters and
+                ``update_calibration_parameters`` keyed by task name. Set ``run`` and
+                ``update_calibration_parameters`` on each ``TaskCall`` instead. Still
+                applied, below ``task_parameters``, with a ``DeprecationWarning``.
+            task_parameters: Deprecated. Settings keyed by task name that every call
+                of the task starts from: ``run``, ``input``, and
+                ``update_calibration_parameters``. Set the same fields on each
+                ``TaskCall`` instead, and keep shared values in local variables. Still
+                applied, below each call's own settings, with a ``DeprecationWarning``.
+                Whether validated outputs update calibration parameters is set the
+                same way: ``TaskCall(..., update_calibration_parameters=False)`` runs
+                a call measurement-only. The session-wide
+                ``persist_output_parameters`` argument was removed.
             configuration_mode: Qubex control layout inherited by parent and isolated
                 worker sessions. If omitted, the backend default is used.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
+            _task_defaults: Internal. Per-task defaults already resolved by QDash, in
+                the canonical ``task_parameters`` form, for pipeline, isolated worker,
+                and single-task sessions. Applied like ``task_parameters`` without a
+                deprecation warning; workflows do not pass it.
 
         Raises:
             RuntimeError: If use_lock=True and another calibration is already running
@@ -446,7 +474,10 @@ class CalibService:
         self.use_lock = use_lock
         self.skip_execution = skip_execution
         self.default_run_parameters = normalize_default_run_parameters(default_run_parameters)
-        self.task_parameters = resolve_task_parameters(task_parameters, task_run_parameters)
+        # Resolved per-task defaults; the internal form isolated workers inherit.
+        self.task_parameters = resolve_task_parameters(
+            task_parameters, task_run_parameters, task_defaults=_task_defaults
+        )
         self.configuration_mode = configuration_mode
         validate_task_names(self.task_parameters, self.backend_name)
         self._lock_acquired = False
@@ -460,7 +491,6 @@ class CalibService:
         self._source_task_id = source_task_id
         self._snapshot_exempt_tasks = snapshot_exempt_tasks or set()
         self._force_update_params = force_update_params
-        self._persist_output_parameters = persist_output_parameters
 
         # Store injected repositories for later use
         self._user_repo = user_repo
@@ -510,6 +540,8 @@ class CalibService:
         # Session state
         self._initialized = False
         self._pipeline_active = False
+        # Version of the plan being run, recorded on each task's invocation.
+        self.plan_digest: str | None = None
         self.execution_id: str | None = execution_id
         self._orchestrator: CalibOrchestrator | None = None
         self.github_integration: GitHubIntegration | None = None
@@ -746,7 +778,6 @@ class CalibService:
                 default_run_parameters=self.default_run_parameters,
                 task_parameters=self.task_parameters,
                 force_update_params=self._force_update_params,
-                persist_output_parameters=self._persist_output_parameters,
             )
             if self.configuration_mode is not None:
                 config.configuration_mode = self.configuration_mode
@@ -845,6 +876,7 @@ class CalibService:
         upstream_id: str | None = None,
         *,
         parameters: dict[str, Any] | None = None,
+        invocation: TaskInvocation | None = None,
     ) -> dict[str, Any]:
         """Execute a calibration task with integrated save processing.
 
@@ -857,6 +889,9 @@ class CalibService:
                 ``task_parameters`` entry: ``run``, ``input``, and
                 ``update_calibration_parameters``. They take precedence over the
                 service's ``task_parameters``.
+            invocation: The planned step and call this run executes, recorded on
+                the task result together with the effective call settings. Steps
+                set it for every call; direct calls may leave it unset.
 
         Returns:
             Dictionary containing the task's output parameters and task_id
@@ -888,7 +923,13 @@ class CalibService:
             }
         self._validate_resource_scope(resource_parameters)
         assert self._orchestrator is not None, "Session not initialized"
-        result: dict[str, Any] = self._orchestrator.run_task(task_name, qid, settings, upstream_id)
+        result: dict[str, Any] = self._orchestrator.run_task(
+            task_name,
+            qid,
+            settings,
+            upstream_id,
+            invocation=_with_settings(invocation, effective_settings),
+        )
         return result
 
     def execute_task_batch(
@@ -899,17 +940,29 @@ class CalibService:
         upstream_id: str | None = None,
         *,
         parameters: dict[str, Any] | None = None,
+        invocation: TaskInvocation | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Execute one calibration task with a single batch_run over qids.
 
-        ``parameters`` and the deprecated ``task_details`` behave as in ``execute_task``.
+        ``parameters``, ``invocation`` and the deprecated ``task_details`` behave as
+        in ``execute_task``.
         """
         if self.use_lock and not self._lock_acquired:
             raise RuntimeError("No hardware reservation is held for this execution")
         settings = self._call_settings(task_name, task_details, parameters)
+        effective_settings = merge_task_parameters(
+            {task_name: self.task_parameters.get(task_name, {RUN: {}, INPUT: {}})},
+            {task_name: settings},
+        )[task_name]
         self._validate_resource_scope({"qids": qids})
         assert self._orchestrator is not None, "Session not initialized"
-        return self._orchestrator.run_task_batch(task_name, qids, settings, upstream_id)
+        return self._orchestrator.run_task_batch(
+            task_name,
+            qids,
+            settings,
+            upstream_id,
+            invocation=_with_settings(invocation, effective_settings),
+        )
 
     @staticmethod
     def _call_settings(
@@ -1659,11 +1712,15 @@ class CalibService:
         completed_steps = 0
         pipeline_flow_name = self.flow_name
         pipeline_note = self.note
+        original_note = self.note
 
         try:
             qids = targets.to_qids(self.chip_id)
-            # Validate pipeline dependencies
+            # Validate pipeline dependencies, step ids and filter references
             pipeline = Pipeline(steps)
+            calibration_plan = self.calibration_plan(list(pipeline))
+            self.plan_digest = calibration_plan["digest"]
+            pipeline_note = {**(pipeline_note or {}), "calibration_plan": calibration_plan}
             from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
 
             planned_scope = plan_pipeline_resources(self.chip_id, targets, steps, self.muxes)
@@ -1692,6 +1749,7 @@ class CalibService:
                         self.note = {
                             **(pipeline_note or {}),
                             "step_name": step.name,
+                            "step_id": getattr(step, "resolved_step_id", step.name),
                             "step_index": i + 1,
                             "pipeline_name": pipeline_flow_name,
                         }
@@ -1746,7 +1804,8 @@ class CalibService:
             raise
         finally:
             self.flow_name = pipeline_flow_name
-            self.note = pipeline_note
+            self.note = original_note
+            self.plan_digest = None
             self._pipeline_active = False
             try:
                 self._release_lock_if_acquired()
@@ -1768,8 +1827,51 @@ class CalibService:
             results["filters"] = ctx.filters
         if ctx.metadata:
             results["metadata"] = ctx.metadata
+        if ctx.step_results:
+            results["steps"] = ctx.step_results
 
         return results
+
+    def calibration_plan(self, steps: Sequence[Step]) -> dict[str, Any]:
+        """The validated plan recorded in every step Execution's note.
+
+        Lists each step's step_id and its resolved calls together with the
+        workflow's per-task defaults and shared run defaults, and a digest of all
+        of it that identifies this plan version on every task result
+        (``invocation.plan_digest``). Each task result's own run and input
+        parameter snapshots stay the record of what actually ran; the plan alone
+        does not recreate hardware or calibration state.
+        """
+        from qdash.datamodel.task_call import calls_json, plan_digest
+        from qdash.workflow.service.steps.base import CalibrationStep
+
+        planned_steps: list[dict[str, Any]] = []
+        for index, step in enumerate(steps, start=1):
+            entry: dict[str, Any] = {
+                "index": index,
+                "name": step.name,
+                "type": type(step).__name__,
+                "kind": "calibration" if isinstance(step, CalibrationStep) else "transform",
+            }
+            if isinstance(step, CalibrationStep):
+                entry["step_id"] = step.resolved_step_id
+                entry["continue_on_failure"] = step.continue_on_failure
+                entry["calls"] = calls_json(step.calls())
+            else:
+                reference = {
+                    key: getattr(step, key)
+                    for key in ("step", "call_id", "metric", "threshold")
+                    if getattr(step, key, None) is not None
+                }
+                if reference:
+                    entry["reference"] = reference
+            planned_steps.append(entry)
+        plan: dict[str, Any] = {
+            "steps": planned_steps,
+            "task_parameters": self.task_parameters,
+            "default_run_parameters": self.default_run_parameters,
+        }
+        return {"digest": plan_digest(plan), **plan}
 
 
 # =============================================================================

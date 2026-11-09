@@ -37,6 +37,7 @@ interface ChatModel {
   reasoning_effort?: unknown;
   sampling_params?: unknown;
   sampling_params_by_thinking_level?: unknown;
+  strict_tool_schemas?: unknown;
 }
 
 interface ModelEntry {
@@ -137,6 +138,15 @@ export function buildModelsConfig(
     const maxTokens = asNumber(model.max_output_tokens);
     const reasoningEffort = asString(model.reasoning_effort)?.toLowerCase();
     const reasoning = reasoningEffort !== undefined && reasoningEffort !== "none";
+    const modelCompat = {
+      ...(reasoning && isOpenAiCompatibleProvider(rawProvider) && isQwenModel(name)
+        ? { thinkingFormat: "qwen-chat-template" }
+        : {}),
+      // Only the operator knows whether a custom endpoint enforces OpenAI
+      // `strict` function schemas; pi assumes it does not. Tools that prefer
+      // constrained sampling, such as render_ui, then send `strict: true`.
+      ...(model.strict_tool_schemas === true ? { supportsStrictMode: true } : {}),
+    };
 
     if (!baseUrlSetting) {
       if (!sampling && maxTokens === undefined) continue;
@@ -189,9 +199,7 @@ export function buildModelsConfig(
       contextWindow: asNumber(model.num_ctx) ?? DEFAULT_CONTEXT_WINDOW,
       maxTokens: maxTokens ?? DEFAULT_MAX_TOKENS,
       ...(reasoning ? { reasoning: true } : {}),
-      ...(reasoning && isOpenAiCompatibleProvider(rawProvider) && isQwenModel(name)
-        ? { compat: { thinkingFormat: "qwen-chat-template" } }
-        : {}),
+      ...(Object.keys(modelCompat).length > 0 ? { compat: modelCompat } : {}),
       // Pi treats an unstated `input` as text-only and then silently drops
       // image content while building the request. Figure analysis exists to
       // read figures, so the answer would come back as "no figures attached"
@@ -207,21 +215,44 @@ export function buildModelsConfig(
   return { providers };
 }
 
+/** The variables of the Cloudflare Access service token shared by QDash's AI endpoints. */
+export const CF_ACCESS_ENV = { clientId: "CF_ACCESS_CLIENT_ID", clientSecret: "CF_ACCESS_CLIENT_SECRET" } as const;
+
+/**
+ * Whether an endpoint gets the shared Access token: its base URL is one of the
+ * variables `prefixes` names and the token is set. A name ending in `_` is a
+ * prefix that needs a suffix (`env:<prefix><SUFFIX>`); any other name must
+ * match exactly. Half a token is an error. Reads presence only, never returns
+ * a value.
+ */
+export function usesCloudflareAccess(
+  baseUrlSetting: string,
+  env: NodeJS.ProcessEnv,
+  prefixes: readonly string[] = ["OPENAI_COMPATIBLE_BASE_URL_"],
+): boolean {
+  const match = /^env:([A-Za-z0-9_]+)$/.exec(baseUrlSetting);
+  const eligible = (name: string, prefix: string) =>
+    prefix.endsWith("_") ? name.startsWith(prefix) && name.length > prefix.length : name === prefix;
+  if (!match || !prefixes.some((prefix) => eligible(match[1], prefix))) {
+    return false;
+  }
+  const { clientId, clientSecret } = CF_ACCESS_ENV;
+  if (!env[clientId] && !env[clientSecret]) return false;
+  if (!env[clientId]?.trim() || !env[clientSecret]?.trim()) {
+    throw new Error(`Cloudflare Access requires both ${clientId} and ${clientSecret}`);
+  }
+  return true;
+}
+
 /** Share Access authentication across configured compatible endpoints without persisting secrets. */
 function cloudflareAccessHeaders(
   baseUrlSetting: string,
   env: NodeJS.ProcessEnv,
 ): Record<string, string> | undefined {
-  if (!/^env:OPENAI_COMPATIBLE_BASE_URL_[A-Za-z0-9_]+$/.test(baseUrlSetting)) return undefined;
-  const clientId = "CF_ACCESS_CLIENT_ID";
-  const clientSecret = "CF_ACCESS_CLIENT_SECRET";
-  if (!env[clientId] && !env[clientSecret]) return undefined;
-  if (!env[clientId]?.trim() || !env[clientSecret]?.trim()) {
-    throw new Error(`Cloudflare Access requires both ${clientId} and ${clientSecret}`);
-  }
+  if (!usesCloudflareAccess(baseUrlSetting, env)) return undefined;
   return {
-    "CF-Access-Client-Id": `$${clientId}`,
-    "CF-Access-Client-Secret": `$${clientSecret}`,
+    "CF-Access-Client-Id": `$${CF_ACCESS_ENV.clientId}`,
+    "CF-Access-Client-Secret": `$${CF_ACCESS_ENV.clientSecret}`,
   };
 }
 
@@ -268,7 +299,7 @@ function readFileIfPresent(path: string): string | undefined {
  * configured path through after removing trailing slashes. Pi's OpenAI SDK then
  * appends the operation path such as `/chat/completions` or `/responses`.
  */
-function resolveBaseUrl(setting: string, env: NodeJS.ProcessEnv): string | undefined {
+export function resolveBaseUrl(setting: string, env: NodeJS.ProcessEnv): string | undefined {
   const raw = setting.startsWith("env:") ? env[setting.slice(4)] : setting;
   if (!raw) return undefined;
   return raw.replace(/\/+$/, "");

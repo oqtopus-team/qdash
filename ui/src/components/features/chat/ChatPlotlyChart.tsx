@@ -12,17 +12,30 @@ const Plot = dynamic(() => import("@/components/charts/Plot"), { ssr: false });
 interface ChatPlotlyChartProps {
   data: Record<string, unknown>[];
   layout: Record<string, unknown>;
+  /**
+   * Called when the chart fails to render. A container with its own fallback,
+   * such as a rich UI block, uses it to replace the chart; standalone charts
+   * show their inline error message.
+   */
+  onRenderError?: (error: Error) => void;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class ChartErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+class ChartErrorBoundary extends Component<
+  { children: ReactNode; onError?: (error: Error) => void },
+  ErrorBoundaryState
+> {
   state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(): ErrorBoundaryState {
     return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    this.props.onError?.(error);
   }
 
   render() {
@@ -37,7 +50,7 @@ class ChartErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundar
   }
 }
 
-export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
+export function ChatPlotlyChart({ data, layout, onRenderError }: ChatPlotlyChartProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const openLightbox = useCallback(() => {
@@ -66,7 +79,7 @@ export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
 
   return (
     <>
-      <ChartErrorBoundary>
+      <ChartErrorBoundary onError={onRenderError}>
         <div className="w-full my-2 rounded-lg border border-base-300 overflow-hidden">
           <div className="flex justify-end px-2 pt-1">
             <Tooltip>
@@ -123,7 +136,7 @@ export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
           <DialogDescription className="sr-only">Expanded interactive chart.</DialogDescription>
           <div className="flex-1 min-h-0">
             {isExpanded && (
-              <ChartErrorBoundary>
+              <ChartErrorBoundary onError={onRenderError}>
                 <Plot
                   data={data as Plotly.Data[]}
                   layout={expandedLayout as Partial<Plotly.Layout>}

@@ -34,6 +34,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -42,8 +43,6 @@ from qdash.workflow.service.calib_service import (
 )
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
-
-TASKS = ["Configure", "CheckT1", "CheckRamsey"]
 
 
 @flow(
@@ -72,7 +71,11 @@ def coherence_sample(
     steps = [
         CustomOneQubit(
             step_name="coherence_sample",
-            tasks=TASKS,
+            tasks=[
+                TaskCall(name="Configure"),
+                TaskCall(name="CheckT1"),
+                TaskCall(name="CheckRamsey"),
+            ],
             mode="synchronized",
         )
     ]
@@ -120,8 +123,10 @@ flowchart LR
 
 Keep task lists in the template rather than importing them from another template or relying on a
 step's default list. The visible order is part of the flow contract: repeated measurements and
-configuration checkpoints must remain reviewable in the saved source. If two templates must stay
-aligned, compare their lists in template tests.
+configuration checkpoints must remain reviewable in the saved source. A task that runs more than
+once in one step, such as a second `Configure` or a fine `CheckRamsey`, needs its own `call_id`
+on every occurrence; see [Task Calls](./task-calls.md) for ids, per-call settings, and the
+failure policy. If two templates must stay aligned, compare their lists in template tests.
 
 ## State Between Steps
 
@@ -134,9 +139,10 @@ the current calibration database when each task preprocesses.
 | Remaining qubits | `StepContext.candidate_qids` | Filters, scheduling, and calibration steps |
 | Candidate coupling IDs | `StepContext.candidate_couplings` | Steps that consume coupling candidates |
 | CR parallel groups | `StepContext.metadata["cr_schedule"]` | `CustomTwoQubit` and `TwoQubitCalibration` |
-| Typed step results | `StepContext.one_qubit_check`, `one_qubit_fine_tune`, `two_qubit` | Filters and pipeline results |
+| Typed step results | `StepContext.one_qubit_check`, `one_qubit_fine_tune`, `two_qubit`, and each bring-up, one-qubit, and two-qubit step's result by `step_id` in `step_results` | Filters and pipeline results |
+| Filter outcomes | `StepContext.filters` | Pipeline results |
 | Accepted calibration values | MongoDB qubit and coupling calibration records | Declared task inputs |
-| Experiment settings and overrides | `CalibService.default_run_parameters` and `task_parameters` | Task construction and isolated worker sessions |
+| Experiment settings and overrides | Each `TaskCall`'s settings, `CalibService.default_run_parameters`, and the resolved per-task defaults in `CalibService.task_parameters` | Task construction and isolated worker sessions |
 
 ```mermaid
 flowchart TD
@@ -178,11 +184,30 @@ For the user-facing procedure, see
 
 ## Set Task Parameters
 
-Pass shared run-parameter fallbacks through `default_run_parameters` and settings for one task
-through `task_parameters`:
+Set `run`, `input`, and `update_calibration_parameters` on a `TaskCall` to configure that call.
+Keep a value that several calls share in a local variable, and pass run-parameter fallbacks shared
+by every task through `default_run_parameters`:
 
 ```python
-from qdash.workflow import sweep
+from qdash.workflow import TaskCall, sweep
+
+RAMSEY_RUN = {"shots": 1024}
+
+steps = [
+    CustomOneQubit(
+        step_name="ramsey",
+        tasks=[
+            TaskCall(name="Configure"),
+            TaskCall(
+                name="CheckRamsey",
+                call_id="ramsey_fine",
+                run={**RAMSEY_RUN, "time_range": sweep.arange(0, 10_000, 100)},
+                input={"control_frequency": 7.012},
+                update_calibration_parameters=False,
+            ),
+        ],
+    )
+]
 
 service = CalibService(
     username,
@@ -191,31 +216,28 @@ service = CalibService(
     default_run_parameters={
         "interval": 150 * 1024,
     },
-    task_parameters={
-        "CheckRamsey": {
-            "run": {
-                "shots": 1024,
-                "time_range": sweep.arange(0, 10_000, 100),
-            },
-            "input": {"control_frequency": 7.012},
-            "update_calibration_parameters": False,
-        },
-    },
 )
 ```
 
-`default_run_parameters` and `task_parameters[task_name]["run"]` use the same value syntax.
-`run` sets run parameters the task declares in its `run_spec`, and overrides shared defaults.
-`input` replaces calibration inputs the task declares in its `input_spec`; the value applies to
-every qid the task runs on. Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or
-`sweep.range` for generated run ranges, `sweep.values(...)` for explicit points, and plain values
-for other run values and `input` entries. The helper records the constructor without creating an
-array in the workflow process, and a parameter that declares one sweep constructor accepts any of
-them. Setting
+Here `ramsey_fine` sets its own `shots`, `time_range`, `control_frequency`, and
+`update_calibration_parameters=False`, and takes `interval` from `default_run_parameters`. A call's
+settings take precedence over `default_run_parameters`; a field the call leaves out, or sets to
+`None`, inherits from the next layer. `CalibService(task_parameters=...)` and
+`CalibService(task_run_parameters=...)` are deprecated: they still apply between the call and
+`default_run_parameters`, with a `DeprecationWarning`. See
+[Migrate per-task defaults](./task-calls.md#migrate-per-task-defaults).
+
+`TaskCall.run` and `default_run_parameters` use the same
+value syntax. `run` sets run parameters the task declares in its `run_spec`. `input` replaces
+calibration inputs the task declares in its `input_spec`; the value applies to every qid the call
+runs on. Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or `sweep.range` for generated
+run ranges, `sweep.values(...)` for explicit points, and plain values for other run values and
+`input` entries. The helper records the constructor without creating an array in the workflow
+process, and a parameter that declares one sweep constructor accepts any of them. Setting
 `update_calibration_parameters=False` retains task history without promoting validated outputs to
 the current calibration state. A name in the wrong section, or one the task does not declare,
-fails when the task is created. The complete precedence rules are in [Parameter
-Resolution](./parameter-resolution.md).
+fails when the task is created. The complete precedence rules are in [Task Calls](./task-calls.md#settings)
+and [Parameter Resolution](./parameter-resolution.md).
 
 ## Preserve Terminal Handling
 

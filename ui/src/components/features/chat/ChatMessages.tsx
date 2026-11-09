@@ -15,6 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
+import { ChatUiBlock } from "@/components/features/chat/ChatUiBlock";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
 import { ChatTraceSummary, LiveTrace } from "@/components/features/chat/ChatTrace";
 import { FigureStrip, figuresInSteps } from "@/components/features/chat/ChatFigures";
@@ -58,13 +59,17 @@ function parseBlocksContent(content: string): CopilotBlocksResult | null {
   return null;
 }
 
-/** Plain text of an assistant message, for copying. */
-function messageText(content: string): string {
+/** Plain text of an assistant message, for copying; a composed UI contributes its fallback text. */
+export function messageText(content: string): string {
   const parsed = parseBlocksContent(content);
   if (!parsed) return content;
   return parsed.blocks
-    .filter((b) => b.type === "text" && b.content)
-    .map((b) => b.content)
+    .map((b) => {
+      if (b.type === "text") return b.content;
+      if (b.type === "ui") return typeof b.ui?.fallback === "string" ? b.ui.fallback : b.content;
+      return null;
+    })
+    .filter((text): text is string => typeof text === "string" && text.length > 0)
     .join("\n\n");
 }
 
@@ -260,6 +265,9 @@ function BlocksContent({
         }
         if (block.type === "edit" && block.edit) {
           return <EditProposalCard key={i} edit={block.edit} state={state} />;
+        }
+        if (block.type === "ui") {
+          return <ChatUiBlock key={i} ui={block.ui ?? { fallback: block.content ?? "" }} />;
         }
         if (block.type === "chart" && block.chart) {
           return (
@@ -513,8 +521,15 @@ export function LiveAssistantMessage({
       {answer && figuresInSteps(work).length > 0 && (
         <FigureStrip paths={figuresInSteps(work)} className="mb-3" />
       )}
+      {turn.blocks?.map((block, i) =>
+        block.type === "ui" ? (
+          <ChatUiBlock key={i} ui={block.ui} />
+        ) : block.content ? (
+          <ChatMarkdown key={i}>{block.content}</ChatMarkdown>
+        ) : null,
+      )}
       {answer ? (
-        <ChatMarkdown className="chat-streaming">{answer}</ChatMarkdown>
+        <ChatMarkdown streaming>{answer}</ChatMarkdown>
       ) : (
         !busy && (
           <div className="flex items-center gap-2.5 h-7 text-sm">

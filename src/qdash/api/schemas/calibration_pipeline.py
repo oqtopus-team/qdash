@@ -7,9 +7,11 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from qdash.api.schemas.flow import ExecuteFlowResponse
+from qdash.datamodel.task_call import TaskCall  # noqa: TC001 - pydantic field type
 
 _SPEC_EXAMPLE: dict[str, Any] = {
-    "name": "coarse-then-coherence",
+    "spec_version": 2,
+    "name": "coarse-then-two-pass-ramsey",
     "targets": {"qids": ["0", "1"]},
     "steps": [
         {"type": "OneQubitCheck", "mode": "scheduled"},
@@ -17,11 +19,35 @@ _SPEC_EXAMPLE: dict[str, Any] = {
         {
             "type": "CustomOneQubit",
             "step_name": "coherence",
-            "tasks": ["CheckT1", "CheckT2Echo"],
             "mode": "scheduled",
+            "continue_on_failure": True,
+            "tasks": [
+                {"name": "CheckT1"},
+                {
+                    "name": "CheckRamsey",
+                    "call_id": "ramsey_coarse",
+                    "run": {"detuning": 0.001, "shots": 1024},
+                },
+                {
+                    "name": "CheckRamsey",
+                    "call_id": "ramsey_fine",
+                    "run": {
+                        "detuning": 0.0002,
+                        "shots": 1024,
+                        "time_range": {"value": [0, 50001, 500], "value_type": "np.arange"},
+                    },
+                },
+            ],
+        },
+        {
+            "type": "FilterByMetric",
+            "step": "coherence",
+            "call_id": "ramsey_fine",
+            "metric": "t2_star",
+            "threshold": 10.0,
         },
     ],
-    "default_run_parameters": {"shots": 1024},
+    "default_run_parameters": {"interval": 153600},
 }
 
 
@@ -32,14 +58,43 @@ class PipelineProblem(BaseModel):
     message: str
 
 
+class ResolvedTaskCall(BaseModel):
+    """One call as it will run: identity and settings after per-task defaults."""
+
+    call_id: str = Field(description="Identifier of the call within its step.")
+    name: str = Field(description="Task name.")
+    on_failure: str = Field(
+        description='"stop" or "continue": what the target\'s later calls do if this one fails.'
+    )
+    settings: dict[str, Any] = Field(
+        description=(
+            "Effective call settings (run, input, and update_calibration_parameters when "
+            "set): the call's own settings over the deprecated task_parameters. default_run_parameters "
+            "and task declarations fill in the rest when the task runs."
+        )
+    )
+
+
 class ResolvedPipelineStep(BaseModel):
-    """A step as it will run: effective tasks filled in from the catalog defaults."""
+    """A step as it will run: effective calls filled in from the catalog defaults."""
 
     index: int = Field(description="1-based position in the pipeline.")
     type: str
     name: str = Field(description="Step name as it appears in execution history.")
+    step_id: str | None = Field(
+        default=None, description="Plan-scoped id of a calibration step; filters reference it."
+    )
     kind: str = Field(description='"calibration" runs hardware; "transform" only filters.')
-    tasks: list[str] = Field(description="Tasks the step runs, in order; empty for transforms.")
+    tasks: list[str] = Field(
+        description="Task names in call order, with repeats; empty for transforms."
+    )
+    calls: list[ResolvedTaskCall] = Field(
+        default_factory=list, description="The calls each target runs, in order."
+    )
+    reference: dict[str, Any] | None = Field(
+        default=None,
+        description="For filters: the step and call they read, or null for the default.",
+    )
 
 
 class ResolvedPipelineTargets(BaseModel):
@@ -67,17 +122,42 @@ class ValidatePipelineRequest(BaseModel):
 
 
 class ValidatePipelineResponse(BaseModel):
-    """Whether the spec can run, and what it would do."""
+    """Whether the spec can run, and what it would do.
+
+    ``valid`` is true exactly when ``problems`` is empty. ``warnings`` never make
+    a spec invalid; they point at choices that are allowed but probably unintended.
+    """
 
     valid: bool
     problems: list[PipelineProblem] = Field(default_factory=list)
+    warnings: list[PipelineProblem] = Field(
+        default_factory=list, description="Allowed but probably unintended choices."
+    )
     backend_name: str
+    spec_version: int | None = Field(
+        default=None, description="Version of the submitted spec, when it could be read."
+    )
     spec: dict[str, Any] | None = Field(
         default=None, description="The normalized spec, when it parsed; defaults filled in."
     )
+    migrated_spec: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "For a version 1 spec: the same pipeline converted to version 2. Review it, "
+            "rename generated call_ids if you like, and submit it instead."
+        ),
+    )
+    plan_digest: str | None = Field(
+        default=None,
+        description=(
+            "Digest of the validated spec, stored as note.pipeline.spec_digest on each step "
+            "execution. Task results carry the worker's resolved-plan digest "
+            "(note.calibration_plan.digest) in invocation.plan_digest."
+        ),
+    )
     targets: ResolvedPipelineTargets | None = None
     steps: list[ResolvedPipelineStep] = Field(default_factory=list)
-    task_run_count: int = Field(default=0, description="Task runs per target qubit or coupling.")
+    task_run_count: int = Field(default=0, description="Task calls per target qubit or coupling.")
 
 
 class ExecutePipelineRequest(ValidatePipelineRequest):
@@ -100,7 +180,13 @@ class PipelineStepTypeInfo(BaseModel):
     requires: list[str] = Field(description="Any one of these must come from an earlier step.")
     provides: list[str]
     task_scope: str | None = Field(description='"qubit" or "coupling" for steps that run tasks.')
-    default_tasks: list[str]
+    default_step_id: str | None = Field(
+        default=None, description="step_id of a calibration step that sets none."
+    )
+    default_tasks: list[TaskCall] = Field(description="Calls the step runs without tasks.")
+    step_metrics: list[str] = Field(
+        default_factory=list, description="Metrics FilterByMetric can read from the step itself."
+    )
 
 
 class PipelineCatalogResponse(BaseModel):
@@ -112,5 +198,6 @@ class PipelineCatalogResponse(BaseModel):
     tasks: dict[str, list[str]] = Field(
         description='Available task names by task_type ("qubit", "coupling", ...).'
     )
+    spec_version: int = Field(description="The spec version this QDash accepts.")
     spec_schema: dict[str, Any] = Field(description="JSON schema of CalibrationPipelineSpec.")
     example: dict[str, Any] = Field(default_factory=lambda: dict(_SPEC_EXAMPLE))

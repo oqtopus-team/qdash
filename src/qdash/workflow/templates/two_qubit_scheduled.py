@@ -22,6 +22,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -36,14 +37,22 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import CouplingTargets
 
-TWO_QUBIT_SCHEDULED_TASKS: list[str] = [
-    "CheckCrossResonance",
-    "CreateZX90",
-    "CheckZX90",
-    "CheckBellState",
-    "CheckBellStateTomography",
-    "Check2QGateCoherenceLimit",
-    "ZX90InterleavedRandomizedBenchmarking",
+TWO_QUBIT_SCHEDULED_TASKS: list[TaskCall] = [
+    TaskCall(
+        name="CheckCrossResonance",
+        # Uncomment to tune the CR parameter search.
+        # run={
+        #     "adiabatic_safe_factor": 0.65,
+        #     "max_amplitude": 0.85,
+        #     "max_time_range": 8192,
+        # },
+    ),
+    TaskCall(name="CreateZX90"),
+    TaskCall(name="CheckZX90"),
+    TaskCall(name="CheckBellState"),
+    TaskCall(name="CheckBellStateTomography"),
+    TaskCall(name="Check2QGateCoherenceLimit"),
+    TaskCall(name="ZX90InterleavedRandomizedBenchmarking"),
 ]
 
 
@@ -56,7 +65,7 @@ def two_qubit_scheduled(
     username: str,
     chip_id: str,
     schedule: list[list[tuple[str, str]]],
-    tasks: list[str] | None = None,
+    tasks: list[TaskCall] | None = None,
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
@@ -100,7 +109,7 @@ def two_qubit_scheduled(
             username="alice",
             chip_id="64Qv3",
             schedule=[[("0", "1")]],
-            tasks=["CheckCrossResonance"],
+            tasks=[TaskCall(name="CheckCrossResonance")],
         )
     """
     # =========================================================================
@@ -158,16 +167,6 @@ def two_qubit_scheduled(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            # Per-task overrides — uncomment to tune the CR parameter search.
-            # "CheckCrossResonance": {
-            #     "run": {
-            #         "adiabatic_safe_factor": 0.65,
-            #         "max_amplitude": 0.85,
-            #         "max_time_range": 8192,
-            #     },
-            # },
-        },
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,

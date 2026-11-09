@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.calib_service import (
     CalibService,
     _is_cancellation,
@@ -383,6 +384,49 @@ class TestCalibServiceInitialization:
         assert session.configuration_mode == "ge-ef-fh"
         assert session._orchestrator is not None
         assert session._orchestrator.config.configuration_mode == "ge-ef-fh"
+
+    def test_session_wide_persistence_argument_is_removed(
+        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
+    ):
+        """The removed argument fails instead of being ignored and leaving writes enabled."""
+        with pytest.raises(TypeError, match="persist_output_parameters"):
+            CalibService(  # type: ignore[call-arg]
+                username="test_user",
+                execution_id="20240101-001",
+                chip_id="chip_1",
+                qids=["0"],
+                backend_name="fake",
+                project_id="test_project",
+                lock_repo=mock_lock_repo,
+                user_repo=mock_user_repo,
+                persist_output_parameters=False,
+            )
+
+    def test_isolated_worker_resolves_writeback_like_its_parent(self, mock_flow_session_deps):
+        """Per-task write-back defaults reach the worker; calls still decide for themselves."""
+        from qdash.workflow.engine.orchestrator import CalibOrchestrator
+        from qdash.workflow.service._internal.scheduling_tasks import _create_isolated_session
+
+        session = _create_isolated_session(
+            {
+                "username": "test_user",
+                "chip_id": "chip_1",
+                "execution_id": "20240101-001",
+                "backend_name": "fake",
+                "project_id": "test_project",
+                "task_parameters": {"CheckRabi": {"update_calibration_parameters": False}},
+            },
+            ["0"],
+        )
+
+        assert session._orchestrator is not None
+        resolve = CalibOrchestrator(
+            session._orchestrator.config
+        )._should_update_calibration_parameters
+        assert resolve("CheckRabi", None) is False
+        assert resolve("CheckRabi", {"update_calibration_parameters": True}) is True
+        assert resolve("CheckT1", None) is True
+        assert resolve("CheckT1", {"update_calibration_parameters": False}) is False
 
     def test_flow_session_default_tags(
         self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
@@ -1181,10 +1225,11 @@ def test_pipeline_owns_one_execution_per_calibration_step(
     env = pipeline_execution_env
     worker_ids = []
 
-    def run_workers(*, tasks, qids=None, mux_groups=None, session_config=None):
+    def run_workers(*, plan, qids=None, mux_groups=None, session_config=None):
         session = get_session()
         assert env.lock.owner == "exec-reserved"
         assert all(record.status == "completed" for record in env.records[:-1])
+        assert plan.step_id in {"one_qubit_check", "one_qubit_fine_tune"}
         worker_ids.append(
             session_config["execution_id"] if session_config else session.execution_id
         )
@@ -1196,8 +1241,18 @@ def test_pipeline_owns_one_execution_per_calibration_step(
         "_calibrate_mux_qubits",
     ):
         monkeypatch.setattr(f"qdash.workflow.service.strategy.{method}", run_workers)
-    monkeypatch.setattr(
-        CalibService, "execute_task_batch", lambda self, name, qids: run_workers(tasks=[name])
+
+    def run_batch(self, name, qids, **kwargs):
+        invocation = kwargs["invocation"]
+        run_workers(plan=SimpleNamespace(step_id=invocation.step_id))
+        return {qid: {"status": "success", "task_id": f"{name}-{qid}"} for qid in qids}
+
+    monkeypatch.setattr(CalibService, "execute_task_batch", run_batch)
+    # The batch path runs only tasks that implement batch_run.
+    check_task, fine_task = (
+        ("CheckQubitSpectroscopy", "CheckResonatorSpectroscopy")
+        if mode == "simultaneous_spectroscopy"
+        else ("CheckRabi", "CheckRamsey")
     )
     session = CalibService(
         "alice",
@@ -1213,9 +1268,9 @@ def test_pipeline_owns_one_execution_per_calibration_step(
     session.run(
         QubitTargets(["0", "1"]),
         steps=[
-            OneQubitCheck(mode=mode, tasks=["CheckRabi"]),
+            OneQubitCheck(mode=mode, tasks=[TaskCall(name=check_task)]),
             FilterByStatus(),
-            OneQubitFineTune(mode=mode, tasks=["CheckRamsey"]),
+            OneQubitFineTune(mode=mode, tasks=[TaskCall(name=fine_task)]),
         ],
     )
 
@@ -1311,7 +1366,7 @@ def test_single_step_without_api_reservation_creates_one_execution(
         lock_repo=env.lock,
         counter_repo=FakeExecutionCounterRepository(2),
     )
-    session.run(QubitTargets(["0"]), steps=[CustomOneQubit(tasks=["CheckRabi"])])
+    session.run(QubitTargets(["0"]), steps=[CustomOneQubit(tasks=[TaskCall(name="CheckRabi")])])
 
     assert len(env.records) == 1
     assert env.records[0].status == "completed"
@@ -1344,12 +1399,12 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
         lock_repo=env.lock,
         counter_repo=FakeExecutionCounterRepository(2),
         default_run_parameters={"interval": {"value": 1024, "value_type": "int"}},
-        task_parameters={"CheckRabi": {"run": {"shots": {"value": 2048, "value_type": "int"}}}},
+        _task_defaults={"CheckRabi": {"run": {"shots": {"value": 2048, "value_type": "int"}}}},
     )
     session.run(
         QubitTargets(["0", "1"]),
         steps=[
-            CustomTwoQubit(tasks=["CheckCrossResonance"]),
+            CustomTwoQubit(tasks=[TaskCall(name="CheckCrossResonance")]),
             TwoQubitCalibration(),
         ],
     )
@@ -1564,7 +1619,7 @@ def test_configure_all_scope_uses_service_task_parameters(pipeline_wiring):
         use_lock=False,
         resource_scope=scope,
         enable_github=False,
-        task_parameters={"ConfigureAll": {"run": {"mux_ids": [0]}}},
+        _task_defaults={"ConfigureAll": {"run": {"mux_ids": [0]}}},
     )
     orchestrator = MagicMock()
     session._orchestrator = orchestrator

@@ -85,7 +85,7 @@ class TaskExecutor:
         snapshot_loader: SnapshotParameterLoader | None = None,
         source_task_id: str | None = None,
         force_update_params: bool = False,
-        persist_output_parameters: bool = True,
+        update_calibration_parameters: bool = True,
     ) -> None:
         self.state_manager = state_manager
         self.execution_id = execution_id
@@ -103,7 +103,7 @@ class TaskExecutor:
             calib_dir=calib_dir,
             task_manager_id=task_manager_id,
             force_update_params=force_update_params,
-            persist_output_parameters=persist_output_parameters,
+            update_calibration_parameters=update_calibration_parameters,
         )
         self._mux_distributor = MuxDistributor(
             state_manager=state_manager,
@@ -851,7 +851,8 @@ class TaskExecutor:
         )
 
         assert self._snapshot_loader is not None
-        snapshot = self._snapshot_loader.get_snapshot(task_name, qid)
+        invocation = self.state_manager.get_task(task_name, task_type, qid).invocation
+        snapshot = self._snapshot_loader.get_snapshot(task_name, qid, invocation)
         if snapshot is None:
             if self._snapshot_loader.requires_snapshot(task_name):
                 raise ValueError(

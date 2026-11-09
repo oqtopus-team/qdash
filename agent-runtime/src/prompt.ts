@@ -17,6 +17,10 @@ export function buildSystemPrompt(
   localToolGuide: string | null = null,
   /** Whether the workspace tools (`bash`, `read`, `write`, `edit`) are offered; see exec-env.ts. */
   workspaceTools = false,
+  /** Guideline of `present_results`, when a classifier is usable; see presentation-tool.ts. */
+  presentationGuideline: string | null = null,
+  /** Guideline of `classify`, when a classifier is usable; see classify-tool.ts. */
+  classifyGuideline: string | null = null,
 ): string {
   const thinkingLanguageName = languageName(thinkingLanguage);
   return [
@@ -35,6 +39,9 @@ export function buildSystemPrompt(
     "- When data is missing or a tool fails, say so plainly instead of guessing.",
     "- Prefer a short direct answer over an exhaustive report. Expand only when asked.",
     "- Use `render_chart` when a plot communicates better than text.",
+    "- Use `render_ui` for a compact read-only view of values from tool results (metric cards, a comparison table, a status alert, links to QDash pages). Only show values a tool returned, and still answer in text.",
+    ...(presentationGuideline ? [presentationGuideline] : []),
+    ...(classifyGuideline ? [classifyGuideline] : []),
     ...(workspaceTools
       ? [
           "- Use the workspace for arithmetic, statistics, fitting and data wrangling rather than computing in your head: write the data to a file, run a short Python script with `bash`, and print only what you need.",

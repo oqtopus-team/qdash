@@ -93,6 +93,7 @@ When another member will continue the calibration:
    workflow.
 
 Saved calibrated outputs become the current state for later tasks in the same project. An
-exploratory run with **Save calibrated outputs to DB** turned off remains available for review,
+exploratory run with **Update calibration values** turned off remains available for review,
 but later tasks do not use its outputs as current values. See
-[Task Parameters](./task-parameters.md#decide-whether-to-save-outputs) for that choice.
+[Task Parameters](./task-parameters.md#decide-whether-to-update-calibration-values) for that
+choice.

@@ -55,9 +55,9 @@ Stop QDash before advancing `main`:
 docker compose down
 ```
 
-When upgrading a Copilot deployment from Pi 1.3 to Pi 1.4, back up the stopped
-`agent-runtime-state` Docker volume before continuing. Pi 1.4 migrates saved conversations when
-the new runtime first opens them. A previous release cannot read the migrated volume; restore the
+When upgrading a Copilot deployment to a newer Pi release, such as Pi 1.3 to 1.4 or Pi 1.4 to
+1.5, back up the stopped `agent-runtime-state` Docker volume before continuing. The new Pi release
+migrates saved conversations when the new runtime first opens or writes them. A previous release cannot read the migrated volume; restore the
 pre-update volume backup before starting that release during a rollback. How this works:
 [Copilot architecture](../developer-guide/copilot/architecture.md#durable-conversations).
 
@@ -102,6 +102,24 @@ Compose stack publishes no direct API or Prefect ports. Follow service logs as d
 [Operations](./operations.md#inspect-logs) when a container is unhealthy or a page is unavailable.
 For HTTPS deployments, open the origin configured in `CLIENT_URL`; the `localhost:5714` links
 above describe the default HTTP configuration.
+
+## Check Saved Workflows
+
+Workflows saved before task calls list tasks by name and stop before they measure on a release
+that requires task calls. QDash does not convert them; each workflow owner updates their own.
+Before anyone edits them, copy the saved workflows from the checkout so every owner can compare
+against the original:
+
+```bash
+cp -a src/qdash/workflow/user_flows user_flows-backup
+```
+
+After the update, each owner edits their workflows as described in
+[Update a flow saved before task calls](./creating-workflows.md#update-a-flow-saved-before-task-calls)
+and tests each one on the Fake backend before it measures on hardware again. Pipeline specs queued
+before the update run after conversion, and a new version 1 spec is rejected with a converted
+spec to submit instead. The full list of edits:
+[Migrate Saved Flows](../developer-guide/workflow/task-calls.md#migrate-saved-flows).
 
 ## Recover from a Failed Update
 

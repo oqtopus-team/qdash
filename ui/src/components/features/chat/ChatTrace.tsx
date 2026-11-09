@@ -4,7 +4,12 @@ import Link from "next/link";
 
 import { useEffect, useState } from "react";
 import { Brain, Check, Loader2, PenLine, X } from "lucide-react";
-import type { ChatTrace as ChatTraceData, ToolEvaluation, TraceStep } from "@/types/copilotChat";
+import type {
+  ChatTrace as ChatTraceData,
+  ToolClassification,
+  ToolEvaluation,
+  TraceStep,
+} from "@/types/copilotChat";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
 import { FigureStrip } from "@/components/features/chat/ChatFigures";
 import {
@@ -74,6 +79,69 @@ function EvaluationPanel({ evaluation }: { evaluation: ToolEvaluation }) {
           {evaluation.prompt}
         </pre>
       </details>
+    </div>
+  );
+}
+
+const OUTCOME_BADGE: Record<ToolClassification["outcome"], { label: string; className: string }> = {
+  classified: { label: "Classified", className: "badge-success" },
+  ambiguous: { label: "Unclear", className: "badge-warning" },
+  failed: { label: "No answer", className: "badge-error" },
+};
+
+const percent = (value: number) => `${Math.round(value * 100)}%`;
+
+/** What the classifier answered, which model it was, and on request every category's share. */
+function ClassificationPanel({ classification }: { classification: ToolClassification }) {
+  const badge = OUTCOME_BADGE[classification.outcome];
+  const { category, probability, margin, probabilities, reason } = classification;
+  return (
+    <div className="mt-1.5 text-xs text-base-content/60" data-testid="classification-panel">
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+        <span className={`badge badge-soft badge-xs ${badge.className}`}>{badge.label}</span>
+        {/* A clear answer names its category in the row title; an unclear one only here. */}
+        {category && classification.outcome === "ambiguous" && (
+          <span>
+            leaning <span className="font-mono text-base-content/80">{category}</span>
+          </span>
+        )}
+        {probability !== undefined && (
+          <span className="tabular-nums">
+            {percent(probability)}
+            {margin !== undefined && <>, lead {percent(margin)}</>}
+          </span>
+        )}
+        <span>
+          · by <span className="font-mono text-base-content/75">{classification.classifier}</span>
+        </span>
+      </div>
+      {classification.outcome === "failed" && reason && (
+        <p className="mt-0.5 text-base-content/55">The classifier gave no answer: {reason}.</p>
+      )}
+      {probabilities && probabilities.length > 1 && (
+        <details className="mt-1">
+          <summary className="cursor-pointer select-none text-base-content/50 hover:text-base-content/80">
+            All categories
+          </summary>
+          <ul className="mt-1 space-y-0.5">
+            {probabilities.map((entry) => (
+              <li
+                key={entry.category}
+                className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)_3rem] items-center gap-2"
+              >
+                <span className="truncate font-mono text-base-content/70">{entry.category}</span>
+                <progress
+                  className="progress progress-neutral h-1.5"
+                  value={Math.round(entry.probability * 100)}
+                  max={100}
+                  aria-label={`${entry.category} probability`}
+                />
+                <span className="text-right tabular-nums">{percent(entry.probability)}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }
@@ -150,6 +218,7 @@ function ToolStepRow({
         <FigureStrip paths={step.figures} compact className="mt-1.5" />
       )}
       {step.evaluation && <EvaluationPanel evaluation={step.evaluation} />}
+      {step.classification && <ClassificationPanel classification={step.classification} />}
       {details && (
         <ChainOfThoughtContent>
           <ToolDetails step={step} />
@@ -213,7 +282,12 @@ function TraceSteps({ steps, live }: { steps: TraceStep[]; live: boolean }) {
         }
         return (
           <ChainOfThoughtStep key={`text-${i}`} marker={null} defaultOpen>
-            <ChatMarkdown className="text-xs text-base-content/70">{step.text}</ChatMarkdown>
+            <ChatMarkdown
+              className="text-xs text-base-content/70"
+              streaming={live && i === steps.length - 1}
+            >
+              {step.text}
+            </ChatMarkdown>
           </ChainOfThoughtStep>
         );
       })}

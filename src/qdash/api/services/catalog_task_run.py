@@ -158,7 +158,7 @@ async def run_catalog_task(
     project_id: str,
     input_overrides: dict[str, Any],
     run_overrides: dict[str, Any],
-    persist_output_parameters: bool,
+    update_calibration_parameters: bool,
     update_params: bool,
     reconfigure: bool,
     execution_name: str,
@@ -197,7 +197,7 @@ async def run_catalog_task(
                 name: _run_parameter_entry(override) for name, override in run_overrides.items()
             }
         },
-        persist_output_parameters=persist_output_parameters,
+        update_calibration_parameters=update_calibration_parameters,
         update_params=update_params,
         reconfigure=reconfigure,
         execution_name=execution_name,

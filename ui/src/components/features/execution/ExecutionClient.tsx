@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { ArrowLeft, Calendar, Clock, Download, StopCircle, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  ChevronRight,
+  Clock,
+  Download,
+  StopCircle,
+  UserRound,
+} from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
 import { isExecutionCancellable } from "@/lib/executionStatus";
@@ -20,6 +28,7 @@ import { useGetExecution, useCancelExecution } from "@/client/execution/executio
 import { InvestigateWithAiButton } from "@/components/features/chat/InvestigateWithAiButton";
 import { CancelExecutionModal } from "@/components/features/execution/CancelExecutionModal";
 import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
+import { distinctCallId } from "@/components/features/execution/executionTopologyTasks";
 import { gridFullscreenPanelClass } from "@/components/ui/GridFullscreenButton";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
@@ -53,6 +62,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
   const [topologyMode, setTopologyMode] = useState<TopologyMode>("1q");
   const [filterTaskName, setFilterTaskName] = useState<string>("");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // Folded by default; the comparison is fetched only once the user opens it.
+  const [parameterChangesOpen, setParameterChangesOpen] = useState(false);
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
 
   const calculateDetailedDuration = (
@@ -190,7 +201,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     return execution.task
       .filter((task) => task.task_id)
       .map((task) => {
-        const taskName = task.name || "Unnamed Task";
+        const callId = distinctCallId(task);
+        const taskName = `${task.name || "Unnamed Task"}${callId ? ` (${callId})` : ""}`;
         const displayName = task.qid ? `${task.qid}-${taskName}` : taskName;
         return {
           task_id: task.task_id as string,
@@ -293,11 +305,29 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
         </div>
 
         <div id="parameter-changes" className="bg-base-100 rounded-lg shadow-md p-6">
-          <h2 className="text-sm font-medium mb-1">Parameter changes</h2>
-          <p className="text-xs text-base-content/60 mb-3">
-            Values this run wrote to the calibration database, against the previous run.
-          </p>
-          <ExecutionParameterChanges chipId={chipId} executionId={executionId} />
+          <details className="group" open={parameterChangesOpen}>
+            <summary
+              className="flex cursor-pointer list-none items-start gap-1.5"
+              onClick={(event) => {
+                // Controlled so the comparison (and its requests) exists only while open.
+                event.preventDefault();
+                setParameterChangesOpen((current) => !current);
+              }}
+            >
+              <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-base-content/60 transition-transform group-open:rotate-90" />
+              <div>
+                <h2 className="text-sm font-medium mb-1">Parameter changes</h2>
+                <p className="text-xs text-base-content/60">
+                  Values this run wrote to the calibration database, against the previous run.
+                </p>
+              </div>
+            </summary>
+            {parameterChangesOpen && (
+              <div className="mt-3">
+                <ExecutionParameterChanges chipId={chipId} executionId={executionId} />
+              </div>
+            )}
+          </details>
         </div>
 
         {/* Execution Note (if available) */}

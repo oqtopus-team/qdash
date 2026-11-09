@@ -23,7 +23,7 @@ Example:
         username="alice",
         chip_id="64Qv3",
         mux_ids=[0, 1],
-        tasks=["CheckRamsey", "CheckT1"],
+        tasks=[TaskCall(name="CheckRamsey"), TaskCall(name="CheckT1")],
     )
 """
 
@@ -31,6 +31,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -52,7 +53,7 @@ def simple_calibration(
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
-    tasks: list[str] | None = None,
+    tasks: list[TaskCall] | None = None,
     mode: str = "scheduled",
     tags: list[str] | None = None,
     flow_name: str | None = None,
@@ -70,7 +71,9 @@ def simple_calibration(
         mux_ids: MUX IDs to calibrate (uses MUX-based scheduling)
         exclude_qids: Qubit IDs to exclude (only with mux_ids)
         qids: Qubit IDs to calibrate (fallback if mux_ids not set)
-        tasks: Task names to run (default: CheckRabi, CreateHPIPulse, CheckHPIPulse)
+        tasks: Task calls to run; flow runs pass [{"name": "CheckRabi"}, ...]
+            (default: CheckRabi, CreateHPIPulse with hpi_duration=32, CheckHPIPulse).
+            A custom list runs as given, with each call's own settings.
         mode: Execution mode:
             - "scheduled": Box-based parallelism with hardware constraints (default)
             - "serial": Fully sequential execution
@@ -97,17 +100,19 @@ def simple_calibration(
     else:
         raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
-    # Define tasks to run
-    if tasks is None:
-        tasks = [
-            "CheckRabi",
-            "CreateHPIPulse",
-            "CheckHPIPulse",
-        ]
-
-    # Define steps
+    # Define steps; a custom task list runs as given
     steps = [
-        CustomOneQubit(step_name="simple_tasks", tasks=tasks, mode=mode),
+        CustomOneQubit(
+            step_name="simple_tasks",
+            tasks=tasks
+            if tasks is not None
+            else [
+                TaskCall(name="CheckRabi"),
+                TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
+                TaskCall(name="CheckHPIPulse"),
+            ],
+            mode=mode,
+        ),
     ]
 
     # =========================================================================
@@ -120,13 +125,6 @@ def simple_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            "CreateHPIPulse": {
-                "run": {
-                    "hpi_duration": 32,
-                },
-            },
-        },
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,

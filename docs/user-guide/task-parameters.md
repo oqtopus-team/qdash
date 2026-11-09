@@ -44,10 +44,11 @@ re-running that result restores it.
 QDash uses an entered input value before a current calibration value or a task fallback. A task
 that requires a missing value stops with the parameter name instead of silently using zero.
 
-## Decide Whether to Save Outputs
+## Decide Whether to Update Calibration Values
 
-Leave **Save calibrated outputs to DB** off for an exploratory run. QDash records the result,
-effective parameters, figures, and raw data without replacing current calibration values.
+Leave **Update calibration values** off for an exploratory run. QDash still saves the run in task
+history with its result, effective parameters, figures, and raw data, but does not replace current
+calibration values.
 
 Enable it only when successful output parameters should become the current values for later
 tasks. The warning below the setting confirms that the run can change shared state. Mapped backend
@@ -63,7 +64,7 @@ Re-running one task result opens the current task definition with compatible val
 source result. Review any skipped historical fields, then edit the restored values before
 selecting **Run task**. Values entered in the form take priority.
 
-Always check **Save calibrated outputs to DB** again on a re-run; reproducing a measurement and
+Always check **Update calibration values** again on a re-run; reproducing a measurement and
 accepting its outputs are separate decisions.
 
 How this works: [Parameter Resolution](../developer-guide/workflow/parameter-resolution.md).

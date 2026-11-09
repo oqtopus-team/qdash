@@ -28,7 +28,7 @@ ui/src/hooks/useCopilotChat.ts
 | `tool_draft` | `tool_draft` | Open a tool row while the model is still writing the call (`index`: the call's position in the message). |
 | `tool_args_delta` | `tool_args_delta` | Append text to one argument (`path`, such as `["content"]`) of the call being written; the chat shows code as it is typed. |
 | `tool_start` | `tool_start`, `status` | The call runs: the drafted row gets its validated arguments and progress. |
-| `tool_end` | `tool_end`, `status` | Complete the tool row and attach figures, evaluation details, or a workspace tool's `output` and `exit_code`. |
+| `tool_end` | `tool_end`, `status` | Complete the tool row and attach figures, evaluation details, a `classify` call's `classification`, or a workspace tool's `output` and `exit_code`. |
 | `chart` | Included in final `result` | Render a collected chart. |
 | `ask` | Included in final `result` | Render a question card. |
 | `approval` | Included in final `result` | Render an approval card. |
@@ -51,7 +51,20 @@ preserve the connection without creating transcript entries.
 
 ## Change and Test Streaming
 
-Update `agent-runtime/src/events.ts` when the runtime event contract changes. Update
+The runtime derives its events from the durable conversation view: `agent-runtime/src/server.ts`
+watches it with `Conversation.watch()`, and `ViewEventTranslator` in
+`agent-runtime/src/view-events.ts` turns each new revision into text, thinking, and tool-call
+argument appends and tool starts and ends. A revision can skip states while the stream writes, so
+the translator takes an answer's unseen tail from its entry and ends a tool from its result entry.
+A revision's entries are a window of the newest 50 to 100, so when the window has moved past the
+last entry the stream wrote, `ViewEventStream` reads the skipped entries with
+`Conversation.entries()` before translating it. When the turn settles, `ViewEventStream.finish()`
+stops the watch and translates the view read after settlement, so tool, chart, and text events the
+watch had not delivered yet still reach the stream before `done` or `error`.
+`agent-runtime/src/events.ts` maps these events to NDJSON lines.
+
+Update `agent-runtime/src/events.ts` when the runtime event contract changes, and
+`agent-runtime/src/view-events.ts` when Pi's conversation view changes. Update
 `src/qdash/api/services/pi_chat_service.py` when the SSE contract or translation changes, then
 update `ui/src/hooks/useCopilotChat.ts` and its tests for browser behavior.
 

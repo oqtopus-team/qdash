@@ -91,19 +91,41 @@ before running resonator spectroscopy. The template requires `mux_ids` and runs
 ## Choose Tasks and Execution Order
 
 The task list runs from top to bottom. Open **Tasks** in another tab to find the task names enabled
-for the active backend, then replace the default list in the template:
+for the active backend, then replace the default list in the template. In **Simple Calibration**,
+edit the default list after `else` in the `tasks=` argument of `CustomOneQubit` in the flow
+function. Keep the condition so tasks supplied at execution time still override the default:
 
 ```python
-if tasks is None:
-    tasks = [
-        "Configure",
-        "CheckT1",
-        "CheckRamsey",
-    ]
+CustomOneQubit(
+    step_name="simple_tasks",
+    tasks=tasks
+    if tasks is not None
+    else [
+        TaskCall(name="CheckRabi"),
+        TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
+        TaskCall(name="CheckHPIPulse"),
+    ],
+    mode=mode,
+),
 ```
+
+The `run={"hpi_duration": 32}` setting belongs to that `CreateHPIPulse` call only. A replacement
+list runs each call with only the settings that call sets.
 
 Keep configuration tasks and measurement tasks in their required order. A later task reads the
 calibration state produced or applied by earlier tasks.
+
+To run a task twice in the same step, for example a coarse and a fine Ramsey measurement, give
+each occurrence its own `call_id` and its own settings:
+
+```python
+TaskCall(name="CheckRamsey", call_id="ramsey_coarse", run={"detuning": 0.001}),
+TaskCall(name="CheckRamsey", call_id="ramsey_fine", run={"detuning": 0.0002}),
+```
+
+Each call appears as its own task in the execution, labeled with its call ID. A list of plain task
+names such as `"CheckT1"` stops the flow before it measures; see
+[Update a flow saved before task calls](#update-a-flow-saved-before-task-calls).
 
 The `mode` value controls how one-qubit work is arranged:
 
@@ -147,34 +169,51 @@ How this works: [CR Gate Scheduler](../developer-guide/architecture/cr-scheduler
 
 ## Set Parameters for One Task
 
-Add `task_parameters` to the workflow's calibration service when one named task needs different
-run settings, calibration inputs, or output-saving behavior:
+Set `run`, `input`, and `update_calibration_parameters` on a `TaskCall` when one call needs
+different run settings, calibration inputs, or output-saving behavior. The settings apply to that
+call only:
 
 ```python
-from qdash.workflow import sweep
+from qdash.workflow import TaskCall, sweep
 
-task_parameters={
-    "CheckRamsey": {
-        "run": {
-            "shots": 1024,
-            "time_range": sweep.arange(0, 10_000, 100),
-        },
-        "input": {
-            "control_frequency": 7.012,
-        },
-        "update_calibration_parameters": False,
+TaskCall(
+    name="CheckRamsey",
+    run={
+        "shots": 1024,
+        "time_range": sweep.arange(0, 10_000, 100),
     },
-},
+    input={"control_frequency": 7.012},
+    update_calibration_parameters=False,
+),
 ```
 
 Values under `run` control the experiment. Use `sweep.linspace`, `sweep.logspace`,
 `sweep.arange`, or `sweep.range` for generated ranges so their construction remains visible in the
 workflow, or `sweep.values(0, 4, 16, 64)` for points you list yourself. A parameter that the task
 defines as one kind of range accepts any of these forms. Other run parameters use plain values.
-Values under `input` replace the current
-calibration input for every selected target in that task. Set `update_calibration_parameters` to
-`False` for an exploratory measurement whose outputs must remain in history without becoming the
-current calibration values.
+Values under `input` replace the current calibration input for every selected target in that call.
+Set `update_calibration_parameters` to `False` for an exploratory measurement whose outputs must
+remain in history without becoming the current calibration values.
+
+When several calls need the same settings, keep them in a variable and reuse it in each
+`TaskCall`:
+
+```python
+RAMSEY_RUN = {"shots": 1024}
+
+TaskCall(name="CheckRamsey", call_id="ramsey_coarse", run={**RAMSEY_RUN, "detuning": 0.001}),
+TaskCall(name="CheckRamsey", call_id="ramsey_fine", run={**RAMSEY_RUN, "detuning": 0.0002}),
+```
+
+Run settings that every task shares, such as `interval`, belong in the workflow's
+`default_run_parameters`.
+
+Older workflows may pass `task_parameters` or `task_run_parameters` to `CalibService` to give every
+call of a task the same settings. Both are deprecated. They still apply, under each call's own
+settings, and emit a Python `DeprecationWarning`, which pytest and `python -W default` display. To remove them, copy each task's settings
+into every call of that task, keeping any value the call already sets, as
+[Migrate per-task defaults](../developer-guide/workflow/task-calls.md#migrate-per-task-defaults)
+shows.
 
 QDash rejects a parameter placed in the wrong section, a parameter the task does not declare, or
 an input the task does not allow users to override. See [Task Parameters](./task-parameters.md)
@@ -194,6 +233,24 @@ An explicit input override takes priority over either value.
 
 Review the effective inputs in **Execution** to confirm what the later task actually used.
 How this works: [State Between Steps](../developer-guide/workflow/quickstart.md#state-between-steps).
+
+## Update a Flow Saved Before Task Calls
+
+A flow saved before task calls lists tasks by name, such as `tasks=["Configure", "CheckT1"]`, and
+stops before it measures. Edit the flow in **Workflow**:
+
+1. Add `from qdash.workflow import TaskCall` to the imports.
+2. Replace each task name with `TaskCall(name="...")`. Where the same task appears more than once
+   in one list, add a `call_id` that describes each occurrence, for example
+   `call_id="configure_readout"`.
+3. Replace `stop_on_failure_tasks=("Configure",)` with `on_failure="stop"` on the listed calls.
+4. Save the flow and run it on a small target.
+
+Check the call IDs and settings of the run in **Execution** before running the flow on more
+targets. Results recorded before the update stay readable in **Execution**; they show the task
+name without a call ID. Flows that read results by task name, filter on one call, or set
+per-occurrence settings need further edits:
+[Migrate Saved Flows](../developer-guide/workflow/task-calls.md#migrate-saved-flows).
 
 ## Save and Test the Workflow
 

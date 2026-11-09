@@ -183,6 +183,7 @@ export default withMermaid(
                 { text: "Quickstart", link: "/developer-guide/workflow/quickstart" },
                 { text: "Engine Architecture", link: "/developer-guide/workflow/engine-architecture" },
                 { text: "Services", link: "/developer-guide/workflow/services" },
+                { text: "Task Calls", link: "/developer-guide/workflow/task-calls" },
                 { text: "Calibration Pipeline Spec", link: "/developer-guide/workflow/calibration-pipeline" },
                 { text: "Calibration Data Lifecycle", link: "/developer-guide/workflow/calibration-data-lifecycle" },
                 { text: "Parameter Resolution", link: "/developer-guide/workflow/parameter-resolution" },

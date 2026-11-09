@@ -448,6 +448,9 @@ class ExecutionService:
                     PipelineStepProgress(
                         index=index,
                         name=str(entry.get("name") or ""),
+                        step_id=(
+                            entry.get("step_id") if isinstance(entry.get("step_id"), str) else None
+                        ),
                         type=str(entry.get("type") or ""),
                         kind=kind,
                         status="pending",
@@ -467,6 +470,7 @@ class ExecutionService:
                 PipelineStepProgress(
                     index=index,
                     name=str(entry.get("name") or ""),
+                    step_id=entry.get("step_id") if isinstance(entry.get("step_id"), str) else None,
                     type=str(entry.get("type") or ""),
                     kind=kind,
                     execution_id=started.execution_id,
@@ -865,6 +869,7 @@ class ExecutionService:
                     end_at=doc.end_at,
                     elapsed_time=elapsed,
                     task_type=doc.task_type,
+                    invocation=doc.invocation,
                 )
             )
 

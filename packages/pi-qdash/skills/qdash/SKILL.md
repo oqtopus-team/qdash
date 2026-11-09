@@ -50,21 +50,25 @@ Prefer the dedicated tool that matches the question. Use `qdash_query` only as a
 
 ## Composing a calibration pipeline
 
-A calibration pipeline spec is a JSON description of one calibration run: targets, an ordered list of steps, and run parameters. QDash validates it against the chip, backend, and task catalog and runs it as one execution. The spec can only name the step types and tasks QDash exposes; it cannot contain code.
+A calibration pipeline spec is a JSON description of one calibration run: `spec_version: 2`, targets, an ordered list of steps, and the settings of each task call. QDash validates it against the chip, backend, and task catalog and runs it as one execution. The spec can only name the step types and tasks QDash exposes; it cannot contain code.
+
+A step's `tasks` are calls, not names: `{"name": "CheckRamsey", "call_id": "ramsey_fine", "run": {"detuning": 0.0002}}`. Put `run`, `input`, and `update_calibration_parameters` on the call itself; to share a value such as `shots`, repeat it on each call that needs it, or use `default_run_parameters` for run values every task shares. The top-level `task_parameters` (per-task defaults) is deprecated: QDash still applies it, under each call's own settings, and planning reports a warning. Do not add it to a new spec. One step may run the same task several times (a coarse and a fine Ramsey, two Configure/Rabi rounds) when every occurrence has its own `call_id`; a task that appears once may omit it. Each call on each target gets its own `task_id` in the results.
 
 Workflow:
 
 1. `qdash_get_pipeline_catalog` — read the step types (with what each needs from an earlier step and its default task list), the one-qubit modes, and the task names by type. Use only names from this catalog.
 2. Turn the request into steps. Start from the catalog defaults and the flow templates (`qdash_query` with `flow_templates`, then `flow_template` for one template's task list): `OneQubitCheck` and `OneQubitFineTune` carry the standard one-qubit sequences, `TwoQubitCalibration` the two-qubit chain. Use `CustomOneQubit` / `CustomTwoQubit` only where the user wants a different task list, and keep the task order the templates use.
-3. `qdash_plan_pipeline` — validate. A result with problems is not an error: each problem carries a path into the spec (`steps[2].tasks[0]`, `targets.qids[1]`); fix it and plan again until it is valid.
-4. Show the user the resolved steps and task counts from the plan, then `qdash_run_pipeline` with the same `chipId` and `spec`. The execution is confirmation-gated. Say that completed tasks write their calibrated parameters to QDash directly; there is no candidate gate, so inside an agent calibration session use the session's actions instead.
+3. `qdash_plan_pipeline` — validate. A result with problems is not an error: each problem carries a path into the spec (`steps[2].tasks[0]`, `targets.qids[1]`); fix it and plan again until it is valid. Warnings do not make a spec invalid but usually mean a filter reads a different step than intended. A result with `migrated_spec` means the spec used the version 1 shape; plan the migrated spec.
+4. Show the user the resolved steps, each call's `call_id` and effective settings from the plan, then `qdash_run_pipeline` with the same `chipId` and `spec`. The execution is confirmation-gated. Say that completed tasks write their calibrated parameters to QDash directly; there is no candidate gate, so inside an agent calibration session use the session's actions instead.
 5. `qdash_wait_execution` with the returned `execution_id`. It returns when the whole run has finished, not just its first step. Then summarize which targets passed and which failed, fetch the figures of failed tasks with `qdash_get_task_figures` so the user sees them, and read `qdash_get_task_knowledge` for any task whose result needs interpretation.
 
 Rules:
 
 - Targets are either `qids` or `mux_ids` (with optional `exclude_qids`), never both. Prefer MUX targets for more than a few qubits; hardware scheduling works per MUX.
-- `FilterByStatus` and `FilterByMetric` are only valid after a one-qubit step. Put a filter before any two-qubit step.
-- Put values into `task_run_parameters` only when the user asked for them; otherwise leave QDash's defaults.
+- `FilterByStatus` and `FilterByMetric` are only valid after a one-qubit step. Put a filter before any two-qubit step. Without `step` they read the latest `OneQubitFineTune` or `OneQubitCheck`; to filter on a custom step or on one call, set `step` to its `step_id` (a custom step's `step_name`) and `call_id` to the call, e.g. `{"type": "FilterByMetric", "step": "coherence", "call_id": "ramsey_fine", "metric": "t2_star", "threshold": 10}`. A failed or missing call removes the qubit; QDash never falls back to another call of the same task.
+- Give two steps of the same type distinct `step_id` values.
+- Put values into a call's `run` / `input` only when the user asked for them; otherwise leave QDash's defaults.
+- A failed call stops that target's later calls in the step unless the step sets `continue_on_failure` or the call sets `on_failure: "continue"`; `on_failure: "stop"` keeps a prerequisite such as `Configure` fail-fast. Other targets are not affected.
 - A pipeline takes the project execution lock. Check `qdash_list_executions` for a running execution before starting one.
 - Prefer short pipelines (one or two steps) when the next step depends on the result: run, inspect results and figures, then compose the next spec. Calibrated parameters persist in QDash between executions, so a later spec continues from the earlier one. Retries and branches are your decision between executions, not something the spec expresses.
 

@@ -65,6 +65,7 @@ def _document_to_task_result(doc: TaskResultHistoryDocument) -> TaskResult:
         end_at=doc.end_at,
         elapsed_time=parse_elapsed_time(doc.elapsed_time),
         task_type=doc.task_type,
+        invocation=doc.invocation,
     )
 
 
@@ -92,10 +93,16 @@ class TaskResultService:
         start_from: datetime | None = None,
         start_to: datetime | None = None,
         message_contains: str | None = None,
+        step_id: str | None = None,
+        call_id: str | None = None,
         skip: int = 0,
         limit: int = 50,
     ) -> TaskResultListResponse:
-        """List task results for cross-task investigation."""
+        """List task results for cross-task investigation.
+
+        ``step_id`` and ``call_id`` select the results of one planned call, for
+        example the fine ``CheckRamsey`` of a step that also runs a coarse one.
+        """
         from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
         query: dict[str, Any] = {"project_id": project_id}
@@ -111,6 +118,10 @@ class TaskResultService:
             query["execution_id"] = execution_id
         if username:
             query["username"] = username
+        if step_id:
+            query["invocation.step_id"] = step_id
+        if call_id:
+            query["invocation.call_id"] = call_id
         start_bounds: dict[str, datetime] = {}
         if start_from:
             start_bounds["$gte"] = start_from
@@ -163,6 +174,7 @@ class TaskResultService:
             message=doc.message,
             has_stack_trace=bool(doc.stack_trace),
             source_task_id=doc.source_task_id,
+            invocation=doc.invocation,
             start_at=doc.start_at,
             end_at=doc.end_at,
             elapsed_time=parse_elapsed_time(doc.elapsed_time),

@@ -281,6 +281,7 @@ services:
     volumes:
       - ./agent-runtime/src:/app/agent-runtime/src
       - ./agent-runtime/exec:/app/agent-runtime/exec # Hello protocol shared with agent-exec
+      - ./ui/src/lib/copilotUiSpec.ts:/app/ui/src/lib/copilotUiSpec.ts:ro # render_ui catalog shared with the chat
       - ./config:/app/config # Read for copilot language and model settings only
       # Local pi extension checkouts for development (gitignored, empty in
       # production); the runtime trusts whatever package directories it finds.
@@ -314,6 +315,9 @@ services:
       # ignores it. Keep a placeholder for keyless local endpoints.
       - OPENAI_COMPATIBLE_API_KEY_CHAT=${OPENAI_COMPATIBLE_API_KEY_CHAT:-openai-compatible}
       - OPENAI_COMPATIBLE_API_KEY_EVALUATION=${OPENAI_COMPATIBLE_API_KEY_EVALUATION:-openai-compatible}
+      # The classifier of config/copilot/classifier.yaml reads CLASSIFIER_BASE_URL
+      # and CLASSIFIER_API_KEY from .env (env_file above). There is no default
+      # endpoint; without both the classifier stays unavailable.
       # The Copilot workspace (agent-exec below): where the chat's bash, read,
       # write and edit tools run. Unset AGENT_EXEC_SOCKET to offer no workspace.
       - AGENT_EXEC_SOCKET=/run/agent-exec/exec.sock
