@@ -126,6 +126,27 @@ export interface ToolEvaluation {
   evaluationId?: string;
 }
 
+/**
+ * What the classifier model decided for a `classify` call: the assistant asked
+ * it to pick one of the categories it defined. Never the classifier's input.
+ */
+export interface ToolClassification {
+  /** `provider/model` of the classifier model (classifier.yaml). */
+  classifier: string;
+  /** `classified`: a clear answer; `ambiguous`: no clear winner; `failed`: no answer. */
+  outcome: "classified" | "ambiguous" | "failed";
+  /** The chosen category, as the assistant named it. */
+  category?: string;
+  /** The chosen category's probability. */
+  probability?: number;
+  /** Its lead over the runner-up. */
+  margin?: number;
+  /** Every category's probability, highest first. */
+  probabilities?: { category: string; probability: number }[];
+  /** Why there is no answer, when `failed`. */
+  reason?: string;
+}
+
 export type TraceStep =
   | { kind: "thinking"; text: string; startedAt: number; endedAt?: number }
   | {
@@ -153,6 +174,8 @@ export type TraceStep =
       figures?: string[];
       /** What an evaluation tool sent its model (qcal_evaluate). */
       evaluation?: ToolEvaluation;
+      /** What the classifier decided (classify). */
+      classification?: ToolClassification;
     }
   | { kind: "text"; text: string };
 

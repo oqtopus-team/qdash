@@ -43,6 +43,7 @@ import {
   configurePresentation,
 } from "./presentation-tool.ts";
 import { configureClassifierModels, readClassifierConfig } from "./classifier-models.ts";
+import { buildClassifyChatTool, CLASSIFY_CHAT_TOOL, CLASSIFY_GUIDELINE, configureClassify } from "./classify-tool.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { ExecWorkspace, execConfigFromEnv, removeWorkspace, WORKSPACE_TOOL_NAMES } from "./exec-env.ts";
 import { askUserTool } from "./ask-tool.ts";
@@ -101,8 +102,8 @@ const COPILOT_CONFIG_PATH = process.env.COPILOT_CONFIG_PATH ?? "/app/config/copi
 const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
 const EVALUATION_CONFIG_PATH =
   process.env.EVALUATION_CONFIG_PATH ?? "/app/config/copilot/evaluation.yaml";
-// Optional: the classifier models QDash features may use; present_results is
-// offered when one of them is usable.
+// Optional: the classifier models QDash features may use; present_results and
+// classify are offered when one of them is usable.
 const CLASSIFIER_CONFIG_PATH =
   process.env.CLASSIFIER_CONFIG_PATH ?? "/app/config/copilot/classifier.yaml";
 // One model request; a whole turn is bounded by the server's own timers.
@@ -317,6 +318,8 @@ export class SharedRuntime {
     );
     const presentation = configurePresentation(classifiers, console);
     const presentationTools = presentation ? buildPresentationTools(presentation) : [];
+    // On-demand classification the model asks for; separate from present_results' layouts.
+    const classify = configureClassify(classifiers, console);
 
     // Built once: the same text every chat gets and Settings shows read-only.
     const systemPrompt = buildSystemPrompt(
@@ -327,6 +330,7 @@ export class SharedRuntime {
       localToolGuide,
       EXEC_CONFIG !== undefined,
       presentation ? PRESENTATION_GUIDELINE : null,
+      classify ? CLASSIFY_GUIDELINE : null,
     );
     const copilotExtension = defineExtension({
       name: "qdash-copilot",
@@ -335,6 +339,7 @@ export class SharedRuntime {
         chartTool,
         uiTool,
         ...presentationTools,
+        ...(classify ? [buildClassifyChatTool(classify)] : []),
         askUserTool,
         ...(skills.length ? [buildSkillTool(skills)] : []),
       ],
@@ -388,6 +393,7 @@ export class SharedRuntime {
       "render_chart",
       "render_ui",
       ...(presentation ? [PRESENT_TOOL] : []),
+      ...(classify ? [CLASSIFY_CHAT_TOOL] : []),
       "ask_user",
       ...(EXEC_CONFIG ? WORKSPACE_TOOL_NAMES : []),
       ...(skills.length ? ["read_skill"] : []),

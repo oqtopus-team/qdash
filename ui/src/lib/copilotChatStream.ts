@@ -6,6 +6,7 @@ import type {
   ChatTrace,
   ContentBlock,
   LiveTurn,
+  ToolClassification,
   ToolEvaluation,
   TraceStep,
 } from "@/types/copilotChat";
@@ -159,6 +160,42 @@ function toolEvaluation(value: unknown): ToolEvaluation | undefined {
   };
 }
 
+const CLASSIFICATION_OUTCOMES = new Set<ToolClassification["outcome"]>([
+  "classified",
+  "ambiguous",
+  "failed",
+]);
+
+const isProbability = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+
+/** The classifier decision of a tool_end payload (classify), when it is well-formed. */
+function toolClassification(value: unknown): ToolClassification | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const { classifier, outcome, category, probability, margin, probabilities, reason } =
+    value as Record<string, unknown>;
+  if (typeof classifier !== "string" || !classifier) return undefined;
+  if (!CLASSIFICATION_OUTCOMES.has(outcome as ToolClassification["outcome"])) return undefined;
+  const ranked = Array.isArray(probabilities)
+    ? probabilities.flatMap((entry) => {
+        if (!entry || typeof entry !== "object") return [];
+        const { category: name, probability: p } = entry as Record<string, unknown>;
+        return typeof name === "string" && name && isProbability(p)
+          ? [{ category: name, probability: p }]
+          : [];
+      })
+    : [];
+  return {
+    classifier,
+    outcome: outcome as ToolClassification["outcome"],
+    ...(typeof category === "string" && category ? { category } : {}),
+    ...(isProbability(probability) ? { probability } : {}),
+    ...(typeof margin === "number" && Number.isFinite(margin) ? { margin } : {}),
+    ...(ranked.length ? { probabilities: ranked } : {}),
+    ...(typeof reason === "string" && reason ? { reason } : {}),
+  };
+}
+
 export function endTool(
   steps: TraceStep[],
   payload: {
@@ -167,6 +204,7 @@ export function endTool(
     is_error?: boolean;
     figures?: unknown;
     evaluation?: unknown;
+    classification?: unknown;
     output?: unknown;
     exit_code?: unknown;
   },
@@ -184,6 +222,7 @@ export function endTool(
     ? payload.figures.filter((p): p is string => typeof p === "string" && p.length > 0)
     : [];
   const evaluation = toolEvaluation(payload.evaluation);
+  const classification = toolClassification(payload.classification);
   const next = [...steps];
   next[idx] = {
     ...step,
@@ -191,6 +230,7 @@ export function endTool(
     endedAt: Date.now(),
     ...(figures.length ? { figures } : {}),
     ...(evaluation ? { evaluation } : {}),
+    ...(classification ? { classification } : {}),
     ...(typeof payload.output === "string" && payload.output ? { output: payload.output } : {}),
     ...(typeof payload.exit_code === "number" ? { exitCode: payload.exit_code } : {}),
   };

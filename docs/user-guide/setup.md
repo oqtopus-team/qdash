@@ -64,9 +64,11 @@ for chat, and the corresponding `EVALUATION` pair for figure analysis. Base URLs
 `/v1`. Select models in `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml`.
 
 A classifier model chooses how the chat lays out the values it found: a calibration summary, an
-execution comparison, or a failure list. The chat uses it whenever a classifier is available. No
-classifier endpoint is preconfigured: you supply its URL and token. Until both are set, the chat
-composes its own views as before.
+execution comparison, or a failure list. The chat also asks it when an answer depends on a
+judgment between a few categories, such as which kind of problem a failure points to; the
+chat's steps then show **Classifying** and the category the classifier chose. No classifier endpoint
+is preconfigured: you supply its URL and token. Until both are set, the chat composes its own
+views and makes such judgments itself, as before.
 
 1. Set the endpoint's URL, up to the API version, and its token in `.env`:
 
@@ -76,10 +78,11 @@ composes its own views as before.
    ```
 
 2. Recreate the runtime, as at the end of this section. Its log reports
-   `present_results: classifier system-one-classifier/ZefanCai/Open-Jev-2B`, or why
-   it is not offered, such as an unset variable.
+   `present_results: classifier system-one-classifier/ZefanCai/Open-Jev-2B` and
+   `classify: classifier system-one-classifier/ZefanCai/Open-Jev-2B`, or why they are not
+   offered, such as an unset variable.
 
-The model is declared in `config/copilot/classifier.yaml`. To turn the layouts off, leave the
+The model is declared in `config/copilot/classifier.yaml`. To turn the classifier off, leave the
 variables unset or remove the model from that file.
 
 How this works: [Copilot architecture](../developer-guide/copilot/architecture.md#presentation-classifier).

@@ -28,7 +28,7 @@ ui/src/hooks/useCopilotChat.ts
 | `tool_draft` | `tool_draft` | Open a tool row while the model is still writing the call (`index`: the call's position in the message). |
 | `tool_args_delta` | `tool_args_delta` | Append text to one argument (`path`, such as `["content"]`) of the call being written; the chat shows code as it is typed. |
 | `tool_start` | `tool_start`, `status` | The call runs: the drafted row gets its validated arguments and progress. |
-| `tool_end` | `tool_end`, `status` | Complete the tool row and attach figures, evaluation details, or a workspace tool's `output` and `exit_code`. |
+| `tool_end` | `tool_end`, `status` | Complete the tool row and attach figures, evaluation details, a `classify` call's `classification`, or a workspace tool's `output` and `exit_code`. |
 | `chart` | Included in final `result` | Render a collected chart. |
 | `ask` | Included in final `result` | Render a question card. |
 | `approval` | Included in final `result` | Render an approval card. |

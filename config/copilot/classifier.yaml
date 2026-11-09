@@ -3,7 +3,8 @@
 # Classifier models QDash features may use, as chat.yaml lists chat models and
 # evaluation.yaml evaluation models. Features use the first usable entry, in
 # order. While one is usable the chat offers fixed result layouts
-# (`present_results`); with none, or without this file, it renders as before.
+# (`present_results`) and on-demand classification (`classify`); with none, or
+# without this file, it renders and decides as before.
 classifier_models:
   # Open-Jev 2B on a self-hosted System One (TypeSafe Jev) endpoint. Set
   # CLASSIFIER_BASE_URL (up to the API version) and CLASSIFIER_API_KEY in .env;

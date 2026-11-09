@@ -33,6 +33,7 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 | `config/copilot/classifier.yaml` | Optional classifier models any feature can use; the first usable one is used |
 | `agent-runtime/src/classifier-models.ts` | Reads `classifier_models`, registers System One endpoints as Pi providers, and selects a feature's model |
 | `agent-runtime/src/presentation-tool.ts` | `present_results`: classifier-chosen layouts of values the chat passes, offered when a classifier is usable |
+| `agent-runtime/src/classify-tool.ts` | `classify`: the chat asks the classifier to pick one of the categories it defines, offered when a classifier is usable |
 | `config/copilot/evaluation.yaml` | Evaluation model (calibration VLM) |
 | `agent-runtime/src/evaluate.ts`                           | Planner-less evaluation of one task result: evidence tool, then `qcal_evaluate`, as one record                                     |
 | `src/qdash/api/services/evaluation_service.py`             | Bulk evaluation runs: selection per chip, background execution through the runtime, records and verdicts                          |
@@ -316,19 +317,57 @@ is unavailable, with the reason logged, when a variable is unset, the catalog mo
 or its provider has no credentials. An invalid file is logged and declares nothing. Neither
 stops the runtime. Variables are read for each request and never logged.
 
-The runtime offers `present_results` with the first model in `classifier_models` that is
-usable, in the listed order; a model the file does not declare is never used. When the file is
-missing or invalid, or no declared model is usable, the runtime registers neither tool and adds
-no prompt guideline, and the chat renders with `render_ui` as before. No other setting turns the
-tool on or off. The supplied file declares the System One model, so the tool is offered once
-`CLASSIFIER_BASE_URL` and `CLASSIFIER_API_KEY` are set. The classifier is called only when the
-chat calls `present_results`, not on every turn.
+The runtime offers `present_results` and [`classify`](#on-demand-classification) with the
+first model in `classifier_models` that is usable, in the listed order; a model the file does
+not declare is never used. When the file is missing or invalid, or no declared model is usable,
+the runtime registers neither tool and adds no prompt guideline, and the chat renders with
+`render_ui` as before. No other setting turns the tools on or off. The supplied file declares
+the System One model, so the tools are offered once `CLASSIFIER_BASE_URL` and
+`CLASSIFIER_API_KEY` are set. The classifier is called only when the chat calls one of them, not
+on every turn.
 
 `agent-runtime/test/classifier-models.test.mjs` covers `classifier_models` without any feature.
 `agent-runtime/test/presentation-tool.test.mjs` runs `present_results` in a Harness with a
 mocked classifier for each outcome and across a restart, checks the supplied configuration, and
 sends a System One request through a mocked `fetch` to check the URL, headers, and parsing of a
 response the endpoint returned.
+
+### On-demand classification
+
+`classify` (`agent-runtime/src/classify-tool.ts`) lets the chat ask the classifier model a
+question it cannot settle from tool results or a simple rule, such as which kind of problem a
+failure message points to. The prompt guideline tells the chat not to classify what a tool
+result already answers, not to call it routinely, and not to use it to choose a layout. The
+call is separate from rendering: it shows nothing but its own step and picks no layout.
+
+| Argument | Bounds |
+| --- | --- |
+| `question` | 1 to 300 characters; sent as the choice question's `instructions` |
+| `categories` | 2 to 8 entries of a snake_case `name` (up to 40 characters, distinct) and a `description` (up to 200 characters); sent as its `criteria` |
+| `context` | 1 to 4,000 characters of facts from tool results or the user; sent as `state.context` |
+
+The decision reads the answer's `probabilities` only, as for `present_results`. The outcome is
+`classified` when the chosen category's probability is at least 0.6 and leads the runner-up by
+at least 0.2, and `ambiguous` otherwise; an ambiguous answer is still returned, and the result
+tells the chat to treat it as weak evidence or ask the user. Either way the chat gets the
+category, its probability and lead, and every category's probability. An unavailable model, an
+error, cancellation, a timeout (5 seconds), or a malformed answer ends the call as an error with
+outcome `failed` and one fixed reason (`classifier unavailable`, `classifier request failed`,
+`cancelled`, `timed out after 5 s`, or `invalid classifier answer`). The provider's own message
+goes only to the runtime log. The tool is not replay-safe, so a call a restart interrupted ends
+as an error rather than asking the classifier again.
+
+The result's `details.classification` holds the classifier's `provider/model`, the outcome, and
+those numbers, never the classifier's input. `events.ts` copies it onto the `classify` call's
+`tool_end` as `classification`, and the API passes only the known fields, bounded. The chat
+shows the call as an ordinary tool row: "Classifying" while it runs, then "Classified as
+`<category>`", "Classification unclear", or "Classification failed", with an outcome badge, the
+probability, the model, and every category's share on request. The question, categories, and
+context appear in the row's details as the arguments. The trace stored with the answer keeps the
+decision for a reload.
+
+`agent-runtime/test/classify-tool.test.mjs` runs `classify` in a Harness with a mocked
+classifier for each outcome and checks the stream and the bounds.
 
 ### Cloudflare Access Authentication
 
