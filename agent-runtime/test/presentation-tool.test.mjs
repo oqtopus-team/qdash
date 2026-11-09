@@ -20,7 +20,6 @@ import {
   classifierState,
   configurePresentation,
   decideCategory,
-  presentationSettingsFrom,
   renderTemplate,
 } from "../src/presentation-tool.ts";
 import { classifierEndpointProvider, configureClassifierModels } from "../src/classifier-models.ts";
@@ -120,8 +119,9 @@ const endpointEnv = {
 const classifiersFor = (yaml, env = endpointEnv, runtime = fakeRuntime()) =>
   configureClassifierModels(yaml, runtime, env, capturedLog().log);
 
-test("the repository enables present_results with the System One classifier, the first classifier model", () => {
-  assert.deepEqual(presentationSettingsFrom(repoFile("chat.yaml")), { minProbability: 0.6, minMargin: 0.2, timeoutMs: 5000 });
+test("the repository offers present_results with its System One classifier once the endpoint is set", () => {
+  // chat.yaml carries no presentation settings; classifier.yaml alone decides.
+  assert.doesNotMatch(repoFile("chat.yaml"), /presentation/);
   const classifiers = classifiersFor(repoFile("classifier.yaml"));
   assert.deepEqual(classifiers.declared[0], {
     provider: "system-one-classifier",
@@ -129,7 +129,7 @@ test("the repository enables present_results with the System One classifier, the
     endpoint: { baseUrl: "env:CLASSIFIER_BASE_URL", apiKeyEnv: "CLASSIFIER_API_KEY" },
   });
   const { lines, log } = capturedLog();
-  assert.deepEqual(configurePresentation(repoFile("chat.yaml"), classifiers, log), {
+  assert.deepEqual(configurePresentation(classifiers, log), {
     provider: "system-one-classifier",
     name: "ZefanCai/Open-Jev-2B",
     minProbability: 0.6,
@@ -161,8 +161,8 @@ test("without the endpoint URL the repository's classifier is unavailable and th
     log,
   );
   assert.equal(runtime.registered.length, 0);
-  assert.equal(configurePresentation(repoFile("chat.yaml"), classifiers, log), undefined);
-  assert.match(lines.join("\n"), /present_results disabled: classifier system-one-classifier\/ZefanCai\/Open-Jev-2B unavailable: CLASSIFIER_BASE_URL not set/);
+  assert.equal(configurePresentation(classifiers, log), undefined);
+  assert.match(lines.join("\n"), /present_results not offered: no usable classifier: system-one-classifier\/ZefanCai\/Open-Jev-2B unavailable: CLASSIFIER_BASE_URL not set/);
   assert.doesNotMatch(lines.join("\n"), /secret-token-value/);
 });
 
@@ -176,86 +176,41 @@ test("without the token the repository's classifier is unavailable and the chat 
     log,
   );
   assert.equal(runtime.registered.length, 0);
-  assert.equal(configurePresentation(repoFile("chat.yaml"), classifiers, log), undefined);
-  assert.match(lines.join("\n"), /present_results disabled: classifier system-one-classifier\/ZefanCai\/Open-Jev-2B unavailable: CLASSIFIER_API_KEY not set/);
+  assert.equal(configurePresentation(classifiers, log), undefined);
+  assert.match(lines.join("\n"), /present_results not offered: no usable classifier: system-one-classifier\/ZefanCai\/Open-Jev-2B unavailable: CLASSIFIER_API_KEY not set/);
 });
 
-test("presentation settings: off unless enabled, defaults, and errors", () => {
-  assert.equal(presentationSettingsFrom("chat_models: []\n"), undefined);
-  assert.equal(presentationSettingsFrom("presentation:\n  enabled: false\n"), undefined);
-  assert.deepEqual(presentationSettingsFrom("presentation:\n  enabled: true\n"), {
+test("present_results uses the first usable declared classifier, and only a declared one", () => {
+  const yaml = `${endpointYaml}  - provider: typesafe
+    name: jev-latest
+`;
+  const catalog = { catalog: ["typesafe/jev-latest"], auth: ["typesafe"] };
+  const both = classifiersFor(yaml, endpointEnv, fakeRuntime(catalog));
+  assert.deepEqual(configurePresentation(both, capturedLog().log), {
+    provider: "system-one-classifier",
+    name: "ZefanCai/Open-Jev-2B",
     minProbability: 0.6,
     minMargin: 0.2,
     timeoutMs: 5000,
   });
-  assert.deepEqual(
-    presentationSettingsFrom("presentation:\n  enabled: true\n  classifier: {provider: typesafe, name: jev-latest}\n").classifier,
-    { provider: "typesafe", name: "jev-latest" },
-  );
-  assert.throws(() => presentationSettingsFrom("presentation: {}\n"), /presentation.enabled must be true or false/);
-  assert.throws(
-    () => presentationSettingsFrom("presentation:\n  enabled: true\n  min_probability: 2\n"),
-    /min_probability must be a number in \(0, 1\]/,
-  );
-  assert.throws(() => presentationSettingsFrom("presentation:\n  enabled: true\n  timeout_ms: 10\n"), /timeout_ms/);
-  // Model wiring belongs in classifier.yaml, not here.
-  assert.throws(
-    () => presentationSettingsFrom("presentation:\n  enabled: true\n  base_url: https://x/v1\n"),
-    /unknown keys base_url; the classifier model and its endpoint belong in classifier.yaml/,
-  );
-  assert.throws(
-    () => presentationSettingsFrom("presentation:\n  enabled: true\n  classifier: {provider: p, name: n, base_url: u}\n"),
-    /presentation.classifier must name/,
-  );
-  // The unreleased combined section fails clearly instead of being ignored.
-  assert.throws(
-    () => presentationSettingsFrom("presentation_classifier:\n  provider: system-one-classifier\n  name: m\n"),
-    /presentation_classifier is no longer read/,
-  );
-});
-
-test("present_results uses the first classifier model unless it names another declared one", () => {
-  const yaml = `${endpointYaml}  - provider: typesafe
-    name: jev-latest
-`;
-  const classifiers = classifiersFor(yaml, endpointEnv, fakeRuntime({ catalog: ["typesafe/jev-latest"], auth: ["typesafe"] }));
-  const on = "presentation:\n  enabled: true\n  min_margin: 0.3\n";
-  assert.equal(configurePresentation(on, classifiers, capturedLog().log).provider, "system-one-classifier");
-  const named = configurePresentation(
-    "presentation:\n  enabled: true\n  classifier: {provider: typesafe, name: jev-latest}\n  timeout_ms: 800\n",
-    classifiers,
-    capturedLog().log,
-  );
-  assert.deepEqual(named, { provider: "typesafe", name: "jev-latest", minProbability: 0.6, minMargin: 0.2, timeoutMs: 800 });
-
-  // A model classifier.yaml does not declare is never used, even if pi's catalog has it.
+  // The first entry has no endpoint: the next usable one is used.
+  assert.equal(configurePresentation(classifiersFor(yaml, {}, fakeRuntime(catalog)), capturedLog().log).name, "jev-latest");
+  // None usable: not offered, with each reason logged. Pi's catalog is never used unasked.
   const { lines, log } = capturedLog();
-  assert.equal(
-    configurePresentation("presentation:\n  enabled: true\n  classifier: {provider: typesafe, name: other}\n", classifiers, log),
-    undefined,
-  );
-  assert.match(lines.join("\n"), /typesafe\/other is not in classifier.yaml's classifier_models/);
-  // No classifier.yaml: enabling the tool alone does not pick a model.
+  assert.equal(configurePresentation(classifiersFor(yaml, {}, fakeRuntime()), log), undefined);
+  assert.match(lines.join("\n"), /present_results not offered: no usable classifier: .*CLASSIFIER_API_KEY not set; typesafe\/jev-latest unavailable: not in the model catalog/);
+  // No classifier.yaml, or an empty list: not offered.
   const none = capturedLog();
-  assert.equal(configurePresentation(on, classifiersFor(undefined), none.log), undefined);
+  assert.equal(configurePresentation(classifiersFor(undefined), none.log), undefined);
   assert.match(none.lines.join("\n"), /declares no classifier_models/);
-  // Declared models alone do not turn the tool on.
-  assert.equal(configurePresentation("chat_models: []\n", classifiers, capturedLog().log), undefined);
-  assert.equal(configurePresentation("presentation:\n  enabled: false\n", classifiers, capturedLog().log), undefined);
 });
 
-test("an invalid presentation section or classifier.yaml disables only present_results", () => {
+test("an invalid classifier.yaml disables only present_results", () => {
   const { lines, log } = capturedLog();
   const broken = configureClassifierModels("classifier_models: {}\n", fakeRuntime(), endpointEnv, log);
   assert.equal(broken.declared.length, 0);
-  assert.equal(configurePresentation("presentation:\n  enabled: true\n", broken, log), undefined);
-  assert.match(lines.join("\n"), /present_results disabled: classifier.yaml is invalid: classifier_models must be a list/);
-  const old = capturedLog();
-  assert.equal(
-    configurePresentation("presentation_classifier:\n  provider: p\n  name: n\n", classifiersFor(endpointYaml), old.log),
-    undefined,
-  );
-  assert.match(old.lines.join("\n"), /present_results disabled: presentation_classifier is no longer read/);
+  assert.equal(configurePresentation(broken, log), undefined);
+  assert.match(lines.join("\n"), /present_results not offered: classifier.yaml is invalid: classifier_models must be a list/);
 });
 
 // --- the System One endpoint through pi-ai's typesafe-system-one adapter ---
@@ -784,7 +739,7 @@ test("on pi's ModelRuntime the repository's classifier is registered and reached
   });
   const classifiers = configureClassifierModels(repoFile("classifier.yaml"), runtime, process.env, capturedLog().log);
   assert.equal(classifiers.unavailable.size, 0);
-  const config = configurePresentation(repoFile("chat.yaml"), classifiers, capturedLog().log);
+  const config = configurePresentation(classifiers, capturedLog().log);
   assert.equal(config.name, "ZefanCai/Open-Jev-2B");
   const model = runtime.getModelOfType("classifier", "system-one-classifier", "ZefanCai/Open-Jev-2B");
   assert.ok(model);

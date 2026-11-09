@@ -80,9 +80,20 @@ test("declared models are set up without any feature, and secrets are never logg
   assert.deepEqual(runtime.registered.map((p) => p.id), ["system-one-classifier"]);
   assert.ok(runtime.getModelOfType("classifier", "system-one-classifier", "ZefanCai/Open-Jev-2B"));
   assert.doesNotMatch(lines.join("\n"), /secret-token-value|classifier\.example/);
-  // Any feature may pick a model: the first by default, or one it names.
+  // Any feature may pick a model: the first usable by default, or one it names.
   assert.equal(selectClassifierModel(models).model.provider, "system-one-classifier");
   assert.equal(selectClassifierModel(models, { provider: "typesafe", name: "jev-latest" }).model.name, "jev-latest");
+  const withoutEndpoint = configureClassifierModels(
+    `classifier_models:\n${endpointEntry}  - provider: typesafe\n    name: jev-latest\n`,
+    fakeRuntime({ catalog: ["typesafe/jev-latest"], auth: ["typesafe"] }),
+    {},
+    capturedLog().log,
+  );
+  assert.equal(selectClassifierModel(withoutEndpoint).model.name, "jev-latest");
+  assert.match(
+    selectClassifierModel(withoutEndpoint, { provider: "system-one-classifier", name: "ZefanCai/Open-Jev-2B" }).error,
+    /unavailable: CLASSIFIER_BASE_URL, CLASSIFIER_API_KEY not set/,
+  );
 });
 
 test("an unusable model is reported, not registered, and never replaced by another provider", () => {

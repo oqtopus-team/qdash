@@ -2,7 +2,6 @@ import type { JsonValue } from "@earendil-works/chord";
 import type { ClassifierContext, ClassifierResult } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
 import { Type, type Static } from "typebox";
-import { parse } from "yaml";
 
 import { classifierLabel, selectClassifierModel, type ClassifierModels, type Log } from "./classifier-models.ts";
 // See ui-tool.ts for why this path resolves in the image too.
@@ -37,9 +36,9 @@ type JsonObject = ClassifierContext["state"];
  * a low winning probability) or records the chosen layout cannot hold falls back: no UI,
  * and the model is told to use `render_ui` or plain text, as without this tool.
  *
- * The tool exists only when chat.yaml's `presentation` section is enabled and
- * names (or defaults to) a usable model from classifier.yaml; otherwise the
- * runtime registers neither tool and nothing changes.
+ * The tool exists only when classifier.yaml declares a usable model (the
+ * first usable one is used); otherwise the runtime registers neither tool and
+ * nothing changes. The classifier is called only when the chat calls the tool.
  */
 
 export const PRESENT_TOOL = "present_results";
@@ -74,126 +73,31 @@ export interface PresentationConfig {
   timeoutMs: number;
 }
 
-/** chat.yaml's `presentation` section once enabled: which classifier, and when to accept its answer. */
-export interface PresentationSettings {
-  /** A model from classifier.yaml's `classifier_models`; the first one when absent. */
-  classifier?: { provider: string; name: string };
-  minProbability: number;
-  minMargin: number;
-  timeoutMs: number;
-}
-
 /**
- * Defaults for the chosen category's probability and its lead over the
- * runner-up. With four categories an uninformed answer gives each 0.25; 0.6
- * asks for a clear majority and 0.2 for a lead no close second can match.
- * Both are heuristics for when a fixed layout is worth showing, not
- * calibrated guarantees; chat.yaml can change them.
+ * When a chosen layout is accepted: the chosen category's probability and its
+ * lead over the runner-up, and the longest wait for the classifier. With four
+ * categories an uninformed answer gives each 0.25; 0.6 asks for a clear
+ * majority and 0.2 for a lead no close second can match. Both are heuristics
+ * for when a fixed layout is worth showing, not calibrated guarantees.
  */
 export const PRESENTATION_DEFAULTS = { minProbability: 0.6, minMargin: 0.2, timeoutMs: 5_000 } as const;
-const TIMEOUT_RANGE = [100, 60_000] as const;
-const SECTION_KEYS = new Set(["enabled", "classifier", "min_probability", "min_margin", "timeout_ms"]);
 
 /**
- * chat.yaml's `presentation` section, or undefined when it is absent or
- * `enabled: false`. Declaring a classifier model in classifier.yaml never
- * turns the tool on by itself. Throws on an invalid section, including the
- * retired `presentation_classifier`, so a typo is reported instead of
- * silently changing behaviour.
+ * Offer `present_results` with the first usable model classifier.yaml
+ * declares (see classifier-models.ts). Undefined, with the reason logged, when
+ * the file declares none, is invalid, or none of its models is usable (no
+ * endpoint, token or credentials): the chat then has no `present_results` and
+ * renders as before. Never picks a model classifier.yaml does not declare.
  */
-export function presentationSettingsFrom(chatYaml: string): PresentationSettings | undefined {
-  const document = parse(chatYaml) as Record<string, unknown> | null;
-  if (document && "presentation_classifier" in document) {
-    throw new Error(
-      "presentation_classifier is no longer read: declare the model in classifier.yaml's classifier_models and enable the tool with chat.yaml's presentation section",
-    );
-  }
-  const raw = document?.presentation;
-  if (raw === undefined || raw === null) return undefined;
-  if (typeof raw !== "object" || Array.isArray(raw)) throw new Error("presentation must be a mapping");
-  const section = raw as Record<string, unknown>;
-  const unknown = Object.keys(section).filter((key) => !SECTION_KEYS.has(key));
-  if (unknown.length > 0) {
-    throw new Error(
-      `presentation has unknown keys ${unknown.join(", ")}; the classifier model and its endpoint belong in classifier.yaml`,
-    );
-  }
-  if (typeof section.enabled !== "boolean") throw new Error("presentation.enabled must be true or false");
-  if (!section.enabled) return undefined;
-  let classifier: PresentationSettings["classifier"];
-  if (section.classifier !== undefined && section.classifier !== null) {
-    const selected = section.classifier as Record<string, unknown>;
-    if (
-      typeof selected !== "object" ||
-      Array.isArray(selected) ||
-      typeof selected.provider !== "string" ||
-      !selected.provider ||
-      typeof selected.name !== "string" ||
-      !selected.name ||
-      Object.keys(selected).some((key) => key !== "provider" && key !== "name")
-    ) {
-      throw new Error("presentation.classifier must name a classifier.yaml model by `provider` and `name` only");
-    }
-    classifier = { provider: selected.provider, name: selected.name };
-  }
-  const number = (key: string, fallback: number, ok: (value: number) => boolean, range: string) => {
-    const value = section[key];
-    if (value === undefined || value === null) return fallback;
-    if (typeof value !== "number" || !Number.isFinite(value) || !ok(value)) {
-      throw new Error(`presentation.${key} must be a number ${range}`);
-    }
-    return value;
-  };
-  return {
-    ...(classifier ? { classifier } : {}),
-    minProbability: number("min_probability", PRESENTATION_DEFAULTS.minProbability, (v) => v > 0 && v <= 1, "in (0, 1]"),
-    minMargin: number("min_margin", PRESENTATION_DEFAULTS.minMargin, (v) => v >= 0 && v < 1, "in [0, 1)"),
-    timeoutMs: number(
-      "timeout_ms",
-      PRESENTATION_DEFAULTS.timeoutMs,
-      (v) => Number.isInteger(v) && v >= TIMEOUT_RANGE[0] && v <= TIMEOUT_RANGE[1],
-      `of milliseconds from ${TIMEOUT_RANGE[0]} to ${TIMEOUT_RANGE[1]}`,
-    ),
-  };
-}
-
-/**
- * Read chat.yaml's `presentation` section and pick its classifier from the
- * models classifier.yaml set up (see classifier-models.ts). Undefined, with the
- * reason logged, when the section is absent, disabled or invalid, or the model
- * is not declared or not usable (no endpoint, token or credentials): the chat
- * then has no `present_results` and renders as before. Never picks a model
- * classifier.yaml does not declare.
- */
-export function configurePresentation(
-  chatYaml: string,
-  classifiers: ClassifierModels,
-  log: Log,
-): PresentationConfig | undefined {
-  const disabled = (reason: string) => {
-    log.error(`[agent-runtime] present_results disabled: ${reason}`);
+export function configurePresentation(classifiers: ClassifierModels, log: Log): PresentationConfig | undefined {
+  const selected = selectClassifierModel(classifiers);
+  if ("error" in selected) {
+    log.log(`[agent-runtime] present_results not offered: ${selected.error}`);
     return undefined;
-  };
-  let settings: PresentationSettings | undefined;
-  try {
-    settings = presentationSettingsFrom(chatYaml);
-  } catch (error) {
-    return disabled(error instanceof Error ? error.message : String(error));
   }
-  if (!settings) return undefined;
-  const selected = selectClassifierModel(classifiers, settings.classifier);
-  if ("error" in selected) return disabled(selected.error);
   const { provider, name } = selected.model;
-  const config = {
-    provider,
-    name,
-    minProbability: settings.minProbability,
-    minMargin: settings.minMargin,
-    timeoutMs: settings.timeoutMs,
-  };
-  log.log(
-    `[agent-runtime] present_results: classifier ${classifierLabel(config)}, min_probability ${config.minProbability}, min_margin ${config.minMargin}, timeout ${config.timeoutMs} ms`,
-  );
+  const config = { provider, name, ...PRESENTATION_DEFAULTS };
+  log.log(`[agent-runtime] present_results: classifier ${classifierLabel(config)}`);
   return config;
 }
 
@@ -651,8 +555,8 @@ const FALLBACK_ADVICE =
   "No UI was shown. If a view would help, compose one with `render_ui` from the same values; otherwise answer in text.";
 
 /**
- * `present_results` and its internal classifier tool, for a chat.yaml whose
- * `presentation` section is enabled.
+ * `present_results` and its internal classifier tool, for the classifier
+ * configurePresentation picked.
  */
 export function buildPresentationTools(config: PresentationConfig) {
   const classifier = classifierLabel(config);

@@ -29,10 +29,10 @@ Both run on the Pi Agent Runtime (`agent-runtime/`) with the pi-qdash tools, a s
 | `src/qdash/copilot/config/settings.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `TaskChatConfig`; YAML loading with local override |
 | `src/qdash/datamodel/task_knowledge.py` | `TaskKnowledge` model with domain-specific knowledge per calibration task |
 | `config/copilot/config.yaml` | Enablement, languages, how a task chat opens |
-| `config/copilot/chat.yaml` | Planner models for every chat; the `presentation` switch and thresholds of `present_results` |
-| `config/copilot/classifier.yaml` | Optional classifier models any feature can use; the first is the default |
+| `config/copilot/chat.yaml` | Planner models for every chat |
+| `config/copilot/classifier.yaml` | Optional classifier models any feature can use; the first usable one is used |
 | `agent-runtime/src/classifier-models.ts` | Reads `classifier_models`, registers System One endpoints as Pi providers, and selects a feature's model |
-| `agent-runtime/src/presentation-tool.ts` | `present_results`: classifier-chosen layouts of values the chat passes, and its `presentation` settings |
+| `agent-runtime/src/presentation-tool.ts` | `present_results`: classifier-chosen layouts of values the chat passes, offered when a classifier is usable |
 | `config/copilot/evaluation.yaml` | Evaluation model (calibration VLM) |
 | `agent-runtime/src/evaluate.ts`                           | Planner-less evaluation of one task result: evidence tool, then `qcal_evaluate`, as one record                                     |
 | `src/qdash/api/services/evaluation_service.py`             | Bulk evaluation runs: selection per chip, background execution through the runtime, records and verdicts                          |
@@ -277,11 +277,10 @@ each value appears in their results. The block goes out as `details.ui`, the sam
 stored block `render_ui` produces.
 
 The decision reads the answer's `probabilities` only. The chosen category is accepted when its
-probability is at least `min_probability` (default 0.6) and leads the runner-up by `min_margin`
-(default 0.2). With four categories an uninformed answer gives each 0.25, so the defaults ask
-for a clear majority; they are heuristics, not calibrated accuracy. The answer's `confidence`
+probability is at least 0.6 and leads the runner-up by at least 0.2. With four categories an uninformed answer gives each 0.25, so the defaults ask
+for a clear majority; they are heuristics, not calibrated accuracy, and are not configurable. The answer's `confidence`
 is a separate service-defined score and is not used. An error, abort, or timeout
-(`timeout_ms`, default 5000), an invalid answer, an ambiguous one, or records the layout cannot
+(5 seconds), an invalid answer, an ambiguous one, or records the layout cannot
 hold give no UI and a result telling the chat to use `render_ui` or text; the turn continues.
 
 The classifier runs as a nested call, `qdash.presentation.classify`, under a fixed key of the
@@ -291,8 +290,8 @@ nested tool is not replay-safe, so a classification a restart interrupted ends a
 falls back instead of asking the classifier again. The model is never offered the nested tool.
 
 The classifier model comes from `config/copilot/classifier.yaml`, which lists the classifier
-models any QDash feature can use, as `chat.yaml` and `evaluation.yaml` list theirs. The first
-entry is the default. `agent-runtime/src/classifier-models.ts` reads the file at startup; a
+models any QDash feature can use, as `chat.yaml` and `evaluation.yaml` list theirs.
+`agent-runtime/src/classifier-models.ts` reads the file at startup; a
 missing file declares no models. A self-hosted System One (TypeSafe Jev) endpoint is declared
 like an OpenAI-compatible model entry:
 
@@ -317,25 +316,13 @@ is unavailable, with the reason logged, when a variable is unset, the catalog mo
 or its provider has no credentials. An invalid file is logged and declares nothing. Neither
 stops the runtime. Variables are read for each request and never logged.
 
-Declaring a model does not enable a feature. The `presentation` section of `chat.yaml` enables
-`present_results` and holds only its own settings:
-
-```yaml
-presentation:
-  enabled: true
-  # classifier: {provider: system-one-classifier, name: ZefanCai/Open-Jev-2B}
-  min_probability: 0.6
-  min_margin: 0.2
-  timeout_ms: 5000
-```
-
-`classifier` names a model from `classifier_models`; without it the first entry is used. A model
-`classifier.yaml` does not declare is never used. The runtime registers neither tool and adds no
-prompt guideline when the section is absent or `enabled: false`, when it is invalid, or when the
-selected model is unavailable. The supplied configuration enables the tool with the System One
-model, so it is offered once `CLASSIFIER_BASE_URL` and `CLASSIFIER_API_KEY` are set. Model settings in this
-section, or the earlier combined `presentation_classifier` section, are rejected with an error
-that names `classifier.yaml`.
+The runtime offers `present_results` with the first model in `classifier_models` that is
+usable, in the listed order; a model the file does not declare is never used. When the file is
+missing or invalid, or no declared model is usable, the runtime registers neither tool and adds
+no prompt guideline, and the chat renders with `render_ui` as before. No other setting turns the
+tool on or off. The supplied file declares the System One model, so the tool is offered once
+`CLASSIFIER_BASE_URL` and `CLASSIFIER_API_KEY` are set. The classifier is called only when the
+chat calls `present_results`, not on every turn.
 
 `agent-runtime/test/classifier-models.test.mjs` covers `classifier_models` without any feature.
 `agent-runtime/test/presentation-tool.test.mjs` runs `present_results` in a Harness with a

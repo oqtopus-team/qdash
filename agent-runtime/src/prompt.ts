@@ -17,7 +17,7 @@ export function buildSystemPrompt(
   localToolGuide: string | null = null,
   /** Whether the workspace tools (`bash`, `read`, `write`, `edit`) are offered; see exec-env.ts. */
   workspaceTools = false,
-  /** Guideline of `present_results`, when chat.yaml configures it; see presentation-tool.ts. */
+  /** Guideline of `present_results`, when a classifier is usable; see presentation-tool.ts. */
   presentationGuideline: string | null = null,
 ): string {
   const thinkingLanguageName = languageName(thinkingLanguage);

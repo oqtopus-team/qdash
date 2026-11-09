@@ -101,7 +101,8 @@ const COPILOT_CONFIG_PATH = process.env.COPILOT_CONFIG_PATH ?? "/app/config/copi
 const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
 const EVALUATION_CONFIG_PATH =
   process.env.EVALUATION_CONFIG_PATH ?? "/app/config/copilot/evaluation.yaml";
-// Optional: the classifier models QDash features may use.
+// Optional: the classifier models QDash features may use; present_results is
+// offered when one of them is usable.
 const CLASSIFIER_CONFIG_PATH =
   process.env.CLASSIFIER_CONFIG_PATH ?? "/app/config/copilot/classifier.yaml";
 // One model request; a whole turn is bounded by the server's own timers.
@@ -314,7 +315,7 @@ export class SharedRuntime {
       process.env,
       console,
     );
-    const presentation = configurePresentation(readFileSync(CHAT_CONFIG_PATH, "utf8"), classifiers, console);
+    const presentation = configurePresentation(classifiers, console);
     const presentationTools = presentation ? buildPresentationTools(presentation) : [];
 
     // Built once: the same text every chat gets and Settings shows read-only.

@@ -1,9 +1,9 @@
 # Copilot Classifier Configuration
 #
 # Classifier models QDash features may use, as chat.yaml lists chat models and
-# evaluation.yaml evaluation models. The first entry is the default. Declaring
-# a model here only makes it available; each feature has its own switch, such
-# as chat.yaml's `presentation` section. This file is optional.
+# evaluation.yaml evaluation models. Features use the first usable entry, in
+# order. While one is usable the chat offers fixed result layouts
+# (`present_results`); with none, or without this file, it renders as before.
 classifier_models:
   # Open-Jev 2B on a self-hosted System One (TypeSafe Jev) endpoint. Set
   # CLASSIFIER_BASE_URL (up to the API version) and CLASSIFIER_API_KEY in .env;

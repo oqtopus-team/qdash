@@ -110,23 +110,3 @@ chat_models:
   #   api_style: responses
   #   temperature: 0.7
   #   max_output_tokens: 4096
-
-# Let a classifier model pick a fixed layout (calibration summary, execution
-# comparison, failure list, or text) for values the chat already read, through
-# the `present_results` tool. The classifier only picks the layout; the values
-# shown are the ones the chat passed. The model comes from classifier.yaml: the
-# first of its `classifier_models` unless `classifier` names another. When that
-# model is unavailable (for example CLASSIFIER_BASE_URL or CLASSIFIER_API_KEY is
-# unset) the tool is not offered and the chat renders with `render_ui` as
-# before; set `enabled: false` to turn it off.
-presentation:
-  enabled: true
-  # classifier:
-  #   provider: system-one-classifier
-  #   name: ZefanCai/Open-Jev-2B
-  # Accept the chosen layout only when its probability is at least
-  # min_probability and leads the runner-up by min_margin; otherwise the chat
-  # falls back to render_ui or text.
-  min_probability: 0.6
-  min_margin: 0.2
-  timeout_ms: 5000

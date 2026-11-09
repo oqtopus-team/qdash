@@ -12,9 +12,8 @@ import { CF_ACCESS_ENV, PROVIDER_ALIASES, resolveBaseUrl, usesCloudflareAccess }
  *
  * `classifier_models` lists the models a QDash feature may ask to classify,
  * as `chat_models` and `evaluation_models` list chat and evaluation models.
- * The first entry is the default. Declaring a model only makes it available:
- * each feature that classifies has its own switch (for `present_results`, the
- * `presentation` section of chat.yaml) and names, or defaults to, one of these.
+ * A feature that classifies uses the first usable entry, in order, unless it
+ * names one; with no usable entry the feature is not offered.
  *
  * An entry is either a pi catalog classifier (provider and name only; its
  * credentials come from that provider's own variable) or a self-hosted System
@@ -270,27 +269,26 @@ function prepare(model: ClassifierModelConfig, runtime: ClassifierRuntime, env: 
 }
 
 /**
- * The model a feature uses: the one it names, or the first declared. An error
- * message instead when that model is not declared or not usable.
+ * The model a feature uses: the one it names, or else the first declared
+ * model that is usable. An error message instead when that model is not
+ * declared or not usable, or no declared model is usable. Never a model
+ * classifier.yaml does not declare.
  */
 export function selectClassifierModel(
   models: ClassifierModels,
   selection?: Pick<ClassifierModelConfig, "provider" | "name">,
 ): { model: ClassifierModelConfig } | { error: string } {
   if (models.error) return { error: `classifier.yaml is invalid: ${models.error}` };
-  const wanted = selection
-    ? { ...selection, provider: PROVIDER_ALIASES[selection.provider] ?? selection.provider }
-    : undefined;
-  const model = wanted
-    ? models.declared.find((m) => m.provider === wanted.provider && m.name === wanted.name)
-    : models.declared[0];
-  if (!model) {
-    return {
-      error: wanted
-        ? `classifier ${classifierLabel(wanted)} is not in classifier.yaml's classifier_models`
-        : "classifier.yaml declares no classifier_models",
-    };
+  if (!selection) {
+    if (models.declared.length === 0) return { error: "classifier.yaml declares no classifier_models" };
+    const usable = models.declared.find((m) => !models.unavailable.has(classifierLabel(m)));
+    if (usable) return { model: usable };
+    const reasons = models.declared.map((m) => `${classifierLabel(m)} unavailable: ${models.unavailable.get(classifierLabel(m))}`);
+    return { error: `no usable classifier: ${reasons.join("; ")}` };
   }
+  const wanted = { ...selection, provider: PROVIDER_ALIASES[selection.provider] ?? selection.provider };
+  const model = models.declared.find((m) => m.provider === wanted.provider && m.name === wanted.name);
+  if (!model) return { error: `classifier ${classifierLabel(wanted)} is not in classifier.yaml's classifier_models` };
   const reason = models.unavailable.get(classifierLabel(model));
   return reason ? { error: `classifier ${classifierLabel(model)} unavailable: ${reason}` } : { model };
 }
