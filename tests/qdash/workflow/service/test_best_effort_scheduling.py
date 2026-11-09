@@ -217,7 +217,7 @@ def test_custom_two_qubit_uses_saved_schedule_after_candidate_filtering(monkeypa
         run_coupling_calibrations_parallel,
     )
     spec = object()
-    service = SimpleNamespace(
+    session = SimpleNamespace(
         username="alice",
         chip_id="64Q",
         project_id="project-1",
@@ -231,7 +231,7 @@ def test_custom_two_qubit_uses_saved_schedule_after_candidate_filtering(monkeypa
         continue_on_failure=True,
     )
 
-    result = step.execute(cast("CalibSession", service), QubitTargets([]), ctx)
+    result = step.execute(cast("CalibSession", session), QubitTargets([]), ctx)
 
     assert calls[0]["coupling_qids"] == ["0-1"]
     assert calls[0]["plan"].continue_on_failure is True

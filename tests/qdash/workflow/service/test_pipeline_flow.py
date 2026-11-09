@@ -234,11 +234,11 @@ def test_configure_all_call_reaches_the_plan_and_the_task(monkeypatch: Any) -> N
     assert isinstance(built, ConfigureAll)
     assert list(built.calls()) == step_calls(parsed.steps[0])
 
-    service = MagicMock()
-    service._initialized = True
-    service.task_parameters = {}
-    service.default_run_parameters = {}
-    plan = CalibSession.calibration_plan(service, [built])
+    session = MagicMock()
+    session._initialized = True
+    session.task_parameters = {}
+    session.default_run_parameters = {}
+    plan = CalibSession.calibration_plan(session, [built])
     assert plan["steps"][0]["calls"] == [
         {
             "name": "ConfigureAll",
@@ -246,11 +246,11 @@ def test_configure_all_call_reaches_the_plan_and_the_task(monkeypatch: Any) -> N
             "run": {"configuration_mode": {"value": "ge-ef-cr"}, "mux_ids": {"value": [9]}},
         }
     ]
-    service.plan_digest = plan["digest"]
+    session.plan_digest = plan["digest"]
 
     monkeypatch.setattr("qdash.workflow.service.steps.box_setup.get_run_logger", MagicMock)
-    built.execute(service, build_targets(parsed), StepContext())
-    _, kwargs = service.execute_task.call_args
+    built.execute(session, build_targets(parsed), StepContext())
+    _, kwargs = session.execute_task.call_args
     assert kwargs["parameters"]["run"] == {
         "configuration_mode": {"value": "ge-ef-cr"},
         "mux_ids": {"value": [2, 3]},

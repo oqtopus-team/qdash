@@ -145,7 +145,7 @@ class FilterByMetric(StepReferenceFilter):
 
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -198,7 +198,7 @@ class FilterByStatus(StepReferenceFilter):
 
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:

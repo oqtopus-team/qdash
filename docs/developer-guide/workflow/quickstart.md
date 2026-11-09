@@ -137,6 +137,10 @@ rule across templates so UI and scheduled executions resolve the same request co
 `CalibrationStep` performs hardware work and receives its own QDash execution record.
 `TransformStep` filters or schedules existing context without creating an execution record.
 `Pipeline` validates each step's `requires` and `provides` fields before the first step runs.
+A custom step subclasses one of them and implements `execute(session, targets, ctx)`, where
+`session` is the run's `CalibSession` and `self.step_calls(session)` returns the step's calls as
+workers receive them. Earlier releases named this parameter `service`; a step or caller that
+passes it by keyword must use `session`.
 
 ```mermaid
 flowchart LR

@@ -113,7 +113,7 @@ class BringUp(CalibrationStep):
 
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -123,7 +123,7 @@ class BringUp(CalibrationStep):
         by the scheduling infrastructure.
         """
         logger = get_run_logger()
-        plan = self.step_calls(service)
+        plan = self.step_calls(session)
 
         logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(plan.calls)} calls")
 
@@ -137,10 +137,10 @@ class BringUp(CalibrationStep):
                 plan=plan,
             )
             strategy = get_one_qubit_strategy(self.mode)
-            raw_results = strategy.execute(service, config)
+            raw_results = strategy.execute(session, config)
         else:
-            qids = targets.to_qids(service.chip_id)
-            raw_results = self._execute_direct(service, qids, plan)
+            qids = targets.to_qids(session.chip_id)
+            raw_results = self._execute_direct(session, qids, plan)
 
         # Build typed result
         result = self._build_result(raw_results)
@@ -166,7 +166,7 @@ class BringUp(CalibrationStep):
 
     def _execute_direct(
         self,
-        service: CalibSession,
+        session: CalibSession,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:
@@ -177,8 +177,8 @@ class BringUp(CalibrationStep):
 
         results = run_qubit_calibrations_parallel(
             qids=qids,
-            plan=plan or self.step_calls(service),
-            worker=service.worker_spec(),
+            plan=plan or self.step_calls(session),
+            worker=session.worker_spec(),
         )
         return {"direct": results}
 

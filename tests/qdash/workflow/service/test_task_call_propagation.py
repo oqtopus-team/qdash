@@ -97,7 +97,7 @@ def _worker_spec() -> Any:
     )
 
 
-def _service() -> CalibSession:
+def _session() -> CalibSession:
     return cast(
         "CalibSession",
         SimpleNamespace(
@@ -195,7 +195,7 @@ def test_parallel_modes_run_every_call_per_target_in_order(
     recorder.fail.add(("ramsey_coarse", "4"))
     step = CustomOneQubit(step_name="ramsey", mode=mode, tasks=list(REPEATED))
 
-    ctx = step.execute(_service(), QubitTargets(["0", "1", "4", "5"]), StepContext())
+    ctx = step.execute(_session(), QubitTargets(["0", "1", "4", "5"]), StepContext())
 
     result = ctx.get_step_result("ramsey")
     assert result is not None
@@ -241,7 +241,7 @@ def test_serial_mode_runs_calls_in_the_parent_session(
     set_current_session(cast("CalibSession", parent))
     try:
         step = CustomOneQubit(step_name="ramsey", mode="serial", tasks=list(REPEATED))
-        ctx = step.execute(_service(), QubitTargets(["0", "1"]), StepContext())
+        ctx = step.execute(_session(), QubitTargets(["0", "1"]), StepContext())
     finally:
         clear_current_session()
 
@@ -267,7 +267,7 @@ def test_mux_tasks_run_on_representatives_and_are_skipped_on_the_others(
         ],
     )
 
-    ctx = step.execute(_service(), MuxTargets(mux_ids=[0, 1]), StepContext())
+    ctx = step.execute(_session(), MuxTargets(mux_ids=[0, 1]), StepContext())
 
     result = ctx.get_step_result("bringup")
     assert result is not None
@@ -300,7 +300,7 @@ def test_batch_mode_runs_each_call_once_per_batch(
             TaskCall(name="CheckQubitSpectroscopy", call_id="spec_fine", run={"shots": 2048}),
         ],
     )
-    ctx = step.execute(_service(), QubitTargets(["0", "1", "4", "5"]), StepContext())
+    ctx = step.execute(_session(), QubitTargets(["0", "1", "4", "5"]), StepContext())
 
     # One batch per schedule round and call; qubit 4 leaves after its failed coarse call.
     assert [(call_id, qid) for _, call_id, _, qid in recorder.log] == [
@@ -347,7 +347,7 @@ def test_batch_missing_target_is_failed_and_obeys_call_policy(
             TaskCall(name="CheckQubitSpectroscopy", call_id="spec_fine"),
         ],
     )
-    ctx = step.execute(_service(), QubitTargets(["0", "4"]), StepContext())
+    ctx = step.execute(_session(), QubitTargets(["0", "4"]), StepContext())
     result = ctx.get_step_result("spectroscopy")
     assert isinstance(result, OneQubitResult)
     missing = result.get_qubit("4")
@@ -376,7 +376,7 @@ def test_batch_mode_rejects_input_overrides_before_any_batch(
     )
 
     with pytest.raises(ValueError, match="calibration input overrides"):
-        step.execute(_service(), QubitTargets(["0", "1"]), StepContext())
+        step.execute(_session(), QubitTargets(["0", "1"]), StepContext())
     assert recorder.log == []
 
 
@@ -395,7 +395,7 @@ def test_isolated_workers_receive_each_calls_input_and_writeback(
     calibrate = TaskCall(name="CheckRabi", call_id="rabi_calibrate")
     step = CustomOneQubit(step_name="rabi", mode=mode, tasks=[measure, calibrate])
 
-    step.execute(_service(), QubitTargets(["0", "1", "4", "5"]), StepContext())
+    step.execute(_session(), QubitTargets(["0", "1", "4", "5"]), StepContext())
 
     assert recorder.sessions
     for session in recorder.sessions:
@@ -428,7 +428,7 @@ def test_stage_runner_batch_carries_measurement_only_calls(
         ],
     )
 
-    step.execute(_service(), QubitTargets(["0", "1"]), StepContext())
+    step.execute(_session(), QubitTargets(["0", "1"]), StepContext())
 
     assert parent.parameters["spec_measure"]["update_calibration_parameters"] is False
 
@@ -443,7 +443,7 @@ def test_two_qubit_calls_carry_identity_per_coupling(recorder: SimpleNamespace) 
     ctx = StepContext(candidate_qids=["0", "1", "4", "5"])
     ctx.metadata["cr_schedule"] = [[("0", "1"), ("4", "5")]]
 
-    ctx = step.execute(_service(), QubitTargets([]), ctx)
+    ctx = step.execute(_session(), QubitTargets([]), ctx)
 
     result = ctx.get_step_result("zx90")
     assert result is not None
@@ -460,19 +460,19 @@ def test_pipeline_filter_reads_the_custom_step_call(
 ) -> None:
     _schedule(monkeypatch)
     recorder.fail.add(("ramsey_fine", "1"))
-    service = _service()
+    session = _session()
     ctx = StepContext(candidate_qids=["0", "1"])
     step = CustomOneQubit(
         step_name="ramsey", mode="scheduled", tasks=list(REPEATED), continue_on_failure=True
     )
-    ctx = step.execute(service, QubitTargets(["0", "1"]), ctx)
+    ctx = step.execute(session, QubitTargets(["0", "1"]), ctx)
     ctx = FilterByStatus(step="ramsey", call_id="ramsey_fine").execute(
-        service, QubitTargets(["0", "1"]), ctx
+        session, QubitTargets(["0", "1"]), ctx
     )
     assert ctx.candidate_qids == ["0"]
     ctx.candidate_qids = ["0", "1"]
     ctx = FilterByStatus(step="ramsey", call_id="ramsey_coarse").execute(
-        service, QubitTargets(["0", "1"]), ctx
+        session, QubitTargets(["0", "1"]), ctx
     )
     assert ctx.candidate_qids == ["0", "1"]
 
@@ -501,7 +501,7 @@ def test_coherence_check_runs_one_step_with_per_target_fail_fast(
     recorder.fail.add(("rabi_initial", "4"))
 
     (step,) = captured["steps"]
-    ctx = step.execute(_service(), captured["targets"], StepContext())
+    ctx = step.execute(_session(), captured["targets"], StepContext())
 
     full_sequence = [
         "configure_initial",

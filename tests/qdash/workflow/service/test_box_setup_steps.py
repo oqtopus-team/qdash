@@ -21,12 +21,12 @@ class CancelledRun(Exception):
 def test_configure_all_leaves_closing_the_execution_to_the_pipeline(monkeypatch, exc) -> None:
     """The pipeline's owned Execution records the abort; the step only propagates it."""
     monkeypatch.setattr("qdash.workflow.service.steps.box_setup.get_run_logger", MagicMock)
-    service = MagicMock()
-    service.execute_task.side_effect = exc
+    session = MagicMock()
+    session.execute_task.side_effect = exc
 
     with pytest.raises(type(exc)) as raised:
         ConfigureAll(mux_ids=[1]).execute(
-            cast("CalibSession", service), MuxTargets([1]), StepContext()
+            cast("CalibSession", session), MuxTargets([1]), StepContext()
         )
 
     assert raised.value is exc
@@ -37,7 +37,7 @@ def test_configure_all_leaves_closing_the_execution_to_the_pipeline(monkeypatch,
         "cancel_calibration",
         "abandon_calibration",
     ):
-        getattr(service, name).assert_not_called()
+        getattr(session, name).assert_not_called()
 
 
 def test_configure_all_call_settings_reach_the_task_with_resolved_mux_ids(monkeypatch) -> None:
@@ -45,17 +45,17 @@ def test_configure_all_call_settings_reach_the_task_with_resolved_mux_ids(monkey
     from qdash.datamodel.task_call import TaskCall
 
     monkeypatch.setattr("qdash.workflow.service.steps.box_setup.get_run_logger", MagicMock)
-    service = MagicMock()
-    service._initialized = True
-    service.plan_digest = None
+    session = MagicMock()
+    session._initialized = True
+    session.plan_digest = None
 
     step = ConfigureAll(
         call=TaskCall(name="ConfigureAll", run={"configuration_mode": "ge-ef-cr"}),
     )
     assert [call.resolved_call_id for call in step.calls()] == ["ConfigureAll"]
-    step.execute(cast("CalibSession", service), MuxTargets([2, 3]), StepContext())
+    step.execute(cast("CalibSession", session), MuxTargets([2, 3]), StepContext())
 
-    _, kwargs = service.execute_task.call_args
+    _, kwargs = session.execute_task.call_args
     assert kwargs["parameters"] == {
         "run": {
             "configuration_mode": {"value": "ge-ef-cr"},

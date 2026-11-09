@@ -223,7 +223,7 @@ def test_fake_chip_runs_bring_up_and_the_fake_calibration_chain(
         str(4 * mux + offset) for mux in mux_ids for offset in range(4)
     ]
 
-    service = CalibSession(
+    session = CalibSession(
         SessionSettings(
             username=USERNAME,
             chip_id=CHIP_ID,
@@ -233,14 +233,14 @@ def test_fake_chip_runs_bring_up_and_the_fake_calibration_chain(
             github=GitHubPolicy.disabled(),
         )
     )
-    with service.owned_execution(qids):
-        exp = service.backend.get_instance() if service.backend else None
+    with session.owned_execution(qids):
+        exp = session.backend.get_instance() if session.backend else None
         assert isinstance(exp, FakeExperiment)
         assert Path(exp.config_path) == fake_deployment / CHIP_ID / "config"
 
         for call in FAKE_CALIBRATION_TASKS:
             for qid in qids:
-                service.execute_task(call.name, qid, parameters=call.settings())
+                session.execute_task(call.name, qid, parameters=call.settings())
 
     results = list(
         TaskResultHistoryDocument.find({"project_id": PROJECT_ID, "chip_id": CHIP_ID}).run()
@@ -289,7 +289,7 @@ def test_qubex_fits_never_open_a_browser_during_tests(monkeypatch: pytest.Monkey
     assert opened == []
 
 
-class _RecordingStageService:
+class _RecordingStageSession:
     """The parts of CalibSession the scheduled one-qubit strategy reads."""
 
     def __init__(self) -> None:
@@ -417,11 +417,11 @@ def test_the_template_runs_through_the_hardware_box_scheduler(
         return {qid: {"status": "success"} for group in mux_groups for qid in group}
 
     monkeypatch.setattr(strategy, "run_mux_calibrations_parallel", _record_mux_run)
-    service = _RecordingStageService()
-    ctx = step.execute(service, targets, StepContext())
+    session = _RecordingStageSession()
+    ctx = step.execute(session, targets, StepContext())
 
     assert calls == [expected_groups]
-    assert list(service.stage_results) == ["1q_scheduled"]
+    assert list(session.stage_results) == ["1q_scheduled"]
     assert sorted(ctx.metadata["calibration"].successful_qids(), key=int) == [
         qid for group in expected_groups for qid in group
     ]

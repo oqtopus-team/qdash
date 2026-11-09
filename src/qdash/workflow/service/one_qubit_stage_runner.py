@@ -40,8 +40,8 @@ def batch_capable_tasks(backend_name: str) -> dict[str, bool]:
 class OneQubitStageRunner:
     """Run one-qubit schedules without owning the execution lifecycle."""
 
-    def __init__(self, cal_service: CalibSession) -> None:
-        self.cal_service = cal_service
+    def __init__(self, session: CalibSession) -> None:
+        self.session = session
 
     def collect_scheduled_qids(
         self, schedule: Any, allowed_qids: list[str] | None = None
@@ -66,8 +66,8 @@ class OneQubitStageRunner:
         """Raise before any hardware work when the batch path cannot run ``plan``."""
         problems = batch_preflight_problems(
             plan,
-            self.cal_service.task_parameters,
-            batch_capable_tasks(self.cal_service.backend_name),
+            self.session.task_parameters,
+            batch_capable_tasks(self.session.backend_name),
         )
         if problems:
             raise ValueError(

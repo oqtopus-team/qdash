@@ -19,21 +19,21 @@ def test_custom_one_qubit_direct_targets_reuse_step_execution(monkeypatch) -> No
         "qdash.workflow.service._internal.scheduling_tasks.run_qubit_calibrations_parallel",
         run,
     )
-    service = SimpleNamespace(
+    session = SimpleNamespace(
         chip_id="64Qv3",
         worker_spec=MagicMock(return_value=spec),
         record_stage_result=MagicMock(),
         finish_calibration=MagicMock(side_effect=AssertionError("pipeline owns completion")),
     )
     step = CustomOneQubit(step_name="simple_tasks", tasks=[TaskCall(name="CheckRabi")])
-    result = step._execute_direct(cast("CalibSession", service), ["1"])
+    result = step._execute_direct(cast("CalibSession", session), ["1"])
 
     assert result == {"direct": {"1": {"status": "success"}}}
     # Workers receive the step session's spec and borrow its Execution.
     assert run.call_args.kwargs["worker"] is spec
     assert run.call_args.kwargs["plan"].step_id == "simple_tasks"
-    service.record_stage_result.assert_called_once_with("simple_tasks", result)
-    service.finish_calibration.assert_not_called()
+    session.record_stage_result.assert_called_once_with("simple_tasks", result)
+    session.finish_calibration.assert_not_called()
 
 
 def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> None:
@@ -43,7 +43,7 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
     calls = []
 
     class FakeStrategy:
-        def execute(self, service, config):
+        def execute(self, session, config):
             calls.append(config)
             return {"scheduled": {"1": {"status": "success"}, "4": {"status": "success"}}}
 
@@ -52,7 +52,7 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
         lambda mode: FakeStrategy(),
     )
 
-    service = SimpleNamespace(
+    session = SimpleNamespace(
         username="alice",
         chip_id="64Qv3",
         backend_name="qubex",
@@ -70,7 +70,7 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
         continue_on_failure=True,
     )
 
-    step.execute(cast("CalibSession", service), QubitTargets(["1", "4"]), StepContext())
+    step.execute(cast("CalibSession", session), QubitTargets(["1", "4"]), StepContext())
 
     assert len(calls) == 1
     assert calls[0].mux_ids == [0, 1]
@@ -88,7 +88,7 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
     calls = []
 
     class FakeStrategy:
-        def execute(self, service, config):
+        def execute(self, session, config):
             calls.append(config)
             return {"scheduled": {"2": {"status": "success"}, "5": {"status": "success"}}}
 
@@ -97,7 +97,7 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
         lambda mode: FakeStrategy(),
     )
 
-    service = SimpleNamespace(
+    session = SimpleNamespace(
         username="alice",
         chip_id="64Qv3",
         backend_name="qubex",
@@ -110,7 +110,7 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
     )
     step = OneQubitCheck(mode="synchronized", tasks=[TaskCall(name="CheckRabi")])
 
-    step.execute(cast("CalibSession", service), QubitTargets(["2", "5"]), StepContext())
+    step.execute(cast("CalibSession", session), QubitTargets(["2", "5"]), StepContext())
 
     assert len(calls) == 1
     assert calls[0].mux_ids == [0, 1]
@@ -132,14 +132,14 @@ def test_fine_tune_respects_coarse_status_filter(monkeypatch, successful_qids) -
             qid, QubitCalibData(status="success" if qid in successful_qids else "failed")
         )
     ctx = StepContext(candidate_qids=["0", "1"], one_qubit_check=coarse_result)
-    service = cast("CalibSession", SimpleNamespace(chip_id="64Q"))
+    session = cast("CalibSession", SimpleNamespace(chip_id="64Q"))
     targets = QubitTargets(["0", "1"])
-    ctx = FilterByStatus().execute(service, targets, ctx)
+    ctx = FilterByStatus().execute(session, targets, ctx)
     execute = MagicMock(return_value={})
     step = OneQubitFineTune()
     monkeypatch.setattr(step, "_execute_with_qids", execute)
 
-    step.execute(service, targets, ctx)
+    step.execute(session, targets, ctx)
 
     if successful_qids:
         assert execute.call_args.args[1] == successful_qids

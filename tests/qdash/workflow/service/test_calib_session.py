@@ -296,7 +296,7 @@ class BoomStep(Step):
         """Return a fixed step name for identification."""
         return "boom"
 
-    def execute(self, service: Any, targets: Any, ctx: Any) -> Any:
+    def execute(self, session: Any, targets: Any, ctx: Any) -> Any:
         """Raise a RuntimeError to simulate a step failing mid-pipeline."""
         raise RuntimeError("boom")
 
@@ -312,7 +312,7 @@ class RaisingStep(Step):
         """Return a fixed step name for identification."""
         return "raising"
 
-    def execute(self, service: Any, targets: Any, ctx: Any) -> Any:
+    def execute(self, session: Any, targets: Any, ctx: Any) -> Any:
         """Raise the exception supplied at construction time."""
         raise self.exc
 
@@ -1273,11 +1273,11 @@ def test_pipeline_failure_preserves_completed_steps(
         pass
 
     class FirstStep(BoomStep):
-        def execute(self, service, targets, ctx):
+        def execute(self, session, targets, ctx):
             return ctx
 
     class FailureStep(BoomStep):
-        def execute(self, service, targets, ctx):
+        def execute(self, session, targets, ctx):
             assert env.lock.locked
             assert env.records[0].status == "completed"
             raise CancelledRun() if cancel else RuntimeError("boom")
@@ -1459,13 +1459,13 @@ def test_pipeline_retains_whole_plan_and_releases_its_original_owner(
     assert repo.try_lock("project-1", "other-chip", "chip-2", ("mux:0",), False)
     seen = []
 
-    def first(self, service, targets, ctx):
-        seen.append(service.execution_id)
+    def first(self, session, targets, ctx):
+        seen.append(session.execution_id)
         assert not repo.try_lock("project-1", "intruder", "chip-1", ("mux:1",), False)
         return ctx
 
-    def second(self, service, targets, ctx):
-        seen.append(service.execution_id)
+    def second(self, session, targets, ctx):
+        seen.append(session.execution_id)
         assert not repo.try_lock("project-1", "intruder", "chip-1", ("mux:0",), False)
         assert not repo.try_lock("project-1", "intruder", "chip-1", ("mux:1",), False)
         if fail:
@@ -1503,7 +1503,7 @@ def test_pipeline_rejects_unplanned_targets_before_later_hardware_step(
 ):
     from qdash.workflow.service.steps import CustomOneQubit, SetCRSchedule
 
-    def change_targets(self, service, targets, ctx):
+    def change_targets(self, session, targets, ctx):
         ctx.candidate_qids = ["12"]  # The declared schedule only reserved MUX 0.
         return ctx
 
@@ -1574,7 +1574,7 @@ def test_configure_all_scope_uses_session_task_defaults(pipeline_wiring):
 def test_pipeline_keeps_supplied_reservation_owner(pipeline_execution_env, monkeypatch):
     from qdash.workflow.service.steps import CustomOneQubit
 
-    monkeypatch.setattr(CustomOneQubit, "execute", lambda self, service, targets, ctx: ctx)
+    monkeypatch.setattr(CustomOneQubit, "execute", lambda self, session, targets, ctx: ctx)
     session = _session(
         username="alice",
         chip_id="chip-1",
@@ -1874,8 +1874,8 @@ def test_pipeline_steps_share_settings_except_their_metadata(pipeline_execution_
 
     seen: list[tuple[SessionSettings, WorkerSpec]] = []
 
-    def capture(self, service, targets, ctx):
-        seen.append((service.settings, service.worker_spec()))
+    def capture(self, session, targets, ctx):
+        seen.append((session.settings, session.worker_spec()))
         return ctx
 
     monkeypatch.setattr(CustomOneQubit, "execute", capture)
@@ -1909,14 +1909,14 @@ def test_configure_all_layout_reaches_later_steps_and_their_workers(
     from qdash.workflow.service.steps import ConfigureAll, CustomOneQubit
 
     modes: list[tuple[str | None, str | None]] = []
-    monkeypatch.setattr(ConfigureAll, "execute", lambda self, service, targets, ctx: ctx)
+    monkeypatch.setattr(ConfigureAll, "execute", lambda self, session, targets, ctx: ctx)
 
-    def capture(self, service, targets, ctx):
-        assert service._orchestrator is not None
+    def capture(self, session, targets, ctx):
+        assert session._orchestrator is not None
         modes.append(
             (
-                service._orchestrator.config.configuration_mode,
-                service.worker_spec().settings.configuration_mode,
+                session._orchestrator.config.configuration_mode,
+                session.worker_spec().settings.configuration_mode,
             )
         )
         return ctx
@@ -1974,7 +1974,7 @@ def test_public_run_closes_every_execution_without_a_finish_call(public_run_env,
     from tests.qdash.workflow.context_helpers import granted_context
 
     class Last(CustomOneQubit):
-        def execute(self, service, targets, ctx):
+        def execute(self, session, targets, ctx):
             if outcome == "failed":
                 raise RuntimeError("measurement failed")
             if outcome == "cancelled":
@@ -1982,7 +1982,7 @@ def test_public_run_closes_every_execution_without_a_finish_call(public_run_env,
             return ctx
 
     class First(CustomOneQubit):
-        def execute(self, service, targets, ctx):
+        def execute(self, session, targets, ctx):
             return ctx
 
     cal = CalibService.from_context(granted_context(project_id="project-1"), flow_name="run")
@@ -2005,7 +2005,7 @@ def test_public_run_leaves_a_terminated_execution_to_the_flow_hooks(public_run_e
     from qdash.workflow.service.steps import CustomOneQubit
     from tests.qdash.workflow.context_helpers import granted_context
 
-    def terminated(self, service, targets, ctx):
+    def terminated(self, session, targets, ctx):
         raise TerminationSignal("SIGTERM")
 
     monkeypatch.setattr(CustomOneQubit, "execute", terminated)

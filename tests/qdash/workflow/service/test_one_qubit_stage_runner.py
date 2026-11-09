@@ -13,7 +13,7 @@ def _plan(*calls: TaskCall) -> StepCalls:
     return StepCalls(step_id="spectroscopy", calls=normalize_calls(calls))
 
 
-def _service() -> CalibSession:
+def _session() -> CalibSession:
     return cast(
         "CalibSession",
         SimpleNamespace(
@@ -43,7 +43,7 @@ def _worker_spec() -> WorkerSpec:
 
 
 def test_collect_qids_preserves_order_and_filters_duplicates() -> None:
-    runner = OneQubitStageRunner(_service())
+    runner = OneQubitStageRunner(_session())
     schedule = SimpleNamespace(
         stages=[
             SimpleNamespace(parallel_groups=[["0", "4"], ["1"]]),
@@ -57,7 +57,7 @@ def test_collect_qids_preserves_order_and_filters_duplicates() -> None:
 def test_execute_scheduled_mux_schedule_hands_workers_the_owner_spec(
     monkeypatch: Any,
 ) -> None:
-    runner = OneQubitStageRunner(_service())
+    runner = OneQubitStageRunner(_session())
     calls: list[dict[str, Any]] = []
 
     def run_mux_calibrations_parallel(
@@ -122,7 +122,7 @@ class FakeBatchSession:
 def test_execute_simultaneous_spectroscopy_schedule_batches_current_session(
     monkeypatch: Any,
 ) -> None:
-    runner = OneQubitStageRunner(_service())
+    runner = OneQubitStageRunner(_session())
     session = FakeBatchSession()
     monkeypatch.setattr(
         "qdash.workflow.service.one_qubit_stage_runner.get_session",
@@ -152,7 +152,7 @@ def test_execute_simultaneous_spectroscopy_schedule_batches_current_session(
 def test_batch_repeats_a_call_per_batch_and_stops_only_the_failed_qubit(
     monkeypatch: Any,
 ) -> None:
-    runner = OneQubitStageRunner(_service())
+    runner = OneQubitStageRunner(_session())
     session = FakeBatchSession(failures={"coarse": {"0"}})
     monkeypatch.setattr(
         "qdash.workflow.service.one_qubit_stage_runner.get_session", lambda: session
@@ -184,7 +184,7 @@ def test_batch_repeats_a_call_per_batch_and_stops_only_the_failed_qubit(
 
 
 def test_batch_preflight_rejects_input_overrides_and_non_batch_tasks(monkeypatch: Any) -> None:
-    runner = OneQubitStageRunner(_service())
+    runner = OneQubitStageRunner(_session())
     monkeypatch.setattr(
         "qdash.workflow.service.one_qubit_stage_runner.batch_capable_tasks",
         lambda backend: {"CheckQubitSpectroscopy": True, "CheckRabi": False},
@@ -222,9 +222,9 @@ def test_fake_batch_preflight_rejects_inherited_stub() -> None:
 
     assert BaseTask.registry["fake"]["FakeBringUp"].batch_run is FakeTask.batch_run
     assert batch_capable_tasks("fake")["FakeBringUp"] is False
-    service = _service()
-    service.backend_name = "fake"
-    runner = OneQubitStageRunner(service)
+    session = _session()
+    session.backend_name = "fake"
+    runner = OneQubitStageRunner(session)
     with pytest.raises(ValueError, match=r"FakeBringUp.*does not support batch execution"):
         runner.preflight_batch(_plan(TaskCall(name="FakeBringUp")))
 
@@ -232,7 +232,7 @@ def test_fake_batch_preflight_rejects_inherited_stub() -> None:
 def test_execute_simultaneous_spectroscopy_schedule_uses_isolated_batch(
     monkeypatch: Any,
 ) -> None:
-    runner = OneQubitStageRunner(_service())
+    runner = OneQubitStageRunner(_session())
     calls: list[dict[str, Any]] = []
 
     def run_qubit_batch_calibration_isolated(

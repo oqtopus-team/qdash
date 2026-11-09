@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 
 
 def _execute_direct_one_qubit(
-    service: CalibSession,
+    session: CalibSession,
     *,
     qids: list[str],
     plan: StepCalls,
@@ -56,15 +56,15 @@ def _execute_direct_one_qubit(
     results = run_qubit_calibrations_parallel(
         qids=qids,
         plan=plan,
-        worker=service.worker_spec(),
+        worker=session.worker_spec(),
     )
     wrapped_results = {"direct": results}
-    service.record_stage_result(stage_name, wrapped_results)
+    session.record_stage_result(stage_name, wrapped_results)
     return wrapped_results
 
 
 def _execute_scheduled_one_qubit(
-    service: CalibSession,
+    session: CalibSession,
     *,
     qids: list[str],
     plan: StepCalls,
@@ -85,12 +85,12 @@ def _execute_scheduled_one_qubit(
         plan=plan,
     )
     strategy = get_one_qubit_strategy(mode)
-    result: dict[str, Any] = strategy.execute(service, config)
+    result: dict[str, Any] = strategy.execute(session, config)
     return result
 
 
 def _execute_mux_one_qubit(
-    service: CalibSession,
+    session: CalibSession,
     *,
     targets: Any,
     plan: StepCalls,
@@ -105,7 +105,7 @@ def _execute_mux_one_qubit(
         exclude_qids=targets.exclude_qids,
         plan=plan,
     )
-    result: dict[str, Any] = get_one_qubit_strategy(mode).execute(service, config)
+    result: dict[str, Any] = get_one_qubit_strategy(mode).execute(session, config)
     return result
 
 
@@ -172,7 +172,7 @@ class CustomOneQubit(CalibrationStep):
 
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -183,7 +183,7 @@ class CustomOneQubit(CalibrationStep):
             logger.warning(f"[{self.name}] No tasks specified, skipping")
             return ctx
 
-        plan = self.step_calls(service)
+        plan = self.step_calls(session)
         logger.info(
             f"[{self.name}] Starting with {len(self.tasks)} calls: "
             f"{[call.resolved_call_id for call in self.tasks]}"
@@ -191,17 +191,17 @@ class CustomOneQubit(CalibrationStep):
 
         has_previous_selection = bool(ctx.filters) or ctx.get_latest_one_qubit_result() is not None
         if has_previous_selection:
-            raw_results = self._execute_scheduled(service, ctx.candidate_qids, plan)
+            raw_results = self._execute_scheduled(session, ctx.candidate_qids, plan)
         else:
             from qdash.workflow.service.targets import MuxTargets
 
             if isinstance(targets, MuxTargets):
                 raw_results = _execute_mux_one_qubit(
-                    service, targets=targets, plan=plan, stage_name=self.name, mode=self.mode
+                    session, targets=targets, plan=plan, stage_name=self.name, mode=self.mode
                 )
             else:
                 raw_results = self._execute_scheduled(
-                    service, targets.to_qids(service.chip_id), plan
+                    session, targets.to_qids(session.chip_id), plan
                 )
 
         result = self._build_result(raw_results)
@@ -218,29 +218,29 @@ class CustomOneQubit(CalibrationStep):
 
     def _execute_scheduled(
         self,
-        service: CalibSession,
+        session: CalibSession,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:
         """Execute explicit QubitTargets through hardware-aware scheduling."""
         return _execute_scheduled_one_qubit(
-            service,
+            session,
             qids=qids,
-            plan=plan or self.step_calls(service),
+            plan=plan or self.step_calls(session),
             stage_name=self.step_name,
             mode=self.mode,
         )
 
     def _execute_direct(
         self,
-        service: CalibSession,
+        session: CalibSession,
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
         return _execute_direct_one_qubit(
-            service,
+            session,
             qids=qids,
-            plan=self.step_calls(service),
+            plan=self.step_calls(session),
             stage_name=self.step_name,
         )
 
@@ -294,13 +294,13 @@ class OneQubitCheck(CalibrationStep):
 
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
         """Execute 1-qubit check calibration."""
         logger = get_run_logger()
-        plan = self.step_calls(service)
+        plan = self.step_calls(session)
 
         logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(plan.calls)} calls")
 
@@ -308,11 +308,11 @@ class OneQubitCheck(CalibrationStep):
 
         if isinstance(targets, MuxTargets):
             raw_results = _execute_mux_one_qubit(
-                service, targets=targets, plan=plan, stage_name=self.name, mode=self.mode
+                session, targets=targets, plan=plan, stage_name=self.name, mode=self.mode
             )
         else:
-            qids = targets.to_qids(service.chip_id)
-            raw_results = self._execute_scheduled(service, qids, plan)
+            qids = targets.to_qids(session.chip_id)
+            raw_results = self._execute_scheduled(session, qids, plan)
 
         result = self._build_result(raw_results)
         ctx.one_qubit_check = result
@@ -326,29 +326,29 @@ class OneQubitCheck(CalibrationStep):
 
     def _execute_scheduled(
         self,
-        service: CalibSession,
+        session: CalibSession,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:
         """Execute explicit QubitTargets through hardware-aware scheduling."""
         return _execute_scheduled_one_qubit(
-            service,
+            session,
             qids=qids,
-            plan=plan or self.step_calls(service),
+            plan=plan or self.step_calls(session),
             stage_name=self.name,
             mode=self.mode,
         )
 
     def _execute_direct(
         self,
-        service: CalibSession,
+        session: CalibSession,
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
         return _execute_direct_one_qubit(
-            service,
+            session,
             qids=qids,
-            plan=self.step_calls(service),
+            plan=self.step_calls(session),
             stage_name=self.name,
         )
 
@@ -402,20 +402,20 @@ class OneQubitFineTune(CalibrationStep):
 
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
         """Execute 1-qubit fine-tuning calibration."""
         logger = get_run_logger()
-        plan = self.step_calls(service)
+        plan = self.step_calls(session)
 
         # Use filtered candidates from context if available
         has_previous_selection = bool(ctx.filters) or ctx.get_latest_one_qubit_result() is not None
         qids = (
             ctx.candidate_qids
             if ctx.candidate_qids or has_previous_selection
-            else targets.to_qids(service.chip_id)
+            else targets.to_qids(session.chip_id)
         )
 
         logger.info(
@@ -429,7 +429,7 @@ class OneQubitFineTune(CalibrationStep):
             ctx.record_step_result(self.resolved_step_id, ctx.one_qubit_fine_tune)
             return ctx
 
-        raw_results = self._execute_with_qids(service, qids, plan)
+        raw_results = self._execute_with_qids(session, qids, plan)
 
         result = self._build_result(raw_results)
         ctx.one_qubit_fine_tune = result
@@ -443,29 +443,29 @@ class OneQubitFineTune(CalibrationStep):
 
     def _execute_with_qids(
         self,
-        service: CalibSession,
+        session: CalibSession,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:
         """Execute calibration for specific qubit IDs."""
         return _execute_scheduled_one_qubit(
-            service,
+            session,
             qids=qids,
-            plan=plan or self.step_calls(service),
+            plan=plan or self.step_calls(session),
             stage_name=self.name,
             mode=self.mode,
         )
 
     def _execute_direct(
         self,
-        service: CalibSession,
+        session: CalibSession,
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets using multiprocess parallelism."""
         return _execute_direct_one_qubit(
-            service,
+            session,
             qids=qids,
-            plan=self.step_calls(service),
+            plan=self.step_calls(session),
             stage_name=self.name,
         )
 

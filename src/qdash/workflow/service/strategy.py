@@ -63,13 +63,13 @@ class OneQubitStrategy(ABC):
     @abstractmethod
     def execute(
         self,
-        cal_service: CalibSession,
+        session: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute the 1-qubit calibration strategy.
 
         Args:
-            cal_service: CalibSession instance with username, chip_id, etc.
+            session: CalibSession instance with username, chip_id, etc.
             config: Configuration for the calibration
 
         Returns:
@@ -117,13 +117,13 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalibSession,
+        session: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute Box-based scheduled calibration."""
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
+        wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id, wiring_config_path=wiring_config_path
         )
         schedule = scheduler.generate_from_mux(
             mux_ids=config.mux_ids, exclude_qids=config.exclude_qids
@@ -169,7 +169,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
         all_qids = list(dict.fromkeys(all_qids))
 
         # Workers borrow the Execution owned by the pipeline step.
-        worker = cal_service.worker_spec()
+        worker = session.worker_spec()
 
         # Execute stages grouped by box type (sequentially between box types)
         for box_type, sequential_groups in box_sequential_groups.items():
@@ -187,7 +187,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
             all_results[stage_name] = stage_results
 
         # Record all box results within the current step Execution
-        cal_service.record_stage_result("1q_scheduled", all_results)
+        session.record_stage_result("1q_scheduled", all_results)
 
         return all_results
 
@@ -206,15 +206,15 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalibSession,
+        session: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute synchronized step-based calibration."""
         logger = get_run_logger()
 
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
+        wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id, wiring_config_path=wiring_config_path
         )
         schedule = scheduler.generate_synchronized_from_mux(
             mux_ids=config.mux_ids,
@@ -237,7 +237,7 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             return {}
 
         # Workers borrow the Execution owned by the pipeline step.
-        worker = cal_service.worker_spec()
+        worker = session.worker_spec()
 
         all_results: dict[str, Any] = {}
 
@@ -258,7 +258,7 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             all_results[box_key].update(step_results)
 
         # Record all scheduling rounds within the current step Execution
-        cal_service.record_stage_result("1q_synchronized", all_results)
+        session.record_stage_result("1q_synchronized", all_results)
 
         return all_results
 
@@ -268,15 +268,15 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalibSession,
+        session: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute local-index spectroscopy steps as hardware-aware batches."""
         from qdash.workflow.service.one_qubit_stage_runner import OneQubitStageRunner
 
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
+        wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id, wiring_config_path=wiring_config_path
         )
         schedule = scheduler.generate_simultaneous_spectroscopy_batches_from_mux(
             mux_ids=config.mux_ids,
@@ -284,7 +284,7 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
             mode=config.simultaneous_spectroscopy_schedule_mode,
         )
 
-        runner = OneQubitStageRunner(cal_service)
+        runner = OneQubitStageRunner(session)
         all_qids = runner.collect_simultaneous_qids(schedule, config.qids)
         if not all_qids:
             return {}
@@ -297,7 +297,7 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
             allowed_qids=config.qids,
         )
 
-        cal_service.record_stage_result("experimental_simultaneous_spectroscopy", all_results)
+        session.record_stage_result("experimental_simultaneous_spectroscopy", all_results)
         return all_results
 
 
@@ -313,13 +313,13 @@ class OneQubitSerialStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalibSession,
+        session: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute fully serial calibration."""
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
+        wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id, wiring_config_path=wiring_config_path
         )
         schedule = scheduler.generate_from_mux(
             mux_ids=config.mux_ids, exclude_qids=config.exclude_qids
@@ -344,7 +344,7 @@ class OneQubitSerialStrategy(OneQubitStrategy):
         for mux_group in all_mux_groups:
             all_results.update(_calibrate_mux_qubits(qids=mux_group, plan=config.plan))
 
-        cal_service.record_stage_result("1q_serial", all_results)
+        session.record_stage_result("1q_serial", all_results)
 
         return {"serial": all_results}
 

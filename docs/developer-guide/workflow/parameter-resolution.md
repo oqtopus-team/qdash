@@ -140,7 +140,7 @@ for that call only, which suits values computed at run time, such as the MUX IDs
 the `ConfigureAll` step adds to its call's settings before it runs the `ConfigureAll` task:
 
 ```python
-service.execute_task("CheckRabi", "0", parameters={"input": {"control_amplitude": 0.05}})
+session.execute_task("CheckRabi", "0", parameters={"input": {"control_amplitude": 0.05}})
 ```
 
 The task records the merged explicit values when it is created: input overrides in

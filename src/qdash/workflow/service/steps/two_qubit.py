@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 
 def _run_coupling_groups(
-    service: CalibSession,
+    session: CalibSession,
     coupling_groups: list[list[str]],
     plan: StepCalls,
 ) -> dict[str, Any]:
@@ -45,7 +45,7 @@ def _run_coupling_groups(
         run_coupling_calibrations_parallel,
     )
 
-    worker = service.worker_spec()
+    worker = session.worker_spec()
     all_raw_results: dict[str, Any] = {}
     for group in coupling_groups:
         all_raw_results.update(
@@ -116,7 +116,7 @@ class CustomTwoQubit(CalibrationStep):
 
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -127,7 +127,7 @@ class CustomTwoQubit(CalibrationStep):
             logger.warning(f"[{self.name}] No tasks specified, skipping")
             return ctx
 
-        plan = self.step_calls(service)
+        plan = self.step_calls(session)
         logger.info(
             f"[{self.name}] Starting with {len(self.tasks)} calls: "
             f"{[call.resolved_call_id for call in self.tasks]}"
@@ -149,12 +149,12 @@ class CustomTwoQubit(CalibrationStep):
 
             from qdash.workflow.engine import CRScheduler
 
-            wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
+            wiring_config_path = str(get_qubex_paths().wiring_yaml(session.chip_id))
             scheduler = CRScheduler(
-                service.username,
-                service.chip_id,
+                session.username,
+                session.chip_id,
                 wiring_config_path=wiring_config_path,
-                project_id=service.project_id,
+                project_id=session.project_id,
             )
             schedule = scheduler.generate(
                 candidate_qubits=candidate_qubits,
@@ -174,9 +174,9 @@ class CustomTwoQubit(CalibrationStep):
             f"[{self.name}] Executing {total_pairs} coupling pairs in {len(coupling_groups)} groups"
         )
 
-        all_raw_results = _run_coupling_groups(service, coupling_groups, plan)
+        all_raw_results = _run_coupling_groups(session, coupling_groups, plan)
 
-        service.record_stage_result(self.name, all_raw_results)
+        session.record_stage_result(self.name, all_raw_results)
 
         # Build typed result
         result = self._build_result(all_raw_results)
@@ -237,7 +237,7 @@ class SetCRSchedule(TransformStep):
 
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -306,7 +306,7 @@ class GenerateCRSchedule(TransformStep):
 
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -321,12 +321,12 @@ class GenerateCRSchedule(TransformStep):
 
         from qdash.workflow.engine import CRScheduler
 
-        wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
+        wiring_config_path = str(get_qubex_paths().wiring_yaml(session.chip_id))
         scheduler = CRScheduler(
-            service.username,
-            service.chip_id,
+            session.username,
+            session.chip_id,
             wiring_config_path=wiring_config_path,
-            project_id=service.project_id,
+            project_id=session.project_id,
         )
         schedule = scheduler.generate(
             candidate_qubits=candidate_qubits,
@@ -390,13 +390,13 @@ class TwoQubitCalibration(CalibrationStep):
 
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
         """Execute 2-qubit calibration."""
         logger = get_run_logger()
-        plan = self.step_calls(service)
+        plan = self.step_calls(session)
 
         candidate_qubits = ctx.candidate_qids
         if len(candidate_qubits) < 2:
@@ -412,12 +412,12 @@ class TwoQubitCalibration(CalibrationStep):
         else:
             from qdash.workflow.engine import CRScheduler
 
-            wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
+            wiring_config_path = str(get_qubex_paths().wiring_yaml(session.chip_id))
             scheduler = CRScheduler(
-                service.username,
-                service.chip_id,
+                session.username,
+                session.chip_id,
                 wiring_config_path=wiring_config_path,
-                project_id=service.project_id,
+                project_id=session.project_id,
             )
             schedule = scheduler.generate(
                 candidate_qubits=candidate_qubits,
@@ -437,9 +437,9 @@ class TwoQubitCalibration(CalibrationStep):
             f"[{self.name}] Executing {total_pairs} coupling pairs in {len(coupling_groups)} groups"
         )
 
-        all_raw_results = _run_coupling_groups(service, coupling_groups, plan)
+        all_raw_results = _run_coupling_groups(session, coupling_groups, plan)
 
-        service.record_stage_result(self.name, all_raw_results)
+        session.record_stage_result(self.name, all_raw_results)
 
         # Build typed result
         result = self._build_result(all_raw_results)

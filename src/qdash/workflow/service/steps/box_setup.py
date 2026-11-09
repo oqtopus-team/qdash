@@ -49,22 +49,22 @@ class ConfigureAll(CalibrationStep):
 
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
         logger = get_run_logger()
-        mux_ids = self._resolve_mux_ids(service, targets)
+        mux_ids = self._resolve_mux_ids(session, targets)
 
         logger.info(f"[{self.name}] Configuring boxes for {len(mux_ids)} MUXes")
         # The pipeline opened this step's Execution and closes it however it ends.
-        plan = self.step_calls(service)
+        plan = self.step_calls(session)
         call = plan.calls[0]
         parameters = merge_task_parameters(
             {call.name: call.settings()},
             {call.name: normalize_task_settings(call.name, {"run": {"mux_ids": mux_ids}})},
         )[call.name]
-        ctx.metadata[self.name] = service.execute_task(
+        ctx.metadata[self.name] = session.execute_task(
             "ConfigureAll",
             qid="",
             parameters=parameters,
@@ -74,11 +74,11 @@ class ConfigureAll(CalibrationStep):
         logger.info(f"[{self.name}] Completed")
         return ctx
 
-    def _resolve_mux_ids(self, service: CalibSession, targets: Target) -> list[int]:
+    def _resolve_mux_ids(self, session: CalibSession, targets: Target) -> list[int]:
         """The MUXes to configure: the step's own, or the targets'."""
         if self.mux_ids is not None:
             return list(self.mux_ids)
         if isinstance(targets, MuxTargets):
             return list(targets.mux_ids)
-        qids = targets.to_qids(service.chip_id)
+        qids = targets.to_qids(session.chip_id)
         return sorted({int(qid) // 4 for qid in qids})

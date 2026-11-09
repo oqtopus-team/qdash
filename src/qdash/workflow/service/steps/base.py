@@ -59,14 +59,14 @@ class Step(ABC):
     @abstractmethod
     def execute(
         self,
-        service: CalibSession,
+        session: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
         """Execute the step.
 
         Args:
-            service: CalibSession instance (provides execute_task, etc.)
+            session: CalibSession instance (provides execute_task, etc.)
             targets: Target specification
             ctx: Current pipeline context
 
@@ -108,9 +108,9 @@ class CalibrationStep(Step):
         """Default for calls without on_failure: run a target's later calls after a failure."""
         return False
 
-    def step_calls(self, service: CalibSession) -> StepCalls:
+    def step_calls(self, session: CalibSession) -> StepCalls:
         """The calls with step identity and failure policy, as workers receive them."""
-        digest = getattr(service, "plan_digest", None)
+        digest = getattr(session, "plan_digest", None)
         return StepCalls(
             step_id=self.resolved_step_id,
             calls=self.calls(),
