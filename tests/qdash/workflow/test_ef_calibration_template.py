@@ -11,7 +11,7 @@ import pytest
 
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
-from tests.qdash.workflow.task_call_helpers import names
+from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
 
 ef_calibration_module = importlib.import_module("qdash.workflow.templates.ef_calibration")
 
@@ -54,7 +54,7 @@ def test_ef_calibration_runs_expected_tasks_in_one_synchronized_step() -> None:
     ]
 
 
-def test_ef_calibration_forwards_configuration_mode_and_shared_defaults() -> None:
+def test_ef_calibration_forwards_context_and_shared_defaults() -> None:
     result = ef_calibration_module.ef_calibration(
         username="alice",
         chip_id="64Q",
@@ -69,38 +69,44 @@ def test_ef_calibration_forwards_configuration_mode_and_shared_defaults() -> Non
         "flow_name": "ef-check",
         "tags": ["ef"],
         "project_id": "project-1",
-        "task_parameters": {
-            "ConfigureEF": {
-                "run": {
-                    "configuration_mode": "ge-ef-fh",
-                },
-            },
-            "CreateHPIPulse": {
-                "run": {
-                    "hpi_duration": 32,
-                },
-            },
-            "CheckAdaptiveEFChevron": {
-                "run": {
-                    "shots": 256,
-                },
-            },
-            "CreateEFHPIPulse": {
-                "run": {
-                    "ef_hpi_duration": 32,
-                },
-            },
-            "CreateEFPIPulse": {
-                "run": {
-                    "ef_pi_duration": 32,
-                },
-            },
-        },
         "default_run_parameters": {
             "readout_duration": 1024,
             "interval": 150 * 1024,
         },
     }
+
+
+@pytest.mark.parametrize("configuration_mode", ["ge-ef-cr", "ge-ef-fh"])
+def test_ef_calibration_calls_carry_their_settings(configuration_mode: str) -> None:
+    result = ef_calibration_module.ef_calibration(
+        username="alice",
+        chip_id="64Q",
+        qids=["0"],
+        configuration_mode=configuration_mode,
+    )
+
+    assert effective_settings(result["steps"][0].tasks) == [
+        ("ConfigureEF", settings(run={"configuration_mode": configuration_mode})),
+        ("CheckRabi", settings()),
+        ("CreateHPIPulse", settings(run={"hpi_duration": 32})),
+        ("CheckAdaptiveEFChevron", settings(run={"shots": 256})),
+        ("CheckEFRabi", settings()),
+        ("CreateEFHPIPulse", settings(run={"ef_hpi_duration": 32})),
+        ("CreateEFPIPulse", settings(run={"ef_pi_duration": 32})),
+        ("EFReadoutClassification", settings()),
+    ]
+
+
+def test_ef_calibration_builds_configuration_mode_per_run() -> None:
+    fh = ef_calibration_module.ef_calibration(
+        username="alice", chip_id="64Q", qids=["0"], configuration_mode="ge-ef-fh"
+    )
+    default = ef_calibration_module.ef_calibration(username="alice", chip_id="64Q", qids=["0"])
+
+    # A later run with another mode does not change an earlier run's calls.
+    assert fh["steps"][0].tasks[0].run == {"configuration_mode": {"value": "ge-ef-fh"}}
+    assert default["steps"][0].tasks[0].run == {"configuration_mode": {"value": "ge-ef-cr"}}
+    assert fh["steps"][0].tasks is not default["steps"][0].tasks
 
 
 def test_ef_calibration_uses_explicit_qubits() -> None:

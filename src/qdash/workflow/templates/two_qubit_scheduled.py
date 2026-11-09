@@ -38,7 +38,15 @@ from qdash.workflow.service.steps import (
 from qdash.workflow.service.targets import CouplingTargets
 
 TWO_QUBIT_SCHEDULED_TASKS: list[TaskCall] = [
-    TaskCall(name="CheckCrossResonance"),
+    TaskCall(
+        name="CheckCrossResonance",
+        # Uncomment to tune the CR parameter search.
+        # run={
+        #     "adiabatic_safe_factor": 0.65,
+        #     "max_amplitude": 0.85,
+        #     "max_time_range": 8192,
+        # },
+    ),
     TaskCall(name="CreateZX90"),
     TaskCall(name="CheckZX90"),
     TaskCall(name="CheckBellState"),
@@ -159,16 +167,6 @@ def two_qubit_scheduled(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            # Per-task overrides — uncomment to tune the CR parameter search.
-            # "CheckCrossResonance": {
-            #     "run": {
-            #         "adiabatic_safe_factor": 0.65,
-            #         "max_amplitude": 0.85,
-            #         "max_time_range": 8192,
-            #     },
-            # },
-        },
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,

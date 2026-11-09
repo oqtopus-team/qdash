@@ -27,6 +27,7 @@ Example:
     )
 """
 
+from collections.abc import Mapping
 from typing import Any
 
 from prefect import flow
@@ -40,6 +41,29 @@ from qdash.workflow.service.calib_service import (
 )
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
+
+# Custom task lists inherit this call's run settings for every CreateHPIPulse call
+# that does not set them itself.
+CREATE_HPI_PULSE = TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32})
+
+SIMPLE_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckRabi"),
+    CREATE_HPI_PULSE,
+    TaskCall(name="CheckHPIPulse"),
+]
+
+
+def _with_hpi_defaults(entry: Any) -> Any:
+    """Return a CreateHPIPulse call with the template run settings under its own.
+
+    Other entries are returned unchanged, so the step still validates them and
+    reports plain task names or repeated tasks without call ids.
+    """
+    if isinstance(entry, Mapping) and entry.get("name") == CREATE_HPI_PULSE.name:
+        entry = TaskCall.model_validate(entry)
+    if not isinstance(entry, TaskCall) or entry.name != CREATE_HPI_PULSE.name:
+        return entry
+    return entry.model_copy(update={"run": {**(CREATE_HPI_PULSE.run or {}), **(entry.run or {})}})
 
 
 @flow(
@@ -72,7 +96,8 @@ def simple_calibration(
         exclude_qids: Qubit IDs to exclude (only with mux_ids)
         qids: Qubit IDs to calibrate (fallback if mux_ids not set)
         tasks: Task calls to run; flow runs pass [{"name": "CheckRabi"}, ...]
-            (default: CheckRabi, CreateHPIPulse, CheckHPIPulse)
+            (default: CheckRabi, CreateHPIPulse, CheckHPIPulse). A CreateHPIPulse
+            call uses hpi_duration=32 unless it sets its own value.
         mode: Execution mode:
             - "scheduled": Box-based parallelism with hardware constraints (default)
             - "serial": Fully sequential execution
@@ -99,17 +124,12 @@ def simple_calibration(
     else:
         raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
-    # Define tasks to run
-    if tasks is None:
-        tasks = [
-            TaskCall(name="CheckRabi"),
-            TaskCall(name="CreateHPIPulse"),
-            TaskCall(name="CheckHPIPulse"),
-        ]
+    # Define tasks to run; build a new list so the caller's list is never modified.
+    calls = [_with_hpi_defaults(entry) for entry in (SIMPLE_TASKS if tasks is None else tasks)]
 
     # Define steps
     steps = [
-        CustomOneQubit(step_name="simple_tasks", tasks=tasks, mode=mode),
+        CustomOneQubit(step_name="simple_tasks", tasks=calls, mode=mode),
     ]
 
     # =========================================================================
@@ -122,13 +142,6 @@ def simple_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            "CreateHPIPulse": {
-                "run": {
-                    "hpi_duration": 32,
-                },
-            },
-        },
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,

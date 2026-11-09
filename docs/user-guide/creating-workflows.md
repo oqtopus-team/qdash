@@ -91,16 +91,19 @@ before running resonator spectroscopy. The template requires `mux_ids` and runs
 ## Choose Tasks and Execution Order
 
 The task list runs from top to bottom. Open **Tasks** in another tab to find the task names enabled
-for the active backend, then replace the default list in the template:
+for the active backend, then replace the default list in the template. In **Simple Calibration**,
+the list is `SIMPLE_TASKS` near the top of the source:
 
 ```python
-if tasks is None:
-    tasks = [
-        TaskCall(name="Configure"),
-        TaskCall(name="CheckT1"),
-        TaskCall(name="CheckRamsey"),
-    ]
+SIMPLE_TASKS: list[TaskCall] = [
+    TaskCall(name="Configure"),
+    TaskCall(name="CheckT1"),
+    TaskCall(name="CheckRamsey"),
+]
 ```
+
+In **Simple Calibration**, every `CreateHPIPulse` call runs with `hpi_duration` 32 unless the call
+sets its own `hpi_duration`.
 
 Keep configuration tasks and measurement tasks in their required order. A later task reads the
 calibration state produced or applied by earlier tasks.

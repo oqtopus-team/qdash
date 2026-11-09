@@ -8,10 +8,9 @@ from typing import Any
 import pytest
 
 from qdash.workflow.calibtasks.qubex import CorrectCaptureDelay
-from qdash.workflow.engine.task_parameters import normalize_task_parameters
 from qdash.workflow.service.steps import BringUp
 from qdash.workflow.service.targets import MuxTargets
-from tests.qdash.workflow.task_call_helpers import names
+from tests.qdash.workflow.task_call_helpers import effective_settings, names
 
 box_setup_module = importlib.import_module("qdash.workflow.templates.box_setup")
 
@@ -45,9 +44,18 @@ def test_box_setup_corrects_each_mux() -> None:
 def test_box_setup_settings_match_task_defaults() -> None:
     result = box_setup_module.box_setup(username="alice", chip_id="64Q", mux_ids=[0])
 
-    settings = normalize_task_parameters(result["kwargs"]["task_parameters"])
-    run = settings["CorrectCaptureDelay"]["run"]
-    for name in ("delay_range", "capture_delay_word_range", "capture_delay_ns_range", "shots"):
+    assert "task_parameters" not in result["kwargs"]
+    assert result["kwargs"]["default_run_parameters"] == {"readout_duration": 1024}
+    ((call_id, call_settings),) = effective_settings(result["steps"][0].tasks)
+    assert call_id == "CorrectCaptureDelay"
+    run = call_settings["run"]
+    assert set(run) == {
+        "delay_range",
+        "capture_delay_word_range",
+        "capture_delay_ns_range",
+        "shots",
+    }
+    for name in run:
         assert run[name]["value"] == CorrectCaptureDelay.run_spec[name].default
 
 

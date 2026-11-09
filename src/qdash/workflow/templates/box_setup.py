@@ -74,25 +74,24 @@ def box_setup(
 
     targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
 
-    task_parameters: dict[str, dict[str, Any]] = {
-        "CorrectCaptureDelay": {
-            "run": {
-                # Fixed readout tone in GHz, away from the resonators. Leave unset to
-                # use 0.25 GHz above the connected readout box's default resonator
-                # spectroscopy range (11.0 GHz for the high band, 7.0 GHz for the low
-                # band), or set it to a frequency inside the readout band.
-                # "readout_frequency": 11.0,
-                # QuEL-1: coarse sweep in 128 ns units with capture_delay_word fixed at 0.
-                "delay_range": sweep.range(0, 19, 1),
-                # QuEL-1: word sweep in 8 ns units at the chosen coarse delay (32 ns steps).
-                "capture_delay_word_range": sweep.range(0, 16, 4),
-                # QuEL-3: sweep in ns; every value must be a multiple of 0.8 ns.
-                "capture_delay_ns_range": sweep.arange(0, 2432, 128),
-                "shots": 1024,
-            },
+    correct_capture_delay = TaskCall(
+        name="CorrectCaptureDelay",
+        run={
+            # Fixed readout tone in GHz, away from the resonators. Leave unset to
+            # use 0.25 GHz above the connected readout box's default resonator
+            # spectroscopy range (11.0 GHz for the high band, 7.0 GHz for the low
+            # band), or set it to a frequency inside the readout band.
+            # "readout_frequency": 11.0,
+            # QuEL-1: coarse sweep in 128 ns units with capture_delay_word fixed at 0.
+            "delay_range": sweep.range(0, 19, 1),
+            # QuEL-1: word sweep in 8 ns units at the chosen coarse delay (32 ns steps).
+            "capture_delay_word_range": sweep.range(0, 16, 4),
+            # QuEL-3: sweep in ns; every value must be a multiple of 0.8 ns.
+            "capture_delay_ns_range": sweep.arange(0, 2432, 128),
+            "shots": 1024,
         },
-    }
-    steps = [BringUp(mode=mode, tasks=[TaskCall(name="CorrectCaptureDelay")])]
+    )
+    steps = [BringUp(mode=mode, tasks=[correct_capture_delay])]
 
     cal = CalibService(
         username,
@@ -103,6 +102,5 @@ def box_setup(
         default_run_parameters={
             "readout_duration": 1024,
         },
-        task_parameters=task_parameters,
     )
     return cal.run(targets, steps=steps)

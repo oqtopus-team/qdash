@@ -34,13 +34,13 @@ COARSE_ONE_TASKS: list[TaskCall] = [
     TaskCall(name="CheckRabi", call_id="rabi_amplitude_update"),
     # Measure again at the updated amplitude for HPI creation.
     TaskCall(name="CheckRabi", call_id="rabi_at_updated_amplitude"),
-    TaskCall(name="CreateHPIPulse"),
+    TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
     TaskCall(name="CheckHPIPulse"),
-    TaskCall(name="CreatePIPulse"),
+    TaskCall(name="CreatePIPulse", run={"pi_duration": 32}),
     TaskCall(name="CheckPIPulse"),
-    TaskCall(name="CreateDRAGHPIPulse"),
+    TaskCall(name="CreateDRAGHPIPulse", run={"drag_hpi_duration": 16}),
     TaskCall(name="CheckDRAGHPIPulse"),
-    TaskCall(name="CreateDRAGPIPulse"),
+    TaskCall(name="CreateDRAGPIPulse", run={"drag_pi_duration": 24}),
     TaskCall(name="CheckDRAGPIPulse"),
     TaskCall(name="CheckT1"),
     TaskCall(name="CheckT2Echo"),
@@ -94,28 +94,6 @@ def coarse_one(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_parameters={
-            "CreateHPIPulse": {
-                "run": {
-                    "hpi_duration": 32,
-                },
-            },
-            "CreatePIPulse": {
-                "run": {
-                    "pi_duration": 32,
-                },
-            },
-            "CreateDRAGHPIPulse": {
-                "run": {
-                    "drag_hpi_duration": 16,
-                },
-            },
-            "CreateDRAGPIPulse": {
-                "run": {
-                    "drag_pi_duration": 24,
-                },
-            },
-        },
         default_run_parameters={
             "readout_duration": 1024,
             "interval": 150 * 1024,

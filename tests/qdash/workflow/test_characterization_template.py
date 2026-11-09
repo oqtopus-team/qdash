@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import importlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from qdash.workflow import sweep
 from qdash.workflow.service.steps import (
     ConfigureAll,
     CustomOneQubit,
@@ -17,7 +19,7 @@ from qdash.workflow.service.steps import (
     OneQubitFineTune,
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
-from tests.qdash.workflow.task_call_helpers import names
+from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
 
 characterization_module = importlib.import_module("qdash.workflow.templates.characterization")
 
@@ -159,38 +161,94 @@ def test_characterization_requires_targets_and_an_enabled_stage() -> None:
         characterization_module.characterization(username="alice", chip_id="64Q")
 
 
-def test_characterization_exposes_primary_task_parameters() -> None:
+def _template_calls(result: dict[str, Any]) -> list[Any]:
+    return [call for step in result["steps"] for call in getattr(step, "tasks", None) or ()]
+
+
+@pytest.mark.parametrize(
+    ("run_ef_characterization", "configuration_mode"),
+    [(True, "ge-ef-fh"), (False, "ge-cr-cr")],
+)
+def test_characterization_keeps_only_the_configure_all_mode_as_a_task_default(
+    run_ef_characterization: bool, configuration_mode: str
+) -> None:
+    result = characterization_module.characterization(
+        username="alice",
+        chip_id="64Q",
+        qids=["0", "1"],
+        run_ef_characterization=run_ef_characterization,
+    )
+
+    # ConfigureAll is a step without a call list, so its mode stays a task default.
+    assert result["kwargs"]["task_parameters"] == {
+        "ConfigureAll": {"run": {"configuration_mode": configuration_mode}},
+    }
+    assert result["kwargs"]["configuration_mode"] == configuration_mode
+    assert result["kwargs"]["default_run_parameters"] == {
+        "readout_duration": 1024,
+        "interval": characterization_module.STANDARD_INTERVAL,
+    }
+
+
+def test_characterization_calls_carry_their_acquisition_settings() -> None:
     result = characterization_module.characterization(
         username="alice",
         chip_id="64Q",
         qids=["0", "1"],
     )
 
-    parameters = result["kwargs"]["task_parameters"]
-    expected_tasks = {
-        "ConfigureAll",
+    calls = _template_calls(result)
+    assert names(calls) == [
         *names(characterization_module.GE_CALIBRATION_TASKS),
         *names(characterization_module.GE_CHARACTERIZATION_TASKS),
         *names(characterization_module.EF_CALIBRATION_TASKS),
         *names(characterization_module.EF_CHARACTERIZATION_TASKS),
         *names(characterization_module.COUPLING_CHARACTERIZATION_TASKS),
-    }
-    assert parameters.keys() == expected_tasks
-    assert parameters["ConfigureAll"]["run"]["configuration_mode"] == "ge-ef-fh"
+    ]
+    runs = dict(effective_settings(calls, result["kwargs"]["task_parameters"]))
+    # Every call sets its own shots and interval instead of inheriting the shared interval.
+    for call_id, call_settings in runs.items():
+        assert {"shots", "interval"} <= call_settings["run"].keys(), call_id
     assert (
         characterization_module.SHORT_INTERVAL
         < characterization_module.STANDARD_INTERVAL
         < characterization_module.LONG_INTERVAL
     )
-    assert (
-        parameters["ReadoutClassification"]["run"]["interval"]
-        == characterization_module.LONG_INTERVAL
+    assert runs["CheckRabi"] == settings(
+        run={
+            "time_range": sweep.range(0, 401, 8),
+            "shots": 2048,
+            "interval": characterization_module.SHORT_INTERVAL,
+        }
     )
-    assert (
-        parameters["CheckThermalExcitation"]["run"]["interval"]
-        == characterization_module.LONG_INTERVAL
+    assert runs["CreateDRAGPIPulse"] == settings(
+        run={
+            "drag_pi_duration": 24,
+            "shots": 2048,
+            "interval": characterization_module.STANDARD_INTERVAL,
+        }
     )
-    assert parameters["CheckThermalExcitation"]["run"]["shots"] > 0
+    assert runs["ReadoutClassification"] == settings(
+        run={"shots": 2048, "interval": characterization_module.LONG_INTERVAL}
+    )
+    assert runs["CheckT1Average"] == settings(
+        run={
+            "time_range": sweep.logspace(math.log10(100), math.log10(500_000), 51),
+            "shots": 1024,
+            "interval": characterization_module.STANDARD_INTERVAL,
+            "n_runs": 8,
+        }
+    )
+    assert runs["CheckThermalExcitation"] == settings(
+        run={"shots": 256 * 1024, "interval": characterization_module.LONG_INTERVAL}
+    )
+    assert runs["CheckCouplingStrength"] == settings(
+        run={
+            "time_range": sweep.arange(0, 20_001, 400),
+            "shots": 1024,
+            "interval": characterization_module.STANDARD_INTERVAL,
+        }
+    )
 
 
 def test_characterization_task_parameters_match_task_specs() -> None:
@@ -208,14 +266,21 @@ def test_characterization_task_parameters_match_task_specs() -> None:
     )
 
     registry = BaseTask.registry["qubex"]
-    for task_name, settings in result["kwargs"]["task_parameters"].items():
-        normalized = normalize_task_settings(task_name, settings)
-        validate_task_settings(
-            registry[task_name],
-            task_name,
-            normalized,
-            source=f"task_parameters[{task_name!r}]",
+    task_parameters = result["kwargs"]["task_parameters"]
+    checked = [
+        (f"task_parameters[{task_name!r}]", task_name, entry)
+        for task_name, entry in task_parameters.items()
+    ] + [
+        (f"call {call_id!r}", call.name, call_settings)
+        for call, (call_id, call_settings) in zip(
+            _template_calls(result),
+            effective_settings(_template_calls(result), task_parameters),
+            strict=True,
         )
+    ]
+    for source, task_name, task_settings in checked:
+        normalized = normalize_task_settings(task_name, task_settings)
+        validate_task_settings(registry[task_name], task_name, normalized, source=source)
         instances = generate_task_instances(
             [task_name],
             {

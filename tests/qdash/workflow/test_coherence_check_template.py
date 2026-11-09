@@ -12,10 +12,9 @@ import pytest
 
 from qdash.workflow import sweep
 from qdash.workflow.calibtasks.qubex import CheckChevron
-from qdash.workflow.engine.task_parameters import normalize_task_parameters
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
-from tests.qdash.workflow.task_call_helpers import names
+from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
 
 coherence_check_module = importlib.import_module("qdash.workflow.templates.coherence_check")
 
@@ -68,19 +67,18 @@ def test_coherence_check_scales_second_ramsey_range_and_detuning_on_its_call() -
         qids=["0"],
     )
 
-    second_ramsey = result["steps"][1].tasks[-1]
-    assert second_ramsey.call_id == "ramsey_long"
-    assert second_ramsey.run == {
-        "time_range": {"value": (0, 50_001, 500), "value_type": "np.arange"},
-        "detuning": {"value": 0.0002},
-    }
-    # The call's settings override the per-task defaults only for this call.
-    defaults = normalize_task_parameters(result["kwargs"]["task_parameters"])
-    effective = second_ramsey.effective_settings(defaults)
-    assert effective["run"]["detuning"] == {"value": 0.0002}
-    assert defaults["CheckRamsey"]["run"]["detuning"] == {"value": 0.001}
     first_ramsey = result["steps"][0].tasks[-1]
-    assert first_ramsey.effective_settings(defaults)["run"]["detuning"] == {"value": 0.001}
+    second_ramsey = result["steps"][1].tasks[-1]
+    assert first_ramsey.resolved_call_id == "CheckRamsey"
+    assert second_ramsey.call_id == "ramsey_long"
+    # Each pass carries its own Ramsey settings on its call.
+    assert first_ramsey.effective_settings({}) == settings(
+        run={"time_range": sweep.arange(0, 10_001, 100), "detuning": 0.001}
+    )
+    assert second_ramsey.effective_settings({}) == settings(
+        # Keep 101 points while extending the time scale by 5x.
+        run={"time_range": sweep.arange(0, 50_001, 500), "detuning": 0.0002}
+    )
 
 
 def test_coherence_check_uses_explicit_shared_run_defaults() -> None:
@@ -96,47 +94,61 @@ def test_coherence_check_uses_explicit_shared_run_defaults() -> None:
     }
 
 
-def test_coherence_check_uses_explicit_chevron_settings_without_updating_calibration() -> None:
+def test_coherence_check_calls_carry_every_measurement_setting() -> None:
     result = coherence_check_module.coherence_check(
         username="alice",
         chip_id="64Q",
         qids=["0"],
     )
 
-    assert result["kwargs"]["task_parameters"] == {
-        "CheckChevron": {
-            "run": {
-                "detuning_range": sweep.linspace(-0.05, 0.05, 41),
-                "time_range": sweep.linspace(0, 250, 26),
-                "shots": 256,
-            },
-            "update_calibration_parameters": False,
-        },
-        "CheckT1": {
-            "run": {
-                "time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51),
-            },
-        },
-        "CheckT2Echo": {
-            "run": {
-                "time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51),
-            },
-        },
-        "CheckRamsey": {
-            "run": {
-                "time_range": sweep.arange(0, 10_001, 100),
-                "detuning": 0.001,
-            },
-        },
-    }
-    chevron_settings = normalize_task_parameters(result["kwargs"]["task_parameters"])[
-        "CheckChevron"
+    # No per-task defaults: every setting is visible on the call it applies to.
+    assert "task_parameters" not in result["kwargs"]
+    first_step, second_step = result["steps"]
+    coherence_range = sweep.logspace(math.log10(300), math.log10(500_000), 51)
+    assert effective_settings(first_step.tasks) == [
+        ("Configure", settings()),
+        (
+            "CheckChevron",
+            settings(
+                run={
+                    "detuning_range": sweep.linspace(-0.05, 0.05, 41),
+                    "time_range": sweep.linspace(0, 250, 26),
+                    "shots": 256,
+                },
+                update_calibration_parameters=False,
+            ),
+        ),
+        ("CheckRabi", settings()),
+        ("CheckT1", settings(run={"time_range": coherence_range})),
+        ("CheckT2Echo", settings(run={"time_range": coherence_range})),
+        (
+            "CheckRamsey",
+            settings(run={"time_range": sweep.arange(0, 10_001, 100), "detuning": 0.001}),
+        ),
     ]
+    assert effective_settings(second_step.tasks) == [
+        ("Configure", settings()),
+        ("CheckRabi", settings()),
+        (
+            "ramsey_long",
+            settings(run={"time_range": sweep.arange(0, 50_001, 500), "detuning": 0.0002}),
+        ),
+    ]
+
+
+def test_coherence_check_chevron_settings_match_task_defaults() -> None:
+    result = coherence_check_module.coherence_check(
+        username="alice",
+        chip_id="64Q",
+        qids=["0"],
+    )
+
+    chevron = result["steps"][0].tasks[1]
+    assert chevron.name == "CheckChevron"
+    assert chevron.update_calibration_parameters is False
     for parameter_name in ("detuning_range", "time_range", "shots"):
-        assert (
-            chevron_settings["run"][parameter_name]["value"]
-            == CheckChevron.run_spec[parameter_name].default
-        )
+        assert chevron.run is not None
+        assert chevron.run[parameter_name]["value"] == CheckChevron.run_spec[parameter_name].default
 
 
 def test_coherence_check_uses_explicit_qubits() -> None:
