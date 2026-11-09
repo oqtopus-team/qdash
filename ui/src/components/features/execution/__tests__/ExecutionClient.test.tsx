@@ -23,7 +23,9 @@ vi.mock("next/link", () => ({
   ),
 }));
 vi.mock("../ExecutionDAG", () => ({ ExecutionDAG: () => null }));
-vi.mock("../ExecutionParameterChanges", () => ({ ExecutionParameterChanges: () => null }));
+vi.mock("../ExecutionParameterChanges", () => ({
+  ExecutionParameterChanges: () => <div>parameter changes body</div>,
+}));
 vi.mock("@/components/features/execution/ExecutionTopologyView", () => ({
   ExecutionTopologyView: () => null,
 }));
@@ -57,5 +59,25 @@ describe("ExecutionDetailClient failure investigation", () => {
     render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
 
     expect(screen.queryByRole("button", { name: "Investigate with AI" })).toBeNull();
+  });
+});
+
+describe("ExecutionDetailClient parameter changes", () => {
+  it("starts collapsed and loads the comparison only when the user expands it", () => {
+    execution = { name: "Daily run", status: "completed", chip_id: "64Q", task: [] };
+    render(<ExecutionDetailClient chipId="64Q" executionId="exec-1" />);
+
+    const heading = screen.getByRole("heading", { name: "Parameter changes" });
+    const details = heading.closest("details")!;
+    expect(details.open).toBe(false);
+    expect(screen.queryByText("parameter changes body")).toBeNull();
+
+    fireEvent.click(details.querySelector("summary")!);
+    expect(details.open).toBe(true);
+    expect(screen.getByText("parameter changes body")).toBeTruthy();
+
+    fireEvent.click(details.querySelector("summary")!);
+    expect(details.open).toBe(false);
+    expect(screen.queryByText("parameter changes body")).toBeNull();
   });
 });
