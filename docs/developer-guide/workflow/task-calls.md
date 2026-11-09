@@ -156,44 +156,94 @@ retry or resume a run and makes no claim that repeating a hardware call is idemp
 
 ## Migrate Saved Flows
 
-`python -m qdash.common.migration.task_calls` inventories saved flows (the user flows directory
-by default, or the paths given) and reports each place that still uses task names. It parses the
-source with `ast` and never imports or runs a flow.
+A Python flow saved before task calls must be edited by its owner; QDash does not rewrite saved
+flow sources. A step built from plain task names fails when it is constructed, so an
+unconverted flow stops before it measures. Version 1 [pipeline specs](./calibration-pipeline.md)
+are separate: the API returns a converted `migrated_spec`, and the worker converts a version 1
+spec queued before the upgrade with `migrate_pipeline_spec`.
+
+Saved flows live in the user flows directory, `src/qdash/workflow/user_flows` in the checkout,
+mounted at `/app/qdash/workflow/user_flows` in the containers. Copy it before editing:
 
 ```bash
-python -m qdash.common.migration.task_calls                       # report only
-python -m qdash.common.migration.task_calls --write-to /tmp/converted user_flows/alice
+cp -a src/qdash/workflow/user_flows user_flows-backup
+grep -rL --include='*.py' "TaskCall" src/qdash/workflow/user_flows
 ```
 
-With `--write-to` it writes converted copies to that directory and leaves the originals unchanged.
-It reads every file before it writes, and writes nothing when a copy would replace an input file
-(also through a symlink), when two inputs map to the same copy, or when a different file already
-exists at a destination; it then lists each conflict and exits with status 2.
-It converts a literal task-name list passed to a step into `TaskCall` entries, and so does it for
-a variable assigned such a list once and used only as `tasks=` arguments; a name repeated in one
-list gets `call_id` values `<Task>`, `<Task>_2`, and so on, skipping ids the list already uses,
-which you should rename to describe each call. It turns `stop_on_failure_tasks` on the same step
-into `on_failure="stop"` and adds `from qdash.workflow import TaskCall` before the first converted
-line. A file is not converted when `TaskCall` already names an import from outside `qdash`, or
-when the result would not parse; its findings are reported as manual changes instead. Names
-resolve with Python's scoping rules, so a function-local variable that shadows a module-level
-list is judged by its own assignment.
+The `grep` lists the files that do not mention `TaskCall` yet; review each one, since a flow that
+builds no step needs no change.
 
-It reports, without changing, every `tasks=` value it cannot prove holds `TaskCall` entries: a
-list built at run time, a variable that is not assigned in the file, reassigned, appended to with
-something other than a `TaskCall`, or imported from a module outside `qdash`, and a flow parameter
-annotated `list[str]` or not annotated at all. It also reports a task-name list that is used
-outside `tasks=` or shared by steps with different `stop_on_failure_tasks`, step-level
-`task_parameters`, and the deprecated `CalibService(task_run_parameters=...)`. The exit status is
-0 when nothing needs attention, 1 when a file needs conversion or manual changes, and 2 when a
-file cannot be read or `--write-to` would overwrite a file.
+A flow written before task calls:
+
+```python
+from qdash.workflow.service.steps import CustomOneQubit
+
+TASKS = ["Configure", "CheckRamsey", "CheckRamsey", "CheckT1"]
+
+steps = [
+    CustomOneQubit(
+        step_name="ramsey",
+        tasks=TASKS,
+        continue_on_failure=True,
+        stop_on_failure_tasks=("Configure",),
+    ),
+]
+```
+
+becomes:
+
+```python
+from qdash.workflow import TaskCall
+from qdash.workflow.service.steps import CustomOneQubit, FilterByMetric
+
+TASKS = [
+    TaskCall(name="Configure", on_failure="stop"),
+    TaskCall(name="CheckRamsey", call_id="ramsey_coarse", run={"detuning": 0.001}),
+    TaskCall(name="CheckRamsey", call_id="ramsey_fine", run={"detuning": 0.0002}),
+    TaskCall(name="CheckT1"),
+]
+
+steps = [
+    CustomOneQubit(step_name="ramsey", tasks=TASKS, continue_on_failure=True),
+    FilterByMetric(step="ramsey", call_id="CheckT1", metric="t1", threshold=10.0),
+]
+```
+
+Make these changes in every saved flow:
+
+1. Import `TaskCall` from `qdash.workflow` and wrap each task name, in module-level lists,
+   defaults of flow parameters, and `tasks=` arguments, in `TaskCall(name=...)`. Annotate a flow
+   parameter that takes calls as `list[TaskCall] | None`; a `list[str]` parameter cannot carry
+   calls.
+2. Give every occurrence of a task that appears more than once in one step its own `call_id`
+   that describes the call, such as `ramsey_coarse`; the [identity](#identity) rules reject
+   duplicates. A task that appears once can keep its name as its id.
+3. Give built-in steps of the same class distinct `step_id` values, and custom steps distinct
+   `step_name` values, when a pipeline repeats them.
+4. Replace `stop_on_failure_tasks=(...)` with `on_failure="stop"` on each listed call; the step
+   no longer accepts the argument. Calls without `on_failure` inherit the step's
+   `continue_on_failure`, as described in [Failure Policy](#failure-policy).
+5. Keep `CalibService(task_parameters=...)` as the defaults for every call of a task. Move a
+   setting that applied to only one occurrence into that call's `run`, `input`, or
+   `update_calibration_parameters`; [Settings](#settings) gives the precedence.
+6. Replace reads of a target's raw result by task name, such as `data.raw["CheckT1"]`, with the
+   ordered calls: `data.call(call_id)`, `data.latest_call(name)`, or `data.calls`, as described
+   in [Results](#results).
+7. Set `step` and, for one call, `call_id` on `FilterByStatus` and `FilterByMetric` when the
+   filter must read a specific step or call, as the converted example does to keep qubits whose
+   `CheckT1` call measured a T1 of at least 10 μs. A filter without `step` keeps reading the
+   latest `OneQubitFineTune` or `OneQubitCheck`.
+
+Save each flow, run it on the Fake backend, and confirm the call ids and settings in
+**Execution** before running it on hardware. Results recorded before the
+upgrade stay readable and have no `invocation`.
 
 ## Testing
 
 `tests/qdash/workflow/test_task_call_pipeline_e2e.py` runs a step with two `CheckRamsey` calls on
 the fake backend and checks task ids, upstream links, per-call settings, accepted-write
 propagation, the call filter, and re-execution. `tests/qdash/workflow/service/test_task_call_propagation.py`
-covers each scheduling path, and `tests/qdash/common/test_task_call_migration.py` the migration.
+covers each scheduling path.
 `tests/qdash/workflow/test_task_call_plan_digest_e2e.py` runs an API-validated spec through
 `calibration_pipeline` with isolated worker sessions and checks that every step execution stores
 the API's `plan_digest` as `note.pipeline.spec_digest` and every task result carries
@@ -209,4 +259,3 @@ the API's `plan_digest` as `note.pipeline.spec_digest` and every task result car
 - `src/qdash/workflow/service/_internal/call_runner.py`: per-target and batch call execution
 - `src/qdash/workflow/service/steps/filters.py`: step and call references
 - `src/qdash/workflow/engine/task/snapshot_loader.py`: call-aware snapshot lookup
-- `src/qdash/common/migration/task_calls.py`: saved-flow migration

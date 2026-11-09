@@ -224,9 +224,11 @@ stops before it measures. Edit the flow in **Workflow**:
 3. Replace `stop_on_failure_tasks=("Configure",)` with `on_failure="stop"` on the listed calls.
 4. Save the flow and run it on a small target.
 
-An administrator can list every saved flow that needs this change and get converted copies, as
-described in [Check Saved Workflows](./system-updates.md#check-saved-workflows). Results recorded
-before the update stay readable in **Execution**; they show the task name without a call ID.
+Check the call IDs and settings of the run in **Execution** before running the flow on more
+targets. Results recorded before the update stay readable in **Execution**; they show the task
+name without a call ID. Flows that read results by task name, filter on one call, or set
+per-occurrence settings need further edits:
+[Migrate Saved Flows](../developer-guide/workflow/task-calls.md#migrate-saved-flows).
 
 ## Save and Test the Workflow
 

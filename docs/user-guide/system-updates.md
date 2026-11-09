@@ -91,24 +91,20 @@ unavailable.
 ## Check Saved Workflows
 
 Workflows saved before task calls list tasks by name and stop before they measure on a release
-that requires task calls. List the saved workflows that need a change after the update:
+that requires task calls. QDash does not convert them; each workflow owner updates their own.
+Before anyone edits them, copy the saved workflows from the checkout so every owner can compare
+against the original:
 
 ```bash
-docker compose exec api python -m qdash.common.migration.task_calls /app/qdash/workflow/user_flows
+cp -a src/qdash/workflow/user_flows user_flows-backup
 ```
 
-The report names each file and line, marks what can be converted automatically, and what needs a
-manual edit. To get converted copies without changing the saved workflows, write them to a
-directory in the container and copy it out:
-
-```bash
-docker compose exec api python -m qdash.common.migration.task_calls /app/qdash/workflow/user_flows --write-to /tmp/converted-flows
-docker compose cp api:/tmp/converted-flows ./converted-flows
-```
-
-Review each copy, rename any generated call IDs such as `CheckRabi_2`, and paste the change into
-the workflow in the editor. The command reads the files only; it never runs a workflow. How to
-edit a workflow by hand: [Update a flow saved before task calls](./creating-workflows.md#update-a-flow-saved-before-task-calls).
+After the update, each owner edits their workflows as described in
+[Update a flow saved before task calls](./creating-workflows.md#update-a-flow-saved-before-task-calls)
+and tests each one on the Fake backend before it measures on hardware again. Pipeline specs queued
+before the update run after conversion, and a new version 1 spec is rejected with a converted
+spec to submit instead. The full list of edits:
+[Migrate Saved Flows](../developer-guide/workflow/task-calls.md#migrate-saved-flows).
 
 ## Recover from a Failed Update
 

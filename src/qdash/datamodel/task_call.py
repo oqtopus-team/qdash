@@ -81,9 +81,10 @@ OnFailure = Literal["continue", "stop"]
 
 MIGRATION_HINT = (
     "Task lists take TaskCall entries since spec version 2, e.g. "
-    'TaskCall(name="CheckRabi"). Convert saved flows with '
-    "`python -m qdash.common.migration.task_calls <file.py>`; see "
-    "docs/developer-guide/workflow/task-calls.md."
+    'TaskCall(name="CheckRabi"). Update the saved flow by hand: import TaskCall from '
+    "qdash.workflow and wrap each task name in TaskCall(name=...), giving a repeated task "
+    "a call_id per occurrence; see "
+    "docs/developer-guide/workflow/task-calls.md#migrate-saved-flows."
 )
 
 
