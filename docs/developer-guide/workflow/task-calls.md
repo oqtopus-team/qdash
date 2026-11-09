@@ -347,7 +347,7 @@ cal.run(
 For the low-level API, pass the setting with each call:
 `cal.execute_task("CheckRabi", qid, parameters={"update_calibration_parameters": False})`.
 [Parameter Resolution](./parameter-resolution.md#output-persistence) gives the full precedence and
-how Tasks quick runs map their `persist_output_parameters` request field.
+how single-task runs apply their `update_calibration_parameters` request field.
 
 ## Testing
 

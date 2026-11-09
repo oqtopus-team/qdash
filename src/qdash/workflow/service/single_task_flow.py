@@ -15,12 +15,17 @@ The shared finalizer preserves reservations belonging to other executions.
 from __future__ import annotations
 
 import contextlib
+import warnings
 from typing import Any
 
 from prefect import flow, get_run_logger
 
 from qdash.common.config.backend import get_default_backend
 from qdash.common.config.loader import ConfigLoader
+from qdash.datamodel.task_settings import (
+    LEGACY_UPDATE_CALIBRATION_PARAMETERS_DEPRECATION,
+    resolve_update_calibration_parameters_alias,
+)
 from qdash.workflow.engine.task_parameters import (
     UPDATE_CALIBRATION_PARAMETERS,
     merge_task_parameters,
@@ -36,28 +41,118 @@ from qdash.workflow.service.calib_service import (
 from qdash.workflow.service.github import GitHubPushConfig
 
 
+def _resolve_single_task_writeback(
+    task_name: str,
+    *,
+    update_calibration_parameters: bool | None,
+    persist_output_parameters: bool | None,
+    parameter_overrides: dict[str, Any] | None,
+    task_run_parameters: dict[str, dict[str, Any]] | None,
+    reconfigure: bool,
+) -> tuple[bool, dict[str, Any] | None, dict[str, dict[str, Any]] | None]:
+    """Resolve the one write-back control of a single-task run.
+
+    The top-level ``update_calibration_parameters`` controls the requested task
+    and the optional Configure call. Two migration inputs are still read:
+
+    - the deprecated top-level ``persist_output_parameters`` alias;
+    - an ``update_calibration_parameters`` nested in ``parameter_overrides`` or
+      in the ``task_run_parameters`` entry of a call this run executes.
+
+    A nested value that matches the top-level control is redundant; one that
+    differs is rejected. Without a top-level control, nested values that agree
+    become the control. Every legacy form warns. Nested values are stripped from
+    the returned settings so they cannot override the control. Raises
+    ``ValueError`` before any hardware session exists.
+
+    Returns:
+        The effective control and the stripped ``parameter_overrides`` and
+        ``task_run_parameters``.
+    """
+    logger = get_run_logger()
+    top_level = resolve_update_calibration_parameters_alias(
+        update_calibration_parameters, persist_output_parameters
+    )
+    if persist_output_parameters is not None:
+        warnings.warn(
+            LEGACY_UPDATE_CALIBRATION_PARAMETERS_DEPRECATION, DeprecationWarning, stacklevel=2
+        )
+        logger.warning(LEGACY_UPDATE_CALIBRATION_PARAMETERS_DEPRECATION)
+
+    executed = [task_name, *(["Configure"] if reconfigure else [])]
+    nested: dict[str, Any] = {}
+    overrides = dict(parameter_overrides) if parameter_overrides is not None else None
+    if overrides is not None and UPDATE_CALIBRATION_PARAMETERS in overrides:
+        nested["parameter_overrides"] = overrides.pop(UPDATE_CALIBRATION_PARAMETERS)
+    run_parameters = (
+        {
+            name: dict(entries) if isinstance(entries, dict) else entries
+            for name, entries in task_run_parameters.items()
+        }
+        if isinstance(task_run_parameters, dict)
+        else task_run_parameters
+    )
+    if isinstance(run_parameters, dict):
+        for name in executed:
+            entries = run_parameters.get(name)
+            if isinstance(entries, dict) and UPDATE_CALIBRATION_PARAMETERS in entries:
+                nested[f"task_run_parameters[{name!r}]"] = entries.pop(
+                    UPDATE_CALIBRATION_PARAMETERS
+                )
+    if not nested:
+        return (True if top_level is None else top_level), overrides, run_parameters
+
+    for source, value in nested.items():
+        if not isinstance(value, bool):
+            raise ValueError(f"{source}.update_calibration_parameters must be a boolean")
+    sources = ", ".join(f"{source}={value}" for source, value in nested.items())
+    if top_level is not None:
+        conflicting = {s: v for s, v in nested.items() if v is not top_level}
+        if conflicting:
+            raise ValueError(
+                f"update_calibration_parameters={top_level} conflicts with the nested "
+                f"update_calibration_parameters in {sources}; remove the nested value and "
+                "set only the top-level update_calibration_parameters"
+            )
+        effective = top_level
+    else:
+        if len(set(nested.values())) > 1:
+            raise ValueError(
+                f"Nested update_calibration_parameters values disagree ({sources}); one "
+                "control applies to every call of a single-task run, so set only the "
+                "top-level update_calibration_parameters"
+            )
+        effective = next(iter(nested.values()))
+    message = (
+        f"A nested update_calibration_parameters ({sources}) is deprecated for single-task "
+        "runs and will be removed; set the top-level update_calibration_parameters instead"
+    )
+    warnings.warn(message, DeprecationWarning, stacklevel=2)
+    logger.warning(message)
+    return effective, overrides, run_parameters
+
+
 def _single_task_defaults(
     task_name: str,
     *,
-    parameter_overrides: dict[str, dict[str, Any]] | None,
+    parameter_overrides: dict[str, Any] | None,
     task_run_parameters: dict[str, dict[str, Any]] | None,
-    persist_output_parameters: bool,
+    update_calibration_parameters: bool,
 ) -> dict[str, dict[str, Any]]:
     """Return the per-task defaults of one single-task run.
 
-    ``persist_output_parameters`` is the request's write-back control. It becomes
-    the requested task's fallback ``update_calibration_parameters``. Explicit
-    per-task settings take precedence, preserving the former session fallback.
+    The run's resolved ``update_calibration_parameters`` applies to the requested
+    task; nested values are already stripped by ``_resolve_single_task_writeback``.
     """
     writeback = normalize_task_parameters(
-        {task_name: {UPDATE_CALIBRATION_PARAMETERS: persist_output_parameters}}
+        {task_name: {UPDATE_CALIBRATION_PARAMETERS: update_calibration_parameters}}
     )
     requested = [
         task_parameters_from_run_parameters(task_run_parameters),
         # Request overrides ({"input": ..., "run": ...}) apply to the requested task.
         normalize_task_parameters({task_name: parameter_overrides or {}}),
     ]
-    return merge_task_parameters(writeback, *requested)
+    return merge_task_parameters(*requested, writeback)
 
 
 @flow(
@@ -78,11 +173,12 @@ def single_task_executor(
     source_task_id: str | None = None,
     parameter_overrides: dict[str, dict[str, Any]] | None = None,
     update_params: bool = True,
-    persist_output_parameters: bool = True,
+    update_calibration_parameters: bool | None = None,
     reconfigure: bool = False,
     backend_name: str | None = None,
     default_run_parameters: dict[str, Any] | None = None,
     task_run_parameters: dict[str, dict[str, Any]] | None = None,
+    persist_output_parameters: bool | None = None,
 ) -> Any:
     """Execute a single calibration task.
 
@@ -104,15 +200,32 @@ def single_task_executor(
             ``{"input": {...}, "run": {...}}``. They become that task's entry in
             ``task_parameters`` and are applied on top of the source snapshot.
         update_params: Force backend parameter updates regardless of quality checks.
-        persist_output_parameters: Fallback write-back setting for the requested
-            task and optional Configure call. Explicit per-task settings override
-            it. False also disables GitHub push independently of those settings.
+        update_calibration_parameters: Whether validated outputs of the requested
+            task and the optional Configure call replace the current calibration
+            values. Task history, figures and raw data are saved either way.
+            False also disables GitHub push. Defaults to True when omitted.
         default_run_parameters: Shared fallback run parameters for compatibility.
         task_run_parameters: Explicit run parameters keyed by task name.
+        persist_output_parameters: Deprecated alias of
+            ``update_calibration_parameters`` kept for runs queued by older API
+            servers. It warns, conflicts with a different canonical value raise
+            ``ValueError``, and it will be removed.
+
+    Raises:
+        ValueError: The write-back controls conflict. Raised before the
+            calibration session or hardware is touched.
 
     Returns:
         Task execution result dictionary
     """
+    writeback, parameter_overrides, task_run_parameters = _resolve_single_task_writeback(
+        task_name,
+        update_calibration_parameters=update_calibration_parameters,
+        persist_output_parameters=persist_output_parameters,
+        parameter_overrides=parameter_overrides,
+        task_run_parameters=task_run_parameters,
+        reconfigure=reconfigure,
+    )
     logger = get_run_logger()
     logger.info(
         f"Single-task executor: task={task_name}, qid={qid}, "
@@ -124,9 +237,9 @@ def single_task_executor(
         github_settings.get("enabled", True) is True
         and (backend_name or get_default_backend()) == "qubex"
     )
-    # Persistence controls publication; update_params only overrides quality checks.
+    # Write-back controls publication; update_params only overrides quality checks.
     push_config = GitHubPushConfig(
-        enabled=persist_output_parameters and github_enabled,
+        enabled=writeback and github_enabled,
         branch=github_settings.get("branch", "main"),
     )
 
@@ -141,7 +254,7 @@ def single_task_executor(
         task_name,
         parameter_overrides=parameter_overrides,
         task_run_parameters=task_run_parameters,
-        persist_output_parameters=persist_output_parameters,
+        update_calibration_parameters=writeback,
     )
     cal = CalibService(
         username,
@@ -166,15 +279,12 @@ def single_task_executor(
     try:
         if reconfigure:
             logger.info(f"Reconfiguring hardware for qid={qid} before executing {task_name}")
-            # Resolve the fallback at the call so a backend without Configure
-            # still fails here, rather than while validating service defaults.
-            configure_writeback = task_defaults.get("Configure", {}).get(
-                UPDATE_CALIBRATION_PARAMETERS, persist_output_parameters
-            )
+            # Pass the control on the call so a backend without Configure still
+            # fails here, rather than while validating service defaults.
             cal.execute_task(
                 "Configure",
                 qid,
-                parameters={UPDATE_CALIBRATION_PARAMETERS: configure_writeback},
+                parameters={UPDATE_CALIBRATION_PARAMETERS: writeback},
             )
 
         result = cal.execute_task(task_name, qid)

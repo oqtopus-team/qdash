@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from qdash.datamodel.sweep import Sweep
 
@@ -33,6 +33,44 @@ INPUT = "input"
 UPDATE_CALIBRATION_PARAMETERS = "update_calibration_parameters"
 SETTING_KEYS = frozenset({RUN, INPUT, UPDATE_CALIBRATION_PARAMETERS})
 _TASK_DETAILS_KEYS = SETTING_KEYS | {"run_parameters", "input_parameters", "calibration_inputs"}
+
+# Former name of the single-task request control, accepted only at the HTTP and
+# Prefect boundaries while old clients and queued runs migrate. It will be removed.
+LEGACY_UPDATE_CALIBRATION_PARAMETERS = "persist_output_parameters"
+LEGACY_UPDATE_CALIBRATION_PARAMETERS_DEPRECATION = (
+    "persist_output_parameters is deprecated and will be removed; send "
+    "update_calibration_parameters instead"
+)
+
+
+def resolve_update_calibration_parameters_alias(
+    update_calibration_parameters: Any,
+    persist_output_parameters: Any,
+) -> bool | None:
+    """Combine the canonical single-task control with its deprecated alias.
+
+    Returns the explicit value, or ``None`` when neither name was sent so the
+    caller applies its own default. Both names with the same value are accepted;
+    different values raise ``ValueError``. The caller warns about the alias.
+    """
+    for name, value in (
+        (UPDATE_CALIBRATION_PARAMETERS, update_calibration_parameters),
+        (LEGACY_UPDATE_CALIBRATION_PARAMETERS, persist_output_parameters),
+    ):
+        if value is not None and not isinstance(value, bool):
+            raise ValueError(f"{name} must be a boolean")
+    if persist_output_parameters is None:
+        return cast("bool | None", update_calibration_parameters)
+    if (
+        update_calibration_parameters is not None
+        and update_calibration_parameters != persist_output_parameters
+    ):
+        raise ValueError(
+            f"update_calibration_parameters={update_calibration_parameters} conflicts with "
+            f"the deprecated persist_output_parameters={persist_output_parameters}; "
+            "send only update_calibration_parameters"
+        )
+    return cast("bool", persist_output_parameters)
 
 
 def normalize_task_parameters(

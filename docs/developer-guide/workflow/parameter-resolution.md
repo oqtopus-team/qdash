@@ -192,7 +192,7 @@ The operation itself determines the baseline; no additional source selector is n
 
 This gives `re-execution` one stable meaning: reproduce the recorded execution conditions, optionally with explicit parameter overrides. Running the same task against current calibration state is a new Tasks quick run, not a re-execution mode.
 
-`user_override` and `persist_output_parameters` remain independent policies. A permitted override has the highest precedence; choosing to persist new outputs does not change how inputs were selected.
+`user_override` and `update_calibration_parameters` remain independent policies. A permitted override has the highest precedence; choosing to update calibration values does not change how inputs were selected.
 
 ```mermaid
 flowchart TD
@@ -354,11 +354,22 @@ per-task defaults with their session configuration, so a worker resolves the sam
 parent session. `CalibService` no longer accepts `persist_output_parameters`; passing it raises a
 `TypeError`. [Task Calls](./task-calls.md#migrate-session-write-back) shows the migration.
 
-Tasks quick runs, agent actions, and task re-executions keep their `persist_output_parameters`
-request field. `single-task-executor` turns it into `update_calibration_parameters` for the
-requested task as a fallback; explicit per-task settings take precedence. The optional
-`Configure` call resolves its setting the same way. A `false` request disables GitHub push
-even when an explicit task setting enables calibration write-back.
+Tasks quick runs, agent actions, and task re-executions run through `single-task-executor`, which
+takes one top-level `update_calibration_parameters` field. Its value applies to the requested task
+and to the optional `Configure` call, and `false` also disables GitHub push. Omitting it keeps the
+surface's default: `false` for the `quickRunTask` request, `true` for the flow and task
+re-execution. Agent actions always send `false`.
+
+The flow normalizes two migration inputs before it opens a calibration session, so an invalid
+request never reaches hardware:
+
+| Input | Accepted | Rejected |
+| --- | --- | --- |
+| Deprecated `persist_output_parameters` on the `quickRunTask` request or the flow | Alone, or equal to `update_calibration_parameters`; logs a deprecation warning | A value that differs from `update_calibration_parameters`: HTTP 422, or a `ValueError` in the flow |
+| `update_calibration_parameters` nested in `parameter_overrides` or in the `task_run_parameters` entry of the requested task or `Configure` | Equal to the top-level value, or without a top-level value when all nested values agree; warns, then is removed from the settings | A value that differs from the top-level value or from another nested value |
+
+The deprecated name and the nested form will be removed in a later release. A run queued with
+`persist_output_parameters` before an upgrade still applies its value, `false` included.
 
 A successful measurement-only task keeps its outputs in task history and metrics but does not
 replace current calibration values, update the workflow's in-memory calibration state, or update
@@ -376,7 +387,7 @@ When persistence is enabled:
 - Successful qubit outputs are synchronized through the backend parameter updater.
 - Failed validation skips backend parameter updates unless `force_update_params` is true.
 
-The API field `update_params` is passed to `single-task-executor` as `force_update_params` and also controls GitHub integration for that run. It does not replace `persist_output_parameters`; persistence must be enabled before output values can be written.
+The API field `update_params` is passed to `single-task-executor` as `force_update_params`. It does not replace `update_calibration_parameters`; updates must be enabled before output values can be written.
 
 ## Implementation files
 

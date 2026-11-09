@@ -615,7 +615,7 @@ class TestTaskCalibrationParameterUpdates:
         prepare_context.assert_called_once_with(
             "0",
             None,
-            persist_output_parameters=False,
+            update_calibration_parameters=False,
         )
         merge_results.assert_called_once_with(
             executed_context,
@@ -661,7 +661,7 @@ class TestTaskCalibrationParameterUpdates:
         prepare_context.assert_called_once_with(
             ["0", "1"],
             None,
-            persist_output_parameters=False,
+            update_calibration_parameters=False,
         )
         merge_results.assert_called_once_with(
             executed_context,

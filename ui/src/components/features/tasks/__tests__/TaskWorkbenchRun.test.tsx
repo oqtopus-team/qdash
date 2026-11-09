@@ -159,7 +159,7 @@ describe("TaskWorkbench run availability", () => {
         source_task_id: "source-task",
         run_parameter_overrides: { shots: 200 },
         input_parameter_overrides: { qubit_frequency: 5.2 },
-        persist_output_parameters: false,
+        update_calibration_parameters: false,
         update_params: false,
         reconfigure: false,
       }),
@@ -332,7 +332,7 @@ describe("TaskWorkbench run availability", () => {
     expect(screen.getByText("11 points: 100 to 100000")).toBeInTheDocument();
   });
 
-  it("uses the same save and reconfigure controls for re-execution", async () => {
+  it("uses the same update and reconfigure controls for re-execution", async () => {
     renderWorkbench(
       {
         input_parameters: {
@@ -343,8 +343,10 @@ describe("TaskWorkbench run availability", () => {
       source,
     );
     const save = screen.getByRole("checkbox", {
-      name: /Save calibrated outputs to DB/,
+      name: /Update calibration values/,
     });
+    // Turning updates off must not read as discarding the run.
+    expect(save).toHaveAccessibleName(/still saved in task history/);
     const reconfigure = screen.getByRole("checkbox", {
       name: /Reconfigure hardware first/,
     });
@@ -368,7 +370,7 @@ describe("TaskWorkbench run availability", () => {
         source_task_id: "source-task",
         run_parameter_overrides: {},
         input_parameter_overrides: { qubit_frequency: 5.2 },
-        persist_output_parameters: true,
+        update_calibration_parameters: true,
         update_params: false,
         reconfigure: true,
       }),

@@ -43,7 +43,7 @@ def test_single_task_publication_follows_persistence_and_integration(
         qid="0",
         task_name="CheckRabi",
         backend_name=backend,
-        persist_output_parameters=persist,
+        update_calibration_parameters=persist,
         update_params=force,
     )
 
@@ -198,7 +198,7 @@ def test_single_task_executor_accepts_quick_run_parameters(monkeypatch, source_t
         backend_name="fake",
         source_task_id=source_task_id,
         task_run_parameters=defaults,
-        persist_output_parameters=False,
+        update_calibration_parameters=False,
         update_params=False,
     )
 
@@ -255,53 +255,120 @@ def test_single_task_executor_scopes_request_overrides_to_the_task(monkeypatch):
     }
 
 
-@pytest.mark.parametrize(
-    ("persist", "requested", "expected"),
-    [
-        # Explicit per-task settings override the request fallback.
-        (False, True, True),
-        (False, None, False),
-        # A writing request keeps an explicit per-task False.
-        (True, False, False),
-        (True, None, True),
-    ],
-)
-@pytest.mark.parametrize("source", ["task_run_parameters", "parameter_overrides"])
-def test_single_task_executor_resolves_writeback_per_task(
-    monkeypatch, persist, requested, expected, source
-):
+def _run_single_task(monkeypatch: pytest.MonkeyPatch, **request: Any) -> Any:
+    """Run the flow with a mocked CalibService and return the mock."""
     from unittest.mock import MagicMock
 
     from qdash.workflow.service.single_task_flow import single_task_executor
 
     service = MagicMock()
     monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
-    setting = {} if requested is None else {"update_calibration_parameters": requested}
-    request: dict[str, Any] = (
-        {"task_run_parameters": {"CheckRabi": setting}}
-        if source == "task_run_parameters"
-        else {"parameter_overrides": setting}
+    monkeypatch.setattr(
+        "qdash.workflow.service.single_task_flow.ConfigLoader.load_workflow",
+        lambda: {"github": {"enabled": True}},
     )
-
     single_task_executor(
         username="alice",
         chip_id="chip-1",
         qid="0",
         task_name="CheckRabi",
         project_id="project-1",
-        backend_name="fake",
-        persist_output_parameters=persist,
+        backend_name="qubex",
         **request,
     )
-
-    defaults = service.call_args.kwargs["_task_defaults"]
-    assert defaults["CheckRabi"]["update_calibration_parameters"] is expected
-    assert service.call_args.kwargs["github_push_config"].enabled is False
+    return service
 
 
-@pytest.mark.parametrize("persist", [False, True])
-@pytest.mark.parametrize("configured", [None, False, True])
-def test_single_task_executor_resolves_reconfigure_writeback(monkeypatch, persist, configured):
+def _writeback(service: Any) -> dict[str, Any]:
+    """Return what the run applied to each executed call and to GitHub publication."""
+    kwargs = service.call_args.kwargs
+    applied = {"CheckRabi": kwargs["_task_defaults"]["CheckRabi"]["update_calibration_parameters"]}
+    for call in service.return_value.execute_task.call_args_list:
+        if call.args[0] == "Configure":
+            applied["Configure"] = call.kwargs["parameters"]["update_calibration_parameters"]
+    applied["github"] = kwargs["github_push_config"].enabled
+    return applied
+
+
+@pytest.mark.parametrize(
+    ("request_fields", "expected", "deprecated"),
+    [
+        # Omitted keeps the deployment default.
+        ({}, True, False),
+        ({"update_calibration_parameters": True}, True, False),
+        ({"update_calibration_parameters": False}, False, False),
+        # Runs queued by an older API server still apply their value, False included.
+        ({"persist_output_parameters": True}, True, True),
+        ({"persist_output_parameters": False}, False, True),
+        (
+            {"update_calibration_parameters": False, "persist_output_parameters": False},
+            False,
+            True,
+        ),
+    ],
+)
+@pytest.mark.parametrize("reconfigure", [False, True])
+def test_single_task_executor_resolves_one_writeback_control(
+    monkeypatch, request_fields, expected, deprecated, reconfigure
+):
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        service = _run_single_task(monkeypatch, reconfigure=reconfigure, **request_fields)
+
+    applied = _writeback(service)
+    assert applied == {
+        "CheckRabi": expected,
+        **({"Configure": expected} if reconfigure else {}),
+        "github": expected,
+    }
+    assert "persist_output_parameters" not in service.call_args.kwargs
+    messages = [str(w.message) for w in caught if w.category is DeprecationWarning]
+    assert any("persist_output_parameters is deprecated" in m for m in messages) is deprecated
+
+
+@pytest.mark.parametrize(
+    "request_fields",
+    [
+        {"update_calibration_parameters": True, "persist_output_parameters": False},
+        {"update_calibration_parameters": False, "persist_output_parameters": True},
+        # A nested value cannot silently override the top-level control...
+        {
+            "update_calibration_parameters": True,
+            "parameter_overrides": {"update_calibration_parameters": False},
+        },
+        {
+            "update_calibration_parameters": False,
+            "task_run_parameters": {"CheckRabi": {"update_calibration_parameters": True}},
+        },
+        # ...including on the Configure call it also controls.
+        {
+            "update_calibration_parameters": False,
+            "reconfigure": True,
+            "task_run_parameters": {"Configure": {"update_calibration_parameters": True}},
+        },
+        {
+            "persist_output_parameters": True,
+            "parameter_overrides": {"update_calibration_parameters": False},
+        },
+        # Without a top-level control, nested values must agree across executed calls.
+        {
+            "reconfigure": True,
+            "task_run_parameters": {
+                "CheckRabi": {"update_calibration_parameters": False},
+                "Configure": {"update_calibration_parameters": True},
+            },
+        },
+        {
+            "parameter_overrides": {"update_calibration_parameters": False},
+            "task_run_parameters": {"CheckRabi": {"update_calibration_parameters": True}},
+        },
+        {"parameter_overrides": {"update_calibration_parameters": "false"}},
+        {"update_calibration_parameters": "false", "persist_output_parameters": False},
+    ],
+)
+def test_single_task_executor_rejects_conflicts_before_hardware(monkeypatch, request_fields):
     from unittest.mock import MagicMock
 
     from qdash.workflow.service.single_task_flow import single_task_executor
@@ -309,34 +376,83 @@ def test_single_task_executor_resolves_reconfigure_writeback(monkeypatch, persis
     service = MagicMock()
     monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
 
-    single_task_executor(
-        username="alice",
-        chip_id="chip-1",
-        qid="0",
-        task_name="CheckRabi",
-        project_id="project-1",
-        persist_output_parameters=persist,
-        reconfigure=True,
-        task_run_parameters=(
-            None
-            if configured is None
-            else {"Configure": {"update_calibration_parameters": configured}}
-        ),
-    )
+    with pytest.raises(Exception, match="update_calibration_parameters"):
+        single_task_executor(
+            username="alice",
+            chip_id="chip-1",
+            qid="0",
+            task_name="CheckRabi",
+            project_id="project-1",
+            backend_name="fake",
+            **request_fields,
+        )
 
+    # No calibration session, hence no hardware connection or lock, was created.
+    service.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("request_fields", "expected"),
+    [
+        # A redundant nested value equal to the top-level control is accepted.
+        (
+            {
+                "update_calibration_parameters": False,
+                "reconfigure": True,
+                "parameter_overrides": {"update_calibration_parameters": False},
+                "task_run_parameters": {
+                    "CheckRabi": {"update_calibration_parameters": False},
+                    "Configure": {"update_calibration_parameters": False},
+                },
+            },
+            False,
+        ),
+        # Nested-only values become the control of every executed call.
+        ({"parameter_overrides": {"update_calibration_parameters": False}}, False),
+        (
+            {
+                "reconfigure": True,
+                "task_run_parameters": {"CheckRabi": {"update_calibration_parameters": False}},
+            },
+            False,
+        ),
+        (
+            {
+                "reconfigure": True,
+                "task_run_parameters": {"Configure": {"update_calibration_parameters": False}},
+            },
+            False,
+        ),
+    ],
+)
+def test_single_task_executor_migrates_nested_writeback(monkeypatch, request_fields, expected):
+    with pytest.warns(DeprecationWarning, match="set the top-level update_calibration_parameters"):
+        service = _run_single_task(monkeypatch, **request_fields)
+
+    applied = _writeback(service)
+    assert applied["CheckRabi"] is expected
+    assert applied["github"] is expected
+    if request_fields.get("reconfigure"):
+        assert applied["Configure"] is expected
+    # The nested value is stripped, so only the control reaches the session.
     defaults = service.call_args.kwargs["_task_defaults"]
-    assert set(defaults) == ({"CheckRabi"} if configured is None else {"CheckRabi", "Configure"})
-    assert defaults["CheckRabi"]["update_calibration_parameters"] is persist
-    configure, task = service.return_value.execute_task.call_args_list
-    assert configure.args == ("Configure", "0")
-    assert configure.kwargs == {
-        "parameters": {
-            "update_calibration_parameters": persist if configured is None else configured
-        }
-    }
-    assert task.args == ("CheckRabi", "0")
-    assert defaults["CheckRabi"]["update_calibration_parameters"] is persist
-    assert service.return_value.execute_task.call_args_list[0].args == ("Configure", "0")
+    assert "update_calibration_parameters" not in defaults.get("Configure", {})
+
+
+def test_single_task_executor_ignores_settings_of_calls_it_does_not_run(monkeypatch):
+    """A nested value on a call outside this run neither conflicts nor warns."""
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        service = _run_single_task(
+            monkeypatch,
+            update_calibration_parameters=True,
+            task_run_parameters={"Configure": {"update_calibration_parameters": False}},
+        )
+
+    assert _writeback(service) == {"CheckRabi": True, "github": True}
+    service.return_value.execute_task.assert_called_once_with("CheckRabi", "0")
 
 
 @pytest.mark.parametrize(

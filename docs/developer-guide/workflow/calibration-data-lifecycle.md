@@ -92,8 +92,8 @@ roll the MongoDB value back.
 `update_calibration_parameters` is the write-back control, resolved for each task call: the call's
 own value, then the task's per-task default, then `True`. Normal workflows therefore write back by
 default. Tasks quick runs default to disabled because the single-task flow turns the request's
-`persist_output_parameters` field into the task's setting. The resolved value is passed into the
-task context.
+top-level `update_calibration_parameters` field into the task's setting. The resolved value is
+passed into the task context.
 
 The control is independent of parameter resolution. It changes where validated outputs are
 published, not which Input or Run parameters the experiment uses. See

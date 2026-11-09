@@ -620,7 +620,7 @@ async def test_execute_single_task_uses_the_requested_execution_name(
     call = coordinator.run_calls[0]
     assert call["name"] == expected_flow_name
     assert call["parameters"]["flow_name"] == expected_flow_name
-    assert call["parameters"]["persist_output_parameters"] is True
+    assert call["parameters"]["update_calibration_parameters"] is True
     assert call.get("workflow", False) is False
 
 
@@ -643,7 +643,7 @@ async def test_execute_single_task_supports_quick_run_without_snapshot(
         execution_name="quick-run:CheckRabi",
         backend_name="fake",
         task_run_parameters=task_run_parameters,
-        persist_output_parameters=False,
+        update_calibration_parameters=False,
         update_params=False,
     )
 
@@ -651,7 +651,7 @@ async def test_execute_single_task_supports_quick_run_without_snapshot(
     assert parameters["source_execution_id"] is None
     assert parameters["backend_name"] == "fake"
     assert parameters["task_run_parameters"] == task_run_parameters
-    assert parameters["persist_output_parameters"] is False
+    assert parameters["update_calibration_parameters"] is False
     assert parameters["update_params"] is False
 
 

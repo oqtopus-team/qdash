@@ -636,3 +636,115 @@ async def test_re_execute_keeps_session_duration_out_of_undeclared_run_overrides
     assert sent["default_run_parameters"] == {
         "readout_duration": {"value": 1024, "value_type": "float"}
     }
+
+
+def _no_task_service() -> SimpleNamespace:
+    return SimpleNamespace()
+
+
+def _quick_run_client(execute: AsyncMock, monkeypatch: pytest.MonkeyPatch) -> Any:
+    """Return a client that posts quick runs through the real router and schema."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from qdash.api.dependencies import get_flow_service, get_task_file_service, get_task_service
+    from qdash.api.lib.project import get_project_context_editor
+    from qdash.api.routers.task import router
+
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.get_available_backends", lambda: ["fake"]
+    )
+    monkeypatch.setattr(
+        "qdash.api.services.catalog_task_run.is_task_available", lambda *_args: True
+    )
+    execute.return_value = ExecuteFlowResponse(
+        execution_id="exec-1", flow_run_id="run-1", flow_run_url="", qdash_ui_url="", message="ok"
+    )
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_project_context_editor] = _project_context
+    app.dependency_overrides[get_flow_service] = lambda: SimpleNamespace(
+        execute_single_task_from_snapshot=execute
+    )
+    app.dependency_overrides[get_task_file_service] = lambda: _task_file_service(_task_info())
+    app.dependency_overrides[get_task_service] = _no_task_service
+    return TestClient(app)
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected", "deprecated"),
+    [
+        ({}, False, False),
+        ({"update_calibration_parameters": True}, True, False),
+        ({"update_calibration_parameters": False}, False, False),
+        # Old clients keep working, explicit False included.
+        ({"persist_output_parameters": True}, True, True),
+        ({"persist_output_parameters": False}, False, True),
+        ({"persist_output_parameters": None}, False, False),
+        (
+            {"update_calibration_parameters": True, "persist_output_parameters": True},
+            True,
+            True,
+        ),
+        (
+            {"update_calibration_parameters": False, "persist_output_parameters": False},
+            False,
+            True,
+        ),
+    ],
+)
+def test_quick_run_resolves_update_calibration_parameters(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    fields: dict[str, Any],
+    expected: bool,
+    deprecated: bool,
+) -> None:
+    execute = AsyncMock()
+    client = _quick_run_client(execute, monkeypatch)
+
+    with caplog.at_level("WARNING", logger="qdash.api.schemas.task"):
+        response = client.post(
+            "/tasks/CheckRabi/execute",
+            json={"chip_id": "chip-1", "qid": "0", "backend_name": "fake", **fields},
+        )
+
+    assert response.status_code == 200, response.text
+    sent = execute.await_args_list[0].kwargs
+    assert sent["update_calibration_parameters"] is expected
+    assert "persist_output_parameters" not in sent
+    assert ("persist_output_parameters is deprecated" in caplog.text) is deprecated
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"update_calibration_parameters": True, "persist_output_parameters": False},
+        {"update_calibration_parameters": False, "persist_output_parameters": True},
+    ],
+)
+def test_quick_run_rejects_conflicting_update_aliases(
+    monkeypatch: pytest.MonkeyPatch, fields: dict[str, Any]
+) -> None:
+    execute = AsyncMock()
+    client = _quick_run_client(execute, monkeypatch)
+
+    response = client.post(
+        "/tasks/CheckRabi/execute",
+        json={"chip_id": "chip-1", "qid": "0", "backend_name": "fake", **fields},
+    )
+
+    assert response.status_code == 422
+    assert "conflicts with the deprecated persist_output_parameters" in response.text
+    execute.assert_not_awaited()
+
+
+def test_quick_run_schema_marks_the_old_name_deprecated() -> None:
+    schema = QuickRunTaskRequest.model_json_schema()
+    assert schema["properties"]["update_calibration_parameters"]["default"] is False
+    assert schema["properties"]["persist_output_parameters"]["deprecated"] is True
+    dumped = QuickRunTaskRequest.model_validate(
+        {"chip_id": "chip-1", "qid": "0", "persist_output_parameters": True}
+    ).model_dump()
+    assert dumped["update_calibration_parameters"] is True
+    assert "persist_output_parameters" not in dumped

@@ -448,7 +448,7 @@ class CalibOrchestrator:
         exec_context = self._prepare_execution_context(
             qid,
             upstream_id,
-            persist_output_parameters=update_calibration_parameters,
+            update_calibration_parameters=update_calibration_parameters,
         )
 
         planned = exec_context.state.ensure_task_exists(task_name, task_type, qid)
@@ -499,7 +499,7 @@ class CalibOrchestrator:
         exec_context = self._prepare_batch_execution_context(
             qids,
             upstream_id,
-            persist_output_parameters=update_calibration_parameters,
+            update_calibration_parameters=update_calibration_parameters,
         )
         planned_ids: dict[str, str] = {}
         for qid in qids:
@@ -633,7 +633,7 @@ class CalibOrchestrator:
         qid: str,
         upstream_id: str | None,
         *,
-        persist_output_parameters: bool,
+        update_calibration_parameters: bool,
     ) -> TaskContext:
         """Prepare a TaskContext for task execution."""
         from copy import deepcopy
@@ -652,7 +652,7 @@ class CalibOrchestrator:
             snapshot_loader=self._snapshot_loader,
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
-            persist_output_parameters=persist_output_parameters,
+            update_calibration_parameters=update_calibration_parameters,
         )
 
         # Copy relevant calibration data
@@ -683,7 +683,7 @@ class CalibOrchestrator:
         qids: list[str],
         upstream_id: str | None,
         *,
-        persist_output_parameters: bool,
+        update_calibration_parameters: bool,
     ) -> TaskContext:
         """Prepare a TaskContext for batch task execution."""
         from copy import deepcopy
@@ -700,7 +700,7 @@ class CalibOrchestrator:
             snapshot_loader=self._snapshot_loader,
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
-            persist_output_parameters=persist_output_parameters,
+            update_calibration_parameters=update_calibration_parameters,
         )
 
         relevant_qids: list[str] = []

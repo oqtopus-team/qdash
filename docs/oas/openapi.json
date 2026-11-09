@@ -28042,15 +28042,29 @@
             "title": "Reconfigure",
             "default": false
           },
-          "persist_output_parameters": {
+          "update_calibration_parameters": {
             "type": "boolean",
-            "title": "Persist Output Parameters",
+            "title": "Update Calibration Parameters",
+            "description": "Replace the current calibration values with the task's validated outputs. When false, the run still saves its task history, figures and raw data.",
             "default": false
           },
           "update_params": {
             "type": "boolean",
             "title": "Update Params",
             "default": false
+          },
+          "persist_output_parameters": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persist Output Parameters",
+            "description": "Deprecated alias of update_calibration_parameters; it will be removed. A value that differs from update_calibration_parameters is rejected.",
+            "deprecated": true
           }
         },
         "type": "object",
