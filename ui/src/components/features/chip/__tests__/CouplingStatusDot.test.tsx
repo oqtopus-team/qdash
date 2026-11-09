@@ -15,7 +15,7 @@ describe("CouplingStatusDot", () => {
         className="bg-success"
         style={{ position: "absolute", left: 0, top: 0 }}
         onClick={vi.fn()}
-      />
+      />,
     );
 
     const button = screen.getByRole("button");
