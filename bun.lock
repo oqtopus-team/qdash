@@ -4,6 +4,10 @@
   "workspaces": {
     "": {
       "name": "qdash-workspace",
+      "dependencies": {
+        "@json-render/core": "0.22.0",
+        "zod": "^4.4.3",
+      },
     },
     "agent-runtime": {
       "name": "qdash-agent-runtime",
@@ -13,10 +17,8 @@
         "@earendil-works/pi-coding-agent": "1.4.0",
         "@earendil-works/pi-durable": "1.4.0",
         "@earendil-works/pi-env": "1.4.0",
-        "@json-render/core": "0.22.0",
         "typebox": "^1.0.55",
         "yaml": "^2.8.0",
-        "zod": "^4.4.3",
       },
       "devDependencies": {
         "@oqtopus-team/pi-qcaleval": "workspace:*",

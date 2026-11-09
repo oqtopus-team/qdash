@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { toNdjsonEvents } from "../src/events.ts";
@@ -219,4 +220,24 @@ test("tool details with an unknown version or invalid spec stream no ui line", (
     result: { details: { ui: { version: 1, spec: { root: 1 }, fallback: "x" } } },
   });
   assert.deepEqual(events, [{ type: "tool_end", name: "render_ui", isError: false }]);
+});
+
+// ui/src/lib/copilotUiSpec.ts lives outside every root workspace package, so its
+// bare imports resolve by walking up from ui/src/lib: to ui/node_modules in the UI
+// build, and to the root workspace's node_modules in the runtime (CI and the
+// image install no UI dependencies). The root manifest must declare each of them,
+// with the UI's range, so both ends validate with the same libraries.
+test("the shared render_ui catalog's dependencies are declared by the root workspace", () => {
+  const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+  const source = read("../../ui/src/lib/copilotUiSpec.ts");
+  const imports = new Set(
+    [...source.matchAll(/^import\s[^;]*?\sfrom\s+"([^"./][^"]*)"/gms)].map(([, name]) => name),
+  );
+  assert.deepEqual([...imports].sort(), ["@json-render/core", "zod"]);
+  const root = JSON.parse(read("../../package.json")).dependencies ?? {};
+  const ui = JSON.parse(read("../../ui/package.json")).dependencies ?? {};
+  for (const name of imports) {
+    assert.ok(root[name], `${name} is missing from the root package.json dependencies`);
+    assert.equal(root[name], ui[name], `${name} range differs between root and ui package.json`);
+  }
 });

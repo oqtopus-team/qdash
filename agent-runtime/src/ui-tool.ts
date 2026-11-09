@@ -4,7 +4,8 @@ import { Type } from "typebox";
 
 // The catalog, validation and fallback text are shared with the chat, which
 // validates the stored spec again before rendering it. The Dockerfile copies
-// this file into the image.
+// this file into the image. Its imports resolve from the root workspace's
+// node_modules, so the root package.json declares them, not this package.
 import {
   UI_BLOCK_VERSION,
   UI_COMPONENT_TYPES,

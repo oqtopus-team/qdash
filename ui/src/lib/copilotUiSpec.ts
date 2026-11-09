@@ -5,7 +5,9 @@
  * spec with it before the tool succeeds (agent-runtime/src/ui-tool.ts imports
  * this file), and the chat validates the stored spec again before rendering
  * it. Keep this module free of React and of `@/` imports so the runtime can
- * load it, and within the ES2020 library the UI compiles against.
+ * load it, and within the ES2020 library the UI compiles against. The runtime
+ * resolves its package imports from the repository root workspace, so declare
+ * any new one in the root package.json too, with the range ui/package.json uses.
  *
  * Specs use json-render's flat format (`root` plus an `elements` map). Only
  * `type`, `props` and `children` are accepted on an element: no state,
