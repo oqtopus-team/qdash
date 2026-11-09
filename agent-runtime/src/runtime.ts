@@ -36,6 +36,13 @@ import {
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
 import { chartTool } from "./chart-tool.ts";
 import { uiTool } from "./ui-tool.ts";
+import {
+  buildPresentationTools,
+  PRESENTATION_GUIDELINE,
+  PRESENT_TOOL,
+  configurePresentation,
+} from "./presentation-tool.ts";
+import { configureClassifierModels, readClassifierConfig } from "./classifier-models.ts";
 import { loadLanguageConfig } from "./config.ts";
 import { ExecWorkspace, execConfigFromEnv, removeWorkspace, WORKSPACE_TOOL_NAMES } from "./exec-env.ts";
 import { askUserTool } from "./ask-tool.ts";
@@ -94,6 +101,9 @@ const COPILOT_CONFIG_PATH = process.env.COPILOT_CONFIG_PATH ?? "/app/config/copi
 const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
 const EVALUATION_CONFIG_PATH =
   process.env.EVALUATION_CONFIG_PATH ?? "/app/config/copilot/evaluation.yaml";
+// Optional: the classifier models QDash features may use.
+const CLASSIFIER_CONFIG_PATH =
+  process.env.CLASSIFIER_CONFIG_PATH ?? "/app/config/copilot/classifier.yaml";
 // One model request; a whole turn is bounded by the server's own timers.
 const MODEL_STREAM_TIMEOUT_MS = Number(process.env.MODEL_STREAM_TIMEOUT_MS ?? 180_000);
 // The Copilot workspace (agent-exec container); without it the chat has no
@@ -298,6 +308,15 @@ export class SharedRuntime {
       TRUSTED_EXTENSION_PACKAGES,
     );
 
+    const classifiers = configureClassifierModels(
+      readClassifierConfig(CLASSIFIER_CONFIG_PATH),
+      modelRuntime,
+      process.env,
+      console,
+    );
+    const presentation = configurePresentation(readFileSync(CHAT_CONFIG_PATH, "utf8"), classifiers, console);
+    const presentationTools = presentation ? buildPresentationTools(presentation) : [];
+
     // Built once: the same text every chat gets and Settings shows read-only.
     const systemPrompt = buildSystemPrompt(
       responseLanguage,
@@ -306,11 +325,18 @@ export class SharedRuntime {
       toolGuide,
       localToolGuide,
       EXEC_CONFIG !== undefined,
+      presentation ? PRESENTATION_GUIDELINE : null,
     );
     const copilotExtension = defineExtension({
       name: "qdash-copilot",
       sections: [section("qdash-copilot", () => systemPrompt, { tag: false })],
-      tools: [chartTool, uiTool, askUserTool, ...(skills.length ? [buildSkillTool(skills)] : [])],
+      tools: [
+        chartTool,
+        uiTool,
+        ...presentationTools,
+        askUserTool,
+        ...(skills.length ? [buildSkillTool(skills)] : []),
+      ],
     });
     const buildChatRegistry = (
       connection: QDashConnection,
@@ -360,6 +386,7 @@ export class SharedRuntime {
       ...qdashToolNames,
       "render_chart",
       "render_ui",
+      ...(presentation ? [PRESENT_TOOL] : []),
       "ask_user",
       ...(EXEC_CONFIG ? WORKSPACE_TOOL_NAMES : []),
       ...(skills.length ? ["read_skill"] : []),

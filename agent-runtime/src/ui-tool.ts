@@ -1,6 +1,5 @@
 import type { JsonValue } from "@earendil-works/chord";
 import { defineTool } from "@earendil-works/pi-durable";
-import { Type, type Static } from "typebox";
 
 // The catalog, validation and fallback text are shared with the chat, which
 // validates the stored spec again before rendering it. The Dockerfile copies
@@ -8,13 +7,19 @@ import { Type, type Static } from "typebox";
 // node_modules, so the root package.json declares them, not this package.
 import {
   UI_BLOCK_VERSION,
-  UI_COMPONENT_TYPES,
   UI_SPEC_LIMITS,
   uiCatalogPrompt,
   uiSpecToText,
   validateUiSpec,
   type UiBlockPayload,
 } from "../../ui/src/lib/copilotUiSpec.ts";
+import {
+  UI_INPUT_GROUPS,
+  UI_TOOL_PARAMETERS,
+  specFromToolArgs,
+  toolArgsFromSpec,
+  type UiToolArgs,
+} from "./ui-tool-input.ts";
 
 export {
   UI_BLOCK_VERSION,
@@ -85,18 +90,9 @@ function locateBracketProblem(text: string): string | undefined {
   return undefined;
 }
 
-/**
- * Accepts `spec` sent as a string holding JSON, which some models and
- * providers produce for an object argument, by parsing it into the object the
- * schema expects. Malformed JSON is rejected with its location rather than
- * repaired, so the model resends a correct spec. Anything other than a string
- * `spec` is returned unchanged for schema validation.
- */
-export function prepareUiArguments(args: unknown): UiToolArgs {
-  if (!args || typeof args !== "object" || Array.isArray(args)) return args as UiToolArgs;
-  const { spec } = args as { spec?: unknown };
-  if (typeof spec !== "string") return args as UiToolArgs;
-  const advice = "Send `spec` as a JSON object, not a string.";
+/** The earlier `{ spec }` form's spec, parsed when it was sent as a JSON string. */
+function parseSpecString(spec: string): unknown {
+  const advice = "Send the elements as JSON objects, not as a string.";
   if (spec.length > MAX_SPEC_STRING_LENGTH) {
     throw new Error(
       `render_ui spec is a ${spec.length}-character string; the limit is ${UI_SPEC_LIMITS.maxBytes} characters of compact JSON. ${advice}`,
@@ -109,77 +105,135 @@ export function prepareUiArguments(args: unknown): UiToolArgs {
     const reason = error instanceof Error ? error.message : String(error);
     const where = locateBracketProblem(spec);
     throw new Error(
-      `render_ui spec was sent as a string that is not valid JSON (${reason})${where ? `; ${where}` : ""}. ${advice} Each element's props and children belong inside that element, and every element inside \`elements\`.`,
+      `render_ui spec was sent as a string that is not valid JSON (${reason})${where ? `; ${where}` : ""}. ${advice} Each element's fields belong inside that element.`,
     );
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error(`render_ui spec string must hold a JSON object with root and elements. ${advice}`);
   }
-  return { ...(args as Record<string, unknown>), spec: parsed } as UiToolArgs;
+  return parsed;
 }
 
-const UI_PARAMETERS = Type.Object({
-  spec: Type.Object(
-    {
-      root: Type.String({ description: "Id of the top element." }),
-      elements: Type.Record(
-        Type.String(),
-        Type.Object({
-          // `{ type, enum }` rather than a literal union, for vLLM guided decoding.
-          type: Type.Unsafe<string>({ type: "string", enum: [...UI_COMPONENT_TYPES] }),
-          props: Type.Record(Type.String(), Type.Any(), {
-            description: "The component's props, as listed in the tool description.",
-          }),
-          children: Type.Optional(Type.Array(Type.String())),
-        }),
-        { description: "Elements by id." },
-      ),
-    },
-    { description: "json-render flat spec, as a JSON object (not a JSON-encoded string)." },
-  ),
-});
+/** An element list sent as a JSON string, parsed; malformed JSON is rejected with its location. */
+function parseGroupString(group: string, text: string): unknown {
+  const advice = `Send \`${group}\` as a JSON array, not a string.`;
+  if (text.length > MAX_SPEC_STRING_LENGTH) {
+    throw new Error(`render_ui ${group} is a ${text.length}-character string. ${advice}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    const where = locateBracketProblem(text);
+    throw new Error(
+      `render_ui ${group} was sent as a string that is not valid JSON (${reason})${where ? `; ${where}` : ""}. ${advice}`,
+    );
+  }
+  if (!Array.isArray(parsed)) throw new Error(`render_ui ${group} string must hold a JSON array. ${advice}`);
+  return parsed;
+}
 
-/** The arguments as `parameters` declares them; the harness validates them after `prepareArguments`. */
-type UiToolArgs = Static<typeof UI_PARAMETERS>;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** One element in a form models often send instead of the declared one, rewritten; anything else unchanged. */
+function prepareElement(group: string, item: unknown): unknown {
+  if (!isRecord(item)) return item;
+  if (group === "tables" && Array.isArray(item.rows) && Array.isArray(item.columns)) {
+    const keys = item.columns.map((column) => (isRecord(column) ? column.key : undefined));
+    // Rows keyed by column, as the stored spec keeps them, become cell lists.
+    const rows = item.rows.map((row) =>
+      isRecord(row) ? keys.map((key) => (typeof key === "string" && Object.hasOwn(row, key) ? row[key] : null)) : row,
+    );
+    return { ...item, rows };
+  }
+  if (group === "charts") {
+    // Traces and layout sent as JSON values rather than text.
+    const data = Array.isArray(item.data) ? JSON.stringify(item.data) : item.data;
+    const layout = isRecord(item.layout) ? JSON.stringify(item.layout) : item.layout;
+    return { ...item, data, ...(layout === undefined ? {} : { layout }) };
+  }
+  return item;
+}
+
+/**
+ * Brings arguments into the declared form before schema validation. Models
+ * without constrained sampling sometimes send a JSON value as a string, or
+ * leave out element lists they do not use; providers that sample against
+ * the schema never do. Malformed JSON is rejected with its location rather
+ * than repaired, so the model resends a correct call.
+ *
+ * Calls in the earlier `{ spec }` form (a json-render spec, or a string
+ * holding one), as recorded in existing sessions, are validated against the
+ * catalog and rewritten into the declared form. Never mutates `args`.
+ */
+export function prepareUiArguments(args: unknown): UiToolArgs {
+  if (!isRecord(args)) return args as UiToolArgs;
+  if ("spec" in args) {
+    const spec = typeof args.spec === "string" ? parseSpecString(args.spec) : args.spec;
+    const result = validateUiSpec(spec);
+    if (!result.ok) throw invalidSpecError(result.errors);
+    return toolArgsFromSpec(result.spec);
+  }
+  const prepared: Record<string, unknown> = { ...args };
+  for (const group of Object.values(UI_INPUT_GROUPS)) {
+    let items = prepared[group];
+    if (items === undefined || items === null) items = [];
+    if (typeof items === "string") items = parseGroupString(group, items);
+    prepared[group] = Array.isArray(items) ? items.map((item) => prepareElement(group, item)) : items;
+  }
+  return prepared as UiToolArgs;
+}
+
+function invalidSpecError(errors: string[]): Error {
+  return new Error(`render_ui spec is invalid:\n- ${errors.slice(0, 12).join("\n- ")}`);
+}
 
 const DESCRIPTION = [
   "Render a compact, read-only UI in the QDash chat: metric cards, tables, alerts, short text, Plotly charts and links to QDash pages.",
   "Use it to present values you already have from QDash tool results; never invent or estimate values, and say in your text answer where they came from.",
   "Keep your explanation in the text answer; the UI is for scanning numbers and status. Prefer `render_chart` for a single plot.",
   "",
-  "Pass `spec` as a JSON object, not as a string holding JSON.",
-  "The spec is a flat map: `root` names the top element, and `elements` maps ids to `{ type, props, children }`.",
-  "`children` lists element ids and is allowed only on Stack and Card; every other element is a leaf. Each element has exactly one parent.",
+  "List each element under its type (`stacks`, `cards`, `metrics`, `tables`, `alerts`, `texts`, `charts`, `links`) with a unique `id`; send an empty list for a type you do not use. `root` names the top element.",
+  "Only Stack and Card have `children`, the ids of their child elements; every other element is a leaf. Each element has exactly one parent.",
+  "A table row lists one cell per column, in column order. A chart's `data` and `layout` are JSON text.",
   "Only literal values: no state, visibility, repeat, watch, actions, or `$` expressions. No HTML, no Markdown, no external URLs.",
   `Limits: ${UI_SPEC_LIMITS.maxElements} elements, depth ${UI_SPEC_LIMITS.maxDepth}, ${UI_SPEC_LIMITS.maxChildren} children per element, ${UI_SPEC_LIMITS.maxTableRows} table rows, ${UI_SPEC_LIMITS.maxTableColumns} columns, ${UI_SPEC_LIMITS.maxBytes} characters in all.`,
   "",
   "Components:",
   uiCatalogPrompt(),
   "",
-  'Example: {"root":"s","elements":{"s":{"type":"Stack","props":{"direction":"horizontal"},"children":["t1","f"]},"t1":{"type":"Metric","props":{"label":"T1","value":42.1,"unit":"us","detail":"Q03"},"children":[]},"f":{"type":"Metric","props":{"label":"X90 fidelity","value":0.9971,"tone":"success"},"children":[]}}}',
+  'Example: {"root":"s","stacks":[{"id":"s","direction":"horizontal","children":["t1","f"]}],"cards":[],"metrics":[{"id":"t1","label":"T1","value":42.1,"unit":"us","detail":"Q03"},{"id":"f","label":"X90 fidelity","value":0.9971,"tone":"success"}],"tables":[],"alerts":[],"texts":[],"charts":[],"links":[]}',
 ].join("\n");
 
 /**
  * Lets the model compose a read-only UI in the QDash chat.
  *
- * The spec is validated against the shared catalog; an invalid one fails the
- * call with the problems listed so the model can correct it. A spec sent as a
- * JSON string is parsed first (`prepareUiArguments`) and then checked the same
- * way as an object; malformed JSON fails with its location. A valid spec and
- * its plain-text fallback go out as `details.ui`, which events.ts streams as a
+ * The arguments list elements by component type (ui-tool-input.ts), a shape
+ * strict JSON schemas can express, so the tool asks providers that support it
+ * to sample its arguments against the schema. `strict: "prefer"` sends the
+ * schema as a hint, unenforced, to models without that support instead of
+ * failing their requests, so `prepareUiArguments` still repairs the forms
+ * those models send. The arguments are then mapped to a json-render spec and
+ * validated against the shared catalog; an invalid one fails the call with
+ * the problems listed so the model can correct it. A valid spec and its
+ * plain-text fallback go out as `details.ui`, which events.ts streams as a
  * `ui` NDJSON line, the same way `render_chart` carries `details.chart`.
  */
 export const uiTool = defineTool({
   name: "render_ui",
   description: DESCRIPTION,
-  parameters: UI_PARAMETERS,
+  parameters: UI_TOOL_PARAMETERS,
+  constrainedSampling: { type: "json_schema", strict: "prefer" },
   replay: "safe",
   prepareArguments: prepareUiArguments,
   execute: async (params) => {
-    const result = validateUiSpec(params.spec);
-    if (!result.ok) {
-      throw new Error(`render_ui spec is invalid:\n- ${result.errors.slice(0, 12).join("\n- ")}`);
-    }
+    const mapped = specFromToolArgs(params);
+    if (!mapped.ok) throw invalidSpecError(mapped.errors);
+    const result = validateUiSpec(mapped.spec);
+    if (!result.ok) throw invalidSpecError(result.errors);
     const ui: UiBlockPayload = {
       version: UI_BLOCK_VERSION,
       spec: result.spec,

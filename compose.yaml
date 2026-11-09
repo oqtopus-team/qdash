@@ -297,6 +297,9 @@ services:
       # ignores it. Keep a placeholder for keyless local endpoints.
       - OPENAI_COMPATIBLE_API_KEY_CHAT=${OPENAI_COMPATIBLE_API_KEY_CHAT:-openai-compatible}
       - OPENAI_COMPATIBLE_API_KEY_EVALUATION=${OPENAI_COMPATIBLE_API_KEY_EVALUATION:-openai-compatible}
+      # The classifier of config/copilot/classifier.yaml reads CLASSIFIER_BASE_URL
+      # and CLASSIFIER_API_KEY from .env (env_file above). There is no default
+      # endpoint; without both the classifier stays unavailable.
       # The Copilot workspace (agent-exec below): where the chat's bash, read,
       # write and edit tools run. Unset AGENT_EXEC_SOCKET to offer no workspace.
       - AGENT_EXEC_SOCKET=/run/agent-exec/exec.sock

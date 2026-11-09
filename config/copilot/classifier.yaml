@@ -1,0 +1,25 @@
+# Copilot Classifier Configuration
+#
+# Classifier models QDash features may use, as chat.yaml lists chat models and
+# evaluation.yaml evaluation models. The first entry is the default. Declaring
+# a model here only makes it available; each feature has its own switch, such
+# as chat.yaml's `presentation` section. This file is optional.
+classifier_models:
+  # Open-Jev 2B on a self-hosted System One (TypeSafe Jev) endpoint. Set
+  # CLASSIFIER_BASE_URL (up to the API version) and CLASSIFIER_API_KEY in .env;
+  # there is no default endpoint, and the model stays unavailable until both
+  # are set. Requests go to <base_url>/systemone with `Authorization: Bearer`
+  # from api_key_env and, when CF_ACCESS_CLIENT_ID/SECRET are set, the shared
+  # Cloudflare Access headers. Name further endpoints' variables
+  # CLASSIFIER_BASE_URL_<SUFFIX> / CLASSIFIER_API_KEY_<SUFFIX> and their
+  # provider system-one-<suffix>.
+  - provider: system-one-classifier
+    name: ZefanCai/Open-Jev-2B
+    base_url: env:CLASSIFIER_BASE_URL
+    api_key_env: CLASSIFIER_API_KEY
+
+  # A classifier from pi's catalog names its provider and model only (no
+  # base_url); its credentials come from that provider's own variable, such as
+  # TYPESAFE_API_KEY. These services are billed by their provider.
+  # - provider: typesafe
+  #   name: jev-latest
