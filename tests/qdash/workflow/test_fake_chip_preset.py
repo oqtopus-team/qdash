@@ -211,7 +211,8 @@ def test_fake_chip_runs_bring_up_and_the_fake_calibration_chain(
     project: None, fake_deployment: Path, test_client: TestClient, mux_ids: list[int]
 ) -> None:
     from qdash.workflow.engine.backend.fake_qubex import FakeExperiment
-    from qdash.workflow.service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.settings import GitHubPolicy, SessionSettings
     from qdash.workflow.service.targets import MuxTargets
 
     _create_fake_chip(test_client)
@@ -222,23 +223,24 @@ def test_fake_chip_runs_bring_up_and_the_fake_calibration_chain(
         str(4 * mux + offset) for mux in mux_ids for offset in range(4)
     ]
 
-    service = CalibService(
-        USERNAME,
-        CHIP_ID,
-        qids=qids,
-        backend_name="fake",
-        project_id=PROJECT_ID,
-        enable_github=False,
-        flow_name="fake_calibration",
+    service = CalibSession(
+        SessionSettings(
+            username=USERNAME,
+            chip_id=CHIP_ID,
+            project_id=PROJECT_ID,
+            backend_name="fake",
+            flow_name="fake_calibration",
+            github=GitHubPolicy.disabled(),
+        )
     )
-    exp = service.backend.get_instance() if service.backend else None
-    assert isinstance(exp, FakeExperiment)
-    assert Path(exp.config_path) == fake_deployment / CHIP_ID / "config"
+    with service.owned_execution(qids):
+        exp = service.backend.get_instance() if service.backend else None
+        assert isinstance(exp, FakeExperiment)
+        assert Path(exp.config_path) == fake_deployment / CHIP_ID / "config"
 
-    for call in FAKE_CALIBRATION_TASKS:
-        for qid in qids:
-            service.execute_task(call.name, qid, parameters=call.settings())
-    service.finish_calibration()
+        for call in FAKE_CALIBRATION_TASKS:
+            for qid in qids:
+                service.execute_task(call.name, qid, parameters=call.settings())
 
     results = list(
         TaskResultHistoryDocument.find({"project_id": PROJECT_ID, "chip_id": CHIP_ID}).run()
@@ -288,7 +290,7 @@ def test_qubex_fits_never_open_a_browser_during_tests(monkeypatch: pytest.Monkey
 
 
 class _RecordingStageService:
-    """The parts of CalibService the scheduled one-qubit strategy reads."""
+    """The parts of CalibSession the scheduled one-qubit strategy reads."""
 
     def __init__(self) -> None:
         self.username = USERNAME
@@ -303,6 +305,20 @@ class _RecordingStageService:
         self.note = None
         self.stage_results: dict[str, Any] = {}
 
+    def worker_spec(self) -> Any:
+        from qdash.workflow.service._internal.settings import (
+            SessionSettings,
+            WorkerLease,
+            WorkerSpec,
+        )
+
+        return WorkerSpec(
+            settings=SessionSettings(
+                username=USERNAME, chip_id=CHIP_ID, project_id=PROJECT_ID, backend_name="fake"
+            ).for_worker(),
+            lease=WorkerLease(execution_id=self.execution_id),
+        )
+
     def record_stage_result(self, stage_name: str, result: dict[str, Any]) -> None:
         self.stage_results[stage_name] = result
 
@@ -315,6 +331,10 @@ def _template_run(monkeypatch: pytest.MonkeyPatch, **params: Any) -> tuple[Any, 
         def __init__(self, *_args: Any, **_kwargs: Any) -> None:
             pass
 
+        @classmethod
+        def from_context(cls, *_args: Any, **_kwargs: Any) -> Any:
+            return cls()
+
         def run(self, targets: Any, *, steps: list[Any]) -> tuple[Any, Any]:
             [step] = steps
             return targets, step
@@ -322,6 +342,7 @@ def _template_run(monkeypatch: pytest.MonkeyPatch, **params: Any) -> tuple[Any, 
         backend = None
 
     monkeypatch.setattr(fake_backend, "CalibService", _Recorder)
+    monkeypatch.setattr(fake_backend, "resolve_calib_context", lambda *_a, **_k: None)
     result: tuple[Any, Any] = fake_backend.fake_calibration(
         username=USERNAME, chip_id=CHIP_ID, **params
     )
@@ -387,12 +408,12 @@ def test_the_template_runs_through_the_hardware_box_scheduler(
     calls: list[list[list[str]]] = []
 
     def _record_mux_run(
-        mux_groups: list[list[str]], plan: Any, session_config: dict[str, Any], **_: Any
+        mux_groups: list[list[str]], plan: Any, worker: Any, **_: Any
     ) -> dict[str, Any]:
         calls.append(mux_groups)
         assert plan.task_names() == [call.name for call in FAKE_CALIBRATION_TASKS]
         assert plan.step_id == "calibration"
-        assert session_config["backend_name"] == "fake"
+        assert worker.settings.backend_name == "fake"
         return {qid: {"status": "success"} for group in mux_groups for qid in group}
 
     monkeypatch.setattr(strategy, "run_mux_calibrations_parallel", _record_mux_run)

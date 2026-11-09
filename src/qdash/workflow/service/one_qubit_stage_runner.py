@@ -14,11 +14,12 @@ from qdash.workflow.service._internal.scheduling_tasks import (
     run_mux_calibrations_parallel,
     run_qubit_batch_calibration_isolated,
 )
-from qdash.workflow.service.calib_service import get_session
+from qdash.workflow.service.session_context import get_session
 
 if TYPE_CHECKING:
     from qdash.datamodel.task_call import StepCalls
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.settings import WorkerSpec
 
 
 def batch_capable_tasks(backend_name: str) -> dict[str, bool]:
@@ -39,26 +40,8 @@ def batch_capable_tasks(backend_name: str) -> dict[str, bool]:
 class OneQubitStageRunner:
     """Run one-qubit schedules without owning the execution lifecycle."""
 
-    def __init__(self, cal_service: CalibService, *, project_id: str | None = None) -> None:
+    def __init__(self, cal_service: CalibSession) -> None:
         self.cal_service = cal_service
-        self.project_id = project_id or cal_service.project_id
-
-    def build_session_config(self, *, execution_id: str, flow_name: str | None) -> dict[str, Any]:
-        """Build isolated-worker session config for the current parent execution."""
-        return {
-            "username": self.cal_service.username,
-            "chip_id": self.cal_service.chip_id,
-            "backend_name": self.cal_service.backend_name,
-            "project_id": self.project_id,
-            "muxes": None,
-            "execution_id": execution_id,
-            "default_run_parameters": self.cal_service.default_run_parameters,
-            "task_parameters": self.cal_service.task_parameters,
-            "configuration_mode": getattr(self.cal_service, "configuration_mode", None),
-            "tags": self.cal_service.tags,
-            "flow_name": flow_name,
-            "note": self.cal_service.note,
-        }
 
     def collect_scheduled_qids(
         self, schedule: Any, allowed_qids: list[str] | None = None
@@ -96,7 +79,7 @@ class OneQubitStageRunner:
         schedule: Any,
         *,
         plan: StepCalls,
-        session_config: dict[str, Any],
+        worker: WorkerSpec,
         allowed_qids: list[str] | None = None,
     ) -> dict[str, Any]:
         """Run a scheduled MUX plan under the current parent execution."""
@@ -117,7 +100,7 @@ class OneQubitStageRunner:
                 mux_results = run_mux_calibrations_parallel(
                     mux_groups=parallel_groups,
                     plan=plan,
-                    session_config=session_config,
+                    worker=worker,
                 )
                 stage_results.update(mux_results)
             if stage_results:
@@ -130,7 +113,7 @@ class OneQubitStageRunner:
         *,
         plan: StepCalls,
         allowed_qids: list[str] | None = None,
-        session_config: dict[str, Any] | None = None,
+        worker: WorkerSpec | None = None,
     ) -> dict[str, Any]:
         """Run simultaneous spectroscopy batches under the current execution.
 
@@ -148,11 +131,11 @@ class OneQubitStageRunner:
                 step.step_index,
                 len(step_qids),
             )
-            if session_config is not None:
+            if worker is not None:
                 all_results[f"step_{step.step_index}"] = run_qubit_batch_calibration_isolated(
                     qids=step_qids,
                     plan=plan,
-                    session_config=session_config,
+                    worker=worker,
                 )
                 continue
             all_results[f"step_{step.step_index}"] = run_batch_calls(

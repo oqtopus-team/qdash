@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from qdash.datamodel.task_call import StepCalls, TaskCall
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
@@ -59,14 +59,14 @@ class Step(ABC):
     @abstractmethod
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
         """Execute the step.
 
         Args:
-            service: CalibService instance (provides execute_task, etc.)
+            service: CalibSession instance (provides execute_task, etc.)
             targets: Target specification
             ctx: Current pipeline context
 
@@ -108,7 +108,7 @@ class CalibrationStep(Step):
         """Default for calls without on_failure: run a target's later calls after a failure."""
         return False
 
-    def step_calls(self, service: CalibService) -> StepCalls:
+    def step_calls(self, service: CalibSession) -> StepCalls:
         """The calls with step identity and failure policy, as workers receive them."""
         digest = getattr(service, "plan_digest", None)
         return StepCalls(

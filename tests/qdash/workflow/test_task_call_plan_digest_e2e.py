@@ -77,22 +77,22 @@ def isolated_workers(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
 
     received: list[Any] = []
 
-    def _across_process(plan: Any, session_config: Any) -> tuple[Any, Any]:
+    def _across_process(plan: Any, worker: Any) -> tuple[Any, Any]:
         plan = pickle.loads(pickle.dumps(plan))  # noqa: S301 - our own object, as Dask does
         received.append(plan)
-        return plan, pickle.loads(pickle.dumps(session_config))  # noqa: S301
+        return plan, pickle.loads(pickle.dumps(worker))  # noqa: S301
 
-    def mux_parallel(*, mux_groups: list[list[str]], plan: Any, session_config: Any) -> Any:
+    def mux_parallel(*, mux_groups: list[list[str]], plan: Any, worker: Any) -> Any:
         results: dict[str, Any] = {}
         for group in mux_groups:
-            worker_plan, config = _across_process(plan, session_config)
+            worker_plan, config = _across_process(plan, worker)
             results.update(scheduling_tasks.calibrate_mux_qubits(group, worker_plan, config))
         return results
 
-    def qubit_parallel(*, qids: list[str], plan: Any, session_config: Any) -> Any:
+    def qubit_parallel(*, qids: list[str], plan: Any, worker: Any) -> Any:
         results: dict[str, Any] = {}
         for qid in qids:
-            worker_plan, config = _across_process(plan, session_config)
+            worker_plan, config = _across_process(plan, worker)
             target, result = scheduling_tasks.calibrate_single_qubit(qid, worker_plan, config)
             results[target] = result
         return results

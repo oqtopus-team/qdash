@@ -25,13 +25,13 @@ from qdash.workflow.service.steps.base import CalibrationStep, TransformStep
 from qdash.workflow.service.tasks import FULL_2Q_TASKS
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
 
 def _run_coupling_groups(
-    service: CalibService,
+    service: CalibSession,
     coupling_groups: list[list[str]],
     plan: StepCalls,
 ) -> dict[str, Any]:
@@ -45,26 +45,14 @@ def _run_coupling_groups(
         run_coupling_calibrations_parallel,
     )
 
-    session_config = {
-        "username": service.username,
-        "chip_id": service.chip_id,
-        "backend_name": service.backend_name,
-        "execution_id": service.execution_id,
-        "project_id": service.project_id,
-        "default_run_parameters": service.default_run_parameters,
-        "task_parameters": service.task_parameters,
-        "configuration_mode": getattr(service, "configuration_mode", None),
-        "tags": service.tags,
-        "flow_name": service.flow_name,
-        "note": service.note,
-    }
+    worker = service.worker_spec()
     all_raw_results: dict[str, Any] = {}
     for group in coupling_groups:
         all_raw_results.update(
             run_coupling_calibrations_parallel(
                 coupling_qids=group,
                 plan=plan,
-                session_config=session_config,
+                worker=worker,
             )
         )
     return all_raw_results
@@ -128,7 +116,7 @@ class CustomTwoQubit(CalibrationStep):
 
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -249,7 +237,7 @@ class SetCRSchedule(TransformStep):
 
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -318,7 +306,7 @@ class GenerateCRSchedule(TransformStep):
 
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -402,7 +390,7 @@ class TwoQubitCalibration(CalibrationStep):
 
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:

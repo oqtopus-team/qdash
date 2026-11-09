@@ -2,13 +2,14 @@
 
 import sys
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
 
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
-from qdash.workflow.service.calib_service import CalibService
+from qdash.workflow.service._internal.session import CalibSession
+from qdash.workflow.service._internal.settings import SessionSettings
 from qdash.workflow.service.flow_targets import override_target, read_target_override
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
 
@@ -46,49 +47,31 @@ def test_no_flow_context_leaves_defaults():
     assert read_target_override() is None
 
 
-def test_context_applies_to_constructor_and_pipeline():
+def test_context_override_replaces_the_pipeline_targets(monkeypatch):
+    from qdash.workflow.service._internal import runs
+
     override = FlowTargetOverride(qids=["9"])
     context = SimpleNamespace(
         flow_run=SimpleNamespace(context={TARGET_CONTEXT_KEY: override.model_dump()})
     )
-    with (
-        patch.dict(
-            sys.modules,
-            {
-                "prefect.context": SimpleNamespace(
-                    FlowRunContext=SimpleNamespace(get=lambda: context)
-                )
-            },
-        ),
-        patch.object(CalibService, "_initialize") as initialize,
+    run_pipeline = MagicMock(return_value={})
+    monkeypatch.setattr(CalibSession, "run_pipeline", run_pipeline)
+    settings = SessionSettings(
+        username="user", chip_id="chip", project_id="project", backend_name="fake"
+    )
+    with patch.dict(
+        sys.modules,
+        {"prefect.context": SimpleNamespace(FlowRunContext=SimpleNamespace(get=lambda: context))},
     ):
-        service = CalibService(
-            "user", "chip", qids=["0"], muxes=[0], project_id="project", backend_name="fake"
-        )
-        assert service.qids == ["9"]
-        assert service.muxes is None
-        initialize.assert_called_once_with(["9"], None, None)
-        with patch.object(service, "_run_pipeline", return_value={}) as run:
-            service.run(MuxTargets([0]), [])
-            run.assert_called_once_with(QubitTargets(["9"]), [])
+        runs.run_calibration(settings, MuxTargets([0]), [])
+
+    run_pipeline.assert_called_once_with(QubitTargets(["9"]), [])
 
 
-def test_isolated_worker_keeps_its_scheduled_subset():
-    with (
-        patch(
-            "qdash.workflow.service.flow_targets.read_target_override",
-            return_value=FlowTargetOverride(qids=["1", "2"]),
-        ),
-        patch.object(CalibService, "_initialize"),
-    ):
-        worker = CalibService(
-            "user",
-            "chip",
-            qids=["2"],
-            project_id="project",
-            backend_name="fake",
-            use_lock=False,
-            skip_execution=True,
-        )
-        assert worker.qids == ["2"]
-        assert worker._target_override is None
+def test_workers_never_read_the_override():
+    """Workers keep their scheduled subset: borrowing never consults the run context."""
+    import inspect
+
+    from qdash.workflow.service._internal import session
+
+    assert "read_target_override" not in inspect.getsource(session)

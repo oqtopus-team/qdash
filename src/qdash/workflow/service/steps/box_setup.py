@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -15,7 +14,7 @@ from qdash.workflow.service.targets import MuxTargets
 
 if TYPE_CHECKING:
     from qdash.datamodel.task_call import TaskCall
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
@@ -50,7 +49,7 @@ class ConfigureAll(CalibrationStep):
 
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -58,57 +57,28 @@ class ConfigureAll(CalibrationStep):
         mux_ids = self._resolve_mux_ids(service, targets)
 
         logger.info(f"[{self.name}] Configuring boxes for {len(mux_ids)} MUXes")
-        owns_session = not service._initialized
-        if owns_session:
-            service._initialize([])
-
+        # The pipeline opened this step's Execution and closes it however it ends.
         plan = self.step_calls(service)
         call = plan.calls[0]
         parameters = merge_task_parameters(
             {call.name: call.settings()},
             {call.name: normalize_task_settings(call.name, {"run": {"mux_ids": mux_ids}})},
         )[call.name]
-        try:
-            raw_result = service.execute_task(
-                "ConfigureAll",
-                qid="",
-                parameters=parameters,
-                invocation=plan.invocation(call),
-            )
-            ctx.metadata[self.name] = raw_result
-            if owns_session:
-                service.finish_calibration()
-        except BaseException as e:
-            from qdash.workflow.service.calib_service import (
-                _is_cancellation,
-                _is_external_termination,
-            )
-
-            if owns_session:
-                if _is_cancellation(e):
-                    logger.info(f"[{self.name}] Cancelled")
-                    with contextlib.suppress(Exception):
-                        service.cancel_calibration()
-                elif _is_external_termination(e):
-                    logger.info(f"[{self.name}] Interrupted by a termination signal")
-                    with contextlib.suppress(Exception):
-                        service.abandon_calibration()
-                else:
-                    logger.error(f"[{self.name}] Failed: {e}")
-                    with contextlib.suppress(Exception):
-                        service.fail_calibration(str(e))
-            raise
+        ctx.metadata[self.name] = service.execute_task(
+            "ConfigureAll",
+            qid="",
+            parameters=parameters,
+            invocation=plan.invocation(call),
+        )
 
         logger.info(f"[{self.name}] Completed")
         return ctx
 
-    def _resolve_mux_ids(self, service: CalibService, targets: Target) -> list[int]:
-        """The MUXes to configure: the step's own, the targets', or the session's."""
+    def _resolve_mux_ids(self, service: CalibSession, targets: Target) -> list[int]:
+        """The MUXes to configure: the step's own, or the targets'."""
         if self.mux_ids is not None:
             return list(self.mux_ids)
         if isinstance(targets, MuxTargets):
             return list(targets.mux_ids)
-        if service.muxes is not None:
-            return list(service.muxes)
         qids = targets.to_qids(service.chip_id)
         return sorted({int(qid) // 4 for qid in qids})

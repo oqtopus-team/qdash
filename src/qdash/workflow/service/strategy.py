@@ -1,4 +1,4 @@
-"""Calibration strategy classes for CalibService.
+"""Calibration strategy classes for one-qubit calibration steps.
 
 Strategy pattern implementation for different calibration execution modes.
 """
@@ -23,7 +23,7 @@ from qdash.workflow.service._internal.scheduling_tasks import (
 
 if TYPE_CHECKING:
     from qdash.datamodel.task_call import StepCalls
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
 
 
 # =============================================================================
@@ -43,8 +43,6 @@ class OneQubitConfig:
     mux_ids: list[int]
     exclude_qids: list[str]
     plan: StepCalls
-    flow_name: str | None
-    project_id: str | None
     qids: list[str] | None = None  # Explicit qubit IDs (overrides mux_ids if set)
     simultaneous_spectroscopy_schedule_mode: str = "local_index"
 
@@ -65,13 +63,13 @@ class OneQubitStrategy(ABC):
     @abstractmethod
     def execute(
         self,
-        cal_service: CalibService,
+        cal_service: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute the 1-qubit calibration strategy.
 
         Args:
-            cal_service: CalibService instance with username, chip_id, etc.
+            cal_service: CalibSession instance with username, chip_id, etc.
             config: Configuration for the calibration
 
         Returns:
@@ -119,7 +117,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalibService,
+        cal_service: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute Box-based scheduled calibration."""
@@ -171,20 +169,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
         all_qids = list(dict.fromkeys(all_qids))
 
         # Workers borrow the Execution owned by the pipeline step.
-        session_config = {
-            "username": cal_service.username,
-            "chip_id": cal_service.chip_id,
-            "backend_name": cal_service.backend_name,
-            "project_id": config.project_id,
-            "muxes": None,
-            "execution_id": cal_service.execution_id,
-            "default_run_parameters": cal_service.default_run_parameters,
-            "task_parameters": cal_service.task_parameters,
-            "configuration_mode": getattr(cal_service, "configuration_mode", None),
-            "tags": cal_service.tags,
-            "flow_name": cal_service.flow_name,
-            "note": cal_service.note,
-        }
+        worker = cal_service.worker_spec()
 
         # Execute stages grouped by box type (sequentially between box types)
         for box_type, sequential_groups in box_sequential_groups.items():
@@ -195,7 +180,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
                 mux_results = run_mux_calibrations_parallel(
                     mux_groups=parallel_groups,
                     plan=config.plan,
-                    session_config=session_config,
+                    worker=worker,
                 )
                 stage_results.update(mux_results)
 
@@ -221,7 +206,7 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalibService,
+        cal_service: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute synchronized step-based calibration."""
@@ -252,20 +237,7 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             return {}
 
         # Workers borrow the Execution owned by the pipeline step.
-        session_config = {
-            "username": cal_service.username,
-            "chip_id": cal_service.chip_id,
-            "backend_name": cal_service.backend_name,
-            "project_id": config.project_id,
-            "muxes": None,
-            "execution_id": cal_service.execution_id,
-            "default_run_parameters": cal_service.default_run_parameters,
-            "task_parameters": cal_service.task_parameters,
-            "configuration_mode": getattr(cal_service, "configuration_mode", None),
-            "tags": cal_service.tags,
-            "flow_name": cal_service.flow_name,
-            "note": cal_service.note,
-        }
+        worker = cal_service.worker_spec()
 
         all_results: dict[str, Any] = {}
 
@@ -277,7 +249,7 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             step_results = run_qubit_calibrations_parallel(
                 qids=filtered_qids,
                 plan=config.plan,
-                session_config=session_config,
+                worker=worker,
             )
             # Group results by box type for organized output
             box_key = f"Box_{step.box_type}"
@@ -296,7 +268,7 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalibService,
+        cal_service: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute local-index spectroscopy steps as hardware-aware batches."""
@@ -312,7 +284,7 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
             mode=config.simultaneous_spectroscopy_schedule_mode,
         )
 
-        runner = OneQubitStageRunner(cal_service, project_id=config.project_id)
+        runner = OneQubitStageRunner(cal_service)
         all_qids = runner.collect_simultaneous_qids(schedule, config.qids)
         if not all_qids:
             return {}
@@ -341,7 +313,7 @@ class OneQubitSerialStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalibService,
+        cal_service: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute fully serial calibration."""

@@ -1,10 +1,10 @@
 """Task-scoped parameter settings for workflows.
 
 ``task_parameters`` maps a task name to the settings that apply to every call of
-that task in a workflow (the common per-task defaults). Workflows set these
-settings on each ``TaskCall`` instead; passing ``task_parameters`` to
-``CalibService`` is deprecated but still applies. The mapping itself remains the
-internal form that carries resolved defaults to pipeline, worker and single-task
+that task (per-task defaults). Workflows set these settings on each ``TaskCall``;
+``CalibService`` does not accept per-task defaults. The mapping is the internal
+form that carries defaults QDash resolves itself (a pipeline spec's deprecated
+``task_parameters`` and single-task request overrides) to owner and worker
 sessions::
 
     {
@@ -21,7 +21,7 @@ normalization live in :mod:`qdash.datamodel.task_settings` so the API normalizes
 declarative spec the same way; this module re-exports them and adds the checks
 that need the task registry.
 
-``CalibService.execute_task(parameters=...)`` takes one entry of the same form for a
+A session's ``execute_task(parameters=...)`` takes one entry of the same form for a
 single call, and the single-task flow turns a request's ``{"input": ..., "run": ...}``
 overrides into the requested task's entry.
 """
@@ -29,7 +29,6 @@ overrides into the requested task's entry.
 from __future__ import annotations
 
 import difflib
-import warnings
 from collections.abc import Mapping
 from typing import Any
 
@@ -56,54 +55,12 @@ __all__ = [
     "normalize_default_run_parameters",
     "normalize_task_parameters",
     "normalize_task_settings",
-    "resolve_task_parameters",
     "task_parameters_from_run_parameters",
     "task_settings_from_task_details",
     "validate_sweep_type",
     "validate_task_names",
     "validate_task_settings",
 ]
-
-
-TASK_PARAMETERS_DEPRECATION = (
-    "task_parameters is deprecated; set run, input and update_calibration_parameters "
-    "on each TaskCall instead (reuse shared values through local variables, and "
-    "default_run_parameters for run values every task shares). task_parameters still "
-    "applies until it is removed."
-)
-TASK_RUN_PARAMETERS_DEPRECATION = (
-    "task_run_parameters is deprecated; set run and update_calibration_parameters on "
-    "each TaskCall instead (default_run_parameters for run values every task shares). "
-    "task_run_parameters still applies until it is removed."
-)
-
-
-def resolve_task_parameters(
-    task_parameters: Mapping[str, Any] | None,
-    task_run_parameters: Mapping[str, Any] | None,
-    *,
-    task_defaults: Mapping[str, Any] | None = None,
-    stacklevel: int = 3,
-) -> dict[str, dict[str, Any]]:
-    """Combine the per-task defaults a workflow passes to ``CalibService``.
-
-    ``task_parameters`` and the older flat ``task_run_parameters`` are deprecated
-    public arguments: each emits a ``DeprecationWarning`` when non-empty but keeps
-    its effect. ``task_defaults`` is the internal form that pipeline, isolated
-    worker and single-task sessions use to carry already-resolved defaults; it
-    does not warn. Later layers win per parameter: ``task_defaults``, then
-    ``task_run_parameters``, then ``task_parameters``. ``stacklevel`` points the
-    warnings at the caller of ``CalibService``.
-    """
-    if task_run_parameters:
-        warnings.warn(TASK_RUN_PARAMETERS_DEPRECATION, DeprecationWarning, stacklevel=stacklevel)
-    if task_parameters:
-        warnings.warn(TASK_PARAMETERS_DEPRECATION, DeprecationWarning, stacklevel=stacklevel)
-    return merge_task_parameters(
-        normalize_task_parameters(task_defaults),
-        task_parameters_from_run_parameters(task_run_parameters),
-        normalize_task_parameters(task_parameters),
-    )
 
 
 def validate_task_names(task_parameters: Mapping[str, Any], backend_name: str) -> None:

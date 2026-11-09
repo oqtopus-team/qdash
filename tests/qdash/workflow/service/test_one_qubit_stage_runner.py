@@ -4,7 +4,8 @@ from typing import Any, cast
 import pytest
 
 from qdash.datamodel.task_call import StepCalls, TaskCall, normalize_calls
-from qdash.workflow.service.calib_service import CalibService
+from qdash.workflow.service._internal.session import CalibSession
+from qdash.workflow.service._internal.settings import SessionSettings, WorkerLease, WorkerSpec
 from qdash.workflow.service.one_qubit_stage_runner import OneQubitStageRunner
 
 
@@ -12,9 +13,9 @@ def _plan(*calls: TaskCall) -> StepCalls:
     return StepCalls(step_id="spectroscopy", calls=normalize_calls(calls))
 
 
-def _service() -> CalibService:
+def _service() -> CalibSession:
     return cast(
-        "CalibService",
+        "CalibSession",
         SimpleNamespace(
             username="alice",
             chip_id="144Q-test",
@@ -25,6 +26,19 @@ def _service() -> CalibService:
             tags=["tag-1"],
             note={"kind": "test"},
         ),
+    )
+
+
+def _worker_spec() -> WorkerSpec:
+    return WorkerSpec(
+        settings=SessionSettings(
+            username="alice",
+            chip_id="144Q-test",
+            project_id="project-1",
+            backend_name="qubex",
+            task_defaults={"CreateHPIPulse": {"run": {"hpi_duration": {"value": 52}}}},
+        ).for_worker(),
+        lease=WorkerLease(execution_id="exec-1"),
     )
 
 
@@ -40,16 +54,16 @@ def test_collect_qids_preserves_order_and_filters_duplicates() -> None:
     assert runner.collect_scheduled_qids(schedule, allowed_qids=["4", "8"]) == ["4", "8"]
 
 
-def test_execute_scheduled_mux_schedule_uses_parent_session_config(
+def test_execute_scheduled_mux_schedule_hands_workers_the_owner_spec(
     monkeypatch: Any,
 ) -> None:
     runner = OneQubitStageRunner(_service())
     calls: list[dict[str, Any]] = []
 
     def run_mux_calibrations_parallel(
-        *, mux_groups: list[list[str]], plan: StepCalls, session_config: dict[str, Any]
+        *, mux_groups: list[list[str]], plan: StepCalls, worker: WorkerSpec
     ) -> dict[str, Any]:
-        calls.append({"mux_groups": mux_groups, "plan": plan, "session_config": session_config})
+        calls.append({"mux_groups": mux_groups, "plan": plan, "worker": worker})
         return {qid: {"calls": [], "status": "success"} for group in mux_groups for qid in group}
 
     monkeypatch.setattr(
@@ -62,20 +76,20 @@ def test_execute_scheduled_mux_schedule_uses_parent_session_config(
             SimpleNamespace(box_type="B", parallel_groups=[["8"]]),
         ]
     )
-    session_config = runner.build_session_config(execution_id="exec-1", flow_name="flow-1")
+    worker = _worker_spec()
 
     plan = _plan(TaskCall(name="CheckResonatorSpectroscopy"))
     result = runner.execute_scheduled_mux_schedule(
         schedule,
         plan=plan,
-        session_config=session_config,
+        worker=worker,
         allowed_qids=["0", "8"],
     )
 
     assert calls[0]["mux_groups"] == [["0"]]
-    assert calls[0]["session_config"]["execution_id"] == "exec-1"
-    assert calls[0]["session_config"]["task_parameters"] == {
-        "CreateHPIPulse": {"run": {"hpi_duration": {"value": 52}}}
+    assert calls[0]["worker"].lease.execution_id == "exec-1"
+    assert calls[0]["worker"].settings.task_defaults["CreateHPIPulse"]["run"] == {
+        "hpi_duration": {"value": 52}
     }
     assert calls[1]["mux_groups"] == [["8"]]
     assert all(call["plan"] is plan for call in calls)
@@ -222,9 +236,9 @@ def test_execute_simultaneous_spectroscopy_schedule_uses_isolated_batch(
     calls: list[dict[str, Any]] = []
 
     def run_qubit_batch_calibration_isolated(
-        *, qids: list[str], plan: StepCalls, session_config: dict[str, Any]
+        *, qids: list[str], plan: StepCalls, worker: WorkerSpec
     ) -> dict[str, Any]:
-        calls.append({"qids": qids, "plan": plan, "session_config": session_config})
+        calls.append({"qids": qids, "plan": plan, "worker": worker})
         return {qid: {"calls": [], "status": "success"} for qid in qids}
 
     monkeypatch.setattr(
@@ -237,19 +251,19 @@ def test_execute_simultaneous_spectroscopy_schedule_uses_isolated_batch(
             SimpleNamespace(step_index=1, parallel_qids=["1", "5"]),
         ]
     )
-    session_config = runner.build_session_config(execution_id="exec-1", flow_name="flow-1")
+    worker = _worker_spec()
     plan = _plan(TaskCall(name="CheckSimultaneousQubitSpectroscopy"))
 
     result = runner.execute_simultaneous_spectroscopy_schedule(
         schedule,
         plan=plan,
         allowed_qids=["0", "5"],
-        session_config=session_config,
+        worker=worker,
     )
 
     assert calls == [
-        {"qids": ["0"], "plan": plan, "session_config": session_config},
-        {"qids": ["5"], "plan": plan, "session_config": session_config},
+        {"qids": ["0"], "plan": plan, "worker": worker},
+        {"qids": ["5"], "plan": plan, "worker": worker},
     ]
     assert result == {
         "step_0": {"0": {"calls": [], "status": "success"}},

@@ -1,1840 +1,289 @@
-"""Tests for CalibService.
+"""The public CalibService: a small author contract over QDash-owned execution."""
 
-These tests verify the CalibService API and helper functions for custom calibration flows.
-"""
+from __future__ import annotations
 
-import asyncio
-import re
-import sys
-from dataclasses import dataclass, field
-from types import SimpleNamespace
-from typing import Any, cast
+import dataclasses
+import inspect
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from qdash.datamodel.task_call import TaskCall
-from qdash.workflow.service.calib_service import (
-    CalibService,
-    _is_cancellation,
-    _is_external_termination,
-    finish_calibration,
-    get_session,
-    init_calibration,
-)
-from qdash.workflow.service.session_context import clear_current_session
-from qdash.workflow.service.steps import Step
+from qdash.workflow.service.calib_service import LEGACY_OPTION_MIGRATIONS, CalibService
+from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import QubitTargets
-
-
-class MockExecutionService:
-    """Mock ExecutionService for testing."""
-
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-        self.calib_data_path = kwargs.get("calib_data_path", "")
-        self.calib_data = type("obj", (object,), {"qubit": {}, "coupling": {}})()
-        self.tags = kwargs.get("tags", [])
-        self.project_id = kwargs.get("project_id", "test_project")
-        self.completed = False
-
-    def save(self):
-        return self
-
-    def start(self):
-        return self
-
-    def complete(self):
-        self.completed = True
-        return self
-
-    def fail(self, error_message=""):
-        return self
-
-    def cancel(self):
-        return self
-
-    def reload(self):
-        return self
-
-    def merge_calib_data(self, calib_data):
-        for qid, params in calib_data.qubit.items():
-            self.calib_data.qubit.setdefault(qid, {}).update(params)
-        for qid, params in calib_data.coupling.items():
-            self.calib_data.coupling.setdefault(qid, {}).update(params)
-        return self
-
-    @classmethod
-    def create(cls, **kwargs):
-        return cls(**kwargs)
-
-
-class MockTaskContext:
-    """Mock TaskSession for testing."""
-
-    def __init__(self, *args, **kwargs):
-        self.id = "mock-task-session-id"
-        self.calib_data = type("obj", (object,), {"qubit": {"0": {}}, "coupling": {}})()
-        self.state = MagicMock()
-        self.state.calib_data = self.calib_data
-
-    def save(self):
-        pass
-
-
-class MockBackend:
-    """Mock backend for testing."""
-
-    def __init__(self, *args, **kwargs):
-        self.name = "fake"
-        self.disconnect = MagicMock()
-
-    def connect(self):
-        pass
-
-
-class MockCalibOrchestrator:
-    """Mock CalibOrchestrator for testing."""
-
-    def __init__(self, config, github_integration=None, snapshot_loader=None):
-        self.config = config
-        self._initialized = False
-        self._execution_service = MockExecutionService(tags=config.tags or [])
-        self._task_context = MockTaskContext()
-        self._backend = MockBackend()
-
-    @property
-    def execution_service(self):
-        return self._execution_service
-
-    @property
-    def task_context(self):
-        return self._task_context
-
-    @property
-    def backend(self):
-        return self._backend
-
-    @property
-    def is_initialized(self):
-        return self._initialized
-
-    def initialize(self):
-        self._initialized = True
-
-    def complete(self, update_chip_history=True, export_note_to_file=False):
-        self._execution_service.complete()
-
-    def fail(self):
-        self._execution_service.fail()
-
-
-class MockGitHubIntegration:
-    """Mock GitHubIntegration for testing."""
-
-    def __init__(self, *args, **kwargs):
-        pass
-
-    @staticmethod
-    def check_credentials():
-        return False
-
-
-class MockExecutionLockRepository:
-    """Mock ExecutionLockRepository for testing."""
-
-    def __init__(self, locked: bool = False, owner: str | None = None) -> None:
-        self.locked = locked
-        self.owner = owner
-        self.try_lock_calls: list[str | None] = []
-        self.unlock_calls: list[str | None] = []
-
-    def is_locked(self, project_id: str) -> bool:
-        return self.locked
-
-    def try_lock(
-        self,
-        project_id: str,
-        execution_id: str | None = None,
-        chip_id: str = "",
-        resources: tuple[str, ...] = (),
-        exclusive: bool = True,
-    ) -> bool:
-        self.try_lock_calls.append(execution_id)
-        if self.locked and (execution_id is None or self.owner != execution_id):
-            return False
-        self.locked = True
-        self.owner = execution_id
-        return True
-
-    def lock(self, project_id: str, execution_id: str | None = None) -> None:
-        self.locked = True
-        self.owner = execution_id
-
-    def unlock(self, project_id: str, execution_id: str | None = None) -> None:
-        self.unlock_calls.append(execution_id)
-        if execution_id is not None and execution_id != self.owner:
-            return
-        self.locked = False
-        self.owner = None
-
-
-class MockUserRepository:
-    """Mock UserRepository for testing."""
-
-    def get_default_project_id(self, username: str) -> str | None:
-        # Return None so tests must provide project_id explicitly
-        return None
-
-
-class FakeExecutionRepository:
-    """Fake MongoExecutionRepository recording claim_scheduled_execution calls."""
-
-    def __init__(self, claimed_execution_id: str | None) -> None:
-        """Store the execution id this fake should return when a claim is attempted."""
-        self.claimed_execution_id = claimed_execution_id
-        self.calls: list[dict[str, str]] = []
-
-    def claim_scheduled_execution(self, *, project_id: str, flow_run_id: str) -> str | None:
-        """Record the call and return the pre-configured claimed execution id."""
-        self.calls.append({"project_id": project_id, "flow_run_id": flow_run_id})
-        return self.claimed_execution_id
-
-
-class FakeExecutionCounterRepository:
-    """Fake ExecutionCounterRepository returning a fixed next index without touching Mongo."""
-
-    def __init__(self, next_index: int) -> None:
-        """Store the fixed index this fake should return from get_next_index."""
-        self.next_index = next_index
-
-    def get_next_index(self, date: str, username: str, chip_id: str, project_id: str | None) -> int:
-        """Return the pre-configured next index."""
-        return self.next_index
-
-    def get_dates_for_chip(self, project_id: str, chip_id: str) -> list[str]:
-        """Return an empty list; unused by these tests."""
-        return []
-
-
-def _stub_prefect_flow_run_context(monkeypatch: pytest.MonkeyPatch, flow_run_id: str) -> None:
-    """Register a fake prefect.context module exposing a flow run with the given id."""
-    monkeypatch.setitem(
-        sys.modules,
-        "prefect.context",
-        SimpleNamespace(
-            get_run_context=lambda: SimpleNamespace(flow_run=SimpleNamespace(id=flow_run_id))
-        ),
-    )
-
-
-@dataclass
-class BoomStep(Step):
-    """Step whose execute() always raises, to exercise the pipeline-abort logging path."""
-
-    @property
-    def name(self) -> str:
-        """Return a fixed step name for identification."""
-        return "boom"
-
-    def execute(self, service: Any, targets: Any, ctx: Any) -> Any:
-        """Raise a RuntimeError to simulate a step failing mid-pipeline."""
-        raise RuntimeError("boom")
-
-
-@dataclass
-class RaisingStep(Step):
-    """Step that raises a caller-supplied exception, to exercise abort classification."""
-
-    exc: BaseException = field(default_factory=lambda: RuntimeError("boom"))
-
-    @property
-    def name(self) -> str:
-        """Return a fixed step name for identification."""
-        return "raising"
-
-    def execute(self, service: Any, targets: Any, ctx: Any) -> Any:
-        """Raise the exception supplied at construction time."""
-        raise self.exc
-
-
-class CancelledRun(Exception):
-    """Stand-in for prefect.exceptions.CancelledRun, which is matched by class name."""
-
-
-class ExternalSignal(BaseException):
-    """Stand-in for prefect.exceptions.ExternalSignal."""
-
-
-class TerminationSignal(ExternalSignal):
-    """Stand-in for prefect.exceptions.TerminationSignal."""
-
-
-@pytest.fixture(autouse=True)
-def clear_session_state():
-    """Clear session state before and after each test."""
-    import qdash.workflow.service.calib_service as session_module
-
-    # Clear before test
-    session_module._current_session = None  # type: ignore[attr-defined]
-    clear_current_session()
-
-    yield
-
-    # Clear after test
-    session_module._current_session = None  # type: ignore[attr-defined]
-    clear_current_session()
+from tests.qdash.workflow.context_helpers import grant_all_contexts, granted_context
 
 
 @pytest.fixture
-def mock_lock_repo():
-    """Create a mock lock repository."""
-    return MockExecutionLockRepository()
+def recorded_runs(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Record what ``CalibService.run`` hands to the internal runner."""
+    runs: list[dict[str, Any]] = []
 
+    def run_calibration(settings: Any, targets: Any, steps: Any) -> dict[str, Any]:
+        runs.append({"settings": settings, "targets": targets, "steps": steps})
+        return {"candidate_qids": targets.to_qids(settings.chip_id)}
 
-@pytest.fixture
-def mock_user_repo():
-    """Create a mock user repository."""
-    return MockUserRepository()
-
-
-@pytest.fixture
-def mock_flow_session_deps(monkeypatch):
-    """Fixture to mock CalibService dependencies."""
+    monkeypatch.setattr("qdash.workflow.service._internal.runs.run_calibration", run_calibration)
     monkeypatch.setattr(
-        "qdash.workflow.service.calib_service.CalibOrchestrator",
-        MockCalibOrchestrator,
+        "qdash.workflow.service._internal.runs.load_flow_default_run_parameters",
+        lambda project_id, flow_name: {"interval": {"value": 1}} if flow_name else {},
     )
-    monkeypatch.setattr(
-        "qdash.workflow.service.calib_service.GitHubIntegration",
-        MockGitHubIntegration,
-    )
-    # Patch the repository imports where they are lazily imported in CalibService
-    monkeypatch.setattr(
-        "qdash.repository.MongoExecutionLockRepository",
-        MockExecutionLockRepository,
-    )
-    monkeypatch.setattr(
-        "qdash.repository.MongoUserRepository",
-        MockUserRepository,
-    )
-
-
-class TestCalibServiceInitialization:
-    """Test CalibService initialization and basic setup."""
-
-    def test_flow_session_attributes(self, mock_flow_session_deps, mock_lock_repo, mock_user_repo):
-        """Test that CalibService initializes with correct attributes."""
-        # Create session with qids (required parameter)
-        session = CalibService(
-            username="test_user",
-            execution_id="20240101-001",
-            chip_id="chip_1",
-            qids=["0", "1"],
-            backend_name="fake",
-            project_id="test_project",  # Required to avoid UserDocument lookup
-            lock_repo=mock_lock_repo,
-            user_repo=mock_user_repo,
-        )
-
-        # Verify attributes
-        assert session.username == "test_user"
-        assert session.execution_id == "20240101-001"
-        assert session.chip_id == "chip_1"
-        assert session.backend_name == "fake"
-        assert session.qids == ["0", "1"]
-        assert session.execution_service is not None
-        assert session.backend is not None
-
-    def test_configuration_mode_is_applied_to_the_session_config(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
-    ):
-        session = CalibService(
-            username="test_user",
-            execution_id="20240101-001",
-            chip_id="chip_1",
-            qids=["0"],
-            backend_name="fake",
-            project_id="test_project",
-            configuration_mode="ge-ef-fh",
-            lock_repo=mock_lock_repo,
-            user_repo=mock_user_repo,
-        )
-
-        assert session.configuration_mode == "ge-ef-fh"
-        assert session._orchestrator is not None
-        assert session._orchestrator.config.configuration_mode == "ge-ef-fh"
-
-    def test_isolated_worker_inherits_configuration_mode(self, mock_flow_session_deps):
-        from qdash.workflow.service._internal.scheduling_tasks import _create_isolated_session
-
-        session = _create_isolated_session(
-            {
-                "username": "test_user",
-                "chip_id": "chip_1",
-                "execution_id": "20240101-001",
-                "backend_name": "fake",
-                "project_id": "test_project",
-                "configuration_mode": "ge-ef-fh",
-            },
-            ["0"],
-        )
-
-        assert session.configuration_mode == "ge-ef-fh"
-        assert session._orchestrator is not None
-        assert session._orchestrator.config.configuration_mode == "ge-ef-fh"
-
-    def test_session_wide_persistence_argument_is_removed(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
-    ):
-        """The removed argument fails instead of being ignored and leaving writes enabled."""
-        with pytest.raises(TypeError, match="persist_output_parameters"):
-            CalibService(  # type: ignore[call-arg]
-                username="test_user",
-                execution_id="20240101-001",
-                chip_id="chip_1",
-                qids=["0"],
-                backend_name="fake",
-                project_id="test_project",
-                lock_repo=mock_lock_repo,
-                user_repo=mock_user_repo,
-                persist_output_parameters=False,
-            )
-
-    def test_isolated_worker_resolves_writeback_like_its_parent(self, mock_flow_session_deps):
-        """Per-task write-back defaults reach the worker; calls still decide for themselves."""
-        from qdash.workflow.engine.orchestrator import CalibOrchestrator
-        from qdash.workflow.service._internal.scheduling_tasks import _create_isolated_session
-
-        session = _create_isolated_session(
-            {
-                "username": "test_user",
-                "chip_id": "chip_1",
-                "execution_id": "20240101-001",
-                "backend_name": "fake",
-                "project_id": "test_project",
-                "task_parameters": {"CheckRabi": {"update_calibration_parameters": False}},
-            },
-            ["0"],
-        )
-
-        assert session._orchestrator is not None
-        resolve = CalibOrchestrator(
-            session._orchestrator.config
-        )._should_update_calibration_parameters
-        assert resolve("CheckRabi", None) is False
-        assert resolve("CheckRabi", {"update_calibration_parameters": True}) is True
-        assert resolve("CheckT1", None) is True
-        assert resolve("CheckT1", {"update_calibration_parameters": False}) is False
-
-    def test_flow_session_default_tags(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
-    ):
-        """Test that default tags are set correctly."""
-        session = CalibService(
-            username="test_user",
-            execution_id="20240101-001",
-            chip_id="chip_1",
-            qids=["0"],
-            tags=["python_flow"],  # Explicitly pass tags
-            project_id="test_project",
-            lock_repo=mock_lock_repo,
-            user_repo=mock_user_repo,
-        )
-
-        assert session.execution_service is not None
-        assert "python_flow" in session.execution_service.tags
-
-    def test_initialize_adopts_claimed_scheduled_execution(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
-    ):
-        """A scheduled execution claimed by flow_run_id is adopted as the session's execution_id."""
-        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
-        fake_repo = FakeExecutionRepository(claimed_execution_id="20240101-777")
-        monkeypatch.setattr("qdash.repository.MongoExecutionRepository", lambda: fake_repo)
-
-        session = CalibService(
-            username="test_user",
-            chip_id="chip_1",
-            qids=["0"],
-            project_id="test_project",
-            lock_repo=mock_lock_repo,
-            user_repo=mock_user_repo,
-        )
-
-        assert session.execution_id == "20240101-777"
-        assert session.note is not None
-        assert session.note["flow_run_id"] == "flow-run-9"
-        assert fake_repo.calls == [{"project_id": "test_project", "flow_run_id": "flow-run-9"}]
-
-    def test_initialize_generates_execution_id_when_nothing_claimed(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
-    ):
-        """With no scheduled execution to claim, _initialize falls back to generate_execution_id."""
-        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
-        fake_repo = FakeExecutionRepository(claimed_execution_id=None)
-        monkeypatch.setattr("qdash.repository.MongoExecutionRepository", lambda: fake_repo)
-        fake_counter_repo = FakeExecutionCounterRepository(next_index=7)
-
-        session = CalibService(
-            username="test_user",
-            chip_id="chip_1",
-            qids=["0"],
-            project_id="test_project",
-            lock_repo=mock_lock_repo,
-            user_repo=mock_user_repo,
-            counter_repo=fake_counter_repo,
-        )
-
-        assert fake_repo.calls == [{"project_id": "test_project", "flow_run_id": "flow-run-9"}]
-        assert session.execution_id is not None
-        assert re.fullmatch(r"\d{8}-007", session.execution_id)
-
-    @pytest.mark.parametrize("skip_execution", [False, True])
-    def test_initialize_adopts_a_lock_claimed_by_the_api_for_this_execution(
-        self, mock_flow_session_deps, mock_user_repo, monkeypatch, skip_execution
-    ):
-        """A lock the API claimed for the execution being claimed is adopted, not contested."""
-        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
-        monkeypatch.setattr(
-            "qdash.repository.MongoExecutionRepository",
-            lambda: FakeExecutionRepository(claimed_execution_id="20240101-777"),
-        )
-        lock_repo = MockExecutionLockRepository(locked=True, owner="20240101-777")
-
-        session = CalibService(
-            username="test_user",
-            chip_id="chip_1",
-            qids=["0"],
-            project_id="test_project",
-            lock_repo=lock_repo,
-            user_repo=mock_user_repo,
-            skip_execution=skip_execution,
-            counter_repo=FakeExecutionCounterRepository(next_index=7),
-        )
-
-        assert session.execution_id == "20240101-777"
-        assert session._lock_acquired is True
-        assert lock_repo.try_lock_calls == ["20240101-777"]
-        assert lock_repo.owner == "20240101-777"
-        assert session.skip_execution is False
-        assert session._orchestrator is not None
-        assert session._orchestrator.config.skip_execution is False
-
-    @pytest.mark.parametrize("skip_execution", [False, True])
-    def test_initialize_refuses_a_lock_owned_by_another_execution(
-        self, mock_flow_session_deps, mock_user_repo, monkeypatch, skip_execution
-    ):
-        """A lock owned by a different execution still blocks the session."""
-        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
-        monkeypatch.setattr(
-            "qdash.repository.MongoExecutionRepository",
-            lambda: FakeExecutionRepository(claimed_execution_id="20240101-777"),
-        )
-        lock_repo = MockExecutionLockRepository(locked=True, owner="20240101-111")
-
-        with pytest.raises(RuntimeError, match="Calibration is already running"):
-            CalibService(
-                username="test_user",
-                chip_id="chip_1",
-                qids=["0"],
-                project_id="test_project",
-                lock_repo=lock_repo,
-                user_repo=mock_user_repo,
-                skip_execution=skip_execution,
-                counter_repo=FakeExecutionCounterRepository(next_index=7),
-            )
-
-        assert lock_repo.owner == "20240101-111"
-
-    @pytest.mark.parametrize("skip_execution", [False, True])
-    def test_initialize_refuses_an_unowned_lock(
-        self, mock_flow_session_deps, mock_user_repo, monkeypatch, skip_execution
-    ):
-        """A held lock with no recorded owner is not adopted either."""
-        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
-        monkeypatch.setattr(
-            "qdash.repository.MongoExecutionRepository",
-            lambda: FakeExecutionRepository(claimed_execution_id="20240101-777"),
-        )
-        lock_repo = MockExecutionLockRepository(locked=True, owner=None)
-
-        with pytest.raises(RuntimeError, match="Calibration is already running"):
-            CalibService(
-                username="test_user",
-                chip_id="chip_1",
-                qids=["0"],
-                project_id="test_project",
-                lock_repo=lock_repo,
-                user_repo=mock_user_repo,
-                skip_execution=skip_execution,
-                counter_repo=FakeExecutionCounterRepository(next_index=7),
-            )
-
-    @pytest.mark.parametrize("terminal", ["complete", "fail", "cancel"])
-    def test_api_wrapper_finalizes_its_adopted_execution_and_releases_lock(
-        self, mock_flow_session_deps, mock_user_repo, monkeypatch, terminal
-    ):
-        """The UI's parent row must reach a terminal state when its pipeline ends."""
-        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
-        monkeypatch.setattr(
-            "qdash.repository.MongoExecutionRepository",
-            lambda: FakeExecutionRepository(claimed_execution_id="20240101-777"),
-        )
-        lock_repo = MockExecutionLockRepository(locked=True, owner="20240101-777")
-        session = CalibService(
-            username="test_user",
-            chip_id="chip_1",
-            qids=["0"],
-            project_id="test_project",
-            skip_execution=True,
-            lock_repo=lock_repo,
-            user_repo=mock_user_repo,
-            counter_repo=FakeExecutionCounterRepository(next_index=7),
-        )
-        execution_service = MagicMock()
-        session.execution_service = execution_service
-        monkeypatch.setattr(session, "_finalize_stale_running_tasks", MagicMock())
-        monkeypatch.setattr(session, "_finalize_tasks_on_cancel", MagicMock())
-
-        if terminal == "complete":
-            session.finish_calibration(update_chip_history=False, push_to_github=False)
-        elif terminal == "fail":
-            session.fail_calibration("measurement failed")
-        else:
-            session.cancel_calibration()
-
-        getattr(execution_service.reload.return_value, terminal).assert_called_once()
-        backend = session.backend
-        assert backend is not None
-        cast("MagicMock", backend.disconnect).assert_called_once_with()
-        if terminal == "fail":
-            execution_service.reload.return_value.fail.assert_called_once_with("measurement failed")
-        assert lock_repo.locked is False
-        assert session._lock_acquired is False
-
-    @pytest.mark.parametrize("execution_id", [None, "parent-execution"])
-    def test_isolated_worker_does_not_claim_or_finalize_parent_execution(
-        self, mock_flow_session_deps, mock_user_repo, monkeypatch, execution_id
-    ):
-        """Workers borrowing a parent's execution must not take over its lifecycle."""
-        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
-        fake_repo = FakeExecutionRepository(claimed_execution_id="20240101-777")
-        monkeypatch.setattr("qdash.repository.MongoExecutionRepository", lambda: fake_repo)
-        lock_repo = MockExecutionLockRepository(locked=True, owner="parent-execution")
-        session = CalibService(
-            username="test_user",
-            chip_id="chip_1",
-            qids=["0"],
-            project_id="test_project",
-            execution_id=execution_id,
-            skip_execution=True,
-            use_lock=False,
-            lock_repo=lock_repo,
-            user_repo=mock_user_repo,
-            counter_repo=FakeExecutionCounterRepository(next_index=7),
-        )
-        execution_service = MagicMock()
-        session.execution_service = execution_service
-
-        session.finish_calibration(update_chip_history=False, push_to_github=False)
-        backend = session.backend
-        assert backend is not None
-        cast("MagicMock", backend.disconnect).assert_called_once_with()
-        session.fail_calibration()
-        session.cancel_calibration()
-
-        assert fake_repo.calls == []
-        assert session.skip_execution is True
-        assert lock_repo.try_lock_calls == []
-        assert lock_repo.owner == "parent-execution"
-        assert lock_repo.locked is True
-        execution_service.reload.assert_not_called()
-
-    def test_wrapper_without_api_execution_keeps_skipping_execution_creation(
-        self, mock_flow_session_deps, mock_user_repo, monkeypatch
-    ):
-        """Scheduled or direct pipelines can still run without a pre-created parent row."""
-        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
-        fake_repo = FakeExecutionRepository(claimed_execution_id=None)
-        monkeypatch.setattr("qdash.repository.MongoExecutionRepository", lambda: fake_repo)
-        lock_repo = MockExecutionLockRepository()
-        session = CalibService(
-            username="test_user",
-            chip_id="chip_1",
-            qids=["0"],
-            project_id="test_project",
-            skip_execution=True,
-            lock_repo=lock_repo,
-            user_repo=mock_user_repo,
-            counter_repo=FakeExecutionCounterRepository(next_index=7),
-        )
-
-        assert session.skip_execution is True
-        assert session.execution_id is not None
-        assert re.fullmatch(r"\d{8}-007", session.execution_id)
-        assert lock_repo.owner == session.execution_id
-        session.finish_calibration(update_chip_history=False, push_to_github=False)
-        assert lock_repo.locked is False
-
-    def test_initialize_takes_a_free_lock_itself(
-        self, mock_flow_session_deps, mock_user_repo, monkeypatch
-    ):
-        """Runs that never went through the API, such as cron schedules, lock here."""
-        _stub_prefect_flow_run_context(monkeypatch, flow_run_id="flow-run-9")
-        monkeypatch.setattr(
-            "qdash.repository.MongoExecutionRepository",
-            lambda: FakeExecutionRepository(claimed_execution_id="20240101-777"),
-        )
-        lock_repo = MockExecutionLockRepository()
-
-        session = CalibService(
-            username="test_user",
-            chip_id="chip_1",
-            qids=["0"],
-            project_id="test_project",
-            lock_repo=lock_repo,
-            user_repo=mock_user_repo,
-        )
-
-        assert lock_repo.try_lock_calls == ["20240101-777"]
-        assert lock_repo.locked is True
-        assert lock_repo.owner == session.execution_id
-
-
-class TestCalibServiceParameterManagement:
-    """Test parameter get/set operations."""
-
-    def test_set_and_get_parameter(self, mock_flow_session_deps, mock_lock_repo, mock_user_repo):
-        """Test setting and getting parameters."""
-        session = CalibService(
-            username="test_user",
-            execution_id="20240101-001",
-            chip_id="chip_1",
-            qids=["0"],
-            project_id="test_project",
-            lock_repo=mock_lock_repo,
-            user_repo=mock_user_repo,
-        )
-
-        # Set parameter
-        session.set_parameter("0", "qubit_frequency", 5.0)
-
-        # Get parameter
-        freq = session.get_parameter("0", "qubit_frequency")
-        assert freq == 5.0
-
-    def test_get_nonexistent_parameter(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
-    ):
-        """Test getting a parameter that doesn't exist."""
-        session = CalibService(
-            username="test_user",
-            execution_id="20240101-001",
-            chip_id="chip_1",
-            qids=["0"],
-            project_id="test_project",
-            lock_repo=mock_lock_repo,
-            user_repo=mock_user_repo,
-        )
-
-        # Get nonexistent parameter
-        result = session.get_parameter("0", "nonexistent")
-        assert result is None
-
-    def test_sync_backend_params_filters_configured_push_files_to_touched_files(
-        self,
-        monkeypatch,
-    ):
-        """Only configured params files touched by this calibration should be batch-pushed."""
-        from qdash.workflow.service.github import GitHubPushConfig
-
-        class FakeUpdater:
-            def update(self, qid, params):
-                assert qid == "0"
-                assert params == {"t1": {"value": 12.0}}
-                return {"t1.yaml"}
-
-        orchestrator = MagicMock()
-        orchestrator._execution_service = MockExecutionService()
-        orchestrator._execution_service.calib_data.qubit = {
-            "0": {"t1": {"value": 12.0}},
-        }
-        orchestrator._backend = MagicMock()
-
-        session = CalibService.__new__(CalibService)
-        session.chip_id = "chip_1"
-        session._orchestrator = orchestrator
-        session.github_push_config = GitHubPushConfig(
-            params_file_names=["t1.yaml", "t2_echo.yaml"],
-        )
-
-        monkeypatch.setattr(
-            "qdash.workflow.service.calib_service.get_params_updater",
-            lambda backend, chip_id: FakeUpdater(),
-        )
-        logger = MagicMock()
-
-        push_config = session._sync_backend_params_before_push(logger)
-
-        assert push_config.params_file_names == ["t1.yaml"]
-        # Pipeline steps share the session config, so it must keep the full allowlist.
-        assert session.github_push_config.params_file_names == ["t1.yaml", "t2_echo.yaml"]
-        logger.info.assert_called_once()
-
-    def test_sync_backend_params_does_not_narrow_later_pipeline_steps(self, monkeypatch):
-        """A step that touches no params must not empty the allowlist for later steps."""
-        from qdash.workflow.service.github import GitHubPushConfig
-
-        class FakeUpdater:
-            def update(self, qid, params):
-                return {"capture_delay.yaml"} if params else set()
-
-        orchestrator = MagicMock()
-        orchestrator._execution_service = MockExecutionService()
-        orchestrator._backend = MagicMock()
-
-        session = CalibService.__new__(CalibService)
-        session.chip_id = "chip_1"
-        session._orchestrator = orchestrator
-        session.github_push_config = GitHubPushConfig(
-            params_file_names=["capture_delay.yaml", "t1.yaml"],
-        )
-        monkeypatch.setattr(
-            "qdash.workflow.service.calib_service.get_params_updater",
-            lambda backend, chip_id: FakeUpdater(),
-        )
-
-        # Step 1 (ConfigureAll) updates no params.
-        orchestrator._execution_service.calib_data.qubit = {}
-        first = session._sync_backend_params_before_push(MagicMock())
-        # Step 2 (CorrectCaptureDelay) updates the capture delay.
-        orchestrator._execution_service.calib_data.qubit = {"0": {"capture_delay": {"value": 8}}}
-        second = session._sync_backend_params_before_push(MagicMock())
-
-        assert first.params_file_names == []
-        assert second.params_file_names == ["capture_delay.yaml"]
-
-    def test_sync_backend_params_keeps_touched_files_when_already_updated(
-        self,
-        monkeypatch,
-    ):
-        """Task-time params updates should still be batch-pushed on finish."""
-        from qdash.workflow.service.github import GitHubPushConfig
-
-        class FakeUpdater:
-            def update(self, qid, params):
-                assert qid == "0"
-                assert params == {"t1": {"value": 12.0}}
-                return set()
-
-        orchestrator = MagicMock()
-        orchestrator._execution_service = MockExecutionService()
-        orchestrator._execution_service.calib_data.qubit = {
-            "0": {"t1": {"value": 12.0}},
-        }
-        orchestrator._backend = MagicMock()
-
-        session = CalibService.__new__(CalibService)
-        session.chip_id = "chip_1"
-        session._orchestrator = orchestrator
-        session.github_push_config = GitHubPushConfig(
-            params_file_names=["t1.yaml", "t2_echo.yaml"],
-        )
-
-        monkeypatch.setattr(
-            "qdash.workflow.service.calib_service.get_params_updater",
-            lambda backend, chip_id: FakeUpdater(),
-        )
-        monkeypatch.setattr(
-            "qdash.workflow.engine.params_updater.ConfigLoader.load_workflow",
-            lambda: {
-                "params_updater": {
-                    "parameter_file_map": {
-                        "t1": "t1.yaml",
-                        "t2_echo": "t2_echo.yaml",
-                    },
-                },
-            },
-        )
-        logger = MagicMock()
-
-        push_config = session._sync_backend_params_before_push(logger)
-
-        assert push_config.params_file_names == ["t1.yaml"]
-        # Pipeline steps share the session config, so it must keep the full allowlist.
-        assert session.github_push_config.params_file_names == ["t1.yaml", "t2_echo.yaml"]
-        logger.info.assert_called_once()
-
-    def test_sync_backend_params_pushes_publish_target_files(self, monkeypatch):
-        """A publish-only YAML file (control_frequency_fh.yaml) stays in the push."""
-        from qdash.datamodel.task import ParameterModel
-        from qdash.workflow.engine.task.state_manager import TaskStateManager
-        from qdash.workflow.service.github import GitHubPushConfig
-
-        state_manager = TaskStateManager(qids=["0"])
-        state_manager.put_output_parameters(
-            "CheckAdaptiveFHChevron",
-            {"fh_frequency": ParameterModel(value=4.2, unit="GHz")},
-            "qubit",
-            "0",
-            publish_targets={"fh_frequency": ("fh_frequency", "control_frequency_fh")},
-        )
-
-        class FakeUpdater:
-            def update(self, qid, params):
-                assert set(params) == {"fh_frequency", "control_frequency_fh"}
-                return set()
-
-        orchestrator = MagicMock()
-        orchestrator._execution_service = MockExecutionService()
-        orchestrator._execution_service.calib_data = state_manager.calib_data
-        orchestrator._backend = MagicMock()
-
-        session = CalibService.__new__(CalibService)
-        session.chip_id = "chip_1"
-        session._orchestrator = orchestrator
-        session.github_push_config = GitHubPushConfig(
-            params_file_names=["control_frequency_fh.yaml", "t1.yaml"],
-        )
-        monkeypatch.setattr(
-            "qdash.workflow.service.calib_service.get_params_updater",
-            lambda backend, chip_id: FakeUpdater(),
-        )
-        monkeypatch.setattr(
-            "qdash.workflow.engine.params_updater.ConfigLoader.load_workflow",
-            lambda: {
-                "params_updater": {
-                    "parameter_file_map": {
-                        "control_frequency_fh": "control_frequency_fh.yaml",
-                        "t1": "t1.yaml",
-                    },
-                },
-            },
-        )
-
-        push_config = session._sync_backend_params_before_push(MagicMock())
-
-        assert push_config.params_file_names == ["control_frequency_fh.yaml"]
-
-    def test_merge_task_result_calib_data_before_push_loads_completed_outputs(
-        self,
-        monkeypatch,
-    ):
-        """Parent sessions should rebuild calib_data from isolated child task results."""
-        from qdash.datamodel.task import ParameterModel, TaskTypes
-
-        class FakeFinder:
-            def sort(self, sort):
-                return self
-
-            def run(self):
-                return [
-                    MagicMock(
-                        qid="0",
-                        task_type=TaskTypes.QUBIT,
-                        task_id="task-1",
-                        output_parameters={
-                            "control_amplitude": {
-                                "value": 0.25,
-                                "database_updated": True,
-                            },
-                            "fh_frequency": {
-                                "value": 4.25,
-                                "database_updated": True,
-                                "database_updates": [
-                                    {
-                                        "parameter_name": "fh_frequency",
-                                        "updated_value": 4.25,
-                                        "updated": True,
-                                    },
-                                    {
-                                        "parameter_name": "control_frequency_fh",
-                                        "updated_value": 4.2,
-                                        "updated": True,
-                                    },
-                                    {
-                                        "parameter_name": "not_written",
-                                        "updated_value": 4.25,
-                                        "updated": False,
-                                    },
-                                ],
-                            },
-                            "not_written_only": {
-                                "value": 1.0,
-                                "database_updated": True,
-                                "database_updates": [
-                                    {
-                                        "parameter_name": "not_written_only",
-                                        "updated_value": 1.0,
-                                        "updated": False,
-                                    }
-                                ],
-                            },
-                            "measurement_only": {
-                                "value": 0.75,
-                                "database_updated": False,
-                            },
-                        },
-                    )
-                ]
-
-        monkeypatch.setattr(
-            "qdash.dbmodel.task_result_history.TaskResultHistoryDocument.find",
-            lambda query: FakeFinder(),
-        )
-
-        orchestrator = MagicMock()
-        orchestrator._execution_service = MockExecutionService()
-
-        session = CalibService.__new__(CalibService)
-        session.project_id = "test_project"
-        session.execution_id = "exec-1"
-        session._orchestrator = orchestrator
-
-        session._merge_task_result_calib_data_before_push(MagicMock())
-
-        execution_service = session.execution_service
-        assert execution_service is not None
-        merged = execution_service.calib_data.qubit["0"]["control_amplitude"]
-        assert isinstance(merged, ParameterModel)
-        assert merged.value == 0.25
-        # Published destinations are keyed by their database names so the YAML
-        # push sees control_frequency_fh.yaml even though the output is fh_frequency.
-        qubit_data = execution_service.calib_data.qubit["0"]
-        assert qubit_data["fh_frequency"].value == 4.25
-        assert qubit_data["control_frequency_fh"].value == 4.2
-        assert qubit_data["control_frequency_fh"].parameter_name == "control_frequency_fh"
-        assert "not_written" not in qubit_data
-        assert "not_written_only" not in qubit_data
-        assert "measurement_only" not in qubit_data
-
-    def test_merge_task_result_calib_data_drops_replaced_publish_targets(self, monkeypatch):
-        """History reconstruction keeps the latest owner of each published name."""
-        from qdash.datamodel.task import ParameterModel, TaskTypes
-
-        def result(task_name: str, target: str, value: float):
-            return SimpleNamespace(
-                name=task_name,
-                qid="0",
-                task_type=TaskTypes.QUBIT,
-                task_id=f"{task_name}-{target}",
-                output_parameters={
-                    "measured": {
-                        "value": value,
-                        "database_updated": True,
-                        "database_updates": [
-                            {"parameter_name": target, "updated_value": value, "updated": True}
-                        ],
-                    }
-                },
-            )
-
-        class FakeFinder:
-            def sort(self, sort):
-                return self
-
-            def run(self):
-                return [
-                    SimpleNamespace(
-                        name="TaskA",
-                        qid="0",
-                        task_type=TaskTypes.QUBIT,
-                        task_id="TaskA-first",
-                        output_parameters={
-                            "measured": {
-                                "value": 4.2,
-                                "database_updated": True,
-                                "database_updates": [
-                                    {
-                                        "parameter_name": "old_alias",
-                                        "updated_value": 4.2,
-                                        "updated": True,
-                                    },
-                                    {
-                                        "parameter_name": "shared_alias",
-                                        "updated_value": 4.2,
-                                        "updated": True,
-                                    },
-                                ],
-                            }
-                        },
-                    ),
-                    result("TaskB", "shared_alias", 5.0),
-                    result("TaskA", "new_alias", 4.3),
-                ]
-
-        monkeypatch.setattr(
-            "qdash.dbmodel.task_result_history.TaskResultHistoryDocument.find",
-            lambda query: FakeFinder(),
-        )
-        execution_service = MockExecutionService()
-        execution_service.calib_data.qubit["0"] = {
-            "old_alias": ParameterModel(value=4.2),
-            "shared_alias": ParameterModel(value=5.0),
-        }
-        session = CalibService.__new__(CalibService)
-        session.project_id = "test_project"
-        session.execution_id = "exec-1"
-        orchestrator = MagicMock()
-        orchestrator._execution_service = execution_service
-        session._orchestrator = orchestrator
-
-        session._merge_task_result_calib_data_before_push(MagicMock())
-
-        calib = execution_service.calib_data.qubit["0"]
-        assert set(calib) == {"shared_alias", "new_alias"}
-        assert calib["shared_alias"].value == 5.0
-        assert calib["new_alias"].value == 4.3
-
-
-class TestGlobalSessionHelpers:
-    """Test global session helper functions."""
-
-    def test_init_and_get_session(self, mock_flow_session_deps):
-        """Test init_calibration and get_session."""
-        # Initialize session with qids
-        session1 = init_calibration(
-            username="test_user",
-            execution_id="20240101-001",
-            chip_id="chip_1",
-            qids=["0", "1"],
-            project_id="test_project",
-        )
-
-        # Get session
-        session2 = get_session()
-
-        assert session1 is session2
-
-    def test_get_session_without_init(self):
-        """Test that get_session raises error when no session exists."""
-        with pytest.raises(RuntimeError, match="No active calibration session"):
-            get_session()
-
-    def test_finish_calibration(self, mock_flow_session_deps, monkeypatch):
-        """Test finish_calibration helper."""
-        # Mock Prefect logger to avoid context error
-        mock_logger = MagicMock()
-        monkeypatch.setattr(
-            "qdash.workflow.service.calib_service.get_run_logger",
-            lambda: mock_logger,
-        )
-
-        # Initialize and finish
-        session = init_calibration(
-            username="test_user",
-            execution_id="20240101-001",
-            chip_id="chip_1",
-            qids=["0"],
-            project_id="test_project",
-        )
-
-        finish_calibration()
-
-        assert session.execution_service is not None
-        assert session.execution_service.completed is True  # type: ignore[attr-defined]
-
-
-class TestRunPipelineFailureLogging:
-    """Test that _run_pipeline logs the abort reason and re-raises on step failure."""
-
-    def test_run_pipeline_logs_and_reraises_on_step_failure(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
-    ):
-        """A step raising during execute() propagates after the abort is logged."""
-        session = CalibService(
-            username="test_user",
-            execution_id="20240101-001",
-            chip_id="chip_1",
-            qids=["0"],
-            project_id="test_project",
-            lock_repo=mock_lock_repo,
-            user_repo=mock_user_repo,
-        )
-
-        with pytest.raises(RuntimeError, match="boom"):
-            session._run_pipeline(QubitTargets(["0"]), [BoomStep()])
-
-
-@pytest.fixture
-def pipeline_execution_env(mock_flow_session_deps, monkeypatch):
-    """Exercise real pipeline/strategy lifecycle without hardware or database I/O."""
-    records = []
-    lock = MockExecutionLockRepository(locked=True, owner="exec-reserved")
-    claims = MagicMock(side_effect=["exec-reserved", None])
-    monkeypatch.setattr(CalibService, "_read_flow_run_id_from_context", lambda self: "flow-1")
-    monkeypatch.setattr(
-        "qdash.repository.MongoExecutionRepository",
-        lambda: SimpleNamespace(claim_scheduled_execution=claims),
-    )
-
-    class RecordingOrchestrator(MockCalibOrchestrator):
-        def initialize(self):
-            super().initialize()
-            record = SimpleNamespace(config=self.config, status="running")
-            records.append(record)
-            for method, status in (
-                ("complete", "completed"),
-                ("fail", "failed"),
-                ("cancel", "cancelled"),
-            ):
-
-                def close(*args, status=status):
-                    assert lock.locked  # No stage may release the pipeline lock.
-                    record.status = status
-                    return self._execution_service
-
-                setattr(self._execution_service, method, close)
-
-    monkeypatch.setattr(
-        "qdash.workflow.service.calib_service.CalibOrchestrator", RecordingOrchestrator
-    )
-    for method in (
-        "record_stage_result",
-        "_finalize_stale_running_tasks",
-        "_finalize_tasks_on_cancel",
-        "_update_chip_history",
-        "_push_to_github_if_configured",
-    ):
-        monkeypatch.setattr(CalibService, method, MagicMock())
-    schedule = SimpleNamespace(
-        stages=[SimpleNamespace(box_type="A", parallel_groups=[["0", "1"]])],
-        steps=[SimpleNamespace(box_type="A", parallel_qids=["0", "1"], step_index=0)],
-        total_steps=1,
-        metadata={"strategy": "test"},
-    )
-    scheduler = MagicMock()
-    scheduler.generate_from_mux.return_value = schedule
-    scheduler.generate_synchronized_from_mux.return_value = schedule
-    scheduler.generate_simultaneous_spectroscopy_batches_from_mux.return_value = schedule
-    monkeypatch.setattr("qdash.workflow.service.strategy.OneQubitScheduler", lambda **kw: scheduler)
-    return SimpleNamespace(records=records, lock=lock, claims=claims)
-
-
-@pytest.mark.parametrize("skip_execution", [False, True])
-@pytest.mark.parametrize(
-    "mode", ["synchronized", "scheduled", "serial", "simultaneous_spectroscopy"]
-)
-def test_pipeline_owns_one_execution_per_calibration_step(
-    pipeline_execution_env, monkeypatch, skip_execution, mode
-):
-    from qdash.workflow.service.steps import FilterByStatus, OneQubitCheck, OneQubitFineTune
-
-    env = pipeline_execution_env
-    worker_ids = []
-
-    def run_workers(*, plan, qids=None, mux_groups=None, session_config=None):
-        session = get_session()
-        assert env.lock.owner == "exec-reserved"
-        assert all(record.status == "completed" for record in env.records[:-1])
-        assert plan.step_id in {"one_qubit_check", "one_qubit_fine_tune"}
-        worker_ids.append(
-            session_config["execution_id"] if session_config else session.execution_id
-        )
-        return {"0": {"status": "success"}, "1": {"status": "success"}}
-
-    for method in (
-        "run_qubit_calibrations_parallel",
-        "run_mux_calibrations_parallel",
-        "_calibrate_mux_qubits",
-    ):
-        monkeypatch.setattr(f"qdash.workflow.service.strategy.{method}", run_workers)
-
-    def run_batch(self, name, qids, **kwargs):
-        invocation = kwargs["invocation"]
-        run_workers(plan=SimpleNamespace(step_id=invocation.step_id))
-        return {qid: {"status": "success", "task_id": f"{name}-{qid}"} for qid in qids}
-
-    monkeypatch.setattr(CalibService, "execute_task_batch", run_batch)
-    # The batch path runs only tasks that implement batch_run.
-    check_task, fine_task = (
-        ("CheckQubitSpectroscopy", "CheckResonatorSpectroscopy")
-        if mode == "simultaneous_spectroscopy"
-        else ("CheckRabi", "CheckRamsey")
-    )
-    session = CalibService(
-        "alice",
-        "chip-1",
-        project_id="project-1",
-        flow_name="one",
-        skip_execution=skip_execution,
-        enable_github=False,
-        lock_repo=env.lock,
-        counter_repo=FakeExecutionCounterRepository(2),
-    )
-
-    session.run(
-        QubitTargets(["0", "1"]),
-        steps=[
-            OneQubitCheck(mode=mode, tasks=[TaskCall(name=check_task)]),
-            FilterByStatus(),
-            OneQubitFineTune(mode=mode, tasks=[TaskCall(name=fine_task)]),
-        ],
-    )
-
-    assert len(env.records) == 2
-    first, second = env.records
-    assert first.config.execution_id == "exec-reserved"
-    assert second.config.execution_id != first.config.execution_id
-    assert worker_ids == [first.config.execution_id, second.config.execution_id]
-    assert [record.status for record in env.records] == ["completed", "completed"]
-    assert [record.config.flow_name for record in env.records] == [
-        "one_one_qubit_check",
-        "one_one_qubit_fine_tune",
+    return runs
+
+
+def test_constructor_surface_is_context_and_run_metadata_only() -> None:
+    parameters = inspect.signature(CalibService.__init__).parameters
+    named = [
+        name
+        for name, parameter in parameters.items()
+        if parameter.kind not in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD)
     ]
-    assert [record.config.note["step_index"] for record in env.records] == [1, 3]
-    assert all(record.config.note["flow_run_id"] == "flow-1" for record in env.records)
-    assert all(record.config.skip_execution is False for record in env.records)
-    assert env.lock.try_lock_calls == ["exec-reserved"]
-    assert env.lock.unlock_calls == ["exec-reserved"]
-    assert env.lock.locked is False
-    assert session.flow_name == "one"
-    with pytest.raises(RuntimeError, match="No active"):
-        get_session()
-
-
-@pytest.mark.parametrize("cancel", [False, True])
-@pytest.mark.parametrize("transform_failure", [False, True])
-def test_pipeline_failure_preserves_completed_steps(
-    pipeline_execution_env, cancel, transform_failure
-):
-    from qdash.workflow.service.steps.base import TransformStep
-
-    env = pipeline_execution_env
-
-    class CancelledRun(BaseException):
-        pass
-
-    class FirstStep(BoomStep):
-        def execute(self, service, targets, ctx):
-            return ctx
-
-    class FailureStep(BoomStep):
-        def execute(self, service, targets, ctx):
-            assert env.lock.locked
-            assert env.records[0].status == "completed"
-            raise CancelledRun() if cancel else RuntimeError("boom")
-
-    class FailureTransform(FailureStep, TransformStep):
-        pass
-
-    session = CalibService(
-        "alice",
-        "chip-1",
-        project_id="project-1",
-        enable_github=False,
-        lock_repo=env.lock,
-        counter_repo=FakeExecutionCounterRepository(2),
-    )
-    with pytest.raises(CancelledRun if cancel else RuntimeError):
-        session.run(
-            QubitTargets(["0"]),
-            steps=[
-                FirstStep(),
-                FailureTransform() if transform_failure else FailureStep(),
-            ],
-        )
-    expected = (
-        ["completed"] if transform_failure else ["completed", "cancelled" if cancel else "failed"]
-    )
-    assert [record.status for record in env.records] == expected
-    assert env.lock.locked is False
-
-
-@pytest.mark.parametrize("skip_execution", [False, True])
-def test_single_step_without_api_reservation_creates_one_execution(
-    pipeline_execution_env, monkeypatch, skip_execution
-):
-    from qdash.workflow.service.steps import CustomOneQubit
-
-    env = pipeline_execution_env
-    env.lock.unlock("project-1")
-    env.claims.side_effect = [None]
-    worker = MagicMock(return_value={"0": {"status": "success"}})
-    monkeypatch.setattr(
-        "qdash.workflow.service.strategy.run_qubit_calibrations_parallel",
-        worker,
-    )
-    session = CalibService(
-        "alice",
-        "chip-1",
-        project_id="project-1",
-        enable_github=False,
-        skip_execution=skip_execution,
-        lock_repo=env.lock,
-        counter_repo=FakeExecutionCounterRepository(2),
-    )
-    session.run(QubitTargets(["0"]), steps=[CustomOneQubit(tasks=[TaskCall(name="CheckRabi")])])
-
-    assert len(env.records) == 1
-    assert env.records[0].status == "completed"
-    assert env.records[0].config.skip_execution is False
-    assert (
-        worker.call_args.kwargs["session_config"]["execution_id"]
-        == env.records[0].config.execution_id
-    )
-    assert env.lock.locked is False
-
-
-def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, monkeypatch):
-    from qdash.workflow.service.steps import CustomTwoQubit, TwoQubitCalibration
-
-    env = pipeline_execution_env
-    scheduler = MagicMock()
-    scheduler.generate.return_value = SimpleNamespace(parallel_groups=[[("0", "1")]])
-    monkeypatch.setattr("qdash.workflow.engine.CRScheduler", lambda *a, **kw: scheduler)
-    worker = MagicMock(return_value={"0-1": {"status": "success"}})
-    monkeypatch.setattr(
-        "qdash.workflow.service._internal.scheduling_tasks.run_coupling_calibrations_parallel",
-        worker,
-    )
-    session = CalibService(
-        "alice",
-        "chip-1",
-        project_id="project-1",
-        backend_name="fake",
-        enable_github=False,
-        lock_repo=env.lock,
-        counter_repo=FakeExecutionCounterRepository(2),
-        default_run_parameters={"interval": {"value": 1024, "value_type": "int"}},
-        _task_defaults={"CheckRabi": {"run": {"shots": {"value": 2048, "value_type": "int"}}}},
-    )
-    session.run(
-        QubitTargets(["0", "1"]),
-        steps=[
-            CustomTwoQubit(tasks=[TaskCall(name="CheckCrossResonance")]),
-            TwoQubitCalibration(),
-        ],
-    )
-    assert len(env.records) == 2
-    configs = [call.kwargs["session_config"] for call in worker.call_args_list]
-    assert [config["execution_id"] for config in configs] == [
-        record.config.execution_id for record in env.records
+    assert named == [
+        "self",
+        "username",
+        "chip_id",
+        "project_id",
+        "flow_name",
+        "tags",
+        "note",
+        "default_run_parameters",
     ]
-    assert all(config["backend_name"] == "fake" for config in configs)
-    assert all(
-        config["default_run_parameters"] == session.default_run_parameters for config in configs
-    )
-    assert all(config["task_parameters"] == session.task_parameters for config in configs)
-    assert [record.status for record in env.records] == ["completed", "completed"]
-    assert env.lock.locked is False
-
-
-@pytest.fixture
-def pipeline_wiring(tmp_path, monkeypatch):
-    from qdash.common import execution_resources
-
-    path = tmp_path / "chip-1" / "config" / "wiring.yaml"
-    path.parent.mkdir(parents=True)
-    path.write_text(
-        "chip-1:\n"
-        + "".join(
-            f"  - mux: {mux}\n    ctrl: [C{mux}-1]\n    read_out: R{mux}-1\n" for mux in range(4)
-        )
-    )
-    monkeypatch.setattr(execution_resources, "resolve_config_base_path", lambda: tmp_path)
-
-
-def test_pipeline_plan_includes_later_configuration_and_schedule(pipeline_wiring):
-    from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
-    from qdash.workflow.service.steps import ConfigureAll, OneQubitCheck, SetCRSchedule
-
-    scope = plan_pipeline_resources(
-        "chip-1",
-        QubitTargets(["0"]),
-        [OneQubitCheck(), ConfigureAll(mux_ids=[1]), SetCRSchedule(schedule=[[("8", "12")]])],
-    )
-    assert not scope.exclusive
-    assert {r for r in scope.resources if r.startswith("mux:")} == {
-        "mux:0",
-        "mux:1",
-        "mux:2",
-        "mux:3",
+    assert list(inspect.signature(CalibService.from_context).parameters) == [
+        "context",
+        "flow_name",
+        "tags",
+        "note",
+        "default_run_parameters",
+    ]
+    public = {name for name in vars(CalibService) if not name.startswith("_")}
+    assert public == {
+        "from_context",
+        "run",
+        "context",
+        "username",
+        "chip_id",
+        "project_id",
+        "backend_name",
+        "flow_name",
+        "tags",
+        "note",
+        "default_run_parameters",
     }
+    assert not hasattr(CalibService, "__getattr__")
 
 
-def test_unknown_step_plan_is_chip_exclusive(pipeline_wiring):
-    from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
+@pytest.mark.parametrize("name", sorted(LEGACY_OPTION_MIGRATIONS))
+def test_every_removed_option_fails_with_its_migration(name: str) -> None:
+    options: dict[str, Any] = {name: object()}
+    with pytest.raises(TypeError) as raised:
+        CalibService("alice", "chip-1", **options)
 
-    scope = plan_pipeline_resources("chip-1", QubitTargets(["0"]), [BoomStep()])
-    assert scope.exclusive
-
-
-def test_pipeline_blocks_on_later_step_resources_before_running_any_step(
-    pipeline_execution_env,
-    pipeline_wiring,
-    monkeypatch,
-):
-    from qdash.repository.inmemory.execution_lock import InMemoryExecutionLockRepository
-    from qdash.workflow.service.steps import ConfigureAll, CustomOneQubit
-
-    repo = InMemoryExecutionLockRepository()
-    assert repo.try_lock("project-1", "other-run", "chip-1", ("mux:1",), False)
-    run_step = MagicMock()
-    monkeypatch.setattr(CustomOneQubit, "execute", run_step)
-    session = CalibService(
-        "alice", "chip-1", project_id="project-1", enable_github=False, lock_repo=repo
-    )
-    with pytest.raises(RuntimeError, match="already running"):
-        session.run(QubitTargets(["0"]), [CustomOneQubit(), ConfigureAll(mux_ids=[1])])
-    run_step.assert_not_called()
-    assert repo.is_locked("project-1")
-    assert not repo.try_lock("project-1", "third", "chip-1", ("mux:1",), False)
+    message = str(raised.value)
+    assert f"{name}: {LEGACY_OPTION_MIGRATIONS[name]}" in message
+    assert "services.md" in message
 
 
-@pytest.mark.parametrize("fail", [False, True])
-def test_pipeline_retains_whole_plan_and_releases_its_original_owner(
-    pipeline_execution_env,
-    pipeline_wiring,
-    monkeypatch,
-    fail,
-):
-    from qdash.repository.inmemory.execution_lock import InMemoryExecutionLockRepository
-    from qdash.workflow.service.steps import ConfigureAll, CustomOneQubit
+def test_removed_options_are_reported_together_before_any_lookup(monkeypatch) -> None:
+    resolve = MagicMock()
+    monkeypatch.setattr("qdash.workflow.service.calib_service.resolve_calib_context", resolve)
 
-    repo = InMemoryExecutionLockRepository()
-    assert repo.try_lock("project-1", "exec-reserved", "chip-1", ("mux:0",), False)
-    assert repo.try_lock("project-1", "other-chip", "chip-2", ("mux:0",), False)
-    seen = []
-
-    def first(self, service, targets, ctx):
-        seen.append(service.execution_id)
-        assert not repo.try_lock("project-1", "intruder", "chip-1", ("mux:1",), False)
-        return ctx
-
-    def second(self, service, targets, ctx):
-        seen.append(service.execution_id)
-        assert not repo.try_lock("project-1", "intruder", "chip-1", ("mux:0",), False)
-        assert not repo.try_lock("project-1", "intruder", "chip-1", ("mux:1",), False)
-        if fail:
-            raise RuntimeError("second step failed")
-        return ctx
-
-    monkeypatch.setattr(CustomOneQubit, "execute", first)
-    monkeypatch.setattr(ConfigureAll, "execute", second)
-    session = CalibService(
-        "alice",
-        "chip-1",
-        project_id="project-1",
-        enable_github=False,
-        lock_repo=repo,
-        counter_repo=FakeExecutionCounterRepository(2),
-    )
-    if fail:
-        with pytest.raises(RuntimeError, match="second step failed"):
-            session.run(QubitTargets(["0"]), [CustomOneQubit(), ConfigureAll(mux_ids=[1])])
-    else:
-        session.run(QubitTargets(["0"]), [CustomOneQubit(), ConfigureAll(mux_ids=[1])])
-    assert seen[0] == "exec-reserved"
-    assert seen[1] != seen[0]
-    assert [record.config.connect_backend for record in pipeline_execution_env.records] == [
-        False,
-        True,
-    ]
-    assert repo.try_lock("project-1", "next-run", "chip-1", (), True)
-    assert not repo.try_lock("project-1", "other", "chip-2", ("mux:0",), False)
-
-
-def test_pipeline_rejects_unplanned_targets_before_later_hardware_step(
-    pipeline_execution_env,
-    pipeline_wiring,
-    monkeypatch,
-):
-    from qdash.workflow.service.steps import CustomOneQubit, SetCRSchedule
-
-    def change_targets(self, service, targets, ctx):
-        ctx.candidate_qids = ["12"]  # The declared schedule only reserved MUX 0.
-        return ctx
-
-    run_step = MagicMock()
-    monkeypatch.setattr(SetCRSchedule, "execute", change_targets)
-    monkeypatch.setattr(CustomOneQubit, "execute", run_step)
-    session = CalibService(
-        "alice",
-        "chip-1",
-        project_id="project-1",
-        enable_github=False,
-        lock_repo=pipeline_execution_env.lock,
-    )
-    with pytest.raises(RuntimeError, match="outside the workflow"):
-        session.run(QubitTargets(["0"]), [SetCRSchedule(schedule=[[("0", "1")]]), CustomOneQubit()])
-    run_step.assert_not_called()
-    assert not pipeline_execution_env.lock.locked
-
-
-def test_task_and_isolated_worker_reject_unreserved_hardware(pipeline_wiring, monkeypatch):
-    from qdash.common.execution_resources import resolve_execution_resource_scope
-    from qdash.workflow.service._internal.scheduling_tasks import _create_isolated_session
-
-    scope = resolve_execution_resource_scope("chip-1", {"qid": "0"})
-    session = CalibService(
-        "alice",
-        "chip-1",
-        project_id="project-1",
-        use_lock=False,
-        resource_scope=scope,
-        enable_github=False,
-    )
-    orchestrator = MagicMock()
-    session._orchestrator = orchestrator
-    with pytest.raises(RuntimeError, match="outside the workflow"):
-        session.execute_task("CheckRabi", "4")
-    with pytest.raises(RuntimeError, match="outside the workflow"):
-        session.execute_task_batch("CheckRabi", ["0", "4"])
-    with pytest.raises(RuntimeError, match="outside the workflow"):
-        session.execute_task("ConfigureAll", "", parameters={"run": {"mux_ids": {"value": [1]}}})
-    orchestrator.run_task.assert_not_called()
-    orchestrator.run_task_batch.assert_not_called()
-    with pytest.raises(RuntimeError, match="outside the workflow"):
-        _create_isolated_session(
-            {
-                "username": "alice",
-                "chip_id": "chip-1",
-                "project_id": "project-1",
-                "execution_id": "child",
-                "backend_name": "fake",
-                "note": {
-                    "hardware_reservation": {
-                        "chip_id": scope.chip_id,
-                        "resources": list(scope.resources),
-                        "exclusive": False,
-                    }
-                },
-            },
-            ["4"],
-        )
-
-
-def test_configure_all_scope_uses_service_task_parameters(pipeline_wiring):
-    """Service-level MUX settings should be used for operation scope validation."""
-    from qdash.common.execution_resources import resolve_execution_resource_scope
-
-    scope = resolve_execution_resource_scope("chip-1", {"mux_ids": [0]})
-    session = CalibService(
-        "alice",
-        "chip-1",
-        project_id="project-1",
-        use_lock=False,
-        resource_scope=scope,
-        enable_github=False,
-        _task_defaults={"ConfigureAll": {"run": {"mux_ids": [0]}}},
-    )
-    orchestrator = MagicMock()
-    session._orchestrator = orchestrator
-
-    session.execute_task("ConfigureAll", "")
-
-    orchestrator.run_task.assert_called_once()
-
-
-def test_pipeline_keeps_supplied_reservation_owner(pipeline_execution_env, monkeypatch):
-    from qdash.workflow.service.steps import CustomOneQubit
-
-    monkeypatch.setattr(CustomOneQubit, "execute", lambda self, service, targets, ctx: ctx)
-    session = CalibService(
-        "alice",
-        "chip-1",
-        project_id="project-1",
-        enable_github=False,
-        execution_id="exec-reserved",
-        lock_repo=pipeline_execution_env.lock,
-    )
-    session.run(QubitTargets(["0"]), [CustomOneQubit()])
-    assert pipeline_execution_env.lock.try_lock_calls == ["exec-reserved"]
-    assert pipeline_execution_env.lock.unlock_calls == ["exec-reserved"]
-    with pytest.raises(RuntimeError, match="No hardware reservation"):
-        session.execute_task("CheckRabi", "0")
-
-
-class TestAbortClassification:
-    """Test _is_cancellation and _is_external_termination exception matching."""
-
-    def test_bare_cancelled_run_is_a_cancellation(self):
-        """A bare CancelledRun is a cancellation and not an external termination."""
-        exc = CancelledRun("cancelled")
-        assert _is_cancellation(exc) is True
-        assert _is_external_termination(exc) is False
-
-    def test_bare_termination_signal_is_an_external_termination(self):
-        """A bare TerminationSignal is an external termination and not a cancellation."""
-        exc = TerminationSignal("SIGTERM")
-        assert _is_external_termination(exc) is True
-        assert _is_cancellation(exc) is False
-
-    def test_unrelated_exception_is_neither(self):
-        """A plain RuntimeError is neither a cancellation nor an external termination."""
-        exc = RuntimeError("boom")
-        assert _is_cancellation(exc) is False
-        assert _is_external_termination(exc) is False
-
-    def test_cancelled_run_as_cause_is_recognised(self):
-        """A CancelledRun attached as __cause__ of a RuntimeError is still a cancellation."""
-        try:
-            try:
-                raise CancelledRun("cancelled")
-            except CancelledRun as cause:
-                raise RuntimeError("wrapped") from cause
-        except RuntimeError as exc:
-            assert _is_cancellation(exc) is True
-
-    def test_cancelled_run_nested_in_exception_group_is_recognised(self):
-        """A CancelledRun nested in an ExceptionGroup alongside a ValueError is still recognised."""
-        group = ExceptionGroup(  # noqa: F821 (3.11 builtin; ruff targets py310)
-            "multiple errors", [CancelledRun("cancelled"), ValueError("other")]
-        )
-        assert _is_cancellation(group) is True
-
-    def test_termination_signal_as_cause_is_recognised(self):
-        """A TerminationSignal attached as __cause__ is an external termination.
-
-        This matches Prefect's async path, which raises
-        ``TerminationSignal(...) from exc``.
-        """
-        try:
-            try:
-                raise RuntimeError("original")
-            except RuntimeError as cause:
-                raise TerminationSignal("SIGTERM") from cause
-        except TerminationSignal as exc:
-            assert _is_external_termination(exc) is True
-
-    def test_context_is_not_followed(self):
-        """__context__ is not followed: a real failure while handling a cancellation is not mistaken for one."""
-        try:
-            try:
-                raise CancelledRun("cancelled")
-            except CancelledRun:
-                raise RuntimeError("real failure") from None
-        except RuntimeError as exc:
-            assert exc.__context__ is not None
-            assert _is_cancellation(exc) is False
-
-    def test_self_referencing_cause_does_not_hang(self):
-        """A self-referencing __cause__ does not hang the exception chain walk."""
-        exc = RuntimeError("boom")
-        exc.__cause__ = exc
-        assert _is_cancellation(exc) is False
-        assert _is_external_termination(exc) is False
-
-
-def _build_abort_handling_session(mock_lock_repo, mock_user_repo) -> CalibService:
-    """Build a CalibService the same way TestRunPipelineFailureLogging does."""
-    return CalibService(
-        username="test_user",
-        execution_id="20240101-001",
-        chip_id="chip_1",
-        qids=["0"],
-        project_id="test_project",
-        lock_repo=mock_lock_repo,
-        user_repo=mock_user_repo,
-    )
-
-
-def _mock_terminal_handlers(
-    session: CalibService, monkeypatch: pytest.MonkeyPatch
-) -> tuple[MagicMock, MagicMock, MagicMock]:
-    """Replace the three terminal handlers so the abort branch can be observed."""
-    fail, cancel, abandon = MagicMock(), MagicMock(), MagicMock()
-    monkeypatch.setattr(session, "fail_calibration", fail)
-    monkeypatch.setattr(session, "cancel_calibration", cancel)
-    monkeypatch.setattr(session, "abandon_calibration", abandon)
-    return fail, cancel, abandon
-
-
-class TestRunPipelineAbortHandling:
-    """Test that _run_pipeline routes aborts to the correct terminal handler."""
-
-    def test_unrelated_exception_calls_fail_calibration(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
-    ):
-        """A plain RuntimeError routes to fail_calibration only."""
-        session = _build_abort_handling_session(mock_lock_repo, mock_user_repo)
-        fail, cancel, abandon = _mock_terminal_handlers(session, monkeypatch)
-        exc = RuntimeError("boom")
-
-        with pytest.raises(RuntimeError):
-            session._run_pipeline(QubitTargets(["0"]), [RaisingStep(exc=exc)])
-
-        fail.assert_called_once()
-        cancel.assert_not_called()
-        abandon.assert_not_called()
-
-    def test_cancelled_run_calls_cancel_calibration(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
-    ):
-        """A CancelledRun routes to cancel_calibration only."""
-        session = _build_abort_handling_session(mock_lock_repo, mock_user_repo)
-        fail, cancel, abandon = _mock_terminal_handlers(session, monkeypatch)
-        exc = CancelledRun("cancelled")
-
-        with pytest.raises(CancelledRun):
-            session._run_pipeline(QubitTargets(["0"]), [RaisingStep(exc=exc)])
-
-        cancel.assert_called_once()
-        fail.assert_not_called()
-        abandon.assert_not_called()
-
-    def test_termination_signal_calls_abandon_calibration(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo, monkeypatch
-    ):
-        """A TerminationSignal routes to abandon_calibration only."""
-        session = _build_abort_handling_session(mock_lock_repo, mock_user_repo)
-        fail, cancel, abandon = _mock_terminal_handlers(session, monkeypatch)
-        exc = TerminationSignal("SIGTERM")
-
-        with pytest.raises(TerminationSignal):
-            session._run_pipeline(QubitTargets(["0"]), [RaisingStep(exc=exc)])
-
-        abandon.assert_called_once()
-        fail.assert_not_called()
-        cancel.assert_not_called()
-
-    def test_abandon_calibration_releases_lock_without_closing_execution(
-        self, mock_flow_session_deps, mock_lock_repo, mock_user_repo
-    ):
-        """abandon_calibration releases the lock and resets state without a terminal write."""
-        session = _build_abort_handling_session(mock_lock_repo, mock_user_repo)
-        session._lock_acquired = True
-        session._lock_repo = mock_lock_repo
-        session.use_lock = True
-        execution_service = MagicMock()
-        session.execution_service = execution_service
-
-        session.abandon_calibration()
-
-        assert session._lock_acquired is False
-        assert session._initialized is False
-        execution_service.complete.assert_not_called()
-        execution_service.fail.assert_not_called()
-        execution_service.cancel.assert_not_called()
-
-
-@pytest.mark.parametrize("signal", [TerminationSignal("SIGTERM"), asyncio.CancelledError()])
-def test_initialization_interrupt_releases_auto_resolved_project_lock(
-    mock_flow_session_deps, monkeypatch, signal
-):
-    """A constructor abort frees its claim even when the caller has no CalibService instance."""
-    lock = MockExecutionLockRepository()
-    user = MockUserRepository()
-    monkeypatch.setattr(user, "get_default_project_id", lambda username: "test_project")
-
-    def interrupt(self):
-        """Interrupt initialization after its reservation has been acquired."""
-        assert lock.locked
-        raise signal
-
-    monkeypatch.setattr(MockCalibOrchestrator, "initialize", interrupt)
-    with pytest.raises(type(signal)) as raised:
+    with pytest.raises(TypeError) as raised:
         CalibService(
-            username="test_user",
-            chip_id="chip_1",
+            "alice",
+            "chip-1",
             qids=["0"],
-            execution_id="20261022-008",
-            lock_repo=lock,
-            user_repo=user,
+            use_lock=False,
+            snapshot_exempt_tasks={"Configure"},
         )
-    assert raised.value is signal
-    assert not lock.locked
-    assert lock.unlock_calls == ["20261022-008"]
+
+    message = str(raised.value)
+    assert "qids: pass targets to run()" in message
+    assert "use_lock:" in message
+    assert "snapshot_exempt_tasks:" in message
+    resolve.assert_not_called()
+
+
+def test_positional_targets_name_the_removed_parameter() -> None:
+    with pytest.raises(TypeError, match=r"positional argument 3 \(qids\): pass targets to run"):
+        CalibService("alice", "chip-1", ["0", "1"])
+
+
+def test_unknown_option_lists_the_accepted_ones() -> None:
+    with pytest.raises(TypeError, match="accepts flow_name, tags, note and default_run_parameters"):
+        CalibService("alice", "chip-1", colour="blue")
+
+
+def test_flow_entry_resolves_and_authorizes_the_context(monkeypatch, recorded_runs) -> None:
+    directory = grant_all_contexts(monkeypatch)
+
+    cal = CalibService("alice", "chip-1", project_id="project-1", flow_name="nightly")
+
+    assert directory.checked == [("alice", "project-1")]
+    assert (cal.username, cal.chip_id, cal.project_id) == ("alice", "chip-1", "project-1")
+    assert cal.context.project_id == "project-1"
+
+
+def test_from_context_requires_a_resolved_context() -> None:
+    with pytest.raises(TypeError, match="resolve_calib_context"):
+        CalibService.from_context(object())  # type: ignore[arg-type]
+
+
+def _deployment_github(monkeypatch: pytest.MonkeyPatch, github: dict[str, Any]) -> None:
+    monkeypatch.setattr(
+        "qdash.common.config.loader.ConfigLoader.load_workflow", lambda: {"github": github}
+    )
+
+
+def _context_on(backend: str) -> Any:
+    # Backends listed in the deployment depend on the host; pin the one under test.
+    return dataclasses.replace(granted_context(project_id="project-1"), backend_name=backend)
+
+
+def test_run_hands_typed_settings_to_qdash_owned_execution(monkeypatch, recorded_runs) -> None:
+    _deployment_github(monkeypatch, {"enabled": True, "branch": "calibration"})
+    context = _context_on("qubex")
+    cal = CalibService.from_context(
+        context,
+        flow_name="nightly",
+        tags=["t"],
+        note={"why": "test"},
+        default_run_parameters={"readout_duration": 1024},
+    )
+    steps = [CustomOneQubit(tasks=[TaskCall(name="CheckRabi")])]
+
+    result = cal.run(QubitTargets(["0"]), steps=steps)
+
+    [run] = recorded_runs
+    settings = run["settings"]
+    assert result == {"candidate_qids": ["0"]}
+    assert run["steps"] is steps
+    assert (settings.username, settings.chip_id, settings.project_id) == (
+        "alice",
+        "chip-1",
+        "project-1",
+    )
+    assert settings.backend_name == context.backend_name
+    assert (settings.flow_name, settings.tags, settings.note) == ("nightly", ["t"], {"why": "test"})
+    assert settings.default_run_parameters == {"readout_duration": {"value": 1024}}
+    # Per-task defaults, snapshots and force updates are not workflow settings.
+    assert settings.task_defaults == {}
+    assert settings.snapshot.active is False
+    assert settings.force_update_params is False
+    assert settings.github.pull is True
+    assert settings.github.push.enabled is True
+    assert settings.github.push.branch == "calibration"
+
+
+@pytest.mark.parametrize(
+    ("github", "backend"),
+    [
+        ({"enabled": False}, "qubex"),
+        ({"enabled": "true"}, "qubex"),
+        ({"enabled": True}, "fake"),
+    ],
+)
+def test_runs_follow_the_deployment_github_policy(
+    monkeypatch, recorded_runs, github, backend
+) -> None:
+    """A disabled deployment or a backend without a config repository never syncs."""
+    from qdash.workflow.service._internal.settings import GitHubPolicy
+
+    _deployment_github(monkeypatch, github)
+
+    CalibService.from_context(_context_on(backend)).run(QubitTargets(["0"]), [])
+
+    assert recorded_runs[0]["settings"].github == GitHubPolicy.disabled()
+
+
+def test_deployment_policy_defaults_to_enabled_on_main(monkeypatch) -> None:
+    from qdash.workflow.service._internal.settings import GitHubPolicy
+
+    _deployment_github(monkeypatch, {})
+
+    assert GitHubPolicy.from_deployment("qubex") == GitHubPolicy.pull_and_push(branch="main")
+
+
+def test_raw_session_settings_never_sync_github() -> None:
+    from qdash.workflow.service._internal.settings import GitHubPolicy, SessionSettings
+
+    settings = SessionSettings(
+        username="alice", chip_id="chip-1", project_id="project-1", backend_name="qubex"
+    )
+
+    assert settings.github == GitHubPolicy.disabled()
+
+
+def test_saved_flow_defaults_apply_when_the_workflow_sets_none(recorded_runs) -> None:
+    CalibService.from_context(granted_context(), flow_name="nightly").run(QubitTargets(["0"]), [])
+    CalibService.from_context(granted_context()).run(QubitTargets(["0"]), [])
+
+    assert recorded_runs[0]["settings"].default_run_parameters == {"interval": {"value": 1}}
+    assert recorded_runs[1]["settings"].default_run_parameters == {}
+
+
+def test_a_flow_with_source_execution_id_reruns_from_its_snapshot(
+    monkeypatch, recorded_runs
+) -> None:
+    monkeypatch.setattr(
+        "qdash.workflow.service._internal.runs.read_source_execution_id_from_context",
+        lambda: "exec-source",
+    )
+
+    CalibService.from_context(granted_context()).run(QubitTargets(["0"]), [])
+
+    snapshot = recorded_runs[0]["settings"].snapshot
+    assert (snapshot.execution_id, snapshot.task_id, snapshot.exempt_tasks) == (
+        "exec-source",
+        None,
+        frozenset(),
+    )
+
+
+def test_run_metadata_is_copied_and_the_service_runs_again(recorded_runs) -> None:
+    note = {"nested": {"value": 1}}
+    tags = ["a"]
+    cal = CalibService.from_context(granted_context(), tags=tags, note=note)
+    note["nested"]["value"] = 2
+    tags.append("b")
+
+    cal.run(QubitTargets(["0"]), [])
+    cal.run(QubitTargets(["1"]), [])
+
+    assert [run["settings"].note for run in recorded_runs] == [{"nested": {"value": 1}}] * 2
+    assert [run["settings"].tags for run in recorded_runs] == [["a"]] * 2
+    assert cal.note == {"nested": {"value": 1}}
+
+
+def test_internal_runs_keep_an_explicit_operational_policy(monkeypatch) -> None:
+    """``run_calibration`` runs the settings it is given; it does not reapply defaults."""
+    from qdash.workflow.service._internal import runs
+    from qdash.workflow.service._internal.settings import GitHubPolicy
+
+    _deployment_github(monkeypatch, {"enabled": True})
+    monkeypatch.setattr("qdash.workflow.service.flow_targets.read_target_override", lambda: None)
+    sessions: list[Any] = []
+
+    class RecordingSession:
+        def __init__(self, settings: Any, repositories: Any = None) -> None:
+            self.settings = settings
+            sessions.append(self)
+
+        def run_pipeline(self, targets: Any, steps: Any) -> dict[str, Any]:
+            return {}
+
+    monkeypatch.setattr(runs, "CalibSession", RecordingSession)
+    settings = runs.workflow_settings(
+        _context_on("qubex"),
+        flow_name="maintenance",
+        tags=None,
+        note=None,
+        default_run_parameters={"interval": 1},
+    ).model_copy(update={"github": GitHubPolicy.disabled(), "configuration_mode": "ge-ef-cr"})
+
+    runs.run_calibration(settings, QubitTargets(["0"]), [])
+
+    [session] = sessions
+    assert session.settings.github == GitHubPolicy.disabled()
+    assert session.settings.configuration_mode == "ge-ef-cr"

@@ -34,7 +34,7 @@ from qdash.workflow.service.steps.base import TransformStep
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
     from qdash.workflow.service.steps.base import CalibrationStep
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
@@ -145,7 +145,7 @@ class FilterByMetric(StepReferenceFilter):
 
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -198,7 +198,7 @@ class FilterByStatus(StepReferenceFilter):
 
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:

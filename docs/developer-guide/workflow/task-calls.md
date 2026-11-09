@@ -81,9 +81,9 @@ task calls existed have no `invocation`.
 For one call, run and input values resolve from highest to lowest precedence:
 
 1. The call's `run` and `input`
-2. The per-task defaults: a pipeline spec's `task_parameters`, or the deprecated
-   `CalibService(task_parameters=...)` argument, which
-   [migrate to the calls](#migrate-per-task-defaults)
+2. The per-task defaults QDash resolves: a pipeline spec's deprecated `task_parameters`, or a
+   single-task run's request overrides. `CalibService` takes no per-task defaults;
+   [migrate them to the calls](#migrate-per-task-defaults)
 3. `default_run_parameters`, the shared run defaults
 4. The task's `run_spec` and input resolution
 
@@ -226,9 +226,9 @@ Make these changes in every saved flow:
    no longer accepts the argument. Calls without `on_failure` inherit the step's
    `continue_on_failure`, as described in [Failure Policy](#failure-policy).
 5. Move a setting that applied to only one occurrence into that call's `run`, `input`, or
-   `update_calibration_parameters`; [Settings](#settings) gives the precedence. Move the
-   deprecated `CalibService(task_parameters=...)` and `task_run_parameters` onto the calls as
-   described in [Migrate per-task defaults](#migrate-per-task-defaults).
+   `update_calibration_parameters`; [Settings](#settings) gives the precedence. Move
+   `CalibService(task_parameters=...)` and `task_run_parameters` onto the calls as described in
+   [Migrate per-task defaults](#migrate-per-task-defaults).
 6. Replace reads of a target's raw result by task name, such as `data.raw["CheckT1"]`, with the
    ordered calls: `data.call(call_id)`, `data.latest_call(name)`, or `data.calls`, as described
    in [Results](#results).
@@ -243,11 +243,9 @@ upgrade stay readable and have no `invocation`.
 
 ## Migrate per-task defaults
 
-`CalibService(task_parameters=...)` and `CalibService(task_run_parameters=...)` are deprecated.
-Each still applies with its previous precedence and emits a `DeprecationWarning` that names the
-workflow line passing it; a workflow that sets every value on its calls emits none. To migrate,
-merge each task's entry into every call of that task, keeping the call's own value wherever both
-set the same field:
+`CalibService` no longer accepts `task_parameters` or `task_run_parameters`; passing either
+raises a `TypeError` that points here. To migrate, merge each task's entry into every call of
+that task, keeping the call's own value wherever both set the same field:
 
 - A `run` or `input` value the call already sets stays; the call receives every other value of
   the entry.
@@ -344,8 +342,8 @@ cal.run(
 )
 ```
 
-For the low-level API, pass the setting with each call:
-`cal.execute_task("CheckRabi", qid, parameters={"update_calibration_parameters": False})`.
+A custom step that calls the session directly passes the setting with each call:
+`session.execute_task("CheckRabi", qid, parameters={"update_calibration_parameters": False})`.
 [Parameter Resolution](./parameter-resolution.md#output-persistence) gives the full precedence and
 how single-task runs apply their `update_calibration_parameters` request field.
 

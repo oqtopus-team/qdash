@@ -90,9 +90,22 @@ def coherence_sample(
 ```
 
 Keep `username`, `chip_id`, `flow_name`, and `project_id` in the signature. QDash injects them when
-it starts a saved flow. Target parameters remain optional in the signature so the same flow can
+it starts a saved flow, and `CalibService` checks the user's write permission on the project
+before anything runs. Target parameters remain optional in the signature so the same flow can
 accept a MUX selection or an explicit qubit selection, but the function must reject a run with
-neither.
+neither. `service.run()` closes every Execution it opens, so the flow calls nothing after it.
+
+Outside Prefect, resolve the context first and pass it to `CalibService.from_context()`:
+
+```python
+from qdash.workflow import CalibService, resolve_calib_context
+
+context = resolve_calib_context("alice", "64Qv3", project_id="my-project")
+CalibService.from_context(context, flow_name="manual_check").run(QubitTargets(["0"]), steps)
+```
+
+[Workflow Author Contract](./services.md#workflow-author-contract) lists what the context checks
+and how to migrate arguments that `CalibService` no longer accepts.
 
 ## Choose Targets
 
@@ -130,7 +143,7 @@ failure policy. If two templates must stay aligned, compare their lists in templ
 
 ## State Between Steps
 
-`CalibService._run_pipeline()` passes the returned `StepContext` to each step in order. Target
+`CalibSession.run_pipeline()` passes the returned `StepContext` to each step in order. Target
 selection and scheduling travel through this context; Qubex calibration inputs resolve from
 the current calibration database when each task preprocesses.
 
@@ -142,7 +155,7 @@ the current calibration database when each task preprocesses.
 | Typed step results | `StepContext.one_qubit_check`, `one_qubit_fine_tune`, `two_qubit`, and each bring-up, one-qubit, and two-qubit step's result by `step_id` in `step_results` | Filters and pipeline results |
 | Filter outcomes | `StepContext.filters` | Pipeline results |
 | Accepted calibration values | MongoDB qubit and coupling calibration records | Declared task inputs |
-| Experiment settings and overrides | Each `TaskCall`'s settings, `CalibService.default_run_parameters`, and the resolved per-task defaults in `CalibService.task_parameters` | Task construction and isolated worker sessions |
+| Experiment settings and overrides | Each `TaskCall`'s settings and the run's `SessionSettings`: `default_run_parameters`, per-task defaults QDash resolves, snapshot source, and configuration mode | Task construction and isolated worker sessions |
 
 ```mermaid
 flowchart TD
@@ -168,14 +181,15 @@ come from task and workflow settings. See [Parameter Resolution](./parameter-res
 precedence and snapshot re-execution, and [Calibration Data Lifecycle](./calibration-data-lifecycle.md)
 for output promotion.
 
-Parallel coupling workers receive the shared settings and parent Execution ID in
-`session_config`, then create isolated sessions. Within each coupling, tasks run sequentially;
+Parallel coupling workers receive the step session's `WorkerSpec` (the run's settings and the
+step's Execution ID), then open borrowed sessions. Within each coupling, tasks run sequentially;
 workers do not share Python objects. See [CR Gate Scheduler](../architecture/cr-scheduler.md#workflow-integration)
 for schedule reuse and group ordering.
 
 The context and session lifecycle are implemented in `service/steps/pipeline.py` and
-`service/calib_service.py`; worker session construction is in
-`service/_internal/scheduling_tasks.py`, all under `src/qdash/workflow/`.
+`service/_internal/session.py`; worker settings are in `service/_internal/settings.py` and the
+worker tasks in `service/_internal/scheduling_tasks.py`, all under `src/qdash/workflow/`. See
+[Isolated Workers](./engine-architecture.md#isolated-workers) for what workers inherit.
 When changing these boundaries, run the pipeline and worker tests under
 `tests/qdash/workflow/service/` using the [Workflow Testing](./testing.md) guidance.
 
@@ -222,9 +236,8 @@ service = CalibService(
 Here `ramsey_fine` sets its own `shots`, `time_range`, `control_frequency`, and
 `update_calibration_parameters=False`, and takes `interval` from `default_run_parameters`. A call's
 settings take precedence over `default_run_parameters`; a field the call leaves out, or sets to
-`None`, inherits from the next layer. `CalibService(task_parameters=...)` and
-`CalibService(task_run_parameters=...)` are deprecated: they still apply between the call and
-`default_run_parameters`, with a `DeprecationWarning`. See
+`None`, inherits from the next layer. `CalibService` rejects `task_parameters` and
+`task_run_parameters` with a `TypeError`; see
 [Migrate per-task defaults](./task-calls.md#migrate-per-task-defaults).
 
 `TaskCall.run` and `default_run_parameters` use the same
@@ -244,8 +257,7 @@ and [Parameter Resolution](./parameter-resolution.md).
 Every top-level flow that owns hardware reservations must register `on_flow_cancellation`,
 `on_flow_failure`, and `on_flow_crashed`. Do not reproduce their exception-classification logic in
 the template. The system `single-task-executor` also owns its reservation and uses these hooks.
-Use the `*_keep_lock` variants only for nested flows configured with `use_lock=False` that borrow
-the parent flow's reservation.
+Use the `*_keep_lock` variants only for nested flows that borrow another run's reservation.
 
 The hooks finalize execution and task records that the worker cannot close itself and release only
 reservations owned by that flow. [Workflow Engine Architecture](./engine-architecture.md#cancellation)

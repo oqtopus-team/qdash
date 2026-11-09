@@ -79,28 +79,23 @@ none. Use plain values for other `run` values and for `input` values. QDash cont
 three-element lists or tuples and `{"value": ...}` mappings in existing workflows.
 
 Internally, QDash carries per-task defaults as a `task_parameters` mapping from a task name to an
-entry with the same three keys. A pipeline spec's deprecated `task_parameters`, the deprecated
-`CalibService(task_parameters=...)` argument, and the single-task run API's overrides arrive in
-this form, and isolated worker sessions inherit it from the parent session.
-`qdash.workflow.engine.task_parameters` normalizes the mapping when `CalibService` starts. The
+entry with the same three keys, held as `SessionSettings.task_defaults`. A pipeline spec's
+deprecated `task_parameters` and the single-task run API's overrides arrive in this form, and
+isolated worker sessions inherit it through their `WorkerSpec`. `CalibService` takes no per-task
+defaults. `SessionSettings` normalizes the mapping when it is built. The
 orchestrator validates it against the task class when it creates the task: a name under `run`
 that the task declares in `input_spec` fails with a message pointing to `input`, the reverse
 fails the same way, and an undeclared name fails. A misplaced value therefore stops the run
-instead of being ignored. `CalibService` also rejects a task name that no task registered for its
+instead of being ignored. `CalibSession` also rejects a task name that no task registered for its
 backend uses, and suggests the closest registered name, so a misspelled entry fails before the
 session starts.
 
-`CalibService(task_parameters=...)` and the older flat `CalibService(task_run_parameters=...)`,
-which holds run parameters and `update_calibration_parameters` side by side in each task entry,
-are deprecated. `CalibService` still applies both with the same precedence and emits one
-`DeprecationWarning` for each non-empty argument, pointing at the workflow line that passed it;
-`task_parameters` wins for a parameter set in both. Pipeline, isolated worker, and single-task
-sessions pass their resolved defaults through the internal `_task_defaults` argument instead, so
-they do not warn. To migrate, see [Task Calls](./task-calls.md#migrate-per-task-defaults).
+`CalibService(task_parameters=...)` and the older flat `CalibService(task_run_parameters=...)`
+raise a `TypeError`. To migrate, see [Task Calls](./task-calls.md#migrate-per-task-defaults).
 
 Task construction resolves Run parameters in this order, from highest to lowest precedence:
 
-1. `run` in the call-level `parameters` of `CalibService.execute_task()`; a step passes each
+1. `run` in the call-level `parameters` of `CalibSession.execute_task()`; a step passes each
    `TaskCall`'s own settings here, see [Task Calls](./task-calls.md#settings)
 2. `task_parameters[task_name]["run"]`, the per-task defaults described above
 3. Legacy per-task entries in `CalibConfig.default_run_parameters`
@@ -139,8 +134,8 @@ spec's resolution policy and produces an effective `InputParameterModel` for the
 After preprocess, `TaskExecutor._apply_input_overrides()` replaces that baseline with every
 explicit input override, so an override wins over the database value even in a normal workflow.
 
-`CalibService.execute_task()` and `execute_task_batch()` take call-level `parameters` in the
-form of one `task_parameters` entry. They take precedence over the service's per-task defaults
+`CalibSession.execute_task()` and `execute_task_batch()` take call-level `parameters` in the
+form of one `task_parameters` entry. They take precedence over the session's per-task defaults
 for that call only, which suits values computed at run time, such as the MUX IDs that
 the `ConfigureAll` step adds to its call's settings before it runs the `ConfigureAll` task:
 
@@ -155,9 +150,10 @@ converted to the declared `value_type`, and a sweep parameter takes the `value_t
 it was given. Batch execution has no preprocess step, so
 `TaskExecutor.execute_batch()` rejects a task that carries input overrides.
 
-`task_details` is the deprecated call-level form keyed by task name. `execute_task` still accepts
-it with a `DeprecationWarning` and converts its keys: `run`, `run_parameters`, and the older
-`input_parameters` become `run`; `input` and `calibration_inputs` become `input`.
+`execute_task` no longer accepts the call-level `task_details` form keyed by task name; pass
+`parameters`. `task_settings_from_task_details()` still converts its keys for stored data: `run`,
+`run_parameters`, and the older `input_parameters` become `run`; `input` and
+`calibration_inputs` become `input`.
 
 ```mermaid
 flowchart TD
@@ -234,7 +230,9 @@ flowchart LR
 
 ### Re-execution behavior
 
-For a single-task re-execution, `CalibService` passes `source_task_id` to `SnapshotParameterLoader`, which loads that exact task result. `task_name` and `qid` then validate that the selected history record matches the requested task. This avoids resolving an already identified task indirectly through its execution.
+For a single-task re-execution, the session passes `source_task_id` from its `SessionSettings.snapshot` to `SnapshotParameterLoader`, which loads that exact task result. `task_name` and `qid` then validate that the selected history record matches the requested task. This avoids resolving an already identified task indirectly through its execution.
+
+A workflow re-executes from an execution when its flow declares a `source_execution_id` parameter. The snapshot source, including the tasks exempt from it, is part of the run's settings, so every step session and every isolated worker restores from the same source; see [Isolated Workers](./engine-architecture.md#isolated-workers).
 
 For an execution re-execution (`source_execution_id`), the loader keeps every source result and matches each new call by task name, qid, and the `step_id` and `call_id` of its `invocation`, so repeated calls of one task restore their own records. A source result without `invocation`, written before task calls existed, is used when it is the only one for its task and qid; several raise `SnapshotAmbiguityError`, and the task fails rather than restore an arbitrary record.
 
@@ -321,7 +319,7 @@ This endpoint is available for API clients that require exact snapshot re-execut
   `input` entry in `task_parameters`.
 - `run_parameter_overrides` becomes the `task_run_parameters` flow parameter of
   `single-task-executor`, which converts it to the selected task's `run` entry. This internal
-  flow parameter is not the deprecated `CalibService` argument and does not warn.
+  flow parameter is not the removed `CalibService` argument and does not warn.
 - No `SnapshotParameterLoader` is needed for the overrides: the task carries them and
   `TaskExecutor` reapplies the input overrides after preprocessing.
 - When `source_task_id` is supplied by **Run again**, it records provenance without restoring the source snapshot; the submitted form values and current task definition remain authoritative.
@@ -345,13 +343,13 @@ direct `execute_task` call can also put the key in its `parameters`. The value r
 order:
 
 1. The call's own value, from `TaskCall` or `execute_task(parameters=...)`
-2. The task's per-task default: a pipeline spec's `task_parameters`, or the deprecated
-   `CalibService` `task_parameters` and `task_run_parameters` arguments
+2. The task's per-task default: a pipeline spec's `task_parameters`, or a single-task run's
+   control
 3. `True`
 
 No session-wide value exists. Isolated workers receive each call's settings with the plan and the
-per-task defaults with their session configuration, so a worker resolves the same value as the
-parent session. `CalibService` no longer accepts `persist_output_parameters`; passing it raises a
+per-task defaults with their `WorkerSpec`, so a worker resolves the same value as the parent
+session. `CalibService` no longer accepts `persist_output_parameters`; passing it raises a
 `TypeError`. [Task Calls](./task-calls.md#migrate-session-write-back) shows the migration.
 
 Tasks quick runs, agent actions, and task re-executions run through `single-task-executor`, which
@@ -398,5 +396,6 @@ The API field `update_params` is passed to `single-task-executor` as `force_upda
 - `src/qdash/workflow/engine/task/snapshot_loader.py`
 - `src/qdash/workflow/engine/task/executor.py`
 - `src/qdash/workflow/engine/task/backend_saver.py`
-- `src/qdash/workflow/service/calib_service.py`
+- `src/qdash/workflow/service/_internal/settings.py`
+- `src/qdash/workflow/service/_internal/session.py`
 - `src/qdash/workflow/service/single_task_flow.py`

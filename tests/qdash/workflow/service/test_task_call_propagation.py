@@ -9,6 +9,7 @@ which call each target executed, in which order, and with which identity.
 
 from __future__ import annotations
 
+import contextlib
 import itertools
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
@@ -29,7 +30,9 @@ from qdash.workflow.service.steps import (
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.calib_service import CalibService
+    from collections.abc import Iterator
+
+    from qdash.workflow.service._internal.session import CalibSession
 
 REPEATED = [
     TaskCall(name="CheckRamsey", call_id="ramsey_coarse", run={"detuning": 0.001}),
@@ -79,22 +82,33 @@ class RecordingSession:
         pass
 
 
-def _service() -> CalibService:
+def _worker_spec() -> Any:
+    from qdash.workflow.service._internal.settings import (
+        SessionSettings,
+        WorkerLease,
+        WorkerSpec,
+    )
+
+    return WorkerSpec(
+        settings=SessionSettings(
+            username="alice", chip_id="64Q", project_id="project-1", backend_name="qubex"
+        ).for_worker(),
+        lease=WorkerLease(execution_id="exec-1"),
+    )
+
+
+def _service() -> CalibSession:
     return cast(
-        "CalibService",
+        "CalibSession",
         SimpleNamespace(
             username="alice",
             chip_id="64Q",
             backend_name="qubex",
             execution_id="exec-1",
             project_id="project-1",
-            default_run_parameters={},
             task_parameters={},
-            configuration_mode=None,
-            tags=[],
-            flow_name="flow",
-            note={},
             plan_digest="digest-1",
+            worker_spec=_worker_spec,
             record_stage_result=lambda *args: None,
         ),
     )
@@ -110,31 +124,32 @@ def recorder(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     sessions: list[RecordingSession] = []
     groups: list[list[str]] = []
 
-    def isolated(session_config: dict[str, Any], qids: list[str]) -> RecordingSession:
+    specs: list[Any] = []
+
+    @contextlib.contextmanager
+    def borrowed(worker: Any, qids: list[str]) -> Iterator[RecordingSession]:
+        specs.append(worker)
         session = RecordingSession(log, fail)
         sessions.append(session)
-        return session
+        yield session
 
-    monkeypatch.setattr(scheduling_tasks, "_create_isolated_session", isolated)
+    monkeypatch.setattr(scheduling_tasks, "borrowed_session", borrowed)
 
-    def mux_parallel(*, mux_groups: list[list[str]], plan: Any, session_config: Any) -> Any:
+    def mux_parallel(*, mux_groups: list[list[str]], plan: Any, worker: Any) -> Any:
         groups.extend(mux_groups)
         results: dict[str, Any] = {}
         for group in mux_groups:
-            results.update(scheduling_tasks.calibrate_mux_qubits(group, plan, session_config))
+            results.update(scheduling_tasks.calibrate_mux_qubits(group, plan, worker))
         return results
 
-    def qubit_parallel(*, qids: list[str], plan: Any, session_config: Any) -> Any:
+    def qubit_parallel(*, qids: list[str], plan: Any, worker: Any) -> Any:
         groups.append(list(qids))
-        return dict(
-            scheduling_tasks.calibrate_single_qubit(qid, plan, session_config) for qid in qids
-        )
+        return dict(scheduling_tasks.calibrate_single_qubit(qid, plan, worker) for qid in qids)
 
-    def coupling_parallel(*, coupling_qids: list[str], plan: Any, session_config: Any) -> Any:
+    def coupling_parallel(*, coupling_qids: list[str], plan: Any, worker: Any) -> Any:
         groups.append(list(coupling_qids))
         return dict(
-            scheduling_tasks.execute_coupling_pair(cqid, plan, session_config)
-            for cqid in coupling_qids
+            scheduling_tasks.execute_coupling_pair(cqid, plan, worker) for cqid in coupling_qids
         )
 
     monkeypatch.setattr(strategy, "run_mux_calibrations_parallel", mux_parallel)
@@ -144,7 +159,7 @@ def recorder(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         "qdash.workflow.service.strategy.OneQubitStrategy._get_wiring_config_path",
         lambda self, chip_id: "wiring.yaml",
     )
-    return SimpleNamespace(log=log, fail=fail, sessions=sessions, groups=groups)
+    return SimpleNamespace(log=log, fail=fail, sessions=sessions, groups=groups, specs=specs)
 
 
 def _schedule(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -223,7 +238,7 @@ def test_serial_mode_runs_calls_in_the_parent_session(
 
     _schedule(monkeypatch)
     parent = RecordingSession(recorder.log, recorder.fail)
-    set_current_session(cast("CalibService", parent))
+    set_current_session(cast("CalibSession", parent))
     try:
         step = CustomOneQubit(step_name="ramsey", mode="serial", tasks=list(REPEATED))
         ctx = step.execute(_service(), QubitTargets(["0", "1"]), StepContext())
@@ -378,14 +393,6 @@ def test_isolated_workers_receive_each_calls_input_and_writeback(
         update_calibration_parameters=False,
     )
     calibrate = TaskCall(name="CheckRabi", call_id="rabi_calibrate")
-    configs: list[dict[str, Any]] = []
-    isolated = scheduling_tasks._create_isolated_session
-
-    def capture(session_config: dict[str, Any], qids: list[str]) -> Any:
-        configs.append(session_config)
-        return isolated(session_config, qids)
-
-    monkeypatch.setattr(scheduling_tasks, "_create_isolated_session", capture)
     step = CustomOneQubit(step_name="rabi", mode=mode, tasks=[measure, calibrate])
 
     step.execute(_service(), QubitTargets(["0", "1", "4", "5"]), StepContext())
@@ -399,8 +406,8 @@ def test_isolated_workers_receive_each_calls_input_and_writeback(
         }
         # A call that does not set it leaves the decision to the worker's defaults (True).
         assert "update_calibration_parameters" not in session.parameters["rabi_calibrate"]
-    assert configs
-    assert all("persist_output_parameters" not in config for config in configs)
+    assert recorder.specs
+    assert all(spec.settings.github.push.enabled is False for spec in recorder.specs)
 
 
 def test_stage_runner_batch_carries_measurement_only_calls(

@@ -33,15 +33,20 @@ Example:
 from qdash.datamodel.task_call import TaskCall
 from qdash.workflow import sweep
 from qdash.workflow.service import (
+    CalibContext,
+    CalibContextError,
     CalibService,
     ConfigFileType,
     GitHubIntegration,
     GitHubPushConfig,
     generate_execution_id,
+    resolve_calib_context,
 )
 
 __all__ = [
     # === High-level API ===
+    "CalibContext",
+    "CalibContextError",
     "CalibService",
     "ConfigFileType",
     # === GitHub Integration ===
@@ -49,5 +54,6 @@ __all__ = [
     "GitHubPushConfig",
     "TaskCall",
     "generate_execution_id",
+    "resolve_calib_context",
     "sweep",
 ]

@@ -13,7 +13,6 @@ from qdash.api.services.flow_service.target_defaults import resolve_target_defau
             {"mux_ids": [0, 2], "exclude_qids": ["1"]},
         ),
         ('QubitTargets(["2", "3"])', {"qids": ["2", "3"]}),
-        ('CalibService("user", "chip", qids=["4"])', {"qids": ["4"]}),
     ],
 )
 def test_literal_defaults(expression, expected):
@@ -21,6 +20,26 @@ def test_literal_defaults(expression, expected):
     assert result is not None
     for key, value in expected.items():
         assert getattr(result, key) == value
+
+
+def test_service_construction_does_not_declare_targets():
+    """CalibService takes no targets; only run() targets are defaults."""
+    code = 'def run():\n    cal = CalibService("user", "chip", project_id="p")\n    cal.run(QubitTargets(["4"]), [])'
+    result = resolve_target_defaults(code, "run", {})
+    assert result is not None
+    assert result.qids == ["4"]
+
+
+def test_from_context_services_are_recognized():
+    code = """
+def run(qids=["7"]):
+    cal = CalibService.from_context(resolve_calib_context("u", "c", backend="fake"))
+    cal.run(QubitTargets(qids), steps=[])
+"""
+    result = resolve_target_defaults(code, "run", {})
+    assert result is not None
+    assert result.qids == ["7"]
+    assert resolve_target_defaults(code.replace("QubitTargets(qids)", "make()"), "run", {}) is None
 
 
 def test_parameter_and_local_binding_defaults():

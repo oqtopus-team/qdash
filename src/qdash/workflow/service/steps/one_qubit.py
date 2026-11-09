@@ -33,29 +33,13 @@ from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_1Q_TASKS_AFTER_CHECK
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
 
-def _session_config(service: CalibService) -> dict[str, Any]:
-    return {
-        "username": service.username,
-        "chip_id": service.chip_id,
-        "backend_name": service.backend_name,
-        "execution_id": service.execution_id,
-        "project_id": service.project_id,
-        "default_run_parameters": service.default_run_parameters,
-        "task_parameters": service.task_parameters,
-        "configuration_mode": getattr(service, "configuration_mode", None),
-        "tags": service.tags,
-        "flow_name": service.flow_name,
-        "note": service.note,
-    }
-
-
 def _execute_direct_one_qubit(
-    service: CalibService,
+    service: CalibSession,
     *,
     qids: list[str],
     plan: StepCalls,
@@ -72,7 +56,7 @@ def _execute_direct_one_qubit(
     results = run_qubit_calibrations_parallel(
         qids=qids,
         plan=plan,
-        session_config=_session_config(service),
+        worker=service.worker_spec(),
     )
     wrapped_results = {"direct": results}
     service.record_stage_result(stage_name, wrapped_results)
@@ -80,7 +64,7 @@ def _execute_direct_one_qubit(
 
 
 def _execute_scheduled_one_qubit(
-    service: CalibService,
+    service: CalibSession,
     *,
     qids: list[str],
     plan: StepCalls,
@@ -99,8 +83,6 @@ def _execute_scheduled_one_qubit(
         exclude_qids=[],
         qids=qids,
         plan=plan,
-        flow_name=f"{service.flow_name}_{stage_name}" if service.flow_name else stage_name,
-        project_id=service.project_id,
     )
     strategy = get_one_qubit_strategy(mode)
     result: dict[str, Any] = strategy.execute(service, config)
@@ -108,7 +90,7 @@ def _execute_scheduled_one_qubit(
 
 
 def _execute_mux_one_qubit(
-    service: CalibService,
+    service: CalibSession,
     *,
     targets: Any,
     plan: StepCalls,
@@ -122,8 +104,6 @@ def _execute_mux_one_qubit(
         mux_ids=targets.mux_ids,
         exclude_qids=targets.exclude_qids,
         plan=plan,
-        flow_name=f"{service.flow_name}_{stage_name}" if service.flow_name else stage_name,
-        project_id=service.project_id,
     )
     result: dict[str, Any] = get_one_qubit_strategy(mode).execute(service, config)
     return result
@@ -192,7 +172,7 @@ class CustomOneQubit(CalibrationStep):
 
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -238,7 +218,7 @@ class CustomOneQubit(CalibrationStep):
 
     def _execute_scheduled(
         self,
-        service: CalibService,
+        service: CalibSession,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:
@@ -253,7 +233,7 @@ class CustomOneQubit(CalibrationStep):
 
     def _execute_direct(
         self,
-        service: CalibService,
+        service: CalibSession,
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
@@ -314,7 +294,7 @@ class OneQubitCheck(CalibrationStep):
 
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -346,7 +326,7 @@ class OneQubitCheck(CalibrationStep):
 
     def _execute_scheduled(
         self,
-        service: CalibService,
+        service: CalibSession,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:
@@ -361,7 +341,7 @@ class OneQubitCheck(CalibrationStep):
 
     def _execute_direct(
         self,
-        service: CalibService,
+        service: CalibSession,
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for tests and callers that explicitly need unscheduled qid parallelism."""
@@ -422,7 +402,7 @@ class OneQubitFineTune(CalibrationStep):
 
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -463,7 +443,7 @@ class OneQubitFineTune(CalibrationStep):
 
     def _execute_with_qids(
         self,
-        service: CalibService,
+        service: CalibSession,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:
@@ -478,7 +458,7 @@ class OneQubitFineTune(CalibrationStep):
 
     def _execute_direct(
         self,
-        service: CalibService,
+        service: CalibSession,
         qids: list[str],
     ) -> dict[str, Any]:
         """Direct execution for QubitTargets using multiprocess parallelism."""

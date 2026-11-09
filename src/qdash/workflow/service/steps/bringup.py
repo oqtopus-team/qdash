@@ -10,7 +10,6 @@ Tasks include:
 
 from __future__ import annotations
 
-import copy
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -18,7 +17,6 @@ from prefect import get_run_logger
 
 from qdash.datamodel.calibration_pipeline import BRINGUP_METRICS
 from qdash.datamodel.task_call import StepCalls, TaskCall, normalize_calls
-from qdash.workflow.engine.task_parameters import normalize_task_parameters
 from qdash.workflow.service._internal.call_runner import (
     NOT_MUX_REPRESENTATIVE,
     call_results,
@@ -33,7 +31,7 @@ from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import BRINGUP_TASKS
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
 
@@ -89,7 +87,25 @@ class BringUp(CalibrationStep):
         return self.step_id or "bringup"
 
     def calls(self) -> tuple[TaskCall, ...]:
-        return tuple(self.tasks)
+        """The calls, with ``resonator_assignment_order`` on resonator spectroscopy.
+
+        A call's own ``run`` value for the order takes precedence.
+        """
+        if self.resonator_assignment_order is None:
+            return tuple(self.tasks)
+        order = list(self.resonator_assignment_order)
+        return tuple(
+            TaskCall.model_validate(
+                {
+                    **call.model_dump(),
+                    "run": {"resonator_assignment_order": order, **(call.run or {})},
+                }
+            )
+            if call.name == "CheckResonatorSpectroscopy"
+            and "resonator_assignment_order" not in (call.run or {})
+            else call
+            for call in self.tasks
+        )
 
     @property
     def provides(self) -> set[str]:
@@ -97,7 +113,7 @@ class BringUp(CalibrationStep):
 
     def execute(
         self,
-        service: CalibService,
+        service: CalibSession,
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
@@ -107,7 +123,6 @@ class BringUp(CalibrationStep):
         by the scheduling infrastructure.
         """
         logger = get_run_logger()
-        self._apply_resonator_assignment_order(service)
         plan = self.step_calls(service)
 
         logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(plan.calls)} calls")
@@ -120,8 +135,6 @@ class BringUp(CalibrationStep):
                 mux_ids=targets.mux_ids,
                 exclude_qids=targets.exclude_qids,
                 plan=plan,
-                flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
-                project_id=service.project_id,
             )
             strategy = get_one_qubit_strategy(self.mode)
             raw_results = strategy.execute(service, config)
@@ -151,22 +164,9 @@ class BringUp(CalibrationStep):
         )
         return ctx
 
-    def _apply_resonator_assignment_order(self, service: CalibService) -> None:
-        """Inject step-level resonator assignment order as a task run parameter."""
-        if self.resonator_assignment_order is None:
-            return
-
-        task_parameters = copy.deepcopy(service.task_parameters)
-        task_settings = task_parameters.setdefault(
-            "CheckResonatorSpectroscopy", {"run": {}, "input": {}}
-        )
-        task_settings["run"]["resonator_assignment_order"] = self.resonator_assignment_order
-        service.task_parameters.clear()
-        service.task_parameters.update(normalize_task_parameters(task_parameters))
-
     def _execute_direct(
         self,
-        service: CalibService,
+        service: CalibSession,
         qids: list[str],
         plan: StepCalls | None = None,
     ) -> dict[str, Any]:
@@ -175,25 +175,10 @@ class BringUp(CalibrationStep):
             run_qubit_calibrations_parallel,
         )
 
-        # Build session config for multiprocess execution
-        session_config = {
-            "username": service.username,
-            "chip_id": service.chip_id,
-            "backend_name": service.backend_name,
-            "execution_id": service.execution_id,
-            "project_id": service.project_id,
-            "default_run_parameters": service.default_run_parameters,
-            "task_parameters": service.task_parameters,
-            "configuration_mode": getattr(service, "configuration_mode", None),
-            "tags": service.tags,
-            "flow_name": service.flow_name,
-            "note": service.note,
-        }
-
         results = run_qubit_calibrations_parallel(
             qids=qids,
             plan=plan or self.step_calls(service),
-            session_config=session_config,
+            worker=service.worker_spec(),
         )
         return {"direct": results}
 

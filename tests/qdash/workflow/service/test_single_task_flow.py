@@ -1,8 +1,14 @@
+"""Single-task executor: write-back resolution, snapshot policy and owned lifecycle."""
+
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
+
+from qdash.workflow.service._internal.session import CalibSession
+from tests.qdash.workflow.context_helpers import grant_all_contexts
 
 
 class CancelledRun(Exception):
@@ -17,25 +23,72 @@ class TerminationSignal(ExternalSignal):
     """Stand-in for prefect.exceptions.TerminationSignal."""
 
 
+class RecordingSession(CalibSession):
+    """A real CalibSession lifecycle with hardware, database and handlers stubbed."""
+
+    instances: list[RecordingSession] = []
+    error: BaseException | None = None
+    failing_handler: str | None = None
+
+    def __init__(self, settings: Any, **kwargs: Any) -> None:
+        super().__init__(settings, **kwargs)
+        self.initialized_qids: list[str] | None = None
+        self.calls: list[tuple[str, str, Any]] = []
+        self.finished = False
+        for name in ("fail_calibration", "cancel_calibration", "abandon_calibration"):
+            handler = MagicMock()
+            if name == RecordingSession.failing_handler:
+                handler.side_effect = RuntimeError("releasing the lock failed")
+            setattr(self, name, handler)
+        RecordingSession.instances.append(self)
+
+    def _initialize(self, qids: list[str], *, connect_backend: bool = True) -> None:
+        self.initialized_qids = qids
+        self._initialized = True
+
+    def execute_task(
+        self, task_name: str, qid: str, upstream_id: Any = None, *, parameters: Any = None, **_: Any
+    ) -> dict[str, Any]:
+        self.calls.append((task_name, qid, parameters))
+        if task_name != "Configure" and RecordingSession.error is not None:
+            raise RecordingSession.error
+        return {"task_name": task_name, "qid": qid}
+
+    def finish_calibration(self, *args: Any, **kwargs: Any) -> None:
+        self.finished = True
+
+
+@pytest.fixture
+def sessions(monkeypatch: pytest.MonkeyPatch) -> type[RecordingSession]:
+    """Record every session the single-task flow opens."""
+    RecordingSession.instances = []
+    RecordingSession.error = None
+    RecordingSession.failing_handler = None
+    grant_all_contexts(monkeypatch)
+    monkeypatch.setattr("qdash.workflow.service._internal.runs.CalibSession", RecordingSession)
+    monkeypatch.setattr("qdash.workflow.service.single_task_flow.get_run_logger", MagicMock)
+    return RecordingSession
+
+
+def _session(sessions: type[RecordingSession]) -> RecordingSession:
+    assert len(sessions.instances) == 1
+    return sessions.instances[0]
+
+
 @pytest.mark.parametrize("persist", [False, True])
 @pytest.mark.parametrize("enabled", [False, True])
 @pytest.mark.parametrize("force", [False, True])
 @pytest.mark.parametrize("backend", ["qubex", "fake"])
 def test_single_task_publication_follows_persistence_and_integration(
-    monkeypatch, persist, enabled, force, backend
+    monkeypatch, sessions, persist, enabled, force, backend
 ):
-    """Tasks saves publish without forcing rejected calibration values into YAML."""
-    from unittest.mock import MagicMock
-
+    """Task saves publish without forcing rejected calibration values into YAML."""
     from qdash.workflow.service.single_task_flow import single_task_executor
 
-    service = MagicMock()
-    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
     monkeypatch.setattr(
-        "qdash.workflow.service.single_task_flow.ConfigLoader.load_workflow",
+        "qdash.common.config.loader.ConfigLoader.load_workflow",
         lambda: {"github": {"enabled": enabled, "branch": "calibration"}},
     )
-    monkeypatch.setattr("qdash.workflow.service.single_task_flow.get_run_logger", MagicMock)
 
     single_task_executor(
         username="alice",
@@ -47,37 +100,21 @@ def test_single_task_publication_follows_persistence_and_integration(
         update_params=force,
     )
 
-    kwargs = service.call_args.kwargs
-    assert kwargs["github_push_config"].enabled is (persist and enabled and backend == "qubex")
-    assert kwargs["github_push_config"].branch == "calibration"
-    assert "persist_output_parameters" not in kwargs
-    assert kwargs["_task_defaults"]["CheckRabi"]["update_calibration_parameters"] is persist
-    assert kwargs["force_update_params"] is force
-    assert kwargs["enable_github_pull"] is (enabled and backend == "qubex")
-    service.return_value.execute_task.assert_called_once_with("CheckRabi", "0")
-    service.return_value.finish_calibration.assert_called_once_with()
+    session = _session(sessions)
+    settings = session.settings
+    assert settings.github.push.enabled is (persist and enabled and backend == "qubex")
+    if enabled and backend == "qubex":
+        assert settings.github.push.branch == "calibration"
+    assert settings.task_defaults["CheckRabi"]["update_calibration_parameters"] is persist
+    assert settings.force_update_params is force
+    assert settings.github.pull is (enabled and backend == "qubex")
+    assert session.calls == [("CheckRabi", "0", None)]
+    assert session.finished is True
 
 
-def test_single_task_executor_pulls_config_before_reexecute(monkeypatch):
-    """Re-execute must pull latest config before a possible params batch push."""
+def test_single_task_executor_owns_its_execution_and_reservation(monkeypatch, sessions):
+    """The run reserves its target and closes its Execution without a caller finish."""
     from qdash.workflow.service.single_task_flow import single_task_executor
-
-    captured: dict[str, Any] = {}
-
-    class FakeCalibService:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            captured["kwargs"] = kwargs
-
-        def execute_task(self, task_name: str, qid: str) -> dict[str, Any]:
-            return {"task_name": task_name, "qid": qid}
-
-        def finish_calibration(self) -> None:
-            captured["finished"] = True
-
-    monkeypatch.setattr(
-        "qdash.workflow.service.single_task_flow.CalibService",
-        FakeCalibService,
-    )
 
     result = single_task_executor(
         username="alice",
@@ -89,38 +126,20 @@ def test_single_task_executor_pulls_config_before_reexecute(monkeypatch):
         update_params=True,
     )
 
+    session = _session(sessions)
     assert result == {"task_name": "CheckRabi", "qid": "0"}
-    assert captured["kwargs"]["enable_github_pull"] is True
-    assert captured["kwargs"]["enable_github"] is True
-    assert captured["kwargs"]["_task_defaults"]["CheckRabi"]["update_calibration_parameters"]
-    assert captured["kwargs"]["use_lock"] is True
-    assert "execution_id" not in captured["kwargs"]
-    assert captured["finished"] is True
-
-    single_task_executor(
-        username="alice",
-        chip_id="chip-1",
-        qid="0",
-        task_name="CheckRabi",
-        source_execution_id="exec-001",
-        project_id="project-1",
-        update_params=False,
-    )
-
-    assert captured["kwargs"]["enable_github"] is True
-    assert captured["kwargs"]["_task_defaults"]["CheckRabi"]["update_calibration_parameters"]
-    assert captured["kwargs"]["force_update_params"] is False
+    assert session.role.value == "owner"
+    assert session.initialized_qids == ["0"]
+    assert session.execution_id is None  # Allocated when the Execution opens.
+    assert session.settings.project_id == "project-1"
+    assert session.settings.snapshot.execution_id == "exec-001"
+    assert session.settings.force_update_params is True
+    assert session.finished is True
 
 
-def test_single_task_executor_preserves_coupling_qid(monkeypatch):
+def test_single_task_executor_preserves_coupling_qid(sessions):
     """A coupling target remains intact through session initialization and execution."""
-    from unittest.mock import MagicMock
-
     from qdash.workflow.service.single_task_flow import single_task_executor
-
-    service = MagicMock()
-    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
-    monkeypatch.setattr("qdash.workflow.service.single_task_flow.get_run_logger", MagicMock)
 
     single_task_executor(
         username="alice",
@@ -130,30 +149,14 @@ def test_single_task_executor_preserves_coupling_qid(monkeypatch):
         backend_name="qubex",
     )
 
-    assert service.call_args.kwargs["qids"] == ["32-33"]
-    service.return_value.execute_task.assert_called_once_with("CheckCrossResonance", "32-33")
+    session = _session(sessions)
+    assert session.initialized_qids == ["32-33"]
+    assert session.calls == [("CheckCrossResonance", "32-33", None)]
 
 
-def test_single_task_executor_exempts_reconfigure_from_snapshot(monkeypatch):
+def test_single_task_executor_exempts_reconfigure_from_snapshot(sessions):
+    """Configure runs inside the same owned Execution, before the task."""
     from qdash.workflow.service.single_task_flow import single_task_executor
-
-    captured: dict[str, Any] = {}
-    calls: list[str] = []
-
-    class FakeCalibService:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            captured.update(kwargs)
-
-        def execute_task(
-            self, task_name: str, qid: str, *, parameters: Any = None
-        ) -> dict[str, Any]:
-            calls.append(task_name)
-            return {"task_name": task_name, "qid": qid}
-
-        def finish_calibration(self) -> None:
-            pass
-
-    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", FakeCalibService)
 
     single_task_executor(
         username="alice",
@@ -166,27 +169,16 @@ def test_single_task_executor_exempts_reconfigure_from_snapshot(monkeypatch):
         reconfigure=True,
     )
 
-    assert captured["snapshot_exempt_tasks"] == {"Configure"}
-    assert calls == ["Configure", "CheckRabi"]
+    session = _session(sessions)
+    assert session.settings.snapshot.exempt_tasks == frozenset({"Configure"})
+    assert session.settings.snapshot.task_id == "task-001"
+    assert [name for name, _, _ in session.calls] == ["Configure", "CheckRabi"]
+    assert session.finished is True
 
 
 @pytest.mark.parametrize("source_task_id", [None, "source-task"])
-def test_single_task_executor_accepts_quick_run_parameters(monkeypatch, source_task_id):
+def test_single_task_executor_accepts_quick_run_parameters(sessions, source_task_id):
     from qdash.workflow.service.single_task_flow import single_task_executor
-
-    captured: dict[str, Any] = {}
-
-    class FakeCalibService:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            captured["kwargs"] = kwargs
-
-        def execute_task(self, task_name: str, qid: str) -> dict[str, Any]:
-            return {"task_name": task_name, "qid": qid}
-
-        def finish_calibration(self) -> None:
-            pass
-
-    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", FakeCalibService)
 
     defaults = {"CheckRabi": {"shots": {"value": 100}}}
     single_task_executor(
@@ -202,36 +194,22 @@ def test_single_task_executor_accepts_quick_run_parameters(monkeypatch, source_t
         update_params=False,
     )
 
-    assert captured["kwargs"]["source_execution_id"] is None
-    assert captured["kwargs"]["source_task_id"] == source_task_id
-    assert captured["kwargs"]["snapshot_exempt_tasks"] == {"CheckRabi"}
-    assert captured["kwargs"]["backend_name"] == "fake"
-    assert captured["kwargs"]["_task_defaults"] == {
+    settings = _session(sessions).settings
+    assert settings.snapshot.execution_id is None
+    assert settings.snapshot.task_id == source_task_id
+    assert settings.snapshot.exempt_tasks == frozenset({"CheckRabi"})
+    assert settings.backend_name == "fake"
+    assert settings.task_defaults == {
         "CheckRabi": {
             "run": {"shots": {"value": 100}},
             "input": {},
             "update_calibration_parameters": False,
         }
     }
-    assert "persist_output_parameters" not in captured["kwargs"]
 
 
-def test_single_task_executor_scopes_request_overrides_to_the_task(monkeypatch):
+def test_single_task_executor_scopes_request_overrides_to_the_task(sessions):
     from qdash.workflow.service.single_task_flow import single_task_executor
-
-    captured: dict[str, Any] = {}
-
-    class FakeCalibService:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            captured["kwargs"] = kwargs
-
-        def execute_task(self, task_name: str, qid: str) -> dict[str, Any]:
-            return {"task_name": task_name, "qid": qid}
-
-        def finish_calibration(self) -> None:
-            pass
-
-    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", FakeCalibService)
 
     single_task_executor(
         username="alice",
@@ -245,8 +223,7 @@ def test_single_task_executor_scopes_request_overrides_to_the_task(monkeypatch):
         parameter_overrides={"input": {"control_amplitude": 0.05}, "run": {"shots": 2000}},
     )
 
-    assert "parameter_overrides" not in captured["kwargs"]
-    assert captured["kwargs"]["_task_defaults"] == {
+    assert _session(sessions).settings.task_defaults == {
         "CheckRabi": {
             "run": {"shots": {"value": 2000}},
             "input": {"control_amplitude": 0.05},
@@ -255,16 +232,37 @@ def test_single_task_executor_scopes_request_overrides_to_the_task(monkeypatch):
     }
 
 
-def _run_single_task(monkeypatch: pytest.MonkeyPatch, **request: Any) -> Any:
-    """Run the flow with a mocked CalibService and return the mock."""
-    from unittest.mock import MagicMock
-
+def test_single_task_executor_rejects_an_unauthorized_context(monkeypatch):
+    """The worker re-checks the user's project permission before any session exists."""
+    from qdash.workflow.service.context import AccessDecision, CalibContextError
     from qdash.workflow.service.single_task_flow import single_task_executor
 
-    service = MagicMock()
-    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
+    class DenyingDirectory:
+        def default_project_id(self, username: str) -> str:
+            return "project-1"
+
+        def write_access(self, username: str, project_id: str) -> AccessDecision:
+            return AccessDecision.DENIED
+
     monkeypatch.setattr(
-        "qdash.workflow.service.single_task_flow.ConfigLoader.load_workflow",
+        "qdash.workflow.service.context.MongoProjectAccessDirectory", DenyingDirectory
+    )
+    opened = MagicMock()
+    monkeypatch.setattr("qdash.workflow.service._internal.runs.CalibSession", opened)
+
+    with pytest.raises(CalibContextError, match="editor or owner"):
+        single_task_executor(username="mallory", chip_id="chip-1", qid="0", task_name="CheckRabi")
+    opened.assert_not_called()
+
+
+def _run_single_task(
+    monkeypatch: pytest.MonkeyPatch, sessions: type[RecordingSession], **request: Any
+) -> RecordingSession:
+    """Run the flow with GitHub enabled and return its session."""
+    from qdash.workflow.service.single_task_flow import single_task_executor
+
+    monkeypatch.setattr(
+        "qdash.common.config.loader.ConfigLoader.load_workflow",
         lambda: {"github": {"enabled": True}},
     )
     single_task_executor(
@@ -276,17 +274,17 @@ def _run_single_task(monkeypatch: pytest.MonkeyPatch, **request: Any) -> Any:
         backend_name="qubex",
         **request,
     )
-    return service
+    return _session(sessions)
 
 
-def _writeback(service: Any) -> dict[str, Any]:
+def _writeback(session: RecordingSession) -> dict[str, Any]:
     """Return what the run applied to each executed call and to GitHub publication."""
-    kwargs = service.call_args.kwargs
-    applied = {"CheckRabi": kwargs["_task_defaults"]["CheckRabi"]["update_calibration_parameters"]}
-    for call in service.return_value.execute_task.call_args_list:
-        if call.args[0] == "Configure":
-            applied["Configure"] = call.kwargs["parameters"]["update_calibration_parameters"]
-    applied["github"] = kwargs["github_push_config"].enabled
+    settings = session.settings
+    applied = {"CheckRabi": settings.task_defaults["CheckRabi"]["update_calibration_parameters"]}
+    for name, _, parameters in session.calls:
+        if name == "Configure":
+            applied["Configure"] = parameters["update_calibration_parameters"]
+    applied["github"] = settings.github.push.enabled
     return applied
 
 
@@ -309,21 +307,20 @@ def _writeback(service: Any) -> dict[str, Any]:
 )
 @pytest.mark.parametrize("reconfigure", [False, True])
 def test_single_task_executor_resolves_one_writeback_control(
-    monkeypatch, request_fields, expected, deprecated, reconfigure
+    monkeypatch, sessions, request_fields, expected, deprecated, reconfigure
 ):
     import warnings
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        service = _run_single_task(monkeypatch, reconfigure=reconfigure, **request_fields)
+        session = _run_single_task(monkeypatch, sessions, reconfigure=reconfigure, **request_fields)
 
-    applied = _writeback(service)
+    applied = _writeback(session)
     assert applied == {
         "CheckRabi": expected,
         **({"Configure": expected} if reconfigure else {}),
         "github": expected,
     }
-    assert "persist_output_parameters" not in service.call_args.kwargs
     messages = [str(w.message) for w in caught if w.category is DeprecationWarning]
     assert any("persist_output_parameters is deprecated" in m for m in messages) is deprecated
 
@@ -368,13 +365,8 @@ def test_single_task_executor_resolves_one_writeback_control(
         {"update_calibration_parameters": "false", "persist_output_parameters": False},
     ],
 )
-def test_single_task_executor_rejects_conflicts_before_hardware(monkeypatch, request_fields):
-    from unittest.mock import MagicMock
-
+def test_single_task_executor_rejects_conflicts_before_hardware(sessions, request_fields):
     from qdash.workflow.service.single_task_flow import single_task_executor
-
-    service = MagicMock()
-    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
 
     with pytest.raises(Exception, match="update_calibration_parameters"):
         single_task_executor(
@@ -388,7 +380,7 @@ def test_single_task_executor_rejects_conflicts_before_hardware(monkeypatch, req
         )
 
     # No calibration session, hence no hardware connection or lock, was created.
-    service.assert_not_called()
+    assert sessions.instances == []
 
 
 @pytest.mark.parametrize(
@@ -425,34 +417,37 @@ def test_single_task_executor_rejects_conflicts_before_hardware(monkeypatch, req
         ),
     ],
 )
-def test_single_task_executor_migrates_nested_writeback(monkeypatch, request_fields, expected):
+def test_single_task_executor_migrates_nested_writeback(
+    monkeypatch, sessions, request_fields, expected
+):
     with pytest.warns(DeprecationWarning, match="set the top-level update_calibration_parameters"):
-        service = _run_single_task(monkeypatch, **request_fields)
+        session = _run_single_task(monkeypatch, sessions, **request_fields)
 
-    applied = _writeback(service)
+    applied = _writeback(session)
     assert applied["CheckRabi"] is expected
     assert applied["github"] is expected
     if request_fields.get("reconfigure"):
         assert applied["Configure"] is expected
     # The nested value is stripped, so only the control reaches the session.
-    defaults = service.call_args.kwargs["_task_defaults"]
+    defaults = session.settings.task_defaults
     assert "update_calibration_parameters" not in defaults.get("Configure", {})
 
 
-def test_single_task_executor_ignores_settings_of_calls_it_does_not_run(monkeypatch):
+def test_single_task_executor_ignores_settings_of_calls_it_does_not_run(monkeypatch, sessions):
     """A nested value on a call outside this run neither conflicts nor warns."""
     import warnings
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", DeprecationWarning)
-        service = _run_single_task(
+        session = _run_single_task(
             monkeypatch,
+            sessions,
             update_calibration_parameters=True,
             task_run_parameters={"Configure": {"update_calibration_parameters": False}},
         )
 
-    assert _writeback(service) == {"CheckRabi": True, "github": True}
-    service.return_value.execute_task.assert_called_once_with("CheckRabi", "0")
+    assert _writeback(session) == {"CheckRabi": True, "github": True}
+    assert session.calls == [("CheckRabi", "0", None)]
 
 
 @pytest.mark.parametrize(
@@ -463,30 +458,25 @@ def test_single_task_executor_ignores_settings_of_calls_it_does_not_run(monkeypa
         (TerminationSignal("SIGTERM"), "abandon_calibration"),
     ],
 )
-def test_single_task_executor_routes_aborts_to_one_handler(monkeypatch, exc, handler):
-    """Each kind of abort reaches exactly one terminal handler."""
-    from unittest.mock import MagicMock
-
+@pytest.mark.parametrize("reconfigure", [False, True])
+def test_single_task_executor_routes_aborts_to_one_handler(sessions, exc, handler, reconfigure):
+    """Each kind of abort reaches exactly one terminal handler, Configure included."""
     from qdash.workflow.service.single_task_flow import single_task_executor
 
-    service = MagicMock()
-    service.return_value.execute_task.side_effect = exc
-    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
-
+    sessions.error = exc
     with pytest.raises(type(exc)):
         single_task_executor(
             username="alice",
             chip_id="chip-1",
             qid="0",
             task_name="CheckRabi",
+            reconfigure=reconfigure,
         )
 
-    cal = service.return_value
+    session = _session(sessions)
+    assert session.finished is False
     for name in ("fail_calibration", "cancel_calibration", "abandon_calibration"):
-        if name == handler:
-            getattr(cal, name).assert_called_once()
-        else:
-            getattr(cal, name).assert_not_called()
+        assert getattr(session, name).called is (name == handler)
 
 
 @pytest.mark.parametrize(
@@ -497,17 +487,12 @@ def test_single_task_executor_routes_aborts_to_one_handler(monkeypatch, exc, han
         (TerminationSignal("SIGTERM"), "abandon_calibration"),
     ],
 )
-def test_single_task_executor_keeps_the_abort_when_cleanup_fails(monkeypatch, exc, handler):
+def test_single_task_executor_keeps_the_abort_when_cleanup_fails(sessions, exc, handler):
     """A handler that raises must not replace the abort that triggered it."""
-    from unittest.mock import MagicMock
-
     from qdash.workflow.service.single_task_flow import single_task_executor
 
-    service = MagicMock()
-    service.return_value.execute_task.side_effect = exc
-    getattr(service.return_value, handler).side_effect = RuntimeError("releasing the lock failed")
-    monkeypatch.setattr("qdash.workflow.service.single_task_flow.CalibService", service)
-
+    sessions.error = exc
+    sessions.failing_handler = handler
     with pytest.raises(type(exc)) as raised:
         single_task_executor(
             username="alice",

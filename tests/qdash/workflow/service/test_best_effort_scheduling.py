@@ -15,7 +15,7 @@ from qdash.workflow.service.steps import CustomTwoQubit, StepContext
 from qdash.workflow.service.targets import QubitTargets
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
 
 
 class FakeLogger:
@@ -67,7 +67,7 @@ def test_single_qubit_best_effort_continues_after_task_failure() -> None:
     session = FakeSession()
 
     result = _execute_single_qubit_with_session(
-        cast("CalibService", session),
+        cast("CalibSession", session),
         "0",
         plan("first", "fails", "last", continue_on_failure=True),
         FakeLogger(),
@@ -87,7 +87,7 @@ def test_single_qubit_remains_fail_fast_by_default_and_keeps_earlier_calls() -> 
     session = FakeSession()
 
     result = _execute_single_qubit_with_session(
-        cast("CalibService", session),
+        cast("CalibSession", session),
         "0",
         plan("first", "fails", "last"),
         FakeLogger(),
@@ -104,7 +104,7 @@ def test_call_stop_policy_overrides_best_effort_step() -> None:
     session = FakeSession()
 
     result = _execute_single_qubit_with_session(
-        cast("CalibService", session),
+        cast("CalibSession", session),
         "0",
         plan("first", "fails", "last", continue_on_failure=True, fails="stop"),
         FakeLogger(),
@@ -119,7 +119,7 @@ def test_call_continue_policy_overrides_fail_fast_step() -> None:
     session = FakeSession()
 
     result = _execute_single_qubit_with_session(
-        cast("CalibService", session),
+        cast("CalibSession", session),
         "0",
         plan("first", "fails", "last", fails="continue"),
         FakeLogger(),
@@ -133,7 +133,7 @@ def test_mux_failure_policy_is_scoped_to_one_target() -> None:
     session = FakeSession(fail_on={("first", "0")})
 
     result = _execute_mux_qubits_with_session(
-        cast("CalibService", session),
+        cast("CalibSession", session),
         ["0", "1"],
         plan("first", "last"),
         FakeLogger(),
@@ -150,7 +150,7 @@ def test_mux_best_effort_continues_each_qubit_independently() -> None:
     session = FakeSession()
 
     result = _execute_mux_qubits_with_session(
-        cast("CalibService", session),
+        cast("CalibSession", session),
         ["0", "1"],
         plan("fails", "last", continue_on_failure=True),
         FakeLogger(),
@@ -172,7 +172,7 @@ def test_repeated_task_keeps_one_result_per_call_with_its_own_invocation() -> No
     )
 
     result = _execute_single_qubit_with_session(
-        cast("CalibService", session),
+        cast("CalibSession", session),
         "0",
         StepCalls(step_id="coherence", calls=calls, plan_digest="abc"),
         FakeLogger(),
@@ -193,7 +193,7 @@ def test_coupling_best_effort_continues_after_task_failure() -> None:
     session = FakeSession()
 
     result = _execute_coupling_pair_with_session(
-        cast("CalibService", session),
+        cast("CalibSession", session),
         "0-1",
         plan("fails", "last", continue_on_failure=True),
         FakeLogger(),
@@ -216,18 +216,12 @@ def test_custom_two_qubit_uses_saved_schedule_after_candidate_filtering(monkeypa
         "qdash.workflow.service._internal.scheduling_tasks.run_coupling_calibrations_parallel",
         run_coupling_calibrations_parallel,
     )
+    spec = object()
     service = SimpleNamespace(
         username="alice",
         chip_id="64Q",
-        backend_name="qubex",
-        execution_id="execution-1",
         project_id="project-1",
-        default_run_parameters={},
-        task_parameters={},
-        configuration_mode="ge-ef-fh",
-        tags=[],
-        flow_name="characterization_jazz",
-        note={},
+        worker_spec=lambda: spec,
         record_stage_result=lambda *args: None,
     )
     ctx = StepContext(candidate_qids=[], metadata={"cr_schedule": [[("0", "1")]]})
@@ -237,12 +231,12 @@ def test_custom_two_qubit_uses_saved_schedule_after_candidate_filtering(monkeypa
         continue_on_failure=True,
     )
 
-    result = step.execute(cast("CalibService", service), QubitTargets([]), ctx)
+    result = step.execute(cast("CalibSession", service), QubitTargets([]), ctx)
 
     assert calls[0]["coupling_qids"] == ["0-1"]
     assert calls[0]["plan"].continue_on_failure is True
     assert calls[0]["plan"].step_id == "jazz_characterization"
-    assert calls[0]["session_config"]["configuration_mode"] == "ge-ef-fh"
+    assert calls[0]["worker"] is spec
     assert result.metadata["jazz_characterization"].successful_couplings() == ["0-1"]
     assert (
         result.get_step_result("jazz_characterization") is result.metadata["jazz_characterization"]
