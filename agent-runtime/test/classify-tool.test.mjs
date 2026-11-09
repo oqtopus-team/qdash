@@ -17,7 +17,7 @@ import {
 } from "../src/classify-tool.ts";
 import { configureClassifierModels } from "../src/classifier-models.ts";
 import { toNdjsonEvents } from "../src/events.ts";
-import { PRESENT_TOOL } from "../src/presentation-tool.ts";
+import { PRESENT_TOOL, PRESENTATION_GUIDELINE } from "../src/presentation-tool.ts";
 import { buildSystemPrompt } from "../src/prompt.ts";
 import { ViewEventStream } from "../src/view-events.ts";
 
@@ -128,8 +128,38 @@ test("classify is offered with the first usable classifier, and only then", () =
   assert.equal(configureClassify(configureClassifierModels(undefined, runtime, {}, quiet), quiet), undefined);
   assert.doesNotMatch(buildSystemPrompt("en", "en"), /`classify`/);
   assert.match(buildSystemPrompt("en", "en", [], null, null, false, null, CLASSIFY_GUIDELINE), /`classify`/);
-  // The guideline steers away from routine use and from layout choice.
-  assert.match(CLASSIFY_GUIDELINE, /do not call it routinely or to choose a layout/);
+});
+
+test("the guideline asks for classify at concrete decision points and keeps its limits", () => {
+  // Proactive: no blanket restraint, and the four decision points it serves.
+  assert.doesNotMatch(CLASSIFY_GUIDELINE, /routinely|choose a layout/);
+  assert.match(CLASSIFY_GUIDELINE, /^- Call `classify` whenever your next step turns on a judgment/);
+  for (const use of ["Intent:", "Cause triage:", "Next investigation:", "Presentation:"]) {
+    assert.ok(CLASSIFY_GUIDELINE.includes(`  - ${use}`), use);
+  }
+  // Custom views only: the fixed layouts stay with present_results, classified once.
+  assert.match(CLASSIFY_GUIDELINE, /`render_ui`.*`render_chart`.*fixed layouts do not cover/);
+  assert.match(CLASSIFY_GUIDELINE, /Do not classify a layout `present_results` offers; call `present_results` directly/);
+  // Simple decisions, values, uncertainty, failure and approval stay with the chat.
+  assert.match(CLASSIFY_GUIDELINE, /Skip it when a tool result, a threshold, a status, or the user's words already decide/);
+  assert.match(CLASSIFY_GUIDELINE, /never supplies a value to show/);
+  assert.match(CLASSIFY_GUIDELINE, /evidence, not authority/);
+  assert.match(CLASSIFY_GUIDELINE, /`ambiguous` as weak evidence or ask with `ask_user`/);
+  assert.match(CLASSIFY_GUIDELINE, /decide yourself when it fails/);
+  assert.match(CLASSIFY_GUIDELINE, /never approves a write tool or replaces its approval card/);
+
+  // The tool description matches: it serves custom-view choice and leaves the fixed layouts alone.
+  const tool = buildClassifyChatTool(config(), { log() {}, warn() {}, error() {} });
+  assert.match(tool.description, /which custom view suits values no fixed layout covers/);
+  assert.match(tool.description, /supplies no value to show; for a calibration summary.*call `present_results`/);
+  assert.doesNotMatch(tool.description, /does not choose a layout/);
+
+  // Both guidelines sit in the prompt's guideline list, presentation first.
+  const prompt = buildSystemPrompt("en", "en", [], null, null, false, PRESENTATION_GUIDELINE, CLASSIFY_GUIDELINE);
+  const at = prompt.indexOf(CLASSIFY_GUIDELINE);
+  assert.ok(prompt.indexOf(PRESENTATION_GUIDELINE) > prompt.indexOf("Guidelines:"));
+  assert.ok(at > prompt.indexOf(PRESENTATION_GUIDELINE));
+  assert.ok(at < prompt.indexOf("call `ask_user`"));
 });
 
 test("the classifier gets the context as state and one choice question over the categories", () => {

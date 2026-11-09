@@ -335,10 +335,25 @@ response the endpoint returned.
 ### On-demand classification
 
 `classify` (`agent-runtime/src/classify-tool.ts`) lets the chat ask the classifier model a
-question it cannot settle from tool results or a simple rule, such as which kind of problem a
-failure message points to. The prompt guideline tells the chat not to classify what a tool
-result already answers, not to call it routinely, and not to use it to choose a layout. The
-call is separate from rendering: it shows nothing but its own step and picks no layout.
+question it cannot settle from tool results or a simple rule. The prompt guideline,
+`CLASSIFY_GUIDELINE`, tells the chat to call it at four kinds of decision point instead of
+guessing:
+
+| Use | Example question |
+| --- | --- |
+| Intent | Is an ambiguous message a status lookup, a trend, a comparison, or troubleshooting? |
+| Cause triage | Do the statuses, messages, and values read point to readout, drive, frequency drift, or a fit failure? |
+| Next investigation | Which of a few possible checks is most likely to explain the problem? |
+| Presentation | Does a custom `render_ui` view, `render_chart`, or text suit values the fixed layouts do not cover? |
+
+The guideline keeps the rest with the chat. The chat skips `classify` when a tool result, a
+threshold, a status, or the user's words already decide. It calls `present_results` directly
+for the fixed layouts, so a layout is classified once. It passes only facts it read, and the
+classifier supplies no value to show. The answer is evidence, not authority: the chat weighs
+it against the data and says when it relies on it. An `ambiguous` answer counts as weak
+evidence or prompts `ask_user`, and the chat decides itself when the call fails. A
+classification never approves a write tool or replaces its approval card. The call shows nothing
+but its own step and renders no view.
 
 | Argument | Bounds |
 | --- | --- |

@@ -14,8 +14,10 @@ import { classifierLabel, selectClassifierModel, type ClassifierModels, type Log
  * usable classifier of classifier.yaml (pi-ai `Models.classify`, one choice
  * question) and returns the chosen category with its probability, its lead
  * over the runner-up and the full distribution. It only answers the question:
- * it shows nothing in the chat and picks no layout (that is
- * `present_results`).
+ * it shows nothing in the chat and supplies no value. The chat uses it for
+ * intent, cause triage, the next check and the choice of a custom view (see
+ * CLASSIFY_GUIDELINE); the fixed layouts are classified by `present_results`
+ * itself.
  *
  * A clear answer (see CLASSIFY_DEFAULTS) is `classified`; a split one is
  * `ambiguous` and still reported, so the model can weigh it. A classifier that
@@ -257,9 +259,9 @@ function failureReason(result: ClassifierResult, timedOut: boolean, timeoutMs: n
 const round = (value: number) => Math.round(value * 1000) / 1000;
 
 const DESCRIPTION = [
-  "Ask a classifier model to choose one of a few categories you define, when your answer depends on such a judgment and neither a tool result nor a simple rule settles it: for example which kind of problem a failure message points to.",
+  "Ask a classifier model to choose one of a few categories you define, when your next step depends on such a judgment and neither a tool result nor a simple rule settles it: what kind of request a message is, which kind of problem the evidence points to, which check to run next, or which custom view suits values no fixed layout covers.",
   "Pass one question, 2-8 mutually exclusive categories (snake_case name and a one-line description; add `other` or `unclear` when none may fit), and the relevant facts from tool results or the user as context.",
-  "The result names the chosen category with its probability, its lead over the runner-up and every category's probability. `ambiguous` means no clear winner: treat it as weak evidence or ask the user. It is a model's judgment, not a QDash fact: say so when you rely on it. It shows nothing to the user and does not choose a layout.",
+  "The result names the chosen category with its probability, its lead over the runner-up and every category's probability. `ambiguous` means no clear winner: treat it as weak evidence or ask the user. It is a model's judgment, not a QDash fact: weigh it against the data and say so when you rely on it. It shows nothing to the user and supplies no value to show; for a calibration summary, an execution comparison or a failure list call `present_results`, which classifies the layout itself.",
 ].join("\n");
 
 /** The `classify` tool for the classifier configureClassify picked. */
@@ -321,5 +323,11 @@ export function buildClassifyChatTool(config: ClassifyConfig, log: Log = console
 }
 
 /** System prompt guideline for a chat that has `classify`. */
-export const CLASSIFY_GUIDELINE =
-  "- When your answer depends on choosing between a few defined categories that the data does not settle by itself (such as which kind of problem a failure points to), call `classify` with the question, the candidate categories and the relevant facts. Do not classify what a tool result or a simple rule already answers, and do not call it routinely or to choose a layout. Treat its answer as a model's judgment.";
+export const CLASSIFY_GUIDELINE = [
+  "- Call `classify` whenever your next step turns on a judgment between a few options that the evidence does not settle by itself; a call is short and bounded by a timeout, so use it rather than guessing. Typical uses:",
+  "  - Intent: which kind of request an ambiguous message is (such as status lookup, trend, comparison, or troubleshooting), before choosing tools.",
+  "  - Cause triage: which kind of problem the statuses, messages and values you read point to (such as readout, drive, frequency drift, fit failure, or unclear).",
+  "  - Next investigation: which of a few checks you could run next is most likely to explain the problem.",
+  "  - Presentation: which custom view (`render_ui` metric cards, comparison table or status alert, `render_chart`, or text) suits values the fixed layouts do not cover.",
+  "  Skip it when a tool result, a threshold, a status, or the user's words already decide. Do not classify a layout `present_results` offers; call `present_results` directly, as it classifies on its own. Pass only facts you read; the classifier picks a category and never supplies a value to show. Its answer is evidence, not authority: weigh it against the data and say when you rely on it, treat `ambiguous` as weak evidence or ask with `ask_user`, and decide yourself when it fails. A classification never approves a write tool or replaces its approval card.",
+].join("\n");
