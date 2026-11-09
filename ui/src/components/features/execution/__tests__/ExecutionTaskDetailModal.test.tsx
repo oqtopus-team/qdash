@@ -60,3 +60,26 @@ describe("ExecutionTaskDetailModal investigation", () => {
     expect(screen.queryByRole("button", { name: "Investigate with AI" })).toBeNull();
   });
 });
+
+describe("ExecutionTaskDetailModal task calls", () => {
+  it("tells repeated calls of one task apart by their call id", () => {
+    renderModal([
+      {
+        name: "CheckRamsey",
+        status: "completed",
+        task_id: "t1",
+        invocation: { step_id: "ramsey", call_id: "ramsey_coarse" },
+      },
+      {
+        name: "CheckRamsey",
+        status: "failed",
+        task_id: "t2",
+        invocation: { step_id: "ramsey", call_id: "ramsey_fine" },
+      },
+    ]);
+
+    // The selected run names its planned call as step.call.
+    expect(screen.getByText("ramsey.ramsey_coarse")).not.toBeNull();
+    expect(screen.queryByText("ramsey.ramsey_fine")).toBeNull();
+  });
+});

@@ -69,3 +69,13 @@ export function resolveInitialTaskIndex(tasks: Task[], taskName: string): number
   const index = tasks.findIndex((task) => task.name === taskName);
   return index >= 0 ? index : 0;
 }
+
+/**
+ * The planned call a task run executed, when it is worth showing: the call id
+ * if it differs from the task name (a task that runs more than once in a step),
+ * else null. Results recorded before task calls existed have no call identity.
+ */
+export function distinctCallId(task: Task): string | null {
+  const callId = task.invocation?.call_id;
+  return callId && callId !== task.name ? callId : null;
+}
