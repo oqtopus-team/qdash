@@ -11,7 +11,6 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { useState, useMemo, useRef, useCallback, useEffect, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
@@ -30,6 +29,7 @@ import {
 } from "@/components/ui/GridFullscreenButton";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -70,41 +70,22 @@ interface CouplingStatusDotProps {
   onClick: () => void;
 }
 
-// Status dot whose hover tooltip is portaled to document.body so the grid's
-// overflow-hidden container and pan/zoom transform cannot clip it.
+// Status dot using the shared Tooltip primitive, whose portal keeps the tooltip from being
+// clipped by the grid's overflow-hidden container and pan/zoom transform.
 export function CouplingStatusDot({ label, className, style, onClick }: CouplingStatusDotProps) {
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
-
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
-      }}
-      onMouseLeave={() => setTooltipPos(null)}
-      style={style}
-      className={className}
-    >
-      {tooltipPos &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            role="tooltip"
-            className="px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg whitespace-nowrap pointer-events-none border border-base-300"
-            style={{
-              position: "fixed",
-              left: tooltipPos.x,
-              top: tooltipPos.y - 8,
-              transform: "translate(-50%, -100%)",
-              zIndex: 9999,
-            }}
-          >
-            {label}
-          </div>,
-          document.body,
-        )}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={label}
+          style={style}
+          className={className}
+        />
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
 

@@ -1,52 +1,58 @@
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+
 import { CouplingStatusDot } from "../CouplingGrid";
 
 afterEach(() => {
   cleanup();
-  vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
-describe("CouplingStatusDot", () => {
-  it("portals the tooltip to document.body and removes it on mouse leave", () => {
-    render(
+function renderDot(onClick = vi.fn()) {
+  render(
+    <div data-testid="clip" style={{ overflow: "hidden" }}>
       <CouplingStatusDot
         label="0_1: completed"
         className="bg-success"
         style={{ position: "absolute", left: 0, top: 0 }}
-        onClick={vi.fn()}
-      />,
-    );
+        onClick={onClick}
+      />
+    </div>,
+  );
+  return { onClick, button: screen.getByRole("button", { name: "0_1: completed" }) };
+}
 
-    const button = screen.getByRole("button");
-
-    vi.spyOn(button, "getBoundingClientRect").mockReturnValue({
-      x: 100,
-      y: 80,
-      left: 100,
-      top: 80,
-      right: 140,
-      bottom: 92,
-      width: 40,
-      height: 12,
-      toJSON: () => ({}),
-    });
+describe("CouplingStatusDot", () => {
+  it("shows the tooltip outside the clipping container after the delay and dismisses it", () => {
+    vi.useFakeTimers();
+    const { button } = renderDot();
 
     expect(screen.queryByRole("tooltip")).toBeNull();
 
-    fireEvent.mouseEnter(button);
+    fireEvent.pointerMove(button, { pointerType: "mouse" });
+    act(() => vi.advanceTimersByTime(350));
 
     const tooltip = screen.getByRole("tooltip");
-
     expect(tooltip.textContent).toBe("0_1: completed");
-    expect(tooltip.parentElement).toBe(document.body);
-    expect(tooltip.style.position).toBe("fixed");
-    expect(tooltip.style.left).toBe("120px");
-    expect(tooltip.style.top).toBe("72px");
-    expect(tooltip.style.zIndex).toBe("9999");
+    expect(screen.getByTestId("clip").contains(tooltip)).toBe(false);
 
-    fireEvent.mouseLeave(button);
-
+    fireEvent.keyDown(button, { key: "Escape" });
     expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("shows the label on keyboard focus", () => {
+    const { button } = renderDot();
+
+    act(() => button.focus());
+
+    expect(screen.getByRole("tooltip").textContent).toBe("0_1: completed");
+  });
+
+  it("keeps its click behavior", () => {
+    const { onClick, button } = renderDot();
+
+    fireEvent.click(button);
+
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 });
