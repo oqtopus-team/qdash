@@ -711,7 +711,7 @@ export class SharedRuntime {
           models: this.modelRuntime,
           registry,
           ...(workspace ? { env: workspaceEnv } : {}),
-          onReport: (error, info) => logDurableReport(storageName, error, info),
+          onReport: (report) => logDurableReport(storageName, report),
           settings: {
             stream: { timeoutMs: MODEL_STREAM_TIMEOUT_MS },
             compaction: {

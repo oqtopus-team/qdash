@@ -1,19 +1,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
-import {
-  UserEntry,
-  watchEvents,
-  type AgentEvent,
-  type Conversation,
-} from "@earendil-works/pi-durable";
+import { UserEntry, type Conversation, type Submission } from "@earendil-works/pi-durable";
 
 import { requestQDashAuth } from "./auth.ts";
 import { parsePageContext } from "./page-context.ts";
 import { WRAP_UP_MESSAGE } from "./budget.ts";
-import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent } from "./events.ts";
+import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent, type SessionEventLike } from "./events.ts";
 import { hasBearerToken, readJsonBody, RequestError, runtimeToken } from "./http.ts";
 import { decisionMessage, type ApprovalRequest } from "./durable-tools.ts";
 import { EvaluationError } from "./evaluate.ts";
+import { ViewEventStream } from "./view-events.ts";
 import {
   answerText,
   pendingApproval,
@@ -166,7 +162,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
 }
 
 /** Translate one committed durable event to the existing NDJSON bridge. */
-function writeAgentEvent(event: AgentEvent, write: (event: NdjsonEvent) => void): void {
+function writeAgentEvent(event: SessionEventLike, write: (event: NdjsonEvent) => void): void {
   for (const line of toNdjsonEvents(event)) write(line);
 }
 
@@ -225,7 +221,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     return;
   }
 
-  const { harness, conversation } = opened;
+  const { conversation } = opened;
   running.set(runKey, conversation);
 
   try {
@@ -259,9 +255,19 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     };
     const ping = CHAT_PING_MS > 0 ? setInterval(() => write({ type: "ping" }), CHAT_PING_MS) : null;
 
-    const events = await watchEvents(harness, conversation.id, BACKGROUND_CONTEXT);
-    events.start(async (batch) => {
-      for (const event of batch) writeAgentEvent(event, write);
+    // Stream what changes in the conversation view; its first value is history.
+    const events = await conversation.watch(BACKGROUND_CONTEXT);
+    const stream = new ViewEventStream(
+      conversation,
+      events.value,
+      (event) => writeAgentEvent(event, write),
+      BACKGROUND_CONTEXT,
+    );
+    events.start(async (call) => {
+      if (call.kind !== "value") return;
+      await stream.push(call.value).catch((error: unknown) => {
+        console.warn("[agent-runtime] chat stream revision failed:", error);
+      });
     });
 
     try {
@@ -318,7 +324,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
       );
       // A steer is placed after the current tool round, so the model reads it
       // before deciding on more tools and answers in the same run.
-      let wrapUp: ReturnType<typeof conversation.submit> | undefined;
+      let wrapUp: Promise<Submission> | undefined;
       const wrapUpTimer =
         CHAT_WRAP_UP_MS > 0
           ? setTimeout(() => {
@@ -342,7 +348,8 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
       await wrapUp
         ?.then((placed) => placed.abort(BACKGROUND_CONTEXT))
         .catch((error: unknown) => console.warn("[agent-runtime] wrap-up steer failed:", error));
-      await events.stop();
+      // Stream every commit of the turn, also those the watch had not delivered when it settled.
+      await stream.finish(events);
       if (settled.status === "done" && settled.type === "input") {
         write({
           type: "done",

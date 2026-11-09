@@ -55,9 +55,9 @@ Stop QDash before advancing `main`:
 docker compose down
 ```
 
-When upgrading a Copilot deployment from Pi 1.3 to Pi 1.4, back up the stopped
-`agent-runtime-state` Docker volume before continuing. Pi 1.4 migrates saved conversations when
-the new runtime first opens them. A previous release cannot read the migrated volume; restore the
+When upgrading a Copilot deployment to a newer Pi release, such as Pi 1.3 to 1.4 or Pi 1.4 to
+1.5, back up the stopped `agent-runtime-state` Docker volume before continuing. The new Pi release
+migrates saved conversations when the new runtime first opens or writes them. A previous release cannot read the migrated volume; restore the
 pre-update volume backup before starting that release during a rollback. How this works:
 [Copilot architecture](../developer-guide/copilot/architecture.md#durable-conversations).
 
