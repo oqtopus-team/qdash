@@ -983,18 +983,13 @@ class QubexTask(BaseTask):
         Example:
         -------
             ```python
-            # Overrides are declared per task in the workflow and applied to
-            # input_parameters by TaskExecutor after preprocess.
-            cal = CalibService(
-                username,
-                chip_id,
-                task_parameters={
-                    "CheckFineChevron": {
-                        "input": {
-                            "control_frequency": 5.2,
-                            "readout_amplitude": 0.15,
-                        }
-                    }
+            # Overrides are declared on the task call in the workflow and applied
+            # to input_parameters by TaskExecutor after preprocess.
+            TaskCall(
+                name="CheckFineChevron",
+                input={
+                    "control_frequency": 5.2,
+                    "readout_amplitude": 0.15,
                 },
             )
 

@@ -24,13 +24,14 @@ from typing import TYPE_CHECKING, Any
 from qdash.api.schemas.calibration_pipeline import PipelineProblem
 from qdash.api.services.catalog_task_run import matches_parameter_type, run_override_parts
 from qdash.common.config.calibration import DEFAULT_READOUT_DURATION
-from qdash.datamodel.calibration_pipeline import STEP_CATALOG, step_calls
+from qdash.datamodel.calibration_pipeline import STEP_CATALOG, ConfigureAllStep, step_calls
 from qdash.datamodel.task import compatible_value_type
 from qdash.datamodel.task_settings import UPDATE_CALIBRATION_PARAMETERS
 
 if TYPE_CHECKING:
     from qdash.api.schemas.task_file import TaskInfo
     from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec, PipelineStep
+    from qdash.datamodel.task_call import TaskCall
 
 # Inputs that ``required_rabi_normalization_inputs`` declares; restoring them
 # requires the source CheckRabi to have run under the session's readout duration.
@@ -82,11 +83,34 @@ def _problem(path: str, message: str) -> PipelineProblem:
 
 
 def _call_path(step_index: int, step: PipelineStep, call_index: int) -> str:
-    """The spec path of a call from ``step_calls``, which may start with Configure."""
+    """The spec path of a call from ``step_calls``.
+
+    The calls may start with the implicit Configure call, and a ConfigureAll
+    step's only call is its ``call`` field, or the step itself when that is unset.
+    """
+    if isinstance(step, ConfigureAllStep):
+        return f"steps[{step_index}].call" if step.call is not None else f"steps[{step_index}]"
     offset = 1 if getattr(step, "configure", False) else 0
     if call_index < offset:
         return f"steps[{step_index}].configure"
     return f"steps[{step_index}].tasks[{call_index - offset}]"
+
+
+def _explicit_calls(spec: CalibrationPipelineSpec) -> list[tuple[str, TaskCall]]:
+    """Every call the spec spells out, with its spec path.
+
+    These are the entries of a step's ``tasks`` and a ConfigureAll step's
+    ``call``; default and implicit calls carry no settings of their own.
+    """
+    found: list[tuple[str, TaskCall]] = []
+    for step_index, step in enumerate(spec.steps):
+        if isinstance(step, ConfigureAllStep):
+            if step.call is not None:
+                found.append((f"steps[{step_index}].call", step.call))
+            continue
+        for task_index, call in enumerate(getattr(step, "tasks", None) or []):
+            found.append((f"steps[{step_index}].tasks[{task_index}]", call))
+    return found
 
 
 def _persists_outputs(effective: Mapping[str, Any]) -> bool:
@@ -235,22 +259,21 @@ def run_parameter_problems(
                 )
             )
 
-    for step_index, step in enumerate(spec.steps):
-        for task_index, call in enumerate(getattr(step, "tasks", None) or []):
-            declared_task = tasks.get(call.name)
-            if declared_task is None:
-                continue
-            for name, override in (call.run or {}).items():
-                problems.extend(
-                    _run_value_problems(
-                        f"steps[{step_index}].tasks[{task_index}].run.{name}",
-                        call.name,
-                        name,
-                        override,
-                        declared_task,
-                        session_duration,
-                    )
+    for call_path, call in _explicit_calls(spec):
+        declared_task = tasks.get(call.name)
+        if declared_task is None:
+            continue
+        for name, override in (call.run or {}).items():
+            problems.extend(
+                _run_value_problems(
+                    f"{call_path}.run.{name}",
+                    call.name,
+                    name,
+                    override,
+                    declared_task,
+                    session_duration,
                 )
+            )
     return problems
 
 
@@ -283,18 +306,12 @@ def input_parameter_problems(
                     f"task_parameters.{task_name}.input", task_name, settings.input, declared_task
                 )
             )
-    for step_index, step in enumerate(spec.steps):
-        for task_index, call in enumerate(getattr(step, "tasks", None) or []):
-            declared_task = tasks.get(call.name)
-            if declared_task is not None and call.input:
-                problems.extend(
-                    _input_name_problems(
-                        f"steps[{step_index}].tasks[{task_index}].input",
-                        call.name,
-                        call.input,
-                        declared_task,
-                    )
-                )
+    for call_path, call in _explicit_calls(spec):
+        declared_task = tasks.get(call.name)
+        if declared_task is not None and call.input:
+            problems.extend(
+                _input_name_problems(f"{call_path}.input", call.name, call.input, declared_task)
+            )
     return problems
 
 

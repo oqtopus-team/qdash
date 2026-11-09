@@ -1356,7 +1356,7 @@ def test_two_qubit_steps_reuse_their_pipeline_execution(pipeline_execution_env, 
         lock_repo=env.lock,
         counter_repo=FakeExecutionCounterRepository(2),
         default_run_parameters={"interval": {"value": 1024, "value_type": "int"}},
-        task_parameters={"CheckRabi": {"run": {"shots": {"value": 2048, "value_type": "int"}}}},
+        _task_defaults={"CheckRabi": {"run": {"shots": {"value": 2048, "value_type": "int"}}}},
     )
     session.run(
         QubitTargets(["0", "1"]),
@@ -1576,7 +1576,7 @@ def test_configure_all_scope_uses_service_task_parameters(pipeline_wiring):
         use_lock=False,
         resource_scope=scope,
         enable_github=False,
-        task_parameters={"ConfigureAll": {"run": {"mux_ids": [0]}}},
+        _task_defaults={"ConfigureAll": {"run": {"mux_ids": [0]}}},
     )
     orchestrator = MagicMock()
     session._orchestrator = orchestrator

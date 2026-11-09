@@ -25,52 +25,6 @@ from qdash.workflow.service.calib_service import (
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
-COHERENCE_CHECK_TASKS: list[TaskCall] = [
-    TaskCall(name="Configure", call_id="configure_initial"),
-    TaskCall(
-        name="CheckChevron",
-        run={
-            # Keep the measurement grid explicit so users can inspect and
-            # tune the coherence-check acquisition condition here.
-            "detuning_range": sweep.linspace(-0.05, 0.05, 41),
-            "time_range": sweep.linspace(0, 250, 26),
-            "shots": 256,
-        },
-        update_calibration_parameters=False,
-    ),
-    TaskCall(name="CheckRabi", call_id="rabi_initial"),
-    TaskCall(
-        name="CheckT1",
-        run={"time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51)},
-    ),
-    TaskCall(
-        name="CheckT2Echo",
-        run={"time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51)},
-    ),
-    TaskCall(
-        name="CheckRamsey",
-        call_id="ramsey_short",
-        run={
-            "time_range": sweep.arange(0, 10_001, 100),
-            "detuning": 0.001,
-        },
-    ),
-    # Configure and CheckRabi run again on fresh hardware state before the
-    # long Ramsey. A target that fails an earlier call stops here; other
-    # targets continue without waiting for every target's short pass.
-    TaskCall(name="Configure", call_id="configure_long_ramsey"),
-    TaskCall(name="CheckRabi", call_id="rabi_long_ramsey"),
-    TaskCall(
-        name="CheckRamsey",
-        call_id="ramsey_long",
-        run={
-            # Keep 101 points while extending the time scale by 5x.
-            "time_range": sweep.arange(0, 50_001, 500),
-            "detuning": 0.0002,
-        },
-    ),
-]
-
 
 @flow(
     on_cancellation=[on_flow_cancellation],
@@ -113,7 +67,51 @@ def coherence_check(
     steps = [
         CustomOneQubit(
             step_name="coherence_check",
-            tasks=COHERENCE_CHECK_TASKS,
+            tasks=[
+                TaskCall(name="Configure", call_id="configure_initial"),
+                TaskCall(
+                    name="CheckChevron",
+                    run={
+                        # Keep the measurement grid explicit so users can inspect and
+                        # tune the coherence-check acquisition condition here.
+                        "detuning_range": sweep.linspace(-0.05, 0.05, 41),
+                        "time_range": sweep.linspace(0, 250, 26),
+                        "shots": 256,
+                    },
+                    update_calibration_parameters=False,
+                ),
+                TaskCall(name="CheckRabi", call_id="rabi_initial"),
+                TaskCall(
+                    name="CheckT1",
+                    run={"time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51)},
+                ),
+                TaskCall(
+                    name="CheckT2Echo",
+                    run={"time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51)},
+                ),
+                TaskCall(
+                    name="CheckRamsey",
+                    call_id="ramsey_short",
+                    run={
+                        "time_range": sweep.arange(0, 10_001, 100),
+                        "detuning": 0.001,
+                    },
+                ),
+                # Configure and CheckRabi run again on fresh hardware state before the
+                # long Ramsey. A target that fails an earlier call stops here; other
+                # targets continue without waiting for every target's short pass.
+                TaskCall(name="Configure", call_id="configure_long_ramsey"),
+                TaskCall(name="CheckRabi", call_id="rabi_long_ramsey"),
+                TaskCall(
+                    name="CheckRamsey",
+                    call_id="ramsey_long",
+                    run={
+                        # Keep 101 points while extending the time scale by 5x.
+                        "time_range": sweep.arange(0, 50_001, 500),
+                        "detuning": 0.0002,
+                    },
+                ),
+            ],
             mode="synchronized",
         ),
     ]

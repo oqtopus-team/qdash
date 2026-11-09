@@ -26,13 +26,14 @@ _SPEC_EXAMPLE: dict[str, Any] = {
                 {
                     "name": "CheckRamsey",
                     "call_id": "ramsey_coarse",
-                    "run": {"detuning": 0.001},
+                    "run": {"detuning": 0.001, "shots": 1024},
                 },
                 {
                     "name": "CheckRamsey",
                     "call_id": "ramsey_fine",
                     "run": {
                         "detuning": 0.0002,
+                        "shots": 1024,
                         "time_range": {"value": [0, 50001, 500], "value_type": "np.arange"},
                     },
                 },
@@ -46,7 +47,6 @@ _SPEC_EXAMPLE: dict[str, Any] = {
             "threshold": 10.0,
         },
     ],
-    "task_parameters": {"CheckRamsey": {"run": {"shots": 1024}}},
     "default_run_parameters": {"interval": 153600},
 }
 
@@ -69,7 +69,7 @@ class ResolvedTaskCall(BaseModel):
     settings: dict[str, Any] = Field(
         description=(
             "Effective call settings (run, input, and update_calibration_parameters when "
-            "set): the call's own settings over task_parameters. default_run_parameters "
+            "set): the call's own settings over the deprecated task_parameters. default_run_parameters "
             "and task declarations fill in the rest when the task runs."
         )
     )

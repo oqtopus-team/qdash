@@ -115,13 +115,12 @@ def good_spec() -> dict[str, Any]:
                 "type": "CustomOneQubit",
                 "step_name": "coherence",
                 "tasks": [
-                    {"name": "CheckT1", "call_id": "t1_short"},
+                    {"name": "CheckT1", "call_id": "t1_short", "run": {"shots": 2048}},
                     {"name": "CheckT1", "call_id": "t1_long", "run": {"shots": 4096}},
                     {"name": "CheckT2Echo"},
                 ],
             },
         ],
-        "task_parameters": {"CheckT1": {"run": {"shots": 2048}}},
     }
 
 
@@ -169,7 +168,7 @@ class TestValidate:
             None,
             "coherence",
         ]
-        # Each call shows its effective settings: the call over task_parameters.
+        # Each call shows its effective settings.
         calls = data["steps"][2]["calls"]
         assert [(call["call_id"], call["on_failure"]) for call in calls] == [
             ("t1_short", "stop"),
@@ -272,6 +271,125 @@ class TestValidate:
         assert data["valid"] is False
         problems = {problem["path"]: problem["message"] for problem in data["problems"]}
         assert "configure=True already runs Configure" in problems["steps[0]"]
+
+    def test_deprecated_task_parameters_still_apply_with_a_warning(
+        self, test_client, chip, auth_headers
+    ):
+        spec = good_spec()
+        calls = spec["steps"][2]["tasks"]
+        calls[0] = {"name": "CheckT1", "call_id": "t1_short"}
+        calls[1]["update_calibration_parameters"] = True
+        spec["task_parameters"] = {
+            "CheckT1": {"run": {"shots": 2048}, "update_calibration_parameters": False}
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is True, data["problems"]
+        warnings = {warning["path"]: warning["message"] for warning in data["warnings"]}
+        assert list(warnings) == ["task_parameters"]
+        assert "deprecated" in warnings["task_parameters"]
+        assert "CheckT1" in warnings["task_parameters"]
+        # Same effective settings as before the deprecation: the default fills
+        # what a call omits, and a call's own values (including False/True) win.
+        settings = [call["settings"] for call in data["steps"][2]["calls"]]
+        assert settings[0] == {
+            "run": {"shots": {"value": 2048}},
+            "input": {},
+            "update_calibration_parameters": False,
+        }
+        assert settings[1] == {
+            "run": {"shots": {"value": 4096}},
+            "input": {},
+            "update_calibration_parameters": True,
+        }
+        # The normalized spec keeps the deprecated field, so the worker applies it.
+        assert data["spec"]["task_parameters"]["CheckT1"]["update_calibration_parameters"] is False
+
+    def test_configure_all_call_settings_replace_task_parameters(
+        self, test_client, chip, auth_headers
+    ):
+        TaskDocument(
+            project_id="test_project",
+            username="test_user",
+            name="ConfigureAll",
+            backend="qubex",
+            description="ConfigureAll",
+            task_type="system",
+        ).insert()
+        spec = good_spec()
+        spec["targets"] = {"mux_ids": [0]}
+        spec["steps"].insert(
+            0,
+            {
+                "type": "ConfigureAll",
+                "call": {"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr"}},
+            },
+        )
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is True, data["problems"]
+        assert data["warnings"] == []
+        configure_all = data["steps"][0]
+        assert configure_all["tasks"] == ["ConfigureAll"]
+        assert [call["call_id"] for call in configure_all["calls"]] == ["ConfigureAll"]
+        assert configure_all["calls"][0]["settings"]["run"] == {
+            "configuration_mode": {"value": "ge-ef-cr"}
+        }
+        assert data["spec"]["steps"][0]["call"]["name"] == "ConfigureAll"
+        # ConfigureAll runs once for its MUXes; the per-target count is unchanged.
+        assert data["task_run_count"] == 6
+
+    def test_configure_all_call_problems_point_at_the_call(self, test_client, chip, auth_headers):
+        spec = good_spec()
+        spec["steps"].insert(0, {"type": "ConfigureAll", "call": {"name": "Configure"}})
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is False
+        problems = {problem["path"]: problem["message"] for problem in data["problems"]}
+        assert "must name ConfigureAll" in problems["steps[0].call"]
+
+    def test_configure_all_call_needs_the_task_on_the_backend(self) -> None:
+        from unittest.mock import MagicMock
+
+        from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
+        from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec
+
+        repository = MagicMock()
+        repository.list_by_project.return_value = []
+        service = CalibrationPipelineService(
+            repository,
+            default_backend=lambda: "fake",
+            available_backends=lambda: ["fake"],
+            backend_tasks=lambda _backend: ["CheckRabi"],
+        )
+        spec = CalibrationPipelineSpec.model_validate(
+            {
+                "spec_version": 2,
+                "targets": {"mux_ids": [0]},
+                "steps": [
+                    {"type": "ConfigureAll", "call": {"name": "ConfigureAll"}},
+                    # A default call is the template's own and is not judged.
+                    {"type": "ConfigureAll", "step_id": "configure_all_default"},
+                ],
+            }
+        )
+        problems: list[Any] = []
+        service._validate_tasks("test_project", "fake", spec, problems)
+        assert [(problem.path, problem.message) for problem in problems] == [
+            ("steps[0].call", "task 'ConfigureAll' is not available on backend 'fake'")
+        ]
 
     def test_warnings_do_not_make_a_spec_invalid(self, test_client, chip, auth_headers):
         spec = good_spec()

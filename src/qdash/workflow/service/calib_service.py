@@ -385,6 +385,7 @@ class CalibService:
         lock_repo: ExecutionLockRepository | None = None,
         counter_repo: ExecutionCounterRepository | None = None,
         resource_scope: ExecutionResourceScope | None = None,
+        _task_defaults: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         """Initialize the calibration service.
 
@@ -430,21 +431,24 @@ class CalibService:
             default_run_parameters: Shared fallback run parameters applied to all tasks.
                 Values use the same plain, sweep, or wrapped form as task-specific
                 ``run`` values.
-            task_run_parameters: Deprecated flat form of ``task_parameters`` that holds
-                only run parameters and ``update_calibration_parameters``.
-            task_parameters: Settings keyed by task name. Each entry may contain
-                ``run`` (run parameters declared in the task's ``run_spec``), ``input``
-                (overrides for calibration inputs declared in its ``input_spec``), and
-                ``update_calibration_parameters`` (``False`` keeps the output as
-                measurement history without updating current calibration parameters).
-                For example: ``{"CheckAdaptiveChevron": {"run": {"shots": 256},
-                "input": {"coarse_control_amplitude": 0.05}}}``. An input override
-                applies to every qid the task runs on.
+            task_run_parameters: Deprecated. Flat per-task run parameters and
+                ``update_calibration_parameters`` keyed by task name. Set ``run`` and
+                ``update_calibration_parameters`` on each ``TaskCall`` instead. Still
+                applied, below ``task_parameters``, with a ``DeprecationWarning``.
+            task_parameters: Deprecated. Settings keyed by task name that every call
+                of the task starts from: ``run``, ``input``, and
+                ``update_calibration_parameters``. Set the same fields on each
+                ``TaskCall`` instead, and keep shared values in local variables. Still
+                applied, below each call's own settings, with a ``DeprecationWarning``.
             configuration_mode: Qubex control layout inherited by parent and isolated
                 worker sessions. If omitted, the backend default is used.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
+            _task_defaults: Internal. Per-task defaults already resolved by QDash, in
+                the canonical ``task_parameters`` form, for pipeline, isolated worker,
+                and single-task sessions. Applied like ``task_parameters`` without a
+                deprecation warning; workflows do not pass it.
 
         Raises:
             RuntimeError: If use_lock=True and another calibration is already running
@@ -467,7 +471,10 @@ class CalibService:
         self.use_lock = use_lock
         self.skip_execution = skip_execution
         self.default_run_parameters = normalize_default_run_parameters(default_run_parameters)
-        self.task_parameters = resolve_task_parameters(task_parameters, task_run_parameters)
+        # Resolved per-task defaults; the internal form isolated workers inherit.
+        self.task_parameters = resolve_task_parameters(
+            task_parameters, task_run_parameters, task_defaults=_task_defaults
+        )
         self.configuration_mode = configuration_mode
         validate_task_names(self.task_parameters, self.backend_name)
         self._lock_acquired = False

@@ -536,3 +536,58 @@ def test_problem_paths_skip_the_implicit_configure_call() -> None:
     problems = prerequisite_problems(pipeline, ["0"], TASKS, calibrated_lookup(**{"0": {}}), None)
     assert problems
     assert {problem.path for problem in problems} == {"steps[0].tasks[0]"}
+
+
+CONFIGURE_ALL_TASKS = {
+    **TASKS,
+    "ConfigureAll": PreflightTask(
+        name="ConfigureAll",
+        input_parameters={},
+        run_parameters={
+            "configuration_mode": {"value_type": "str", "value": "ge-cr-cr"},
+            "mux_ids": {"value_type": "list", "value": []},
+        },
+        output_parameters=(),
+    ),
+}
+
+
+def test_configure_all_call_settings_are_checked_with_paths_into_the_call() -> None:
+    pipeline = spec(
+        [
+            {
+                "type": "ConfigureAll",
+                "call": {
+                    "name": "ConfigureAll",
+                    "run": {"configuration_mode": 3, "shots": 10},
+                    "input": {"control_frequency": 7.0},
+                },
+            },
+            custom({"name": "CheckT1", "run": {"shots": "many"}}),
+        ]
+    )
+    run_problems = paths(run_parameter_problems(pipeline, CONFIGURE_ALL_TASKS))
+    assert set(run_problems) == {
+        "steps[0].call.run.configuration_mode",
+        "steps[0].call.run.shots",
+        "steps[1].tasks[0].run.shots",
+    }
+    assert "must be str" in run_problems["steps[0].call.run.configuration_mode"]
+    input_problems = paths(input_parameter_problems(pipeline, CONFIGURE_ALL_TASKS))
+    assert set(input_problems) == {"steps[0].call.input.control_frequency"}
+
+
+def test_valid_configure_all_call_has_no_problems() -> None:
+    pipeline = spec(
+        [
+            {
+                "type": "ConfigureAll",
+                "call": {"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr"}},
+            },
+            {"type": "ConfigureAll", "step_id": "configure_all_default"},
+        ]
+    )
+    assert run_parameter_problems(pipeline, CONFIGURE_ALL_TASKS) == []
+    assert input_parameter_problems(pipeline, CONFIGURE_ALL_TASKS) == []
+    assert batch_input_problems(pipeline) == []
+    assert prerequisite_problems(pipeline, ["0"], CONFIGURE_ALL_TASKS, lambda _qid: {}) == []

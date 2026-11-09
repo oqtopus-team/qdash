@@ -16,8 +16,16 @@ A calibration pipeline spec is a JSON description of a calibration run: the spec
       "continue_on_failure": true,
       "tasks": [
         { "name": "CheckT1" },
-        { "name": "CheckRamsey", "call_id": "ramsey_coarse", "run": { "detuning": 0.001 } },
-        { "name": "CheckRamsey", "call_id": "ramsey_fine", "run": { "detuning": 0.0002 } }
+        {
+          "name": "CheckRamsey",
+          "call_id": "ramsey_coarse",
+          "run": { "detuning": 0.001, "shots": 1024 }
+        },
+        {
+          "name": "CheckRamsey",
+          "call_id": "ramsey_fine",
+          "run": { "detuning": 0.0002, "shots": 1024 }
+        }
       ]
     },
     {
@@ -28,12 +36,11 @@ A calibration pipeline spec is a JSON description of a calibration run: the spec
       "threshold": 10.0
     }
   ],
-  "task_parameters": { "CheckRamsey": { "run": { "shots": 1024 } } },
   "default_run_parameters": { "interval": 153600 }
 }
 ```
 
-Each entry in `tasks` is a [task call](./task-calls.md): `name`, an optional `call_id`, `run`, `input`, `update_calibration_parameters`, and `on_failure`. The same task may run several times in one step when every occurrence has its own `call_id`. `task_parameters` holds the per-task defaults every call of a task starts from; a call's own values take precedence for that call. The models are shared with Python flows, so the spec and a flow normalize and validate calls identically.
+Each entry in `tasks` is a [task call](./task-calls.md): `name`, an optional `call_id`, `run`, `input`, `update_calibration_parameters`, and `on_failure`. The same task may run several times in one step when every occurrence has its own `call_id`. `default_run_parameters` holds run values shared by every task that declares them. The top-level `task_parameters`, per-task defaults keyed by task name that every call of the task starts from, is deprecated: the schema marks it `deprecated`, `validate` reports a warning at `task_parameters`, and QDash still applies it under each call's own values, so saved and queued specs run unchanged. Move its values onto the calls as [Task Calls](./task-calls.md#migrate-per-task-defaults) describes. The models are shared with Python flows, so the spec and a flow normalize and validate calls identically.
 
 The spec cannot reference code. Each `type` maps to one Step class, task names must be enabled for the backend and match the step's task type, and anything else is rejected before dispatch.
 
@@ -45,11 +52,11 @@ The spec cannot reference code. Each `type` maps to one Step class, task names m
 | `POST /calibration-pipelines/validate` | viewer | Dry run: every problem with a path into the spec, warnings, and the resolved steps with each call's id, failure policy, and effective settings |
 | `POST /calibration-pipelines/execute` | editor | Validate, then run the spec as one execution through the worker's `system-calibration-pipeline` deployment |
 
-`validate` never fails with a 422 for a bad spec. It returns `valid: false` and a `problems` list such as `targets.qids[1]: qubit '99' is not on chip 64Qv3`, so a caller can correct the spec. `valid` is true exactly when `problems` is empty; `warnings` point at allowed but probably unintended choices, such as a filter without `step` placed after a custom step it will not read, and never make a spec invalid. The response also carries `plan_digest`, the digest of the validated spec, which each step execution stores as `note.pipeline.spec_digest`; task results carry the digest of the plan the worker resolved (`note.calibration_plan.digest`) in `invocation.plan_digest`. `execute` returns the same problems in the 422 detail when the spec is not valid, and 503 when the worker has not registered the deployment yet.
+`validate` never fails with a 422 for a bad spec. It returns `valid: false` and a `problems` list such as `targets.qids[1]: qubit '99' is not on chip 64Qv3`, so a caller can correct the spec. `valid` is true exactly when `problems` is empty; `warnings` point at allowed but probably unintended choices, such as a filter without `step` placed after a custom step it will not read, or deprecated ones such as a non-empty `task_parameters`, and never make a spec invalid. The response also carries `plan_digest`, the digest of the validated spec, which each step execution stores as `note.pipeline.spec_digest`; task results carry the digest of the plan the worker resolved (`note.calibration_plan.digest`) in `invocation.plan_digest`. `execute` returns the same problems in the 422 detail when the spec is not valid, and 503 when the worker has not registered the deployment yet.
 
 ### Version 1 specs
 
-A version 1 spec (no `spec_version`, or `spec_version: 1`) is rejected with one problem at `spec_version` and a `migrated_spec` that runs the same tasks with the same settings: every task name becomes a call, a name listed more than once in one step gets `call_id` values `<Task>`, `<Task>_2`, and so on, skipping ids the step already uses, a built-in step repeated in the pipeline gets `step_id` values `<name>_2`, `<name>_3`, and so on, skipping ids a custom step already uses, and `task_run_parameters` moves to `task_parameters.<task>.run`. Filters without `step` keep reading the latest `OneQubitFineTune` or `OneQubitCheck`, so the new step ids do not change what they read. `migrate_pipeline_spec` performs the conversion; it is pure and deterministic. Any other `spec_version` is rejected with a problem at `spec_version` and no `migrated_spec`. The worker applies the same conversion only to a version 1 spec that was queued before the upgrade, and logs it.
+A version 1 spec (no `spec_version`, or `spec_version: 1`) is rejected with one problem at `spec_version` and a `migrated_spec` that runs the same tasks with the same settings: every task name becomes a call, a name listed more than once in one step gets `call_id` values `<Task>`, `<Task>_2`, and so on, skipping ids the step already uses, a built-in step repeated in the pipeline gets `step_id` values `<name>_2`, `<name>_3`, and so on, skipping ids a custom step already uses, and `task_run_parameters` moves to `task_parameters.<task>.run`, so the migrated spec can carry the deprecated `task_parameters` and its validation reports the warning. Filters without `step` keep reading the latest `OneQubitFineTune` or `OneQubitCheck`, so the new step ids do not change what they read. `migrate_pipeline_spec` performs the conversion; it is pure and deterministic. Any other `spec_version` is rejected with a problem at `spec_version` and no `migrated_spec`. The worker applies the same conversion only to a version 1 spec that was queued before the upgrade, and logs it.
 
 ### Preflight checks
 
@@ -57,9 +64,9 @@ Beyond the spec's shape, `validate` reports what a task would reject before it m
 
 | Check | Problem path | What it catches |
 | --- | --- | --- |
-| Run parameter names | `task_parameters.<task>.run.<name>`, `steps[i].tasks[j].run.<name>` | A name the task does not declare, or a calibration input set under `run` |
-| Input names | `task_parameters.<task>.input.<name>`, `steps[i].tasks[j].input.<name>` | A name the task does not declare, or a run parameter set under `input` |
-| Run parameter types | `task_parameters.<task>.run.<name>`, `steps[i].tasks[j].run.<name>`, `default_run_parameters.<name>` | A value whose type the declaration cannot take, such as a sweep for `shots`; a shared value is checked against every pipeline task that declares it, and one that no task declares is reported because it would be ignored |
+| Run parameter names | `task_parameters.<task>.run.<name>`, `steps[i].tasks[j].run.<name>`, `steps[i].call.run.<name>` | A name the task does not declare, or a calibration input set under `run` |
+| Input names | `task_parameters.<task>.input.<name>`, `steps[i].tasks[j].input.<name>`, `steps[i].call.input.<name>` | A name the task does not declare, or a run parameter set under `input` |
+| Run parameter types | `task_parameters.<task>.run.<name>`, `steps[i].tasks[j].run.<name>`, `steps[i].call.run.<name>`, `default_run_parameters.<name>` | A value whose type the declaration cannot take, such as a sweep for `shots`; a shared value is checked against every pipeline task that declares it, and one that no task declares is reported because it would be ignored |
 | Session readout duration | `default_run_parameters.readout_duration`, `task_parameters.<task>.run.readout_duration`, `steps[i].tasks[j].run.readout_duration` | A non-positive shared value, or a per-task or per-call value that differs from the session (`readout_duration` is session-scoped in Qubex; the session uses the shared value, or 1024 ns when none is set) |
 | Batch inputs | `steps[i].tasks[j]` or `steps[i]` | A `simultaneous_spectroscopy` step whose calls set calibration inputs, which batch execution does not support |
 | Required inputs | `steps[i].tasks[j]` | A `database_required` input of a qubit task that no earlier call in the pipeline publishes and that a target qubit lacks in its calibration data, such as `CheckT1` without Rabi parameters. A call publishes its outputs unless its effective `update_calibration_parameters` (the call's own value, else `task_parameters.<task>`) is `false`. An `input` override does not satisfy the requirement, because the task loads required inputs from the database before it applies overrides |
@@ -71,7 +78,7 @@ Coupling steps are not checked for required inputs; their inputs span two qubits
 
 | Type | Kind | Runs | Needs before it |
 | --- | --- | --- | --- |
-| `ConfigureAll` | calibration | ConfigureAll for the targets' MUXes | nothing |
+| `ConfigureAll` | calibration | one `ConfigureAll` call, or `call`, for `mux_ids` or the targets' MUXes | nothing |
 | `BringUp` | calibration | `BRINGUP_TASKS` or `tasks` | nothing |
 | `OneQubitCheck` | calibration | `CHECK_1Q_TASKS` or `tasks` | nothing |
 | `OneQubitFineTune` | calibration | `FULL_1Q_TASKS_AFTER_CHECK` or `tasks` | nothing |
@@ -82,7 +89,7 @@ Coupling steps are not checked for required inputs; their inputs span two qubits
 | `TwoQubitCalibration` | calibration | `FULL_2Q_TASKS` or `tasks` | candidate qubits |
 | `CustomTwoQubit` | calibration | `tasks` (coupling tasks) | candidate qubits |
 
-One-qubit steps take `mode` (`synchronized`, `scheduled`, `simultaneous_spectroscopy`, `serial`). Custom steps take a `step_name` and `continue_on_failure`. Every calibration step has a `step_id`: a custom step's `step_name`, a built-in step's `step_id` field, or the catalog name (`one_qubit_check`); it must be unique within the pipeline, so a spec that runs `OneQubitCheck` twice sets `step_id` on at least one of them. `configure: true` on `OneQubitCheck` or `OneQubitFineTune` runs a `Configure` call with `call_id` `Configure` before the step's calls; a step that sets it and also lists a `Configure` call, or another call with that `call_id`, is invalid at `steps[i]`. Targets are either `qids` or `mux_ids` with optional `exclude_qids`.
+One-qubit steps take `mode` (`synchronized`, `scheduled`, `simultaneous_spectroscopy`, `serial`). Custom steps take a `step_name` and `continue_on_failure`. Every calibration step has a `step_id`: a custom step's `step_name`, a built-in step's `step_id` field, or the catalog name (`one_qubit_check`); it must be unique within the pipeline, so a spec that runs `OneQubitCheck` twice sets `step_id` on at least one of them. `configure: true` on `OneQubitCheck` or `OneQubitFineTune` runs a `Configure` call with `call_id` `Configure` before the step's calls; a step that sets it and also lists a `Configure` call, or another call with that `call_id`, is invalid at `steps[i]`. `ConfigureAll` takes an optional `call`, a task call that must name `ConfigureAll`, such as `{"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr"}}`; it replaces a `task_parameters.ConfigureAll` entry, and without it the step runs a call with no settings of its own. The step's `mux_ids`, or the targets' MUXes when it is unset, replace any `run.mux_ids` from the call or `task_parameters`, so `validate` warns at that value. Targets are either `qids` or `mux_ids` with optional `exclude_qids`.
 
 A filter with `step` reads that earlier step, and with `call_id` one of its calls; a failed or missing call removes the qubit without falling back to another call of the same task. A metric filter on a step without `call_id` reads the step-level metrics the catalog lists for it; custom steps have none. A filter without `step` reads the latest `OneQubitFineTune` or `OneQubitCheck`, as in version 1. [Task Calls](./task-calls.md#results) describes the selection in full.
 

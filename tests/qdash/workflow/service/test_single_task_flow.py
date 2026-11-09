@@ -203,7 +203,7 @@ def test_single_task_executor_accepts_quick_run_parameters(monkeypatch, source_t
     assert captured["kwargs"]["source_task_id"] == source_task_id
     assert captured["kwargs"]["snapshot_exempt_tasks"] == {"CheckRabi"}
     assert captured["kwargs"]["backend_name"] == "fake"
-    assert captured["kwargs"]["task_parameters"] == {
+    assert captured["kwargs"]["_task_defaults"] == {
         "CheckRabi": {"run": {"shots": {"value": 100}}, "input": {}}
     }
     assert captured["kwargs"]["persist_output_parameters"] is False
@@ -239,7 +239,7 @@ def test_single_task_executor_scopes_request_overrides_to_the_task(monkeypatch):
     )
 
     assert "parameter_overrides" not in captured["kwargs"]
-    assert captured["kwargs"]["task_parameters"] == {
+    assert captured["kwargs"]["_task_defaults"] == {
         "CheckRabi": {"run": {"shots": {"value": 2000}}, "input": {"control_amplitude": 0.05}}
     }
 

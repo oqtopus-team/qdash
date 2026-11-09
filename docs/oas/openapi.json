@@ -21853,7 +21853,8 @@
                       "call_id": "ramsey_coarse",
                       "name": "CheckRamsey",
                       "run": {
-                        "detuning": 0.001
+                        "detuning": 0.001,
+                        "shots": 1024
                       }
                     },
                     {
@@ -21861,6 +21862,7 @@
                       "name": "CheckRamsey",
                       "run": {
                         "detuning": 0.0002,
+                        "shots": 1024,
                         "time_range": {
                           "value": [
                             0,
@@ -21887,13 +21889,6 @@
                   "0",
                   "1"
                 ]
-              },
-              "task_parameters": {
-                "CheckRamsey": {
-                  "run": {
-                    "shots": 1024
-                  }
-                }
               }
             }
           }
@@ -28673,7 +28668,7 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Settings",
-            "description": "Effective call settings (run, input, and update_calibration_parameters when set): the call's own settings over task_parameters. default_run_parameters and task declarations fill in the rest when the task runs."
+            "description": "Effective call settings (run, input, and update_calibration_parameters when set): the call's own settings over the deprecated task_parameters. default_run_parameters and task declarations fill in the rest when the task runs."
           }
         },
         "type": "object",
@@ -32746,7 +32741,8 @@
                       "call_id": "ramsey_coarse",
                       "name": "CheckRamsey",
                       "run": {
-                        "detuning": 0.001
+                        "detuning": 0.001,
+                        "shots": 1024
                       }
                     },
                     {
@@ -32754,6 +32750,7 @@
                       "name": "CheckRamsey",
                       "run": {
                         "detuning": 0.0002,
+                        "shots": 1024,
                         "time_range": {
                           "value": [
                             0,
@@ -32780,13 +32777,6 @@
                   "0",
                   "1"
                 ]
-              },
-              "task_parameters": {
-                "CheckRamsey": {
-                  "run": {
-                    "shots": 1024
-                  }
-                }
               }
             }
           }
