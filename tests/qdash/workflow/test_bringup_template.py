@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from qdash.workflow.calibtasks.qubex import CheckAdaptiveChevron
+from tests.qdash.workflow.task_call_helpers import names
 
 bringup_module = importlib.import_module("qdash.workflow.templates.bringup")
 
@@ -65,7 +66,7 @@ def test_bringup_template_passes_template_task_list(monkeypatch) -> None:
 
     result = bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
 
-    assert result["steps"][0].tasks == bringup_module.BRINGUP_TASKS
+    assert names(result["steps"][0].tasks) == names(bringup_module.BRINGUP_TASKS)
 
 
 def test_bringup_template_preserves_task_specific_acquisition_settings(monkeypatch) -> None:

@@ -20,10 +20,13 @@ from qdash.api.schemas.calibration_pipeline import (
     PipelineStepTypeInfo,
     ResolvedPipelineStep,
     ResolvedPipelineTargets,
+    ResolvedTaskCall,
     ValidatePipelineResponse,
 )
 from qdash.api.services.calibration_pipeline_preflight import (
     PreflightTask,
+    batch_input_problems,
+    input_parameter_problems,
     prerequisite_problems,
     run_parameter_problems,
 )
@@ -34,12 +37,19 @@ from qdash.common.config.backend import (
 )
 from qdash.datamodel.calibration_pipeline import (
     ONE_QUBIT_MODES,
+    SPEC_VERSION,
     STEP_CATALOG,
     CalibrationPipelineSpec,
     FilterByMetricStep,
+    FilterByStatusStep,
     PipelineStep,
+    migrate_pipeline_spec,
     pipeline_spec_json_schema,
-    step_tasks,
+    pipeline_warnings,
+    step_calls,
+    step_continue_on_failure,
+    step_id,
+    step_name,
 )
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -156,12 +166,15 @@ class CalibrationPipelineService:
                     requires=sorted(entry.requires),
                     provides=sorted(entry.provides),
                     task_scope=entry.task_scope,
+                    default_step_id=entry.name if entry.kind == "calibration" else None,
                     default_tasks=list(entry.default_tasks),
+                    step_metrics=list(entry.step_metrics),
                 )
                 for entry in STEP_CATALOG.values()
             ],
             one_qubit_modes=list(ONE_QUBIT_MODES),
             tasks=by_type,
+            spec_version=SPEC_VERSION,
             spec_schema=pipeline_spec_json_schema(),
         )
 
@@ -179,56 +192,113 @@ class CalibrationPipelineService:
         backend, backend_problem = self.resolve_backend(backend_name)
         problems: list[PipelineProblem] = [backend_problem] if backend_problem else []
 
+        version = spec.get("spec_version", 1) if isinstance(spec, dict) else None
+        if version != SPEC_VERSION:
+            return self._reject_old_version(spec, version, backend, problems)
+
         try:
             parsed = CalibrationPipelineSpec.model_validate(spec)
         except ValidationError as error:
             problems.extend(_pydantic_problems(error))
-            return ValidatePipelineResponse(valid=False, problems=problems, backend_name=backend)
+            return ValidatePipelineResponse(
+                valid=False,
+                problems=problems,
+                backend_name=backend,
+                spec_version=SPEC_VERSION,
+            )
 
         targets, target_qids = self._validate_targets(project_id, chip_id, parsed, problems)
         if not backend_problem:
             self._validate_tasks(project_id, backend, parsed, problems)
-        self._validate_run_parameters(parsed, problems)
+        self._validate_task_parameters(parsed, problems)
         if not backend_problem:
             self._preflight(project_id, chip_id, backend, parsed, target_qids, problems)
 
+        defaults = parsed.canonical_task_parameters()
         steps = [
-            ResolvedPipelineStep(
-                index=index,
-                type=step.type,
-                name=self._step_name(step),
-                kind=STEP_CATALOG[step.type].kind,
-                tasks=step_tasks(step),
-            )
-            for index, step in enumerate(parsed.steps, start=1)
+            self._resolved_step(index, step, defaults) for index, step in enumerate(parsed.steps, 1)
         ]
         return ValidatePipelineResponse(
             valid=not problems,
             problems=problems,
+            warnings=[_problem(path, message) for path, message in pipeline_warnings(parsed)],
             backend_name=backend,
-            spec=parsed.model_dump(mode="json"),
+            spec_version=SPEC_VERSION,
+            spec=parsed.model_dump(mode="json", exclude_none=True),
+            plan_digest=parsed.plan_digest(),
             targets=targets,
             steps=steps,
             task_run_count=len(parsed.all_tasks()),
         )
 
     @staticmethod
+    def _reject_old_version(
+        spec: Any,
+        version: Any,
+        backend: str,
+        problems: list[PipelineProblem],
+    ) -> ValidatePipelineResponse:
+        """A version 1 spec is rejected with the same pipeline converted to version 2."""
+        try:
+            migration = migrate_pipeline_spec(spec)
+        except (ValueError, TypeError, AttributeError) as exc:
+            problems.append(
+                _problem(
+                    "spec_version",
+                    f"spec_version must be {SPEC_VERSION}: {exc}",
+                )
+            )
+            return ValidatePipelineResponse(valid=False, problems=problems, backend_name=backend)
+        notes = "; ".join(migration.notes)
+        problems.append(
+            _problem(
+                "spec_version",
+                f"this is a version {version} spec; QDash accepts spec_version "
+                f"{SPEC_VERSION}, where tasks are TaskCall objects "
+                '({"name": ..., "call_id": ..., "run": ...}) and task_run_parameters '
+                "became task_parameters.<task>.run. Submit migrated_spec, which runs the "
+                "same tasks with the same settings" + (f" ({notes})" if notes else ""),
+            )
+        )
+        return ValidatePipelineResponse(
+            valid=False,
+            problems=problems,
+            backend_name=backend,
+            spec_version=version if isinstance(version, int) else None,
+            migrated_spec=migration.spec,
+        )
+
+    @staticmethod
+    def _resolved_step(
+        index: int, step: PipelineStep, defaults: Mapping[str, Any]
+    ) -> ResolvedPipelineStep:
+        calls = step_calls(step)
+        continue_on_failure = step_continue_on_failure(step)
+        reference = None
+        if isinstance(step, FilterByStatusStep | FilterByMetricStep) and step.step is not None:
+            reference = {"step": step.step, "call_id": step.call_id}
+        return ResolvedPipelineStep(
+            index=index,
+            type=step.type,
+            name=step_name(step),
+            step_id=step_id(step),
+            kind=STEP_CATALOG[step.type].kind,
+            tasks=[call.name for call in calls],
+            calls=[
+                ResolvedTaskCall(
+                    call_id=call.resolved_call_id,
+                    name=call.name,
+                    on_failure=call.on_failure or ("continue" if continue_on_failure else "stop"),
+                    settings=call.effective_settings(defaults),
+                )
+                for call in calls
+            ],
+            reference=reference,
+        )
+
+    @staticmethod
     def _step_name(step: PipelineStep) -> str:
-        step_name = getattr(step, "step_name", None)
-        if step_name:
-            return str(step_name)
-        if isinstance(step, FilterByMetricStep):
-            return f"filter_by_{step.metric}"
-        names = {
-            "ConfigureAll": "configure_all",
-            "BringUp": "bringup",
-            "OneQubitCheck": "one_qubit_check",
-            "OneQubitFineTune": "one_qubit_fine_tune",
-            "FilterByStatus": "filter_by_status",
-            "GenerateCRSchedule": "generate_cr_schedule",
-            "TwoQubitCalibration": "two_qubit_calibration",
-        }
-        return names.get(step.type, step.type)
+        return step_name(step)
 
     def _validate_targets(
         self,
@@ -320,6 +390,8 @@ class CalibrationPipelineService:
         if not tasks:
             return
         problems.extend(run_parameter_problems(spec, tasks))
+        problems.extend(input_parameter_problems(spec, tasks))
+        problems.extend(batch_input_problems(spec))
         if self._qubit_data is None or not target_qids:
             return
         qubit_data = self._qubit_data
@@ -354,8 +426,9 @@ class CalibrationPipelineService:
             # Default lists are the templates' own; only an explicit list is judged.
             if own_tasks is None:
                 continue
-            for task_index, task in enumerate(own_tasks):
+            for task_index, call in enumerate(own_tasks):
                 path = f"steps[{step_index}].tasks[{task_index}]"
+                task = call.name
                 task_type = types.get(task)
                 if task_type is None:
                     problems.append(
@@ -370,15 +443,15 @@ class CalibrationPipelineService:
                     )
 
     @staticmethod
-    def _validate_run_parameters(
+    def _validate_task_parameters(
         spec: CalibrationPipelineSpec, problems: list[PipelineProblem]
     ) -> None:
         tasks_in_pipeline = set(spec.all_tasks())
-        for task in spec.task_run_parameters:
+        for task in spec.task_parameters:
             if task not in tasks_in_pipeline:
                 problems.append(
                     _problem(
-                        f"task_run_parameters.{task}",
+                        f"task_parameters.{task}",
                         f"task {task!r} does not run in this pipeline",
                     )
                 )

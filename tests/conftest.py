@@ -73,6 +73,14 @@ os.environ.setdefault("QPU_DATA_PATH", "/tmp/qpu")
 os.environ["SLACK_APP_TOKEN"] = "test-app-token"  # noqa: S105
 os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
 
+# Qubex fitting helpers call ``fig.show()`` by default. Where a browser is discoverable (a
+# desktop host or an inherited ``BROWSER``), Plotly's default renderer serves the figure from
+# a one-shot local HTTP server and blocks until a browser fetches it, which can stall a run
+# indefinitely. Tests never display figures, so no renderer is active.
+import plotly.io as _plotly_io  # noqa: E402
+
+_plotly_io.renderers.default = ""
+
 
 def _patched_command(self: Any, command: dict[str, Any] | str, **kwargs: Any) -> dict[str, Any]:
     """Patch mongomock's command method to support Bunnet's buildInfo call."""

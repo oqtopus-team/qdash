@@ -7,20 +7,34 @@
  */
 import type { PipelineProblem } from './pipelineProblem';
 import type { ResolvedPipelineStep } from './resolvedPipelineStep';
+import type { ValidatePipelineResponseMigratedSpec } from './validatePipelineResponseMigratedSpec';
+import type { ValidatePipelineResponsePlanDigest } from './validatePipelineResponsePlanDigest';
 import type { ValidatePipelineResponseSpec } from './validatePipelineResponseSpec';
+import type { ValidatePipelineResponseSpecVersion } from './validatePipelineResponseSpecVersion';
 import type { ValidatePipelineResponseTargets } from './validatePipelineResponseTargets';
 
 /**
  * Whether the spec can run, and what it would do.
+ *
+ * ``valid`` is true exactly when ``problems`` is empty. ``warnings`` never make
+ * a spec invalid; they point at choices that are allowed but probably unintended.
  */
 export interface ValidatePipelineResponse {
   valid: boolean;
   problems?: PipelineProblem[];
+  /** Allowed but probably unintended choices. */
+  warnings?: PipelineProblem[];
   backend_name: string;
+  /** Version of the submitted spec, when it could be read. */
+  spec_version?: ValidatePipelineResponseSpecVersion;
   /** The normalized spec, when it parsed; defaults filled in. */
   spec?: ValidatePipelineResponseSpec;
+  /** For a version 1 spec: the same pipeline converted to version 2. Review it, rename generated call_ids if you like, and submit it instead. */
+  migrated_spec?: ValidatePipelineResponseMigratedSpec;
+  /** Digest of the validated spec, stored as note.pipeline.spec_digest on each step execution. Task results carry the worker's resolved-plan digest (note.calibration_plan.digest) in invocation.plan_digest. */
+  plan_digest?: ValidatePipelineResponsePlanDigest;
   targets?: ValidatePipelineResponseTargets;
   steps?: ResolvedPipelineStep[];
-  /** Task runs per target qubit or coupling. */
+  /** Task calls per target qubit or coupling. */
   task_run_count?: number;
 }

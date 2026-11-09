@@ -17,6 +17,7 @@ from typing import Any, Literal
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -26,15 +27,15 @@ from qdash.workflow.service.calib_service import (
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
-EF_CALIBRATION_TASKS: list[str] = [
-    "ConfigureEF",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckAdaptiveEFChevron",
-    "CheckEFRabi",
-    "CreateEFHPIPulse",
-    "CreateEFPIPulse",
-    "EFReadoutClassification",
+EF_CALIBRATION_TASKS: list[TaskCall] = [
+    TaskCall(name="ConfigureEF"),
+    TaskCall(name="CheckRabi"),
+    TaskCall(name="CreateHPIPulse"),
+    TaskCall(name="CheckAdaptiveEFChevron"),
+    TaskCall(name="CheckEFRabi"),
+    TaskCall(name="CreateEFHPIPulse"),
+    TaskCall(name="CreateEFPIPulse"),
+    TaskCall(name="EFReadoutClassification"),
 ]
 
 
