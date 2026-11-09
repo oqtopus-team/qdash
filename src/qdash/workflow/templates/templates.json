@@ -29,7 +29,7 @@
   {
     "id": "coherence_check",
     "name": "Coherence Check",
-    "description": "Apply the current configuration, record a coarse Chevron without updating calibration parameters, then run Rabi, T1, T2Echo, and Ramsey checks for explicitly selected MUXes or qubits.",
+    "description": "Apply the current configuration, record a coarse Chevron without updating calibration parameters, and run Rabi, T1, T2Echo, and Ramsey checks for explicitly selected MUXes or qubits. A second pass reapplies the configuration, re-measures Rabi, and runs Ramsey on a five times longer time scale with a smaller detuning.",
     "category": "production",
     "backend": "qubex",
     "filename": "coherence_check.py",
