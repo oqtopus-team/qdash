@@ -200,6 +200,21 @@ def test_batch_capable_tasks_reads_the_task_registry() -> None:
     assert capable["CheckRabi"] is False
 
 
+def test_fake_batch_preflight_rejects_inherited_stub() -> None:
+    import qdash.workflow.calibtasks.fake  # noqa: F401 - registers actual fake tasks
+    from qdash.workflow.calibtasks.base import BaseTask
+    from qdash.workflow.calibtasks.fake.base import FakeTask
+    from qdash.workflow.service.one_qubit_stage_runner import batch_capable_tasks
+
+    assert BaseTask.registry["fake"]["FakeBringUp"].batch_run is FakeTask.batch_run
+    assert batch_capable_tasks("fake")["FakeBringUp"] is False
+    service = _service()
+    service.backend_name = "fake"
+    runner = OneQubitStageRunner(service)
+    with pytest.raises(ValueError, match=r"FakeBringUp.*does not support batch execution"):
+        runner.preflight_batch(_plan(TaskCall(name="FakeBringUp")))
+
+
 def test_execute_simultaneous_spectroscopy_schedule_uses_isolated_batch(
     monkeypatch: Any,
 ) -> None:

@@ -24,15 +24,16 @@ if TYPE_CHECKING:
 def batch_capable_tasks(backend_name: str) -> dict[str, bool]:
     """Task name -> whether the task implements ``batch_run`` on this backend."""
     from qdash.workflow.calibtasks.base import BaseTask
+    from qdash.workflow.calibtasks.fake.base import FakeTask
+    from qdash.workflow.calibtasks.qubex.base import QubexTask
 
-    capable: dict[str, bool] = {}
-    for name, task_class in BaseTask.registry.get(backend_name, {}).items():
-        owner = next(
-            (klass for klass in task_class.__mro__ if "batch_run" in vars(klass)), task_class
-        )
-        # BaseTask declares batch_run abstract and QubexTask raises NotImplementedError.
-        capable[name] = owner.__name__ not in {"BaseTask", "QubexTask"}
-    return capable
+    # These implementations declare the interface but cannot execute a batch.
+    # Compare methods so inherited stubs are rejected regardless of class names.
+    unsupported = {BaseTask.batch_run, QubexTask.batch_run, FakeTask.batch_run}
+    return {
+        name: task_class.batch_run not in unsupported
+        for name, task_class in BaseTask.registry.get(backend_name, {}).items()
+    }
 
 
 class OneQubitStageRunner:
