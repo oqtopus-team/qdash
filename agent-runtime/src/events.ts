@@ -69,8 +69,8 @@ export interface EvaluationSummary {
   record?: EvaluateResult;
 }
 
-/** Minimal shape of the Pi events we care about. */
-type SessionEventLike = {
+/** Minimal shape of the session events the stream maps; `ViewEventTranslator` produces them. */
+export type SessionEventLike = {
   type: string;
   toolName?: string;
   toolCallId?: string;

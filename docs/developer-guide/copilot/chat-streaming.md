@@ -51,7 +51,20 @@ preserve the connection without creating transcript entries.
 
 ## Change and Test Streaming
 
-Update `agent-runtime/src/events.ts` when the runtime event contract changes. Update
+The runtime derives its events from the durable conversation view: `agent-runtime/src/server.ts`
+watches it with `Conversation.watch()`, and `ViewEventTranslator` in
+`agent-runtime/src/view-events.ts` turns each new revision into text, thinking, and tool-call
+argument appends and tool starts and ends. A revision can skip states while the stream writes, so
+the translator takes an answer's unseen tail from its entry and ends a tool from its result entry.
+A revision's entries are a window of the newest 50 to 100, so when the window has moved past the
+last entry the stream wrote, `ViewEventStream` reads the skipped entries with
+`Conversation.entries()` before translating it. When the turn settles, `ViewEventStream.finish()`
+stops the watch and translates the view read after settlement, so tool, chart, and text events the
+watch had not delivered yet still reach the stream before `done` or `error`.
+`agent-runtime/src/events.ts` maps these events to NDJSON lines.
+
+Update `agent-runtime/src/events.ts` when the runtime event contract changes, and
+`agent-runtime/src/view-events.ts` when Pi's conversation view changes. Update
 `src/qdash/api/services/pi_chat_service.py` when the SSE contract or translation changes, then
 update `ui/src/hooks/useCopilotChat.ts` and its tests for browser behavior.
 
