@@ -276,7 +276,9 @@ def characterization(
 
     # Configure the selected MUXes once; isolated workers inherit the same logical layout.
     steps: list[Step] = [
-        ConfigureAll(),
+        ConfigureAll(
+            call=TaskCall(name="ConfigureAll", run={"configuration_mode": configuration_mode})
+        ),
         # 2. GE calibration: retain only qubits whose calibration succeeded.
         OneQubitCheck(
             mode="synchronized",
@@ -340,9 +342,6 @@ def characterization(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        # ConfigureAll runs as its own step rather than a call in a task list, so its
-        # run-dependent configuration mode stays a per-task default.
-        task_parameters={"ConfigureAll": {"run": {"configuration_mode": configuration_mode}}},
         configuration_mode=configuration_mode,
         default_run_parameters={
             "readout_duration": 1024,

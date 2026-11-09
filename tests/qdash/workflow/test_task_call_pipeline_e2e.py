@@ -78,16 +78,18 @@ def _fail_fine_ramsey_on(monkeypatch: pytest.MonkeyPatch, failing_qid: str) -> N
 def _service(**kwargs: Any) -> Any:
     from qdash.workflow.service import CalibService
 
-    return CalibService(
-        USERNAME,
-        CHIP_ID,
-        backend_name="fake",
-        project_id=PROJECT_ID,
-        enable_github=False,
-        flow_name="ramsey_twice",
-        task_parameters={"CheckRamsey": {"run": {"shots": 256}}},
-        **kwargs,
-    )
+    # The deprecated per-task default still reaches every call that omits shots.
+    with pytest.warns(DeprecationWarning, match="^task_parameters is deprecated"):
+        return CalibService(
+            USERNAME,
+            CHIP_ID,
+            backend_name="fake",
+            project_id=PROJECT_ID,
+            enable_github=False,
+            flow_name="ramsey_twice",
+            task_parameters={"CheckRamsey": {"run": {"shots": 256}}},
+            **kwargs,
+        )
 
 
 def _steps() -> list[Any]:

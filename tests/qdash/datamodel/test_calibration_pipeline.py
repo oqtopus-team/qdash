@@ -377,6 +377,62 @@ def test_warning_when_a_reference_free_filter_skips_a_custom_step() -> None:
     assert pipeline_warnings(explicit) == []
 
 
+def test_deprecated_task_parameters_is_reported_but_still_applied() -> None:
+    parsed = parse(
+        steps=[
+            {
+                "type": "CustomOneQubit",
+                "tasks": [
+                    {"name": "CheckRamsey", "call_id": "coarse"},
+                    {
+                        "name": "CheckRamsey",
+                        "call_id": "fine",
+                        "run": {"detuning": 0.0002},
+                        "update_calibration_parameters": True,
+                    },
+                ],
+            }
+        ],
+        task_parameters={
+            "CheckRamsey": {
+                "run": {"shots": 1024, "detuning": 0.001},
+                "input": {"control_amplitude": 0.05},
+                "update_calibration_parameters": False,
+            }
+        },
+    )
+
+    [(path, message)] = pipeline_warnings(parsed)
+    assert path == "task_parameters"
+    assert "deprecated" in message
+    assert "CheckRamsey" in message
+    defaults = parsed.canonical_task_parameters()
+    coarse, fine = (call for _, call in parsed.all_calls())
+    assert coarse.effective_settings(defaults) == {
+        "run": {"shots": {"value": 1024}, "detuning": {"value": 0.001}},
+        "input": {"control_amplitude": 0.05},
+        "update_calibration_parameters": False,
+    }
+    assert fine.effective_settings(defaults) == {
+        "run": {"shots": {"value": 1024}, "detuning": {"value": 0.0002}},
+        "input": {"control_amplitude": 0.05},
+        "update_calibration_parameters": True,
+    }
+
+
+def test_task_call_settings_without_task_parameters_do_not_warn() -> None:
+    parsed = parse(
+        steps=[
+            {
+                "type": "CustomOneQubit",
+                "tasks": [{"name": "CheckRamsey", "run": {"shots": 1024}}],
+            }
+        ],
+    )
+
+    assert pipeline_warnings(parsed) == []
+
+
 # ---------------------------------------------------------------- plan and migration
 
 
@@ -543,3 +599,6 @@ def test_json_schema_lists_every_step_type_and_task_call() -> None:
     assert "TaskCall" in defs
     assert defs["TaskCall"]["additionalProperties"] is False
     assert schema["required"] == ["spec_version", "targets", "steps"]
+    # task_parameters is deprecated in the schema but stays optional and accepted.
+    assert schema["properties"]["task_parameters"]["deprecated"] is True
+    assert schema["properties"]["task_parameters"]["description"].startswith("Deprecated")

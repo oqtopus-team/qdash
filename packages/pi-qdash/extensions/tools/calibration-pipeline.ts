@@ -231,7 +231,7 @@ const connectionParams = {
 // and a union-heavy schema here would be ignored by vLLM guided decoding anyway.
 const specParam = Type.Object({}, {
   additionalProperties: true,
-  description: "CalibrationPipelineSpec: {spec_version: 2, name?, targets: {qids} | {mux_ids, exclude_qids?}, steps: [{type, step_id?, tasks?: [{name, call_id?, run?, input?, update_calibration_parameters?, on_failure?}], ...}], task_parameters?: {<task>: {run?, input?, update_calibration_parameters?}}, default_run_parameters?, tags?}. Get step types and tasks from qdash_get_pipeline_catalog.",
+  description: "CalibrationPipelineSpec: {spec_version: 2, name?, targets: {qids} | {mux_ids, exclude_qids?}, steps: [{type, step_id?, tasks?: [{name, call_id?, run?, input?, update_calibration_parameters?, on_failure?}], ...}], default_run_parameters?, tags?}. Put per-call settings on each task call; task_parameters (per-task defaults) is deprecated and only kept so existing specs still run. Get step types and tasks from qdash_get_pipeline_catalog.",
 });
 
 export function registerCalibrationPipelineTools(pi: Pick<ExtensionAPI, "registerTool">, deps: CalibrationPipelineDependencies): void {

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import pickle
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -124,13 +125,18 @@ def test_spec_digest_and_plan_digest_are_linked_on_every_execution_and_result(
 
     # The execute endpoint dispatches the normalized spec as a JSON flow parameter.
     dispatched = json.loads(json.dumps(validation["spec"]))
-    calibration_pipeline(
-        USERNAME,
-        CHIP_ID,
-        spec=dispatched,
-        project_id=PROJECT_ID,
-        backend_name="fake",
-    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        calibration_pipeline(
+            USERNAME,
+            CHIP_ID,
+            spec=dispatched,
+            project_id=PROJECT_ID,
+            backend_name="fake",
+        )
+    # The spec's deprecated task_parameters is reported by validation, not
+    # re-warned by the worker, the parent session or isolated worker sessions.
+    assert not [w for w in caught if "task_parameters is deprecated" in str(w.message)]
 
     executions = list(
         ExecutionHistoryDocument.find({"project_id": PROJECT_ID, "chip_id": CHIP_ID}).run()

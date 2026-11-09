@@ -53,7 +53,7 @@ def test_simple_calibration_default_calls_carry_the_hpi_duration() -> None:
     }
 
 
-def test_simple_calibration_custom_hpi_calls_inherit_the_template_duration() -> None:
+def test_simple_calibration_custom_calls_keep_only_their_own_settings() -> None:
     tasks = [
         TaskCall(name="CheckRabi", run={"shots": 512}),
         TaskCall(
@@ -75,7 +75,8 @@ def test_simple_calibration_custom_hpi_calls_inherit_the_template_duration() -> 
 
     step = _step(result)
     assert step.mode == "serial"
-    # Order, ids, duplicates, failure policy, and the user's own values are kept.
+    # Order, ids, duplicates, failure policy, and the user's own values are kept;
+    # the default hpi_duration is not added to custom calls.
     assert [(call.resolved_call_id, call.on_failure) for call in step.tasks] == [
         ("CheckRabi", None),
         ("hpi_default", "continue"),
@@ -87,7 +88,7 @@ def test_simple_calibration_custom_hpi_calls_inherit_the_template_duration() -> 
         (
             "hpi_default",
             settings(
-                run={"hpi_duration": 32, "shots": 2048},
+                run={"shots": 2048},
                 input={"control_amplitude": 0.05},
                 update_calibration_parameters=False,
             ),
@@ -100,7 +101,7 @@ def test_simple_calibration_custom_hpi_calls_inherit_the_template_duration() -> 
     assert tasks[1].run == {"shots": {"value": 2048}}
 
 
-def test_simple_calibration_accepts_mapping_entries_for_hpi_calls() -> None:
+def test_simple_calibration_accepts_mapping_entries_as_given() -> None:
     result = simple_module.simple_calibration(
         username="alice",
         chip_id="64Q",
@@ -108,9 +109,7 @@ def test_simple_calibration_accepts_mapping_entries_for_hpi_calls() -> None:
         tasks=[{"name": "CreateHPIPulse"}],
     )
 
-    assert effective_settings(_step(result).tasks) == [
-        ("CreateHPIPulse", settings(run={"hpi_duration": 32})),
-    ]
+    assert effective_settings(_step(result).tasks) == [("CreateHPIPulse", settings())]
 
 
 def test_simple_calibration_keeps_an_empty_task_list_empty() -> None:

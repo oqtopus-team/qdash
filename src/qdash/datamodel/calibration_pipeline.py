@@ -602,12 +602,18 @@ class CalibrationPipelineSpec(BaseModel):
     )
     targets: PipelineTargets
     steps: list[PipelineStep] = Field(min_length=1, max_length=32)
+    # Deprecated in the schema only: pydantic's ``deprecated=`` would also warn on
+    # every attribute read inside QDash. Validation reports it through
+    # pipeline_warnings instead.
     task_parameters: dict[str, TaskSettings] = Field(
         default_factory=dict,
         description=(
-            "Common per-task defaults keyed by task name; every call of the task "
-            "starts from them and a call's own settings take precedence."
+            "Deprecated: set run, input and update_calibration_parameters on each "
+            "task call instead. Common per-task defaults keyed by task name; every "
+            "call of the task starts from them and a call's own settings take "
+            "precedence. Still accepted and applied."
         ),
+        json_schema_extra={"deprecated": True},
     )
     default_run_parameters: dict[str, Any] = Field(
         default_factory=dict,
@@ -730,13 +736,25 @@ def validate_step_chain(steps: Sequence[PipelineStep]) -> list[str]:
 
 
 def pipeline_warnings(spec: CalibrationPipelineSpec) -> list[tuple[str, str]]:
-    """Valid but probably unintended choices, as (path, message) pairs.
+    """Valid but probably unintended or deprecated choices, as (path, message) pairs.
+
+    A non-empty ``task_parameters`` is deprecated in favor of settings on each call.
 
     A filter without a step reference reads the latest built-in one-qubit step
     (OneQubitFineTune, else OneQubitCheck), as in version 1; custom one-qubit
     steps between that step and the filter are not read.
     """
     found: list[tuple[str, str]] = []
+    if spec.task_parameters:
+        found.append(
+            (
+                "task_parameters",
+                "task_parameters is deprecated; it still applies, but set run, input and "
+                "update_calibration_parameters on each call of "
+                f"{', '.join(sorted(spec.task_parameters))} instead "
+                "(default_run_parameters for run values every task shares)",
+            )
+        )
     custom_since_builtin: list[str] = []
     for index, step in enumerate(spec.steps):
         if isinstance(step, OneQubitCheckStep | OneQubitFineTuneStep):

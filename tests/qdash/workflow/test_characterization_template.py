@@ -71,10 +71,7 @@ def test_characterization_builds_full_pipeline_in_dependency_order() -> None:
     assert steps[8].step_name == "coupling_characterization"
     assert steps[8].continue_on_failure is True
     assert result["kwargs"]["configuration_mode"] == "ge-ef-fh"
-    assert (
-        result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
-        == result["kwargs"]["configuration_mode"]
-    )
+    assert _configure_all_mode(result) == result["kwargs"]["configuration_mode"]
 
 
 def test_ge_only_characterization_uses_ge_configuration() -> None:
@@ -98,10 +95,7 @@ def test_ge_only_characterization_uses_ge_configuration() -> None:
     assert names(steps[3].tasks) == names(characterization_module.GE_CHARACTERIZATION_TASKS)
     assert all(call.on_failure is None for call in steps[3].tasks)
     assert result["kwargs"]["configuration_mode"] == "ge-cr-cr"
-    assert (
-        result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
-        == result["kwargs"]["configuration_mode"]
-    )
+    assert _configure_all_mode(result) == result["kwargs"]["configuration_mode"]
 
 
 def test_ef_characterization_without_fh_chevron_uses_ef_configuration(
@@ -126,10 +120,7 @@ def test_ef_characterization_without_fh_chevron_uses_ef_configuration(
     )
 
     assert result["kwargs"]["configuration_mode"] == "ge-ef-cr"
-    assert (
-        result["kwargs"]["task_parameters"]["ConfigureAll"]["run"]["configuration_mode"]
-        == "ge-ef-cr"
-    )
+    assert _configure_all_mode(result) == "ge-ef-cr"
 
 
 def test_coupling_characterization_does_not_imply_ef_calibration() -> None:
@@ -194,11 +185,16 @@ def _template_calls(result: dict[str, Any]) -> list[Any]:
     return [call for step in result["steps"] for call in getattr(step, "tasks", None) or ()]
 
 
+def _configure_all_mode(result: dict[str, Any]) -> Any:
+    (call,) = result["steps"][0].calls()
+    return call.run["configuration_mode"]["value"]
+
+
 @pytest.mark.parametrize(
     ("run_ef_characterization", "configuration_mode"),
     [(True, "ge-ef-fh"), (False, "ge-cr-cr")],
 )
-def test_characterization_keeps_only_the_configure_all_mode_as_a_task_default(
+def test_characterization_sets_the_configure_all_mode_on_its_call(
     run_ef_characterization: bool, configuration_mode: str
 ) -> None:
     result = characterization_module.characterization(
@@ -208,10 +204,12 @@ def test_characterization_keeps_only_the_configure_all_mode_as_a_task_default(
         run_ef_characterization=run_ef_characterization,
     )
 
-    # ConfigureAll is a step without a call list, so its mode stays a task default.
-    assert result["kwargs"]["task_parameters"] == {
-        "ConfigureAll": {"run": {"configuration_mode": configuration_mode}},
-    }
+    configure_all = result["steps"][0]
+    assert isinstance(configure_all, ConfigureAll)
+    assert [call.resolved_call_id for call in configure_all.calls()] == ["ConfigureAll"]
+    assert _configure_all_mode(result) == configuration_mode
+    # Every setting lives on a call; the template no longer passes per-task defaults.
+    assert "task_parameters" not in result["kwargs"]
     assert result["kwargs"]["configuration_mode"] == configuration_mode
     assert result["kwargs"]["default_run_parameters"] == {
         "readout_duration": 1024,
@@ -234,7 +232,7 @@ def test_characterization_calls_carry_their_acquisition_settings() -> None:
         *names(characterization_module.EF_CHARACTERIZATION_TASKS),
         *names(characterization_module.COUPLING_CHARACTERIZATION_TASKS),
     ]
-    runs = dict(effective_settings(calls, result["kwargs"]["task_parameters"]))
+    runs = dict(effective_settings(calls))
     # Every call sets its own shots and interval instead of inheriting the shared interval.
     for call_id, call_settings in runs.items():
         assert {"shots", "interval"} <= call_settings["run"].keys(), call_id
@@ -303,17 +301,10 @@ def test_characterization_task_parameters_match_task_specs() -> None:
     )
 
     registry = BaseTask.registry["qubex"]
-    task_parameters = result["kwargs"]["task_parameters"]
+    calls = [*result["steps"][0].calls(), *_template_calls(result)]
     checked = [
-        (f"task_parameters[{task_name!r}]", task_name, entry)
-        for task_name, entry in task_parameters.items()
-    ] + [
         (f"call {call_id!r}", call.name, call_settings)
-        for call, (call_id, call_settings) in zip(
-            _template_calls(result),
-            effective_settings(_template_calls(result), task_parameters),
-            strict=True,
-        )
+        for call, (call_id, call_settings) in zip(calls, effective_settings(calls), strict=True)
     ]
     for source, task_name, task_settings in checked:
         normalized = normalize_task_settings(task_name, task_settings)

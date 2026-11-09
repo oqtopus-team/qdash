@@ -118,7 +118,7 @@ def single_task_executor(
         project_id=project_id,
         backend_name=backend_name,
         default_run_parameters=default_run_parameters,
-        task_parameters=merge_task_parameters(
+        _task_defaults=merge_task_parameters(
             task_parameters_from_run_parameters(task_run_parameters),
             # Request overrides ({"input": ..., "run": ...}) apply to the requested task.
             normalize_task_parameters({task_name: parameter_overrides or {}}),

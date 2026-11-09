@@ -7,6 +7,6 @@
  */
 
 /**
- * Effective call settings (run, input, and update_calibration_parameters when set): the call's own settings over task_parameters. default_run_parameters and task declarations fill in the rest when the task runs.
+ * Effective call settings (run, input, and update_calibration_parameters when set): the call's own settings over the deprecated task_parameters. default_run_parameters and task declarations fill in the rest when the task runs.
  */
 export type ResolvedTaskCallSettings = { [key: string]: unknown };

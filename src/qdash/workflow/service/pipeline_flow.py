@@ -224,7 +224,7 @@ def calibration_pipeline(
         tags=all_tags,
         project_id=project_id,
         backend_name=backend_name,
-        task_parameters=parsed.canonical_task_parameters(),
+        _task_defaults=parsed.canonical_task_parameters(),
         default_run_parameters=parsed.default_run_parameters or None,
         note=pipeline_note(parsed, steps),
     )

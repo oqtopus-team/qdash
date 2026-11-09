@@ -56,19 +56,24 @@ def test_one_qubit_template_requires_explicit_targets(monkeypatch) -> None:
 
 def test_one_qubit_template_passes_template_task_lists(monkeypatch) -> None:
     from qdash.workflow.service.steps import FilterByStatus
-    from qdash.workflow.templates.coarse_one import COARSE_ONE_TASKS
-    from qdash.workflow.templates.fine_one import FINE_ONE_TASKS
 
-    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+    coarse_one_module = importlib.import_module("qdash.workflow.templates.coarse_one")
+    fine_one_module = importlib.import_module("qdash.workflow.templates.fine_one")
+    for module in (one_qubit_module, coarse_one_module, fine_one_module):
+        monkeypatch.setattr(module, "CalibService", FakeCalibService)
 
     result = one_qubit_module.one_qubit(username="alice", chip_id="64Q", mux_ids=[0])
+    coarse_step = coarse_one_module.coarse_one(username="alice", chip_id="64Q", mux_ids=[0])[
+        "steps"
+    ][0]
+    fine_step = fine_one_module.fine_one(username="alice", chip_id="64Q", mux_ids=[0])["steps"][0]
 
     steps = result["steps"]
     assert len(steps) == 3
     # The stages match coarse_one and fine_one call for call, settings included.
-    assert effective_settings(steps[0].tasks) == effective_settings(COARSE_ONE_TASKS)
+    assert effective_settings(steps[0].tasks) == effective_settings(coarse_step.tasks)
     assert isinstance(steps[1], FilterByStatus)
-    assert effective_settings(steps[2].tasks) == effective_settings(FINE_ONE_TASKS)
+    assert effective_settings(steps[2].tasks) == effective_settings(fine_step.tasks)
     assert "task_parameters" not in result["kwargs"]
 
 
@@ -221,3 +226,39 @@ def test_fine_one_requires_explicit_targets(monkeypatch) -> None:
     monkeypatch.setattr(fine_one_module, "CalibService", FakeCalibService)
     with pytest.raises(ValueError, match="mux_ids or qids is required"):
         fine_one_module.fine_one(username="alice", chip_id="64Q")
+
+
+def test_fine_one_names_every_call_after_its_round(monkeypatch) -> None:
+    fine_one_module = importlib.import_module("qdash.workflow.templates.fine_one")
+    monkeypatch.setattr(fine_one_module, "CalibService", FakeCalibService)
+
+    result = fine_one_module.fine_one(username="alice", chip_id="64Q", qids=["0"])
+
+    def pulse_round(round_name: str) -> list[str]:
+        return [
+            f"rabi_{round_name}",
+            f"hpi_create_{round_name}",
+            f"hpi_check_{round_name}",
+            f"pi_create_{round_name}",
+            f"pi_check_{round_name}",
+            f"drag_hpi_create_{round_name}",
+            f"drag_hpi_check_{round_name}",
+            f"drag_pi_create_{round_name}",
+            f"drag_pi_check_{round_name}",
+        ]
+
+    assert call_ids(result["steps"][0].calls()) == [
+        "configure_round1",
+        *pulse_round("round1"),
+        "readout_amplitude_round1",
+        "readout_frequency_round1",
+        "configure_round2",
+        *pulse_round("round2"),
+        "readout_amplitude_round2",
+        "readout_frequency_round2",
+        "configure_final",
+        *pulse_round("final"),
+        "ReadoutClassification",
+        "RandomizedBenchmarking",
+        "X90InterleavedRandomizedBenchmarking",
+    ]

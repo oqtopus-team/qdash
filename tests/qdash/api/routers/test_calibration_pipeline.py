@@ -115,13 +115,12 @@ def good_spec() -> dict[str, Any]:
                 "type": "CustomOneQubit",
                 "step_name": "coherence",
                 "tasks": [
-                    {"name": "CheckT1", "call_id": "t1_short"},
+                    {"name": "CheckT1", "call_id": "t1_short", "run": {"shots": 2048}},
                     {"name": "CheckT1", "call_id": "t1_long", "run": {"shots": 4096}},
                     {"name": "CheckT2Echo"},
                 ],
             },
         ],
-        "task_parameters": {"CheckT1": {"run": {"shots": 2048}}},
     }
 
 
@@ -169,7 +168,7 @@ class TestValidate:
             None,
             "coherence",
         ]
-        # Each call shows its effective settings: the call over task_parameters.
+        # Each call shows its effective settings.
         calls = data["steps"][2]["calls"]
         assert [(call["call_id"], call["on_failure"]) for call in calls] == [
             ("t1_short", "stop"),
@@ -272,6 +271,43 @@ class TestValidate:
         assert data["valid"] is False
         problems = {problem["path"]: problem["message"] for problem in data["problems"]}
         assert "configure=True already runs Configure" in problems["steps[0]"]
+
+    def test_deprecated_task_parameters_still_apply_with_a_warning(
+        self, test_client, chip, auth_headers
+    ):
+        spec = good_spec()
+        calls = spec["steps"][2]["tasks"]
+        calls[0] = {"name": "CheckT1", "call_id": "t1_short"}
+        calls[1]["update_calibration_parameters"] = True
+        spec["task_parameters"] = {
+            "CheckT1": {"run": {"shots": 2048}, "update_calibration_parameters": False}
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is True, data["problems"]
+        warnings = {warning["path"]: warning["message"] for warning in data["warnings"]}
+        assert list(warnings) == ["task_parameters"]
+        assert "deprecated" in warnings["task_parameters"]
+        assert "CheckT1" in warnings["task_parameters"]
+        # Same effective settings as before the deprecation: the default fills
+        # what a call omits, and a call's own values (including False/True) win.
+        settings = [call["settings"] for call in data["steps"][2]["calls"]]
+        assert settings[0] == {
+            "run": {"shots": {"value": 2048}},
+            "input": {},
+            "update_calibration_parameters": False,
+        }
+        assert settings[1] == {
+            "run": {"shots": {"value": 4096}},
+            "input": {},
+            "update_calibration_parameters": True,
+        }
+        # The normalized spec keeps the deprecated field, so the worker applies it.
+        assert data["spec"]["task_parameters"]["CheckT1"]["update_calibration_parameters"] is False
 
     def test_warnings_do_not_make_a_spec_invalid(self, test_client, chip, auth_headers):
         spec = good_spec()

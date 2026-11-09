@@ -15,6 +15,8 @@ from qdash.workflow.engine.config import CalibConfig
 from qdash.workflow.engine.orchestrator import CalibOrchestrator
 from qdash.workflow.engine.task.executor import TaskExecutor
 from qdash.workflow.engine.task_parameters import (
+    TASK_PARAMETERS_DEPRECATION,
+    TASK_RUN_PARAMETERS_DEPRECATION,
     merge_task_parameters,
     normalize_default_run_parameters,
     normalize_task_parameters,
@@ -379,7 +381,10 @@ class TestLegacyTaskRunParameters:
         }
 
     def test_resolve_warns_and_lets_task_parameters_win(self) -> None:
-        with pytest.warns(DeprecationWarning, match="task_run_parameters is deprecated"):
+        with (
+            pytest.warns(DeprecationWarning, match="task_run_parameters is deprecated"),
+            pytest.warns(DeprecationWarning, match="^task_parameters is deprecated"),
+        ):
             resolved = resolve_task_parameters(
                 {"CheckRabi": {"run": {"shots": 512}, "input": {"control_amplitude": 0.05}}},
                 {"CheckRabi": {"shots": {"value": 256}, "interval": {"value": 8}}},
@@ -392,9 +397,117 @@ class TestLegacyTaskRunParameters:
             }
         }
 
-    def test_resolve_without_legacy_form_does_not_warn(self, recwarn: Any) -> None:
-        resolve_task_parameters({"CheckRabi": {"run": {"shots": 512}}}, None)
+    def test_task_run_parameters_warning_points_to_task_call(self) -> None:
+        with pytest.warns(DeprecationWarning) as record:
+            resolve_task_parameters(None, {"CheckRabi": {"shots": {"value": 256}}})
 
+        assert [str(w.message) for w in record] == [TASK_RUN_PARAMETERS_DEPRECATION]
+        assert "TaskCall" in TASK_RUN_PARAMETERS_DEPRECATION
+        assert "use task_parameters" not in TASK_RUN_PARAMETERS_DEPRECATION
+
+
+class TestDeprecatedTaskParameters:
+    def test_task_parameters_warns_and_still_applies(self) -> None:
+        with pytest.warns(DeprecationWarning) as record:
+            resolved = resolve_task_parameters(
+                {"CheckRabi": {"run": {"shots": 512}, "update_calibration_parameters": False}},
+                None,
+            )
+
+        assert [str(w.message) for w in record] == [TASK_PARAMETERS_DEPRECATION]
+        assert "TaskCall" in TASK_PARAMETERS_DEPRECATION
+        assert resolved == {
+            "CheckRabi": {
+                "run": {"shots": {"value": 512}},
+                "input": {},
+                "update_calibration_parameters": False,
+            }
+        }
+
+    @pytest.mark.parametrize("task_parameters", [None, {}])
+    def test_empty_or_omitted_settings_do_not_warn(
+        self, task_parameters: dict[str, Any] | None, recwarn: Any
+    ) -> None:
+        assert resolve_task_parameters(task_parameters, {}) == {}
+
+        assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
+
+    def test_internal_task_defaults_do_not_warn_and_sit_below_public_layers(
+        self, recwarn: Any
+    ) -> None:
+        resolved = resolve_task_parameters(
+            None,
+            None,
+            task_defaults={"CheckRabi": {"run": {"shots": 512}, "input": {"control_amplitude": 1}}},
+        )
+
+        assert resolved == {
+            "CheckRabi": {"run": {"shots": {"value": 512}}, "input": {"control_amplitude": 1}}
+        }
+        assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
+
+        with pytest.warns(DeprecationWarning):
+            layered = resolve_task_parameters(
+                {"CheckRabi": {"input": {"control_amplitude": 2}}},
+                None,
+                task_defaults={
+                    "CheckRabi": {"run": {"shots": 512}, "input": {"control_amplitude": 1}}
+                },
+            )
+        assert layered["CheckRabi"] == {
+            "run": {"shots": {"value": 512}},
+            "input": {"control_amplitude": 2},
+        }
+
+    def test_calib_service_warning_points_at_the_workflow(self) -> None:
+        with pytest.warns(DeprecationWarning, match="^task_parameters is deprecated") as record:
+            CalibService(
+                "alice",
+                "chip-1",
+                backend_name="qubex",
+                project_id="project-1",
+                task_parameters={"CheckRabi": {"run": {"shots": 256}}},
+            )
+
+        assert record[0].filename == __file__
+
+    def test_task_call_first_calib_service_does_not_warn(self, recwarn: Any) -> None:
+        CalibService(
+            "alice",
+            "chip-1",
+            backend_name="qubex",
+            project_id="project-1",
+            default_run_parameters={"interval": 150 * 1024},
+        )
+
+        assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
+
+    def test_bundled_templates_do_not_pass_deprecated_task_settings(self) -> None:
+        from pathlib import Path
+
+        import qdash.workflow.templates as templates
+
+        (template_dir,) = templates.__path__
+        assert list(Path(template_dir).glob("characterization.py"))
+        offenders = [
+            path.name
+            for path in Path(template_dir).glob("*.py")
+            if "task_parameters=" in path.read_text() or "task_run_parameters=" in path.read_text()
+        ]
+        assert offenders == []
+
+    def test_calib_service_internal_defaults_do_not_warn(self, recwarn: Any) -> None:
+        service = CalibService(
+            "alice",
+            "chip-1",
+            backend_name="qubex",
+            project_id="project-1",
+            _task_defaults={"CheckRabi": {"run": {"shots": 256}}},
+        )
+
+        assert service.task_parameters == {
+            "CheckRabi": {"run": {"shots": {"value": 256}}, "input": {}}
+        }
         assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
 
 
@@ -486,7 +599,7 @@ class TestValidateTaskNames:
                 "chip-1",
                 backend_name="qubex",
                 project_id="project-1",
-                task_parameters={"CheckRabbi": {"run": {"shots": 256}}},
+                _task_defaults={"CheckRabbi": {"run": {"shots": 256}}},
             )
 
 

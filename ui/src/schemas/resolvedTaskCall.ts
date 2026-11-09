@@ -17,6 +17,6 @@ export interface ResolvedTaskCall {
   name: string;
   /** "stop" or "continue": what the target's later calls do if this one fails. */
   on_failure: string;
-  /** Effective call settings (run, input, and update_calibration_parameters when set): the call's own settings over task_parameters. default_run_parameters and task declarations fill in the rest when the task runs. */
+  /** Effective call settings (run, input, and update_calibration_parameters when set): the call's own settings over the deprecated task_parameters. default_run_parameters and task declarations fill in the rest when the task runs. */
   settings: ResolvedTaskCallSettings;
 }

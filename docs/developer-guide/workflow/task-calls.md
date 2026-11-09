@@ -81,13 +81,15 @@ task calls existed have no `invocation`.
 For one call, run and input values resolve from highest to lowest precedence:
 
 1. The call's `run` and `input`
-2. `CalibService(task_parameters=...)[task_name]`, the common per-task defaults
+2. The per-task defaults: a pipeline spec's `task_parameters`, or the deprecated
+   `CalibService(task_parameters=...)` argument, which
+   [migrate to the calls](#migrate-per-task-defaults)
 3. `default_run_parameters`, the shared run defaults
 4. The task's `run_spec` and input resolution
 
 `run` takes plain values, `{"value": ..., "value_type": ...}`, or the `sweep` helpers; `input`
 takes plain values. Normalization is `qdash.datamodel.task_settings`, the same code
-`task_parameters` uses. A field that is absent or `None` inherits from the next layer, so
+per-task defaults use. A field that is absent or `None` inherits from the next layer, so
 `update_calibration_parameters=None` keeps the per-task or workflow policy instead of resetting
 it. Engine and session constraints still apply to every layer; for example a call cannot set a
 `readout_duration` that differs from the Qubex session. See
@@ -223,9 +225,10 @@ Make these changes in every saved flow:
 4. Replace `stop_on_failure_tasks=(...)` with `on_failure="stop"` on each listed call; the step
    no longer accepts the argument. Calls without `on_failure` inherit the step's
    `continue_on_failure`, as described in [Failure Policy](#failure-policy).
-5. Keep `CalibService(task_parameters=...)` as the defaults for every call of a task. Move a
-   setting that applied to only one occurrence into that call's `run`, `input`, or
-   `update_calibration_parameters`; [Settings](#settings) gives the precedence.
+5. Move a setting that applied to only one occurrence into that call's `run`, `input`, or
+   `update_calibration_parameters`; [Settings](#settings) gives the precedence. Move the
+   deprecated `CalibService(task_parameters=...)` and `task_run_parameters` onto the calls as
+   described in [Migrate per-task defaults](#migrate-per-task-defaults).
 6. Replace reads of a target's raw result by task name, such as `data.raw["CheckT1"]`, with the
    ordered calls: `data.call(call_id)`, `data.latest_call(name)`, or `data.calls`, as described
    in [Results](#results).
@@ -237,6 +240,82 @@ Make these changes in every saved flow:
 Save each flow, run it on the Fake backend, and confirm the call ids and settings in
 **Execution** before running it on hardware. Results recorded before the
 upgrade stay readable and have no `invocation`.
+
+## Migrate per-task defaults
+
+`CalibService(task_parameters=...)` and `CalibService(task_run_parameters=...)` are deprecated.
+Each still applies with its previous precedence and emits a `DeprecationWarning` that names the
+workflow line passing it; a workflow that sets every value on its calls emits none. To migrate,
+merge each task's entry into every call of that task, keeping the call's own value wherever both
+set the same field:
+
+- A `run` or `input` value the call already sets stays; the call receives every other value of
+  the entry.
+- `update_calibration_parameters` copies to a call that leaves it unset, including `False`; a call
+  that sets `True` or `False` keeps it.
+- A field the entry omits stays omitted, so it keeps inheriting from `default_run_parameters`
+  and the task declaration.
+- `task_run_parameters` entries are run values, except `update_calibration_parameters`; apply
+  them first, then the `task_parameters` entry, which wins for a parameter both set.
+- `call_id`, `on_failure`, and the call order do not change, so filters, results, and the plan
+  keep their identities.
+
+Keep a value that several calls share in a local variable, and keep values shared by every task
+that declares them in `default_run_parameters`, which remains supported:
+
+```python
+# Before
+TASKS = [
+    TaskCall(name="CheckRamsey", call_id="ramsey_coarse", run={"detuning": 0.001}),
+    TaskCall(
+        name="CheckRamsey",
+        call_id="ramsey_fine",
+        run={"detuning": 0.0002},
+        update_calibration_parameters=True,
+    ),
+]
+cal = CalibService(
+    username,
+    chip_id,
+    task_parameters={
+        "CheckRamsey": {
+            "run": {"shots": 1024},
+            "input": {"control_amplitude": 0.05},
+            "update_calibration_parameters": False,
+        }
+    },
+    default_run_parameters={"interval": 150 * 1024},
+)
+
+# After: the same effective settings for both calls
+RAMSEY_RUN = {"shots": 1024}
+RAMSEY_INPUT = {"control_amplitude": 0.05}
+TASKS = [
+    TaskCall(
+        name="CheckRamsey",
+        call_id="ramsey_coarse",
+        run={**RAMSEY_RUN, "detuning": 0.001},
+        input=RAMSEY_INPUT,
+        update_calibration_parameters=False,
+    ),
+    TaskCall(
+        name="CheckRamsey",
+        call_id="ramsey_fine",
+        run={**RAMSEY_RUN, "detuning": 0.0002},
+        input=RAMSEY_INPUT,
+        update_calibration_parameters=True,
+    ),
+]
+cal = CalibService(username, chip_id, default_run_parameters={"interval": 150 * 1024})
+```
+
+A task that runs as its own step rather than from a `tasks` list takes its call on the step; for
+example `ConfigureAll(call=TaskCall(name="ConfigureAll", run={"configuration_mode": "ge-ef-cr"}))`
+replaces a `task_parameters` entry for `ConfigureAll`. The step still adds `mux_ids` from its
+targets. Compare each call's effective settings under **Execution** before and after the change.
+
+A pipeline spec's top-level `task_parameters` is deprecated in the same way; see
+[Calibration Pipeline Spec](./calibration-pipeline.md).
 
 ## Testing
 

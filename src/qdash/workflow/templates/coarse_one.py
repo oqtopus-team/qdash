@@ -24,29 +24,6 @@ from qdash.workflow.service.calib_service import (
 from qdash.workflow.service.steps import OneQubitCheck
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
-COARSE_ONE_TASKS: list[TaskCall] = [
-    # Apply the starting configuration before the readout search.
-    TaskCall(name="Configure", call_id="configure_initial"),
-    TaskCall(name="CheckCoarseReadoutParams"),
-    # Apply the updated readout settings before pulse calibration.
-    TaskCall(name="Configure", call_id="configure_readout"),
-    # Update control amplitude from the measured Rabi frequency.
-    TaskCall(name="CheckRabi", call_id="rabi_amplitude_update"),
-    # Measure again at the updated amplitude for HPI creation.
-    TaskCall(name="CheckRabi", call_id="rabi_at_updated_amplitude"),
-    TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
-    TaskCall(name="CheckHPIPulse"),
-    TaskCall(name="CreatePIPulse", run={"pi_duration": 32}),
-    TaskCall(name="CheckPIPulse"),
-    TaskCall(name="CreateDRAGHPIPulse", run={"drag_hpi_duration": 16}),
-    TaskCall(name="CheckDRAGHPIPulse"),
-    TaskCall(name="CreateDRAGPIPulse", run={"drag_pi_duration": 24}),
-    TaskCall(name="CheckDRAGPIPulse"),
-    TaskCall(name="CheckT1"),
-    TaskCall(name="CheckT2Echo"),
-    TaskCall(name="CheckRamsey"),
-]
-
 
 @flow(
     on_cancellation=[on_flow_cancellation],
@@ -86,7 +63,33 @@ def coarse_one(
     else:
         raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
-    steps = [OneQubitCheck(mode="synchronized", tasks=COARSE_ONE_TASKS)]
+    steps = [
+        OneQubitCheck(
+            mode="synchronized",
+            tasks=[
+                # Apply the starting configuration before the readout search.
+                TaskCall(name="Configure", call_id="configure_initial"),
+                TaskCall(name="CheckCoarseReadoutParams"),
+                # Apply the updated readout settings before pulse calibration.
+                TaskCall(name="Configure", call_id="configure_readout"),
+                # Update control amplitude from the measured Rabi frequency.
+                TaskCall(name="CheckRabi", call_id="rabi_amplitude_update"),
+                # Measure again at the updated amplitude for HPI creation.
+                TaskCall(name="CheckRabi", call_id="rabi_at_updated_amplitude"),
+                TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
+                TaskCall(name="CheckHPIPulse"),
+                TaskCall(name="CreatePIPulse", run={"pi_duration": 32}),
+                TaskCall(name="CheckPIPulse"),
+                TaskCall(name="CreateDRAGHPIPulse", run={"drag_hpi_duration": 16}),
+                TaskCall(name="CheckDRAGHPIPulse"),
+                TaskCall(name="CreateDRAGPIPulse", run={"drag_pi_duration": 24}),
+                TaskCall(name="CheckDRAGPIPulse"),
+                TaskCall(name="CheckT1"),
+                TaskCall(name="CheckT2Echo"),
+                TaskCall(name="CheckRamsey"),
+            ],
+        )
+    ]
 
     cal = CalibService(
         username,

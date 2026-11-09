@@ -1,7 +1,11 @@
 """Task-scoped parameter settings for workflows.
 
 ``task_parameters`` maps a task name to the settings that apply to every call of
-that task in a workflow (the common per-task defaults)::
+that task in a workflow (the common per-task defaults). Workflows set these
+settings on each ``TaskCall`` instead; passing ``task_parameters`` to
+``CalibService`` is deprecated but still applies. The mapping itself remains the
+internal form that carries resolved defaults to pipeline, worker and single-task
+sessions::
 
     {
         "CheckAdaptiveChevron": {
@@ -61,22 +65,42 @@ __all__ = [
 ]
 
 
+TASK_PARAMETERS_DEPRECATION = (
+    "task_parameters is deprecated; set run, input and update_calibration_parameters "
+    "on each TaskCall instead (reuse shared values through local variables, and "
+    "default_run_parameters for run values every task shares). task_parameters still "
+    "applies until it is removed."
+)
+TASK_RUN_PARAMETERS_DEPRECATION = (
+    "task_run_parameters is deprecated; set run and update_calibration_parameters on "
+    "each TaskCall instead (default_run_parameters for run values every task shares). "
+    "task_run_parameters still applies until it is removed."
+)
+
+
 def resolve_task_parameters(
     task_parameters: Mapping[str, Any] | None,
     task_run_parameters: Mapping[str, Any] | None,
+    *,
+    task_defaults: Mapping[str, Any] | None = None,
+    stacklevel: int = 3,
 ) -> dict[str, dict[str, Any]]:
-    """Combine ``task_parameters`` with the deprecated ``task_run_parameters``.
+    """Combine the per-task defaults a workflow passes to ``CalibService``.
 
-    ``task_parameters`` takes precedence for any parameter set in both.
+    ``task_parameters`` and the older flat ``task_run_parameters`` are deprecated
+    public arguments: each emits a ``DeprecationWarning`` when non-empty but keeps
+    its effect. ``task_defaults`` is the internal form that pipeline, isolated
+    worker and single-task sessions use to carry already-resolved defaults; it
+    does not warn. Later layers win per parameter: ``task_defaults``, then
+    ``task_run_parameters``, then ``task_parameters``. ``stacklevel`` points the
+    warnings at the caller of ``CalibService``.
     """
     if task_run_parameters:
-        warnings.warn(
-            "task_run_parameters is deprecated; use task_parameters="
-            '{"<task>": {"run": {...}, "input": {...}}} instead',
-            DeprecationWarning,
-            stacklevel=3,
-        )
+        warnings.warn(TASK_RUN_PARAMETERS_DEPRECATION, DeprecationWarning, stacklevel=stacklevel)
+    if task_parameters:
+        warnings.warn(TASK_PARAMETERS_DEPRECATION, DeprecationWarning, stacklevel=stacklevel)
     return merge_task_parameters(
+        normalize_task_parameters(task_defaults),
         task_parameters_from_run_parameters(task_run_parameters),
         normalize_task_parameters(task_parameters),
     )
