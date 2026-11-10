@@ -464,6 +464,71 @@ class CRScheduler:
             mux_conflict_map=mux_conflict_map,
         )
 
+    def schedule_pairs(
+        self,
+        pairs: list[tuple[str, str]],
+        max_parallel_ops: int = 10,
+        coloring_strategy: str = "largest_first",
+    ) -> CRScheduleResult:
+        """Group explicit directed pairs into parallel groups under MUX constraints.
+
+        Unlike :meth:`generate`, no pair is added, dropped or reversed: every
+        ``(control, target)`` pair must be a chip coupling with that exact ID and
+        both qubits must be wired. Pairs sharing a qubit or conflicting MUXes run
+        in different groups.
+
+        Raises:
+            ValueError: If ``pairs`` is empty, duplicated, or names an unknown
+                coupling or an unwired qubit.
+        """
+        cr_pairs = [f"{control}-{target}" for control, target in pairs]
+        if not cr_pairs:
+            raise ValueError("No coupling pairs to schedule")
+        if len(cr_pairs) != len(set(cr_pairs)):
+            raise ValueError("Coupling pairs must not contain duplicates")
+
+        known = set(self._get_two_qubit_pair_list())
+        unknown = [pair for pair in cr_pairs if pair not in known]
+        if unknown:
+            raise ValueError(f"Coupling pairs not found on chip {self.chip_id}: {unknown}")
+
+        wiring_config = self._load_wiring_config()
+        mux_conflict_map = build_mux_conflict_map(wiring_config)
+        qid_to_mux = build_qubit_to_mux_map(wiring_config)
+        unwired = [pair for pair in cr_pairs if any(q not in qid_to_mux for q in pair.split("-"))]
+        if unwired:
+            raise ValueError(f"Coupling pairs with qubits missing from the wiring: {unwired}")
+
+        fast, slow = split_fast_slow_pairs(cr_pairs, qid_to_mux)
+        grouped = group_cr_pairs_by_conflict(
+            fast, qid_to_mux, mux_conflict_map, max_parallel_ops, coloring_strategy
+        ) + group_cr_pairs_by_conflict(
+            slow, qid_to_mux, mux_conflict_map, max_parallel_ops, coloring_strategy
+        )
+        parallel_groups = convert_to_parallel_groups(grouped)
+        logger.info(
+            f"Scheduled {len(cr_pairs)} selected pairs in {len(parallel_groups)} groups "
+            f"(fast={len(fast)}, slow={len(slow)})"
+        )
+        metadata = {
+            "total_pairs": len(cr_pairs),
+            "scheduled_pairs": sum(len(g) for g in parallel_groups),
+            "fast_pairs": len(fast),
+            "slow_pairs": len(slow),
+            "num_groups": len(parallel_groups),
+            "max_parallel_ops": max_parallel_ops,
+            "coloring_strategy": coloring_strategy,
+            "direction_method": "explicit",
+        }
+        return CRScheduleResult(
+            parallel_groups=parallel_groups,
+            metadata=metadata,
+            filtering_stats={"selected_pairs": len(cr_pairs), "direction_method": "explicit"},
+            cr_pairs_string=cr_pairs,
+            qid_to_mux=qid_to_mux,
+            mux_conflict_map=mux_conflict_map,
+        )
+
     def generate(
         self,
         candidate_qubits: list[str] | None = None,

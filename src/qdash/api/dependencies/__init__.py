@@ -585,6 +585,7 @@ def get_flow_service() -> "FlowService":
     return FlowService(
         flow_repository=get_flow_repository(),
         execution_lock_repository=get_execution_lock_repository(),
+        chip_repository=get_chip_repository(),
     )
 
 

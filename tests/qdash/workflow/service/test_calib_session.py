@@ -1417,6 +1417,25 @@ def test_pipeline_plan_includes_later_configuration_and_schedule(pipeline_wiring
     }
 
 
+def test_coupling_override_plans_only_the_selected_pairs(pipeline_wiring):
+    """A source schedule replaced by a pair override no longer reserves its qubits."""
+    from qdash.datamodel.flow_targets import FlowTargetOverride
+    from qdash.workflow.service.flow_targets import override_pipeline
+    from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
+    from qdash.workflow.service.steps import SetCRSchedule, TwoQubitCalibration
+    from qdash.workflow.service.targets import CouplingTargets
+
+    targets, steps = override_pipeline(
+        CouplingTargets([("8", "12")]),
+        [SetCRSchedule(schedule=[[("8", "12")]]), TwoQubitCalibration()],
+        FlowTargetOverride(coupling_pairs=[["1", "0"]]),
+        lambda pairs: [pairs],
+    )
+    scope = plan_pipeline_resources("chip-1", targets, steps)
+    assert not scope.exclusive
+    assert {r for r in scope.resources if r.startswith("mux:")} == {"mux:0"}
+
+
 def test_unknown_step_plan_is_chip_exclusive(pipeline_wiring):
     from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
 

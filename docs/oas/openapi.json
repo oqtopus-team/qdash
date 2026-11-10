@@ -22734,6 +22734,27 @@
             ],
             "title": "Qids"
           },
+          "coupling_pairs": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  "type": "array",
+                  "maxItems": 2,
+                  "minItems": 2
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coupling Pairs",
+            "description": "Directed [control, target] qubit pairs; parallel groups are scheduled automatically"
+          },
           "exclude_qids": {
             "items": {
               "type": "string",
@@ -23832,6 +23853,19 @@
               }
             ],
             "description": "Statically resolved source targets; null when dynamic or ambiguous"
+          },
+          "target_modes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "mux_ids",
+                "qids",
+                "coupling_pairs"
+              ]
+            },
+            "type": "array",
+            "title": "Target Modes",
+            "description": "Target override types this flow accepts for one execution"
           },
           "name": {
             "type": "string",
