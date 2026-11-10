@@ -375,7 +375,7 @@ class FlowService:
             mode = "mux_ids" if request.target_override.mux_ids is not None else "qids"
             # Templates may validate targets before creating CalibService. Pass
             # them (and clear the other mode) only when the flow can receive
-            # this mode; otherwise saved parameters stay and CalibService
+            # this mode; otherwise saved parameters stay and CalibService.run
             # applies the override from the run context.
             if mode in accepted:
                 parameters.update(

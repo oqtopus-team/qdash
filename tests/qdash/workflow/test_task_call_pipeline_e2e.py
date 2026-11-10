@@ -75,21 +75,14 @@ def _fail_fine_ramsey_on(monkeypatch: pytest.MonkeyPatch, failing_qid: str) -> N
     monkeypatch.setattr(CheckRamsey, "postprocess", postprocess)
 
 
-def _service(**kwargs: Any) -> Any:
-    from qdash.workflow.service import CalibService
+def _service() -> Any:
+    from qdash.workflow.service import CalibService, resolve_calib_context
 
-    # The deprecated per-task default still reaches every call that omits shots.
-    with pytest.warns(DeprecationWarning, match="^task_parameters is deprecated"):
-        return CalibService(
-            USERNAME,
-            CHIP_ID,
-            backend_name="fake",
-            project_id=PROJECT_ID,
-            enable_github=False,
-            flow_name="ramsey_twice",
-            task_parameters={"CheckRamsey": {"run": {"shots": 256}}},
-            **kwargs,
-        )
+    # The public direct-Python path: a checked context on the fake backend.
+    context = resolve_calib_context(USERNAME, CHIP_ID, project_id=PROJECT_ID, backend="fake")
+    return CalibService.from_context(
+        context, flow_name="ramsey_twice", default_run_parameters={"shots": 256}
+    )
 
 
 def _steps() -> list[Any]:
@@ -149,7 +142,7 @@ def test_repeated_calls_in_one_step_are_traceable_end_to_end(
     for qid in QIDS:
         coarse = by_call[(qid, "ramsey_coarse")]
         fine = by_call[(qid, "ramsey_fine")]
-        # Each call ran with its own settings over the shared per-task default.
+        # Each call ran with its own settings over the shared run default.
         assert coarse.run_parameters["detuning"]["value"] == COARSE["detuning"]
         assert fine.run_parameters["detuning"]["value"] == FINE["detuning"]
         assert list(fine.run_parameters["time_range"]["value"]) == [0, 50_001, 500]
@@ -219,7 +212,13 @@ def test_repeated_calls_in_one_step_are_traceable_end_to_end(
     from qdash.workflow.service.steps import CustomOneQubit
     from qdash.workflow.service.targets import QubitTargets as Targets
 
-    replay = _service(source_execution_id=ramsey_execution.execution_id)
+    # A flow that declares source_execution_id restores from it, as the flow run
+    # parameter would supply it.
+    monkeypatch.setattr(
+        "qdash.workflow.service._internal.runs.read_source_execution_id_from_context",
+        lambda: ramsey_execution.execution_id,
+    )
+    replay = _service()
     replay.run(
         Targets(qids=["0"]),
         steps=[

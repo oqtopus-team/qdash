@@ -22,17 +22,39 @@ fake_backend_module = importlib.import_module("qdash.workflow.templates.fake_bac
 
 
 class RecordingCalibService:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.args = args
+    def __init__(self, context: Any, **kwargs: Any) -> None:
+        self.context = context
         self.kwargs = kwargs
 
+    @classmethod
+    def from_context(cls, context: Any, **kwargs: Any) -> RecordingCalibService:
+        return cls(context, **kwargs)
+
     def run(self, targets: Any, *, steps: list[Any]) -> dict[str, Any]:
-        return {"targets": targets, "steps": steps}
+        return {"targets": targets, "steps": steps, "context": self.context}
 
 
 @pytest.fixture(autouse=True)
 def recording_calib_service(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fake_backend_module, "CalibService", RecordingCalibService)
+    monkeypatch.setattr(
+        fake_backend_module,
+        "resolve_calib_context",
+        lambda username, chip_id, **kwargs: {"username": username, "chip_id": chip_id, **kwargs},
+    )
+
+
+def test_the_backend_choice_is_part_of_the_resolved_context() -> None:
+    result = fake_backend_module.fake_calibration(
+        username="alice", chip_id="fake-64q", backend_name="fake", project_id="p"
+    )
+
+    assert result["context"] == {
+        "username": "alice",
+        "chip_id": "fake-64q",
+        "project_id": "p",
+        "backend": "fake",
+    }
 
 
 def test_defaults_to_mux_0_to_15_scheduled_like_hardware() -> None:

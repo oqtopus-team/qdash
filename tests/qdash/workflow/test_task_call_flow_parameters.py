@@ -112,3 +112,13 @@ def test_task_names_unknown_fields_and_unnamed_repeats_are_rejected(
     assert result["names_rejected_by_schema"] is True
     assert result["unknown_field_rejected_by_flow"] is True
     assert "give every occurrence its own call_id" in result["duplicate_error"]
+
+
+def test_worker_specs_cross_prefect_and_process_boundaries(contract: dict[str, Any]) -> None:
+    """Workers receive the owner's settings through real Prefect validation and pickling."""
+    assert contract["worker_spec"] == {
+        "validated_equal": True,
+        "json_validated_equal": True,
+        "cloudpickle_equal": True,
+        "hashable": True,
+    }

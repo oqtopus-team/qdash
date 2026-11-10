@@ -36,29 +36,30 @@ def test_bringup_starts_with_measurements(monkeypatch) -> None:
 
 
 def test_bringup_step_accepts_resonator_assignment_order() -> None:
+    from qdash.datamodel.task_call import TaskCall
     from qdash.workflow.service.steps import BringUp
 
-    service = type(
-        "Service",
-        (),
-        {
-            "default_run_parameters": {"interval": {"value": 1, "value_type": "int"}},
-            "task_parameters": {},
-        },
-    )()
     step = BringUp(mode="scheduled", resonator_assignment_order=[0, 3, 1, 2])
 
-    step._apply_resonator_assignment_order(service)
-
-    assert service.default_run_parameters == {
-        "interval": {"value": 1, "value_type": "int"},
-    }
-    assert service.task_parameters == {
-        "CheckResonatorSpectroscopy": {
-            "run": {"resonator_assignment_order": {"value": [0, 3, 1, 2]}},
-            "input": {},
-        },
-    }
+    resonator = [call for call in step.calls() if call.name == "CheckResonatorSpectroscopy"]
+    assert resonator
+    assert all(
+        call.settings()["run"]["resonator_assignment_order"] == {"value": [0, 3, 1, 2]}
+        for call in resonator
+    )
+    assert all(
+        "resonator_assignment_order" not in (call.run or {})
+        for call in step.calls()
+        if call.name != "CheckResonatorSpectroscopy"
+    )
+    # A call's own order takes precedence over the step's.
+    own = BringUp(
+        tasks=[
+            TaskCall(name="CheckResonatorSpectroscopy", run={"resonator_assignment_order": [1]})
+        ],
+        resonator_assignment_order=[0, 3, 1, 2],
+    )
+    assert own.calls()[0].settings()["run"]["resonator_assignment_order"] == {"value": [1]}
 
 
 def test_bringup_template_passes_template_task_list(monkeypatch) -> None:

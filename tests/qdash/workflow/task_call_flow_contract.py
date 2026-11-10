@@ -30,6 +30,8 @@ from prefect.utilities.callables import parameter_schema
 from prefect.utilities.schema_tools import validate
 
 from qdash.api.schemas.flow import ExecuteFlowRequest
+from qdash.datamodel.task_call import StepCalls
+from qdash.workflow.service._internal.settings import WorkerSpec
 
 CALLS: list[dict[str, Any]] = [
     {
@@ -58,6 +60,10 @@ TEMPLATES: dict[str, tuple[str, dict[str, Any]]] = {
 class _RecordingCalibService:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
+
+    @classmethod
+    def from_context(cls, *args: Any, **kwargs: Any) -> _RecordingCalibService:
+        return cls()
 
     def run(self, targets: Any, *, steps: list[Any]) -> list[Any]:
         return steps
@@ -95,6 +101,8 @@ def check(module_name: str, function: str, required: dict[str, Any]) -> dict[str
     flow = getattr(module, function)
     assert isinstance(flow, Flow), f"{module_name}.{function} is not a Prefect flow"
     module.CalibService = _RecordingCalibService  # type: ignore[attr-defined]
+    if hasattr(module, "resolve_calib_context"):
+        module.resolve_calib_context = lambda *args, **kwargs: None  # type: ignore[attr-defined]
     schema = parameter_schema(flow.fn).model_dump_for_openapi()
     base = {"username": "alice", "chip_id": "64Q", **required}
 
@@ -136,12 +144,68 @@ def check(module_name: str, function: str, required: dict[str, Any]) -> dict[str
     }
 
 
+def worker_spec_contract() -> dict[str, Any]:
+    """A WorkerSpec crosses the Prefect flow and Dask process boundaries unchanged."""
+    import cloudpickle
+    from prefect import flow
+    from prefect.utilities.hashing import hash_objects
+
+    from qdash.datamodel.task_call import TaskCall as Call
+    from qdash.datamodel.task_call import normalize_calls
+    from qdash.workflow.service._internal.settings import (
+        ReservationScope,
+        SessionSettings,
+        SnapshotSource,
+        WorkerLease,
+    )
+
+    spec = WorkerSpec(
+        settings=SessionSettings(
+            username="alice",
+            chip_id="64Q",
+            project_id="project-1",
+            backend_name="fake",
+            task_defaults={"CheckRabi": {"run": {"shots": 256}}},
+            snapshot=SnapshotSource(
+                execution_id="exec-src", task_id="task-src", exempt_tasks=frozenset({"Configure"})
+            ),
+            force_update_params=True,
+        ).for_worker(),
+        lease=WorkerLease(
+            execution_id="exec-1",
+            reservation=ReservationScope(chip_id="64Q", resources=("mux:0",)),
+        ),
+    )
+    plan = StepCalls(step_id="step", calls=normalize_calls([Call(name="CheckRabi")]))
+
+    # Annotated like the worker flows in scheduling_tasks: resolved from module globals.
+    @flow
+    def borrow(worker: WorkerSpec, plan: StepCalls) -> WorkerSpec:
+        return worker
+
+    validated = borrow.validate_parameters({"worker": spec, "plan": plan})
+    from_json = borrow.validate_parameters(
+        {"worker": spec.model_dump(mode="json"), "plan": plan.model_dump(mode="json")}
+    )
+    return {
+        "validated_equal": validated["worker"] == spec,
+        "json_validated_equal": from_json["worker"] == spec,
+        "cloudpickle_equal": cloudpickle.loads(cloudpickle.dumps(spec)) == spec,
+        "hashable": hash_objects(spec, plan) is not None,
+    }
+
+
 def main() -> None:
     results = {
         module: check(module, function, required)
         for module, (function, required) in TEMPLATES.items()
     }
-    print(json.dumps({"calls": CALLS, "templates": results}, default=str))
+    print(
+        json.dumps(
+            {"calls": CALLS, "templates": results, "worker_spec": worker_spec_contract()},
+            default=str,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -47,7 +47,7 @@ from typing import Any
 from prefect import flow
 
 from qdash.workflow import TaskCall
-from qdash.workflow.service import CalibService
+from qdash.workflow.service import CalibService, resolve_calib_context
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
     on_flow_crashed,
@@ -133,12 +133,8 @@ def fake_calibration(
         CustomOneQubit(step_name="calibration", tasks=tasks, mode=mode),
     ]
 
-    cal = CalibService(
-        username,
-        chip_id,
-        backend_name=backend_name,
-        flow_name=flow_name,
-        tags=tags,
-        project_id=project_id,
-    )
+    # The backend is part of the execution context; the default comes from
+    # config/app/backend.yaml.
+    context = resolve_calib_context(username, chip_id, project_id=project_id, backend=backend_name)
+    cal = CalibService.from_context(context, flow_name=flow_name, tags=tags)
     return cal.run(targets, steps=steps)

@@ -274,7 +274,8 @@ def characterization(
     else:
         configuration_mode = "ge-cr-cr"
 
-    # Configure the selected MUXes once; isolated workers inherit the same logical layout.
+    # Configure the selected MUXes once; later steps and their isolated workers
+    # run in the layout this ConfigureAll call selects.
     steps: list[Step] = [
         ConfigureAll(
             call=TaskCall(name="ConfigureAll", run={"configuration_mode": configuration_mode})
@@ -342,7 +343,6 @@ def characterization(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        configuration_mode=configuration_mode,
         default_run_parameters={
             "readout_duration": 1024,
             "interval": STANDARD_INTERVAL,

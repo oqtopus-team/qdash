@@ -209,9 +209,9 @@ Run settings that every task shares, such as `interval`, belong in the workflow'
 `default_run_parameters`.
 
 Older workflows may pass `task_parameters` or `task_run_parameters` to `CalibService` to give every
-call of a task the same settings. Both are deprecated. They still apply, under each call's own
-settings, and emit a Python `DeprecationWarning`, which pytest and `python -W default` display. To remove them, copy each task's settings
-into every call of that task, keeping any value the call already sets, as
+call of a task the same settings. QDash no longer accepts them, and such a workflow fails before
+it measures, with an error that names the argument. To fix it, copy each task's settings into
+every call of that task, keeping any value the call already sets, as
 [Migrate per-task defaults](../developer-guide/workflow/task-calls.md#migrate-per-task-defaults)
 shows.
 

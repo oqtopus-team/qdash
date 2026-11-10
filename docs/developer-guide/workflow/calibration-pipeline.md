@@ -107,7 +107,7 @@ Readers that want the whole run use that field rather than the first execution's
 | --- | --- |
 | `src/qdash/datamodel/calibration_pipeline.py` | The spec models, the step catalog (`STEP_CATALOG`), the default call lists, the step-order and reference checks, and `migrate_pipeline_spec`. Free of workflow imports so the API can validate without a Prefect runtime |
 | `src/qdash/datamodel/task_call.py` | `TaskCall`, `TaskSettings`, and call id rules, shared with Python flows |
-| `src/qdash/workflow/service/pipeline_flow.py` | The `calibration-pipeline` system flow: converts a queued version 1 spec, builds Step and Target objects, and calls `CalibService.run` |
+| `src/qdash/workflow/service/pipeline_flow.py` | The `calibration-pipeline` system flow: converts a queued version 1 spec, builds Step and Target objects, checks the context, and runs them like `CalibService.run` with the request's backend and the spec's per-task defaults |
 | `src/qdash/workflow/register_system_flows.py` | Registers `system-calibration-pipeline` on worker startup |
 | `src/qdash/api/services/calibration_pipeline_service.py` | Version handling, chip, backend, and task-type checks, resolved calls, warnings; the catalog |
 | `src/qdash/api/services/calibration_pipeline_preflight.py` | The preflight checks: run and input names and types, batch inputs, the session readout duration, required inputs, and the Rabi readout duration |

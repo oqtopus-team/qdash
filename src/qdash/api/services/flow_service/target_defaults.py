@@ -9,7 +9,6 @@ from pydantic import ValidationError
 from qdash.datamodel.flow_targets import FlowTargetOverride
 
 _OVERRIDABLE_TARGETS = {"MuxTargets", "QubitTargets"}
-_TARGET_CALLS = {*_OVERRIDABLE_TARGETS, "CalibService"}
 
 
 class _Unknown(Exception):
@@ -42,6 +41,20 @@ def _call_name(node: ast.Call) -> str:
     if isinstance(node.func, ast.Attribute):
         return node.func.attr
     return ""
+
+
+def _is_service(node: ast.expr) -> bool:
+    """``CalibService(...)`` or ``CalibService.from_context(...)``."""
+    if not isinstance(node, ast.Call):
+        return False
+    if _call_name(node) == "CalibService":
+        return True
+    func = node.func
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr == "from_context"
+        and _call_name(ast.Call(func=func.value, args=[], keywords=[])) == "CalibService"
+    )
 
 
 def _root_name(node: ast.expr) -> str | None:
@@ -115,10 +128,9 @@ class _Resolver:
         with suppress(_Unknown):
             self.bindings[name] = self.literal(value)
         if isinstance(value, ast.Call):
-            call = _call_name(value)
-            if call in _OVERRIDABLE_TARGETS:
+            if _call_name(value) in _OVERRIDABLE_TARGETS:
                 self.target_names.add(name)
-            elif call == "CalibService":
+            elif _is_service(value):
                 self.service_names.add(name)
 
     def bind(self, statement: ast.stmt) -> None:
@@ -145,11 +157,7 @@ class _Resolver:
         self.invalidate_writes(item.context_expr)
         if item.optional_vars is not None:
             self.invalidate_writes(item.optional_vars)
-        if (
-            isinstance(item.optional_vars, ast.Name)
-            and isinstance(item.context_expr, ast.Call)
-            and _call_name(item.context_expr) == "CalibService"
-        ):
+        if isinstance(item.optional_vars, ast.Name) and _is_service(item.context_expr):
             self.service_names.add(item.optional_vars.id)
 
     def truth(self, test: ast.expr) -> bool:
@@ -191,7 +199,7 @@ class _Resolver:
                     root = _root_name(node.func.value)
                     if root is not None:
                         self.invalidate(root)
-                if _call_name(node) not in _TARGET_CALLS:
+                if _call_name(node) not in _OVERRIDABLE_TARGETS and not _is_service(node):
                     for argument in [*node.args, *(kw.value for kw in node.keywords)]:
                         root = _root_name(argument)
                         if root is not None:
@@ -230,8 +238,8 @@ def _resolve(
         if node is function:
             continue
         for child in ast.walk(node):
-            if isinstance(child, ast.Call) and _call_name(child).endswith(
-                ("Targets", "CalibService")
+            if isinstance(child, ast.Call) and (
+                _call_name(child).endswith("Targets") or _is_service(child)
             ):
                 raise _Unknown
 
@@ -317,7 +325,7 @@ def _candidate(node: ast.Call, resolver: _Resolver) -> FlowTargetOverride | None
         if isinstance(target, ast.Name) and target.id in resolver.target_names:
             return None
         raise _Unknown
-    if name not in _TARGET_CALLS:
+    if name not in _OVERRIDABLE_TARGETS:
         return None
     if any(isinstance(arg, ast.Starred) for arg in node.args) or any(
         kw.arg is None for kw in node.keywords
@@ -330,19 +338,14 @@ def _candidate(node: ast.Call, resolver: _Resolver) -> FlowTargetOverride | None
             keywords.setdefault(key, arg)
     elif name == "QubitTargets" and node.args:
         keywords.setdefault("qids", node.args[0])
-    elif name == "CalibService" and len(node.args) > 2:
-        keywords.setdefault("qids", node.args[2])
 
     values: dict[str, Any] = {}
     for key, expression in keywords.items():
-        normalized = "mux_ids" if key == "muxes" else key
-        if normalized not in {"mux_ids", "qids", "exclude_qids"}:
+        if key not in {"mux_ids", "qids", "exclude_qids"}:
             continue
         value = resolver.literal(expression)
         if value is not None:
-            values[normalized] = value
+            values[key] = value
     if not (values.get("mux_ids") or values.get("qids")):
-        if name in _OVERRIDABLE_TARGETS:
-            raise _Unknown
-        return None
+        raise _Unknown
     return FlowTargetOverride.model_validate(values)

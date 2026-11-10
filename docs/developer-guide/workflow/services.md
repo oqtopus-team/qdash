@@ -12,11 +12,94 @@ connects dispatched flow runs to QDash execution history, hardware reservations,
 | `deployment-service` | Import validation and Prefect deployment or schedule mutations | QDash project authorization |
 | `prefect-server` | Prefect flows, deployments, schedules, run states, and queues | QDash calibration records |
 | `user-flow-worker` | Polling `user-flows-pool` and running deployment entrypoints | Flow persistence or API authorization |
-| `CalibService` | In-process pipeline, execution, reservation, and terminal lifecycle | Deployment registration |
+| `CalibService` | The workflow author's contract: a checked context, run metadata, and `run(targets, steps)` | Execution IDs, reservations, workers, or cleanup |
+| `CalibSession` | In-process pipeline, execution, reservation, worker, and terminal lifecycle | Deployment registration or project authorization |
 
 The API is the authority for project context and QDash metadata. Prefect is the orchestration
 authority. MongoDB execution documents remain the QDash-facing history even though each record can
 carry a Prefect `flow_run_id`.
+
+## Workflow Author Contract
+
+`CalibService` takes only what a workflow author decides: a checked execution context, run
+metadata (`flow_name`, `tags`, `note`), and `default_run_parameters`. Targets go to
+`run(targets, steps)`; per-call settings go to each `TaskCall`. QDash owns everything else:
+execution IDs, hardware reservations, worker sessions, snapshot restoration, GitHub
+synchronization, and closing every Execution on success, failure, or cancellation. There is no
+`finish_calibration()` to call, and one service can run several times.
+
+A context names the user, chip, project, and backend of a run. `resolve_calib_context()` in
+`service/context.py` builds it and applies the API's project rule: the user must exist, be
+enabled, and hold an active `owner` or `editor` membership, or own the project. Without
+`project_id` it uses the user's `default_project_id`. `CalibContext` cannot be constructed
+directly, so an unchecked project ID never reaches a session.
+
+| Entry | Use | Context |
+| --- | --- | --- |
+| `CalibService(username, chip_id, project_id=..., flow_name=...)` | Prefect flows that QDash starts; the API injects these parameters | Resolved by the constructor on the configured default backend |
+| `CalibService.from_context(resolve_calib_context(username, chip_id, project_id=..., backend="fake"), ...)` | Direct Python, and flows that choose a backend, such as `templates/fake_backend.py` | Resolved by the caller |
+
+The worker re-checks the injected context, so a schedule created by a user who later lost
+write access fails before any session opens. A flow that declares a `source_execution_id`
+parameter restores snapshot parameters from that execution; see
+[Parameter Resolution](./parameter-resolution.md#snapshot-re-execution).
+
+The constructor rejects every removed argument with a `TypeError` that names its migration:
+
+| Removed argument | Migration |
+| --- | --- |
+| `qids`, `muxes` (also positional) | `cal.run(QubitTargets(qids), steps)` or `cal.run(MuxTargets(mux_ids), steps)` |
+| `task_parameters`, `task_run_parameters` | Set `run`, `input`, and `update_calibration_parameters` on each `TaskCall`; see [Task Calls](./task-calls.md#migrate-per-task-defaults) |
+| `name` | `flow_name` |
+| `backend_name` | `resolve_calib_context(..., backend=...)` with `CalibService.from_context()` |
+| `configuration_mode` | Put a `ConfigureAll` step whose call sets `run={"configuration_mode": ...}` first; see [Configuration mode and GitHub policy](#configuration-mode-and-github-policy) |
+| `execution_id`, `use_lock`, `skip_execution`, `resource_scope` | Remove; each calibration step owns one Execution inside the run's reservation |
+| `enable_github`, `enable_github_pull`, `github_push_config` | Remove; pull and push follow `github` in `config/app/workflow.yaml`. A run that must not synchronize uses the internal path in [Configuration mode and GitHub policy](#configuration-mode-and-github-policy) |
+| `source_execution_id`, `source_task_id`, `snapshot_exempt_tasks`, `force_update_params` | Re-execute through `single-task-executor`, or declare a `source_execution_id` flow parameter |
+| `user_repo`, `lock_repo`, `counter_repo` | Remove; resolve the context with `resolve_calib_context()` |
+
+### Configuration mode and GitHub policy
+
+The removed `configuration_mode` argument and the public `ConfigureAll` step set the Qubex
+layout at different points. `SessionSettings.configuration_mode` is the initial layout: every
+session of the run, and every worker, initializes its backend with it, from the first step on.
+When it is `None`, the session uses `QUBEX_CONFIGURATION_MODE`. A `ConfigureAll` step whose call
+sets `configuration_mode` switches the layout when that step starts; that step, later steps, and
+their workers use it, while earlier steps keep the initial layout. A `ConfigureAll` placed first,
+as `templates/characterization.py` does, therefore runs the whole pipeline in its layout.
+
+GitHub pull and push follow the deployment. `GitHubPolicy.from_deployment()` in
+`service/_internal/settings.py` reads `github.enabled` (default `true`) and `github.branch`
+(default `main`) from `config/app/workflow.yaml`, and returns `GitHubPolicy.disabled()` when
+`enabled` is not `true` or the backend is not `qubex`. Credentials alone never enable
+synchronization. `TaskCall(..., update_calibration_parameters=False)` only stops that call's
+outputs from replacing calibration values; it does not stop the step's pull or push.
+
+QDash-internal code that needs a different initial layout, or no synchronization for one run,
+builds the settings itself and calls the internal runner with a checked context.
+`SessionSettings` built without `github` is disabled, so only `GitHubPolicy.from_deployment()` or
+`GitHubPolicy.pull_and_push()` turns synchronization on:
+
+```python
+from qdash.workflow.service import ConfigureAll, CustomOneQubit, QubitTargets, TaskCall
+from qdash.workflow.service import resolve_calib_context
+from qdash.workflow.service._internal.runs import run_calibration, workflow_settings
+from qdash.workflow.service._internal.settings import GitHubPolicy
+
+context = resolve_calib_context("alice", "64Qv3", project_id="project-1")
+settings = workflow_settings(
+    context, flow_name="maintenance", tags=None, note=None, default_run_parameters=None
+).model_copy(update={"configuration_mode": "ge-ef-cr", "github": GitHubPolicy.disabled()})
+results = run_calibration(
+    settings,
+    QubitTargets(["0", "1"]),
+    [ConfigureAll(), CustomOneQubit(tasks=[TaskCall(name="CheckRabi")])],
+)
+```
+
+`workflow_settings()` adds the saved flow defaults and snapshot source a workflow run would use,
+and `run_calibration()` runs the settings it receives without reapplying the deployment policy.
+Workers still never pull or push.
 
 ## Save and Register a Flow
 
@@ -72,7 +155,7 @@ sequenceDiagram
     participant Lock as ExecutionLockRepository
     participant Prefect as prefect-server
     participant Worker as user-flow-worker
-    participant Runtime as CalibService
+    participant Runtime as CalibService.run
 
     Client->>API: execute saved flow
     API->>API: merge saved and request parameters
@@ -94,9 +177,9 @@ pre-creates a `scheduled` execution record so the run appears in QDash before a 
 dispatch fails, the API releases its claim. If scheduled-row creation fails after dispatch, the
 flow can still create its own execution when it starts.
 
-Cron-triggered runs do not pass through `FlowService.execute_flow()`. Their `CalibService` instance
-creates an execution ID and acquires the planned reservation at worker start. This difference is
-why the runtime supports both adopting an API claim and claiming resources itself.
+Cron-triggered runs do not pass through `FlowService.execute_flow()`. Their run creates an execution
+ID and acquires the planned reservation at worker start. This difference is why the runtime
+supports both adopting an API claim and claiming resources itself.
 
 ### Per-run Target Overrides
 
@@ -112,12 +195,12 @@ functions, and differing targets return no default.
 (`mux_ids` or `qids`), the API also passes the declared target arguments and sets the other mode's
 argument to `None`, so templates that validate targets before creating `CalibService` accept the
 selection. Otherwise the saved parameters stay unchanged. Workflows that pass literal targets
-directly to `CalibService` keep their source and function signature unchanged.
+directly to `CalibService.run()` keep their source and function signature unchanged.
 Deploy the API and workflow workers together to enable this behavior.
 
-`CalibService` applies the override to constructor targets and initial `MuxTargets` or
-`QubitTargets` passed to each `run()` call. Other target types, such as `AllMuxTargets`, fail
-with an error instead of running unchanged. Every service in the current flow uses the
+`CalibService.run()` applies the override to the initial `MuxTargets` or `QubitTargets` it
+receives. Other target types, such as `AllMuxTargets`, fail with an error instead of running
+unchanged. Every service in the current flow uses the
 selection; later pipeline filters and isolated workers retain their derived subsets. Separate
 nested Prefect flows do not inherit this context, and explicit task-level IDs are not rewritten.
 Omitting the override preserves code behavior. The complete workflow still reserves its chip.
@@ -145,9 +228,11 @@ Calibration figures, raw data, notes, and exported parameters live beneath `CALI
 Docker, the API and workers mount the same host directory at `/app/calib_data`. Stored execution
 paths use the container layout, while API reads map them back to the configured local mount.
 
-GitHub configuration synchronization is separate from flow registration. `GitHubIntegration`
-pulls configuration before a session when enabled and can push selected calibration files during
-successful finalization.
+GitHub configuration synchronization is separate from flow registration. When the run's
+`GitHubPolicy` enables it, `GitHubIntegration` pulls configuration before each step's Execution
+and pushes the calibration note and parameter files when the step completes; see
+[Configuration mode and GitHub policy](#configuration-mode-and-github-policy). Isolated workers
+never pull or push.
 
 ## Handle Terminal States
 
@@ -164,7 +249,9 @@ in-process rules.
 | Flow CRUD and dispatch | `src/qdash/api/services/flow_service/` | `tests/qdash/api/services/test_flow_service.py`, `tests/qdash/api/services/flow_service/` |
 | Schedule API policy | `src/qdash/api/services/flow_schedule_service.py` | `tests/qdash/api/services/test_flow_schedule_service.py` |
 | Prefect registration service | `src/qdash/workflow/deployment_service.py` | `tests/qdash/workflow/test_deployment_service.py` |
-| Runtime lifecycle | `src/qdash/workflow/service/calib_service.py` | `tests/qdash/workflow/service/test_calib_service.py` |
+| Author contract and migration errors | `src/qdash/workflow/service/calib_service.py` | `tests/qdash/workflow/service/test_calib_service.py` |
+| Context resolution and authorization | `src/qdash/workflow/service/context.py` | `tests/qdash/workflow/service/test_calib_context.py` |
+| Runtime lifecycle and worker settings | `src/qdash/workflow/service/_internal/session.py`, `_internal/settings.py`, `_internal/runs.py` | `tests/qdash/workflow/service/test_calib_session.py` |
 | Shared path mapping | `src/qdash/common/config/path_resolver.py` | `tests/qdash/common/config/test_path_resolver.py` |
 
 Run API tests when flow persistence or dispatch changes, workflow tests when deployment or runtime
