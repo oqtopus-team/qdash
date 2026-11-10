@@ -2,16 +2,9 @@ import { useCallback, useState, useEffect } from "react";
 
 import { useQueryState, parseAsString } from "nuqs";
 
-import { isCompactActivityDate } from "@/lib/utils/datetime";
-
-import { URL_DEFAULTS } from "./types";
-
 interface UseExecutionUrlStateResult {
   selectedChip: string | null;
   setSelectedChip: (chip: string | null) => void;
-  /** Day filter of the execution list: YYYYMMDD, or `latest` when no day is picked. */
-  selectedDate: string;
-  setSelectedDate: (date: string) => void;
   isInitialized: boolean;
 }
 
@@ -20,7 +13,6 @@ export function useExecutionUrlState(): UseExecutionUrlStateResult {
 
   // URL state management for execution page
   const [selectedChip, setSelectedChipState] = useQueryState("chip", parseAsString);
-  const [dateParam, setDateState] = useQueryState("date", parseAsString);
 
   // Mark as initialized after first render
   useEffect(() => {
@@ -35,18 +27,9 @@ export function useExecutionUrlState(): UseExecutionUrlStateResult {
     [setSelectedChipState],
   );
 
-  const setSelectedDate = useCallback(
-    (date: string) => {
-      setDateState(isCompactActivityDate(date) ? date : null); // `latest` removes the parameter
-    },
-    [setDateState],
-  );
-
   return {
     selectedChip, // Return null as-is instead of converting to empty string
     setSelectedChip,
-    selectedDate: isCompactActivityDate(dateParam) ? dateParam : URL_DEFAULTS.DATE,
-    setSelectedDate,
     isInitialized,
   };
 }
