@@ -134,6 +134,7 @@ jobs:
         run: uv sync --all-packages --all-groups
 
       - name: Install deployment Caddy for proxy tests
+        shell: bash
         run: |
           image=$(docker compose --env-file .env.example config --format json --no-env-resolution | jq -r '.services.caddy.image')
           container=$(docker create "$image")
