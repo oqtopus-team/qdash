@@ -198,7 +198,6 @@ export function DashboardPageContent() {
           id: member.username,
           label: member.display_name || member.username,
           secondaryLabel: member.organization ?? undefined,
-          avatarKey: member.avatar_key,
         })) ?? []),
     ],
     [membersResponse?.data.members, user?.username],

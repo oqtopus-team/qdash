@@ -85,6 +85,46 @@ or first accessible project. It writes the selection back to the URL and browser
 invalidates queries when the project changes. Feature code uses `useProject()` instead of reading
 that storage directly.
 
+## User Avatars
+
+The browser renders every user avatar locally with the `glyph-avatar` package bundled into the
+UI, pinned to exactly `0.1.0`. `UserAvatar` builds a `data:` URI from a canonical spec string
+and shows it in an `<img>`, so an avatar makes no image request and its SVG cannot run script.
+No CDN or generator service is involved; once the UI assets have loaded, avatars depend only on
+the username.
+
+A user without a custom choice shows the automatic spec `v1:<username>::solid:c`. Its seed is the
+username, so the same username gets the same avatar on every instance that bundles the same
+package version. `UserAvatar` renders this spec immediately and keeps it while avatar data is
+loading, when the API or network fails, and when a stored spec fails validation.
+
+A custom choice from the picker in **Settings** is saved per instance as a spec string. The API
+validates the spec with `parse_avatar_spec` and stores it in the `user_avatar` collection with
+its seed and the generator name and version; it never accepts or stores SVG. Resetting to the
+automatic avatar deletes the record. Records written by an earlier development version with
+`source: "automatic"`, `svg`, or `etag` fields are ignored when read, and the obsolete fields are
+removed when the user saves again, so no migration is needed. The legacy `avatar_key` field on
+`user` is left unchanged and unused by the avatar.
+
+`ui/src/lib/avatar/avatarSpecs.ts` loads custom specs for display. It collects the usernames
+rendered in the same tick and fetches them with one `GET /users/avatars` request of up to 100
+usernames, caches results for five minutes, and retries a failed lookup on a later mount after
+30 seconds. Saving in the profile form writes the new spec into this cache, which updates the
+sidebar, forum, and every other `UserAvatar` of that user without reloading. The profile form
+itself reads and writes the full setting through `GET` and `PUT /auth/me/avatar`.
+
+The cache belongs to one authenticated session. `AuthProvider` calls `startAvatarSpecSession`
+whenever the access token changes, so login, logout, and a rejected token discard every cached
+spec and queued lookup. Mounted avatars show the automatic avatar at once and look their users
+up again when a token is present; no lookup is made without one. A response or profile save
+that started in an earlier session is dropped, so a slow request cannot fill the next account's
+cache. The session is tracked by object identity and holds no token.
+
+Changing the pinned version changes every automatic avatar and how stored specs render. Update
+`ui/package.json`, `GLYPH_AVATAR_VERSION` in `ui/src/lib/avatar/glyphAvatar.ts`, and
+`GLYPH_AVATAR_VERSION` in `src/qdash/api/services/user_avatar_service.py` together; tests on
+both sides fail when they differ.
+
 ## Architectural Invariants
 
 - `page.tsx` and `layout.tsx` use default exports; ordinary modules use named exports.
@@ -114,3 +154,5 @@ that storage directly.
 - `ui/orval.config.cjs`
 - `ui/src/contexts/ProjectContext.tsx`
 - `ui/src/components/layout/navigation.ts`
+- `ui/src/components/ui/UserAvatar.tsx` and `ui/src/lib/avatar/`
+- `src/qdash/api/services/user_avatar_service.py` and `src/qdash/api/routers/user_avatar.py`

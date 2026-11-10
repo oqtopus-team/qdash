@@ -622,11 +622,7 @@ export function ForumNewPage() {
               Author
             </div>
             <div className="flex items-center gap-2">
-              <UserAvatar
-                username={user?.username ?? "you"}
-                avatarKey={user?.avatar_key}
-                size={24}
-              />
+              <UserAvatar username={user?.username ?? ""} size={24} />
               <span className="text-sm font-medium">{user?.username ?? "you"}</span>
             </div>
           </section>

@@ -435,11 +435,7 @@ export function Sidebar() {
         className={`btn btn-ghost w-full ${isOpen || isMobileOpen ? "justify-start gap-3" : "justify-center p-0"} h-auto py-2`}
       >
         <div className="flex items-center justify-center">
-          <UserAvatar
-            username={user?.username || ""}
-            avatarKey={user?.avatar_key}
-            size={isOpen || isMobileOpen ? 28 : 40}
-          />
+          <UserAvatar username={user?.username || ""} size={isOpen || isMobileOpen ? 28 : 40} />
         </div>
         {(isOpen || isMobileOpen) && (
           <div className="flex-1 text-left min-w-0">
@@ -473,7 +469,7 @@ export function Sidebar() {
         {/* Profile Section */}
         <div className="flex flex-col items-center py-4 border-b border-base-300">
           <div className="mb-3">
-            <UserAvatar username={user?.username || ""} avatarKey={user?.avatar_key} size={64} />
+            <UserAvatar username={user?.username || ""} size={64} />
           </div>
           <h2 className="text-sm font-medium">{user?.username}</h2>
           {user?.display_name && (

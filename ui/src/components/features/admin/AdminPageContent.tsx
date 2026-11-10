@@ -43,6 +43,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { AdminPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDate } from "@/lib/utils/datetime";
 
@@ -1033,12 +1034,17 @@ function MembersModal({
                       {members.map((member: MemberItem) => (
                         <tr key={member.username}>
                           <td>
-                            <div className="font-mono text-sm">{member.username}</div>
-                            {member.display_name && (
-                              <div className="text-xs text-base-content/60">
-                                {member.display_name}
+                            <div className="flex items-center gap-2">
+                              <UserAvatar username={member.username} size={24} />
+                              <div className="min-w-0">
+                                <div className="font-mono text-sm">{member.username}</div>
+                                {member.display_name && (
+                                  <div className="text-xs text-base-content/60">
+                                    {member.display_name}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </td>
                           <td>
                             <span className={`badge badge-sm ${getRoleBadgeClass(member.role)}`}>
@@ -1142,6 +1148,7 @@ function MembersModal({
                               checked={selectedCandidateUsernames.includes(userItem.username)}
                               onChange={() => handleToggleCandidate(userItem.username)}
                             />
+                            <UserAvatar username={userItem.username} size={24} />
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="font-mono text-sm">{userItem.username}</span>

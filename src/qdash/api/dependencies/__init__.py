@@ -48,6 +48,7 @@ from qdash.api.services.source_access_service import SourceAccessService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
+from qdash.api.services.user_avatar_service import UserAvatarService
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.repository import (
     MongoChipRepository,
@@ -74,6 +75,7 @@ from qdash.repository.provenance import (
 from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.repository.tag import MongoTagRepository
 from qdash.repository.task_definition import MongoTaskDefinitionRepository
+from qdash.repository.user_avatar import MongoUserAvatarRepository
 
 
 @cached_dependency_provider
@@ -486,6 +488,12 @@ def get_cooldown_wiring_event_service() -> CooldownWiringEventService:
 def get_user_repository() -> MongoUserRepository:
     """Get the user repository instance."""
     return MongoUserRepository()
+
+
+@cached_dependency_provider
+def get_user_avatar_service() -> UserAvatarService:
+    """Get the user avatar settings service instance."""
+    return UserAvatarService(store=MongoUserAvatarRepository())
 
 
 @cached_dependency_provider
