@@ -12,7 +12,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@xyflow/react", () => {
-  type FakeNode = { id: string; data: Record<string, unknown> };
+  type FakeNode = {
+    id: string;
+    data: Record<string, unknown>;
+    position: { x: number; y: number };
+  };
   type FakeReactFlowProps = {
     nodes?: FakeNode[];
     children?: ReactNode;
@@ -205,6 +209,51 @@ describe("ExecutionDAG lock control", () => {
       nodesDraggable: true,
       elementsSelectable: true,
     });
+  });
+});
+
+describe("ExecutionDAG node dragging", () => {
+  type CapturedNode = {
+    id: string;
+    position: { x: number; y: number };
+    data: Record<string, unknown>;
+  };
+  const capturedNode = (id: string) =>
+    (mocks.capturedProps?.nodes as CapturedNode[] | undefined)?.find((node) => node.id === id);
+
+  it("keeps a dragged node at its new position across selection changes", () => {
+    render(<ExecutionDAG tasks={tasks} />);
+    const onNodesChange = mocks.capturedProps?.onNodesChange as (changes: unknown[]) => void;
+    const untouched = capturedNode("task-2")?.position;
+
+    act(() => {
+      onNodesChange([
+        { type: "position", id: "task-1", position: { x: 500, y: 250 }, dragging: true },
+      ]);
+    });
+
+    expect(capturedNode("task-1")?.position).toEqual({ x: 500, y: 250 });
+    expect(capturedNode("task-2")?.position).toEqual(untouched);
+
+    fireEvent.click(screen.getByTestId("node-task-1"));
+
+    expect(capturedNode("task-1")?.data.isSelected).toBe(true);
+    expect(capturedNode("task-1")?.position).toEqual({ x: 500, y: 250 });
+  });
+
+  it("ignores node changes that carry no position", () => {
+    render(<ExecutionDAG tasks={tasks} />);
+    const onNodesChange = mocks.capturedProps?.onNodesChange as (changes: unknown[]) => void;
+    const before = capturedNode("task-1")?.position;
+
+    act(() => {
+      onNodesChange([
+        { type: "position", id: "task-1", dragging: false },
+        { type: "select", id: "task-1", selected: true },
+      ]);
+    });
+
+    expect(capturedNode("task-1")?.position).toEqual(before);
   });
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ReactFlow,
@@ -15,7 +15,7 @@ import {
 } from "@xyflow/react";
 import dagre from "dagre";
 
-import type { Node, Edge, NodeProps, NodeTypes } from "@xyflow/react";
+import type { Node, Edge, NodeChange, NodeProps, NodeTypes, XYPosition } from "@xyflow/react";
 
 import { TaskResultPreviewSidebar } from "@/components/features/task-results/TaskResultPreviewSidebar";
 import {
@@ -154,6 +154,29 @@ function FlowContent({
   const { fitView } = useReactFlow();
   const [isLocked, setIsLocked] = useState(false);
 
+  // `nodes` is controlled, so keep the positions the user drags nodes to and apply them over
+  // the computed layout; otherwise React Flow drops every drag.
+  const [draggedPositions, setDraggedPositions] = useState<Record<string, XYPosition>>({});
+  const displayedNodes = useMemo(
+    () =>
+      nodes.map((node) => {
+        const position = draggedPositions[node.id];
+        return position ? { ...node, position } : node;
+      }),
+    [nodes, draggedPositions],
+  );
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    const moved: Record<string, XYPosition> = {};
+    for (const change of changes) {
+      if (change.type === "position" && change.position) {
+        moved[change.id] = change.position;
+      }
+    }
+    if (Object.keys(moved).length > 0) {
+      setDraggedPositions((previous) => ({ ...previous, ...moved }));
+    }
+  }, []);
+
   // Unlocked, the viewport is the user's pan/zoom: only the locked canvas refits when its
   // container size changes, so the user's view survives fullscreen and preview toggles.
   const isLockedRef = useRef(isLocked);
@@ -192,9 +215,10 @@ function FlowContent({
 
   return (
     <ReactFlow
-      nodes={nodes}
+      nodes={displayedNodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      onNodesChange={handleNodesChange}
       fitView
       className="bg-base-200"
       minZoom={0.1}
