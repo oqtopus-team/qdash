@@ -7,7 +7,7 @@
  */
 
 /**
- * automatic (rendered from the username) or custom (chosen in the picker)
+ * automatic (derived from the username) or custom (chosen in the picker)
  */
 export type UserAvatarResponseSource = typeof UserAvatarResponseSource[keyof typeof UserAvatarResponseSource];
 

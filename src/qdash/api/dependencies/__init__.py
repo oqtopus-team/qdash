@@ -48,8 +48,7 @@ from qdash.api.services.source_access_service import SourceAccessService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
-from qdash.api.services.user_avatar_service import HttpGlyphAvatarGenerator, UserAvatarService
-from qdash.config import get_settings, resolve_avatar_generator_url
+from qdash.api.services.user_avatar_service import UserAvatarService
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.repository import (
     MongoChipRepository,
@@ -493,11 +492,8 @@ def get_user_repository() -> MongoUserRepository:
 
 @cached_dependency_provider
 def get_user_avatar_service() -> UserAvatarService:
-    """Get the generated user avatar service instance."""
-    return UserAvatarService(
-        store=MongoUserAvatarRepository(),
-        generator=HttpGlyphAvatarGenerator(resolve_avatar_generator_url(get_settings())),
-    )
+    """Get the user avatar settings service instance."""
+    return UserAvatarService(store=MongoUserAvatarRepository())
 
 
 @cached_dependency_provider

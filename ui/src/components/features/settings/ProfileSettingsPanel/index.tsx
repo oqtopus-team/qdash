@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { Avatar } from "glyph-avatar/react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -14,10 +13,14 @@ import {
   useUpdateCurrentUserAvatar,
 } from "@/client/user-avatar/user-avatar";
 import { GlyphAvatarPicker } from "@/components/ui/GlyphAvatarPicker";
-import { UserAvatar } from "@/components/ui/UserAvatar";
+import { GlyphAvatarImage } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
-import { setAvatarVersion } from "@/lib/avatar/avatarVersions";
-import { automaticAvatarSpec } from "@/lib/avatar/glyphAvatar";
+import {
+  currentAvatarSpecSession,
+  setAvatarSpec,
+  useCustomAvatarSpec,
+} from "@/lib/avatar/avatarSpecs";
+import { automaticAvatarSpec, resolveAvatarSpec } from "@/lib/avatar/glyphAvatar";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 const profileSchema = z.object({
@@ -76,14 +79,20 @@ export function ProfileSettingsPanel() {
     [],
   );
 
+  const listedSpec = useCustomAvatarSpec(username);
   const savedAvatar = avatarQuery.data?.data;
+  // Without the settings response, fall back to the batched lookup, then the automatic avatar.
+  const savedCustomSpec = savedAvatar
+    ? savedAvatar.source === "custom"
+      ? savedAvatar.spec
+      : null
+    : listedSpec;
   const automaticSpec = username ? automaticAvatarSpec(username) : "";
-  const savedSpec = savedAvatar?.spec ?? automaticSpec;
+  const savedSpec = username ? resolveAvatarSpec(username, savedCustomSpec) : "";
   const pickerStart = pickerStartOverride ?? savedSpec;
   const previewSpec = pendingAvatar ? (pendingAvatar.spec ?? automaticSpec) : savedSpec;
-  const isAutomatic = pendingAvatar
-    ? pendingAvatar.spec === null
-    : savedAvatar?.source !== "custom";
+  const savedIsCustom = savedSpec !== automaticSpec;
+  const isAutomatic = pendingAvatar ? pendingAvatar.spec === null : !savedIsCustom;
 
   const displayName = watch("displayName");
   const nameChanged = displayName.trim() !== (user?.display_name ?? "");
@@ -112,7 +121,7 @@ export function ProfileSettingsPanel() {
   /** Selects the automatic avatar rendered from the username. */
   const selectAutomatic = () => {
     setSaved(false);
-    setPendingAvatar(savedAvatar?.source === "custom" ? { spec: null } : null);
+    setPendingAvatar(savedIsCustom ? { spec: null } : null);
     restartPicker(automaticSpec);
   };
 
@@ -128,17 +137,26 @@ export function ProfileSettingsPanel() {
   const submit = async (values: ProfileFormOutput) => {
     setSaved(false);
     setSaveError(null);
+    // A save that finishes after logout or a new login must not reach the new session's cache.
+    const avatarSession = currentAvatarSpecSession();
     try {
       if (nameChanged) {
         await updateProfileMutation.mutateAsync({ data: { display_name: values.displayName } });
+        if (avatarSession !== currentAvatarSpecSession()) return;
         await queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() });
+        if (avatarSession !== currentAvatarSpecSession()) return;
       }
       if (pendingAvatar) {
         const response = await updateAvatarMutation.mutateAsync({
           data: { spec: pendingAvatar.spec },
         });
+        if (avatarSession !== currentAvatarSpecSession()) return;
         queryClient.setQueryData(getGetCurrentUserAvatarQueryKey(), response);
-        setAvatarVersion(username, response.data.etag);
+        setAvatarSpec(
+          username,
+          response.data.source === "custom" ? response.data.spec : null,
+          avatarSession,
+        );
         setPendingAvatar(null);
         restartPicker(null);
       }
@@ -146,6 +164,7 @@ export function ProfileSettingsPanel() {
       if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
       savedTimeoutRef.current = setTimeout(() => setSaved(false), 2000);
     } catch (error) {
+      if (avatarSession !== currentAvatarSpecSession()) return;
       setSaveError(error);
     }
   };
@@ -157,18 +176,15 @@ export function ProfileSettingsPanel() {
         <form onSubmit={handleSubmit(submit)} noValidate>
           <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
             <div className="flex flex-col items-center gap-3 self-start rounded-box bg-base-100 p-4">
-              {pendingAvatar ? (
-                <span className="avatar" data-testid="profile-avatar-preview">
-                  <Avatar
-                    value={previewSpec}
+              {username ? (
+                <span data-testid={pendingAvatar ? "profile-avatar-preview" : undefined}>
+                  <GlyphAvatarImage
+                    spec={previewSpec}
+                    alt={pendingAvatar ? "Unsaved avatar preview" : username}
                     size={PREVIEW_SIZE}
-                    shape="circle"
-                    alt="Unsaved avatar preview"
                   />
                 </span>
-              ) : (
-                <UserAvatar username={username} size={PREVIEW_SIZE} />
-              )}
+              ) : null}
               <div className="text-center">
                 <div className="font-medium">{displayName.trim() || username}</div>
                 <div className="text-xs text-base-content/50">@{username}</div>
@@ -231,7 +247,7 @@ export function ProfileSettingsPanel() {
                 )}
                 {avatarQuery.isError && (
                   <p className="text-sm text-warning" role="status">
-                    The saved avatar could not be loaded. You can still choose a new one.
+                    Your saved avatar settings could not be loaded. You can still choose a new one.
                   </p>
                 )}
               </div>

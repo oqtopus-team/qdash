@@ -9,11 +9,11 @@ import {
   GLYPH_AVATAR_VERSION,
   automaticAvatarSpec,
   canonicalAvatarSpec,
-  renderGlyphAvatar,
-  userAvatarUrl,
+  glyphAvatarDataUri,
+  resolveAvatarSpec,
 } from "@/lib/avatar/glyphAvatar";
 
-// Golden glyph-avatar 0.1.0 output; a change here changes every newly generated avatar.
+// Golden glyph-avatar 0.1.0 output; a change here changes every user's avatar.
 const ALICE_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="64" height="64" ' +
   'aria-hidden="true"><circle cx="50" cy="50" r="50" fill="#1F6B4A"/>' +
@@ -38,22 +38,24 @@ describe("glyph avatar generation", () => {
     expect(automaticAvatarSpec("a.b-c_d")).toBe("v1:a.b-c_d::solid:c");
   });
 
-  it("renders fixed bytes for a username, matching the documented options", () => {
-    const generated = renderGlyphAvatar(automaticAvatarSpec("alice"));
-    expect(generated).toEqual({
-      spec: "v1:alice::solid:c",
-      svg: ALICE_SVG,
-      generator: "glyph-avatar",
-      generator_version: "0.1.0",
-      options: { size: 64, shape: "circle" },
-    });
+  it("renders fixed bytes for a username locally as a data URI", () => {
+    const uri = glyphAvatarDataUri(automaticAvatarSpec("alice"));
+    expect(uri.startsWith("data:image/svg+xml;utf8,")).toBe(true);
+    expect(decodeURIComponent(uri.slice(uri.indexOf(",") + 1))).toBe(ALICE_SVG);
     expect(
       createAvatar(
         { seed: "alice" },
         { size: 64, colors: "curated", background: "solid", shape: "circle" },
       ),
     ).toBe(ALICE_SVG);
-    expect(renderGlyphAvatar(automaticAvatarSpec("alice")).svg).toBe(generated.svg);
+    expect(glyphAvatarDataUri("v1:alice::solid:c")).toBe(uri);
+  });
+
+  it("uses a valid custom spec and falls back to the automatic spec otherwise", () => {
+    const custom = "v1:k3x9q2a-1.-2:p0w7zz:stripes:c";
+    expect(resolveAvatarSpec("alice", custom)).toBe(custom);
+    expect(resolveAvatarSpec("alice", null)).toBe("v1:alice::solid:c");
+    expect(resolveAvatarSpec("alice", "<svg onload=alert(1)>")).toBe("v1:alice::solid:c");
   });
 
   it.each(["v1:alice::solid:c", "v1:k3x9q2a-1.-2:p0w7zz:stripes:c", "v1:abc", "v1:abc:::c"])(
@@ -75,10 +77,5 @@ describe("glyph avatar generation", () => {
     `v1:${"a".repeat(65)}`,
   ])("rejects non-canonical or unsupported spec %s", (spec) => {
     expect(canonicalAvatarSpec(spec)).toBeNull();
-  });
-
-  it("builds a same-origin avatar URL with an optional cache version", () => {
-    expect(userAvatarUrl("alice")).toBe("/api/users/alice/avatar");
-    expect(userAvatarUrl("alice", "abc")).toBe("/api/users/alice/avatar?v=abc");
   });
 });

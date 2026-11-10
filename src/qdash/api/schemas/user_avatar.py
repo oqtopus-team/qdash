@@ -1,4 +1,4 @@
-"""Schemas for generated user avatars."""
+"""Schemas for glyph avatar settings."""
 
 from typing import Literal
 
@@ -6,15 +6,14 @@ from pydantic import BaseModel, Field
 
 
 class UserAvatarResponse(BaseModel):
-    """The current user's saved avatar description."""
+    """The avatar the current user shows."""
 
     source: Literal["automatic", "custom"] = Field(
-        description="automatic (rendered from the username) or custom (chosen in the picker)"
+        description="automatic (derived from the username) or custom (chosen in the picker)"
     )
-    spec: str = Field(description="Canonical glyph-avatar spec string of the saved avatar")
-    generator: str = Field(description="Generator package that rendered the avatar")
+    spec: str = Field(description="Canonical glyph-avatar spec string the UI renders")
+    generator: str = Field(description="Generator package the spec is for")
     generator_version: str = Field(description="Generator package version")
-    etag: str = Field(description="SHA-256 hex digest of the saved SVG")
 
 
 class UserAvatarUpdate(BaseModel):
@@ -25,6 +24,22 @@ class UserAvatarUpdate(BaseModel):
         max_length=160,
         description=(
             "Canonical glyph-avatar v1 spec string from the avatar picker; "
-            "null resets to the automatic avatar rendered from the username"
+            "null resets to the automatic avatar derived from the username"
         ),
     )
+
+
+class UserAvatarSpec(BaseModel):
+    """A user's custom avatar spec."""
+
+    username: str = Field(description="Username")
+    spec: str = Field(description="Canonical glyph-avatar spec string the UI renders")
+
+
+class UserAvatarSpecList(BaseModel):
+    """Custom avatar specs of the requested users.
+
+    Users that show the automatic avatar are omitted.
+    """
+
+    avatars: list[UserAvatarSpec] = Field(description="Custom avatar specs")

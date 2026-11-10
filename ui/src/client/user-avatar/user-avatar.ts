@@ -27,7 +27,9 @@ import type {
 import type {
   Detail,
   HTTPValidationError,
+  ListUserAvatarsParams,
   UserAvatarResponse,
+  UserAvatarSpecList,
   UserAvatarUpdate
 } from '../../schemas';
 
@@ -54,7 +56,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * Return the current user's saved avatar spec, generating the automatic one on first use.
+ * Return the current user's custom avatar spec, or the automatic spec if none is saved.
  * @summary Get the current user's avatar settings
  */
 export const getCurrentUserAvatar = (
@@ -147,10 +149,9 @@ export function useGetCurrentUserAvatar<TData = Awaited<ReturnType<typeof getCur
 
 
 /**
- * Render and save a picker spec, or reset to the automatic avatar when ``spec`` is null.
+ * Save a picker spec, or reset to the automatic avatar when ``spec`` is null.
  *
- * The API renders the SVG itself from the spec; avatar markup is never accepted from the
- * client. If rendering fails, the saved avatar is unchanged.
+ * Only the validated spec string is stored; avatar markup is never accepted.
  * @summary Set or reset the current user's avatar
  */
 export const updateCurrentUserAvatar = (
@@ -215,20 +216,20 @@ export const useUpdateCurrentUserAvatar = <TError = Detail,
       return useMutation(getUpdateCurrentUserAvatarMutationOptions(options), queryClient);
     }
     /**
- * Return a user's saved avatar SVG, generating the automatic avatar on first request.
+ * Return the custom avatar specs of the listed users in one request.
  *
- * The response carries a strong ETag; a matching ``If-None-Match`` returns 304.
- * @summary Get a user's avatar image
+ * Users that show the automatic avatar, and unknown or malformed usernames, are omitted.
+ * @summary List custom avatar specs of users
  */
-export const getUserAvatar = (
-    username: string,
+export const listUserAvatars = (
+    params: ListUserAvatarsParams,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
 
 
-      return customInstance<Blob>(
-      {url: `/users/${username}/avatar`, method: 'GET',
-        responseType: 'blob', signal
+      return customInstance<UserAvatarSpecList>(
+      {url: `/users/avatars`, method: 'GET',
+        params, signal
     },
       options);
     }
@@ -236,69 +237,69 @@ export const getUserAvatar = (
 
 
 
-export const getGetUserAvatarQueryKey = (username: string,) => {
+export const getListUserAvatarsQueryKey = (params?: ListUserAvatarsParams,) => {
     return [
-    `/users/${username}/avatar`
+    `/users/avatars`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetUserAvatarQueryOptions = <TData = Awaited<ReturnType<typeof getUserAvatar>>, TError = void | Detail | HTTPValidationError>(username: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserAvatar>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getListUserAvatarsQueryOptions = <TData = Awaited<ReturnType<typeof listUserAvatars>>, TError = HTTPValidationError>(params: ListUserAvatarsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserAvatars>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetUserAvatarQueryKey(username);
+  const queryKey =  queryOptions?.queryKey ?? getListUserAvatarsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserAvatar>>> = ({ signal }) => getUserAvatar(username, requestOptions, signal);
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUserAvatars>>> = ({ signal }) => listUserAvatars(params, requestOptions, signal);
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: username !== null && username !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserAvatar>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUserAvatars>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type GetUserAvatarQueryResult = NonNullable<Awaited<ReturnType<typeof getUserAvatar>>>
-export type GetUserAvatarQueryError = void | Detail | HTTPValidationError
+export type ListUserAvatarsQueryResult = NonNullable<Awaited<ReturnType<typeof listUserAvatars>>>
+export type ListUserAvatarsQueryError = HTTPValidationError
 
 
-export function useGetUserAvatar<TData = Awaited<ReturnType<typeof getUserAvatar>>, TError = void | Detail | HTTPValidationError>(
- username: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserAvatar>>, TError, TData>> & Pick<
+export function useListUserAvatars<TData = Awaited<ReturnType<typeof listUserAvatars>>, TError = HTTPValidationError>(
+ params: ListUserAvatarsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserAvatars>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUserAvatar>>,
+          Awaited<ReturnType<typeof listUserAvatars>>,
           TError,
-          Awaited<ReturnType<typeof getUserAvatar>>
+          Awaited<ReturnType<typeof listUserAvatars>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUserAvatar<TData = Awaited<ReturnType<typeof getUserAvatar>>, TError = void | Detail | HTTPValidationError>(
- username: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserAvatar>>, TError, TData>> & Pick<
+export function useListUserAvatars<TData = Awaited<ReturnType<typeof listUserAvatars>>, TError = HTTPValidationError>(
+ params: ListUserAvatarsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserAvatars>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getUserAvatar>>,
+          Awaited<ReturnType<typeof listUserAvatars>>,
           TError,
-          Awaited<ReturnType<typeof getUserAvatar>>
+          Awaited<ReturnType<typeof listUserAvatars>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetUserAvatar<TData = Awaited<ReturnType<typeof getUserAvatar>>, TError = void | Detail | HTTPValidationError>(
- username: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserAvatar>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useListUserAvatars<TData = Awaited<ReturnType<typeof listUserAvatars>>, TError = HTTPValidationError>(
+ params: ListUserAvatarsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserAvatars>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get a user's avatar image
+ * @summary List custom avatar specs of users
  */
 
-export function useGetUserAvatar<TData = Awaited<ReturnType<typeof getUserAvatar>>, TError = void | Detail | HTTPValidationError>(
- username: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserAvatar>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export function useListUserAvatars<TData = Awaited<ReturnType<typeof listUserAvatars>>, TError = HTTPValidationError>(
+ params: ListUserAvatarsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listUserAvatars>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetUserAvatarQueryOptions(username,options)
+  const queryOptions = getListUserAvatarsQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

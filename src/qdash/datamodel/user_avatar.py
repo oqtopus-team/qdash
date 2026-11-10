@@ -1,4 +1,4 @@
-"""Domain model for a user's generated avatar."""
+"""Domain model for a user's chosen glyph avatar."""
 
 from datetime import datetime
 from typing import Literal
@@ -11,22 +11,25 @@ UserAvatarSource = Literal["automatic", "custom"]
 
 
 class UserAvatarModel(BaseModel):
-    """Generated avatar SVG saved for a user.
+    """Avatar settings a user chose in the avatar picker.
 
-    An automatic avatar is rendered the first time the user's avatar is requested; a custom
-    avatar is rendered when the user saves a picker selection. The SVG is kept as rendered, so
-    a later generator upgrade never changes an existing avatar.
+    Only the canonical ``glyph-avatar`` spec string and the generator version are stored; the
+    browser renders the SVG locally with the bundled package. A user without a custom record
+    shows the automatic avatar derived from the username, so no record is needed for it.
     """
 
     user_id: str = Field(description="Internal ID of the user that owns the avatar")
     username: str = Field(description="Username of the user when the avatar was saved")
-    source: UserAvatarSource = Field(description="automatic (from the username) or custom")
-    spec: str = Field(description="Canonical glyph-avatar spec string rendered into the SVG")
+    source: UserAvatarSource = Field(
+        default="custom",
+        description=(
+            "custom for a picker choice. Records with automatic were written by an earlier "
+            "version and are ignored"
+        ),
+    )
+    spec: str = Field(description="Canonical glyph-avatar spec string")
     seed: str = Field(description="Seed part of the spec")
-    svg: str = Field(description="Generated SVG markup")
-    etag: str = Field(description="SHA-256 hex digest of the SVG bytes")
     generator: str = Field(description="Generator package name")
-    generator_version: str = Field(description="Generator package version")
-    options: dict[str, str | int] = Field(description="Render options used for the SVG")
+    generator_version: str = Field(description="Generator package version the spec was chosen with")
     created_at: datetime = Field(default_factory=now, description="First save time")
     updated_at: datetime = Field(default_factory=now, description="Last save time")

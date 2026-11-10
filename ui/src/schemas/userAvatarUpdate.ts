@@ -11,6 +11,6 @@ import type { UserAvatarUpdateSpec } from './userAvatarUpdateSpec';
  * Avatar selection for the current user.
  */
 export interface UserAvatarUpdate {
-  /** Canonical glyph-avatar v1 spec string from the avatar picker; null resets to the automatic avatar rendered from the username */
+  /** Canonical glyph-avatar v1 spec string from the avatar picker; null resets to the automatic avatar derived from the username */
   spec?: UserAvatarUpdateSpec;
 }

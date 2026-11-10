@@ -7,6 +7,6 @@
  */
 
 /**
- * Canonical glyph-avatar v1 spec string from the avatar picker; null resets to the automatic avatar rendered from the username
+ * Canonical glyph-avatar v1 spec string from the avatar picker; null resets to the automatic avatar derived from the username
  */
 export type UserAvatarUpdateSpec = string | null;

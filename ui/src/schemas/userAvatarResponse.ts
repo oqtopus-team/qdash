@@ -8,17 +8,15 @@
 import type { UserAvatarResponseSource } from './userAvatarResponseSource';
 
 /**
- * The current user's saved avatar description.
+ * The avatar the current user shows.
  */
 export interface UserAvatarResponse {
-  /** automatic (rendered from the username) or custom (chosen in the picker) */
+  /** automatic (derived from the username) or custom (chosen in the picker) */
   source: UserAvatarResponseSource;
-  /** Canonical glyph-avatar spec string of the saved avatar */
+  /** Canonical glyph-avatar spec string the UI renders */
   spec: string;
-  /** Generator package that rendered the avatar */
+  /** Generator package the spec is for */
   generator: string;
   /** Generator package version */
   generator_version: string;
-  /** SHA-256 hex digest of the saved SVG */
-  etag: string;
 }

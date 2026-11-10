@@ -48,9 +48,8 @@ reset.
 
 ## Change Your Avatar
 
-Every user has an avatar. QDash generates it from your username the first time it is shown, so
-the same username gets the same automatic avatar on any QDash instance that runs the same
-QDash release.
+Every user has an avatar. QDash generates it in the browser from your username, so the same
+username gets the same automatic avatar on any QDash instance that runs the same QDash release.
 
 To choose a different avatar:
 
@@ -62,8 +61,8 @@ To choose a different avatar:
 4. Select **Save Profile**. **Cancel** discards the selection.
 
 To return to the generated avatar, select **Use automatic avatar**, then **Save Profile**. A chosen
-avatar applies only to the QDash instance where you saved it. Avatars that were already saved do
-not change when QDash is updated.
+avatar applies only to the QDash instance where you saved it. If QDash cannot load your chosen
+avatar, for example during a network interruption, it shows your automatic avatar instead.
 
 ## API Authentication
 

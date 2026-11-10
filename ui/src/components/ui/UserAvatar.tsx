@@ -1,16 +1,44 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
 
-import { useAvatarVersion } from "@/lib/avatar/avatarVersions";
-import { userAvatarUrl } from "@/lib/avatar/glyphAvatar";
+import { useCustomAvatarSpec } from "@/lib/avatar/avatarSpecs";
+import { glyphAvatarDataUri, resolveAvatarSpec } from "@/lib/avatar/glyphAvatar";
 
 /**
- * A user's saved glyph avatar, loaded as an image from the API.
+ * A glyph avatar rendered locally from a spec, shown as a `data:` URI image.
  *
- * The API generates and saves the automatic avatar on first request, so every user has one.
- * The browser revalidates the image with its ETag; an avatar saved in this tab refreshes at once.
+ * No request is made for the image; the markup comes from the bundled glyph-avatar package and
+ * `<img>` never runs script inside it.
+ */
+export function GlyphAvatarImage({
+  spec,
+  alt,
+  size = 28,
+  className = "",
+  title,
+}: {
+  spec: string;
+  alt: string;
+  size?: number;
+  className?: string;
+  title?: string;
+}) {
+  return (
+    <span className={`avatar shrink-0 ${className}`} title={title}>
+      <span className="rounded-full" style={{ width: size, height: size }}>
+        <Image src={glyphAvatarDataUri(spec)} alt={alt} width={size} height={size} unoptimized />
+      </span>
+    </span>
+  );
+}
+
+/**
+ * A user's glyph avatar.
+ *
+ * It renders at once from the username, so loading, network, and API failures still show the
+ * user's automatic avatar. A custom avatar chosen on this instance replaces it when its spec
+ * arrives from the batched lookup.
  */
 export function UserAvatar({
   username,
@@ -21,51 +49,31 @@ export function UserAvatar({
   size?: number;
   className?: string;
 }) {
-  const version = useAvatarVersion(username);
-  const src = username ? userAvatarUrl(username, version) : null;
-  const [request, setRequest] = useState({ src, retries: 0, failed: false });
-  const retries = request.src === src ? request.retries : 0;
-  const failed = !src || (request.src === src && request.failed);
-  const imageSrc = src && retries ? `${src}${src.includes("?") ? "&" : "?"}retry=${retries}` : src;
+  const customSpec = useCustomAvatarSpec(username);
 
-  useEffect(() => {
-    if (!src || !failed || retries >= 2) return;
-    const timer = window.setTimeout(
-      () => setRequest({ src, retries: retries + 1, failed: false }),
-      retries === 0 ? 1000 : 3000,
-    );
-    return () => window.clearTimeout(timer);
-  }, [src, failed, retries]);
-  const dimensions = { width: size, height: size };
-
-  if (failed || !imageSrc) {
+  if (!username) {
     return (
-      <span className={`avatar avatar-placeholder shrink-0 ${className}`} title={username}>
+      <span className={`avatar avatar-placeholder shrink-0 ${className}`}>
         <span
           className="rounded-full bg-base-300 text-base-content/70"
-          style={{ ...dimensions, fontSize: Math.max(10, Math.round(size * 0.42)) }}
+          style={{ width: size, height: size, fontSize: Math.max(10, Math.round(size * 0.42)) }}
           role="img"
-          aria-label={username || "User avatar"}
+          aria-label="User avatar"
         >
-          <span aria-hidden="true">{username.charAt(0).toUpperCase() || "?"}</span>
+          <span aria-hidden="true">?</span>
         </span>
       </span>
     );
   }
 
   return (
-    <span className={`avatar shrink-0 ${className}`} title={username}>
-      <span className="rounded-full" style={dimensions}>
-        <Image
-          src={imageSrc}
-          alt={username}
-          width={size}
-          height={size}
-          unoptimized
-          onError={() => setRequest({ src, retries, failed: true })}
-        />
-      </span>
-    </span>
+    <GlyphAvatarImage
+      spec={resolveAvatarSpec(username, customSpec)}
+      alt={username}
+      size={size}
+      className={className}
+      title={username}
+    />
   );
 }
 

@@ -21,7 +21,7 @@ const ACTION_CLASS = "btn btn-ghost btn-sm btn-square";
  *
  * `defaultValue` is the saved canonical spec; `onChange` receives the spec of the avatar the
  * user moves to or tweaks. The picker renders candidates locally from the pinned package; the
- * API renders and saves the chosen spec when the form is saved. Remount it with a new `key` to
+ * API saves the chosen spec when the form is saved. Remount it with a new `key` to
  * discard a selection.
  */
 export function GlyphAvatarPicker({

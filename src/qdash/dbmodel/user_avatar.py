@@ -1,4 +1,4 @@
-"""Document model for a user's persisted generated avatar."""
+"""Document model for a user's chosen glyph avatar."""
 
 from typing import ClassVar
 
@@ -10,7 +10,7 @@ from qdash.datamodel.user_avatar import UserAvatarModel
 
 
 class UserAvatarDocument(UserAvatarModel, Document):
-    """Generated avatar of one user; see :class:`UserAvatarModel` for the fields."""
+    """Chosen avatar of one user; see :class:`UserAvatarModel` for the fields."""
 
     model_config = ConfigDict(from_attributes=True)
 

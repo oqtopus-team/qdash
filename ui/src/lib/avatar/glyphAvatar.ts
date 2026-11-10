@@ -1,28 +1,18 @@
-import { BACKGROUNDS, createAvatar, parseSpec, stringifySpec } from "glyph-avatar";
+import { BACKGROUNDS, avatarDataUri, parseSpec, stringifySpec } from "glyph-avatar";
 
 /**
- * Generated user avatars rendered by the pinned glyph-avatar package.
+ * User avatars rendered in the browser by the glyph-avatar package bundled with the UI.
  *
- * The API owns persistence: it asks this UI server to render a canonical spec string and saves
- * the resulting SVG. These constants must match `src/qdash/api/services/user_avatar_service.py`
- * and the exact version in `ui/package.json`.
+ * The API stores only canonical spec strings chosen in the picker; it never renders avatars.
+ * These constants must match `src/qdash/api/services/user_avatar_service.py` and the exact
+ * version in `ui/package.json`.
  */
-const GLYPH_AVATAR_GENERATOR = "glyph-avatar";
 export const GLYPH_AVATAR_VERSION = "0.1.0";
-const GLYPH_AVATAR_RENDER_OPTIONS = { size: 64, shape: "circle" } as const;
 const AUTOMATIC_AVATAR_BACKGROUND = "solid";
 
 // Characters encodeURIComponent leaves unchanged, minus the ones the picker never emits.
 const SPEC_TOKEN = /^[A-Za-z0-9._-]{1,64}$/;
 const MAX_SPEC_LENGTH = 160;
-
-export type GeneratedGlyphAvatar = {
-  spec: string;
-  svg: string;
-  generator: typeof GLYPH_AVATAR_GENERATOR;
-  generator_version: typeof GLYPH_AVATAR_VERSION;
-  options: typeof GLYPH_AVATAR_RENDER_OPTIONS;
-};
 
 /** Returns the spec if it is a canonical v1 spec QDash accepts, otherwise null. */
 export function canonicalAvatarSpec(value: string): string | null {
@@ -47,19 +37,24 @@ export function automaticAvatarSpec(username: string): string {
   });
 }
 
-/** Renders a canonical spec with the fixed QDash options. */
-export function renderGlyphAvatar(spec: string): GeneratedGlyphAvatar {
-  return {
-    spec,
-    svg: createAvatar(spec, { ...GLYPH_AVATAR_RENDER_OPTIONS }),
-    generator: GLYPH_AVATAR_GENERATOR,
-    generator_version: GLYPH_AVATAR_VERSION,
-    options: GLYPH_AVATAR_RENDER_OPTIONS,
-  };
+/** The spec a user shows: a valid custom spec, otherwise the automatic one. */
+export function resolveAvatarSpec(username: string, customSpec?: string | null): string {
+  return (customSpec && canonicalAvatarSpec(customSpec)) || automaticAvatarSpec(username);
 }
 
-/** Same-origin URL of a user's saved avatar image; `version` busts the browser cache. */
-export function userAvatarUrl(username: string, version?: string | null): string {
-  const path = `/api/users/${encodeURIComponent(username)}/avatar`;
-  return version ? `${path}?v=${encodeURIComponent(version)}` : path;
+const dataUris = new Map<string, string>();
+
+/**
+ * A `data:` URI of the circular SVG for a canonical spec.
+ *
+ * The SVG is generated locally and shown through `<img>`, so it needs no network request and
+ * cannot run script. Results are memoized because lists render the same users repeatedly.
+ */
+export function glyphAvatarDataUri(spec: string): string {
+  let uri = dataUris.get(spec);
+  if (!uri) {
+    uri = avatarDataUri(spec, { shape: "circle" });
+    dataUris.set(spec, uri);
+  }
+  return uri;
 }
