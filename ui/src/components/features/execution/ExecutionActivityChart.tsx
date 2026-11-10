@@ -1,6 +1,6 @@
 "use client";
 
-import { type KeyboardEvent, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useCallback, useMemo, useRef, useState } from "react";
 
 import { useGetExecutionActivity } from "@/client/execution/execution";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
@@ -17,7 +17,6 @@ import {
   activityBucketTitle,
   activityScaleNote,
   activityStatusTotals,
-  activityWindowSummary,
   describeActivityDay,
   longActivityDate,
   parseActivityDay,
@@ -92,8 +91,6 @@ interface ExecutionActivityChartProps {
   selectedDate: string;
   /** Called with YYYYMMDD when a day is selected, or `latest` when the selection is cleared. */
   onDateSelect: (date: string) => void;
-  /** Control shown before the window tabs, such as the page's Activity/Chart switch. */
-  modeSwitch?: ReactNode;
 }
 
 /**
@@ -110,7 +107,6 @@ export function ExecutionActivityChart({
   onDaysChange,
   selectedDate,
   onDateSelect,
-  modeSwitch,
 }: ExecutionActivityChartProps) {
   const palette = chartTheme(useIsDarkTheme());
   const { data, isLoading, isError } = useGetExecutionActivity(
@@ -136,6 +132,8 @@ export function ExecutionActivityChart({
   }, [buckets, timeZone]);
 
   const total = totals.reduce((acc, item) => acc + item.count, 0);
+  const failed = totals.find((item) => item.key === "failed")?.count ?? 0;
+  const running = totals.find((item) => item.key === "running")?.count ?? 0;
 
   const blockStyle = activityBlockStyler(palette);
 
@@ -205,29 +203,29 @@ export function ExecutionActivityChart({
               ? "Loading"
               : isError
                 ? `Last ${days} days`
-                : activityWindowSummary(totals, days)}
+                : `${total} in the last ${days} days` +
+                  (failed > 0 ? `, ${failed} failed` : "") +
+                  (running > 0 ? `, ${running} in progress` : "") +
+                  "."}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {modeSwitch}
-          <div
-            className="tabs tabs-boxed w-fit bg-base-200"
-            role="tablist"
-            aria-label="Activity window"
-          >
-            {ACTIVITY_WINDOWS.map((window) => (
-              <button
-                key={window}
-                type="button"
-                role="tab"
-                aria-selected={window === days}
-                className={`tab ${window === days ? "tab-active" : ""}`}
-                onClick={() => onDaysChange(window)}
-              >
-                {window}d
-              </button>
-            ))}
-          </div>
+        <div
+          className="tabs tabs-boxed w-fit bg-base-200"
+          role="tablist"
+          aria-label="Activity window"
+        >
+          {ACTIVITY_WINDOWS.map((window) => (
+            <button
+              key={window}
+              type="button"
+              role="tab"
+              aria-selected={window === days}
+              className={`tab ${window === days ? "tab-active" : ""}`}
+              onClick={() => onDaysChange(window)}
+            >
+              {window}d
+            </button>
+          ))}
         </div>
       </div>
       {isError ? (
