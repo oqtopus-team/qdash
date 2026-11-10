@@ -126,12 +126,15 @@ export function CouplingMetricsGrid({
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
   const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
 
-  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
+  // grid is not square.
   useEffect(() => {
-    if (!isSquareGrid && viewMode === "region") {
-      setViewMode("pan-zoom");
+    if (!isSquareGrid) {
+      setZoomMode("full");
+      setSelectedRegion(null);
+      setRegionSelectionEnabled(false);
     }
-  }, [isSquareGrid, viewMode]);
+  }, [isSquareGrid]);
 
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
   const panClickGuard = usePanClickGuard();
@@ -553,18 +556,16 @@ export function CouplingMetricsGrid({
       {/* View mode toggle */}
       <div className="flex items-center justify-between px-1 md:px-4 py-2">
         <div className="tabs tabs-boxed bg-base-200/50 p-1">
-          {isSquareGrid && (
-            <button
-              type="button"
-              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("region")}
-              title="Lock"
-              aria-label="Lock"
-            >
-              <Lock className="h-4 w-4" />
-              <span className="hidden sm:inline">Lock</span>
-            </button>
-          )}
+          <button
+            type="button"
+            className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+            onClick={() => setViewMode("region")}
+            title="Lock"
+            aria-label="Lock"
+          >
+            <Lock className="h-4 w-4" />
+            <span className="hidden sm:inline">Lock</span>
+          </button>
           <button
             type="button"
             className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}

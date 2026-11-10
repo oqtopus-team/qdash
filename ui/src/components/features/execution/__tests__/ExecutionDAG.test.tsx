@@ -132,7 +132,7 @@ afterEach(() => {
 });
 
 describe("ExecutionDAG lock control", () => {
-  it("starts unlocked with pan/zoom and dragging enabled", () => {
+  it("starts unlocked with pan/zoom enabled and node dragging disabled", () => {
     render(<ExecutionDAG tasks={tasks} />);
 
     expect(screen.getByTestId("controls-interactive")).toBeTruthy();
@@ -143,9 +143,9 @@ describe("ExecutionDAG lock control", () => {
       zoomOnPinch: true,
       zoomOnDoubleClick: true,
       preventScrolling: true,
-      nodesDraggable: true,
+      nodesDraggable: false,
       nodesConnectable: false,
-      elementsSelectable: true,
+      elementsSelectable: false,
     });
     expect(mocks.capturedControlsProps).toMatchObject({
       showInteractive: true,
@@ -156,7 +156,7 @@ describe("ExecutionDAG lock control", () => {
     expect(screen.getByTitle("Fit to view")).toBeTruthy();
   });
 
-  it("locks pan/zoom and dragging when the lock control is toggled", () => {
+  it("locks pan/zoom when the lock control is toggled", () => {
     render(<ExecutionDAG tasks={tasks} />);
     mocks.fitView.mockClear();
 
@@ -206,78 +206,9 @@ describe("ExecutionDAG lock control", () => {
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: true,
       panOnDrag: true,
-      nodesDraggable: true,
-      elementsSelectable: true,
+      nodesDraggable: false,
+      elementsSelectable: false,
     });
-  });
-});
-
-describe("ExecutionDAG node dragging", () => {
-  type CapturedNode = {
-    id: string;
-    position: { x: number; y: number };
-    selected?: boolean;
-    data: Record<string, unknown>;
-  };
-  const capturedNode = (id: string) =>
-    (mocks.capturedProps?.nodes as CapturedNode[] | undefined)?.find((node) => node.id === id);
-
-  it("keeps a dragged node at its new position across selection changes", () => {
-    render(<ExecutionDAG tasks={tasks} />);
-    const onNodesChange = mocks.capturedProps?.onNodesChange as (changes: unknown[]) => void;
-    const untouched = capturedNode("task-2")?.position;
-
-    act(() => {
-      onNodesChange([
-        { type: "position", id: "task-1", position: { x: 500, y: 250 }, dragging: true },
-      ]);
-    });
-
-    expect(capturedNode("task-1")?.position).toEqual({ x: 500, y: 250 });
-    expect(capturedNode("task-2")?.position).toEqual(untouched);
-
-    fireEvent.click(screen.getByTestId("node-task-1"));
-
-    expect(capturedNode("task-1")?.data.isSelected).toBe(true);
-    expect(capturedNode("task-1")?.position).toEqual({ x: 500, y: 250 });
-  });
-
-  it("ignores node changes that carry no position", () => {
-    render(<ExecutionDAG tasks={tasks} />);
-    const onNodesChange = mocks.capturedProps?.onNodesChange as (changes: unknown[]) => void;
-    const before = capturedNode("task-1")?.position;
-
-    act(() => {
-      onNodesChange([
-        { type: "position", id: "task-1", dragging: false },
-        { type: "select", id: "task-1", selected: true },
-      ]);
-    });
-
-    expect(capturedNode("task-1")?.position).toEqual(before);
-  });
-
-  it("keeps React Flow selection apart from the preview selection", () => {
-    render(<ExecutionDAG tasks={tasks} />);
-    const onNodesChange = mocks.capturedProps?.onNodesChange as (changes: unknown[]) => void;
-
-    act(() => {
-      onNodesChange([{ type: "select", id: "task-1", selected: true }]);
-    });
-
-    expect(capturedNode("task-1")?.selected).toBe(true);
-    expect(capturedNode("task-1")?.data.isSelected).toBe(false);
-    expect(capturedNode("task-2")?.selected).toBeUndefined();
-
-    act(() => {
-      onNodesChange([
-        { type: "select", id: "task-1", selected: false },
-        { type: "select", id: "task-2", selected: true },
-      ]);
-    });
-
-    expect(capturedNode("task-1")?.selected).toBe(false);
-    expect(capturedNode("task-2")?.selected).toBe(true);
   });
 });
 

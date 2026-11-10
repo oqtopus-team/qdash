@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ReactFlow,
@@ -15,7 +15,7 @@ import {
 } from "@xyflow/react";
 import dagre from "dagre";
 
-import type { Node, Edge, NodeChange, NodeProps, NodeTypes, XYPosition } from "@xyflow/react";
+import type { Node, Edge, NodeProps, NodeTypes } from "@xyflow/react";
 
 import { TaskResultPreviewSidebar } from "@/components/features/task-results/TaskResultPreviewSidebar";
 import {
@@ -135,8 +135,9 @@ interface ExecutionDAGProps {
 
 /**
  * React Flow canvas for the execution graph. Starts unlocked with pan and zoom enabled;
- * the Controls lock button locks or unlocks pan, zoom and node dragging. Locking resets the view
- * to the default fitted view and hides the Controls zoom and fit buttons so it stays there.
+ * the Controls lock button locks or unlocks pan and zoom. Locking resets the view to the default
+ * fitted view and hides the Controls zoom and fit buttons so it stays there. Nodes stay at their
+ * computed layout: they cannot be dragged, so dragging on a node pans the canvas.
  */
 function FlowContent({
   nodes,
@@ -153,44 +154,6 @@ function FlowContent({
 }) {
   const { fitView } = useReactFlow();
   const [isLocked, setIsLocked] = useState(false);
-
-  // `nodes` is controlled, so keep the positions the user drags nodes to and the React Flow
-  // selection, and apply them over the computed layout; otherwise React Flow drops every drag,
-  // and keyboard selection (Enter/Space) never sets `node.selected`, so arrow keys cannot move
-  // the node. This selection is separate from the preview selection in `data.isSelected`.
-  const [draggedPositions, setDraggedPositions] = useState<Record<string, XYPosition>>({});
-  const [flowSelection, setFlowSelection] = useState<Record<string, boolean>>({});
-  const displayedNodes = useMemo(
-    () =>
-      nodes.map((node) => {
-        const position = draggedPositions[node.id];
-        const selected = flowSelection[node.id];
-        if (!position && selected === undefined) return node;
-        return {
-          ...node,
-          ...(position ? { position } : {}),
-          ...(selected !== undefined ? { selected } : {}),
-        };
-      }),
-    [nodes, draggedPositions, flowSelection],
-  );
-  const handleNodesChange = useCallback((changes: NodeChange[]) => {
-    const moved: Record<string, XYPosition> = {};
-    const selection: Record<string, boolean> = {};
-    for (const change of changes) {
-      if (change.type === "position" && change.position) {
-        moved[change.id] = change.position;
-      } else if (change.type === "select") {
-        selection[change.id] = change.selected;
-      }
-    }
-    if (Object.keys(moved).length > 0) {
-      setDraggedPositions((previous) => ({ ...previous, ...moved }));
-    }
-    if (Object.keys(selection).length > 0) {
-      setFlowSelection((previous) => ({ ...previous, ...selection }));
-    }
-  }, []);
 
   // Unlocked, the viewport is the user's pan/zoom: only the locked canvas refits when its
   // container size changes, so the user's view survives fullscreen and preview toggles.
@@ -230,10 +193,9 @@ function FlowContent({
 
   return (
     <ReactFlow
-      nodes={displayedNodes}
+      nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
-      onNodesChange={handleNodesChange}
       fitView
       className="bg-base-200"
       minZoom={0.1}
@@ -244,9 +206,9 @@ function FlowContent({
       zoomOnPinch={!isLocked}
       zoomOnDoubleClick={!isLocked}
       preventScrolling={!isLocked}
-      nodesDraggable={!isLocked}
+      nodesDraggable={false}
       nodesConnectable={false}
-      elementsSelectable={!isLocked}
+      elementsSelectable={false}
       defaultEdgeOptions={{
         type: "smoothstep",
         animated: true,
