@@ -10,7 +10,7 @@ the project toolchain.
 | Tool                                                       | Version | Description                              |
 | ---------------------------------------------------------- | ------- | ---------------------------------------- |
 | [Docker](https://docs.docker.com/get-docker/)              | -       | Container virtualization platform        |
-| [Docker Compose](https://docs.docker.com/compose/install/) | v2.24+  | Management of multiple Docker containers |
+| [Docker Compose](https://docs.docker.com/compose/install/) | v2.24.4+ | Management of multiple Docker containers |
 | [go-task](https://taskfile.dev/installation/)              | v3.41+  | Task runner for development commands     |
 | [uv](https://docs.astral.sh/uv/)                           | -       | Python package manager                   |
 
@@ -152,9 +152,9 @@ Then start the lightweight development stack:
 task dev-local
 ```
 
-This starts MongoDB, PostgreSQL, Prefect, the deployment service, and the user flow worker with
-Docker Compose, then runs the API and UI on the host. The UI is available at
-<http://localhost:5714>.
+This starts Caddy, MongoDB, PostgreSQL, Prefect, the deployment service, the user flow worker,
+and the Pi Agent Runtime with Docker Compose, then runs the API and UI with hot reload on the
+host. Open QDash at <http://localhost:5714> (`UI_PORT`), as in a Compose deployment.
 
 Stop the host API/UI processes and Docker Compose services:
 
@@ -181,28 +181,35 @@ DevContainer or Nix shell.
 task dev-local
 ```
 
-This starts the supporting services in Docker Compose and runs the API and UI directly on the
-host. Use this flow when editing backend or frontend code frequently.
+This starts the supporting services in Docker Compose and runs the API and UI with hot reload,
+on the host or in the DevContainer. Use this flow when editing backend or frontend code
+frequently. The `caddy` service of the Compose deployment serves the browser on `UI_PORT` with
+the same Caddyfile, so `/api`, `/prefect` with its sign-in check, and the Copilot chat stream
+behave as in production.
 
 The component tasks are:
 
-- `task dev-services`: start MongoDB, PostgreSQL, Prefect, deployment-service, and user-flow-worker,
-  adding `compose.dev-local.yaml` to publish MongoDB (`MONGO_PORT`), Prefect (`PREFECT_PORT`),
-  and the deployment service (`DEPLOYMENT_SERVICE_PORT`) on `127.0.0.1`
-- `task dev-api-local`: run the FastAPI app on the host against Docker services
-- `task dev-ui-local`: run the Next.js app on the host against the local API
+- `task dev-services`: start Caddy, MongoDB, PostgreSQL, Prefect, deployment-service,
+  user-flow-worker, and the Pi Agent Runtime, adding `compose.dev-local.yaml`, which points Caddy
+  at the API and UI below and publishes MongoDB (`MONGO_PORT`), Prefect (`PREFECT_PORT`), the
+  deployment service (`DEPLOYMENT_SERVICE_PORT`), and the runtime (`AGENT_RUNTIME_PORT`, default
+  `8002`) on `127.0.0.1`
+- `task dev-api-local`: run the FastAPI app with `--reload` on `API_PORT`
+- `task dev-ui-local` (or `task dev-ui`): run `next dev` on `UI_DEV_PORT`, default `5713`, behind
+  Caddy; it needs `task dev-services` running
 
-### Access Points
+| Service | URL |
+| --- | --- |
+| QDash UI | http://localhost:5714 |
+| API Documentation | http://localhost:5714/api/docs |
+| Prefect Dashboard | http://localhost:5714/prefect/ (signed in) |
 
-| Service           | URL                        |
-| ----------------- | -------------------------- |
-| QDash UI          | http://localhost:5714      |
-| API Documentation | http://localhost:5715/docs |
-| Prefect Dashboard | http://localhost:5714/prefect/dashboard |
-
-The Next.js development server proxies `/api` to the host API and `/prefect` to Prefect, so the
-UI port serves the same paths as the Compose stack's
-[browser entry point](./architecture.md#browser-entry-point). It does not check Prefect access.
+Two development stacks on one host also need distinct `API_PORT`, `UI_DEV_PORT`, and the
+loopback ports above. On macOS the API and Next.js listen on `127.0.0.1`. On a Linux host they
+listen on `0.0.0.0` so that Caddy can reach them through the Docker host gateway, which also
+exposes them to the local network; set `QDASH_DEV_BIND` to narrow this. A DevContainer created
+before this setting existed must be recreated so that `QDASH_DEV_HOST` is set; see
+[how Caddy reaches the development servers](./architecture.md#browser-entry-point).
 `task dev-local-down` stops the host processes and the services with the same overlay.
 
 Use [Developer Commands](./commands.md) for linting, tests, builds, generation,

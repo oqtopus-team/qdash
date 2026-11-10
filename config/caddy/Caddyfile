@@ -1,5 +1,8 @@
 # Browser entry point of the Docker Compose stack, published on UI_PORT:
 # the UI at /, the QDash API at /api and Prefect at /prefect.
+# QDASH_API_UPSTREAM and QDASH_UI_UPSTREAM name the API and UI servers: the api and
+# ui services in compose.yaml, or the `task dev-local` processes in
+# compose.dev-local.yaml. Both use these same routes.
 # TLS, when used, terminates in front of this proxy (for example Cloudflare Tunnel).
 # Caddy trusts no client: the X-Forwarded-* headers it sends upstream are its own.
 {
@@ -26,7 +29,7 @@
 	handle @api {
 		# The API keeps the /api prefix: its root_path removes it for routing and
 		# adds it to the URLs it builds, such as trailing-slash redirects.
-		reverse_proxy api:{$API_PORT} {
+		reverse_proxy {$QDASH_API_UPSTREAM} {
 			header_up X-Forwarded-Proto {public_scheme}
 		}
 	}
@@ -37,7 +40,7 @@
 		route {
 			# Every Prefect request needs a QDash sign-in. The API answers 2xx to
 			# continue, or the denial that is returned to the browser as is.
-			reverse_proxy api:{$API_PORT} {
+			reverse_proxy {$QDASH_API_UPSTREAM} {
 				method GET
 				rewrite /auth/prefect-access
 				header_up Authorization "Bearer {http.request.cookie.access_token}"
@@ -75,7 +78,7 @@
 	}
 
 	handle {
-		reverse_proxy ui:{$UI_PORT} {
+		reverse_proxy {$QDASH_UI_UPSTREAM} {
 			header_up X-Forwarded-Proto {public_scheme}
 		}
 	}

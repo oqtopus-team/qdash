@@ -144,25 +144,73 @@ def test_stacks_differing_only_in_env_and_ui_port_do_not_share_host_ports(
 
 
 def test_dev_overlay_publishes_only_host_development_dependencies(tmp_path: Path) -> None:
-    """compose.dev-local.yaml adds loopback ports for the host API and UI and nothing else."""
+    """compose.dev-local.yaml adds loopback ports for the host API and nothing else."""
     compose = render(tmp_path, files=(REPO_ROOT / "compose.yaml", DEV_OVERLAY))
 
+    # Browsers still use only Caddy on UI_PORT; the rest is loopback for the host API.
     assert published(compose) == {
         "caddy": {("", "5714", 80)},
         "mongo": {("127.0.0.1", "27017", 27017)},
         "prefect-server": {("127.0.0.1", "4200", 4200)},
         "deployment-service": {("127.0.0.1", "4006", 8001)},
+        "agent-runtime": {("127.0.0.1", "8002", 8002)},
     }
 
     custom = (
         LEGACY_ENV.replace("MONGO_PORT=27017", "MONGO_PORT=27018")
         .replace("PREFECT_PORT=4200", "PREFECT_PORT=4201")
         .replace("DEPLOYMENT_SERVICE_PORT=4006", "DEPLOYMENT_SERVICE_PORT=4007")
+        + "AGENT_RUNTIME_PORT=8003\n"
     )
     ports = published(render(tmp_path, custom, files=(REPO_ROOT / "compose.yaml", DEV_OVERLAY)))
     assert ports["mongo"] == {("127.0.0.1", "27018", 27017)}
     assert ports["prefect-server"] == {("127.0.0.1", "4201", 4200)}
     assert ports["deployment-service"] == {("127.0.0.1", "4007", 8001)}
+    assert ports["agent-runtime"] == {("127.0.0.1", "8003", 8003)}
+
+
+@pytest.mark.parametrize(
+    ("extra_env", "dev_host", "ui_dev_port"),
+    [
+        # macOS and Linux hosts: Caddy reaches host processes at host.docker.internal.
+        ("", "host.docker.internal", "5713"),
+        # The DevContainer sets QDASH_DEV_HOST; Caddy reaches it on custom_net.
+        ("QDASH_DEV_HOST=devcontainer\nUI_DEV_PORT=3000\n", "devcontainer", "3000"),
+    ],
+)
+def test_dev_overlay_points_caddy_at_the_development_servers(
+    tmp_path: Path, extra_env: str, dev_host: str, ui_dev_port: str
+) -> None:
+    """The same Caddyfile proxies to the hot-reloading API and UI, not their images."""
+    env = LEGACY_ENV.replace("API_PORT=5715", "API_PORT=5730") + extra_env
+    services = render(tmp_path, env, files=(REPO_ROOT / "compose.yaml", DEV_OVERLAY))["services"]
+
+    caddy = services["caddy"]
+    assert environment(caddy) == {
+        "QDASH_API_UPSTREAM": f"{dev_host}:5730",
+        "QDASH_UI_UPSTREAM": f"{dev_host}:{ui_dev_port}",
+        "CLIENT_URL": "http://localhost:5714",
+    }
+    # Linux Docker Engine resolves host.docker.internal only with this entry.
+    assert caddy["extra_hosts"] == ["host.docker.internal=host-gateway"]
+    # Starting caddy or agent-runtime must not build and start the api and ui images.
+    assert set(caddy["depends_on"]) == {"prefect-server"}
+    assert set(services["agent-runtime"]["depends_on"]) == {"agent-exec", "agent-runtime-auth"}
+    # The runtime calls the development API back; the browser never reaches it.
+    runtime = environment(services["agent-runtime"])
+    assert runtime["QDASH_BASE_URL"] == f"http://{dev_host}:5730"
+    # Same Caddyfile in both stacks.
+    assert caddy["volumes"] == render(tmp_path)["services"]["caddy"]["volumes"]
+
+
+def test_devcontainer_marks_itself_as_the_development_host(tmp_path: Path) -> None:
+    """compose.devcontainer.yaml names itself for Caddy and shares custom_net."""
+    compose = render(tmp_path, files=(REPO_ROOT / "compose.devcontainer.yaml",))
+    devcontainer = compose["services"]["devcontainer"]
+
+    assert environment(devcontainer)["QDASH_DEV_HOST"] == "devcontainer"
+    assert "custom_net" in devcontainer["networks"]
+    assert compose["networks"]["custom_net"]["name"] == "dev-fake_custom_net"
 
 
 def test_only_host_development_tasks_load_the_dev_overlay() -> None:
@@ -174,9 +222,29 @@ def test_only_host_development_tasks_load_the_dev_overlay() -> None:
 
     overlay = "docker compose -f compose.yaml -f compose.dev-local.yaml"
     assert commands("dev-services")[0].startswith(f"{overlay} up -d ")
+    # Caddy and the Pi Agent Runtime start with the other development services; the
+    # API and UI images do not.
+    started = set(commands("dev-services")[0].removeprefix(f"{overlay} up -d ").split())
+    assert {"caddy", "agent-runtime", "prefect-server", "mongo"} <= started
+    assert not started & {"api", "ui"}
     assert commands("dev-local-down")[-1] == f"{overlay} down"
     for name in ("deploy", "deploy-local", "deploy-local-fake"):
         assert all("compose.dev-local.yaml" not in command for command in commands(name))
+
+
+def test_dev_processes_leave_the_ingress_port_to_caddy() -> None:
+    """Next.js listens on UI_DEV_PORT, and dev-local-down never stops UI_PORT's listener."""
+    tasks = yaml.safe_load((REPO_ROOT / "Taskfile.yaml").read_text())["tasks"]
+    ui = "\n".join(tasks["dev-ui-local"]["cmds"])
+    down = "\n".join(c for c in tasks["dev-local-down"]["cmds"] if isinstance(c, str))
+
+    assert 'PORT="${UI_DEV_PORT:-5713}"' in ui
+    assert "UI_PORT" not in ui
+    assert 'stop_port "${UI_DEV_PORT:-5713}" "UI"' in down
+    assert 'stop_port "${UI_PORT' not in down
+    # The Next.js rewrites these variables configured are gone.
+    for name in ("dev-api-local", "dev-ui-local"):
+        assert "INTERNAL_" not in "\n".join(tasks[name]["cmds"])
 
 
 def test_prefect_ui_moves_under_prefect_while_services_keep_its_api(tmp_path: Path) -> None:
@@ -198,6 +266,8 @@ def test_ui_image_ignores_browser_urls_from_env(tmp_path: Path) -> None:
 
     assert ui["build"]["args"]["NEXT_PUBLIC_API_URL"] == "/api"
     assert "NEXT_PUBLIC_PREFECT_URL" not in ui["build"]["args"]
+    # Caddy proxies /api, so the image no longer gets an internal API URL.
+    assert "INTERNAL_API_URL" not in ui["build"]["args"]
     # A plain `docker compose up -d` rebuilds the UI instead of reusing an old image.
     assert ui["pull_policy"] == "build"
 
@@ -212,8 +282,8 @@ def test_custom_ports_follow_env(tmp_path: Path) -> None:
 
     assert published(compose)["caddy"] == {("", "8080", 80)}
     assert environment(services["caddy"]) == {
-        "API_PORT": "5730",
-        "UI_PORT": "8080",
+        "QDASH_API_UPSTREAM": "api:5730",
+        "QDASH_UI_UPSTREAM": "ui:8080",
         "CLIENT_URL": "http://localhost:8080",
     }
     assert environment(services["ui"])["PORT"] == "8080"
