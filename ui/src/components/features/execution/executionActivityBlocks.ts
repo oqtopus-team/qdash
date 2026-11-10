@@ -138,10 +138,7 @@ export function toActivityColumn(
       left -= take;
     }
   }
-  const counts = ACTIVITY_SERIES.map((series) => ({
-    ...series,
-    count: activityCount(bucket, series.key),
-  }));
+  const counts = activityCounts(bucket);
   return {
     date: bucket.date,
     compact: bucket.date.replace(/-/g, ""),
@@ -153,6 +150,10 @@ export function toActivityColumn(
     blocks,
   };
 }
+
+/** A bucket's executions per status, in stacking order. */
+export const activityCounts = (bucket: ExecutionActivityDay) =>
+  ACTIVITY_SERIES.map((series) => ({ ...series, count: activityCount(bucket, series.key) }));
 
 /** Executions per status across the whole window, in stacking order. */
 export const activityStatusTotals = (buckets: readonly ExecutionActivityDay[]) =>
@@ -186,9 +187,12 @@ export const pluralize = (value: number, noun: string) =>
 /** Bucket length the activity endpoint was asked for. */
 export type ActivityGranularity = "day" | "6h";
 
+/** What a bucket's title and description need: its day, hours and counts. */
+export type ActivityDaySummary = Pick<ActivityDayColumn, "date" | "hours" | "total" | "counts">;
+
 /** Heading of a bucket: its day, plus its hours for a 6-hour bucket. */
 export function activityBucketTitle(
-  column: ActivityDayColumn,
+  column: ActivityDaySummary,
   granularity: ActivityGranularity,
 ): string {
   const day = longActivityDate.format(parseActivityDay(column.date));
@@ -197,7 +201,7 @@ export function activityBucketTitle(
 
 /** One-line description of a bucket, for accessible names. */
 export function describeActivityDay(
-  column: ActivityDayColumn,
+  column: ActivityDaySummary,
   granularity: ActivityGranularity = "day",
 ): string {
   const parts = column.counts
@@ -228,3 +232,23 @@ export const activityScaleNote = (scale: number) =>
   scale === 1
     ? "1 block = 1 execution"
     : `1 block = ${scale} executions, a partly filled block holds fewer`;
+
+/**
+ * One-sentence summary of a window, such as "12 in the last 30 days, 2 failed, 1 in progress.";
+ * failed and in-progress counts appear only when non-zero.
+ */
+export function activityWindowSummary(
+  totals: ReadonlyArray<{ key: ActivityStatusKey; count: number }>,
+  days: number,
+): string {
+  const count = (key: ActivityStatusKey) => totals.find((item) => item.key === key)?.count ?? 0;
+  const total = totals.reduce((acc, item) => acc + item.count, 0);
+  const failed = count("failed");
+  const running = count("running");
+  return (
+    `${total} in the last ${days} days` +
+    (failed > 0 ? `, ${failed} failed` : "") +
+    (running > 0 ? `, ${running} in progress` : "") +
+    "."
+  );
+}

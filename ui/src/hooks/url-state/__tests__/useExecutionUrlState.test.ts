@@ -1,10 +1,28 @@
-import { describe, it, expect } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { withNuqsTestingAdapter } from "nuqs/adapters/testing";
 
 import { useExecutionUrlState } from "../useExecutionUrlState";
 
 describe("useExecutionUrlState", () => {
+  it.each(["20260231", "20261301", "20260010", "20260431", "20260229", "20260100"])(
+    "ignores invalid calendar day %s",
+    (date) => {
+      const { result } = renderHook(() => useExecutionUrlState(), {
+        wrapper: withNuqsTestingAdapter({ searchParams: `date=${date}` }),
+      });
+      expect(result.current.selectedDate).toBe("latest");
+      act(() => result.current.setSelectedDate(date));
+      expect(result.current.selectedDate).toBe("latest");
+    },
+  );
+  it("accepts a leap day", () => {
+    const { result } = renderHook(() => useExecutionUrlState(), {
+      wrapper: withNuqsTestingAdapter({ searchParams: "date=20240229" }),
+    });
+    expect(result.current.selectedDate).toBe("20240229");
+  });
+
   it("returns null default (not empty string) when no URL params are set", () => {
     const { result } = renderHook(() => useExecutionUrlState(), {
       wrapper: withNuqsTestingAdapter({ searchParams: "" }),
@@ -64,5 +82,44 @@ describe("useExecutionUrlState", () => {
     });
 
     expect(result.current.isInitialized).toBe(true);
+  });
+
+  it("reads a YYYYMMDD day filter from the date param and treats others as latest", () => {
+    const day = renderHook(() => useExecutionUrlState(), {
+      wrapper: withNuqsTestingAdapter({ searchParams: "chip=CHIP01&date=20261101" }),
+    });
+    const bogus = renderHook(() => useExecutionUrlState(), {
+      wrapper: withNuqsTestingAdapter({ searchParams: "date=yesterday" }),
+    });
+    const none = renderHook(() => useExecutionUrlState(), {
+      wrapper: withNuqsTestingAdapter({ searchParams: "" }),
+    });
+
+    expect(day.result.current.selectedDate).toBe("20261101");
+    expect(bogus.result.current.selectedDate).toBe("latest");
+    expect(none.result.current.selectedDate).toBe("latest");
+  });
+
+  it("writes a picked day to the URL and removes it for latest", async () => {
+    const onUrlUpdate = vi.fn();
+    const { result } = renderHook(() => useExecutionUrlState(), {
+      wrapper: withNuqsTestingAdapter({ searchParams: "chip=CHIP01", onUrlUpdate }),
+    });
+
+    await act(async () => {
+      result.current.setSelectedDate("20261101");
+    });
+    expect(result.current.selectedDate).toBe("20261101");
+    await waitFor(() =>
+      expect(onUrlUpdate.mock.lastCall?.[0].searchParams.get("date")).toBe("20261101"),
+    );
+
+    await act(async () => {
+      result.current.setSelectedDate("latest");
+    });
+    expect(result.current.selectedDate).toBe("latest");
+    await waitFor(() =>
+      expect(onUrlUpdate.mock.lastCall?.[0].searchParams.has("date")).toBe(false),
+    );
   });
 });

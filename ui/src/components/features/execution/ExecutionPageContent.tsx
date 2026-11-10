@@ -20,6 +20,11 @@ import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { DEFAULT_TIMEZONE, formatDateTime } from "@/lib/utils/datetime";
 
 import {
+  type CalendarWindow,
+  DEFAULT_CALENDAR_WINDOW,
+  ExecutionActivityCalendar,
+} from "./ExecutionActivityCalendar";
+import {
   type ActivityWindow,
   DEFAULT_ACTIVITY_WINDOW,
   ExecutionActivityChart,
@@ -81,6 +86,38 @@ function getStatusBadgeClass(status: string) {
   }
 }
 
+type ActivityMode = "activity" | "chart";
+
+const ACTIVITY_MODES: ReadonlyArray<{ mode: ActivityMode; label: string }> = [
+  { mode: "activity", label: "Activity" },
+  { mode: "chart", label: "Chart" },
+];
+
+/** Switch between the calendar heatmap and the per-status column chart. */
+function ActivityModeSwitch({
+  mode,
+  onModeChange,
+}: {
+  mode: ActivityMode;
+  onModeChange: (mode: ActivityMode) => void;
+}) {
+  return (
+    <div className="join" role="group" aria-label="Activity view">
+      {ACTIVITY_MODES.map((item) => (
+        <button
+          key={item.mode}
+          type="button"
+          aria-pressed={item.mode === mode}
+          className={`btn btn-sm join-item ${item.mode === mode ? "btn-active" : ""}`}
+          onClick={() => onModeChange(item.mode)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function PaginationControls({
   currentPage,
   setCurrentPage,
@@ -124,16 +161,18 @@ export function ExecutionPageContent() {
   const queryClient = useQueryClient();
 
   // URL state management
-  const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
-
-  // Add date state for navigation
-  const [selectedDate, setSelectedDate] = useState<string>("latest");
+  // The day filter lives in the URL, so Home can open the page on a day.
+  const { selectedChip, setSelectedChip, selectedDate, setSelectedDate, isInitialized } =
+    useExecutionUrlState();
 
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // Each view keeps its own window; the selected day is shared, so switching keeps it.
+  const [activityMode, setActivityMode] = useState<ActivityMode>("activity");
   const [activityDays, setActivityDays] = useState<ActivityWindow>(DEFAULT_ACTIVITY_WINDOW);
+  const [calendarDays, setCalendarDays] = useState<CalendarWindow>(DEFAULT_CALENDAR_WINDOW);
   const sidebarRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const executionCards = useRef(new Map<string, HTMLDivElement>());
@@ -375,13 +414,25 @@ export function ExecutionPageContent() {
           </PageFiltersBar.Item>
         </PageFiltersBar.Group>
       </PageFiltersBar>
-      <ExecutionActivityChart
-        chipId={selectedChip || ""}
-        days={activityDays}
-        onDaysChange={setActivityDays}
-        selectedDate={selectedDate}
-        onDateSelect={handleDateChange}
-      />
+      {activityMode === "activity" ? (
+        <ExecutionActivityCalendar
+          chipId={selectedChip || ""}
+          days={calendarDays}
+          onDaysChange={setCalendarDays}
+          selectedDate={selectedDate}
+          onDateSelect={handleDateChange}
+          modeSwitch={<ActivityModeSwitch mode={activityMode} onModeChange={setActivityMode} />}
+        />
+      ) : (
+        <ExecutionActivityChart
+          chipId={selectedChip || ""}
+          days={activityDays}
+          onDaysChange={setActivityDays}
+          selectedDate={selectedDate}
+          onDateSelect={handleDateChange}
+          modeSwitch={<ActivityModeSwitch mode={activityMode} onModeChange={setActivityMode} />}
+        />
+      )}
       <section aria-labelledby="recent-executions-heading">
         <div className="mb-3">
           <h2

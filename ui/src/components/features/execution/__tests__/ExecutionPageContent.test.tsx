@@ -102,10 +102,13 @@ vi.mock("@/hooks/useDateNavigation", () => ({
   useDateNavigation: () => undefined,
 }));
 
+let initialDate = "latest";
+
 vi.mock("@/hooks/useUrlState", () => ({
   useExecutionUrlState: () => {
     const [selectedChip, setSelectedChip] = useState("chip-1");
-    return { selectedChip, setSelectedChip, isInitialized: true };
+    const [selectedDate, setSelectedDate] = useState(initialDate);
+    return { selectedChip, setSelectedChip, selectedDate, setSelectedDate, isInitialized: true };
   },
 }));
 
@@ -124,25 +127,49 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-vi.mock("@/components/features/execution/ExecutionActivityChart", () => ({
-  DEFAULT_ACTIVITY_WINDOW: 30,
-  ExecutionActivityChart: ({
+type ActivityViewProps = {
+  days: number;
+  onDaysChange: (days: number) => void;
+  selectedDate: string;
+  onDateSelect: (date: string) => void;
+  modeSwitch?: React.ReactNode;
+};
+
+/** Stand-in for both activity views: their window, selection and the page's mode switch. */
+function activityView(name: string, otherDays: number) {
+  return function ActivityView({
     days,
+    onDaysChange,
     selectedDate,
     onDateSelect,
-  }: {
-    days: number;
-    selectedDate: string;
-    onDateSelect: (date: string) => void;
-  }) => (
-    <div>
-      <span>ActivityChart {days}d</span>
-      <span>selected:{selectedDate}</span>
-      <button type="button" onClick={() => onDateSelect("20260101")}>
-        pick-day
-      </button>
-    </div>
-  ),
+    modeSwitch,
+  }: ActivityViewProps) {
+    return (
+      <div>
+        {modeSwitch}
+        <span>
+          {name} {days}d
+        </span>
+        <span>selected:{selectedDate}</span>
+        <button type="button" onClick={() => onDateSelect("20260101")}>
+          pick-day
+        </button>
+        <button type="button" onClick={() => onDaysChange(otherDays)}>
+          {name} window {otherDays}
+        </button>
+      </div>
+    );
+  };
+}
+
+vi.mock("@/components/features/execution/ExecutionActivityChart", () => ({
+  DEFAULT_ACTIVITY_WINDOW: 30,
+  ExecutionActivityChart: activityView("ActivityChart", 7),
+}));
+
+vi.mock("@/components/features/execution/ExecutionActivityCalendar", () => ({
+  DEFAULT_CALENDAR_WINDOW: 90,
+  ExecutionActivityCalendar: activityView("ActivityCalendar", 365),
 }));
 
 vi.mock("@/components/charts/TaskFigure", () => ({
@@ -195,6 +222,7 @@ describe("ExecutionPageContent cancel confirmation", () => {
     vi.clearAllMocks();
     loadingNextPage = false;
     executionDetail = DEFAULT_DETAIL;
+    initialDate = "latest";
     // Reset the mutate implementation so callback-driven tests don't leak into others.
     mockCancelMutate.mockReset();
   });
@@ -218,15 +246,48 @@ describe("ExecutionPageContent cancel confirmation", () => {
     expect(mockCancelMutate).not.toHaveBeenCalled();
   });
 
-  it("shows the activity chart and lets it pick the day filter", () => {
+  it("defaults to the 90-day activity heatmap and lets it pick the day filter", () => {
     render(<ExecutionPageContent />);
 
-    expect(screen.getByText("ActivityChart 30d")).toBeTruthy();
+    expect(screen.getByText("ActivityCalendar 90d")).toBeTruthy();
+    expect(screen.queryByText(/ActivityChart/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Activity" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
     expect(screen.getByText("selected:latest")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "pick-day" }));
 
     expect(screen.getByText("selected:20260101")).toBeTruthy();
+  });
+
+  it("opens on the day given in the URL, as Home links do", () => {
+    initialDate = "20261101";
+    render(<ExecutionPageContent />);
+
+    expect(screen.getByText("selected:20261101")).toBeTruthy();
+    expect(screen.getByText("No executions found")).toBeTruthy();
+  });
+
+  it("switches between Activity and Chart, keeping each window and the selected day", () => {
+    render(<ExecutionPageContent />);
+
+    fireEvent.click(screen.getByRole("button", { name: "ActivityCalendar window 365" }));
+    fireEvent.click(screen.getByRole("button", { name: "pick-day" }));
+    fireEvent.click(screen.getByRole("button", { name: "Chart" }));
+
+    expect(screen.getByText("ActivityChart 30d")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Chart" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("selected:20260101")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "ActivityChart window 7" }));
+    expect(screen.getByText("ActivityChart 7d")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Activity" }));
+
+    expect(screen.getByText("ActivityCalendar 365d")).toBeTruthy();
+    expect(screen.getByText("selected:20260101")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Chart" }));
+    expect(screen.getByText("ActivityChart 7d")).toBeTruthy();
   });
 
   it("opens a non-modal details panel", () => {

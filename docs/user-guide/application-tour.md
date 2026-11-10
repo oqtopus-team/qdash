@@ -31,12 +31,15 @@ for the role to assign.
 Use **Dashboard** for broad health checks, **Metrics** for a parameter-focused investigation, and
 **Chip** when the calibration task or physical target is the starting point.
 
-**Executions** on Home counts the runs started on every chip of the active project in the last 30
-days, one column of blocks per day colored by status. Each block represents one execution; on
-busy days the card labels how many executions a full block represents, and the top block of a
-day is only partly filled when it holds fewer. Hover over or focus a day to see its exact counts, and select the chart or
-**All executions** to open the **Execution** page. A run in progress appears as a badge in the top
-bar with its name and status; select the badge to open the run.
+**Executions** on Home shows the runs started on every chip of the active project in the last 90
+days as a compact calendar, one square per day. The color shows how many runs the day had, on the
+same scale as the **Execution** page; see [Monitor a Run](./running-calibrations.md#monitor-a-run).
+Hover over or focus a day to see its exact counts by status, select a day to open the
+**Execution** page filtered to that day, or select **All executions** to open the page unfiltered.
+On **Execution**, choose a chip to inspect its runs; its counts cover that chip rather than all
+project chips.
+A run in progress appears as a badge in the top bar with its name and status; select the badge to
+open the run.
 
 ## Run Your First Calibration
 
