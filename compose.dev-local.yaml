@@ -1,0 +1,14 @@
+# Development-only overlay for `task dev-local`. `task dev-services` and
+# `task dev-local-down` add it to compose.yaml; deployments never load it.
+# It publishes, on loopback only, the ports the API and UI started on the host
+# use to reach MongoDB, Prefect and the deployment service.
+services:
+  mongo:
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+  prefect-server:
+    ports:
+      - "127.0.0.1:${PREFECT_PORT:-4200}:4200"
+  deployment-service:
+    ports:
+      - "127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}:8001"

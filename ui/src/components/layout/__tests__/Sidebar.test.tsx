@@ -14,6 +14,7 @@ vi.mock("next/navigation", () => ({
 const setMobileSidebarOpen = vi.fn();
 const toggleSidebar = vi.fn();
 const sidebarState = vi.hoisted(() => ({ isOpen: true, isMobileOpen: false }));
+const projectState = vi.hoisted(() => ({ canEdit: false }));
 
 vi.mock("@/contexts/SidebarContext", () => ({
   useSidebar: () => ({
@@ -34,7 +35,7 @@ vi.mock("@/contexts/AuthContext", () => ({
 }));
 
 vi.mock("@/contexts/ProjectContext", () => ({
-  useProject: () => ({ canEdit: false }),
+  useProject: () => ({ canEdit: projectState.canEdit }),
 }));
 
 vi.mock("@/contexts/ThemeContext", () => ({
@@ -97,6 +98,7 @@ describe("Sidebar", () => {
     mockPathname.mockReturnValue("/dashboard");
     sidebarState.isOpen = true;
     sidebarState.isMobileOpen = false;
+    projectState.canEdit = false;
   });
 
   it("narrows the mobile drawer to w-56 and drops w-72", () => {
@@ -272,5 +274,14 @@ describe("Sidebar", () => {
     fireEvent.click(within(mobile as HTMLElement).getByRole("link", { name: "Home" }));
 
     expect(setMobileSidebarOpen).toHaveBeenCalledWith(false);
+  });
+
+  it("links Prefect to the same-origin /prefect/dashboard path", () => {
+    projectState.canEdit = true;
+    const { container } = render(<Sidebar />);
+
+    const prefectLink = container.querySelector('a[title="Prefect"]');
+
+    expect(prefectLink?.getAttribute("href")).toBe("/prefect/dashboard");
   });
 });

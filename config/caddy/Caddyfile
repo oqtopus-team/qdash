@@ -1,0 +1,82 @@
+# Browser entry point of the Docker Compose stack, published on UI_PORT:
+# the UI at /, the QDash API at /api and Prefect at /prefect.
+# TLS, when used, terminates in front of this proxy (for example Cloudflare Tunnel).
+# Caddy trusts no client: the X-Forwarded-* headers it sends upstream are its own.
+{
+	admin off
+	auto_https off
+}
+
+:80 {
+	# The scheme browsers use, sent upstream as X-Forwarded-Proto: https for requests
+	# to the host of an https:// CLIENT_URL, http for any other host such as localhost.
+	map {env.CLIENT_URL} {https_host} {
+		~(?i)^https://(?:\[([^\]]+)\]|([^/:?#]+))(?::[0-9]+)?(?:[/?#]|$) "${1}${2}"
+		default " "
+	}
+	@publicHttps expression `{http.request.host}.replace("[", "").replace("]", "").lowerAscii() == {https_host}.lowerAscii()`
+	vars @publicHttps public_https yes
+	# Placeholders of `map` resolve when used, so this one sees the `vars` result.
+	map {vars.public_https} {public_scheme} {
+		yes https
+		default http
+	}
+
+	@api path /api /api/*
+	handle @api {
+		# The API keeps the /api prefix: its root_path removes it for routing and
+		# adds it to the URLs it builds, such as trailing-slash redirects.
+		reverse_proxy api:{$API_PORT} {
+			header_up X-Forwarded-Proto {public_scheme}
+		}
+	}
+
+	@prefect path /prefect /prefect/*
+	handle @prefect {
+		# `route` keeps this order: authorize first, then rewrite and proxy.
+		route {
+			# Every Prefect request needs a QDash sign-in. The API answers 2xx to
+			# continue, or the denial that is returned to the browser as is.
+			reverse_proxy api:{$API_PORT} {
+				method GET
+				rewrite /auth/prefect-access
+				header_up Authorization "Bearer {http.request.cookie.access_token}"
+				header_up X-Forwarded-Method {method}
+				header_up X-Forwarded-Uri {http.request.orig_uri}
+				header_up X-Forwarded-Upgrade {http.request.header.Upgrade}
+				# The access check itself is a plain request, never a websocket.
+				header_up -Upgrade
+				header_up -Connection
+
+				@allowed status 2xx
+				handle_response @allowed {
+					# Any route here makes Caddy continue to the Prefect proxy below.
+					vars prefect_access allowed
+				}
+
+				@unauthorized status 401
+				handle_response @unauthorized {
+					@page {
+						method GET HEAD
+						header Accept *text/html*
+					}
+					redir @page /login 302
+					respond 401
+				}
+			}
+
+			# Prefect serves its UI under /prefect and its API at /api.
+			@prefectApi path /prefect/api /prefect/api/*
+			uri @prefectApi strip_prefix /prefect
+			reverse_proxy prefect-server:4200 {
+				header_up X-Forwarded-Proto {public_scheme}
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy ui:{$UI_PORT} {
+			header_up X-Forwarded-Proto {public_scheme}
+		}
+	}
+}

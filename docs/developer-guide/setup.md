@@ -186,7 +186,9 @@ host. Use this flow when editing backend or frontend code frequently.
 
 The component tasks are:
 
-- `task dev-services`: start MongoDB, PostgreSQL, Prefect, deployment-service, and user-flow-worker
+- `task dev-services`: start MongoDB, PostgreSQL, Prefect, deployment-service, and user-flow-worker,
+  adding `compose.dev-local.yaml` to publish MongoDB (`MONGO_PORT`), Prefect (`PREFECT_PORT`),
+  and the deployment service (`DEPLOYMENT_SERVICE_PORT`) on `127.0.0.1`
 - `task dev-api-local`: run the FastAPI app on the host against Docker services
 - `task dev-ui-local`: run the Next.js app on the host against the local API
 
@@ -196,8 +198,12 @@ The component tasks are:
 | ----------------- | -------------------------- |
 | QDash UI          | http://localhost:5714      |
 | API Documentation | http://localhost:5715/docs |
-| Prefect Dashboard | http://localhost:4200      |
-| MongoDB Admin     | http://localhost:8081      |
+| Prefect Dashboard | http://localhost:5714/prefect/dashboard |
+
+The Next.js development server proxies `/api` to the host API and `/prefect` to Prefect, so the
+UI port serves the same paths as the Compose stack's
+[browser entry point](./architecture.md#browser-entry-point). It does not check Prefect access.
+`task dev-local-down` stops the host processes and the services with the same overlay.
 
 Use [Developer Commands](./commands.md) for linting, tests, builds, generation,
 and documentation tasks. Use [Operator Setup](../user-guide/setup.md) when you need the full

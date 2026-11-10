@@ -141,6 +141,7 @@ them.
 ## External Tools
 
 The bottom of the sidebar links to this documentation and, for project editors, to the Prefect
-dashboard. Use the QDash UI or API for workflow changes so QDash project metadata remains
+dashboard. Prefect opens only for users signed in to QDash. Any signed-in user can view runs
+there; only a system administrator can change anything in Prefect. Use the QDash UI or API for workflow changes so QDash project metadata remains
 synchronized with Prefect. The interactive API documentation is not linked from the sidebar; it is
 served at the API's `/docs` path, listed in [Setup](./setup.md#verify-the-installation).

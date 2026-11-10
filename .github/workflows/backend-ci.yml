@@ -10,6 +10,9 @@ on:
       - "pyproject.toml"
       - "uv.lock"
       - "Taskfile.yaml"
+      - "compose.yaml"
+      - "compose.dev-local.yaml"
+      - "config/caddy/**"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     branches: [main, develop]
@@ -20,6 +23,9 @@ on:
       - "pyproject.toml"
       - "uv.lock"
       - "Taskfile.yaml"
+      - "compose.yaml"
+      - "compose.dev-local.yaml"
+      - "config/caddy/**"
       - ".github/workflows/backend-ci.yml"
 
 permissions:
@@ -126,6 +132,16 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --all-packages --all-groups
+
+      - name: Install deployment Caddy for proxy tests
+        run: |
+          image=$(docker compose --env-file .env.example config --format json --no-env-resolution | jq -r '.services.caddy.image')
+          container=$(docker create "$image")
+          trap 'docker rm "$container"' EXIT
+          docker cp "$container:/usr/bin/caddy" "$RUNNER_TEMP/caddy"
+          chmod +x "$RUNNER_TEMP/caddy"
+          "$RUNNER_TEMP/caddy" version
+          echo "CADDY_BIN=$RUNNER_TEMP/caddy" >> "$GITHUB_ENV"
 
       - name: Run tests with coverage
         run: task ci-test

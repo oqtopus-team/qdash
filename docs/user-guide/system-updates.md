@@ -81,12 +81,36 @@ docker compose ps
 ```
 
 - QDash UI: <http://localhost:5714/login>
-- API documentation: <http://localhost:5715/docs>
-- Prefect: <http://localhost:4200>
+- API documentation: <http://localhost:5714/api/docs>
+- Prefect: <http://localhost:5714/prefect/dashboard>
 
-Use the ports from `.env` if the deployment overrides the defaults. Follow service logs as
+Use `UI_PORT` from `.env` if the deployment overrides the default. Follow service logs as
 described in [Operations](./operations.md#inspect-logs) when a container is unhealthy or a page is
 unavailable.
+
+## Check Direct Service Access
+
+The `caddy` service serves the UI, the API under `/api`, and Prefect under `/prefect` on
+`UI_PORT`, the only port QDash opens on the host. The API, Prefect, MongoDB, PostgreSQL,
+mongo-express, and deployment service ports are reachable only from the other QDash containers,
+not from the QDash host itself. Updating from a release without `caddy` needs no `.env` change;
+`docker compose up -d` also rebuilds the UI image, so it does not keep serving an older UI.
+
+Check what reached those services directly, from another machine or from the QDash host:
+
+- Change a script, client, or proxy that called `API_PORT` or `PREFECT_PORT` to
+  `http://<host>:<UI_PORT>/api` or `http://<host>:<UI_PORT>/prefect`. Prefect there requires a
+  QDash sign-in in the browser.
+- Run database tools inside the containers, as in
+  [Open a Database Shell](./operations.md#open-a-database-shell), instead of connecting to
+  `MONGO_PORT`, `POSTGRES_PORT`, or mongo-express on `MONGO_EXPRESS_PORT`.
+- Remove a `compose.override.yaml` port mapping that publishes `UI_PORT` for the `ui` service;
+  `caddy` now uses that port.
+- A Cloudflare Tunnel or other HTTPS proxy that points to `UI_PORT` keeps working when
+  `CLIENT_URL` is its `https://` URL, as [Enable Remote Access](./setup.md#enable-remote-access)
+  sets it. QDash takes the HTTPS scheme from `CLIENT_URL`, not from the proxy's
+  `X-Forwarded-Proto`, so the proxy must keep the public hostname in the `Host` header, as
+  Cloudflare Tunnel does by default.
 
 ## Check Saved Workflows
 

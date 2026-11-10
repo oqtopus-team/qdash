@@ -768,6 +768,7 @@ async def test_execute_agent_candidate_apply_dispatches_in_the_background(
     }
     assert response.execution_id == "flow-run-7"
     assert response.flow_run_id == "flow-run-7"
+    assert response.flow_run_url.endswith("/prefect/runs/flow-run/flow-run-7")
 
 
 @pytest.mark.asyncio

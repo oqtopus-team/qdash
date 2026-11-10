@@ -1,12 +1,34 @@
 name: ${ENV:-default}
 services:
+  caddy:
+    # Browser entry point on UI_PORT: the UI at /, the API at /api and Prefect
+    # at /prefect (signed-in QDash users only). See config/caddy/Caddyfile.
+    # This is the only port the stack publishes on the host, so stacks with
+    # different ENV (Compose project) and UI_PORT values run side by side.
+    # Other services talk over custom_net; `task dev-local` adds the loopback
+    # ports it needs with compose.dev-local.yaml.
+    image: caddy:2.10.2-alpine
+    restart: always
+    environment:
+      API_PORT: ${API_PORT:-5715}
+      UI_PORT: ${UI_PORT:-5714}
+      # Its scheme and host tell Caddy which browser requests use HTTPS.
+      CLIENT_URL: ${CLIENT_URL:-}
+    ports:
+      - "${UI_PORT:-5714}:80"
+    volumes:
+      - ./config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - ui
+      - api
+      - prefect-server
+    networks:
+      - custom_net
   mongo:
     image: mongo
     restart: always
     env_file:
       - .env
-    ports:
-      - "${MONGO_PORT:-27017}:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -49,8 +71,6 @@ services:
     restart: always
     env_file:
       - .env
-    ports:
-      - "${MONGO_EXPRESS_PORT:-8081}:8081"
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
@@ -69,8 +89,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${POSTGRES_DATA_PATH:-./postgres_data}:/var/lib/postgresql/data
     healthcheck:
@@ -88,10 +106,14 @@ services:
       - .env
     entrypoint: ["/bin/bash", "-c"]
     command: ["prefect server start --host 0.0.0.0"]
-    ports:
-      - "${PREFECT_PORT:-4200}:4200"
     environment:
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # The browser opens the Prefect UI through Caddy at /prefect, which maps
+      # /prefect/api to this server's /api. Services keep using /api directly.
+      - PREFECT_SERVER_UI_SERVE_BASE=/prefect
+      - PREFECT_SERVER_UI_API_URL=/prefect/api
+      # The browser session reaches Prefect with a cookie; require CSRF tokens.
+      - PREFECT_SERVER_API_CSRF_PROTECTION_ENABLED=true
     depends_on:
       postgres:
         condition: service_healthy
@@ -122,8 +144,6 @@ services:
       - deployment-logs:/app/logs
     working_dir: /app/qdash/workflow
     command: uvicorn deployment_service:app --host 0.0.0.0 --port 8001 --reload
-    ports:
-      - "${DEPLOYMENT_SERVICE_PORT:-8001}:8001"
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
       - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
@@ -174,8 +194,6 @@ services:
     restart: always
     env_file:
       - .env
-    ports:
-      - "${API_PORT:-5715}:${API_PORT:-5715}"
     volumes:
       - ./src/qdash/api:/app/qdash/api
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (used by reanalysis service)
@@ -199,7 +217,11 @@ services:
       - ./src/qdash:/app/source/qdash:ro
       - ${CALIBTASKS_PATH:-./src/qdash/workflow/calibtasks}:/app/source/qdash/workflow/calibtasks:ro
     working_dir: /app/qdash/api
-    command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
+    # --forwarded-allow-ips: take the scheme of redirects and URLs from the
+    # X-Forwarded-Proto that Caddy sets from CLIENT_URL. The port is not
+    # published on the host; only Caddy and other containers on custom_net
+    # reach it.
+    command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --forwarded-allow-ips=* --log-level debug
     develop:
       watch:
         - action: sync
@@ -357,18 +379,19 @@ services:
       context: .
       dockerfile: ./ui/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        # The browser reaches the API through Caddy on the same origin.
+        NEXT_PUBLIC_API_URL: /api
         NEXT_PUBLIC_ENV: ${ENV}
         NEXT_PUBLIC_DEFAULT_THEME: ${NEXT_PUBLIC_DEFAULT_THEME:-light}
-        NEXT_PUBLIC_PREFECT_URL: ${NEXT_PUBLIC_PREFECT_URL}
         INTERNAL_API_URL: http://api:${API_PORT:-5715}
+    # Rebuild on every `docker compose up`, so a plain `up -d` after `git pull`
+    # does not keep serving an old UI image. Unchanged sources hit the cache.
+    pull_policy: build
     restart: always
     env_file:
       - .env
     environment:
       - PORT=${UI_PORT:-5714}
-    ports:
-      - "${UI_PORT:-5714}:${UI_PORT:-5714}"
     depends_on:
       - api
     networks:

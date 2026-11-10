@@ -138,7 +138,8 @@ tasks:
   dev-services:
     desc: Start only the services needed by host-side API/UI development
     cmds:
-      - docker compose up -d mongo postgres prefect-server deployment-service user-flow-worker
+      # compose.dev-local.yaml publishes the loopback ports the host API and UI use.
+      - docker compose -f compose.yaml -f compose.dev-local.yaml up -d mongo postgres prefect-server deployment-service user-flow-worker
 
   dev-local-down:
     desc: Stop host API/UI processes and Docker Compose services started for development
@@ -193,7 +194,7 @@ tasks:
         stop_command "bun run dev" "UI"
         stop_port "${API_PORT:-5715}" "API"
         stop_port "${UI_PORT:-5714}" "UI"
-      - docker compose down
+      - docker compose -f compose.yaml -f compose.dev-local.yaml down
 
   dev-local-setup:
     desc: Install dependencies and tools needed by local development
@@ -230,7 +231,7 @@ tasks:
         /bin/sh -c '
         mkdir -p ../.tmp
         echo "$$" > ../.tmp/dev-ui-local.pid
-        PORT="${UI_PORT:-5714}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" exec bun run dev
+        PORT="${UI_PORT:-5714}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" INTERNAL_PREFECT_URL="http://127.0.0.1:${PREFECT_PORT:-4200}" exec bun run dev
         '
 
   dev-local:
