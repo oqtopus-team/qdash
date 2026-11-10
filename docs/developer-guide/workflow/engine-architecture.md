@@ -8,16 +8,19 @@ layer described in [Workflow Services](./services.md).
 
 | Component | Responsibility | Does not own |
 | --- | --- | --- |
-| `CalibService` | Pipeline lifecycle, hardware reservation, Prefect terminal hooks, and high-level steps | Task internals |
+| `CalibService` | The author contract: checked context, run metadata, and `run(targets, steps)` | Lifecycle, reservations, or workers |
+| `CalibSession` | Pipeline and Execution lifecycle, hardware reservation, worker settings, and terminal cleanup | Task internals or project authorization |
 | `CalibOrchestrator` | One execution's backend, task context, and execution record | Cross-step scheduling or resource reservation |
 | `ExecutionService` | Execution state transitions and repository persistence | Task-result state |
 | `TaskContext` | In-memory task state, artifacts, and the configured `TaskExecutor` | Execution-level status |
 | `TaskExecutor` | Preprocess, run, postprocess, validation, and result persistence | Prefect flow structure |
 | Backend | Hardware-specific operations and calibration-note updates | QDash lifecycle policy |
 
-`CalibService` is the normal entry point for flow authors. Direct use of
-`CalibOrchestrator` is useful in engine tests and low-level integrations, but callers then own
-initialization and terminal handling themselves.
+`CalibService` is the entry point for flow authors; see
+[Workflow Author Contract](./services.md#workflow-author-contract). It builds one typed
+`SessionSettings` and hands it to an internal `CalibSession`, which owns everything below. Direct
+use of `CalibOrchestrator` is useful in engine tests and low-level integrations, but callers then
+own initialization and terminal handling themselves.
 
 ## Execution Identity
 
@@ -43,7 +46,7 @@ execution history.
 ```mermaid
 sequenceDiagram
     participant Flow as Prefect flow
-    participant Service as CalibService
+    participant Service as CalibSession
     participant Orchestrator as CalibOrchestrator
     participant Runner as Prefect task wrapper
     participant Executor as TaskExecutor
@@ -110,33 +113,57 @@ state is documented in [Calibration Data Lifecycle](./calibration-data-lifecycle
 
 ## Hardware Reservations
 
-`CalibService` resolves qubit or MUX inputs into an `ExecutionResourceScope` before hardware work.
+`CalibSession` resolves qubit or MUX inputs into an `ExecutionResourceScope` before hardware work.
 A pipeline reserves the union of all step scopes before its first step and retains the same owner
-until the pipeline reaches a terminal path. Child workers use `use_lock=False` and borrow the
-parent execution; they must not acquire or release the parent's reservation.
+until the pipeline reaches a terminal path. The single-task executor reserves its one target the
+same way. Isolated workers borrow the owner's Execution and reservation; they never acquire or
+release the reservation.
 
 Repository implementations compare the requested chip, resource keys, and `exclusive` flag
 atomically. A task whose requested scope exceeds the pipeline reservation is rejected before the
 backend call.
+
+## Isolated Workers
+
+`SessionSettings` in `service/_internal/settings.py` is the one record of how a run measures and
+publishes. Every session of a run is built from it: the owner session of each pipeline step, the
+single-task executor's session, and every isolated worker. `CalibSession.worker_spec()` is the
+only place that derives worker settings, as a frozen, picklable `WorkerSpec` that Prefect and
+Dask pass to worker processes; `borrowed_session()` opens the worker and releases only its
+backend when the block ends.
+
+| Setting | Worker policy |
+| --- | --- |
+| Context, backend, run metadata, `default_run_parameters`, per-task defaults | Inherited unchanged |
+| Configuration mode | Inherited as resolved by the owner, including the layout a `ConfigureAll` step selected |
+| Snapshot source (`source_execution_id`, `source_task_id`, exempt tasks) | Inherited, so a re-execution restores the same snapshot in every worker |
+| `force_update_params` | Inherited |
+| GitHub pull and push | Disabled; the owner pulls before and pushes after its Execution |
+| Execution and reservation | Borrowed through `WorkerLease`; never claimed, created, finished, locked, or unlocked |
+
+Serial and batch strategies run in the owner's session, which an in-process Prefect task reads
+through `session_context.get_session()`.
 
 ## Cancellation
 
 Cancellation has two paths because a running worker can observe either a Prefect cancellation
 exception or a process termination signal.
 
-- A `CancelledRun` or `CancelledError` handled inside the flow calls
-  `CalibService.cancel_calibration()`.
+- A `CancelledRun` or `CancelledError` raised inside an Execution that a session owns cancels it
+  through `CalibSession.owned_execution()`, which also completes it on success and fails it on
+  any other exception.
 - A Prefect-installed termination signal leaves the execution open. The registered
   `on_flow_cancellation` or `on_flow_crashed` hook finds executions by `flow_run_id`, assigns the
   correct terminal status, finalizes unfinished tasks, and releases the reservation.
 
 Top-level flows that own a reservation, including `single-task-executor`, use the ordinary terminal
-hooks. The `*_keep_lock` variants are for nested flows configured with `use_lock=False` that borrow
-the parent pipeline's reservation. If `project_id` was resolved inside `CalibService`, terminal hooks
-recover it from the execution history recorded for the same `flow_run_id`. Initialization also
-releases its reservation on signals or cancellation before the caller receives the session.
-The shared flow helpers in `service/calib_service.py` implement the exception classification and
-terminal behavior; flow templates should not reproduce that policy independently.
+hooks. The `*_keep_lock` variants are for nested flows that borrow another run's reservation. If
+`project_id` was resolved from the user's default project, terminal hooks recover it from the
+execution history recorded for the same `flow_run_id`. Initialization also releases its
+reservation on signals or cancellation before the run holds an Execution. The helpers in
+`service/_internal/lifecycle.py` implement the exception classification and terminal hooks, and
+`service/calib_service.py` re-exports the hooks for flows; flow templates should not reproduce
+that policy independently.
 
 <Diagram name="execution-reservation" caption="The pipeline owner reserves hardware once; borrowers are checked against that reservation, and only the owner's terminal paths release it." />
 
@@ -197,7 +224,8 @@ Schedulers return execution groups but do not execute them. See the
 | Session composition | `engine/orchestrator.py` | `tests/qdash/workflow/engine/test_orchestrator_*.py` |
 | Execution lifecycle | `engine/execution/` | `tests/qdash/workflow/engine/execution/` |
 | Task lifecycle | `engine/task/` and `engine/task_runner.py` | `tests/qdash/workflow/engine/task/` |
-| High-level lifecycle and reservations | `service/calib_service.py` | `tests/qdash/workflow/service/test_calib_service.py` |
+| Author contract | `service/calib_service.py`, `service/context.py` | `tests/qdash/workflow/service/test_calib_service.py`, `test_calib_context.py` |
+| Lifecycle, reservations, and worker settings | `service/_internal/session.py`, `_internal/settings.py`, `_internal/lifecycle.py` | `tests/qdash/workflow/service/test_calib_session.py` |
 | Scheduling | `engine/scheduler/` | `tests/qdash/workflow/engine/scheduler/` |
 
 Run `task test-workflow` after engine changes. Also run the repository or API test suites when a

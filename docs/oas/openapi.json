@@ -17039,6 +17039,153 @@
           }
         }
       }
+    },
+    "/auth/me/avatar": {
+      "get": {
+        "tags": [
+          "user-avatar"
+        ],
+        "summary": "Get the current user's avatar settings",
+        "description": "Return the current user's custom avatar spec, or the automatic spec if none is saved.",
+        "operationId": "getCurrentUserAvatar",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserAvatarResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "user-avatar"
+        ],
+        "summary": "Set or reset the current user's avatar",
+        "description": "Save a picker spec, or reset to the automatic avatar when ``spec`` is null.\n\nOnly the validated spec string is stored; avatar markup is never accepted.",
+        "operationId": "updateCurrentUserAvatar",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserAvatarUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserAvatarResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/users/avatars": {
+      "get": {
+        "tags": [
+          "user-avatar"
+        ],
+        "summary": "List custom avatar specs of users",
+        "description": "Return the custom avatar specs of the listed users in one request.\n\nUsers that show the automatic avatar, and unknown or malformed usernames, are omitted.",
+        "operationId": "listUserAvatars",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 100,
+              "description": "Usernames to look up",
+              "title": "Username"
+            },
+            "description": "Usernames to look up"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserAvatarSpecList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -22734,6 +22881,27 @@
             ],
             "title": "Qids"
           },
+          "coupling_pairs": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  "type": "array",
+                  "maxItems": 2,
+                  "minItems": 2
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coupling Pairs",
+            "description": "Directed [control, target] qubit pairs; parallel groups are scheduled automatically"
+          },
           "exclude_qids": {
             "items": {
               "type": "string",
@@ -23832,6 +24000,19 @@
               }
             ],
             "description": "Statically resolved source targets; null when dynamic or ambiguous"
+          },
+          "target_modes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "mux_ids",
+                "qids",
+                "coupling_pairs"
+              ]
+            },
+            "type": "array",
+            "title": "Target Modes",
+            "description": "Target override types this flow accepts for one execution"
           },
           "name": {
             "type": "string",
@@ -32278,6 +32459,102 @@
         ],
         "title": "User",
         "description": "User model for authentication and user management."
+      },
+      "UserAvatarResponse": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "custom"
+            ],
+            "title": "Source",
+            "description": "automatic (derived from the username) or custom (chosen in the picker)"
+          },
+          "spec": {
+            "type": "string",
+            "title": "Spec",
+            "description": "Canonical glyph-avatar spec string the UI renders"
+          },
+          "generator": {
+            "type": "string",
+            "title": "Generator",
+            "description": "Generator package the spec is for"
+          },
+          "generator_version": {
+            "type": "string",
+            "title": "Generator Version",
+            "description": "Generator package version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "spec",
+          "generator",
+          "generator_version"
+        ],
+        "title": "UserAvatarResponse",
+        "description": "The avatar the current user shows."
+      },
+      "UserAvatarSpec": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "Username"
+          },
+          "spec": {
+            "type": "string",
+            "title": "Spec",
+            "description": "Canonical glyph-avatar spec string the UI renders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "spec"
+        ],
+        "title": "UserAvatarSpec",
+        "description": "A user's custom avatar spec."
+      },
+      "UserAvatarSpecList": {
+        "properties": {
+          "avatars": {
+            "items": {
+              "$ref": "#/components/schemas/UserAvatarSpec"
+            },
+            "type": "array",
+            "title": "Avatars",
+            "description": "Custom avatar specs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "avatars"
+        ],
+        "title": "UserAvatarSpecList",
+        "description": "Custom avatar specs of the requested users.\n\nUsers that show the automatic avatar are omitted."
+      },
+      "UserAvatarUpdate": {
+        "properties": {
+          "spec": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spec",
+            "description": "Canonical glyph-avatar v1 spec string from the avatar picker; null resets to the automatic avatar derived from the username"
+          }
+        },
+        "type": "object",
+        "title": "UserAvatarUpdate",
+        "description": "Avatar selection for the current user."
       },
       "UserCreate": {
         "properties": {

@@ -6,22 +6,22 @@ and allows re-executing a single calibration task from the task detail page.
 Unlike user flows, this flow does not require a FlowDocument to exist.
 It is always available as a system deployment.
 
-This top-level flow owns its hardware reservation (``use_lock=True``). Its
-terminal hooks must release that reservation even when cancellation interrupts
-CalibService construction, before the in-process cleanup handler is installed.
-The shared finalizer preserves reservations belonging to other executions.
+This top-level flow owns its hardware reservation and its Execution through the
+same session lifecycle as a pipeline step, Configure included: success, failure
+and cancellation close the Execution and release the reservation in process.
+Its terminal hooks release the reservation when the process is terminated
+before that cleanup runs. The shared finalizer preserves reservations belonging
+to other executions.
 """
 
 from __future__ import annotations
 
-import contextlib
 import warnings
 from typing import Any
 
 from prefect import flow, get_run_logger
 
 from qdash.common.config.backend import get_default_backend
-from qdash.common.config.loader import ConfigLoader
 from qdash.datamodel.task_settings import (
     LEGACY_UPDATE_CALIBRATION_PARAMETERS_DEPRECATION,
     resolve_update_calibration_parameters_alias,
@@ -32,13 +32,18 @@ from qdash.workflow.engine.task_parameters import (
     normalize_task_parameters,
     task_parameters_from_run_parameters,
 )
+from qdash.workflow.service._internal.runs import run_single_task
+from qdash.workflow.service._internal.settings import (
+    GitHubPolicy,
+    SessionSettings,
+    SnapshotSource,
+)
 from qdash.workflow.service.calib_service import (
-    CalibService,
     on_flow_cancellation,
     on_flow_crashed,
     on_flow_failure,
 )
-from qdash.workflow.service.github import GitHubPushConfig
+from qdash.workflow.service.context import resolve_calib_context
 
 
 def _resolve_single_task_writeback(
@@ -232,15 +237,14 @@ def single_task_executor(
         f"source={source_execution_id}, chip={chip_id}"
     )
 
-    github_settings = ConfigLoader.load_workflow().get("github", {})
-    github_enabled = (
-        github_settings.get("enabled", True) is True
-        and (backend_name or get_default_backend()) == "qubex"
-    )
+    deployment_github = GitHubPolicy.from_deployment(backend_name or get_default_backend())
     # Write-back controls publication; update_params only overrides quality checks.
-    push_config = GitHubPushConfig(
-        enabled=writeback and github_enabled,
-        branch=github_settings.get("branch", "main"),
+    github = deployment_github.model_copy(
+        update={
+            "push": deployment_github.push.model_copy(
+                update={"enabled": writeback and deployment_github.push.enabled}
+            )
+        }
     )
 
     snapshot_exempt_tasks = {"Configure"} if reconfigure else set()
@@ -256,58 +260,35 @@ def single_task_executor(
         task_run_parameters=task_run_parameters,
         update_calibration_parameters=writeback,
     )
-    cal = CalibService(
-        username,
-        chip_id,
-        qids=[qid],
-        source_execution_id=source_execution_id,
+    context = resolve_calib_context(username, chip_id, project_id=project_id, backend=backend_name)
+    settings = SessionSettings(
+        username=context.username,
+        chip_id=context.chip_id,
+        project_id=context.project_id,
+        backend_name=context.backend_name,
         flow_name=flow_name or f"re-execute:{task_name}",
         tags=tags,
-        project_id=project_id,
-        backend_name=backend_name,
-        default_run_parameters=default_run_parameters,
-        _task_defaults=task_defaults,
-        enable_github_pull=github_enabled,
-        enable_github=push_config.enabled,
-        github_push_config=push_config,
-        use_lock=True,
-        source_task_id=source_task_id,
-        snapshot_exempt_tasks=snapshot_exempt_tasks or None,
+        default_run_parameters=default_run_parameters or {},
+        task_defaults=task_defaults,
+        snapshot=SnapshotSource(
+            execution_id=source_execution_id,
+            task_id=source_task_id,
+            exempt_tasks=frozenset(snapshot_exempt_tasks),
+        ),
         force_update_params=update_params,
+        github=github,
     )
 
     try:
-        if reconfigure:
-            logger.info(f"Reconfiguring hardware for qid={qid} before executing {task_name}")
-            # Pass the control on the call so a backend without Configure still
-            # fails here, rather than while validating service defaults.
-            cal.execute_task(
-                "Configure",
-                qid,
-                parameters={UPDATE_CALIBRATION_PARAMETERS: writeback},
-            )
-
-        result = cal.execute_task(task_name, qid)
-        cal.finish_calibration()
-
-        logger.info(f"Single-task executor completed: {task_name} / {qid}")
-        return result
-    except BaseException as e:
-        from qdash.workflow.service.calib_service import (
-            _is_cancellation,
-            _is_external_termination,
+        result = run_single_task(
+            settings,
+            qid=qid,
+            task_name=task_name,
+            reconfigure=reconfigure,
+            update_calibration_parameters=writeback,
         )
-
-        if _is_cancellation(e):
-            logger.info("Single-task executor was cancelled")
-            with contextlib.suppress(Exception):
-                cal.cancel_calibration()
-        elif _is_external_termination(e):
-            logger.info("Single-task executor interrupted by a termination signal")
-            with contextlib.suppress(Exception):
-                cal.abandon_calibration()
-        else:
-            logger.error(f"Single-task executor failed: {e}")
-            with contextlib.suppress(Exception):
-                cal.fail_calibration(str(e))
+    except BaseException as e:
+        logger.error(f"Single-task executor ended without completing: {type(e).__name__}: {e}")
         raise
+    logger.info(f"Single-task executor completed: {task_name} / {qid}")
+    return result

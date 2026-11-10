@@ -193,7 +193,7 @@ function ForumThreadCard({
     >
       <div className="flex gap-3 p-3 sm:p-4">
         <div className="hidden pt-0.5 sm:block">
-          <UserAvatar username={post.username} avatarKey={post.avatar_key} size={30} />
+          <UserAvatar username={post.username} size={30} />
         </div>
 
         <div className="min-w-0 flex-1">
@@ -763,11 +763,7 @@ function ForumThreadPreviewSidebar({
                     {replies.map((reply) => (
                       <div key={reply.id} className="rounded-lg border border-base-300 p-3">
                         <div className="mb-2 flex items-center gap-2 text-xs text-base-content/50">
-                          <UserAvatar
-                            username={reply.username}
-                            avatarKey={reply.avatar_key}
-                            size={20}
-                          />
+                          <UserAvatar username={reply.username} size={20} />
                           <span>{reply.username}</span>
                           <span>{formatRelativeTime(reply.created_at)}</span>
                         </div>

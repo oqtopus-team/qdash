@@ -36,6 +36,7 @@ from qdash.api.services.flow_service.source_store import FlowSourceStore
 from qdash.api.services.flow_service.target_defaults import (
     flow_parameter_names,
     resolve_target_defaults,
+    supported_target_modes,
 )
 from qdash.api.services.flow_service.templates import TemplateCatalog
 from qdash.api.services.flow_service.validation import (
@@ -45,12 +46,13 @@ from qdash.api.services.flow_service.validation import (
     validate_flow_name,
 )
 from qdash.config import get_settings
-from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY
+from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
 
 if TYPE_CHECKING:
     from uuid import UUID
 
     from qdash.repository import MongoExecutionLockRepository, MongoFlowRepository
+    from qdash.repository.protocols import ChipRepository
 
 logger = logging.getLogger("uvicorn.app")
 
@@ -67,9 +69,11 @@ class FlowService:
         source_store: FlowSourceStore | None = None,
         deployment_client: DeploymentServiceClient | None = None,
         templates: TemplateCatalog | None = None,
+        chip_repository: ChipRepository | None = None,
     ) -> None:
         """Wire the flow repository and the collaborators it coordinates."""
         self._flow_repo = flow_repository
+        self._chip_repo = chip_repository
         self._coordinator = coordinator or ExecutionCoordinator(
             lock_repository=execution_lock_repository,
         )
@@ -281,6 +285,7 @@ class FlowService:
             target_defaults=resolve_target_defaults(
                 code, flow.flow_function_name, flow.default_parameters
             ),
+            target_modes=supported_target_modes(code, flow.flow_function_name),
             flow_function_name=flow.flow_function_name,
             chip_id=flow.chip_id,
             default_parameters=flow.default_parameters,
@@ -366,16 +371,25 @@ class FlowService:
         if "tags" not in parameters and flow.tags:
             parameters["tags"] = flow.tags
 
+        chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
         run_context: dict[str, Any] = {}
         if request.target_override is not None:
-            override = request.target_override.model_dump()
-            run_context[TARGET_CONTEXT_KEY] = override
             code = self._sources.read(Path(flow.file_path))
+            mode = request.target_override.mode
+            if mode not in supported_target_modes(code, flow.flow_function_name):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Flow '{name}' does not accept {mode} target overrides",
+                )
+            if mode == "coupling_pairs":
+                self._validate_coupling_pairs(project_id, chip_id, request.target_override)
+            override = request.target_override.model_dump()
+            # Omit unselected modes so workers that predate a mode still parse it.
+            run_context[TARGET_CONTEXT_KEY] = request.target_override.model_dump(exclude_none=True)
             accepted = flow_parameter_names(code, flow.flow_function_name)
-            mode = "mux_ids" if request.target_override.mux_ids is not None else "qids"
             # Templates may validate targets before creating CalibService. Pass
             # them (and clear the other mode) only when the flow can receive
-            # this mode; otherwise saved parameters stay and CalibService
+            # this mode; otherwise saved parameters stay and CalibService.run
             # applies the override from the run context.
             if mode in accepted:
                 parameters.update(
@@ -388,7 +402,6 @@ class FlowService:
             f"with parameters: {parameters}"
         )
 
-        chip_id = str(parameters.get("chip_id") or flow.chip_id or "").strip()
         try:
             result = await self._coordinator.dispatch_run(
                 project_id=project_id,
@@ -410,6 +423,22 @@ class FlowService:
 
         logger.info(f"Flow run created: {result.flow_run_id}")
         return _execute_response(result, f"Flow '{name}' execution started successfully")
+
+    def _validate_coupling_pairs(
+        self, project_id: str, chip_id: str, override: FlowTargetOverride
+    ) -> None:
+        """Reject pairs that are not directed couplings of the run's chip before dispatch."""
+        if self._chip_repo is None:
+            from qdash.repository import MongoChipRepository
+
+            self._chip_repo = MongoChipRepository()
+        known = set(self._chip_repo.get_coupling_ids(project_id, chip_id))
+        unknown = [f"{c}-{t}" for c, t in override.pairs() if f"{c}-{t}" not in known]
+        if unknown:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Coupling pairs not found on chip '{chip_id}': {', '.join(unknown)}",
+            )
 
     async def execute_single_task_from_snapshot(
         self,

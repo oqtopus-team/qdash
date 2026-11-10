@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
     from qdash.datamodel.task_call import StepCalls, TaskCall
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
 
 SUCCESS = "success"
 FAILED = "failed"
@@ -104,7 +104,7 @@ def summarize_target(calls: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def run_target_calls(
-    session: CalibService,
+    session: CalibSession,
     target: str,
     plan: StepCalls,
     logger: Any,
@@ -183,7 +183,7 @@ def batch_preflight_problems(
 
 
 def run_batch_calls(
-    session: CalibService,
+    session: CalibSession,
     qids: list[str],
     plan: StepCalls,
     logger: Any,

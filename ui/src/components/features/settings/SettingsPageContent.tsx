@@ -11,6 +11,7 @@ import { ProfileSettingsPanel } from "@/components/features/settings/ProfileSett
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectedLabel } from "@/components/ui/SelectedLabel";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
@@ -365,7 +366,12 @@ function ProjectMembersPanel() {
                     const isCurrentUser = member.username === user?.username;
                     return (
                       <tr key={member.username}>
-                        <td className="font-mono">{member.username}</td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <UserAvatar username={member.username} size={24} />
+                            <span className="font-mono">{member.username}</span>
+                          </div>
+                        </td>
                         <td>
                           {isOwner && !isProjectOwner ? (
                             <select

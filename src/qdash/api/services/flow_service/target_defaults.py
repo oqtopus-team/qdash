@@ -1,15 +1,16 @@
 """Inspect target defaults without importing or executing user workflow code."""
 
 import ast
+from collections.abc import Callable
 from contextlib import suppress
 from typing import Any
 
 from pydantic import ValidationError
 
-from qdash.datamodel.flow_targets import FlowTargetOverride
+from qdash.datamodel.flow_targets import FlowTargetOverride, TargetMode
 
-_OVERRIDABLE_TARGETS = {"MuxTargets", "QubitTargets"}
-_TARGET_CALLS = {*_OVERRIDABLE_TARGETS, "CalibService"}
+_OVERRIDABLE_TARGETS = {"MuxTargets", "QubitTargets", "CouplingTargets"}
+_QUBIT_MODES: list[TargetMode] = ["mux_ids", "qids"]
 
 
 class _Unknown(Exception):
@@ -23,6 +24,250 @@ def flow_parameter_names(code: str, function_name: str) -> set[str]:
         return set()
     args = function.args
     return {arg.arg for arg in [*args.posonlyargs, *args.args, *args.kwonlyargs]}
+
+
+def supported_target_modes(code: str, function_name: str) -> list[TargetMode]:
+    """Return the override types the execution dialog may offer for this source.
+
+    Pair overrides need every ``CalibService.run`` the entrypoint executes to
+    receive ``CouplingTargets`` and a step list with ``SetCRSchedule``, which the
+    runtime replaces with the selected pairs. Only the entrypoint is inspected;
+    anything the check cannot follow statically keeps the MUX and qubit
+    overrides instead (see ``_runs_scheduled_pairs``). User code never executes.
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return list(_QUBIT_MODES)
+    function = _function(tree, function_name)
+    if function is not None and _runs_scheduled_pairs(tree, function):
+        return ["coupling_pairs"]
+    return list(_QUBIT_MODES)
+
+
+def _runs_scheduled_pairs(
+    tree: ast.Module, function: ast.FunctionDef | ast.AsyncFunctionDef
+) -> bool:
+    """Whether every pipeline the entrypoint runs is a scheduled coupling pipeline.
+
+    Conservative by design. Pair mode is rejected when the entrypoint:
+
+    - has no ``CalibService`` ``.run`` call, or runs one inside a loop,
+      comprehension or lambda;
+    - defines nested functions or classes, or references any function or class
+      defined in the module (a helper may run its own pipeline);
+    - builds other target types or ``GenerateCRSchedule``;
+    - passes targets that are not ``CouplingTargets(...)`` bound in the entrypoint;
+    - passes steps that are not a list literal, or a list name whose every
+      assignment is a literal containing ``SetCRSchedule`` and which is changed
+      only through ``append``, ``extend``, ``insert`` or ``+=`` with step calls.
+
+    Module statements outside functions must not build services or targets.
+    Calls into other modules are not followed.
+    """
+    local_defs = {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    }
+    for statement in tree.body:
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        for node in ast.walk(statement):
+            if isinstance(node, ast.Call) and (
+                _call_name(node).endswith("Targets") or _is_service(node)
+            ):
+                return False
+
+    body = ast.Module(body=function.body, type_ignores=[])
+    parameters = {
+        arg.arg
+        for arg in [
+            *function.args.posonlyargs,
+            *function.args.args,
+            *function.args.kwonlyargs,
+            *(a for a in (function.args.vararg, function.args.kwarg) if a is not None),
+        ]
+    }
+    parents: dict[ast.AST, ast.AST] = {}
+    for node in ast.walk(body):
+        if isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Global, ast.Nonlocal)
+        ):
+            return False
+        if isinstance(node, ast.Name) and node.id in local_defs:
+            return False
+        if isinstance(node, ast.Call):
+            name = _call_name(node)
+            if name == "GenerateCRSchedule" or (
+                name.endswith("Targets") and name != "CouplingTargets"
+            ):
+                return False
+        for child in ast.iter_child_nodes(node):
+            parents[child] = node
+
+    # Every write to each name: the value for plain assignments, else None.
+    writes: dict[str, list[ast.expr | None]] = {}
+    augmented: set[str] = set()
+    for node in ast.walk(body):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    writes.setdefault(target.id, []).append(node.value)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            writes.setdefault(node.target.id, []).append(node.value)
+        elif isinstance(node, ast.withitem) and isinstance(node.optional_vars, ast.Name):
+            writes.setdefault(node.optional_vars.id, []).append(node.context_expr)
+    for node in ast.walk(body):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            parent = parents.get(node)
+            plain = (
+                (isinstance(parent, ast.Assign) and node in parent.targets)
+                or (isinstance(parent, ast.AnnAssign) and parent.target is node)
+                or (isinstance(parent, ast.withitem) and parent.optional_vars is node)
+            )
+            if isinstance(parent, ast.AugAssign):
+                # Checked as list extension for steps; unsupported for anything else.
+                augmented.add(node.id)
+            elif not plain:
+                # Loop variables, unpacking, ``del`` and walrus bindings.
+                writes.setdefault(node.id, []).append(None)
+
+    def bound(name: str, accept: Callable[[ast.expr], bool], extendable: bool = False) -> bool:
+        values = writes.get(name)
+        return (
+            name not in parameters
+            and (extendable or name not in augmented)
+            and bool(values)
+            and all(value is not None and accept(value) for value in values or [])
+        )
+
+    def is_service(node: ast.expr) -> bool:
+        if isinstance(node, ast.Name):
+            return bound(node.id, _is_service)
+        return _is_service(node)
+
+    def is_coupling(node: ast.expr) -> bool:
+        if isinstance(node, ast.Name):
+            # Only direct constructions; aliases are not followed.
+            return bound(node.id, _is_coupling_call)
+        return _is_coupling_call(node)
+
+    runs = [
+        node
+        for node in ast.walk(body)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "run"
+        and is_service(node.func.value)
+    ]
+    if not runs:
+        return False
+    for run in runs:
+        ancestor: ast.AST = run
+        while ancestor in parents:
+            ancestor = parents[ancestor]
+            if isinstance(
+                ancestor,
+                (ast.For, ast.AsyncFor, ast.While, ast.Lambda, ast.comprehension),
+            ):
+                return False
+        if any(isinstance(arg, ast.Starred) for arg in run.args) or any(
+            kw.arg is None for kw in run.keywords
+        ):
+            return False
+        arguments = dict(zip(("targets", "steps"), run.args, strict=False))
+        arguments.update({kw.arg: kw.value for kw in run.keywords if kw.arg is not None})
+        targets, steps = arguments.get("targets"), arguments.get("steps")
+        if targets is None or steps is None or not is_coupling(targets):
+            return False
+        if not _scheduled_steps(steps, body, parents, set(runs), bound):
+            return False
+    return True
+
+
+def _is_coupling_call(node: ast.expr) -> bool:
+    return isinstance(node, ast.Call) and _call_name(node) == "CouplingTargets"
+
+
+def _is_step_call(node: ast.expr) -> bool:
+    """A direct step constructor call other than ``GenerateCRSchedule``."""
+    return isinstance(node, ast.Call) and _call_name(node) not in {"", "GenerateCRSchedule"}
+
+
+def _scheduled_list(node: ast.expr) -> bool:
+    """A step list literal with ``SetCRSchedule`` and only direct step calls."""
+    if not isinstance(node, (ast.List, ast.Tuple)):
+        return False
+    calls = [element for element in node.elts if isinstance(element, ast.Call)]
+    return (
+        len(calls) == len(node.elts)
+        and all(_is_step_call(call) for call in calls)
+        and any(_call_name(call) == "SetCRSchedule" for call in calls)
+    )
+
+
+def _scheduled_steps(
+    steps: ast.expr,
+    body: ast.Module,
+    parents: dict[ast.AST, ast.AST],
+    runs: set[ast.Call],
+    bound: Callable[[str, Callable[[ast.expr], bool], bool], bool],
+) -> bool:
+    """Whether ``steps`` always holds ``SetCRSchedule`` and never another schedule."""
+    if not isinstance(steps, ast.Name):
+        return _scheduled_list(steps)
+    name = steps.id
+    if not bound(name, _scheduled_list, True):
+        return False
+    for node in ast.walk(body):
+        if not (isinstance(node, ast.Name) and node.id == name and node is not steps):
+            continue
+        parent = parents.get(node)
+        if isinstance(parent, ast.keyword):
+            parent = parents.get(parent)
+        if isinstance(parent, ast.AugAssign):
+            if not (
+                isinstance(parent.op, ast.Add)
+                and isinstance(parent.value, (ast.List, ast.Tuple))
+                and all(_is_step_call(element) for element in parent.value.elts)
+            ):
+                return False
+            continue
+        if isinstance(parent, (ast.Assign, ast.AnnAssign)) and isinstance(node.ctx, ast.Store):
+            continue
+        if (
+            isinstance(node.ctx, ast.Load)
+            and isinstance(parent, ast.Call)
+            and node in [*parent.args, *(kw.value for kw in parent.keywords)]
+        ):
+            # Only a service run call may read the list as an argument.
+            if parent in runs:
+                continue
+            return False
+        call = parents.get(parent) if isinstance(parent, ast.Attribute) else None
+        if not (
+            isinstance(parent, ast.Attribute)
+            and isinstance(call, ast.Call)
+            and call.func is parent
+            and not call.keywords
+        ):
+            return False
+        if parent.attr == "append" and len(call.args) == 1:
+            added = call.args
+        elif parent.attr == "insert" and len(call.args) == 2:
+            added = call.args[1:]
+        elif (
+            parent.attr == "extend"
+            and len(call.args) == 1
+            and isinstance(call.args[0], (ast.List, ast.Tuple))
+        ):
+            added = call.args[0].elts
+        else:
+            return False
+        if not all(_is_step_call(element) for element in added):
+            return False
+    return True
 
 
 def _function(tree: ast.Module, name: str) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
@@ -42,6 +287,20 @@ def _call_name(node: ast.Call) -> str:
     if isinstance(node.func, ast.Attribute):
         return node.func.attr
     return ""
+
+
+def _is_service(node: ast.expr) -> bool:
+    """``CalibService(...)`` or ``CalibService.from_context(...)``."""
+    if not isinstance(node, ast.Call):
+        return False
+    if _call_name(node) == "CalibService":
+        return True
+    func = node.func
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr == "from_context"
+        and _call_name(ast.Call(func=func.value, args=[], keywords=[])) == "CalibService"
+    )
 
 
 def _root_name(node: ast.expr) -> str | None:
@@ -115,10 +374,9 @@ class _Resolver:
         with suppress(_Unknown):
             self.bindings[name] = self.literal(value)
         if isinstance(value, ast.Call):
-            call = _call_name(value)
-            if call in _OVERRIDABLE_TARGETS:
+            if _call_name(value) in _OVERRIDABLE_TARGETS:
                 self.target_names.add(name)
-            elif call == "CalibService":
+            elif _is_service(value):
                 self.service_names.add(name)
 
     def bind(self, statement: ast.stmt) -> None:
@@ -145,11 +403,7 @@ class _Resolver:
         self.invalidate_writes(item.context_expr)
         if item.optional_vars is not None:
             self.invalidate_writes(item.optional_vars)
-        if (
-            isinstance(item.optional_vars, ast.Name)
-            and isinstance(item.context_expr, ast.Call)
-            and _call_name(item.context_expr) == "CalibService"
-        ):
+        if isinstance(item.optional_vars, ast.Name) and _is_service(item.context_expr):
             self.service_names.add(item.optional_vars.id)
 
     def truth(self, test: ast.expr) -> bool:
@@ -191,7 +445,7 @@ class _Resolver:
                     root = _root_name(node.func.value)
                     if root is not None:
                         self.invalidate(root)
-                if _call_name(node) not in _TARGET_CALLS:
+                if _call_name(node) not in _OVERRIDABLE_TARGETS and not _is_service(node):
                     for argument in [*node.args, *(kw.value for kw in node.keywords)]:
                         root = _root_name(argument)
                         if root is not None:
@@ -230,8 +484,8 @@ def _resolve(
         if node is function:
             continue
         for child in ast.walk(node):
-            if isinstance(child, ast.Call) and _call_name(child).endswith(
-                ("Targets", "CalibService")
+            if isinstance(child, ast.Call) and (
+                _call_name(child).endswith("Targets") or _is_service(child)
             ):
                 raise _Unknown
 
@@ -302,7 +556,7 @@ def _resolve(
 def _candidate(node: ast.Call, resolver: _Resolver) -> FlowTargetOverride | None:
     name = _call_name(node)
     if name.endswith("Targets") and name not in _OVERRIDABLE_TARGETS:
-        # AllMuxTargets, CouplingTargets, and similar cannot be shown as defaults.
+        # AllMuxTargets and similar cannot be shown as defaults.
         raise _Unknown
     if resolver.is_service_run(node):
         target = (
@@ -317,7 +571,7 @@ def _candidate(node: ast.Call, resolver: _Resolver) -> FlowTargetOverride | None
         if isinstance(target, ast.Name) and target.id in resolver.target_names:
             return None
         raise _Unknown
-    if name not in _TARGET_CALLS:
+    if name not in _OVERRIDABLE_TARGETS:
         return None
     if any(isinstance(arg, ast.Starred) for arg in node.args) or any(
         kw.arg is None for kw in node.keywords
@@ -330,19 +584,24 @@ def _candidate(node: ast.Call, resolver: _Resolver) -> FlowTargetOverride | None
             keywords.setdefault(key, arg)
     elif name == "QubitTargets" and node.args:
         keywords.setdefault("qids", node.args[0])
-    elif name == "CalibService" and len(node.args) > 2:
-        keywords.setdefault("qids", node.args[2])
+    elif name == "CouplingTargets" and node.args:
+        keywords.setdefault("pairs", node.args[0])
 
     values: dict[str, Any] = {}
     for key, expression in keywords.items():
-        normalized = "mux_ids" if key == "muxes" else key
-        if normalized not in {"mux_ids", "qids", "exclude_qids"}:
+        if key not in {"mux_ids", "qids", "exclude_qids", "pairs"}:
             continue
         value = resolver.literal(expression)
-        if value is not None:
-            values[normalized] = value
-    if not (values.get("mux_ids") or values.get("qids")):
-        if name in _OVERRIDABLE_TARGETS:
-            raise _Unknown
-        return None
+        if value is None:
+            continue
+        if key == "pairs":
+            if not isinstance(value, (list, tuple)):
+                raise _Unknown
+            values["coupling_pairs"] = [
+                list(pair) if isinstance(pair, (list, tuple)) else pair for pair in value
+            ]
+        else:
+            values[key] = value
+    if not (values.get("mux_ids") or values.get("qids") or values.get("coupling_pairs")):
+        raise _Unknown
     return FlowTargetOverride.model_validate(values)

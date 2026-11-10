@@ -208,9 +208,12 @@ def _service(
     repo: _FakeFlowRepository | None = None,
     coordinator: _StubCoordinator | None = None,
     deployment: _StubDeploymentClient | None = None,
+    coupling_ids: list[str] | None = None,
 ) -> FlowService:
     """Build a service with fakes and a temporary flow tree."""
+    chip_repo = SimpleNamespace(get_coupling_ids=lambda _project, _chip: coupling_ids or [])
     return FlowService(
+        chip_repository=cast("Any", chip_repo),
         flow_repository=cast("MongoFlowRepository", repo or _FakeFlowRepository()),
         coordinator=cast("ExecutionCoordinator", coordinator or _StubCoordinator()),
         source_store=FlowSourceStore(tmp_path / "user_flows"),
@@ -1200,7 +1203,7 @@ async def test_target_override_uses_context_without_adding_unknown_parameters(tm
         "my_flow", ExecuteFlowRequest(target_override=override), "user", "project-1"
     )
     call = coordinator.run_calls[0]
-    assert call["context"] == {TARGET_CONTEXT_KEY: override.model_dump()}
+    assert call["context"] == {TARGET_CONTEXT_KEY: {"mux_ids": [2], "exclude_qids": ["9"]}}
     if "mux_ids" in signature:
         assert call["parameters"]["mux_ids"] == [2]
         assert call["parameters"]["exclude_qids"] == ["9"]
@@ -1211,3 +1214,109 @@ async def test_target_override_uses_context_without_adding_unknown_parameters(tm
         assert "mux_ids" not in call["parameters"]
         assert "qids" not in call["parameters"]
     assert file_path.read_text() == source
+
+
+PAIR_FLOW = """
+def my_flow(username, chip_id, schedule, project_id=None):
+    targets = CouplingTargets(pairs=[pair for group in schedule for pair in group])
+    steps = [SetCRSchedule(schedule=schedule), TwoQubitCalibration()]
+    return CalibService(username, chip_id, project_id=project_id).run(targets, steps=steps)
+"""
+
+
+def _pair_service(tmp_path: Path, coordinator: _StubCoordinator, **flow: Any) -> FlowService:
+    file_path = tmp_path / "my_flow.py"
+    file_path.write_text(PAIR_FLOW)
+    return _service(
+        tmp_path,
+        repo=_FakeFlowRepository(flow=_make_flow(file_path, **flow)),
+        coordinator=coordinator,
+        coupling_ids=["63-85", "85-63", "64-42"],
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_flow_offers_pairs_only_for_scheduled_coupling_flows(tmp_path: Path) -> None:
+    coordinator = _StubCoordinator()
+    response = await _pair_service(tmp_path, coordinator).get_flow("my_flow", "op", "project-1")
+    assert response.target_modes == ["coupling_pairs"]
+    assert response.target_defaults is None
+
+    (tmp_path / "my_flow.py").write_text(FLOW_CODE)
+    service = _service(tmp_path, repo=_FakeFlowRepository(flow=_make_flow(tmp_path / "my_flow.py")))
+    assert (await service.get_flow("my_flow", "op", "project-1")).target_modes == [
+        "mux_ids",
+        "qids",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_coupling_override_dispatches_directed_pairs_without_touching_schedule(
+    tmp_path: Path,
+) -> None:
+    from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
+
+    coordinator = _StubCoordinator()
+    saved = {"schedule": [[["0", "1"]]]}
+    service = _pair_service(tmp_path, coordinator, default_parameters=saved)
+    override = FlowTargetOverride(coupling_pairs=[["63", "85"], ["85", "63"], ["64", "42"]])
+
+    await service.execute_flow(
+        "my_flow", ExecuteFlowRequest(target_override=override), "user", "project-1"
+    )
+
+    call = coordinator.run_calls[0]
+    assert call["context"] == {
+        TARGET_CONTEXT_KEY: {
+            "coupling_pairs": [["63", "85"], ["85", "63"], ["64", "42"]],
+            "exclude_qids": [],
+        }
+    }
+    # The saved schedule still satisfies the template; the runtime replaces it.
+    assert call["parameters"]["schedule"] == [[["0", "1"]]]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("override", "message"),
+    [
+        ({"coupling_pairs": [["63", "86"]]}, "not found on chip 'chip-1': 63-86"),
+        ({"coupling_pairs": [["42", "64"]]}, "42-64"),
+        ({"qids": ["63"]}, "does not accept qids"),
+    ],
+)
+async def test_invalid_pair_overrides_are_rejected_before_dispatch(
+    tmp_path: Path, override: dict[str, Any], message: str
+) -> None:
+    from qdash.datamodel.flow_targets import FlowTargetOverride
+
+    coordinator = _StubCoordinator()
+    service = _pair_service(tmp_path, coordinator)
+    request = ExecuteFlowRequest(target_override=FlowTargetOverride.model_validate(override))
+
+    with pytest.raises(HTTPException) as exc_info:
+        await service.execute_flow("my_flow", request, "user", "project-1")
+
+    assert exc_info.value.status_code == 400
+    assert message in str(exc_info.value.detail)
+    assert coordinator.run_calls == []
+
+
+@pytest.mark.asyncio
+async def test_pair_override_is_rejected_for_qubit_flows(tmp_path: Path) -> None:
+    from qdash.datamodel.flow_targets import FlowTargetOverride
+
+    file_path = tmp_path / "my_flow.py"
+    file_path.write_text('def my_flow():\n    CalibService("u", "c").run(QubitTargets(["0"]))\n')
+    coordinator = _StubCoordinator()
+    service = _service(
+        tmp_path,
+        repo=_FakeFlowRepository(flow=_make_flow(file_path)),
+        coordinator=coordinator,
+        coupling_ids=["0-1"],
+    )
+    request = ExecuteFlowRequest(target_override=FlowTargetOverride(coupling_pairs=[["0", "1"]]))
+
+    with pytest.raises(HTTPException, match="does not accept coupling_pairs"):
+        await service.execute_flow("my_flow", request, "user", "project-1")
+    assert coordinator.run_calls == []

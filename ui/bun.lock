@@ -30,6 +30,7 @@
         "driver.js": "^1.8.0",
         "fflate": "^0.8.3",
         "geist": "^1.9.0",
+        "glyph-avatar": "0.1.0",
         "highlight.js": "^11",
         "katex": "^0.18.2",
         "lucide-react": "^1.26.0",
@@ -1060,6 +1061,8 @@
     "get-proto": ["get-proto@1.0.1", "", { "dependencies": { "dunder-proto": "^1.0.1", "es-object-atoms": "^1.0.0" } }, "sha512-sTSfBjoXBp89JvIKIefqw7U2CCebsc74kiY6awiGogKtoSGbgjYE/G/+l9sF3MWFPNc9IcoOC4ODfKHfxFmp0g=="],
 
     "get-tsconfig": ["get-tsconfig@4.14.3", "", { "dependencies": { "resolve-pkg-maps": "^1.0.0" } }, "sha512-++QEw4DIY7WGoukz+/+A/8dGYPT9l9yIadnmSgZ8Rjr3YVSVDipQSO9CdnJo9ePqFqUUqh+wk9uIaoiAwsiPkA=="],
+
+    "glyph-avatar": ["glyph-avatar@0.1.0", "", { "peerDependencies": { "react": ">=18" }, "optionalPeers": ["react"] }, "sha512-Oy51MZqJKQgJvSgPTk3Rr1cS2h3jrEseOVNVM8n80Gr7CdsATVcZQUZbLMzzxHIPCfTDETFwiuh/ADLgOKG+dA=="],
 
     "gopd": ["gopd@1.2.0", "", {}, "sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg=="],
 

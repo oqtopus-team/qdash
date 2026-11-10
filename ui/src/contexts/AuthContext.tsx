@@ -7,6 +7,7 @@ import Axios from "axios";
 import type { User } from "@/schemas";
 
 import { useGetCurrentUser, useLogin, useLogout } from "@/client/auth/auth";
+import { startAvatarSpecSession } from "@/lib/avatar/avatarSpecs";
 import { getAccessToken } from "@/lib/auth/session";
 
 interface AuthContextType {
@@ -91,6 +92,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [userError, removeAuth]);
+
+  // Avatar specs are cached per session; a new token must not see the previous session's.
+  useEffect(() => {
+    startAvatarSpecSession(accessToken !== null);
+  }, [accessToken]);
 
   // Initialization
   useEffect(() => {

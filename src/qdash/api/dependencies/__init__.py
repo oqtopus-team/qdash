@@ -48,6 +48,7 @@ from qdash.api.services.source_access_service import SourceAccessService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
+from qdash.api.services.user_avatar_service import UserAvatarService
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.repository import (
     MongoChipRepository,
@@ -74,6 +75,7 @@ from qdash.repository.provenance import (
 from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.repository.tag import MongoTagRepository
 from qdash.repository.task_definition import MongoTaskDefinitionRepository
+from qdash.repository.user_avatar import MongoUserAvatarRepository
 
 
 @cached_dependency_provider
@@ -489,6 +491,12 @@ def get_user_repository() -> MongoUserRepository:
 
 
 @cached_dependency_provider
+def get_user_avatar_service() -> UserAvatarService:
+    """Get the user avatar settings service instance."""
+    return UserAvatarService(store=MongoUserAvatarRepository())
+
+
+@cached_dependency_provider
 def get_auth_service() -> AuthService:
     """Get the auth service instance."""
     return AuthService(
@@ -585,6 +593,7 @@ def get_flow_service() -> "FlowService":
     return FlowService(
         flow_repository=get_flow_repository(),
         execution_lock_repository=get_execution_lock_repository(),
+        chip_repository=get_chip_repository(),
     )
 
 

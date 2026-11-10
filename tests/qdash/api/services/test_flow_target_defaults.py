@@ -1,8 +1,17 @@
 """Source target inspection must not execute user Python."""
 
+from pathlib import Path
+
 import pytest
 
-from qdash.api.services.flow_service.target_defaults import resolve_target_defaults
+import qdash.workflow
+from qdash.api.services.flow_service.target_defaults import (
+    resolve_target_defaults,
+    supported_target_modes,
+)
+from qdash.datamodel.flow_targets import TargetMode
+
+TEMPLATES = Path(qdash.workflow.__file__).parent / "templates"
 
 
 @pytest.mark.parametrize(
@@ -13,7 +22,6 @@ from qdash.api.services.flow_service.target_defaults import resolve_target_defau
             {"mux_ids": [0, 2], "exclude_qids": ["1"]},
         ),
         ('QubitTargets(["2", "3"])', {"qids": ["2", "3"]}),
-        ('CalibService("user", "chip", qids=["4"])', {"qids": ["4"]}),
     ],
 )
 def test_literal_defaults(expression, expected):
@@ -21,6 +29,26 @@ def test_literal_defaults(expression, expected):
     assert result is not None
     for key, value in expected.items():
         assert getattr(result, key) == value
+
+
+def test_service_construction_does_not_declare_targets():
+    """CalibService takes no targets; only run() targets are defaults."""
+    code = 'def run():\n    cal = CalibService("user", "chip", project_id="p")\n    cal.run(QubitTargets(["4"]), [])'
+    result = resolve_target_defaults(code, "run", {})
+    assert result is not None
+    assert result.qids == ["4"]
+
+
+def test_from_context_services_are_recognized():
+    code = """
+def run(qids=["7"]):
+    cal = CalibService.from_context(resolve_calib_context("u", "c", backend="fake"))
+    cal.run(QubitTargets(qids), steps=[])
+"""
+    result = resolve_target_defaults(code, "run", {})
+    assert result is not None
+    assert result.qids == ["7"]
+    assert resolve_target_defaults(code.replace("QubitTargets(qids)", "make()"), "run", {}) is None
 
 
 def test_parameter_and_local_binding_defaults():
@@ -120,3 +148,133 @@ def run(mux_ids=None, exclude_qids=None, qids=None):
     assert result is not None
     assert (result.mux_ids, result.exclude_qids) == ([1, 2], [])
     assert resolve_target_defaults(code, "run", {}) is None
+
+
+def test_literal_coupling_pairs_keep_their_direction():
+    code = 'def run():\n    target = CouplingTargets([("63", "85"), ("85", "63")])'
+    result = resolve_target_defaults(code, "run", {})
+    assert result is not None
+    assert result.coupling_pairs == [["63", "85"], ["85", "63"]]
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "CouplingTargets(pairs=[pair for group in schedule for pair in group])",
+        'CouplingTargets([("1", "1")])',
+        'CouplingTargets([("1", "2", "3")])',
+    ],
+)
+def test_dynamic_or_invalid_coupling_defaults_remain_unknown(expression):
+    code = f"def run(schedule=[[('0', '1')]]):\n    target = {expression}"
+    assert resolve_target_defaults(code, "run", {}) is None
+
+
+PAIR_RUN = "CalibService(u, c).run({targets}, steps={steps})"
+PAIRS = "CouplingTargets(p)"
+SCHEDULED = "[SetCRSchedule(schedule=s), TwoQubitCalibration()]"
+
+
+def _modes(body: str, prefix: str = "") -> list[TargetMode]:
+    lines = "\n".join(f"    {line}" for line in body.splitlines())
+    return supported_target_modes(f"{prefix}def run(u, c, p, s):\n{lines}\n", "run")
+
+
+@pytest.mark.parametrize(
+    ("body", "modes"),
+    [
+        (PAIR_RUN.format(targets=PAIRS, steps=SCHEDULED), ["coupling_pairs"]),
+        (
+            f"t = {PAIRS}\nsteps = {SCHEDULED}\nsteps.append(Custom())\n"
+            "with CalibService(u, c) as cal:\n    cal.run(t, steps)",
+            ["coupling_pairs"],
+        ),
+        # Without SetCRSchedule the 2Q steps would schedule other pairs.
+        (PAIR_RUN.format(targets=PAIRS, steps="[TwoQubitCalibration()]"), ["mux_ids", "qids"]),
+        # Building a schedule does not count unless the executed pipeline uses it.
+        (
+            f"unused = {SCHEDULED}\n"
+            + PAIR_RUN.format(targets=PAIRS, steps="[TwoQubitCalibration()]"),
+            ["mux_ids", "qids"],
+        ),
+        (
+            "SetCRSchedule(schedule=s)\n"
+            + PAIR_RUN.format(targets=PAIRS, steps="[TwoQubitCalibration()]"),
+            ["mux_ids", "qids"],
+        ),
+        (
+            "steps = [SetCRSchedule(schedule=s), GenerateCRSchedule()]\n"
+            + PAIR_RUN.format(targets=PAIRS, steps="steps"),
+            ["mux_ids", "qids"],
+        ),
+        (
+            "MuxTargets([0])\n" + PAIR_RUN.format(targets=PAIRS, steps=SCHEDULED),
+            ["mux_ids", "qids"],
+        ),
+        (PAIR_RUN.format(targets="QubitTargets(q)", steps=SCHEDULED), ["mux_ids", "qids"]),
+        # Steps that may lose SetCRSchedule or are not visible are rejected.
+        (
+            f"steps = {SCHEDULED}\nsteps.pop(0)\n" + PAIR_RUN.format(targets=PAIRS, steps="steps"),
+            ["mux_ids", "qids"],
+        ),
+        (
+            f"steps = {SCHEDULED}\nsteps.append(make())\nsteps.append(x)\n"
+            + PAIR_RUN.format(targets=PAIRS, steps="steps"),
+            ["mux_ids", "qids"],
+        ),
+        (
+            f"steps = {SCHEDULED}\nedit(steps)\n" + PAIR_RUN.format(targets=PAIRS, steps="steps"),
+            ["mux_ids", "qids"],
+        ),
+        (
+            "if s:\n    steps = "
+            + SCHEDULED
+            + "\nelse:\n    steps = [TwoQubitCalibration()]\n"
+            + PAIR_RUN.format(targets=PAIRS, steps="steps"),
+            ["mux_ids", "qids"],
+        ),
+        (PAIR_RUN.format(targets=PAIRS, steps="build_steps()"), ["mux_ids", "qids"]),
+        (PAIR_RUN.format(targets="p", steps=SCHEDULED), ["mux_ids", "qids"]),
+        (
+            "for g in s:\n    " + PAIR_RUN.format(targets=PAIRS, steps=SCHEDULED),
+            ["mux_ids", "qids"],
+        ),
+        (f"targets = {PAIRS}\nsteps = {SCHEDULED}", ["mux_ids", "qids"]),
+        ("QubitTargets(q)", ["mux_ids", "qids"]),
+    ],
+)
+def test_supported_target_modes(body, modes):
+    assert _modes(body) == modes
+    assert supported_target_modes("def run(:", "run") == ["mux_ids", "qids"]
+
+
+def test_target_modes_ignore_unused_module_helpers():
+    scheduled = PAIR_RUN.format(targets=PAIRS, steps=SCHEDULED)
+    unscheduled = PAIR_RUN.format(targets=PAIRS, steps="[TwoQubitCalibration()]")
+    helper = "def helper(u, c, p, s):\n    {}\n\n\n"
+    # An unused scheduled helper does not enable pairs for the real entrypoint.
+    assert _modes(unscheduled, helper.format(scheduled)) == ["mux_ids", "qids"]
+    # An unused MUX helper does not disable a valid entrypoint.
+    mux_helper = helper.format("CalibService(u, c).run(MuxTargets([0]), steps=[])")
+    assert _modes(scheduled, mux_helper) == ["coupling_pairs"]
+    # A helper the entrypoint calls may run its own pipeline.
+    assert _modes(f"helper(u, c, p, s)\n{scheduled}", mux_helper) == ["mux_ids", "qids"]
+    # Module-level pipelines run on import.
+    assert _modes(scheduled, "MuxTargets([0])\n") == ["mux_ids", "qids"]
+
+
+def test_target_modes_follow_the_named_entrypoint():
+    source = (
+        f"def other(u, c, p, s):\n    {PAIR_RUN.format(targets=PAIRS, steps=SCHEDULED)}\n\n"
+        "def run(u, c):\n    CalibService(u, c).run(QubitTargets(['0']), steps=[])\n"
+    )
+    assert supported_target_modes(source, "other") == ["coupling_pairs"]
+    assert supported_target_modes(source, "run") == ["mux_ids", "qids"]
+    assert supported_target_modes(source, "missing") == ["mux_ids", "qids"]
+
+
+def test_scheduled_two_qubit_template_accepts_pairs():
+    source = (TEMPLATES / "two_qubit_scheduled.py").read_text()
+    assert supported_target_modes(source, "two_qubit_scheduled") == ["coupling_pairs"]
+    two_qubit = (TEMPLATES / "two_qubit.py").read_text()
+    assert supported_target_modes(two_qubit, "two_qubit") == ["mux_ids", "qids"]

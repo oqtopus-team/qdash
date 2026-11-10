@@ -3,7 +3,7 @@
 ``CalibrationPipelineSpec`` (``qdash.datamodel.calibration_pipeline``) is what
 an agent or the UI submits through ``POST /calibration-pipelines/execute``. The
 API validates it; this flow only maps it onto the same Step classes the
-templates use and hands them to ``CalibService.run``. Nothing in the spec can
+templates use and runs them like ``CalibService.run``. Nothing in the spec can
 reach code outside that mapping.
 
 Registered on worker startup as the ``system-calibration-pipeline`` deployment
@@ -34,12 +34,13 @@ from qdash.datamodel.calibration_pipeline import (
     migrate_pipeline_spec,
     step_id,
 )
+from qdash.workflow.service._internal.runs import run_calibration, workflow_settings
 from qdash.workflow.service.calib_service import (
-    CalibService,
     on_flow_cancellation,
     on_flow_crashed,
     on_flow_failure,
 )
+from qdash.workflow.service.context import resolve_calib_context
 from qdash.workflow.service.steps import (
     BringUp,
     ConfigureAll,
@@ -218,15 +219,13 @@ def calibration_pipeline(
         f"targets={parsed.targets.model_dump(exclude_none=True)}"
     )
 
-    cal = CalibService(
-        username,
-        chip_id,
+    context = resolve_calib_context(username, chip_id, project_id=project_id, backend=backend_name)
+    settings = workflow_settings(
+        context,
         flow_name=name,
         tags=all_tags,
-        project_id=project_id,
-        backend_name=backend_name,
-        _task_defaults=parsed.canonical_task_parameters(),
-        default_run_parameters=parsed.default_run_parameters or None,
         note=pipeline_note(parsed, steps),
+        default_run_parameters=parsed.default_run_parameters or None,
+        task_defaults=parsed.canonical_task_parameters(),
     )
-    return cal.run(targets, steps=steps)
+    return run_calibration(settings, targets, steps)

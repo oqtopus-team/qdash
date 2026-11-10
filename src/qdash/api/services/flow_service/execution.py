@@ -248,7 +248,7 @@ class ExecutionCoordinator:
         Pre-creation is deliberately best effort: the Prefect flow run has
         already been created by the time this runs, and a bookkeeping failure
         here is not a reason to cancel a healthy calibration. On failure the
-        run is left going and ``CalibService._initialize()`` allocates an
+        run is left going and the worker's calibration session allocates an
         execution ID of its own at flow start, exactly as it does for runs that
         never went through the API (cron schedules). Callers fall back to the
         flow run ID for the response, so the only thing lost is the

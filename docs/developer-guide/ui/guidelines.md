@@ -158,8 +158,8 @@ reference carries a status. Do not render ids as plain badges.
 
 Icons come from `lucide-react`, 16px to 18px, in the color of their text role (`text-base-content/60`
 for meta), never in `secondary` or `accent`. Product UI does not use emoji or emoji images; `EmptyState` renders
-a lucide icon from its `emoji` name map, and toasts use lucide status icons. `FluentEmoji` remains
-only for user-chosen avatars and the sign-in page.
+a lucide icon from its `emoji` name map, and toasts use lucide status icons. `UserAvatar` renders
+the user's glyph avatar locally; see [User Avatars](./architecture.md#user-avatars).
 
 ## Draw Charts from One Theme
 

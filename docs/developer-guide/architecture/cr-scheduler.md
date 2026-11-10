@@ -65,6 +65,16 @@ Direction selection uses this priority:
 survives direction or MUX filtering, `generate()` raises `ValueError` instead of returning an empty
 schedule.
 
+## Explicit Pairs
+
+`schedule_pairs(pairs, max_parallel_ops=10, coloring_strategy="largest_first")` groups a caller's
+directed `(control, target)` pairs without the candidate, direction, or MUX-membership filters.
+It never adds, drops, or reverses a pair, so a run calibrates exactly the selection. It raises
+`ValueError` when the list is empty or repeats a pair, when a pair's exact `control-target` ID is
+not a repository coupling, or when either qubit is missing from `wiring.yaml`. Valid pairs then go
+through the same intra/inter-MUX split, conflict coloring, and chunking as `generate()`.
+`metadata["direction_method"]` and `filtering_stats["direction_method"]` are `explicit`.
+
 ## Conflict Invariants
 
 Two CR pairs receive different colors when they:
@@ -103,7 +113,10 @@ diagnostics.
 `GenerateCRSchedule` reads `StepContext.candidate_qids`, stores `parallel_groups` in
 `StepContext.metadata["cr_schedule"]`, and publishes the flattened coupling IDs in
 `candidate_couplings`. `SetCRSchedule` supplies an explicit schedule through the same metadata key.
-`MuxTargets` and `QubitTargets` also use `CRScheduler` to resolve eligible coupling IDs.
+`MuxTargets` and `QubitTargets` also use `CRScheduler` to resolve eligible coupling IDs. A
+per-run coupling pair override replaces each `SetCRSchedule` schedule with the result of
+`schedule_pairs()` before the pipeline starts; see
+[Per-run Target Overrides](../workflow/services.md#per-run-target-overrides).
 
 `CustomTwoQubit` and `TwoQubitCalibration` reuse the stored schedule when present; otherwise they
 generate one internally. When reusing a schedule, their own `max_parallel_ops` does not regroup

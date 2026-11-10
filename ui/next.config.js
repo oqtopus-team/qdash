@@ -52,12 +52,6 @@ const nextConfig = {
         port: "",
         pathname: "/**",
       },
-      {
-        protocol: "https",
-        hostname: "raw.githubusercontent.com",
-        port: "",
-        pathname: "/microsoft/fluentui-emoji/**",
-      },
     ],
   },
   pageExtensions: ["tsx", "ts"],

@@ -38,6 +38,8 @@ from qdash.workflow.service._internal.call_runner import (
     run_batch_calls,
     run_target_calls,
 )
+from qdash.workflow.service._internal.session import borrowed_session
+from qdash.workflow.service._internal.settings import WorkerSpec  # noqa: TC001
 
 # DaskTaskRunner is optional - only needed for multiprocess parallel execution
 DaskTaskRunner: Any
@@ -59,13 +61,13 @@ except Exception as exc:
     DaskTaskRunner = None
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
 
 # Module-level logger for subprocess execution (Prefect logger not available in subprocesses)
 _logger = logging.getLogger(__name__)
 
 
-def _get_session() -> CalibService:
+def _get_session() -> CalibSession:
     """Get the current session from global context (internal use)."""
     from qdash.workflow.service.session_context import get_current_session
 
@@ -141,68 +143,6 @@ def _flush_prefect_logs() -> None:
 def _format_exception_details(e: Exception) -> str:
     """Format exception details, including sub-exceptions for ExceptionGroup."""
     return format_exception_details(e)
-
-
-def _create_isolated_session(
-    session_config: dict[str, Any],
-    qids: list[str],
-) -> CalibService:
-    """Create an isolated CalibService session for parallel execution.
-
-    This creates a new CalibService instance with its own Experiment,
-    avoiding shared state conflicts during parallel execution.
-
-    The isolated session shares the parent's execution_id, so task results
-    are recorded under the parent Execution document (not creating new ones).
-
-    Note: When using multiprocessing, each process has isolated memory,
-    so no locks are needed. Each process gets its own qubex global state.
-
-    Args:
-        session_config: Configuration dict containing:
-            - username: Username for the session
-            - chip_id: Chip ID
-            - backend_name: Backend name (e.g., 'qubex', 'fake')
-            - project_id: Project ID (optional)
-            - muxes: List of MUX IDs (optional)
-            - execution_id: Parent's execution_id (to share Execution document)
-            - configuration_mode: Qubex control layout inherited from the parent
-        qids: List of qubit IDs for this session
-
-    Returns:
-        CalibService instance with isolated backend/Experiment
-    """
-    from qdash.common.execution_resources import ExecutionResourceScope
-    from qdash.workflow.service.calib_service import CalibService
-
-    reservation = (session_config.get("note") or {}).get("hardware_reservation")
-    resource_scope = (
-        ExecutionResourceScope(
-            reservation["chip_id"], tuple(reservation["resources"]), reservation["exclusive"]
-        )
-        if reservation is not None
-        else None
-    )
-    return CalibService(
-        username=session_config["username"],
-        chip_id=session_config["chip_id"],
-        qids=qids,
-        execution_id=session_config.get("execution_id"),  # Use parent's execution_id
-        backend_name=session_config["backend_name"],
-        project_id=session_config.get("project_id"),
-        muxes=session_config.get("muxes"),
-        use_lock=False,  # Parent session holds the lock
-        skip_execution=True,  # Don't create new Execution, use parent's
-        enable_github_pull=False,  # Parent session handles GitHub pull
-        enable_github=False,  # No GitHub operations for isolated sessions
-        default_run_parameters=session_config.get("default_run_parameters"),
-        _task_defaults=session_config.get("task_parameters"),
-        configuration_mode=session_config.get("configuration_mode"),
-        tags=session_config.get("tags"),
-        flow_name=session_config.get("flow_name"),
-        note=session_config.get("note"),
-        resource_scope=resource_scope,
-    )
 
 
 def _is_mux_representative(qid: str) -> bool:
@@ -293,7 +233,7 @@ def _coupling_task_run_name() -> str:
 
 
 def _execute_mux_qubits_with_session(
-    session: CalibService,
+    session: CalibSession,
     qids: list[str],
     plan: StepCalls,
     logger: Any,
@@ -307,7 +247,7 @@ def _execute_mux_qubits_with_session(
 def calibrate_mux_qubits(
     qids: list[str],
     plan: StepCalls,
-    session_config: dict[str, Any] | None = None,
+    worker: WorkerSpec | None = None,
 ) -> dict[str, Any]:
     """Execute a step's calls for qubits in a single MUX sequentially (Prefect task).
 
@@ -321,9 +261,8 @@ def calibrate_mux_qubits(
     Args:
         qids: List of qubit IDs in the MUX
         plan: The step's calls and failure policy
-        session_config: Optional configuration for creating isolated session.
-            If provided, creates independent CalibService. If None, uses
-            global session context.
+        worker: The owner's ``WorkerSpec``. If provided, runs in a borrowed
+            worker session; if None, uses the owner session in this process.
 
     Returns:
         Dictionary mapping qid to its ordered call results
@@ -333,12 +272,9 @@ def calibrate_mux_qubits(
 
     logger = get_run_logger()
 
-    if session_config is not None:
-        session = _create_isolated_session(session_config, qids)
-        try:
+    if worker is not None:
+        with borrowed_session(worker, qids) as session:
             results = _execute_mux_qubits_with_session(session, qids, plan, logger)
-        finally:
-            session.finish_calibration(update_chip_history=False, push_to_github=False)
     else:
         results = _execute_mux_qubits_with_session(_get_session(), qids, plan, logger)
 
@@ -348,7 +284,7 @@ def calibrate_mux_qubits(
 
 
 def _execute_single_qubit_with_session(
-    session: CalibService,
+    session: CalibSession,
     qid: str,
     plan: StepCalls,
     logger: Any,
@@ -361,7 +297,7 @@ def _execute_single_qubit_with_session(
 def calibrate_single_qubit(
     qid: str,
     plan: StepCalls,
-    session_config: dict[str, Any] | None = None,
+    worker: WorkerSpec | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Execute a step's calls for a single qubit (Prefect task).
 
@@ -371,9 +307,8 @@ def calibrate_single_qubit(
     Args:
         qid: Qubit ID
         plan: The step's calls and failure policy
-        session_config: Optional configuration for creating isolated session.
-            If provided, creates independent CalibService. If None, uses
-            global session context.
+        worker: The owner's ``WorkerSpec``. If provided, runs in a borrowed
+            worker session; if None, uses the owner session in this process.
 
     Returns:
         Tuple of (qid, ordered call results)
@@ -383,12 +318,9 @@ def calibrate_single_qubit(
 
     logger = get_run_logger()
 
-    if session_config is not None:
-        session = _create_isolated_session(session_config, [qid])
-        try:
+    if worker is not None:
+        with borrowed_session(worker, [qid]) as session:
             result = _execute_single_qubit_with_session(session, qid, plan, logger)
-        finally:
-            session.finish_calibration(update_chip_history=False, push_to_github=False)
     else:
         result = _execute_single_qubit_with_session(_get_session(), qid, plan, logger)
 
@@ -401,29 +333,28 @@ def calibrate_single_qubit(
 def calibrate_step_qubits_parallel(
     parallel_qids: list[str],
     plan: StepCalls,
-    session_config: dict[str, Any] | None = None,
+    worker: WorkerSpec | None = None,
 ) -> dict[str, Any]:
     """Execute tasks for all qubits in a synchronized step in parallel.
 
     All qubits in parallel_qids are from different MUXes and can be
     calibrated simultaneously in a synchronized step.
 
-    When session_config is provided, each qubit gets its own isolated
-    CalibService with independent Experiment instance, avoiding shared
-    state conflicts during parallel execution.
+    When ``worker`` is provided, each qubit gets its own borrowed worker
+    session with an independent Experiment instance, avoiding shared state
+    conflicts during parallel execution.
 
     Args:
         parallel_qids: List of qubit IDs to calibrate in parallel
         plan: The step's calls and failure policy
-        session_config: Optional configuration for creating isolated sessions.
-            If provided, each qubit task creates independent CalibService.
-            If None, uses global session context.
+        worker: The owner's ``WorkerSpec``. If provided, each qubit runs in its
+            own borrowed worker session; if None, uses the owner session.
 
     Returns:
         Dictionary mapping qid to results
     """
     # Submit all qubits in parallel
-    futures = [calibrate_single_qubit.submit(qid, plan, session_config) for qid in parallel_qids]
+    futures = [calibrate_single_qubit.submit(qid, plan, worker) for qid in parallel_qids]
     pair_results = [f.result() for f in futures]
     return dict(pair_results)
 
@@ -434,7 +365,7 @@ def calibrate_step_qubits_parallel(
 
 
 def _execute_coupling_pair_with_session(
-    session: CalibService,
+    session: CalibSession,
     coupling_qid: str,
     plan: StepCalls,
     logger: Any,
@@ -447,16 +378,15 @@ def _execute_coupling_pair_with_session(
 def execute_coupling_pair(
     coupling_qid: str,
     plan: StepCalls,
-    session_config: dict[str, Any] | None = None,
+    worker: WorkerSpec | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Execute a step's calls for a single coupling pair.
 
     Args:
         coupling_qid: Coupling ID (e.g., "0-1")
         plan: The step's calls and failure policy
-        session_config: Optional configuration for creating isolated session.
-            If provided, creates independent CalibService. If None, uses
-            global session context.
+        worker: The owner's ``WorkerSpec``. If provided, runs in a borrowed
+            worker session; if None, uses the owner session in this process.
 
     Returns:
         Tuple of (coupling_qid, ordered call results)
@@ -469,12 +399,9 @@ def execute_coupling_pair(
     # Parse coupling_qid to get involved qubit IDs
     qids = coupling_qid.split("-")
 
-    if session_config is not None:
-        session = _create_isolated_session(session_config, qids)
-        try:
+    if worker is not None:
+        with borrowed_session(worker, qids) as session:
             result = _execute_coupling_pair_with_session(session, coupling_qid, plan, logger)
-        finally:
-            session.finish_calibration(update_chip_history=False, push_to_github=False)
     else:
         result = _execute_coupling_pair_with_session(_get_session(), coupling_qid, plan, logger)
 
@@ -487,7 +414,7 @@ def execute_coupling_pair(
 def calibrate_parallel_group(
     coupling_qids: list[str],
     plan: StepCalls,
-    session_config: dict[str, Any] | None = None,
+    worker: WorkerSpec | None = None,
 ) -> dict[str, Any]:
     """Execute coupling tasks for a parallel group.
 
@@ -498,14 +425,13 @@ def calibrate_parallel_group(
     Args:
         coupling_qids: List of coupling IDs (e.g., ["0-1", "2-3"])
         plan: The step's calls and failure policy
-        session_config: Optional configuration for creating isolated sessions.
-            If provided, each coupling task creates independent CalibService.
-            If None, uses global session context.
+        worker: The owner's ``WorkerSpec``. If provided, each pair runs in its
+            own borrowed worker session; if None, uses the owner session.
 
     Returns:
         Dictionary mapping coupling_qid to results
     """
-    futures = [execute_coupling_pair.submit(cqid, plan, session_config) for cqid in coupling_qids]
+    futures = [execute_coupling_pair.submit(cqid, plan, worker) for cqid in coupling_qids]
     pair_results = [f.result() for f in futures]
     return dict(pair_results)
 
@@ -550,23 +476,22 @@ def _qubit_batch_task_run_name(parameters: dict[str, Any]) -> str:
 def calibrate_qubit_batch(
     qids: list[str],
     plan: StepCalls,
-    session_config: dict[str, Any],
+    worker: WorkerSpec,
 ) -> dict[str, Any]:
     """Execute batch-capable calls for qids in one isolated session."""
     _ensure_prefect_logging()
     logger = get_run_logger()
-    session = _create_isolated_session(session_config, qids)
     try:
-        return run_batch_calls(session, qids, plan, logger)
+        with borrowed_session(worker, qids) as session:
+            return run_batch_calls(session, qids, plan, logger)
     finally:
-        session.finish_calibration(update_chip_history=False, push_to_github=False)
         _flush_prefect_logs()
 
 
 def run_qubit_batch_calibration_isolated(
     qids: list[str],
     plan: StepCalls,
-    session_config: dict[str, Any],
+    worker: WorkerSpec,
 ) -> dict[str, Any]:
     """Run batch-capable qubit calls in one isolated process.
 
@@ -579,17 +504,17 @@ def run_qubit_batch_calibration_isolated(
     def _run_qubit_batch_flow(
         qids: list[str],
         plan: StepCalls,
-        session_config: dict[str, Any],
+        worker: WorkerSpec,
     ) -> dict[str, Any]:
         future = calibrate_qubit_batch.submit(
             qids=qids,
             plan=plan,
-            session_config=session_config,
+            worker=worker,
         )
         result: dict[str, Any] = future.result()
         return result
 
-    result: dict[str, Any] = _run_qubit_batch_flow(qids, plan, session_config)
+    result: dict[str, Any] = _run_qubit_batch_flow(qids, plan, worker)
     return result
 
 
@@ -606,7 +531,7 @@ def _log_subprocess_failures(logger: Any, kind: str, results: dict[str, Any]) ->
 def run_mux_calibrations_parallel(
     mux_groups: list[list[str]],
     plan: StepCalls,
-    session_config: dict[str, Any],
+    worker: WorkerSpec,
 ) -> dict[str, Any]:
     """Run multiple MUX group calibrations in parallel using separate processes.
 
@@ -617,7 +542,7 @@ def run_mux_calibrations_parallel(
     Args:
         mux_groups: List of MUX groups, where each group is a list of qubit IDs
         plan: The step's calls and failure policy
-        session_config: Configuration for creating isolated sessions
+        worker: The owner's ``WorkerSpec`` that every worker session inherits
 
     Returns:
         Dictionary mapping qid to results (combined from all MUX groups)
@@ -628,13 +553,13 @@ def run_mux_calibrations_parallel(
     def _run_mux_parallel_flow(
         mux_groups: list[list[str]],
         plan: StepCalls,
-        session_config: dict[str, Any],
+        worker: WorkerSpec,
     ) -> dict[str, Any]:
         logger = get_run_logger()
         logger.info(f"Running {len(mux_groups)} MUX groups in parallel processes")
 
         futures = [
-            calibrate_mux_qubits.submit(qids=group, plan=plan, session_config=session_config)
+            calibrate_mux_qubits.submit(qids=group, plan=plan, worker=worker)
             for group in mux_groups
         ]
 
@@ -645,14 +570,14 @@ def run_mux_calibrations_parallel(
             all_results.update(mux_result)
         return all_results
 
-    result: dict[str, Any] = _run_mux_parallel_flow(mux_groups, plan, session_config)
+    result: dict[str, Any] = _run_mux_parallel_flow(mux_groups, plan, worker)
     return result
 
 
 def run_qubit_calibrations_parallel(
     qids: list[str],
     plan: StepCalls,
-    session_config: dict[str, Any],
+    worker: WorkerSpec,
 ) -> dict[str, Any]:
     """Run multiple qubit calibrations in parallel using separate processes.
 
@@ -662,7 +587,7 @@ def run_qubit_calibrations_parallel(
     Args:
         qids: List of qubit IDs to calibrate in parallel
         plan: The step's calls and failure policy
-        session_config: Configuration for creating isolated sessions
+        worker: The owner's ``WorkerSpec`` that every worker session inherits
 
     Returns:
         Dictionary mapping qid to results
@@ -673,27 +598,24 @@ def run_qubit_calibrations_parallel(
     def _run_qubit_parallel_flow(
         qids: list[str],
         plan: StepCalls,
-        session_config: dict[str, Any],
+        worker: WorkerSpec,
     ) -> dict[str, Any]:
         logger = get_run_logger()
         logger.info(f"Running {len(qids)} qubits in parallel processes")
 
-        futures = [
-            calibrate_single_qubit.submit(qid=qid, plan=plan, session_config=session_config)
-            for qid in qids
-        ]
+        futures = [calibrate_single_qubit.submit(qid=qid, plan=plan, worker=worker) for qid in qids]
         results = dict(f.result() for f in futures)
         _log_subprocess_failures(logger, "qubit", results)
         return results
 
-    result: dict[str, Any] = _run_qubit_parallel_flow(qids, plan, session_config)
+    result: dict[str, Any] = _run_qubit_parallel_flow(qids, plan, worker)
     return result
 
 
 def run_coupling_calibrations_parallel(
     coupling_qids: list[str],
     plan: StepCalls,
-    session_config: dict[str, Any],
+    worker: WorkerSpec,
 ) -> dict[str, Any]:
     """Run multiple coupling pair calibrations in parallel using separate processes.
 
@@ -703,7 +625,7 @@ def run_coupling_calibrations_parallel(
     Args:
         coupling_qids: List of coupling IDs (e.g., ["0-1", "2-3"])
         plan: The step's calls and failure policy
-        session_config: Configuration for creating isolated sessions
+        worker: The owner's ``WorkerSpec`` that every worker session inherits
 
     Returns:
         Dictionary mapping coupling_qid to results
@@ -714,20 +636,18 @@ def run_coupling_calibrations_parallel(
     def _run_coupling_parallel_flow(
         coupling_qids: list[str],
         plan: StepCalls,
-        session_config: dict[str, Any],
+        worker: WorkerSpec,
     ) -> dict[str, Any]:
         logger = get_run_logger()
         logger.info(f"Running {len(coupling_qids)} coupling pairs in parallel processes")
 
         futures = [
-            execute_coupling_pair.submit(
-                coupling_qid=cqid, plan=plan, session_config=session_config
-            )
+            execute_coupling_pair.submit(coupling_qid=cqid, plan=plan, worker=worker)
             for cqid in coupling_qids
         ]
         results = dict(f.result() for f in futures)
         _log_subprocess_failures(logger, "coupling", results)
         return results
 
-    result: dict[str, Any] = _run_coupling_parallel_flow(coupling_qids, plan, session_config)
+    result: dict[str, Any] = _run_coupling_parallel_flow(coupling_qids, plan, worker)
     return result

@@ -70,8 +70,8 @@ def test_characterization_builds_full_pipeline_in_dependency_order() -> None:
     assert names(steps[8].tasks) == ["CheckCouplingStrength"]
     assert steps[8].step_name == "coupling_characterization"
     assert steps[8].continue_on_failure is True
-    assert result["kwargs"]["configuration_mode"] == "ge-ef-fh"
-    assert _configure_all_mode(result) == result["kwargs"]["configuration_mode"]
+    assert _configure_all_mode(result) == "ge-ef-fh"
+    assert "configuration_mode" not in result["kwargs"]
 
 
 def test_ge_only_characterization_uses_ge_configuration() -> None:
@@ -94,8 +94,7 @@ def test_ge_only_characterization_uses_ge_configuration() -> None:
     assert names(steps[1].tasks) == names(characterization_module.GE_CALIBRATION_TASKS)
     assert names(steps[3].tasks) == names(characterization_module.GE_CHARACTERIZATION_TASKS)
     assert all(call.on_failure is None for call in steps[3].tasks)
-    assert result["kwargs"]["configuration_mode"] == "ge-cr-cr"
-    assert _configure_all_mode(result) == result["kwargs"]["configuration_mode"]
+    assert _configure_all_mode(result) == "ge-cr-cr"
 
 
 def test_ef_characterization_without_fh_chevron_uses_ef_configuration(
@@ -119,7 +118,7 @@ def test_ef_characterization_without_fh_chevron_uses_ef_configuration(
         run_coupling_characterization=False,
     )
 
-    assert result["kwargs"]["configuration_mode"] == "ge-ef-cr"
+    assert _configure_all_mode(result) == "ge-ef-cr"
     assert _configure_all_mode(result) == "ge-ef-cr"
 
 
@@ -149,7 +148,7 @@ def test_coupling_characterization_does_not_imply_ef_calibration() -> None:
     assert names(steps[4].tasks) == ["CheckCouplingStrength"]
     assert steps[4].step_name == "coupling_characterization"
     assert steps[4].max_parallel_ops == 3
-    assert result["kwargs"]["configuration_mode"] == "ge-cr-cr"
+    assert _configure_all_mode(result) == "ge-cr-cr"
 
 
 def test_characterization_prefers_mux_targets_and_preserves_exclusions() -> None:
@@ -210,7 +209,10 @@ def test_characterization_sets_the_configure_all_mode_on_its_call(
     assert _configure_all_mode(result) == configuration_mode
     # Every setting lives on a call; the template no longer passes per-task defaults.
     assert "task_parameters" not in result["kwargs"]
-    assert result["kwargs"]["configuration_mode"] == configuration_mode
+    # The pipeline runs later steps and their workers in the ConfigureAll layout.
+    from qdash.workflow.service._internal.session import configured_layout
+
+    assert configured_layout(configure_all) == configuration_mode
     assert result["kwargs"]["default_run_parameters"] == {
         "readout_duration": 1024,
         "interval": characterization_module.STANDARD_INTERVAL,
