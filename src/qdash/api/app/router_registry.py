@@ -41,6 +41,7 @@ from qdash.api.routers import (
     task_file,
     task_result,
     topology,
+    user_avatar,
 )
 
 
@@ -94,6 +95,7 @@ PROTECTED_ROUTERS: tuple[RouterRegistration, ...] = (
     RouterRegistration(topology.router, prefix="/topology", tags=("topology",)),
     RouterRegistration(config.router, tags=("config",)),
     RouterRegistration(provenance.router, prefix="/provenance", tags=("provenance",)),
+    RouterRegistration(user_avatar.router, tags=("user-avatar",)),
 )
 
 

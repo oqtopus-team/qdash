@@ -26,6 +26,7 @@ Explain lifecycle and ownership decisions in the Developer Guide instead.
 | Collection | Document | Module |
 | --- | --- | --- |
 | `user` | `UserDocument` | `user.py` |
+| `user_avatar` | `UserAvatarDocument` | `user_avatar.py` |
 | `project` | `ProjectDocument` | `project.py` |
 | `project_membership` | `ProjectMembershipDocument` | `project_membership.py` |
 
