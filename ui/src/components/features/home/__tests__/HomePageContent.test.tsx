@@ -329,7 +329,7 @@ describe("HomePageContent", () => {
     });
     render(<HomePageContent />);
 
-    expect(screen.getByText("No executions in the last 30 days")).toBeTruthy();
+    expect(screen.getByText("No executions in the last 90 days")).toBeTruthy();
     expect(screen.getByText("No failed task results")).toBeTruthy();
   });
 
@@ -465,7 +465,7 @@ describe("HomePageContent", () => {
 
     expect(mockExecutionActivity).toHaveBeenCalled();
     const [params] = mockExecutionActivity.mock.calls[0];
-    expect(params).toEqual({ days: 30, timezone: expect.any(String) });
+    expect(params).toEqual({ days: 90, timezone: expect.any(String) });
     expect(params).not.toHaveProperty("chip_id");
     expect(screen.queryByRole("heading", { name: "Current execution" })).toBeNull();
     expect(screen.queryByText(/tasks$/)).toBeNull();

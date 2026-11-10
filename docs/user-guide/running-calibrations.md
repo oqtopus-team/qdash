@@ -89,18 +89,40 @@ finished and which one is being measured, and the running task shows its measure
 Cancelling a run sends a cancellation request to the worker. A task that is inside an operation
 that cannot be interrupted can take time to stop.
 
-The activity chart at the top of the page counts the chip's runs for the last **7d**, **30d** or
-**90d** as blocks stacked by status; it opens on 30 days. The 30- and 90-day views show one column
-per day (**Executions per day**). The 7-day view shows **Executions per 6 hours**: 28 columns that
-start at 00:00, 06:00, 12:00 and 18:00 in the deployment's time zone, ending with the 6 hours
-that include the current time. Days and periods without runs keep an empty column.
+The activity panel at the top of the page counts the chip's runs and opens in **Activity** view
+on the last 90 days. Use **Activity** for the long-term pattern and **Chart** for the status mix
+of recent days; each view keeps its own period, and the selected day stays selected when you
+switch.
+
+**Activity** shows **Executions per day** as a calendar for the last **30d**, **90d** or
+**365d**: one column per week, one row per weekday, in the deployment's time zone. The color of a
+day shows only how many executions it had, on the same scale on Home and in every period:
+
+| Color | Executions per day |
+| --- | --- |
+| Empty | 0 |
+| Lightest | 1–4 |
+| Light | 5–19 |
+| Dark | 20–99 |
+| Darkest | 100 or more |
+
+On a narrow screen, scroll the calendar sideways. Use the arrow keys to move between days: up
+and down move by one day, left and right by one week.
+
+**Chart** counts the runs for the last **7d**, **30d** or **90d** as blocks stacked by status;
+it opens on 30 days. The 30- and 90-day views show one column per day (**Executions per day**).
+The 7-day view shows **Executions per 6 hours**: 28 columns that start at 00:00, 06:00, 12:00 and
+18:00 in the deployment's time zone, ending with the 6 hours that include the current time. Days
+and periods without runs keep an empty column.
 
 Each block represents one execution, and the axis on the left shows execution counts. For busy
 periods, the chart labels how many executions a full block represents; the top block of a column
-is only partly filled when it holds fewer. Hover over or focus a column to see its exact counts.
-Select a column to limit the list below to its day; in the 7-day view, a 6-hour column selects
-its whole day, because the list filters by day. Select a column of that day again to return to
-the latest runs.
+is only partly filled when it holds fewer. In the 7-day view, a 6-hour column selects its whole
+day, because the list filters by day.
+
+In either view, hover over or focus a day to see its exact counts by status. Select a day to limit
+the list below to it, and select it again to return to the latest runs. In **Activity**, when the
+selected day is outside the shown period, select **Show latest** to clear it.
 
 ## Inspect a Result
 

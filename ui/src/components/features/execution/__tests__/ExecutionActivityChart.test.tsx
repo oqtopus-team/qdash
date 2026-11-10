@@ -415,6 +415,14 @@ describe("ExecutionActivityChart", () => {
     expect(slotButton("2026-11-04T12:00")).toHaveFocus();
   });
 
+  it("shows the page's mode switch beside the window tabs", () => {
+    mocks.activity = activity;
+    renderChart({ modeSwitch: <button type="button">Activity</button> });
+
+    expect(screen.getByRole("button", { name: "Activity" })).toBeTruthy();
+    expect(screen.getByRole("tablist", { name: "Activity window" })).toBeTruthy();
+  });
+
   it("shows a skeleton while loading", () => {
     mocks.state = { isLoading: true, isError: false };
     renderChart();

@@ -215,3 +215,15 @@ export function formatRelativeFutureTime(
     return "";
   }
 }
+
+/** Whether a list filter names a real calendar day in YYYYMMDD form. */
+export function isCompactActivityDate(value: string | null): value is string {
+  if (!value || !/^\d{8}$/.test(value)) return false;
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  );
+}
