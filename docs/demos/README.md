@@ -91,7 +91,7 @@ for an explicit selector.
 ## Demo video
 
 `video/` holds the Remotion project for the previous 30-second product demo. The current
-README and docs assets come from the 56-second film in the
-[qdash-film repository](https://github.com/orangekame3/qdash-film). Running `task docs-video`
+README and docs assets come from the full film in the
+`qdash-film` repository. Running `task docs-video`
 regenerates the previous demo and overwrites the current published assets. See
 `video/README.md` for the previous demo's source and editing instructions.

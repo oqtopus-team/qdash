@@ -10,7 +10,7 @@ QDash is a web application that provides a user-friendly interface to manage and
 
 ![qdash-demo](docs/public/images/qdash-demo.gif)
 
-[▶ Watch the 56-second film with sound](https://oqtopus-team.github.io/qdash/user-guide/what-is-qdash#demo)
+[▶ Watch the demo with sound](https://oqtopus-team.github.io/qdash/user-guide/what-is-qdash#demo)
 
 > [!WARNING]
 > QDash is currently under development. Please check back later for updates.

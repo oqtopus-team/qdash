@@ -47,7 +47,7 @@ hardware decisions.
 
 ## Demo
 
-Watch a 56-second film introducing QDash.
+Watch the demo introducing QDash.
 
 <video controls playsinline preload="metadata" src="/videos/qdash-demo.mp4" style="width: 100%; border-radius: 8px;"></video>
 
