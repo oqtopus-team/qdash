@@ -648,3 +648,64 @@ def test_generate_measured_inverse(
     all_pairs = [pair for group in schedule.parallel_groups for pair in group]
     assert ("1", "0") in all_pairs
     assert ("0", "1") not in all_pairs
+
+
+# Explicit pair scheduling tests
+@pytest.fixture
+def pair_scheduler(scheduler):
+    """Scheduler with directed coupling IDs; "2-3" exists only in one direction."""
+    scheduler._coupling_ids = ["0-1", "1-0", "1-2", "2-1", "2-3", "4-8", "8-4", "9-10", "10-9"]
+    # MUX 0 and 1 share a readout module; MUX 2 uses its own modules.
+    scheduler._wiring_config = [
+        {"mux": 0, "read_out": "RA-0", "ctrl": ["CA-0"]},
+        {"mux": 1, "read_out": "RA-1", "ctrl": ["CB-0"]},
+        {"mux": 2, "read_out": "RC-0", "ctrl": ["CC-0"]},
+    ]
+    return scheduler
+
+
+def test_schedule_pairs_preserves_direction_and_groups_by_constraints(pair_scheduler):
+    result = pair_scheduler.schedule_pairs([("1", "0"), ("9", "10"), ("4", "8")])
+
+    groups = [set(group) for group in result.parallel_groups]
+    # Intra-MUX pairs on independent MUXes share a group; the inter-MUX pair follows.
+    assert groups == [{("1", "0"), ("9", "10")}, {("4", "8")}]
+    assert result.metadata["direction_method"] == "explicit"
+
+
+def test_schedule_pairs_separates_pairs_sharing_a_qubit(pair_scheduler):
+    result = pair_scheduler.schedule_pairs([("0", "1"), ("1", "0"), ("2", "1")])
+
+    assert sorted(pair for group in result.parallel_groups for pair in group) == [
+        ("0", "1"),
+        ("1", "0"),
+        ("2", "1"),
+    ]
+    assert all(len(group) == 1 for group in result.parallel_groups)
+
+
+def test_schedule_pairs_respects_max_parallel_ops(pair_scheduler):
+    result = pair_scheduler.schedule_pairs([("1", "0"), ("9", "10")], max_parallel_ops=1)
+
+    assert [len(group) for group in result.parallel_groups] == [1, 1]
+
+
+@pytest.mark.parametrize(
+    ("pairs", "message"),
+    [
+        ([], "No coupling pairs"),
+        ([("0", "1"), ("0", "1")], "duplicates"),
+        ([("0", "5")], "not found"),
+        # The reverse of a one-directional coupling is not silently flipped.
+        ([("3", "2")], "not found"),
+    ],
+)
+def test_schedule_pairs_rejects_invalid_pairs(pair_scheduler, pairs, message):
+    with pytest.raises(ValueError, match=message):
+        pair_scheduler.schedule_pairs(pairs)
+
+
+def test_schedule_pairs_rejects_unwired_qubits(pair_scheduler):
+    pair_scheduler._coupling_ids = ["0-20"]
+    with pytest.raises(ValueError, match="missing from the wiring"):
+        pair_scheduler.schedule_pairs([("0", "20")])

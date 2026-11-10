@@ -25,13 +25,27 @@ Running a workflow or task requires project edit permission.
 4. Review the flow name, username, chip, and tags in the confirmation dialog.
 5. Under **Calibration targets**, review the defaults from the saved workflow. To change them
    for this run, select **MUX IDs** or **Qubit IDs** and enter IDs separated by commas or spaces.
-   For MUX targets, use **Excluded qubit IDs** to omit individual qubits.
+   For MUX targets, use **Excluded qubit IDs** to omit individual qubits. For a two-qubit workflow
+   with a fixed CR schedule, enter **Coupling pairs** instead, as described below.
 6. Confirm the run, then open **Execution** to follow its progress.
 
 Leaving the target fields unchanged preserves the workflow's code settings. **Use code defaults**
 discards target edits. An explicit change replaces the initial calibration targets throughout the
 current flow run; later filtering steps still apply. The saved workflow and schedules are unchanged.
-A workflow that targets all MUXes or couplings stops with an error when you change its targets.
+A workflow that targets all MUXes, or targets couplings without offering **Coupling pairs**, stops
+with an error when you change its targets.
+
+**Coupling pairs** replaces the MUX and qubit fields for workflows that calibrate fixed coupling
+pairs with a fixed CR schedule, such as those created from **2Q Scheduled Calibration**. Other
+workflows, including ones that generate the CR schedule from qubits or build their calibration
+steps in helper functions, do not offer it. Write each
+pair as `control-target`, for example `63-85`, and separate pairs with commas, spaces, or new
+lines. Direction matters: `85-63` calibrates the opposite direction of `63-85`, and each directed
+pair must exist as a coupling on the run's chip, or QDash rejects the run before it starts. QDash
+groups the pairs into parallel groups from the chip's hardware constraints, replacing the groups
+saved in the workflow for this run only. A workflow created from **2Q Scheduled
+Calibration** saves no pairs of its own, so enter coupling pairs each time you run it; a run left
+unchanged fails before calibrating.
 
 If targets depend on runtime calculations or differ within the workflow, the dialog cannot show a
 single default. Leave the fields unchanged to use the code, or enter an explicit selection for the

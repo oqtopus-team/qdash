@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from qdash.datamodel.flow_targets import FlowTargetOverride
+from qdash.datamodel.flow_targets import FlowTargetOverride, TargetMode
 
 
 class SaveFlowRequest(BaseModel):
@@ -91,11 +91,19 @@ class ListFlowsResponse(BaseModel):
     flows: list[FlowSummary] = Field(..., description="List of flow summaries")
 
 
+def _default_target_modes() -> list[TargetMode]:
+    return ["mux_ids", "qids"]
+
+
 class GetFlowResponse(BaseModel):
     """Response for getting flow details."""
 
     target_defaults: FlowTargetOverride | None = Field(
         None, description="Statically resolved source targets; null when dynamic or ambiguous"
+    )
+    target_modes: list[TargetMode] = Field(
+        default_factory=_default_target_modes,
+        description="Target override types this flow accepts for one execution",
     )
     name: str = Field(..., description="Flow name")
     created_by: str = Field(..., description="Username of the flow creator")

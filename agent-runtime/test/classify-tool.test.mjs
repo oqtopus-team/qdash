@@ -243,7 +243,11 @@ for (const [name, options, reason] of [
     assert.equal(result.isError, true);
     const classifier = `test-classifier/${options.classifyConfig?.name ?? "jev"}`;
     assert.deepEqual(result.details.classification, { classifier, outcome: "failed", reason });
-    assert.doesNotMatch(JSON.stringify(result), /401|token=abc|ECONNREFUSED|10\.0\.0\.1/);
+    // The clock-derived fields can contain "401" by chance; scan everything else.
+    const { timestamp, durationMs, ...scanned } = result;
+    assert.equal(typeof timestamp, "number");
+    assert.equal(typeof durationMs, "number");
+    assert.doesNotMatch(JSON.stringify(scanned), /401|token=abc|ECONNREFUSED|10\.0\.0\.1/);
     if (name === "a provider error") assert.match(warnings.join("\n"), /401 Unauthorized/);
   });
 }

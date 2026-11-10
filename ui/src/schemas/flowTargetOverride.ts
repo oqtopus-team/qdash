@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { FlowTargetOverrideCouplingPairs } from './flowTargetOverrideCouplingPairs';
 import type { FlowTargetOverrideMuxIds } from './flowTargetOverrideMuxIds';
 import type { FlowTargetOverrideQids } from './flowTargetOverrideQids';
 
@@ -14,6 +15,8 @@ import type { FlowTargetOverrideQids } from './flowTargetOverrideQids';
 export interface FlowTargetOverride {
   mux_ids?: FlowTargetOverrideMuxIds;
   qids?: FlowTargetOverrideQids;
+  /** Directed [control, target] qubit pairs; parallel groups are scheduled automatically */
+  coupling_pairs?: FlowTargetOverrideCouplingPairs;
   /** @items.pattern ^\d+$ */
   exclude_qids?: string[];
 }

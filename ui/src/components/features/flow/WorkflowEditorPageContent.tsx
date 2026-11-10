@@ -1871,6 +1871,7 @@ export function WorkflowEditorPageContent() {
             description={description}
             tags={tags}
             targetDefaults={data?.data?.target_defaults}
+            targetModes={data?.data?.target_modes}
             disabledReason={executeDisabledReason}
             onConfirm={(targetOverride) => {
               if (executeDisabledReason) return;

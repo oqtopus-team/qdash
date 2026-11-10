@@ -7,6 +7,12 @@ to calibrate or when you want to control the execution order.
 The schedule is a list of parallel groups, where each group contains
 (control, target) qubit ID tuples that can be executed simultaneously.
 
+Instead of a schedule, ``coupling_pairs`` lists directed pairs without groups.
+The execution dialog sends its coupling pair override through this parameter;
+the run then groups the pairs by the chip's hardware constraints. A direct
+Python call with ``coupling_pairs`` and no execution override runs one pair at
+a time.
+
 Example:
     two_qubit_scheduled(
         username="alice",
@@ -64,11 +70,13 @@ TWO_QUBIT_SCHEDULED_TASKS: list[TaskCall] = [
 def two_qubit_scheduled(
     username: str,
     chip_id: str,
-    schedule: list[list[tuple[str, str]]],
+    schedule: list[list[tuple[str, str]]] | None = None,
     tasks: list[TaskCall] | None = None,
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
+    *,
+    coupling_pairs: list[tuple[str, str]] | None = None,
 ) -> Any:
     """Two-qubit calibration with pre-defined schedule.
 
@@ -79,6 +87,10 @@ def two_qubit_scheduled(
             Each group is a list of (control, target) qubit ID tuples.
             Groups are executed sequentially, pairs within a group run in parallel.
             Example: [[("0", "1"), ("4", "5")], [("2", "3")]]
+        coupling_pairs: Directed (control, target) pairs to calibrate instead of
+            ``schedule``. Takes precedence over ``schedule``. Without an execution
+            override each pair runs in its own group.
+            Example: [("0", "1"), ("1", "0")]
         tasks: 2Q tasks to run. If None, runs full 2Q calibration tasks:
             - CheckCrossResonance
             - CreateZX90
@@ -116,8 +128,12 @@ def two_qubit_scheduled(
     # Validation
     # =========================================================================
 
+    if coupling_pairs is not None:
+        # One pair per group never runs conflicting pairs together. An execution
+        # override replaces this schedule with hardware-aware parallel groups.
+        schedule = [[(control, target)] for control, target in coupling_pairs]
     if not schedule:
-        raise ValueError("schedule cannot be empty")
+        raise ValueError("Specify a non-empty schedule or coupling_pairs")
 
     for i, group in enumerate(schedule):
         if not group:
