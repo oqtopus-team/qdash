@@ -2,13 +2,22 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
+import { Avatar } from "glyph-avatar/react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { getGetCurrentUserQueryKey, useUpdateCurrentUserProfile } from "@/client/auth/auth";
-import { AVATAR_PRESETS, UserAvatar } from "@/components/ui/UserAvatar";
+import {
+  getGetCurrentUserAvatarQueryKey,
+  useGetCurrentUserAvatar,
+  useUpdateCurrentUserAvatar,
+} from "@/client/user-avatar/user-avatar";
+import { GlyphAvatarPicker } from "@/components/ui/GlyphAvatarPicker";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
+import { setAvatarVersion } from "@/lib/avatar/avatarVersions";
+import { automaticAvatarSpec } from "@/lib/avatar/glyphAvatar";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 
 const profileSchema = z.object({
@@ -17,59 +26,48 @@ const profileSchema = z.object({
     .trim()
     .max(100, "Display name must be 100 characters or fewer")
     .transform((value) => value || null),
-  avatarKey: z
-    .string()
-    .max(64, "Select a valid avatar")
-    .regex(/^[a-z0-9_-]*$/, "Select a valid avatar")
-    .transform((value) => value || null),
 });
 
 type ProfileFormInput = z.input<typeof profileSchema>;
 type ProfileFormOutput = z.output<typeof profileSchema>;
 
-const DISPLAY_NAME_ERROR_ID = "profile-display-name-error";
-const AVATAR_ERROR_ID = "profile-avatar-error";
-const AVATAR_LABEL_ID = "profile-avatar-label";
+/** A pending avatar change: a picker spec, `null` for the automatic avatar, or none. */
+type PendingAvatar = { spec: string | null } | null;
 
-/** Profile settings form for editing the current user's display name and avatar. */
+const DISPLAY_NAME_ERROR_ID = "profile-display-name-error";
+const AVATAR_LABEL_ID = "profile-avatar-label";
+const AVATAR_STATUS_ID = "profile-avatar-status";
+const PREVIEW_SIZE = 72;
+
+/** Profile settings form for the current user's display name and avatar. */
 export function ProfileSettingsPanel() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const username = user?.username ?? "";
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<unknown>(null);
+  const [pendingAvatar, setPendingAvatar] = useState<PendingAvatar>(null);
+  // Where the picker starts after "Use automatic avatar"; otherwise it starts at the saved spec.
+  const [pickerStartOverride, setPickerStartOverride] = useState<string | null>(null);
+  const [pickerGeneration, setPickerGeneration] = useState(0);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     register,
     handleSubmit,
     reset,
-    setValue,
     watch,
     formState: { errors },
   } = useForm<ProfileFormInput, unknown, ProfileFormOutput>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-      displayName: user?.display_name ?? "",
-      avatarKey: user?.avatar_key ?? "",
-    },
+    defaultValues: { displayName: user?.display_name ?? "" },
   });
-  const updateProfileMutation = useUpdateCurrentUserProfile({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: getGetCurrentUserQueryKey(),
-        });
-        setSaved(true);
-        if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
-        savedTimeoutRef.current = setTimeout(() => setSaved(false), 2000);
-      },
-    },
-  });
+  const avatarQuery = useGetCurrentUserAvatar({ query: { enabled: Boolean(username) } });
+  const updateProfileMutation = useUpdateCurrentUserProfile();
+  const updateAvatarMutation = useUpdateCurrentUserAvatar();
 
   useEffect(() => {
-    reset({
-      displayName: user?.display_name ?? "",
-      avatarKey: user?.avatar_key ?? "",
-    });
-  }, [reset, user?.display_name, user?.avatar_key]);
+    reset({ displayName: user?.display_name ?? "" });
+  }, [reset, user?.display_name]);
 
   useEffect(
     () => () => {
@@ -78,24 +76,78 @@ export function ProfileSettingsPanel() {
     [],
   );
 
-  const displayName = watch("displayName");
-  const avatarKey = watch("avatarKey");
-  const isDirty =
-    displayName.trim() !== (user?.display_name ?? "") || avatarKey !== (user?.avatar_key ?? "");
-  const displayNameError = errors.displayName?.message;
-  const avatarError = errors.avatarKey?.message;
+  const savedAvatar = avatarQuery.data?.data;
+  const automaticSpec = username ? automaticAvatarSpec(username) : "";
+  const savedSpec = savedAvatar?.spec ?? automaticSpec;
+  const pickerStart = pickerStartOverride ?? savedSpec;
+  const previewSpec = pendingAvatar ? (pendingAvatar.spec ?? automaticSpec) : savedSpec;
+  const isAutomatic = pendingAvatar
+    ? pendingAvatar.spec === null
+    : savedAvatar?.source !== "custom";
 
-  /** Submits the normalized profile values to the API. */
-  const submit = (values: ProfileFormOutput) => {
-    setSaved(false);
-    updateProfileMutation.mutate({
-      data: { display_name: values.displayName, avatar_key: values.avatarKey },
-    });
+  const displayName = watch("displayName");
+  const nameChanged = displayName.trim() !== (user?.display_name ?? "");
+  const isDirty = nameChanged || pendingAvatar !== null;
+  const isSaving = updateProfileMutation.isPending || updateAvatarMutation.isPending;
+  const displayNameError = errors.displayName?.message;
+
+  /** Restarts the picker at `start`, discarding its local movement and tweaks. */
+  const restartPicker = (start: string | null) => {
+    setPickerStartOverride(start);
+    setPickerGeneration((value) => value + 1);
   };
 
-  /** Selects an avatar key and marks the form dirty. */
-  const selectAvatar = (key: string) => {
-    setValue("avatarKey", key, { shouldDirty: true, shouldValidate: true });
+  /** Records a picker selection; the saved avatar or the automatic one is not a custom choice. */
+  const choose = (spec: string) => {
+    setSaved(false);
+    if (spec === savedSpec) {
+      setPendingAvatar(null);
+    } else if (spec === automaticSpec) {
+      setPendingAvatar({ spec: null });
+    } else {
+      setPendingAvatar({ spec });
+    }
+  };
+
+  /** Selects the automatic avatar rendered from the username. */
+  const selectAutomatic = () => {
+    setSaved(false);
+    setPendingAvatar(savedAvatar?.source === "custom" ? { spec: null } : null);
+    restartPicker(automaticSpec);
+  };
+
+  /** Discards unsaved display name and avatar changes. */
+  const discard = () => {
+    reset({ displayName: user?.display_name ?? "" });
+    setPendingAvatar(null);
+    setSaveError(null);
+    restartPicker(null);
+  };
+
+  /** Saves the changed display name and avatar. */
+  const submit = async (values: ProfileFormOutput) => {
+    setSaved(false);
+    setSaveError(null);
+    try {
+      if (nameChanged) {
+        await updateProfileMutation.mutateAsync({ data: { display_name: values.displayName } });
+        await queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() });
+      }
+      if (pendingAvatar) {
+        const response = await updateAvatarMutation.mutateAsync({
+          data: { spec: pendingAvatar.spec },
+        });
+        queryClient.setQueryData(getGetCurrentUserAvatarQueryKey(), response);
+        setAvatarVersion(username, response.data.etag);
+        setPendingAvatar(null);
+        restartPicker(null);
+      }
+      setSaved(true);
+      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+      savedTimeoutRef.current = setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      setSaveError(error);
+    }
   };
 
   return (
@@ -104,11 +156,22 @@ export function ProfileSettingsPanel() {
         <h2 className="card-title mb-4">Profile</h2>
         <form onSubmit={handleSubmit(submit)} noValidate>
           <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-            <div className="flex flex-col items-center gap-3 rounded-lg bg-base-100 p-4">
-              <UserAvatar username={user?.username ?? ""} avatarKey={avatarKey} size={72} />
+            <div className="flex flex-col items-center gap-3 self-start rounded-box bg-base-100 p-4">
+              {pendingAvatar ? (
+                <span className="avatar" data-testid="profile-avatar-preview">
+                  <Avatar
+                    value={previewSpec}
+                    size={PREVIEW_SIZE}
+                    shape="circle"
+                    alt="Unsaved avatar preview"
+                  />
+                </span>
+              ) : (
+                <UserAvatar username={username} size={PREVIEW_SIZE} />
+              )}
               <div className="text-center">
-                <div className="font-medium">{displayName.trim() || user?.username}</div>
-                <div className="text-xs text-base-content/50">@{user?.username}</div>
+                <div className="font-medium">{displayName.trim() || username}</div>
+                <div className="text-xs text-base-content/50">@{username}</div>
               </div>
             </div>
             <div className="space-y-5">
@@ -119,7 +182,7 @@ export function ProfileSettingsPanel() {
                 <input
                   id="profile-display-name"
                   className={`input input-bordered w-full ${displayNameError ? "input-error" : ""}`}
-                  placeholder={user?.username ?? "Display name"}
+                  placeholder={username || "Display name"}
                   aria-invalid={Boolean(displayNameError)}
                   aria-describedby={displayNameError ? DISPLAY_NAME_ERROR_ID : undefined}
                   {...register("displayName")}
@@ -131,60 +194,51 @@ export function ProfileSettingsPanel() {
                 )}
               </div>
 
-              <div>
-                <div id={AVATAR_LABEL_ID} className="mb-2 text-sm font-medium">
-                  Avatar
-                </div>
-                <div
-                  role="group"
-                  aria-labelledby={AVATAR_LABEL_ID}
-                  aria-describedby={avatarError ? AVATAR_ERROR_ID : undefined}
-                  className="grid grid-cols-4 gap-2 sm:grid-cols-7 md:grid-cols-9"
-                >
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div id={AVATAR_LABEL_ID} className="text-sm font-medium">
+                    Avatar
+                  </div>
                   <button
                     type="button"
-                    className={`btn h-12 min-h-0 rounded-lg p-1 ${
-                      avatarKey === "" ? "btn-primary" : "btn-ghost bg-base-100"
-                    }`}
-                    onClick={() => selectAvatar("")}
-                    title="Automatic"
-                    aria-label="Automatic"
-                    aria-pressed={avatarKey === ""}
+                    className="btn btn-ghost btn-sm"
+                    onClick={selectAutomatic}
+                    disabled={isAutomatic || !username}
                   >
-                    <UserAvatar username={user?.username ?? ""} size={28} />
+                    Use automatic avatar
                   </button>
-                  {AVATAR_PRESETS.map((preset) => (
-                    <button
-                      key={preset.key}
-                      type="button"
-                      className={`btn h-12 min-h-0 rounded-lg p-1 ${
-                        avatarKey === preset.key ? "btn-primary" : "btn-ghost bg-base-100"
-                      }`}
-                      onClick={() => selectAvatar(preset.key)}
-                      title={preset.label}
-                      aria-label={preset.label}
-                      aria-pressed={avatarKey === preset.key}
-                    >
-                      <UserAvatar
-                        username={user?.username ?? ""}
-                        avatarKey={preset.key}
-                        size={28}
-                      />
-                    </button>
-                  ))}
                 </div>
-                {avatarError && (
-                  <p id={AVATAR_ERROR_ID} className="mt-1 text-sm text-error">
-                    {avatarError}
+                <p
+                  id={AVATAR_STATUS_ID}
+                  className="text-xs text-base-content/60"
+                  aria-live="polite"
+                >
+                  {pendingAvatar
+                    ? pendingAvatar.spec === null
+                      ? "Automatic avatar selected. Save to apply it."
+                      : "New avatar selected. Save to apply it."
+                    : isAutomatic
+                      ? "Automatic avatar generated from your username."
+                      : "Custom avatar chosen on this QDash instance."}
+                </p>
+                {username && (
+                  <GlyphAvatarPicker
+                    key={`${pickerStart}:${pickerGeneration}`}
+                    defaultValue={pickerStart}
+                    onChange={choose}
+                    labelledBy={AVATAR_LABEL_ID}
+                  />
+                )}
+                {avatarQuery.isError && (
+                  <p className="text-sm text-warning" role="status">
+                    The saved avatar could not be loaded. You can still choose a new one.
                   </p>
                 )}
               </div>
 
-              {updateProfileMutation.isError && (
+              {saveError !== null && (
                 <div className="alert alert-error" role="alert">
-                  <span>
-                    {getApiErrorMessage(updateProfileMutation.error, "Failed to update profile.")}
-                  </span>
+                  <span>{getApiErrorMessage(saveError, "Failed to update profile.")}</span>
                 </div>
               )}
               {saved && (
@@ -192,17 +246,23 @@ export function ProfileSettingsPanel() {
                   <span>Profile updated.</span>
                 </div>
               )}
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={!isDirty || updateProfileMutation.isPending}
-              >
-                {updateProfileMutation.isPending ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  "Save Profile"
-                )}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="submit" className="btn btn-primary" disabled={!isDirty || isSaving}>
+                  {isSaving ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    "Save Profile"
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={discard}
+                  disabled={!isDirty || isSaving}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </form>

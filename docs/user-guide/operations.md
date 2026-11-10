@@ -94,6 +94,10 @@ intend to delete persistent service state.
 If the UI cannot reach the API, check `INTERNAL_API_URL` and whether the API is listening on
 `API_PORT`.
 
+If user avatars show initials instead of images, confirm that the API can reach the UI server at
+`AVATAR_GENERATOR_URL`; the API renders avatars there. Docker Compose sets it to
+`http://ui:${UI_PORT}`, and a host-side stack defaults to `http://127.0.0.1:${UI_PORT}`.
+
 If workflow execution fails with a missing work pool, restart `deployment-service` and
 `user-flow-worker`; the deployment service creates the `user-flows-pool` when registering flows.
 

@@ -17039,6 +17039,186 @@
           }
         }
       }
+    },
+    "/auth/me/avatar": {
+      "get": {
+        "tags": [
+          "user-avatar"
+        ],
+        "summary": "Get the current user's avatar settings",
+        "description": "Return the current user's saved avatar spec, generating the automatic one on first use.",
+        "operationId": "getCurrentUserAvatar",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserAvatarResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "user-avatar"
+        ],
+        "summary": "Set or reset the current user's avatar",
+        "description": "Render and save a picker spec, or reset to the automatic avatar when ``spec`` is null.\n\nThe API renders the SVG itself from the spec; avatar markup is never accepted from the\nclient. If rendering fails, the saved avatar is unchanged.",
+        "operationId": "updateCurrentUserAvatar",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserAvatarUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserAvatarResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/users/{username}/avatar": {
+      "get": {
+        "tags": [
+          "user-avatar"
+        ],
+        "summary": "Get a user's avatar image",
+        "description": "Return a user's saved avatar SVG, generating the automatic avatar on first request.\n\nThe response carries a strong ETag; a matching ``If-None-Match`` returns 304.",
+        "operationId": "getUserAvatar",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$",
+              "title": "Username"
+            }
+          },
+          {
+            "name": "if-none-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-None-Match"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The cached avatar is current"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -32278,6 +32458,69 @@
         ],
         "title": "User",
         "description": "User model for authentication and user management."
+      },
+      "UserAvatarResponse": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "custom"
+            ],
+            "title": "Source",
+            "description": "automatic (rendered from the username) or custom (chosen in the picker)"
+          },
+          "spec": {
+            "type": "string",
+            "title": "Spec",
+            "description": "Canonical glyph-avatar spec string of the saved avatar"
+          },
+          "generator": {
+            "type": "string",
+            "title": "Generator",
+            "description": "Generator package that rendered the avatar"
+          },
+          "generator_version": {
+            "type": "string",
+            "title": "Generator Version",
+            "description": "Generator package version"
+          },
+          "etag": {
+            "type": "string",
+            "title": "Etag",
+            "description": "SHA-256 hex digest of the saved SVG"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "spec",
+          "generator",
+          "generator_version",
+          "etag"
+        ],
+        "title": "UserAvatarResponse",
+        "description": "The current user's saved avatar description."
+      },
+      "UserAvatarUpdate": {
+        "properties": {
+          "spec": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spec",
+            "description": "Canonical glyph-avatar v1 spec string from the avatar picker; null resets to the automatic avatar rendered from the username"
+          }
+        },
+        "type": "object",
+        "title": "UserAvatarUpdate",
+        "description": "Avatar selection for the current user."
       },
       "UserCreate": {
         "properties": {

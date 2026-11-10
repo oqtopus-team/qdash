@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     prefect_port: int = 4200
     api_port: int = 5715
     ui_port: int = 5714
+    # Base URL of the UI server that renders generated avatars; defaults to the local UI port
+    avatar_generator_url: str = ""
     # Logging
     log_level: str = "INFO"
     # Timezone
@@ -53,6 +55,13 @@ def resolve_api_cors_origins(settings: Settings) -> list[str]:
             f"http://127.0.0.1:{settings.ui_port}",
         ]
     return []
+
+
+def resolve_avatar_generator_url(settings: Settings) -> str:
+    """Resolve the UI server base URL the API calls to generate avatars."""
+    if settings.avatar_generator_url:
+        return settings.avatar_generator_url
+    return f"http://127.0.0.1:{settings.ui_port}"
 
 
 @lru_cache(maxsize=1)

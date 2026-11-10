@@ -46,6 +46,25 @@ reset.
 
 ![Changing your password from Settings](/images/guides/change-password.gif)
 
+## Change Your Avatar
+
+Every user has an avatar. QDash generates it from your username the first time it is shown, so
+the same username gets the same automatic avatar on any QDash instance that runs the same
+QDash release.
+
+To choose a different avatar:
+
+1. Open **Settings** and select the **Account** tab.
+2. Under **Avatar**, drag the avatar grid or focus it and use the arrow keys. The avatar in the
+   center is selected and appears in the preview.
+3. Optional: use **Shuffle**, **New shape**, **New colors**, or **New background** to vary the
+   selection.
+4. Select **Save Profile**. **Cancel** discards the selection.
+
+To return to the generated avatar, select **Use automatic avatar**, then **Save Profile**. A chosen
+avatar applies only to the QDash instance where you saved it. Avatars that were already saved do
+not change when QDash is updated.
+
 ## API Authentication
 
 Automation should use a saved [QDash Client](../reference/clients/python.md) profile. The client

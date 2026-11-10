@@ -49,6 +49,7 @@ from qdash.dbmodel.target_note import TargetNoteDocument
 from qdash.dbmodel.task import TaskDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
+from qdash.dbmodel.user_avatar import UserAvatarDocument
 
 
 def document_models() -> list[Any]:
@@ -69,6 +70,7 @@ def document_models() -> list[Any]:
         ProjectMembershipDocument,
         SlackForumThreadDocument,
         UserDocument,
+        UserAvatarDocument,
         ExecutionCounterDocument,
         ProjectExecutionCounterDocument,
         ExecutionLockDocument,

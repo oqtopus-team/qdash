@@ -181,11 +181,7 @@ function PostBody({
     >
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {isAi ? (
-            <QdashBotAvatar size={24} />
-          ) : (
-            <UserAvatar username={post.username} avatarKey={post.avatar_key} size={24} />
-          )}
+          {isAi ? <QdashBotAvatar size={24} /> : <UserAvatar username={post.username} size={24} />}
           <span className={`badge badge-sm ${isAi ? "badge-primary" : "badge-neutral"}`}>
             {post.username}
           </span>
@@ -1192,7 +1188,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               Author
             </div>
             <div className="flex items-center gap-2">
-              <UserAvatar username={post.username} avatarKey={post.avatar_key} size={24} />
+              <UserAvatar username={post.username} size={24} />
               <span className="text-sm font-medium">{post.username}</span>
             </div>
           </section>

@@ -1,73 +1,70 @@
 "use client";
 
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
-import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
+import { useAvatarVersion } from "@/lib/avatar/avatarVersions";
+import { userAvatarUrl } from "@/lib/avatar/glyphAvatar";
 
-type AvatarPreset = {
-  key: string;
-  label: string;
-};
-
-export const AVATAR_PRESETS: AvatarPreset[] = [
-  { key: "fox", label: "Fox" },
-  { key: "cat", label: "Cat" },
-  { key: "dog", label: "Dog" },
-  { key: "rabbit", label: "Rabbit" },
-  { key: "bear", label: "Bear" },
-  { key: "panda", label: "Panda" },
-  { key: "koala", label: "Koala" },
-  { key: "tiger", label: "Tiger" },
-  { key: "lion", label: "Lion" },
-  { key: "unicorn", label: "Unicorn" },
-  { key: "owl", label: "Owl" },
-  { key: "octopus", label: "Octopus" },
-  { key: "butterfly", label: "Butterfly" },
-  { key: "dolphin", label: "Dolphin" },
-  { key: "whale", label: "Whale" },
-  { key: "penguin", label: "Penguin" },
-  { key: "sun", label: "Sun" },
-  { key: "moon", label: "Moon" },
-  { key: "star", label: "Star" },
-  { key: "rainbow", label: "Rainbow" },
-  { key: "cloud", label: "Cloud" },
-  { key: "snowflake", label: "Snowflake" },
-  { key: "cherry", label: "Cherry" },
-  { key: "tulip", label: "Tulip" },
-  { key: "sunflower", label: "Sunflower" },
-  { key: "mushroom", label: "Mushroom" },
-  { key: "crystal", label: "Crystal" },
-  { key: "planet", label: "Planet" },
-];
-
-const AVATAR_PRESET_KEYS = new Set(AVATAR_PRESETS.map((preset) => preset.key));
-
-function resolveAvatarKey(username: string, avatarKey?: string | null) {
-  if (avatarKey && AVATAR_PRESET_KEYS.has(avatarKey)) return avatarKey;
-  return getAvatarEmoji(username);
-}
-
+/**
+ * A user's saved glyph avatar, loaded as an image from the API.
+ *
+ * The API generates and saves the automatic avatar on first request, so every user has one.
+ * The browser revalidates the image with its ETag; an avatar saved in this tab refreshes at once.
+ */
 export function UserAvatar({
   username,
-  avatarKey,
   size = 28,
   className = "",
 }: {
   username: string;
-  avatarKey?: string | null;
   size?: number;
   className?: string;
 }) {
+  const version = useAvatarVersion(username);
+  const src = username ? userAvatarUrl(username, version) : null;
+  const [request, setRequest] = useState({ src, retries: 0, failed: false });
+  const retries = request.src === src ? request.retries : 0;
+  const failed = !src || (request.src === src && request.failed);
+  const imageSrc = src && retries ? `${src}${src.includes("?") ? "&" : "?"}retry=${retries}` : src;
+
+  useEffect(() => {
+    if (!src || !failed || retries >= 2) return;
+    const timer = window.setTimeout(
+      () => setRequest({ src, retries: retries + 1, failed: false }),
+      retries === 0 ? 1000 : 3000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [src, failed, retries]);
+  const dimensions = { width: size, height: size };
+
+  if (failed || !imageSrc) {
+    return (
+      <span className={`avatar avatar-placeholder shrink-0 ${className}`} title={username}>
+        <span
+          className="rounded-full bg-base-300 text-base-content/70"
+          style={{ ...dimensions, fontSize: Math.max(10, Math.round(size * 0.42)) }}
+          role="img"
+          aria-label={username || "User avatar"}
+        >
+          <span aria-hidden="true">{username.charAt(0).toUpperCase() || "?"}</span>
+        </span>
+      </span>
+    );
+  }
+
   return (
-    <span
-      className={`inline-flex shrink-0 items-center justify-center ${className}`}
-      title={username}
-    >
-      <FluentEmoji
-        name={resolveAvatarKey(username, avatarKey)}
-        size={size}
-        alt={username || "User avatar"}
-      />
+    <span className={`avatar shrink-0 ${className}`} title={username}>
+      <span className="rounded-full" style={dimensions}>
+        <Image
+          src={imageSrc}
+          alt={username}
+          width={size}
+          height={size}
+          unoptimized
+          onError={() => setRequest({ src, retries, failed: true })}
+        />
+      </span>
     </span>
   );
 }
