@@ -1,8 +1,15 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import dynamic from "next/dynamic";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  useController,
+  useForm,
+  type ControllerRenderProps,
+  type FieldErrors,
+} from "react-hook-form";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -82,6 +89,11 @@ import { executionHref } from "@/components/features/first-calibration/journeyPr
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
 import { FlowExplorer } from "@/components/features/flow/FlowExplorer";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
+import {
+  flowPropertiesSchema,
+  type FlowPropertiesFormData,
+  type FlowPropertiesFormInput,
+} from "@/components/features/flow/flowMetadataSchema";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
@@ -129,6 +141,41 @@ const EDITOR_OPTIONS = {
 
 type SidePanel = "explorer" | "properties";
 
+type PropertyField = keyof FlowPropertiesFormInput;
+
+const EMPTY_PROPERTIES: FlowPropertiesFormInput = {
+  description: "",
+  flow_function_name: "",
+  username: "",
+  chip_id: "",
+  tags: "",
+  folder: "",
+  default_interval: "",
+};
+
+/** Input ids of each property field in the side panel and in the properties modal, in form order. */
+const PROPERTY_INPUT_IDS: Record<PropertyField, { side: string; modal: string }> = {
+  description: { side: "flow-side-description", modal: "flow-description" },
+  flow_function_name: { side: "flow-side-entrypoint", modal: "flow-entrypoint" },
+  username: { side: "flow-side-username", modal: "flow-username" },
+  chip_id: { side: "flow-side-chip-id", modal: "flow-chip-id" },
+  tags: { side: "flow-side-tags", modal: "flow-tags" },
+  folder: { side: "flow-side-folder", modal: "flow-folder" },
+  default_interval: { side: "flow-side-default-interval", modal: "flow-interval" },
+};
+
+/** Value and change handlers of one property field, shared by the side panel and the modal. */
+function propertyInputProps<TName extends PropertyField>(
+  field: ControllerRenderProps<FlowPropertiesFormInput, TName>,
+) {
+  return { value: field.value, onChange: field.onChange, onBlur: field.onBlur };
+}
+
+/**
+ * Editor for a saved flow: the code in Monaco and its properties in one form shared by the side
+ * panel and the properties modal. Saving, by button, Cmd/Ctrl+S or the command palette, submits
+ * that form while the editor is unlocked.
+ */
 export function WorkflowEditorPageContent() {
   const router = useRouter();
   const params = useParams();
@@ -139,14 +186,30 @@ export function WorkflowEditorPageContent() {
   const name = params.name as string;
   const { capture: captureJourneyContext } = useFirstCalibrationJourney();
 
-  const [description, setDescription] = useState("");
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<FlowPropertiesFormInput, unknown, FlowPropertiesFormData>({
+    resolver: zodResolver(flowPropertiesSchema),
+    defaultValues: EMPTY_PROPERTIES,
+    shouldFocusError: false,
+  });
+  const { field: descriptionField } = useController({ control, name: "description" });
+  const { field: flowFunctionNameField } = useController({ control, name: "flow_function_name" });
+  const { field: usernameField } = useController({ control, name: "username" });
+  const { field: chipIdField } = useController({ control, name: "chip_id" });
+  const { field: tagsField } = useController({ control, name: "tags" });
+  const { field: folderField } = useController({ control, name: "folder" });
+  const { field: defaultIntervalField } = useController({ control, name: "default_interval" });
+  const description = descriptionField.value;
+  const flowFunctionName = flowFunctionNameField.value;
+  const username = usernameField.value;
+  const chipId = chipIdField.value;
+  const tags = tagsField.value;
   const [code, setCode] = useState("");
-  const [flowFunctionName, setFlowFunctionName] = useState("");
-  const [username, setUsername] = useState("");
-  const [chipId, setChipId] = useState("");
-  const [tags, setTags] = useState("");
-  const [folder, setFolder] = useState("");
-  const [defaultInterval, setDefaultInterval] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
   const [lastExecutionId, setLastExecutionId] = useState<string | null>(null);
@@ -165,6 +228,8 @@ export function WorkflowEditorPageContent() {
   const [isBottomPanelOpen, setIsBottomPanelOpen] = useState(false);
   const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
   const reportedTerminalExecution = useRef<string | null>(null);
+  const pendingPropertyFocus = useRef<PropertyField | null>(null);
+  const [propertyFocusRequest, setPropertyFocusRequest] = useState(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRef = useRef<any>(null);
 
@@ -336,38 +401,37 @@ export function WorkflowEditorPageContent() {
     latestExecution?.status !== "cancelling" &&
     !isExecutionTerminal(latestExecution?.status);
   const executeErrorMessage = getApiErrorMessage(executeMutation.error, "Unknown error");
+  const currentUsername = userData?.data?.username;
   useEffect(() => {
     if (data?.data) {
       const flow = data.data;
-      setDescription(flow.description);
       setCode(flow.code);
       setOriginalCode(flow.code);
-      setFlowFunctionName(flow.flow_function_name);
 
       // Set username from flow or fallback to current user
       const flowUsername = (flow.default_parameters?.username as string) || "";
-      setUsername(flowUsername || userData?.data?.username || "");
-
-      // Set chip_id from flow or fallback to latest chip
-      setChipId(flow.chip_id);
-
-      setTags(flow.tags?.join(", ") || "");
-      setFolder(flow.folder ?? "");
       const runParams = flow.default_run_parameters as
         | Record<string, { value?: string | number }>
         | undefined;
-      setDefaultInterval(
-        runParams?.interval?.value != null ? String(runParams.interval.value) : "",
-      );
+      reset({
+        description: flow.description,
+        flow_function_name: flow.flow_function_name,
+        username: flowUsername || currentUsername || "",
+        chip_id: flow.chip_id,
+        tags: flow.tags?.join(", ") || "",
+        folder: flow.folder ?? "",
+        default_interval:
+          runParams?.interval?.value != null ? String(runParams.interval.value) : "",
+      });
     }
-  }, [data, userData, chipsData]);
+  }, [data, currentUsername, reset]);
 
   // Set default username if not set by flow data
   useEffect(() => {
     if (userData?.data?.username && !username && !data?.data) {
-      setUsername(userData.data.username);
+      setValue("username", userData.data.username);
     }
-  }, [userData, username, data]);
+  }, [userData, username, data, setValue]);
 
   // Set default chip_id if not set by flow data
   useEffect(() => {
@@ -378,9 +442,9 @@ export function WorkflowEditorPageContent() {
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
         return dateB - dateA;
       });
-      setChipId(sortedChips[0].chip_id);
+      setValue("chip_id", sortedChips[0].chip_id);
     }
-  }, [chipsData, chipId, data]);
+  }, [chipsData, chipId, data, setValue]);
 
   const isDirty = code !== originalCode;
 
@@ -411,55 +475,67 @@ export function WorkflowEditorPageContent() {
     [registerPage],
   );
 
+  /** Saves the validated properties with the editor code. */
+  const saveProperties = useCallback(
+    (values: FlowPropertiesFormData) => {
+      const request: SaveFlowRequest = {
+        name,
+        description: values.description,
+        code,
+        flow_function_name: values.flow_function_name,
+        chip_id: values.chip_id,
+        tags: values.tags,
+        folder: values.folder,
+        default_parameters: {
+          username: values.username,
+          chip_id: values.chip_id,
+        },
+        default_run_parameters: values.default_interval
+          ? {
+              interval: {
+                value: values.default_interval,
+                value_type: "int",
+                unit: "ns",
+              },
+            }
+          : {},
+      };
+
+      saveMutation.mutate({ request, context: captureJourneyContext() });
+    },
+    [name, code, saveMutation, captureJourneyContext],
+  );
+
+  /** Shows the first invalid property, in the open modal or in the side panel, and focuses it. */
+  const revealInvalidProperty = useCallback(
+    (fieldErrors: FieldErrors<FlowPropertiesFormInput>) => {
+      const field = (Object.keys(PROPERTY_INPUT_IDS) as PropertyField[]).find(
+        (key) => fieldErrors[key],
+      );
+      if (!field) return;
+      if (!showPropertiesModal) {
+        setActiveSidePanel("properties");
+        setIsSidebarVisible(true);
+      }
+      pendingPropertyFocus.current = field;
+      setPropertyFocusRequest((request) => request + 1);
+    },
+    [showPropertiesModal],
+  );
+
+  useEffect(() => {
+    const field = pendingPropertyFocus.current;
+    if (!field) return;
+    pendingPropertyFocus.current = null;
+    const ids = PROPERTY_INPUT_IDS[field];
+    document.getElementById(showPropertiesModal ? ids.modal : ids.side)?.focus();
+  }, [propertyFocusRequest, showPropertiesModal]);
+
+  /** Submits the properties form while the editor is unlocked. */
   const handleSave = useCallback(() => {
     if (isEditorLocked) return;
-    if (!username.trim()) {
-      toast.error("Please enter a username");
-      return;
-    }
-
-    const request: SaveFlowRequest = {
-      name,
-      description: description.trim(),
-      code,
-      flow_function_name: flowFunctionName.trim() || undefined,
-      chip_id: chipId.trim(),
-      tags: tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      folder: folder.trim(),
-      default_parameters: {
-        username: username.trim(),
-        chip_id: chipId.trim(),
-      },
-      default_run_parameters: defaultInterval.trim()
-        ? {
-            interval: {
-              value: defaultInterval.trim(),
-              value_type: "int",
-              unit: "ns",
-            },
-          }
-        : {},
-    };
-
-    saveMutation.mutate({ request, context: captureJourneyContext() });
-  }, [
-    isEditorLocked,
-    username,
-    name,
-    description,
-    code,
-    flowFunctionName,
-    chipId,
-    tags,
-    folder,
-    defaultInterval,
-    saveMutation,
-    captureJourneyContext,
-    toast,
-  ]);
+    void handleSubmit(saveProperties, revealInvalidProperty)();
+  }, [isEditorLocked, handleSubmit, saveProperties, revealInvalidProperty]);
 
   // Keep a ref to handleSave for Monaco command (avoids stale closure)
   const handleSaveRef = useRef(handleSave);
@@ -1130,8 +1206,7 @@ export function WorkflowEditorPageContent() {
                         name="flowDescription"
                         className="textarea textarea-bordered textarea-sm min-h-20"
                         placeholder="Describe your flow..."
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
+                        {...propertyInputProps(descriptionField)}
                       />
                     </label>
                     <label className="form-control flex flex-col gap-1">
@@ -1144,24 +1219,29 @@ export function WorkflowEditorPageContent() {
                         type="text"
                         placeholder="simple_flow"
                         className="input input-bordered input-sm"
-                        value={flowFunctionName}
-                        onChange={(e) => setFlowFunctionName(e.target.value)}
+                        {...propertyInputProps(flowFunctionNameField)}
                       />
                     </label>
-                    <label className="form-control flex flex-col gap-1">
-                      <span className="label py-1">
+                    <div className="form-control flex flex-col gap-1">
+                      <label htmlFor="flow-side-username" className="label py-1">
                         <span className="label-text text-xs">Username *</span>
-                      </span>
+                      </label>
                       <input
                         id="flow-side-username"
                         name="flowUsername"
                         type="text"
                         placeholder="your_username"
-                        className="input input-bordered input-sm"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
+                        className={`input input-bordered input-sm ${errors.username ? "input-error" : ""}`}
+                        aria-invalid={Boolean(errors.username)}
+                        aria-describedby={errors.username ? "flow-side-username-error" : undefined}
+                        {...propertyInputProps(usernameField)}
                       />
-                    </label>
+                      {errors.username && (
+                        <p id="flow-side-username-error" className="text-xs text-error">
+                          {errors.username.message}
+                        </p>
+                      )}
+                    </div>
                     <label className="form-control flex flex-col gap-1">
                       <span className="label py-1">
                         <span className="label-text text-xs">Chip ID *</span>
@@ -1172,8 +1252,7 @@ export function WorkflowEditorPageContent() {
                         type="text"
                         placeholder="64Qv3"
                         className="input input-bordered input-sm"
-                        value={chipId}
-                        onChange={(e) => setChipId(e.target.value)}
+                        {...propertyInputProps(chipIdField)}
                       />
                     </label>
                     <label className="form-control flex flex-col gap-1">
@@ -1186,8 +1265,7 @@ export function WorkflowEditorPageContent() {
                         type="text"
                         placeholder="tag1, tag2, tag3"
                         className="input input-bordered input-sm"
-                        value={tags}
-                        onChange={(e) => setTags(e.target.value)}
+                        {...propertyInputProps(tagsField)}
                       />
                     </label>
                     <label className="form-control flex flex-col gap-1">
@@ -1200,8 +1278,7 @@ export function WorkflowEditorPageContent() {
                         type="text"
                         placeholder="daily/t1"
                         className="input input-bordered input-sm"
-                        value={folder}
-                        onChange={(e) => setFolder(e.target.value)}
+                        {...propertyInputProps(folderField)}
                       />
                     </label>
                     <label className="form-control flex flex-col gap-1">
@@ -1214,8 +1291,7 @@ export function WorkflowEditorPageContent() {
                         type="text"
                         placeholder="150 * 1024"
                         className="input input-bordered input-sm"
-                        value={defaultInterval}
-                        onChange={(e) => setDefaultInterval(e.target.value)}
+                        {...propertyInputProps(defaultIntervalField)}
                       />
                     </label>
 
@@ -1682,9 +1758,8 @@ export function WorkflowEditorPageContent() {
                     id="flow-description"
                     className="textarea textarea-bordered textarea-sm"
                     placeholder="Describe your flow..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
                     rows={3}
+                    {...propertyInputProps(descriptionField)}
                   />
                 </div>
 
@@ -1697,8 +1772,7 @@ export function WorkflowEditorPageContent() {
                     type="text"
                     placeholder="simple_flow"
                     className="input input-bordered input-sm"
-                    value={flowFunctionName}
-                    onChange={(e) => setFlowFunctionName(e.target.value)}
+                    {...propertyInputProps(flowFunctionNameField)}
                   />
                   <label className="label">
                     <span className="label-text-alt text-xs">
@@ -1715,10 +1789,16 @@ export function WorkflowEditorPageContent() {
                     id="flow-username"
                     type="text"
                     placeholder="your_username"
-                    className="input input-bordered input-sm"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    className={`input input-bordered input-sm ${errors.username ? "input-error" : ""}`}
+                    aria-invalid={Boolean(errors.username)}
+                    aria-describedby={errors.username ? "flow-username-error" : undefined}
+                    {...propertyInputProps(usernameField)}
                   />
+                  {errors.username && (
+                    <p id="flow-username-error" className="mt-1 text-xs text-error">
+                      {errors.username.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-control flex flex-col gap-1">
@@ -1730,8 +1810,7 @@ export function WorkflowEditorPageContent() {
                     type="text"
                     placeholder="64Qv3"
                     className="input input-bordered input-sm"
-                    value={chipId}
-                    onChange={(e) => setChipId(e.target.value)}
+                    {...propertyInputProps(chipIdField)}
                   />
                 </div>
 
@@ -1744,8 +1823,7 @@ export function WorkflowEditorPageContent() {
                     type="text"
                     placeholder="tag1, tag2, tag3"
                     className="input input-bordered input-sm"
-                    value={tags}
-                    onChange={(e) => setTags(e.target.value)}
+                    {...propertyInputProps(tagsField)}
                   />
                   <label className="label">
                     <span className="label-text-alt text-xs">Comma-separated</span>
@@ -1761,8 +1839,7 @@ export function WorkflowEditorPageContent() {
                     type="text"
                     placeholder="daily/t1"
                     className="input input-bordered input-sm"
-                    value={folder}
-                    onChange={(e) => setFolder(e.target.value)}
+                    {...propertyInputProps(folderField)}
                   />
                   <label className="label">
                     <span className="label-text-alt text-xs">
@@ -1780,8 +1857,7 @@ export function WorkflowEditorPageContent() {
                     type="text"
                     placeholder="150 * 1024"
                     className="input input-bordered input-sm"
-                    value={defaultInterval}
-                    onChange={(e) => setDefaultInterval(e.target.value)}
+                    {...propertyInputProps(defaultIntervalField)}
                   />
                   <label className="label">
                     <span className="label-text-alt text-xs">
