@@ -216,6 +216,7 @@ describe("ExecutionDAG node dragging", () => {
   type CapturedNode = {
     id: string;
     position: { x: number; y: number };
+    selected?: boolean;
     data: Record<string, unknown>;
   };
   const capturedNode = (id: string) =>
@@ -254,6 +255,29 @@ describe("ExecutionDAG node dragging", () => {
     });
 
     expect(capturedNode("task-1")?.position).toEqual(before);
+  });
+
+  it("keeps React Flow selection apart from the preview selection", () => {
+    render(<ExecutionDAG tasks={tasks} />);
+    const onNodesChange = mocks.capturedProps?.onNodesChange as (changes: unknown[]) => void;
+
+    act(() => {
+      onNodesChange([{ type: "select", id: "task-1", selected: true }]);
+    });
+
+    expect(capturedNode("task-1")?.selected).toBe(true);
+    expect(capturedNode("task-1")?.data.isSelected).toBe(false);
+    expect(capturedNode("task-2")?.selected).toBeUndefined();
+
+    act(() => {
+      onNodesChange([
+        { type: "select", id: "task-1", selected: false },
+        { type: "select", id: "task-2", selected: true },
+      ]);
+    });
+
+    expect(capturedNode("task-1")?.selected).toBe(false);
+    expect(capturedNode("task-2")?.selected).toBe(true);
   });
 });
 
