@@ -86,7 +86,18 @@ class ConfigureAll(QubexTask):
             params_dir=exp.params_path,
             configuration_mode=configuration_mode,
         )
-        print(f"[ConfigureAll] Pushing system_manager (box_ids={exp.box_ids})")
-        exp.system_manager.push(box_ids=exp.box_ids, confirm=False, parallel=False)
+        # Experiment.targets is scoped to the qubits in the selected MUXes,
+        # whereas system_manager.load rebuilds the complete system model.
+        target_labels = sorted(exp.targets)
+        print(
+            f"[ConfigureAll] Pushing system_manager "
+            f"(box_ids={exp.box_ids}, target_labels={target_labels})"
+        )
+        exp.system_manager.push(
+            box_ids=exp.box_ids,
+            confirm=False,
+            parallel=False,
+            target_labels=target_labels,
+        )
         print("[ConfigureAll] Done")
         return RunResult(raw_result={"mux_ids": mux_ids, "box_ids": exp.box_ids})

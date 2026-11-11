@@ -66,8 +66,22 @@ class Configure(QubexTask):
             "configuration_mode": mode,
         }
         exp.system_manager.load(**load_kwargs)
-        print(f"[{self.name}] Pushing system_manager for {label} (box_ids={exp.box_ids})")
-        exp.system_manager.push(box_ids=exp.box_ids, confirm=False, parallel=False)
+        # Resolve from the reloaded model so the requested GE/EF/FH layout is used.
+        target_labels = sorted(
+            target.label
+            for target in exp.experiment_system.gen_targets.values()
+            if target.qubit == label and target.channel.port.box_id in exp.box_ids
+        )
+        print(
+            f"[{self.name}] Pushing system_manager for {label} "
+            f"(box_ids={exp.box_ids}, target_labels={target_labels})"
+        )
+        exp.system_manager.push(
+            box_ids=exp.box_ids,
+            confirm=False,
+            parallel=False,
+            target_labels=target_labels,
+        )
         print(f"[{self.name}] Done for {label}")
         self.save_calibration(backend)
         return RunResult(raw_result=None)
