@@ -21,9 +21,15 @@ Independent pi-qdash releases pin a client snapshot from the same commit; the
 See [Pi packages](../../developer-guide/copilot/packages.md) for local development
 and release ordering.
 
-## Configuration
+## Connect to a Deployment
 
-The TypeScript and Python clients use the same `QDASH_*` environment variables and named profiles. This allows an extension to reuse an existing `$XDG_CONFIG_HOME/qdash/config.ini` or `~/.config/qdash/config.ini` file.
+<a id="configuration"></a>
+
+The TypeScript and Python clients read the same `QDASH_*` environment variables and named
+profiles, so an extension can reuse an existing `$XDG_CONFIG_HOME/qdash/config.ini` or
+`~/.config/qdash/config.ini` file. [Connect to a Deployment](./python.md#connect-to-a-deployment)
+in the Python client reference shows where to copy the API token and project ID in QDash and
+how to save a profile.
 
 ```ts
 import { QDashClient } from "@oqtopus-team/qdash-client";

@@ -11,7 +11,7 @@ You drive it from the `qdash-agent` command of the Python client. How this works
 ## Install and configure
 
 Install the client, then configure a named profile as described in the
-[Python client](../reference/clients/python.md#configuration). The command reads credentials
+[Python client](../reference/clients/python.md#connect-to-a-deployment). The command reads credentials
 from that profile and never prints them. In a secret-managed environment, set the documented
 `QDASH_*` variables and replace `--profile local` below with `--from-env`.
 

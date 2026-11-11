@@ -1,4 +1,4 @@
-![OQTOPUS](docs/public/images/oqtopus-logo.png)
+<img src="docs/public/images/oqtopus-logo.png" alt="OQTOPUS" width="100%" />
 
 # QDash
 
@@ -9,14 +9,17 @@
 QDash is a web platform for running qubit calibration workflows, reviewing measurement results,
 and tracking calibration parameters and their history.
 
-![qdash-demo](docs/public/images/qdash-demo.gif)
+<img src="docs/public/images/qdash-demo.gif" alt="QDash calibration demo" width="100%" />
 
 [Watch the demo with sound](https://oqtopus-team.github.io/qdash/user-guide/what-is-qdash#demo)
 
-To try QDash without quantum hardware, follow the
-[Fake backend setup](https://oqtopus-team.github.io/qdash/user-guide/setup/fake-backend); to
-connect a lab system, follow the
-[Qubex backend setup](https://oqtopus-team.github.io/qdash/user-guide/setup/qubex-backend). Read
+To try QDash without quantum hardware, follow
+[Setup](https://oqtopus-team.github.io/qdash/user-guide/setup) with the
+[Fake backend](https://oqtopus-team.github.io/qdash/user-guide/setup/fake-backend), then
+[Run Your First Calibration](https://oqtopus-team.github.io/qdash/user-guide/first-calibration);
+to connect a lab system, start with
+[Setup](https://oqtopus-team.github.io/qdash/user-guide/setup) and choose the
+[Qubex backend](https://oqtopus-team.github.io/qdash/user-guide/setup/qubex-backend). Read
 the release notes and [System Updates](https://oqtopus-team.github.io/qdash/user-guide/system-updates)
 before upgrading an existing deployment.
 
@@ -33,8 +36,10 @@ before upgrading an existing deployment.
 
 - [What is QDash?](https://oqtopus-team.github.io/qdash/user-guide/what-is-qdash): the
   calibration loop and what QDash manages.
-- [Setup](https://oqtopus-team.github.io/qdash/user-guide/setup): choose a backend and deploy
-  QDash.
+- [Setup](https://oqtopus-team.github.io/qdash/user-guide/setup): choose a backend, deploy
+  QDash, and sign in.
+- [Run Your First Calibration](https://oqtopus-team.github.io/qdash/user-guide/first-calibration):
+  create a chip, run a workflow, and inspect its first result.
 - [Operations](https://oqtopus-team.github.io/qdash/user-guide/operations) and
   [System Updates](https://oqtopus-team.github.io/qdash/user-guide/system-updates): run and
   upgrade a deployment.

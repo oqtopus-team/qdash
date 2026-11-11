@@ -11,24 +11,74 @@ pip install qdash-client
 
 The distribution name is `qdash-client`; import it as `qdash.client`.
 
-## Configuration
+## Connect to a Deployment
 
-Use an API token for programmatic access. `QDASH_BASE_URL` is the only required environment
-variable; include an API path prefix when the deployment exposes one.
+<a id="configuration"></a>
+
+Save an API token in a named profile so scripts can connect without embedding credentials:
+
+1. In QDash, open **Settings → API Token** and copy **Your Access Token**. The
+   **Example Usage (curl)** command beside it shows the active project's ID in its
+   `X-Project-Id` header.
+2. Save a profile with the API base URL, the token, and the project ID:
+
+   ```python
+   from getpass import getpass
+
+   from qdash.client import QDashConfig
+
+   QDashConfig(
+       base_url="http://localhost:5714/api",
+       api_token=getpass("QDash API token: "),
+       project_id="your-project-id",
+   ).save("local")
+   ```
+
+3. Check the connection:
+
+   ```python
+   from qdash.client import QDashClient
+
+   client = QDashClient.from_profile("local")
+   try:
+       print(client.list_chips().total)
+   finally:
+       client.close()
+   ```
+
+A Docker Compose deployment serves the API under `/api` on `UI_PORT`, so the base URL is
+`http://<host>:<UI_PORT>/api`, or the public URL followed by `/api` behind
+[remote access](../../user-guide/setup.md#enable-remote-access).
+
+### Profiles
+
+`QDashConfig.save()` creates or updates a profile in `$XDG_CONFIG_HOME/qdash/config.ini`, or
+`~/.config/qdash/config.ini` when `XDG_CONFIG_HOME` is unset, with owner-only permissions
+(`0600`). A profile section uses the setting names below in lowercase without the `QDASH_` prefix:
+
+```ini
+[prod]
+base_url = https://your-qdash-instance/api
+api_token = your-api-token
+project_id = your-project-id
+timeout_seconds = 30
+retry_max_attempts = 3
+```
+
+`QDashClient.from_profile("prod")` loads a profile; `QDashClient()` without a configuration loads
+the `default` profile.
+
+### Environment Variables
+
+In a secret-managed environment, supply the same settings as environment variables and use
+`QDashClient.from_env()`. `QDASH_BASE_URL` is the only required variable; include the API path
+prefix, such as `/api`.
 
 ```bash
 export QDASH_BASE_URL="https://your-qdash-instance/api"
 export QDASH_API_TOKEN="your-api-token"
 export QDASH_PROJECT_ID="your-project-id"
 ```
-
-```python
-from qdash.client import QDashClient
-
-client = QDashClient.from_env()
-```
-
-The client reads these settings:
 
 | Environment variable | Default | Purpose |
 | --- | --- | --- |
@@ -49,27 +99,6 @@ The client reads these settings:
 Legacy deployments can use `QDASH_USERNAME` and the password variable named by
 `QDASH_PASSWORD_ENV`, which defaults to `QDASH_PASSWORD`.
 
-Named profiles live in `$XDG_CONFIG_HOME/qdash/config.ini`, or `~/.config/qdash/config.ini` when
-`XDG_CONFIG_HOME` is unset:
-
-```ini
-[prod]
-base_url = https://your-qdash-instance/api
-api_token = your-api-token
-project_id = your-project-id
-timeout_seconds = 30
-retry_max_attempts = 3
-```
-
-```python
-from qdash.client import QDashClient
-
-client = QDashClient.from_profile("prod")
-```
-
-`QDashConfig.save()` creates or updates a profile with owner-only permissions (`0600`). Constructing
-`QDashClient()` without a configuration loads the `default` profile.
-
 ## Call the High-Level API
 
 Close the client after use so its HTTP session is released:
@@ -77,7 +106,7 @@ Close the client after use so its HTTP session is released:
 ```python
 from qdash.client import QDashClient
 
-client = QDashClient.from_profile("prod")
+client = QDashClient.from_profile("local")
 try:
     chip = client.get_default_chip()
     metrics = client.get_chip_metrics(chip.chip_id)

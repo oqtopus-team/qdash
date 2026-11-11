@@ -1,6 +1,7 @@
 # Operations
 
-Use these commands to start, inspect, restart, and stop a local or lab QDash deployment.
+Use these commands to start, inspect, restart, and stop a Docker Compose deployment of QDash, and
+to narrow down common failures.
 
 Run all commands from the QDash repository root. The examples use the default ports from the
 example `.env` files; use the values in your `.env` if you changed them.
@@ -57,10 +58,6 @@ log and return to the shell.
 The API also writes a rotating file to its Docker log volume. Host-side API runs write under
 `${XDG_STATE_HOME:-$HOME/.local/state}/qdash/logs`.
 
-Pi stores per-user durable conversation state in the `agent-runtime-state` Docker volume. Normal
-container rebuilds preserve it. Deleting that volume removes Pi transcripts and unfinished work;
-the user-facing session list in MongoDB is unaffected.
-
 ## Restart a Service
 
 Restart one service after a transient failure or a configuration change that does not require a
@@ -100,18 +97,47 @@ docker compose down
 This command preserves named volumes and bind-mounted data. Do not add `--volumes` unless you
 intend to delete persistent service state.
 
+The named volumes hold service logs, the AI runtime's internal authentication and workspace, and
+saved AI conversations. The databases and calibration data live in the directories that `.env`
+sets.
+Deleting the `agent-runtime-state` volume removes AI chat transcripts and unfinished AI work; the
+chat session list shown in QDash is kept in MongoDB and is unaffected.
+
 ## Resolve Common Failures
 
-If pages open but show no data, the browser cannot reach the API. Check
-`docker compose logs caddy` and `docker compose logs api`; the `caddy` service forwards `/api` to
-the API on `API_PORT`.
+Start with [Check Service Health](#check-service-health), then match the symptom below.
 
-If workflow execution fails with a missing work pool, restart `deployment-service` and
-`user-flow-worker`; the deployment service creates the `user-flows-pool` when registering flows.
+### A Page Shows No Data
 
-If task figures do not render, confirm `CALIB_DATA_PATH` points at the directory mounted to
-`/app/calib_data` in Docker.
+An empty page is not always a failure. Check, in order:
 
-If Qubex config or task file pages return missing-path errors, confirm `CONFIG_PATH` points
-to the Qubex backend configuration tree and `CALIB_TASKS_PATH` points to the calibration
-task directory in `.env`.
+1. The active project and chip. Data belongs to one project, and a new project has no chips or
+   runs until someone creates them; see
+   [Active Project](./projects-and-data-sharing.md#active-project).
+2. The page's scope. A time range, cool-down, status, or other filter can exclude every record.
+3. The API. Open <http://localhost:5714/api/docs>. If it does not load, or the page shows a
+   request error, read `docker compose logs caddy` and `docker compose logs api`. The `caddy`
+   service forwards `/api` to the API container.
+
+### A Workflow Run Reports a Missing Work Pool
+
+Restart `deployment-service` and `user-flow-worker`. Both create the `user-flows-pool` work pool
+when it is missing:
+
+```bash
+docker compose restart deployment-service user-flow-worker
+```
+
+### Task Figures Do Not Render
+
+Confirm that `CALIB_DATA_PATH` in `.env` names the host directory that holds calibration figures
+and raw data. Compose mounts that directory into the API and the workflow worker. After changing
+it, recreate the services with `docker compose up -d`; figures written earlier stay in the
+previous directory.
+
+### Configuration Pages Report a Missing Path
+
+Confirm that `CONFIG_PATH` in `.env` names the Qubex configuration tree on the host, as
+[Qubex backend](./setup/qubex-backend.md#place-the-qubex-configuration) describes. Compose mounts
+it into the API and the workflow worker; recreate them with `docker compose up -d` after changing
+it.

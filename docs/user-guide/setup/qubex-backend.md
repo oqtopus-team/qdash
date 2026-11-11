@@ -3,14 +3,10 @@
 Use the Qubex backend for a lab deployment that runs QDash calibration tasks against supported
 quantum-control hardware.
 
-Complete [Prepare the Host](../setup.md#prepare-the-host), then create `.env` from the Qubex
-example:
-
-```bash
-cp .env.example.qubex .env
-```
-
-Review these backend-specific settings before starting services:
+Complete this page after [Create the Environment File](../setup.md#create-the-environment-file)
+has copied `.env.example.qubex` to `.env`, and before
+[Configure Shared Deployment Settings](../setup.md#configure-shared-deployment-settings). Review
+these backend-specific settings before starting services:
 
 | Variable | Purpose |
 | --- | --- |
@@ -121,7 +117,6 @@ file management UI can also pull or push the repository. When workflow push is e
 commit updated calibration notes and parameter YAML files after a run.
 
 Confirm that each existing chip has its directory before starting QDash; new chips get theirs
-when you [create them](#create-the-configuration-of-a-new-chip). Then set the administrator
-credentials and common options in
+when you [create them](#create-the-configuration-of-a-new-chip) after sign-in. Then return to
 [Configure Shared Deployment Settings](../setup.md#configure-shared-deployment-settings) and
-[start QDash](../setup.md#start-qdash).
+continue Setup from there.

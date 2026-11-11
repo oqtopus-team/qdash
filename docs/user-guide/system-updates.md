@@ -11,11 +11,11 @@ unavailable while its containers are stopped and rebuilt.
 Read the target release notes before changing the checkout. A release that changes stored data
 can require a backup or a release-specific procedure.
 
-1. Confirm that no calibration or other workflow is running.
-2. Complete or cancel running work from the QDash execution pages.
-3. Back up MongoDB, PostgreSQL, calibration data, and Qubex configuration when required by the
+1. Complete or cancel running calibrations and other workflows from **Execution**, and confirm
+   that none is still running.
+2. Back up MongoDB, PostgreSQL, calibration data, and Qubex configuration when required by the
    release notes or your recovery policy.
-4. Confirm that the checkout is on `main` and has no tracked changes:
+3. Confirm that the checkout is on `main` and has no tracked changes:
 
    ```bash
    git branch --show-current
@@ -49,25 +49,24 @@ The command must exit successfully. If it does not, do not deploy that tag.
 
 ## Deploy the Release
 
-Stop QDash before advancing `main`:
+1. Stop QDash before advancing `main`:
 
-```bash
-docker compose down
-```
+   ```bash
+   docker compose down
+   ```
 
-When upgrading a Copilot deployment to a newer Pi release, such as Pi 1.3 to 1.4 or Pi 1.4 to
-1.5, back up the stopped `agent-runtime-state` Docker volume before continuing. The new Pi release
-migrates saved conversations when the new runtime first opens or writes them. A previous release cannot read the migrated volume; restore the
-pre-update volume backup before starting that release during a rollback. How this works:
-[Copilot architecture](../developer-guide/copilot/architecture.md#durable-conversations).
+2. If the release moves the AI runtime to a newer Pi release, such as Pi 1.3 to 1.4 or Pi 1.4 to
+   1.5, back up the stopped `agent-runtime-state` Docker volume now. The new Pi release migrates
+   saved conversations when it first opens or writes them, and an earlier release cannot read the
+   migrated volume. How this works:
+   [Copilot architecture](../developer-guide/copilot/architecture.md#durable-conversations).
+3. Advance `main` to the target without creating a merge commit, validate Compose, and rebuild:
 
-Advance `main` to the target without creating a merge commit, validate Compose, and rebuild:
-
-```bash
-git merge --ff-only <target-tag>
-docker compose config --quiet
-docker compose up -d --build
-```
+   ```bash
+   git merge --ff-only <target-tag>
+   docker compose config --quiet
+   docker compose up -d --build
+   ```
 
 `git merge --ff-only` refuses a divergent update instead of combining release code with local
 commits. Resolve the branch state before retrying; do not force the merge.
@@ -90,7 +89,7 @@ unavailable.
 
 ## Check Direct Service Access
 
-The `caddy` service serves the UI, the API under `/api`, and Prefect under `/prefect` on
+Check this section when updating from a release without the `caddy` service. The `caddy` service serves the UI, the API under `/api`, and Prefect under `/prefect` on
 `UI_PORT`, the only port QDash opens on the host. The API, Prefect, MongoDB, PostgreSQL,
 mongo-express, and deployment service ports are reachable only from the other QDash containers,
 not from the QDash host itself. Updating from a release without `caddy` needs no `.env` change;
@@ -133,8 +132,10 @@ spec to submit instead. The full list of edits:
 ## Recover from a Failed Update
 
 Follow the target release notes when deployment fails after stored data changes. Moving the Git
-checkout back does not reverse MongoDB, PostgreSQL, calibration-data, or configuration changes.
-Restore the backups required by that release before starting the previous application version.
+checkout back does not reverse MongoDB, PostgreSQL, calibration-data, configuration, or AI
+conversation changes. Restore the backups required by that release, and the
+`agent-runtime-state` backup after a Pi migration, before starting the previous application
+version.
 
 If the failure occurs before stored data changes are applied and the release notes permit a
 code-only rollback, move `main` back to the previously deployed stable tag and rebuild:

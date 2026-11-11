@@ -1,35 +1,35 @@
 # AI Chat
 
-QDash provides conversational analysis tools that use project calibration context without
-replacing operator judgment.
+Use AI chat to ask questions about a project's calibration data, investigate a failure, or have
+the assistant draft a workflow change or a calibration run for you to approve. The assistant reads
+QDash records with your permissions; it does not replace operator judgment.
 
-## Choose a Tool
+AI chat needs a chat model endpoint; an administrator configures it as described in
+[AI Setup](./setup/ai.md). Without one, the rest of QDash works unchanged.
 
-| Tool | Use it for |
+## Choose an Entry Point
+
+| Entry point | Use it for |
 | --- | --- |
-| AI Chat | Explore a question interactively with project-aware tools and cited QDash records. |
-| Analysis chat panel | Discuss the metric and filters already open on the Metrics page. |
-| Agent calibration | Run a separately authorized, bounded calibration plan through the client. |
+| **AI Chat** in the sidebar | A project-wide conversation with cited QDash records |
+| **Ask AI** on the right edge of any page | The same chat beside the page you are on |
+| **Ask AI** on a task result | Discussing or evaluating one result |
+| **Investigate with AI** in an **Error Log** | Finding the likely cause of a failed execution or task |
+| [Agent Calibration](./agent-calibration.md) | Running a separately authorized, bounded calibration plan through the client |
 
-Agent calibration performs hardware-affecting operations and is documented separately in
-[Agent Calibration](./agent-calibration.md).
+## Start a Conversation
 
-## AI Chat
+Open **AI Chat** for a project-wide conversation. Start a new session when the chip,
+investigation, or goal changes substantially. QDash stores sessions so you can return to earlier
+analysis.
 
-Open **AI Chat** for a project-wide conversation. Start a new session when the chip, investigation,
-or goal changes substantially. QDash stores sessions so you can return to prior analysis.
+The assistant can inspect chips, metrics, task results, forum threads, workflows, and provenance.
+Confirm the active project and chip, then check important conclusions against the cited records.
 
-The assistant can use the project tools exposed by QDash to inspect records such as chips,
-metrics, task results, forum threads, workflows, and provenance. Keep the active project and selected chip
-in mind when interpreting an answer. Open referenced records to confirm important conclusions.
+### Ask AI Beside Any Page
 
-### Ask AI beside any page
-
-**Ask AI** on the right edge opens the same chat as a sidebar next to the page you are on. The
-assistant is told which page is open with every message, so "what am I looking at?" or "compare
-this with last week" refer to the current page. Drag the sidebar's left edge to make it wider or
-narrower; double-click the edge to restore the default width. The width is remembered in your
-browser.
+**Ask AI** opens a sidebar with the current page as context. Drag its left edge to resize it, or
+double-click to restore the default width. Your browser remembers the width.
 
 On the **Workflow** editor the assistant also sees the flow's code as it is in the editor,
 unsaved changes included. Ask for a change in plain terms, for example "add a T2 echo check after
@@ -38,15 +38,15 @@ editor and unlocks it, **Discard** leaves it as it was. Nothing is saved until y
 **Save**, which checks the flow the same way as a hand-written one.
 Apply is available only while the proposal's flow is open on the same chip.
 
-### A workspace for calculations and scripts
+### Calculations and Scripts
 
 When the deployment enables it, the assistant has a private workspace for each chat: a shell with
 Python, NumPy, SciPy, pandas, Plotly and Matplotlib, no network, and no access to QDash. It uses
 it for arithmetic, fitting and data wrangling, writing data from tool results into files. The
-answer's trace shows each command, the file it wrote with the code typed out as it is written,
-and the output of each run. Files stay for the rest of the chat and are deleted with it.
+trace shows commands, generated code, and output. Files stay for the rest of the chat and are
+deleted with it.
 
-### Thinking and your own instructions
+### Thinking and Your Own Instructions
 
 The **Thinking** menu next to the model picker sets how much the model reasons before it answers:
 **Auto** (the model's configured default), **Off**, **Low**, **Medium**, or **High**. The choice
@@ -64,7 +64,7 @@ chat model: QDash's system prompt, your instructions as they are appended to it,
 chat offers. It is the running text, so it reflects the current skills, tools, and language
 settings; the application's part is edited in the deployment, not in Settings.
 
-### Investigate a failure
+## Investigate a Failure
 
 Use **Investigate with AI** when an execution or a task failed and you want to know why. The
 button appears in the **Error Log** of a failed execution on the **Execution** page and on its
@@ -74,14 +74,14 @@ task details. It works when the execution failed before any task result was reco
 1. Select **Investigate with AI** in the **Error Log** header.
 2. The chat opens and sends the investigation for you. On the **Execution** pages, in task
    details, and in a task result preview, it opens in the floating chat window, so the details
-   panel stays in view; on a task result's own page it opens in the chat sidebar. QDash adds the recorded error message and
-   stack trace, and the execution, task, qubit, and chip identifiers to the chat.
+   panel stays in view; on a task result's own page it opens in the chat sidebar. QDash adds the
+   recorded error message and stack trace, and the execution, task, qubit, and chip identifiers
+   to the chat.
 3. Read the answer, then ask follow-up questions in the same chat.
 
-The assistant reads available source code,
-starting from the code that raised the error. The answer is short: the likely cause, the evidence
-(a quoted log line and cited code locations), and one next step to check or a fix
-to review. The assistant reads more code only when the evidence is unclear; ask a follow-up
+The assistant reads available source code, starting from the code that raised the error. The
+answer gives a likely cause, supporting logs and code references, and a next step or proposed fix.
+The assistant reads more code only when the evidence is unclear; ask a follow-up
 question for a deeper analysis. It does not apply fixes or re-run anything.
 
 QDash does not record which source revision an execution ran with. The answer names the revision
@@ -92,11 +92,11 @@ Selecting the button again for the same failure reopens that chat instead of sta
 To run the investigation again from the start, select **New chat** while the investigation chat is
 open, then select **Investigate with AI**. The earlier chat stays in your chat history.
 
-### Run a calibration pipeline from chat
+## Run a Calibration Pipeline from Chat
 
 The assistant can compose a calibration from QDash's step catalog and run it as one execution
-with your approval and project permissions. Ask for
-the calibration in plain terms, for example "run the coarse one-qubit check on Q00 and Q01, then
+with your approval and project permissions. Ask for the calibration in plain terms, for example
+"run the coarse one-qubit check on Q00 and Q01, then
 measure T1 and T2 on the ones that pass". The assistant reads the available step types and tasks,
 validates its plan with QDash, and shows an approval card listing the targets, the steps, and the
 exact tasks each step will run. Nothing starts until you approve the card.
@@ -106,27 +106,25 @@ every task result is judged by the same gates as a saved workflow. The execution
 **Execution** page tagged `pipeline`. See
 [Calibration Pipeline Spec](../developer-guide/workflow/calibration-pipeline.md) for the spec format.
 
-## Metrics Analysis
+## Ask AI About a Task Result
 
-The Metrics page includes a chat panel that opens with the selected task result as its context. Use it
-when a question depends on the selected chip, metric, target direction, or time range. Changing those
-filters can change the records available to the chat; state the intended comparison explicitly.
+**Ask AI** appears on a task result and in a metric's history on **Metrics**. It offers two routes
+before anything starts:
 
-**Ask AI** on a task result offers two routes before anything starts. **Evaluate the figure**
-creates a recorded evaluation with the settings described in
-[AI Evaluations](./ai-evaluations.md). **Chat with Copilot** opens the conversation described
-here. Viewers without edit rights go straight to the chat.
+- **Evaluate the figure** creates a recorded evaluation with the settings described in
+  [AI Evaluations](./ai-evaluations.md).
+- **Chat with Copilot** opens a chat with that result and its figures as context.
 
-## Evaluate Findings
+Viewers without edit rights go straight to the chat. When the question depends on the chip,
+metric, target direction, or time range, state the intended comparison explicitly.
+
+## Check AI Findings
 
 Treat AI output as supporting evidence. Before changing calibration state, excluding a result, or
 starting another hardware run:
 
-- open the underlying task result and artifacts;
-- compare the finding with task knowledge;
-- confirm the project, chip, target, and time context;
-- use deterministic quality gates where the workflow provides them;
-- record the decision in a note or a forum thread when others need the context.
-
-Provider availability and model selection depend on the deployment configuration. A missing AI
-provider disables that capability rather than the rest of QDash.
+1. Open the underlying task result and its artifacts.
+2. Compare the finding with the task's knowledge.
+3. Confirm the project, chip, target, and time context.
+4. Use the deterministic quality gates that the workflow provides.
+5. Record the decision in a note or a forum thread when others need the context.
