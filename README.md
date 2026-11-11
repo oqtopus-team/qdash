@@ -17,7 +17,8 @@ To try QDash without quantum hardware, follow
 [Setup](https://oqtopus-team.github.io/qdash/user-guide/setup) with the
 [Fake backend](https://oqtopus-team.github.io/qdash/user-guide/setup/fake-backend), then
 [Run Your First Calibration](https://oqtopus-team.github.io/qdash/user-guide/first-calibration);
-to connect a lab system, choose the
+to connect a lab system, start with
+[Setup](https://oqtopus-team.github.io/qdash/user-guide/setup) and choose the
 [Qubex backend](https://oqtopus-team.github.io/qdash/user-guide/setup/qubex-backend). Read
 the release notes and [System Updates](https://oqtopus-team.github.io/qdash/user-guide/system-updates)
 before upgrading an existing deployment.

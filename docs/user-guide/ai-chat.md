@@ -102,7 +102,8 @@ open, then select **Investigate with AI**. The earlier chat stays in your chat h
 ## Run a Calibration Pipeline from Chat
 
 The assistant can compose a calibration from QDash's step catalog and run it as one execution
-with your approval and project permissions. Ask for the calibration in plain terms, for example "run the coarse one-qubit check on Q00 and Q01, then
+with your approval and project permissions. Ask for the calibration in plain terms, for example
+"run the coarse one-qubit check on Q00 and Q01, then
 measure T1 and T2 on the ones that pass". The assistant reads the available step types and tasks,
 validates its plan with QDash, and shows an approval card listing the targets, the steps, and the
 exact tasks each step will run. Nothing starts until you approve the card.

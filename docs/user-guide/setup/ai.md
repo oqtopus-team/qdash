@@ -88,9 +88,10 @@ The token is sent to every endpoint configured through
 classifier configured through `base_url: env:CLASSIFIER_BASE_URL` or
 `env:CLASSIFIER_BASE_URL_<SUFFIX>`. Literal URLs and built-in providers do not receive it.
 
-Keep an endpoint's API key if its model server requires one; leave the key empty when Cloudflare
-Access alone authenticates the endpoint. Both Access values must be set together. Leave both empty
-to use API keys only.
+Keep an endpoint's API key if its model server requires one. Chat and evaluation endpoints can
+leave the key empty when Cloudflare Access alone authenticates them. The classifier still requires
+a nonempty `CLASSIFIER_API_KEY` (or its configured suffixed variable), even with Access credentials.
+Both Access values must be set together. Leave both empty to use API keys only.
 
 ## Apply AI Changes
 

@@ -91,10 +91,12 @@ calibration complete** with links to the result and the overview.
 The guide follows the same five steps on a Qubex deployment, with these differences:
 
 - **Create Chip** also offers **Qubex configuration** options when a configuration tree is
-  mounted: copy the wiring from an existing system, or start from a backend template. Complete the
-  new chip's files on **Config** before you run, as
+  mounted: copy the wiring from an existing system, or start from a backend template. A new
+  template has empty wiring and box entries; complete its hardware settings on **Config** before
+  you run, as
   [Create the Configuration of a New Chip](./setup/qubex-backend.md#create-the-configuration-of-a-new-chip)
-  describes.
+  describes. If you use a configuration repository, publish the completed files through **Config**;
+  deployments without a repository use the local configuration.
 - After you choose or create the chip, the guide stays on Home under **Hardware readiness**. It
   shows whether QDash found the configuration directory and the chip's wiring file, and asks you
   to confirm that the wiring and device parameters match the connected hardware. QDash cannot

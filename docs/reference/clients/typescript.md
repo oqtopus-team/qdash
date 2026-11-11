@@ -25,7 +25,11 @@ and release ordering.
 
 <a id="configuration"></a>
 
-The TypeScript and Python clients read the same `QDASH_*` environment variables and named profiles, so an extension can reuse an existing `$XDG_CONFIG_HOME/qdash/config.ini` or `~/.config/qdash/config.ini` file. [Connect to a Deployment](./python.md#connect-to-a-deployment) in the Python client reference shows where to copy the API token and project ID in QDash and how to save a profile.
+The TypeScript and Python clients read the same `QDASH_*` environment variables and named
+profiles, so an extension can reuse an existing `$XDG_CONFIG_HOME/qdash/config.ini` or
+`~/.config/qdash/config.ini` file. [Connect to a Deployment](./python.md#connect-to-a-deployment)
+in the Python client reference shows where to copy the API token and project ID in QDash and
+how to save a profile.
 
 ```ts
 import { QDashClient } from "@oqtopus-team/qdash-client";

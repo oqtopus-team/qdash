@@ -58,16 +58,19 @@ DEFAULT_BACKEND=fake
 Fake needs no other backend configuration before startup. [Fake backend](./setup/fake-backend.md)
 explains what the simulator runs.
 
-For Qubex, copy the Qubex example, then complete the
-[Qubex backend](./setup/qubex-backend.md) configuration before continuing:
+For Qubex, copy the Qubex example:
 
 ```bash
 cp .env.example.qubex .env
 ```
 
+Prepare the configuration root at `CONFIG_PATH` before startup. Place existing chips' hardware
+and parameter files there as described in [Qubex backend](./setup/qubex-backend.md). You can
+create a new chip's configuration after signing in.
+
 ## Configure Shared Deployment Settings
 
-Set a unique initial administrator password in `.env` before exposing QDash to a network. The
+Set a unique initial administrator password in `.env` before starting QDash. The
 other values in the example work unchanged for a first local start.
 
 | Variable | Purpose |
