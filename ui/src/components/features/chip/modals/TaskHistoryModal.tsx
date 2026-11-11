@@ -450,7 +450,11 @@ export function TaskHistoryModal({
               <span>{formatDateTime(String(selectedTask.end_at))}</span>
             </div>
           )}
-          <TaskArtifactDownloads jsonFigurePaths={jsonFigures} rawDataPaths={rawDataPaths} />
+          <TaskArtifactDownloads
+            jsonFigurePaths={jsonFigures}
+            rawDataPaths={rawDataPaths}
+            imagePaths={figures}
+          />
           {/* Lineage and Ask AI */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
             <LineageButton
