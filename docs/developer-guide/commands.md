@@ -40,6 +40,7 @@ task build               # UI production build
 task build-client-ts     # build the local TypeScript client for pi CLI development
 task build-docs          # documentation build
 task check-docs-links    # documentation build, links, and anchors
+task check-docs-mermaid  # documentation build, every Mermaid diagram rendered in Chromium
 ```
 
 ## Secrets

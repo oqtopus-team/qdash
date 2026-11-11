@@ -61,7 +61,7 @@ sequenceDiagram
     Runner->>Executor: execute lifecycle
     Executor-->>Orchestrator: task state and calibration data
     Orchestrator-->>Service: task outputs
-    Service->>Service: finish, fail, or cancel; release reservation
+    Service->>Service: finish, fail, or cancel, then release reservation
 ```
 
 The Prefect wrappers in `engine/task_runner.py` are intentionally thin. They invoke the executor

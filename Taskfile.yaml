@@ -348,6 +348,14 @@ tasks:
     cmds:
       - bun run docs:build
 
+  check-docs-mermaid:
+    desc: Build docs and render every Mermaid diagram in headless Chromium
+    deps: [build-docs]
+    dir: docs
+    cmds:
+      - bunx playwright install --only-shell chromium
+      - bun run docs:check-mermaid
+
   check-docs-links:
     desc: Build docs and check external links, local links, and anchors
     deps: [build-docs]

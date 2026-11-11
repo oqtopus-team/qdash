@@ -43,6 +43,14 @@ jobs:
         run: bun run docs:build
         working-directory: docs
 
+      - name: Install Chromium for the Mermaid render check
+        run: bunx playwright install --with-deps --only-shell chromium
+        working-directory: docs
+
+      - name: Check Mermaid diagrams render
+        run: bun run docs:check-mermaid
+        working-directory: docs
+
       - name: Select documentation files
         shell: bash
         env:

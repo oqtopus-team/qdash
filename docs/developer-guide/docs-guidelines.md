@@ -195,10 +195,17 @@ to validate VitePress routes and local links. Run `task check-docs-links` to val
 links and anchors against the local VitePress layout. `task dev-local-setup` installs Lychee when
 the active development environment does not provide it.
 
-CI builds the documentation, checks external links in changed Markdown files, and checks every
-internal link and anchor in the generated site on each pull request. A weekly scan checks every
-Markdown file under `docs/` so an external page that later moves or disappears is detected
-without blocking unrelated pull requests.
+`task build-docs` does not parse Mermaid. The browser renders each diagram, and a syntax error
+leaves an empty block on the published page. Run `task check-docs-mermaid` after changing a
+Mermaid block: it opens every page of the built site that contains one in headless Chromium and
+fails unless each block renders an SVG, printing the Mermaid parse error. In a sequence diagram
+message, a semicolon ends the statement, so write `#59;` or reword the label.
+
+CI builds the documentation, renders every Mermaid diagram, checks external links in changed
+Markdown files, and checks every internal link and anchor in the generated site on each pull
+request. The Pages deployment runs the same Mermaid check before it publishes the site. A weekly
+scan checks every Markdown file under `docs/` so an external page that later moves or disappears
+is detected without blocking unrelated pull requests.
 
 ## Sidebar
 
