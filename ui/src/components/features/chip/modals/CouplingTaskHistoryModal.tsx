@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import React, { useState, useMemo } from "react";
-import { ChevronRight, History, FileText, GitBranch, ListTodo } from "lucide-react";
+import { ChevronLeft, ChevronRight, History, FileText, GitBranch, ListTodo } from "lucide-react";
 
 import type { TaskResult as Task } from "@/schemas";
 
@@ -54,6 +54,7 @@ export function CouplingTaskHistoryModal({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedExecutionTaskIndex, setSelectedExecutionTaskIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
+  const [interactiveFigureIndex, setInteractiveFigureIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
   const { openMiniChat } = useChatDock();
   const manualOverrides = useManualOverrides(couplingId);
@@ -145,6 +146,12 @@ export function CouplingTaskHistoryModal({
         : []
     : [];
   const hasJsonFigures = jsonFigures.length > 0;
+  // Clamp so a task with fewer figures never points past its last figure.
+  const activeJsonFigureIndex = Math.min(
+    interactiveFigureIndex,
+    Math.max(0, jsonFigures.length - 1),
+  );
+  const activeJsonFigure = jsonFigures[activeJsonFigureIndex];
   const rawDataPaths = selectedTask?.raw_data_path ?? [];
 
   const chatContext: TaskChatContext | null = useMemo(() => {
@@ -161,12 +168,14 @@ export function CouplingTaskHistoryModal({
   const handleSelectIndex = (idx: number) => {
     setSelectedIndex(idx);
     setViewMode("static");
+    setInteractiveFigureIndex(0);
     setMobileTab("tasks");
   };
 
   const handleSelectExecutionTask = (idx: number) => {
     setSelectedExecutionTaskIndex(idx);
     setViewMode("static");
+    setInteractiveFigureIndex(0);
     setMobileTab("details");
   };
 
@@ -370,57 +379,97 @@ export function CouplingTaskHistoryModal({
         </div>
       )}
 
-      {/* Figure Display - Fixed height with horizontal scroll */}
-      <div className="h-[280px] bg-base-200 rounded-lg p-3 overflow-x-auto overflow-y-hidden flex items-center justify-start">
-        {isExecutionLoading ? (
-          <span className="loading loading-spinner loading-lg"></span>
-        ) : !selectedTask ? (
-          <div className="flex flex-col items-center justify-center text-base-content/40">
-            <FileText className="h-12 w-12 mb-3 opacity-30" />
-            <p className="text-sm">
-              {selectedExecutionId ? "Select a task to view details" : "Select an execution first"}
-            </p>
+      {viewMode === "interactive" && hasJsonFigures && activeJsonFigure && !isExecutionLoading ? (
+        // Interactive figures: one at a time, sized to the column so the Plotly toolbar
+        // and plot area stay visible instead of overflowing a fixed-height strip.
+        <div className="flex flex-col gap-2">
+          <div className="h-[55vh] min-h-[300px] max-h-[640px] w-full min-w-0 bg-base-200 rounded-lg p-2 overflow-hidden">
+            <PlotlyRenderer
+              key={activeJsonFigure}
+              sizing="container"
+              className="h-full w-full"
+              fullPath={`/api/executions/figure?path=${encodeURIComponent(activeJsonFigure)}`}
+            />
           </div>
-        ) : viewMode === "interactive" && hasJsonFigures ? (
-          jsonFigures.map((jf, i) => (
-            <div
-              key={i}
-              className="min-h-[250px] min-w-[400px] flex-shrink-0 flex justify-center items-center"
-            >
-              <PlotlyRenderer
-                className="w-full h-full"
-                fullPath={`/api/executions/figure?path=${encodeURIComponent(jf)}`}
-              />
+          {jsonFigures.length > 1 && (
+            <div className="flex items-center justify-center gap-2">
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost"
+                aria-label="Previous figure"
+                disabled={activeJsonFigureIndex === 0}
+                onClick={() => setInteractiveFigureIndex(Math.max(0, activeJsonFigureIndex - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-xs text-base-content/60" aria-live="polite">
+                Figure {activeJsonFigureIndex + 1} / {jsonFigures.length}
+              </span>
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost"
+                aria-label="Next figure"
+                disabled={activeJsonFigureIndex === jsonFigures.length - 1}
+                onClick={() =>
+                  setInteractiveFigureIndex(
+                    Math.min(jsonFigures.length - 1, activeJsonFigureIndex + 1),
+                  )
+                }
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
-          ))
-        ) : figures.length > 0 ? (
-          figures.map((fig, i) => (
+          )}
+        </div>
+      ) : (
+        /* Static figures - Fixed height with horizontal scroll */
+        <div className="h-[280px] bg-base-200 rounded-lg p-3 overflow-x-auto overflow-y-hidden flex items-center justify-start">
+          {isExecutionLoading ? (
+            <span className="loading loading-spinner loading-lg"></span>
+          ) : !selectedTask ? (
+            <div className="flex flex-col items-center justify-center text-base-content/40">
+              <FileText className="h-12 w-12 mb-3 opacity-30" />
+              <p className="text-sm">
+                {selectedExecutionId
+                  ? "Select a task to view details"
+                  : "Select an execution first"}
+              </p>
+            </div>
+          ) : figures.length > 0 ? (
+            figures.map((fig, i) => (
+              <TaskFigure
+                key={i}
+                path={fig}
+                qid={couplingId}
+                className="h-full w-auto object-contain"
+              />
+            ))
+          ) : selectedTask.task_id ? (
             <TaskFigure
-              key={i}
-              path={fig}
+              taskId={selectedTask.task_id}
               qid={couplingId}
               className="h-full w-auto object-contain"
             />
-          ))
-        ) : selectedTask.task_id ? (
-          <TaskFigure
-            taskId={selectedTask.task_id}
-            qid={couplingId}
-            className="h-full w-auto object-contain"
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center text-base-content/40">
-            <FileText className="h-12 w-12 mb-3 opacity-30" />
-            <p className="text-sm">No figure available for this task</p>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center text-base-content/40">
+              <FileText className="h-12 w-12 mb-3 opacity-30" />
+              <p className="text-sm">No figure available for this task</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* View mode toggle (static / interactive) */}
       {hasJsonFigures && (
         <div className="flex justify-center mt-2 gap-2 items-center">
           {viewMode === "static" ? (
-            <button className="btn btn-xs btn-primary" onClick={() => setViewMode("interactive")}>
+            <button
+              className="btn btn-xs btn-primary"
+              onClick={() => {
+                setInteractiveFigureIndex(0);
+                setViewMode("interactive");
+              }}
+            >
               Interactive
             </button>
           ) : (
