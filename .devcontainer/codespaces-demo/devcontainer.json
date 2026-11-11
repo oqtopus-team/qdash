@@ -1,9 +1,11 @@
-// QDash demo on GitHub Codespaces: the Fake backend stack of compose.yaml in
-// Docker-in-Docker, reached through Caddy on one forwarded port. Unlike
-// ../devcontainer.json it needs no host Docker socket or sibling checkouts.
+// QDash Demo (sample data) on GitHub Codespaces: the Fake backend stack of
+// compose.yaml in Docker-in-Docker, reached through Caddy on one forwarded
+// port. It runs the prebuilt qdash-demo-* images from GHCR and builds none.
+// Unlike ../devcontainer.json it needs no host Docker socket or sibling
+// checkouts, and the development container never starts it.
 // See docs/user-guide/setup/codespaces-demo.md.
 {
-  "name": "QDash demo (Fake backend)",
+  "name": "QDash Demo (sample data)",
   "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
@@ -18,22 +20,28 @@
     "QDASH_DEMO_PORT": "5714"
   },
   // Only Caddy is forwarded. Codespaces forwards it as a private port, so only
-  // the codespace owner can open it.
+  // the codespace owner can open it. The editor opens QDash in a new browser
+  // tab when it forwards the port; QDash still asks for the sign-in.
   "forwardPorts": [5714],
   "portsAttributes": {
     "5714": {
-      "label": "QDash",
+      "label": "QDash Demo",
       "protocol": "http",
-      "onAutoForward": "notify"
+      "onAutoForward": "openBrowser"
     }
   },
   "otherPortsAttributes": {
     "onAutoForward": "ignore"
   },
-  // Build the images once; start, migrate and seed on every start. Both are
-  // safe to rerun: see demo.sh.
-  "postCreateCommand": "bash .devcontainer/codespaces-demo/demo.sh build",
+  // Pull the prebuilt images once; start, migrate and seed on every start.
+  // Both are safe to rerun and never build an image: see demo.sh. The editor
+  // connects only after the start command, so the browser tab does not open
+  // while QDash is still starting. Each connection then prints the address and
+  // sign-in in a terminal.
+  "postCreateCommand": "bash .devcontainer/codespaces-demo/demo.sh pull",
   "postStartCommand": "bash .devcontainer/codespaces-demo/demo.sh start",
+  "postAttachCommand": "bash .devcontainer/codespaces-demo/demo.sh credentials",
+  "waitFor": "postStartCommand",
   "customizations": {
     "codespaces": {
       "openFiles": ["docs/user-guide/setup/codespaces-demo.md"]

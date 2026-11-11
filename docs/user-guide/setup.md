@@ -11,7 +11,7 @@ theme, several deployments on one host, and remote access are optional and can b
 | Goal | Backend |
 | --- | --- |
 | Evaluate QDash without quantum hardware | [Fake](./setup/fake-backend.md); no backend configuration before startup |
-| Try QDash in your browser without installing it | [Codespaces demo](./setup/codespaces-demo.md); a private Fake deployment in a GitHub Codespace, billed to the codespace owner |
+| Try QDash in your browser without installing it | [QDash Demo in Codespaces](./setup/codespaces-demo.md); a private Fake deployment with sample data in a GitHub Codespace, billed to the codespace owner |
 | Operate a Qubex-connected lab deployment | [Qubex](./setup/qubex-backend.md); place the Qubex configuration before startup |
 | Connect another hardware stack | Not supported by deployment settings, which accept only `fake` and `qubex`; an additional backend requires QDash code changes. |
 

@@ -99,7 +99,7 @@ export default withMermaid(
                   items: [
                     { text: "Install and Sign In", link: "/user-guide/setup" },
                     { text: "Fake Backend", link: "/user-guide/setup/fake-backend" },
-                    { text: "Codespaces Demo", link: "/user-guide/setup/codespaces-demo" },
+                    { text: "QDash Demo in Codespaces", link: "/user-guide/setup/codespaces-demo" },
                     { text: "Qubex Backend", link: "/user-guide/setup/qubex-backend" },
                     { text: "AI Setup", link: "/user-guide/setup/ai" },
                   ],
@@ -168,6 +168,7 @@ export default withMermaid(
             { text: "Commands", link: "/developer-guide/commands" },
             { text: "Testing", link: "/developer-guide/testing" },
             { text: "Development Flow", link: "/developer-guide/development-flow" },
+            { text: "QDash Demo Images", link: "/developer-guide/demo-images" },
             { text: "Docs Guidelines", link: "/developer-guide/docs-guidelines" },
             {
               text: "Conventions",

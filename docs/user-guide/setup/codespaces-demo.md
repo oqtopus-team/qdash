@@ -1,11 +1,11 @@
-# Codespaces Demo
+# QDash Demo in Codespaces
 
-A GitHub Codespace can run a private QDash demo on the [Fake backend](./fake-backend.md), with no
-local installation, lab hardware, or credentials beyond your GitHub account. The codespace starts
-QDash with a virtual 64-qubit chip and starts a calibration run in the background. Follow its
-progress in **Execution**; results appear in **Task Results** and **Chip** as tasks finish.
-Use [Setup](../setup.md) instead for a
-deployment that other people use.
+The QDash Demo (sample data) runs a private QDash in a GitHub Codespace on the
+[Fake backend](./fake-backend.md), with no local installation, lab hardware, or credentials
+beyond your GitHub account. The codespace starts QDash with a virtual 64-qubit chip and starts a
+calibration run in the background. Follow its progress in **Execution**; results appear in
+**Task Results** and **Chip** as tasks finish. Use [Setup](../setup.md) instead for a deployment
+that other people use.
 
 ## Decide Who Pays
 
@@ -29,14 +29,19 @@ uses the included compute twice as fast as the smallest, 2-core machine.
 
 ## Create the Codespace
 
-1. On the repository page on GitHub, select **Code → Codespaces**, open the **...** menu, and
-   select **New with options**.
-2. Under **Dev container configuration**, select **QDash demo (Fake backend)**. The default
-   configuration is the development container, which needs a local Docker host.
+1. In the repository README, select **Launch QDash Demo**. GitHub opens the codespace creation
+   page with the branch and the **QDash Demo (sample data)** configuration selected.
+2. Check that **Dev container configuration** shows **QDash Demo (sample data)**. The default
+   configuration is the development container, which needs a local Docker host and does not
+   start the demo.
 3. Keep the 4-core machine type, or select a larger one, and select **Create codespace**.
 
-The first start builds the QDash images and takes several minutes. The creation log ends with the
-sign-in details:
+Without the README button, select **Code → Codespaces** on the repository page, open the **...**
+menu, select **New with options**, and choose the same configuration.
+
+The codespace downloads ready-made QDash Demo images instead of building them, then starts,
+migrates, and seeds QDash. The editor opens after this startup finishes. The creation log ends with the
+sign-in details, and each time the editor connects, a terminal shows them again:
 
 ```text
 [qdash-demo] QDash:    https://<codespace-name>-5714.app.github.dev/login (in Codespaces: Ports tab, port 5714)
@@ -44,17 +49,34 @@ sign-in details:
 [qdash-demo] Password: <generated password>
 ```
 
-The password is generated for this codespace and stored in its `.env`. To show the details again,
-run this command in the codespace terminal:
+The password is generated for this codespace and stored in its `.env`. To show the details in
+another terminal, run:
 
 ```bash
 bash .devcontainer/codespaces-demo/demo.sh credentials
 ```
 
+If the log ends with `Cannot pull ghcr.io/oqtopus-team/qdash-demo-...`, the images for this
+version of QDash are not available yet: they are published when a change reaches the `develop`
+or `main` branch (or the temporary trusted bootstrap branch `t3/github-pages-demo-hosting`) and its image workflow finishes. Wait, then run the startup again in the codespace terminal:
+
+```bash
+bash .devcontainer/codespaces-demo/demo.sh start
+```
+
+To continue without waiting, build the images in the codespace, which takes longer, and start:
+
+```bash
+bash .devcontainer/codespaces-demo/demo.sh build-local && bash .devcontainer/codespaces-demo/demo.sh start
+```
+
+How the images are built and published: [QDash Demo Images](../../developer-guide/demo-images.md).
+
 ## Open QDash
 
-1. Open the **Ports** tab and select the address of port **5714**, labelled **QDash**.
-2. Sign in with the user and password from the creation log.
+When the editor opens, the browser also opens QDash in a new tab. Sign in with
+the user and password from the terminal. If no tab opens, for example because the browser blocked
+it, open the **Ports** tab and select the address of port **5714**, labelled **QDash Demo**.
 
 Port 5714 is the only forwarded port. Codespaces keeps it private, so only your GitHub account can
 open it. Do not change its visibility to public: anyone with the address could then reach the

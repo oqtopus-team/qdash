@@ -10,6 +10,14 @@
 #
 # The healthchecks let demo.sh wait for Prefect and the deployment service
 # before the seed saves a flow; compose.yaml only waits for them to start.
+#
+# Every QDash service the demo starts runs a prebuilt image from the
+# "QDash Demo Images" workflow instead of building one: `!reset` (Compose
+# 2.24 or later) removes the build section of compose.yaml, so Compose can only
+# pull. agent-runtime and agent-exec are not started and keep their build. demo.sh writes the
+# QDASH_DEMO_*_IMAGE references to .env from images.sh, which tags each image
+# by its build inputs at the checked-out commit. The source mounts of
+# compose.yaml stay, so the code that runs is the checkout's.
 services:
   mongo:
     volumes:
@@ -17,6 +25,26 @@ services:
   postgres:
     volumes:
       - postgres-data:/var/lib/postgresql/data
+  calibration-migration:
+    pull_policy: missing
+    build: !reset null
+    image: ${QDASH_DEMO_API_IMAGE:?run bash .devcontainer/codespaces-demo/demo.sh start}
+  agent-runtime-auth:
+    pull_policy: missing
+    build: !reset null
+    image: ${QDASH_DEMO_API_IMAGE:?run bash .devcontainer/codespaces-demo/demo.sh start}
+  api:
+    pull_policy: missing
+    build: !reset null
+    image: ${QDASH_DEMO_API_IMAGE:?run bash .devcontainer/codespaces-demo/demo.sh start}
+  user-flow-worker:
+    pull_policy: missing
+    build: !reset null
+    image: ${QDASH_DEMO_WORKFLOW_IMAGE:?run bash .devcontainer/codespaces-demo/demo.sh start}
+  ui:
+    pull_policy: missing
+    build: !reset null
+    image: ${QDASH_DEMO_UI_IMAGE:?run bash .devcontainer/codespaces-demo/demo.sh start}
   prefect-server:
     healthcheck:
       test:
@@ -29,6 +57,9 @@ services:
       retries: 24
       start_period: 30s
   deployment-service:
+    pull_policy: missing
+    build: !reset null
+    image: ${QDASH_DEMO_DEPLOYMENT_SERVICE_IMAGE:?run bash .devcontainer/codespaces-demo/demo.sh start}
     healthcheck:
       test:
         - CMD

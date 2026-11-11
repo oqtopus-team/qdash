@@ -13,13 +13,15 @@ and tracking calibration parameters and their history.
 
 [Watch the demo with sound](https://oqtopus-team.github.io/qdash/user-guide/what-is-qdash#demo)
 
-To try QDash without quantum hardware, follow
+[![Launch QDash Demo (sample data) in GitHub Codespaces](https://img.shields.io/badge/Launch_QDash_Demo-sample_data_in_Codespaces-2ea44f?logo=github)](https://codespaces.new/oqtopus-team/qdash/tree/t3/github-pages-demo-hosting?devcontainer_path=.devcontainer%2Fcodespaces-demo%2Fdevcontainer.json)
+
+To try QDash in your browser without installing anything, select **Launch QDash Demo**: it
+creates a private codespace, billed to your GitHub account, that runs QDash on sample data; see
+[QDash Demo in Codespaces](https://oqtopus-team.github.io/qdash/user-guide/setup/codespaces-demo).
+To install QDash without quantum hardware, follow
 [Setup](https://oqtopus-team.github.io/qdash/user-guide/setup) with the
 [Fake backend](https://oqtopus-team.github.io/qdash/user-guide/setup/fake-backend), then
-[Run Your First Calibration](https://oqtopus-team.github.io/qdash/user-guide/first-calibration),
-or start a private
-[Codespaces demo](https://oqtopus-team.github.io/qdash/user-guide/setup/codespaces-demo) without
-installing anything;
+[Run Your First Calibration](https://oqtopus-team.github.io/qdash/user-guide/first-calibration);
 to connect a lab system, start with
 [Setup](https://oqtopus-team.github.io/qdash/user-guide/setup) and choose the
 [Qubex backend](https://oqtopus-team.github.io/qdash/user-guide/setup/qubex-backend). Read

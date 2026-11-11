@@ -1,0 +1,179 @@
+name: QDash Demo Images
+
+# Builds the qdash-demo-* images that the QDash Demo (sample data) codespace
+# pulls instead of building (.devcontainer/codespaces-demo). images.sh names
+# each image and tags it by its build inputs, so the demo of any commit pulls
+# the image built from the same inputs.
+#
+# Pull requests only build, with a read-only token. Pushes to develop and main
+# publish to ghcr.io/<owner>/qdash-demo-*; so does a manual run with "publish"
+# selected, which GitHub offers once this file is on the default branch. An
+# image whose tag is already published is not rebuilt. The first publication
+# creates private packages: docs/user-guide/setup/codespaces-demo.md describes
+# making them public, which the demo requires.
+on:
+  push:
+    branches:
+      - develop
+      - main
+      # Temporary trusted bootstrap; remove after merging the workflow.
+      - t3/github-pages-demo-hosting
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - ".github/workflows/demo-images.yml"
+      - ".devcontainer/codespaces-demo/images.sh"
+      - ".dockerignore"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "src/qdash/api/Dockerfile"
+      - "src/qdash/api/pyproject.toml"
+      - "src/qdash/workflow/Dockerfile"
+      - "src/qdash/workflow/Dockerfile.deployment"
+      - "src/qdash/workflow/pyproject.toml"
+      - "clients/python/pyproject.toml"
+      - "clients/python/README.md"
+      - "ui/**"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the images of the selected branch to GHCR
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  plan:
+    name: Plan demo images
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      images: ${{ steps.plan.outputs.images }}
+      publish: ${{ steps.plan.outputs.publish }}
+      registry: ${{ steps.plan.outputs.registry }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Compute image tags
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUBLISH_INPUT: ${{ inputs.publish }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          publish=false
+          if [ "$EVENT_NAME" = push ] || { [ "$EVENT_NAME" = workflow_dispatch ] && [ "$PUBLISH_INPUT" = true ]; }; then
+            publish=true
+          fi
+          images="$(bash .devcontainer/codespaces-demo/images.sh matrix)"
+          {
+            echo "images=${images}"
+            echo "publish=${publish}"
+            echo "registry=ghcr.io/${OWNER,,}"
+          } >>"$GITHUB_OUTPUT"
+          echo "$images" | jq -r '.[] | "\(.name):\(.tag) from \(.dockerfile)"'
+
+  build:
+    name: Build ${{ matrix.image.name }}
+    needs: plan
+    if: needs.plan.outputs.publish != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.plan.outputs.images) }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.image.dockerfile }}
+          platforms: linux/amd64
+          build-args: ${{ matrix.image.build_args }}
+          push: false
+          tags: ${{ needs.plan.outputs.registry }}/${{ matrix.image.name }}:${{ matrix.image.tag }}
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+
+  publish:
+    name: Publish ${{ matrix.image.name }}
+    needs: plan
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.plan.outputs.images) }}
+    env:
+      IMAGE: ${{ needs.plan.outputs.registry }}/${{ matrix.image.name }}:${{ matrix.image.tag }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for a published image
+        id: existing
+        run: |
+          if docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "found=true" >>"$GITHUB_OUTPUT"
+            echo "$IMAGE is already published"
+          else
+            echo "found=false" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and publish image
+        if: steps.existing.outputs.found != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.image.dockerfile }}
+          platforms: linux/amd64
+          build-args: ${{ matrix.image.build_args }}
+          push: true
+          tags: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image.name }}
+            org.opencontainers.image.description=QDash Demo (sample data) image for GitHub Codespaces; not for production deployments
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ matrix.image.tag }}
+            org.opencontainers.image.licenses=Apache-2.0
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
