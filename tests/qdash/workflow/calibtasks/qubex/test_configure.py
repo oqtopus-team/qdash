@@ -31,10 +31,18 @@ class ConfigurationExperiment:
         self.targets: dict[str, Any] = {}
         for label, port_id in [("R00", "read:0"), ("R01", "read:0"), ("R04", "read:1")]:
             self.targets[label] = SimpleNamespace(
-                label=label, channel=SimpleNamespace(port=SimpleNamespace(id=port_id))
+                label=label,
+                qubit=f"Q{label[1:]}",
+                channel=SimpleNamespace(port=SimpleNamespace(id=port_id, box_id="box-1")),
             )
-        self.experiment_system = SimpleNamespace(read_out_targets=list(self.targets.values()))
-        self.targets["Q00_ge"] = SimpleNamespace(channel=SimpleNamespace(id="ctrl:0"))
+        self.experiment_system = SimpleNamespace(
+            read_out_targets=list(self.targets.values()), gen_targets=self.targets
+        )
+        self.targets["Q00_ge"] = SimpleNamespace(
+            label="Q00_ge",
+            qubit="Q00",
+            channel=SimpleNamespace(id="ctrl:0", port=SimpleNamespace(box_id="box-1")),
+        )
 
     @property
     def configuration_mode(self) -> str:
@@ -43,7 +51,11 @@ class ConfigurationExperiment:
     def _load(self, **kwargs: Any) -> None:
         self.targets.pop("Q00-ef", None)
         if self.ef_available and kwargs["configuration_mode"] in ("ge-ef-cr", "ge-ef-fh"):
-            self.targets["Q00-ef"] = SimpleNamespace(channel=SimpleNamespace(id="ctrl:1"))
+            self.targets["Q00-ef"] = SimpleNamespace(
+                label="Q00-ef",
+                qubit="Q00",
+                channel=SimpleNamespace(id="ctrl:1", port=SimpleNamespace(box_id="box-1")),
+            )
 
     def get_qubit_label(self, qid: int) -> str:
         return f"Q{qid:02d}"
@@ -89,7 +101,12 @@ def test_configure_ef_then_configure_uses_cr_mode_and_preserves_readout_isolatio
             "targets_to_exclude": ["R01"],
             "configuration_mode": mode,
         }
-    exp.system_manager.push.assert_called_with(box_ids=["box-1"], confirm=False, parallel=False)
+    exp.system_manager.push.assert_called_with(
+        box_ids=["box-1"],
+        confirm=False,
+        parallel=False,
+        target_labels=["Q00_ge", "R00"],
+    )
     assert exp.calib_note.save.call_count == 2
 
 
@@ -150,7 +167,10 @@ def test_configuration_does_not_require_ef_measurement_channels(
 
     assert exp.system_manager.load.call_args.kwargs["configuration_mode"] == mode
     exp.system_manager.push.assert_called_once_with(
-        box_ids=["box-1"], confirm=False, parallel=False
+        box_ids=["box-1"],
+        confirm=False,
+        parallel=False,
+        target_labels=["Q00_ge", "R00"],
     )
     exp.calib_note.save.assert_called_once_with()
     assert exp.configuration_mode == "ge-cr-cr"
@@ -191,6 +211,7 @@ def test_configure_all_applies_requested_or_default_configuration_mode(
     exp.config_path = "/config"
     exp.params_path = "/params"
     exp.box_ids = ["box-7"]
+    exp.targets = {"Q28": MagicMock(), "RQ28": MagicMock()}
 
     with patch("qubex.Experiment", return_value=exp) as experiment:
         result = task.run(cast("Any", backend), "")
@@ -209,7 +230,10 @@ def test_configure_all_applies_requested_or_default_configuration_mode(
         configuration_mode=expected_mode,
     )
     exp.system_manager.push.assert_called_once_with(
-        box_ids=["box-7"], confirm=False, parallel=False
+        box_ids=["box-7"],
+        confirm=False,
+        parallel=False,
+        target_labels=["Q28", "RQ28"],
     )
     assert result.raw_result == {"mux_ids": [7], "box_ids": ["box-7"]}
 
