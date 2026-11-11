@@ -12,6 +12,7 @@ from qdash.api.services.flow_service.execution import (
 )
 from qdash.common.config.path_resolver import execution_calib_data_dir
 from qdash.common.execution_resources import ExecutionResourceScope
+from qdash.config import Settings
 from qdash.datamodel.execution import ExecutionStatusModel
 from qdash.repository import MongoExecutionLockRepository
 
@@ -31,6 +32,10 @@ def _coordinator(*, lock=None, executions=None, prefect=None, id_factory=None):
         prefect=prefect or AsyncMock(),
         id_factory=id_factory or MagicMock(return_value="20240101-001"),
     )
+
+
+def _settings(client_url: str) -> Settings:
+    return Settings.model_construct(client_url=client_url, ui_port=5714, prefect_port=4200)
 
 
 def _saved_row(executions: MagicMock):
@@ -466,3 +471,35 @@ class TestExecutionCoordinatorDispatchRun:
         assert result.qdash_ui_url.endswith("/execution")
         lock.try_lock.assert_not_called()
         executions.save.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("client_url", "origin"),
+        [
+            ("https://qdash.example.test:8443", "https://qdash.example.test:8443"),
+            ("https://qdash.example.test/", "https://qdash.example.test"),
+            ("", "http://localhost:5714"),
+        ],
+    )
+    async def test_builds_links_from_the_qdash_url(self, client_url, origin):
+        prefect = AsyncMock()
+        prefect.create_flow_run = AsyncMock(return_value="run-1")
+
+        with patch(
+            "qdash.api.services.flow_service.execution.get_settings",
+            return_value=_settings(client_url),
+        ):
+            result = await _coordinator(
+                lock=_lock(), executions=MagicMock(), prefect=prefect
+            ).dispatch_run(
+                project_id="proj-1",
+                username="user-1",
+                chip_id="chip-1",
+                name="my_flow",
+                deployment_id="dep-1",
+                parameters={},
+            )
+
+        # Prefect is served under /prefect of the QDash URL, never on its own port.
+        assert result.flow_run_url == f"{origin}/prefect/runs/flow-run/run-1"
+        assert result.qdash_ui_url == f"{origin}/execution/chip-1/20240101-001"

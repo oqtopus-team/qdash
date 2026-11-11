@@ -34,14 +34,15 @@ docker compose ps
 After the containers start, check the browser-facing services:
 
 - QDash UI: <http://localhost:5714/login>
-- API documentation: <http://localhost:5715/docs>
-- Prefect: <http://localhost:4200>
+- API documentation: <http://localhost:5714/api/docs>
+- Prefect: <http://localhost:5714/prefect/dashboard>
 
 ## Inspect Logs
 
 Follow a service log with `docker compose logs -f <service>`. Common service names are:
 
 ```bash
+docker compose logs -f caddy
 docker compose logs -f api
 docker compose logs -f ui
 docker compose logs -f deployment-service
@@ -78,6 +79,16 @@ docker compose up -d --build api
 
 `task restart-api` is the Go Task shortcut for restarting the API container.
 
+## Open a Database Shell
+
+MongoDB and PostgreSQL open no host port, so run their clients inside the containers with the
+credentials from `.env`:
+
+```bash
+docker compose exec mongo sh -c 'mongosh --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin'
+docker compose exec postgres sh -c 'psql --username "$POSTGRES_USER" "$POSTGRES_DB"'
+```
+
 ## Stop QDash
 
 Stop and remove the Compose containers and network:
@@ -91,8 +102,9 @@ intend to delete persistent service state.
 
 ## Resolve Common Failures
 
-If the UI cannot reach the API, check `INTERNAL_API_URL` and whether the API is listening on
-`API_PORT`.
+If pages open but show no data, the browser cannot reach the API. Check
+`docker compose logs caddy` and `docker compose logs api`; the `caddy` service forwards `/api` to
+the API on `API_PORT`.
 
 If workflow execution fails with a missing work pool, restart `deployment-service` and
 `user-flow-worker`; the deployment service creates the `user-flows-pool` when registering flows.

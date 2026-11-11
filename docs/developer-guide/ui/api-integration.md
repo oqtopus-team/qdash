@@ -61,7 +61,8 @@ helpers over handwritten string keys.
 ## Shared Request Behavior
 
 `ui/src/lib/api/custom-instance.ts` chooses `/api` by default and uses
-`NEXT_PUBLIC_API_URL` when configured. Its interceptor adds the bearer token and, unless the
+`NEXT_PUBLIC_API_URL` when configured. Docker Compose always builds the UI with `/api`, the
+same-origin path that Caddy forwards to the API. Its interceptor adds the bearer token and, unless the
 request already sets `X-Project-Id`, the active project header. Its returned promise exposes
 cancellation for TanStack Query.
 

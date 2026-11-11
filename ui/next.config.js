@@ -4,6 +4,9 @@ const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS || "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// The browser reaches the API at /api and Prefect at /prefect through Caddy
+// (config/caddy/Caddyfile), in production and under `task dev-local` alike, so
+// Next.js serves only the UI and needs no rewrites.
 const nextConfig = {
   output: "standalone",
   ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
@@ -19,17 +22,6 @@ const nextConfig = {
       { source: "/task-knowledge/:taskName", destination: "/knowledge/:taskName", permanent: true },
       // The knowledge file editor was removed: Knowledge is read-only.
       { source: "/knowledge/files", destination: "/knowledge", permanent: false },
-    ];
-  },
-  async rewrites() {
-    // Proxy /api/* to backend API server
-    // This allows UI-only deployment without exposing API port
-    const apiUrl = process.env.INTERNAL_API_URL || "http://127.0.0.1:5715";
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${apiUrl}/:path*`,
-      },
     ];
   },
   transpilePackages: ["react-plotly.js", "plotly.js-dist-min"],

@@ -5,8 +5,7 @@ import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import { getAccessToken, getProjectId } from "@/lib/auth/session";
 
 export const AXIOS_INSTANCE = Axios.create({
-  // Use /api proxy route (handled by Next.js rewrites)
-  // Falls back to direct API URL for backward compatibility
+  // Caddy serves the API at /api on the UI's origin (config/caddy/Caddyfile).
   baseURL: process.env.NEXT_PUBLIC_API_URL || "/api",
 });
 

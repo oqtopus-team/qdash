@@ -28,9 +28,10 @@ settings. Route groups organize layouts without changing URLs.
 authenticated login request to `/execution`. It deliberately passes `/api` requests through;
 FastAPI validates their bearer token and project permissions.
 
-`ui/src/app/api/copilot/chat/route.ts` is the browser-facing proxy for the streaming chat route.
-Other API calls use the generated client through the Next.js `/api` rewrite or
-`NEXT_PUBLIC_API_URL`.
+Caddy forwards every browser `/api` request to the API, including the Copilot chat stream, both
+in Docker Compose and under `task dev-local`. Next.js has no `/api` rewrites or route handlers;
+`ui/src/lib/__tests__/nextConfig.test.ts` keeps it that way. See
+[Browser Entry Point](../architecture.md#browser-entry-point).
 
 ## Provider Order
 

@@ -68,3 +68,96 @@ Calibration follows this flow.
 The [Workflow Engine Architecture](./workflow/engine-architecture.md) describes the
 runtime components in detail. [Projects and Data Sharing](../user-guide/projects-and-data-sharing.md)
 explains the user-visible boundary for project-scoped state and artifacts.
+
+## Browser Entry Point
+
+The `caddy` service is the only service of `compose.yaml` that publishes a host port. It listens
+on `UI_PORT` and routes by path with `config/caddy/Caddyfile`:
+
+| Path | Upstream | Upstream path |
+| --- | --- | --- |
+| `/api`, `/api/*` | `api` (`QDASH_API_UPSTREAM`) | Unchanged; the API app runs with `root_path="/api"`, which removes the prefix for routing and adds it to URLs the API builds |
+| `/prefect/api`, `/prefect/api/*` | `prefect-server` after the access check | `/api/*`, Prefect's API path |
+| `/prefect`, `/prefect/*` | `prefect-server` after the access check | Unchanged; Prefect serves its UI there |
+| Everything else | `ui` (`QDASH_UI_UPSTREAM`) | Unchanged |
+
+Prefect keeps its API at `/api`, so the API, the deployment service, and the worker use
+`http://prefect-server:4200/api` as before. Only the browser-facing settings move:
+`PREFECT_SERVER_UI_SERVE_BASE=/prefect` and `PREFECT_SERVER_UI_API_URL=/prefect/api`.
+
+The other services reach each other by service name on the Compose project's `custom_net` and
+publish no host port, not even on loopback. Two stacks on one host therefore conflict only on
+`UI_PORT` and the Compose project name, which comes from `ENV`; the internal port settings can
+stay identical. Deployment tasks and a plain `docker compose up -d` load `compose.yaml` alone.
+
+`compose.yaml` sets `QDASH_API_UPSTREAM` to `api:${API_PORT}` and `QDASH_UI_UPSTREAM` to
+`ui:${UI_PORT}`. Under `task dev-local`, the same `caddy` service and Caddyfile serve
+development: `compose.dev-local.yaml` points both upstreams at
+`${QDASH_DEV_HOST}:${API_PORT}` and `${QDASH_DEV_HOST}:${UI_DEV_PORT}`, where the API runs
+under `uvicorn --reload` and Next.js under `next dev`. The overlay replaces Caddy's dependency
+on `api` and `ui` with `!override`, so the production images are neither built nor started.
+`QDASH_DEV_HOST` selects where those processes run:
+
+| Where `task dev-local` runs | `QDASH_DEV_HOST` | Listen address of the API and Next.js |
+| --- | --- | --- |
+| macOS host (Docker Desktop, OrbStack) | `host.docker.internal` (default) | `127.0.0.1`; Docker forwards `host.docker.internal` to host loopback |
+| Linux host | `host.docker.internal` (default), mapped to the Docker host gateway by `extra_hosts: host-gateway` | `0.0.0.0`, because the gateway cannot reach loopback; other machines on the network can reach both ports |
+| DevContainer | `devcontainer`, set by `compose.devcontainer.yaml` | `0.0.0.0` inside the container, reachable only on the project's `custom_net` |
+
+`QDASH_DEV_BIND` overrides the listen address, for example to the Docker bridge gateway
+(`172.17.0.1` by default) on a Linux host. A firewall that drops container traffic to the host,
+such as ufw's default policy, makes Caddy answer 502. In the DevContainer, Caddy resolves
+`devcontainer` only when the DevContainer and the stack share the Compose project, that is, the
+same `ENV`.
+
+The overlay also points the Pi Agent Runtime's `QDASH_BASE_URL` at the development API and
+publishes MongoDB, Prefect, the deployment service, and the runtime on `127.0.0.1` for a host
+API. The browser still reaches only Caddy; the runtime port accepts only the runtime credential,
+which `task dev-api-local` reads from the running container unless `AGENT_RUNTIME_TOKEN` is set.
+In the DevContainer, the API uses the service names instead.
+
+Caddy trusts no client's `X-Forwarded-*` headers. It sends every upstream its own
+`X-Forwarded-Proto`: `https` when the request's host is the host of an `https://` `CLIENT_URL`,
+such as the Cloudflare Tunnel hostname, and `http` for any other host, such as `localhost`.
+TLS terminates in front of Caddy, so Caddy itself only receives HTTP. The API runs gunicorn with
+`--forwarded-allow-ips=*`, so redirects such as `/api/auth/me/` to `/api/auth/me` keep the
+browser's scheme; its default trust covers only loopback, not Caddy's address on `custom_net`.
+This trusts every caller that reaches the API port, which is not published on the host: Caddy
+and other containers on `custom_net`. A forwarded header only changes URLs in the response to
+that caller and grants no access.
+`task dev-api-local` passes the same option to uvicorn; on a Linux host its `0.0.0.0` listener
+extends that trust to the local network.
+
+Before Caddy forwards a Prefect request, it calls `GET /auth/prefect-access` on the API with the
+`access_token` cookie as the bearer token and the original method, URI, and `Upgrade` header in
+`X-Forwarded-*` headers. The route is excluded from the OpenAPI schema. A 2xx response lets the
+request continue; any other status is returned to the browser, and a signed-out page navigation
+is redirected to `/login`. A system administrator may make any Prefect request. Other users may
+make read requests: `GET` and `HEAD` without `include_secrets`, the allowlisted `POST` queries in
+`src/qdash/api/lib/prefect_access.py`, and the `events/out` and `logs/out` websockets. The
+classifier matches the raw URI, so encoded or dot-segment variants of a query path are denied.
+Prefect's CSRF protection (`PREFECT_SERVER_API_CSRF_PROTECTION_ENABLED`) stays on because the
+browser session reaches Prefect with a cookie; Prefect's Python client fetches CSRF tokens
+itself.
+
+Next.js has no rewrites or route handlers under `/api`. The Prefect access check and the
+Copilot chat stream therefore pass through Caddy in development as in production. Caddy flushes
+each `text/event-stream` chunk as it arrives and closes the API's connection when the browser
+closes its own, so the API sees a stopped chat as a disconnect. It also proxies the Next.js HMR websocket at
+`/_next/hmr` with the browser's `Host` header. Next.js accepts it for `localhost`; list any
+other hostname in `NEXT_ALLOWED_DEV_ORIGINS`.
+
+The `ui` service sets `pull_policy: build`, so a plain `docker compose up -d` rebuilds the UI
+image from the current checkout instead of reusing an image built from older code.
+
+`tests/infra/test_compose_ingress.py` renders `compose.yaml` with an unchanged older `.env` and
+checks the published ports and Prefect settings, and renders `compose.dev-local.yaml` for the
+development upstreams and dependencies. `tests/infra/test_caddy_proxy.py` runs the
+Caddyfile against mock upstreams and against the QDash API served by the `compose.yaml` gunicorn
+command, including incremental SSE delivery, cancellation, and the HMR websocket. It also runs
+the Caddyfile in front of the Prefect UI of the installed `prefect` package: opening
+`/prefect/dashboard` or a flow run page returns the UI and its assets, and Prefect API errors
+reach the browser unchanged. Prefect returns its UI for these paths only to requests that accept
+`text/html`, as browser navigations do. The tests skip
+unless `CADDY_BIN` or `caddy` on `PATH` provides Caddy. The access rules are tested in `tests/qdash/api/lib/test_prefect_access.py` and
+`tests/qdash/api/routers/test_auth_prefect_access.py`.
