@@ -69,6 +69,9 @@ cryostat. Start each section with when to use it, then give the steps.
 - **No internals.** No file paths, collection names, library or model names, JSON keys, HTTP
   routes, or component names. A reader who wants the mechanism gets one line: "How this works:
   [Copilot architecture](./copilot/architecture.md)."
+- **Code the user writes is not an internal.** Workflow source edited in **Workflow**, client
+  scripts, and `qdash-agent` commands are part of the job: show them as runnable examples with
+  the names the user types (`TaskCall`, `mux_ids`), and leave out how QDash implements them.
 - **No roles the application does not show.** Say "project editors" when the application calls
   them that; do not invent personas.
 
@@ -200,8 +203,10 @@ without blocking unrelated pull requests.
 ## Sidebar
 
 The sidebar in `docs/.vitepress/config.mts` has two top-level groups, User Guide and Developer
-Guide, with Reference under Developer Guide. Within a group, pages are in reading order: the
-page a newcomer needs first comes first. When a page moves, add its old path to
+Guide, with Reference under Developer Guide. User Guide pages are grouped by the reader's goal:
+set up and operate, get started, run calibrations, review results, collaborate and manage access,
+and use AI assistance. Within a group, pages are in reading order: the page a newcomer needs first
+comes first. When a page moves, add its old path to
 `docs/.vitepress/theme/redirects.ts` so links to the old URL still arrive.
 
 ## Exceptions

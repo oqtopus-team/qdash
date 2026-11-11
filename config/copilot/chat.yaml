@@ -60,7 +60,7 @@ chat_models:
     # model with a `base_url`: `prompt_cache_key_mode` (auto, enabled,
     # disabled), `requires_non_null_assistant_content` and
     # `requires_tools_with_tool_history` (completion only). Unset keeps Pi's
-    # defaults; see docs/developer-guide/copilot/architecture.md.
+    # defaults; see docs/developer-guide/copilot/model-configuration.md.
   # - provider: openai-compatible-ollama
   #   name: nvidia/Gemma-4-31B-IT-NVFP4
   #   api_style: completion

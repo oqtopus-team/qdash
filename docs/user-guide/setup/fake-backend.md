@@ -24,15 +24,24 @@ amplitude, and control amplitude to the database, so the Qubex tasks after it fi
 they require. The **Fake Backend Calibration** workflow template runs FakeBringUp, CheckChevron,
 CheckRabi, CreateHPIPulse, CreatePIPulse, CheckT1, CheckT2Echo, and CheckRamsey in that order.
 
-The template targets MUXes, as the hardware templates do. The literal `MUX_IDS` list at the top
-of the source selects MUX 0 to 15, all 64 qubits, and the execution dialog shows it as the
-default targets. QDash finds the four qubits of each MUX in the chip's wiring, and the same
-box-aware scheduler that runs a hardware chip runs them: MUXes that share no box run in
-parallel, and the qubits of one MUX run one after another. Edit `MUX_IDS`, for example to
-`[9, 15]` for qubits 36 to 39 and 60 to 63, to calibrate fewer qubits; pass `exclude_qids` to leave
-qubits out of the selected MUXes, and a `tasks` list to rerun a subset once the chip has been
-brought up. As on hardware, a `mux_ids` argument or a target override in the execution dialog
-replaces `MUX_IDS` for one run, and a `qids` list without `mux_ids` runs only those qubits.
+### Targets of the Template
+
+The template targets MUXes, as the hardware templates do. The literal `MUX_IDS` list at the top of
+the source selects MUX 0 to 15, all 64 qubits, and the execution dialog shows it as the default
+targets. QDash finds the four qubits of each MUX in the chip's wiring, and the same box-aware
+scheduler that runs a hardware chip runs them: MUXes that share no box run in parallel, and the
+qubits of one MUX run one after another.
+
+To calibrate fewer qubits or tasks, change the source or the run:
+
+| Change | Effect |
+| --- | --- |
+| Edit `MUX_IDS`, for example to `[9, 15]` | Calibrates only those MUXes, here qubits 36 to 39 and 60 to 63 |
+| Pass `exclude_qids` | Leaves those qubits out of the selected MUXes |
+| Pass a `tasks` list | Reruns a subset of tasks once the chip has been brought up |
+| Pass `mux_ids`, or set a target override in the execution dialog | Replaces `MUX_IDS` for one run |
+| Pass `qids` without `mux_ids` | Runs only those qubits |
+
 Flows saved from an earlier version of the template keep their own source and targets.
 
 ## Create a Chip

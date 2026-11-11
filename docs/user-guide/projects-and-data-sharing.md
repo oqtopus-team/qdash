@@ -72,6 +72,6 @@ another member will continue work from an existing result.
 
 ## Programmatic Access
 
-Use a saved [QDash Client](../reference/clients/python.md) profile for scripts and agents, then
-select the project through the profile or client API. Data cannot be moved between projects as a
+Scripts and agents select the project through a saved client profile, as
+[Connect to a Deployment](../reference/clients/python.md#connect-to-a-deployment) describes. Data cannot be moved between projects as a
 normal operation; create or import it in the intended project instead.

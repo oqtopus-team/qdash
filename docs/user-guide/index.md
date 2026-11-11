@@ -1,6 +1,8 @@
 # User Guide
 
-Use this guide to operate a QDash deployment and complete calibration work in the application.
+Use this guide to set up and operate a QDash deployment and to complete calibration work in the
+application. Read [What is QDash?](./what-is-qdash.md) first for the calibration model and a short
+demo.
 
 ## Set Up and Operate QDash
 
@@ -18,30 +20,54 @@ calibrations without it.
 After setup, use [Operations](./operations.md) to control and troubleshoot services and
 [System Updates](./system-updates.md) to deploy another stable release.
 
-## Learn the Application
+## Find Your Way Around
 
-Read [What is QDash?](./what-is-qdash.md) for the calibration model and watch the short demo.
-Use the [Application Tour](./application-tour.md) to find each page and its task-specific guide.
+<a id="learn-the-application"></a>
 
-## Complete Calibration Work
+Use the [Application Tour](./application-tour.md) to find each page of the application and the
+guide for it.
+
+## Run Calibrations
+
+<a id="complete-calibration-work"></a>
 
 | Goal | Guide |
 | --- | --- |
 | Run a workflow or one task | [Running Calibrations](./running-calibrations.md) |
 | Create or change a workflow | [Creating Workflows](./creating-workflows.md) |
 | Control inputs and saved outputs | [Task Parameters](./task-parameters.md) |
+| Track cryostats, cool-downs, and wiring | [Cryostats and Cool-downs](./cryostats-and-cool-downs.md) |
+
+## Review Results
+
+| Goal | Guide |
+| --- | --- |
 | Scan chip health | [Dashboard](./dashboard.md) |
 | Investigate state, history, or provenance | [Calibration Data and Provenance](./data-and-provenance.md) |
 | Review, discuss, or hand off a result | [Reviewing and Sharing Results](./reviewing-results.md) |
-| Track cryostats, cool-downs, and wiring | [Cryostats and Cool-downs](./cryostats-and-cool-downs.md) |
-| Evaluate results with AI | [AI Evaluations](./ai-evaluations.md) |
-| Use assisted calibration | [AI Chat](./ai-chat.md) or [Agent Calibration](./agent-calibration.md) |
 
-## Manage Access
+## Collaborate and Manage Access
 
-Use [Authentication and Users](./authentication-and-users.md) for accounts and passwords,
-[Projects and Data Sharing](./projects-and-data-sharing.md) for membership, roles, and project
-boundaries.
+<a id="manage-access"></a>
 
-For automation, use the [Python client](../reference/clients/python.md) or
-[TypeScript client](../reference/clients/typescript.md).
+Use [Projects and Data Sharing](./projects-and-data-sharing.md) for membership, roles, and project
+boundaries, and [Authentication and Users](./authentication-and-users.md) for accounts and
+passwords.
+
+## Use AI Assistance
+
+| Goal | Guide |
+| --- | --- |
+| Ask questions about project data, or investigate a failure | [AI Chat](./ai-chat.md) |
+| Judge task-result figures and compare evaluation settings | [AI Evaluations](./ai-evaluations.md) |
+| Let an agent you operate run bounded, gated single-qubit steps (experimental) | [Agent Calibration](./agent-calibration.md) |
+
+AI output is supporting evidence; confirm it against the underlying results before changing
+calibration state.
+
+## Automate QDash
+
+Scripts and integrations use the [Python client](../reference/clients/python.md) or the
+[TypeScript client](../reference/clients/typescript.md). Calibration procedures themselves are
+Python workflows that you write in **Workflow**, as [Creating Workflows](./creating-workflows.md)
+describes.

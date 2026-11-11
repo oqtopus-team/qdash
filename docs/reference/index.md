@@ -14,8 +14,8 @@ Explanations and change procedures remain in the Developer Guide.
 | Information | Reference |
 | --- | --- |
 | Interactive generated API operations and schemas | [OpenAPI](./openapi.md) |
-| Python client installation and API | [Python Client](./clients/python.md) |
-| TypeScript client installation and API | [TypeScript Client](./clients/typescript.md) |
+| Python client connection, profiles, and API | [Python Client](./clients/python.md) |
+| TypeScript client installation, connection, and API | [TypeScript Client](./clients/typescript.md) |
 
 ## Pi Extensions
 
