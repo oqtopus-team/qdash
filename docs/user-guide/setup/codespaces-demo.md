@@ -39,9 +39,10 @@ uses the included compute twice as fast as the smallest, 2-core machine.
 Without the README button, select **Code → Codespaces** on the repository page, open the **...**
 menu, select **New with options**, and choose the same configuration.
 
-The codespace downloads ready-made QDash Demo images instead of building them, then starts,
-migrates, and seeds QDash. The editor opens after this startup finishes. The creation log ends with the
-sign-in details, and each time the editor connects, a terminal shows them again:
+The first start builds the QDash images in the codespace, then starts, migrates, and seeds
+QDash; on a 4-core machine it took about 11 minutes. Later starts reuse the images. The editor
+opens after this startup finishes. The creation log ends with the sign-in details, and each time
+the editor connects, a terminal shows them again:
 
 ```text
 [qdash-demo] QDash:    https://<codespace-name>-5714.app.github.dev/login (in Codespaces: Ports tab, port 5714)
@@ -56,25 +57,9 @@ another terminal, run:
 bash .devcontainer/codespaces-demo/demo.sh credentials
 ```
 
-If the log ends with `Cannot pull ghcr.io/oqtopus-team/qdash-demo-...`, the images for this
-version of QDash are not available yet: they are published when a change reaches the `develop`
-or `main` branch (or the temporary trusted bootstrap branch `t3/github-pages-demo-hosting`) and its image workflow finishes. Wait, then run the startup again in the codespace terminal:
-
-```bash
-bash .devcontainer/codespaces-demo/demo.sh start
-```
-
-To continue without waiting, build the images in the codespace, which takes longer, and start:
-
-```bash
-bash .devcontainer/codespaces-demo/demo.sh build-local && bash .devcontainer/codespaces-demo/demo.sh start
-```
-
-How the images are built and published: [QDash Demo Images](../../developer-guide/demo-images.md).
-
 ## Open QDash
 
-When the editor opens, the browser also opens QDash in a new tab. Sign in with
+When the editor opens, the codespace asks the browser to open QDash in a new tab. Sign in with
 the user and password from the terminal. If no tab opens, for example because the browser blocked
 it, open the **Ports** tab and select the address of port **5714**, labelled **QDash Demo**.
 

@@ -168,7 +168,6 @@ export default withMermaid(
             { text: "Commands", link: "/developer-guide/commands" },
             { text: "Testing", link: "/developer-guide/testing" },
             { text: "Development Flow", link: "/developer-guide/development-flow" },
-            { text: "QDash Demo Images", link: "/developer-guide/demo-images" },
             { text: "Docs Guidelines", link: "/developer-guide/docs-guidelines" },
             {
               text: "Conventions",
