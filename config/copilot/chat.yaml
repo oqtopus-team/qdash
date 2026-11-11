@@ -56,6 +56,11 @@ chat_models:
     # enforces OpenAI `strict` function schemas, so render_ui's arguments are
     # sampled against its schema. Without it the schema is sent unenforced.
     # Catalog models (OpenAI, Bedrock) need no setting.
+    # A gateway or proxy that differs from Pi's OpenAI defaults can set, per
+    # model with a `base_url`: `prompt_cache_key_mode` (auto, enabled,
+    # disabled), `requires_non_null_assistant_content` and
+    # `requires_tools_with_tool_history` (completion only). Unset keeps Pi's
+    # defaults; see docs/developer-guide/copilot/architecture.md.
   # - provider: openai-compatible-ollama
   #   name: nvidia/Gemma-4-31B-IT-NVFP4
   #   api_style: completion

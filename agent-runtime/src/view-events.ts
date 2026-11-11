@@ -24,7 +24,8 @@
  * revision at a time, and drains the final state when the turn settles.
  */
 
-import type { Context, WatchHandle } from "@earendil-works/chord";
+import type { Context } from "@earendil-works/chord/context";
+import type { WatchHandle } from "@earendil-works/chord/watch";
 import type {
   Conversation,
   ConversationView,

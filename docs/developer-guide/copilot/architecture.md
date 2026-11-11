@@ -251,6 +251,25 @@ then writes `compat.supportsStrictMode: true` for that model. An endpoint that r
 `strict` field fails requests with the setting enabled, so leave it unset when support is
 unknown.
 
+Gateways and proxies in front of a custom endpoint sometimes expect a request shape that differs
+from Pi's defaults. Three optional keys on a `chat_models` or `evaluation_models` entry with a
+`base_url` set the matching Pi compat field for that model only. An unset key keeps Pi's
+default, an explicit `false` is written as `false`, and catalog models ignore all three:
+
+| Key | Values | Pi compat field | Effect |
+| --- | --- | --- | --- |
+| `prompt_cache_key_mode` | `auto`, `enabled`, `disabled` | `promptCacheKeyMode` | Whether requests carry `prompt_cache_key`, the conversation's provider session ID |
+| `requires_non_null_assistant_content` | `true`, `false` | `requiresNonNullAssistantContent` | Replays an assistant message that holds only tool calls with `""` content instead of `null` |
+| `requires_tools_with_tool_history` | `true`, `false` | `requiresToolsWithToolHistory` | Sends `"tools": []` when a request offers no tools but the history has tool calls, as some proxies in front of Anthropic require |
+
+With `auto`, completions-style requests send `prompt_cache_key` only to `api.openai.com`, and
+responses-style requests always send it. Use `enabled` for a proxy that routes or caches on the
+key and `disabled` for an endpoint that rejects the field. Pi omits an empty `tools` array by
+default because vLLM 0.20 and later reject it; set `requires_tools_with_tool_history: true` only
+for a proxy that needs it. The two `requires_*` keys exist only for `api_style: completion`; the
+runtime drops them on a responses-style endpoint. An invalid value is dropped with a startup
+warning that names the key and the model, not the value.
+
 YAML string values support shell-style environment variable references such
 as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be supplied
 through environment variables instead of committed template files. The Pi runtime
