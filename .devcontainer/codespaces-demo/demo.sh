@@ -5,8 +5,14 @@
 # Usage: demo.sh build|start|stop|status|credentials
 #
 # The first run writes .env from .env.example with a random administrator
-# password. Later runs reuse that .env and the data directories, so start and
+# password. Later runs reuse that .env and the database volumes, so start and
 # restart are idempotent. An .env this script did not write is never changed.
+# compose.yaml in this directory keeps MongoDB and PostgreSQL data in named
+# volumes; stop keeps them, and deleting the codespace removes them.
+#
+# start waits up to QDASH_DEMO_READY_TIMEOUT seconds (default 600) for the
+# services the seed needs, and stops early when one fails for good: a setup job
+# exits with an error or a service keeps restarting.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -18,6 +24,27 @@ port="${QDASH_DEMO_PORT:-5714}"
 # Only the services the demo needs: no AI runtime, mongo-express or tunnel.
 services=(caddy user-flow-worker)
 build_services=(api ui deployment-service user-flow-worker)
+# Compose files of the demo, also written to .env as COMPOSE_FILE so plain
+# `docker compose` commands in the codespace use the same volumes.
+compose_files="compose.yaml:${demo_dir}/compose.yaml"
+# What each service must reach before seeding: healthy (has a healthcheck),
+# running, or completed (a one-shot setup job that exited 0).
+ready_targets=(
+  mongo:healthy
+  postgres:healthy
+  calibration-migration:completed
+  agent-runtime-auth:completed
+  prefect-server:healthy
+  deployment-service:healthy
+  api:running
+  user-flow-worker:running
+  ui:running
+  caddy:running
+)
+ready_timeout="${QDASH_DEMO_READY_TIMEOUT:-600}"
+ready_interval="${QDASH_DEMO_READY_INTERVAL:-5}"
+# A service restarted this often is failing on every start.
+max_restarts="${QDASH_DEMO_MAX_RESTARTS:-3}"
 
 log() { printf '[qdash-demo] %s\n' "$*"; }
 
@@ -69,10 +96,84 @@ prepare_env() {
   fi
   # The forwarded URL follows the codespace name; keep it current.
   set_env CLIENT_URL "$(client_url)"
+  # Also updates an .env written before the demo override existed.
+  set_env COMPOSE_FILE "$compose_files"
   mkdir -p config/qubex-config calib_data .tmp/quelware-client
 }
 
-compose() { docker compose "$@"; }
+compose() {
+  local args=() file
+  local IFS=:
+  for file in $compose_files; do args+=(-f "$file"); done
+  docker compose "${args[@]}" "$@"
+}
+
+# Print "service status health exit-code restart-count" for each container.
+container_states() {
+  local ids
+  ids="$(compose ps -aq)"
+  [ -n "$ids" ] || return 0
+  # shellcheck disable=SC2086 # one argument per container ID
+  docker inspect --format \
+    '{{index .Config.Labels "com.docker.compose.service"}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} {{.State.ExitCode}} {{.RestartCount}}' \
+    $ids
+}
+
+# Show where startup stopped, then exit.
+fail_startup() {
+  local reason="$1"
+  shift
+  log "$reason"
+  compose ps -a || true
+  local service
+  for service in "$@"; do
+    log "Last log lines of ${service}:"
+    compose logs --no-color --tail 40 "$service" || true
+  done
+  log "Fix the cause, then run: bash ${demo_dir}/demo.sh start"
+  exit 1
+}
+
+# Wait until every ready_targets entry holds, or fail on a permanent error or
+# after ready_timeout seconds.
+wait_ready() {
+  local deadline="$1" states target service want line
+  local status health code restarts before pending baseline
+  log "Waiting for the services (up to ${ready_timeout}s)"
+  # Restart counts survive codespace restarts; count only new restarts.
+  baseline="$(container_states)"
+  while :; do
+    states="$(container_states)"
+    pending=()
+    for target in "${ready_targets[@]}"; do
+      service="${target%%:*}"
+      want="${target#*:}"
+      line="$(awk -v s="$service" '$1 == s { print; exit }' <<<"$states")"
+      if [ -z "$line" ]; then
+        pending+=("$service")
+        continue
+      fi
+      read -r _ status health code restarts <<<"$line"
+      if [ "$want" = completed ]; then
+        if [ "$status" = exited ] && [ "$code" = 0 ]; then continue; fi
+        if [ "$status" = exited ] || [ "$status" = dead ]; then
+          fail_startup "${service} exited with code ${code}" "$service"
+        fi
+      elif before="$(awk -v s="$service" '$1 == s { print $5; exit }' <<<"$baseline")" &&
+        [ $((restarts - ${before:-0})) -ge "$max_restarts" ]; then
+        fail_startup "${service} restarted $((restarts - ${before:-0})) times while starting" "$service"
+      elif [ "$status" = running ] && { [ "$want" = running ] || [ "$health" = healthy ]; }; then
+        continue
+      fi
+      pending+=("$service")
+    done
+    [ "${#pending[@]}" -eq 0 ] && return 0
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      fail_startup "Not ready after ${ready_timeout}s: ${pending[*]}" "${pending[@]}"
+    fi
+    sleep "$ready_interval"
+  done
+}
 
 cmd_build() {
   wait_for_docker
@@ -85,7 +186,16 @@ cmd_start() {
   wait_for_docker
   prepare_env
   log "Starting services"
-  compose up -d --build "${services[@]}"
+  local deadline=$((SECONDS + ready_timeout))
+  # up waits for the database healthchecks and setup jobs that compose.yaml
+  # depends on. Bound this wait too: a migration can hang before up returns.
+  # GNU timeout is included in the Ubuntu Codespaces base image.
+  timeout --kill-after=5 "$ready_timeout" docker compose \
+    -f compose.yaml -f "${demo_dir}/compose.yaml" \
+    up -d --build "${services[@]}" || fail_startup \
+    "Services did not start within ${ready_timeout}s or Compose failed" \
+    mongo postgres calibration-migration agent-runtime-auth
+  wait_ready "$deadline"
   log "Seeding the demo chip and its first run"
   # The API container already has the administrator credentials from .env and
   # reaches Caddy on the Compose network.
@@ -93,6 +203,7 @@ cmd_start() {
   cmd_credentials
 }
 
+# Stops the containers only; the database volumes and .env stay.
 cmd_stop() {
   compose stop
 }

@@ -87,13 +87,15 @@ previous run failed or was cancelled. Results you add are kept across restarts. 
    service is unavailable.
 3. Open **Workflow** and run **demo_fake_calibration** again. Follow the new run in **Execution**.
 
-If QDash
-does not answer after a restart, run the startup again in the codespace terminal and read its
-output:
+Startup waits up to 10 minutes for the services to come up before it adds the chip and run. If
+a service fails to start, startup stops and prints that service's last log lines in place of
+the sign-in details. If QDash does not answer after a restart, run the startup again in the
+codespace terminal and read its output:
 
 ```bash
 bash .devcontainer/codespaces-demo/demo.sh start
 ```
 
 `demo.sh status` lists the services, and `demo.sh stop` stops QDash without stopping the
-codespace.
+codespace. The databases are kept in Docker volumes inside the codespace, not in the checkout,
+so `demo.sh stop` and restarts keep them; `docker compose down --volumes` deletes them.

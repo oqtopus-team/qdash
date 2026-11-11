@@ -1,0 +1,44 @@
+# Codespaces demo override, applied after ../../compose.yaml by demo.sh and by
+# COMPOSE_FILE in the .env that demo.sh writes.
+#
+# MongoDB and PostgreSQL drop to uid 999 and chown their data directory. With
+# the compose.yaml bind mounts under /workspaces, a codespace's databases failed
+# with WiredTiger "Operation not permitted" and PostgreSQL "Permission denied".
+# Named volumes live in the Docker-in-Docker data root instead: they survive
+# `demo.sh stop` and codespace restarts, and are removed with the codespace.
+# Volume entries merge by target, so these replace the bind mounts.
+#
+# The healthchecks let demo.sh wait for Prefect and the deployment service
+# before the seed saves a flow; compose.yaml only waits for them to start.
+services:
+  mongo:
+    volumes:
+      - mongo-data:/data/db
+  postgres:
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+  prefect-server:
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health', timeout=5)
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 30s
+  deployment-service:
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=5)
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 30s
+volumes:
+  mongo-data:
+  postgres-data:
