@@ -99,6 +99,7 @@ export default withMermaid(
                   items: [
                     { text: "Install and Sign In", link: "/user-guide/setup" },
                     { text: "Fake Backend", link: "/user-guide/setup/fake-backend" },
+                    { text: "Codespaces Demo", link: "/user-guide/setup/codespaces-demo" },
                     { text: "Qubex Backend", link: "/user-guide/setup/qubex-backend" },
                     { text: "AI Setup", link: "/user-guide/setup/ai" },
                   ],

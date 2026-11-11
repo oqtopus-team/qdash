@@ -1,0 +1,41 @@
+// QDash demo on GitHub Codespaces: the Fake backend stack of compose.yaml in
+// Docker-in-Docker, reached through Caddy on one forwarded port. Unlike
+// ../devcontainer.json it needs no host Docker socket or sibling checkouts.
+// See docs/user-guide/setup/codespaces-demo.md.
+{
+  "name": "QDash demo (Fake backend)",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb",
+    "storage": "32gb"
+  },
+  "containerEnv": {
+    "QDASH_DEMO_PORT": "5714"
+  },
+  // Only Caddy is forwarded. Codespaces forwards it as a private port, so only
+  // the codespace owner can open it.
+  "forwardPorts": [5714],
+  "portsAttributes": {
+    "5714": {
+      "label": "QDash",
+      "protocol": "http",
+      "onAutoForward": "notify"
+    }
+  },
+  "otherPortsAttributes": {
+    "onAutoForward": "ignore"
+  },
+  // Build the images once; start, migrate and seed on every start. Both are
+  // safe to rerun: see demo.sh.
+  "postCreateCommand": "bash .devcontainer/codespaces-demo/demo.sh build",
+  "postStartCommand": "bash .devcontainer/codespaces-demo/demo.sh start",
+  "customizations": {
+    "codespaces": {
+      "openFiles": ["docs/user-guide/setup/codespaces-demo.md"]
+    }
+  }
+}
