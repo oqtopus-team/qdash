@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![slack](https://img.shields.io/badge/slack-OQTOPUS-pink.svg?logo=slack&style=plastic)](https://join.slack.com/t/oqtopus/shared_invite/zt-3bpjb7yc3-Vg8IYSMY1m5wV3DR~TMSnw)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oqtopus-team/qdash)
+[![Documentation](https://img.shields.io/badge/docs-online-blue)](https://oqtopus-team.github.io/qdash/)
 
 QDash is a web platform for running qubit calibration workflows, reviewing measurement results,
 and tracking calibration parameters and their history.
