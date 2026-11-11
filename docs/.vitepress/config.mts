@@ -64,7 +64,9 @@ export default withMermaid(
       theme: "neutral",
     },
     mermaidPlugin: {
-      class: "mermaid my-class",
+      // Not "mermaid": mermaid's startOnLoad handler re-parses every `.mermaid` element on window
+      // load and can replace an already rendered diagram with a syntax-error SVG.
+      class: "mermaid-diagram",
     },
 
     themeConfig: {
