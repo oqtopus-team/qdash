@@ -13,7 +13,7 @@ and tracking calibration parameters and their history.
 
 [Watch the demo with sound](https://oqtopus-team.github.io/qdash/user-guide/what-is-qdash#demo)
 
-[![Launch QDash Demo (sample data) in GitHub Codespaces](https://img.shields.io/badge/Launch_QDash_Demo-sample_data_in_Codespaces-2ea44f?logo=github)](https://codespaces.new/oqtopus-team/qdash/tree/t3/github-pages-demo-hosting?devcontainer_path=.devcontainer%2Fcodespaces-demo%2Fdevcontainer.json)
+[![Launch QDash Demo (sample data) in GitHub Codespaces](https://img.shields.io/badge/Launch_QDash_Demo-sample_data_in_Codespaces-2ea44f?logo=github)](https://codespaces.new/oqtopus-team/qdash/tree/develop?devcontainer_path=.devcontainer%2Fcodespaces-demo%2Fdevcontainer.json)
 
 To try QDash in your browser without installing anything, select **Launch QDash Demo**: it
 creates a private codespace, billed to your GitHub account, that runs QDash on sample data; see
