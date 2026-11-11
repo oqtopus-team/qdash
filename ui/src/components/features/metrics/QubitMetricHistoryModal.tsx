@@ -15,7 +15,6 @@ import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
-import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
 import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
@@ -506,7 +505,7 @@ export function QubitMetricHistoryModal({
               </span>
             </div>
           )}
-          {/* Lineage and Ask AI */}
+          {/* Lineage */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
             <LineageButton
               target={{ parameterName: metricName, qid: qid }}
@@ -515,17 +514,6 @@ export function QubitMetricHistoryModal({
               <GitBranch className="h-3 w-3" />
               Lineage
             </LineageButton>
-            {chatContext && (
-              <AskAiButton
-                taskId={chatContext.taskId}
-                chipId={chatContext.chipId}
-                taskName={chatContext.taskName}
-                qid={chatContext.qid}
-                chatContext={chatContext}
-                onChat={() => openMiniChat(chatContext)}
-                size="xs"
-              />
-            )}
             {selectedHistoryItem?.task_id && (
               <TaskResultExcludeButton
                 taskId={selectedHistoryItem.task_id}
@@ -579,6 +567,7 @@ export function QubitMetricHistoryModal({
           chipId={chipId}
           taskName={selectedTask.name || undefined}
           qid={qid}
+          executionId={selectedExecutionId || undefined}
           onChat={chatContext ? () => openMiniChat(chatContext) : undefined}
         />
       )}
