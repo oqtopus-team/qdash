@@ -4,9 +4,16 @@ Use this guide to operate a QDash deployment and complete calibration work in th
 
 ## Set Up and Operate QDash
 
-Choose a backend in [Setup](./setup.md) to take a new installation from clone to sign-in. The
-[Fake backend](./setup/fake-backend.md) evaluates QDash without hardware; the
-[Qubex backend](./setup/qubex-backend.md) connects a supported control system.
+A new installation follows one path:
+
+1. [Setup](./setup.md): choose a backend, configure `.env`, start QDash, and sign in. The
+   [Fake backend](./setup/fake-backend.md) evaluates QDash without hardware; the
+   [Qubex backend](./setup/qubex-backend.md) connects a supported control system.
+2. [Run Your First Calibration](./first-calibration.md): create a chip, run a workflow, and
+   inspect its first result with the guide on **Home**.
+
+[AI Setup](./setup/ai.md) connects the model endpoints for AI chat and evaluations; QDash runs
+calibrations without it.
 
 After setup, use [Operations](./operations.md) to control and troubleshoot services and
 [System Updates](./system-updates.md) to deploy another stable release.

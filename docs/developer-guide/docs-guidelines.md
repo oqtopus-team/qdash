@@ -26,7 +26,8 @@ docs/
   user-guide/
     index.md               Reading order: set up, operate, work with calibrations
     setup.md               Choose a backend, then clone, configure, start, sign in
-    setup/                  Fake and Qubex backend-specific configuration
+    setup/                 Fake and Qubex backends, optional AI configuration
+    first-calibration.md   Guided first run from chip to inspected result
     operations.md          Start, stop, logs, recovery
     system-updates.md      Select a stable release and rebuild from the host
     application-tour.md    One page per job after that: running calibrations,

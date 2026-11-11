@@ -421,7 +421,7 @@ Setting only one Access variable, or a whitespace-only value, fails configuratio
 sending partial authentication. Leaving both unset or empty preserves existing behavior.
 `agent-runtime/test/cloudflare-access.test.mjs` captures requests from the installed Pi runtime
 for both API styles and both model roles. Deployment steps are in
-[Configure AI](../../user-guide/setup.md#configure-ai).
+[Authenticate AI Endpoints with Cloudflare Access](../../user-guide/setup/ai.md#authenticate-ai-endpoints-with-cloudflare-access).
 
 ### Environment Variables
 
