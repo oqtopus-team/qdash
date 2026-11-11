@@ -1,4 +1,4 @@
-import type { JsonValue } from "@earendil-works/chord";
+import type { JsonValue } from "@earendil-works/chord/json";
 import { defineTool } from "@earendil-works/pi-durable";
 
 // The catalog, validation and fallback text are shared with the chat, which

@@ -1,4 +1,4 @@
-import type { JsonValue } from "@earendil-works/chord";
+import type { JsonValue } from "@earendil-works/chord/json";
 import type { ClassifierContext, ClassifierResult } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
 import { Type, type Static } from "typebox";
