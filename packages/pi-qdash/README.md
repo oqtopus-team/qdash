@@ -83,7 +83,7 @@ Citation information is available in the [CITATION](https://github.com/oqtopus-t
 
 Open a [QDash issue](https://github.com/oqtopus-team/qdash/issues) or email us:
 
-- [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team[at]googlegroups.com)
+- [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team@googlegroups.com)
 
 ## License
 
