@@ -18,7 +18,6 @@ import {
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
-import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
 import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
@@ -436,7 +435,7 @@ export function CouplingTaskHistoryModal({
             rawDataPaths={rawDataPaths}
             imagePaths={figures}
           />
-          {/* Lineage and Ask AI */}
+          {/* Lineage */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
             <LineageButton
               target={inExecution(
@@ -452,17 +451,6 @@ export function CouplingTaskHistoryModal({
               <GitBranch className="h-3 w-3" />
               Lineage
             </LineageButton>
-            {chatContext && (
-              <AskAiButton
-                taskId={chatContext.taskId}
-                chipId={chatContext.chipId}
-                taskName={chatContext.taskName}
-                qid={chatContext.qid}
-                chatContext={chatContext}
-                onChat={() => openMiniChat(chatContext)}
-                size="xs"
-              />
-            )}
           </div>
         </div>
       )}
@@ -473,7 +461,7 @@ export function CouplingTaskHistoryModal({
 
       {/* Parameters */}
       {selectedTask && (
-        <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-col gap-2 mt-2 mb-6">
           {selectedTask.input_parameters &&
             Object.keys(selectedTask.input_parameters).length > 0 && (
               <ParametersTable
@@ -508,6 +496,7 @@ export function CouplingTaskHistoryModal({
           chipId={chipId}
           taskName={selectedTask.name || taskName}
           qid={couplingId}
+          executionId={selectedExecutionId || undefined}
           onChat={chatContext ? () => openMiniChat(chatContext) : undefined}
         />
       )}
