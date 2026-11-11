@@ -1,8 +1,7 @@
 # AI Setup
 
-AI chat and AI evaluations need model endpoints that you supply in `.env`; QDash starts and runs
-calibrations without them. Configure AI after [Setup](../setup.md) has a running deployment you can
-sign in to.
+After [Setup](../setup.md), configure model endpoints in `.env` to enable AI chat and evaluations.
+QDash runs calibrations without AI endpoints.
 
 | Setting | Needed for | Required |
 | --- | --- | --- |
@@ -30,23 +29,19 @@ internal authentication; no AI Compose profile or UI enable flag is needed.
    [Copilot Model Configuration](../../developer-guide/copilot/model-configuration.md).
 3. [Apply the changes](#apply-ai-changes).
 
-Copilot can propose the write operations it supports without an extra setting. The signed-in user
-must approve each proposed write in the chat, and that user's project permissions still apply. The
-retired `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` variable has no effect; remove it from existing `.env`
-files.
+Copilot write operations require your approval and project permissions. No extra enable setting
+is needed; the retired `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` variable has no effect and can be removed.
 
 ## Add a Classifier
 
-A classifier model is optional. When one is configured, the chat uses it to:
+A classifier optionally helps the chat:
 
 - choose a fixed layout for values it found: a calibration summary, an execution comparison, or a
   failure list;
-- judge between a few categories when its next step depends on it, such as what kind of request a
-  message is, which kind of problem a failure points to, or which check to run next.
+- classify requests and failures, or choose the next check.
 
-The chat's steps then show **Classifying** and the category the classifier chose. Without a
-classifier, the chat composes its own views and makes these judgments itself. No classifier
-endpoint is preconfigured; you supply its URL and token.
+The chat shows **Classifying** and the selected category. Without a classifier endpoint, the chat
+chooses layouts and makes these judgments itself.
 
 1. Set the endpoint's URL, up to the API version, and its token in `.env`:
 

@@ -1,18 +1,15 @@
 # Run Your First Calibration
 
-The first calibration guide on **Home** takes a project editor from a chip to an inspected result
-in five steps: **Prepare a chip**, **Review and run**, **Follow progress**, **Inspect a result**,
-and **Chip overview**. This page follows the guide on a Fake deployment, which contacts no
-hardware. [On a Qubex Deployment](#on-a-qubex-deployment) lists what changes when QDash controls
-hardware.
+Use the guide on **Home** to create a chip, run a calibration, and inspect its result on a Fake
+deployment without hardware. For hardware-specific steps, see
+[On a Qubex Deployment](#on-a-qubex-deployment).
 
 ## Before You Start
 
 - QDash is running and you have signed in, as described in [Setup](./setup.md). On a fresh
   deployment, sign in as the initial administrator, who owns the default project that QDash
   creates for that account.
-- You are an Editor or Owner of the active project. The guide is shown only to project editors;
-  another member needs the role described in
+- You are an Editor or Owner of the active project; see
   [Choose a Project Role](./projects-and-data-sharing.md#choose-a-project-role).
 - The deployment can store chip configuration. On a Fake deployment set up from the example
   `.env`, this is already in place; the **Create Chip** dialog blocks creation when it is not, as
@@ -21,24 +18,20 @@ hardware.
 
 ## Start the Guide
 
-1. Select **Home** in the sidebar. Sign-in opens **Execution**, not Home.
+1. Select **Home** in the sidebar.
 2. Start the guide:
    - When the project has no chips, select **Create a chip** under **First calibration**.
    - Otherwise, select **First calibration guide** in the Home header, choose an existing chip or
      **Create a new chip**, and select **Start**.
 
-The guide offers a chip only after it has checked how the deployment runs calibrations and which
-chips the project has. If that check fails, select **Try again**. On a Fake deployment, the guide
-offers only chips with the 64 qubits of the virtual device; when the API does not offer the
-virtual device, the guide offers no chip and asks you to have an administrator check the API
-configuration.
+If the guide cannot load the deployment or its chips, select **Try again**. Fake deployments offer
+only chips matching the 64-qubit virtual device. If that device is unavailable, ask an administrator
+to check the API configuration.
 
 ## Follow the Guide
 
-On each page, a callout points at the next control and names the action, such as **Name the
-chip**, **Save the flow**, or **Start the run**. A callout that asks for an action moves on when
-you take it. A callout that explains the page has **Next**. The rest of the page stays usable while
-a callout is shown, and the guide never saves a flow or starts a run by itself.
+Follow each callout to perform an action, or select **Next** to continue an explanation. You can
+still use the rest of the page. The guide never saves a flow or starts a run without your action.
 
 ### Prepare a Chip
 
@@ -47,9 +40,8 @@ If you chose an existing chip, continue to [Review and Run](#review-and-run).
 1. In the **Create Chip** dialog, enter a **Chip ID**.
 2. Select **Create Chip**.
 
-QDash configures the virtual device for the new chip; [Create a Chip](./setup/fake-backend.md#create-a-chip)
-lists what the dialog creates. **New Flow** then opens on the **Fake Backend Calibration**
-template with the new chip selected.
+QDash creates the [virtual chip configuration](./setup/fake-backend.md#create-a-chip) and opens
+**New Flow** with the **Fake Backend Calibration** template and the new chip selected.
 
 ### Review and Run
 
@@ -65,8 +57,7 @@ A failed save or a run that does not start leaves you in the editor with your ch
 
 ### Follow Progress
 
-The run opens on **Execution**. While it runs, the callout shows how many tasks have finished and
-waits for the run to end; it has no **Next**.
+The run opens on **Execution**. The callout shows the completed task count while you wait.
 
 When the run fails or is cancelled, the guide stays on this step and offers **Open the run** and
 **Run again**. Open the run, or filter **Task Results** by status as described in
@@ -106,17 +97,16 @@ The guide follows the same five steps on a Qubex deployment, with these differen
 
 ## Pause and Resume the Guide
 
-On pages other than Home, a strip under the top bar shows the current step and its next action.
-**Exit guide** in the strip, or the close button of a callout, pauses the guide and hides both.
-Home then marks the guide **Paused** and offers:
+The strip under the top bar shows the current step. Select **Exit guide** or close a callout to
+pause. On **Home**, select:
 
-- **Resume**, which continues at the step that the recorded chip, flow, and run point to.
-- **Start over**, which discards the guide.
+- **Resume** to continue from the recorded step.
+- **Start over** to discard the guide.
 
 The guide is kept in this browser for your account and the active project. A chip, flow, or run
 that finishes after you switch project, pause, or start over is not added to the guide. The guide
 checks each step against the chip, flow, and run that QDash recorded, so deleting one of them
-returns the guide to the step that needs it. Links to the former chip setup tour open the guide.
+returns the guide to the step that needs it.
 
 ## Continue After the First Run
 

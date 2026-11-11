@@ -1,12 +1,9 @@
 # User Guide
 
-Use this guide to set up and operate a QDash deployment and to complete calibration work in the
-application. Read [What is QDash?](./what-is-qdash.md) first for the calibration model and a short
-demo.
+Set up QDash, run calibrations, and review results. Start with
+[What is QDash?](./what-is-qdash.md) for the calibration model and a demo.
 
 ## Set Up and Operate QDash
-
-A new installation follows one path:
 
 1. [Setup](./setup.md): choose a backend, configure `.env`, start QDash, and sign in. The
    [Fake backend](./setup/fake-backend.md) evaluates QDash without hardware; the
@@ -24,8 +21,7 @@ After setup, use [Operations](./operations.md) to control and troubleshoot servi
 
 <a id="learn-the-application"></a>
 
-Use the [Application Tour](./application-tour.md) to find each page of the application and the
-guide for it.
+Find pages and their guides in the [Application Tour](./application-tour.md).
 
 ## Run Calibrations
 

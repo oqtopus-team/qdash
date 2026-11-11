@@ -1,8 +1,6 @@
 # Setup
 
-Setup takes a new installation from clone to a signed-in administrator: prepare the host, create
-`.env`, set the shared settings, start the stack, and sign in. Choose the backend first: Fake runs
-without quantum hardware, while Qubex connects QDash to a supported lab system.
+Install QDash with Docker Compose, then sign in as its initial administrator.
 
 The sections from [Prepare the Host](#prepare-the-host) to
 [Verify the Installation](#verify-the-installation) are required, in order. AI, the default color
@@ -16,12 +14,10 @@ theme, several deployments on one host, and remote access are optional and can b
 | Operate a Qubex-connected lab deployment | [Qubex](./setup/qubex-backend.md); place the Qubex configuration before startup |
 | Connect another hardware stack | Not supported by deployment settings, which accept only `fake` and `qubex`; an additional backend requires QDash code changes. |
 
-Both supported paths use the same Docker Compose stack. The backend choice changes the available
-calibration tasks and whether the workflow worker opens a hardware connection.
+The backend determines the available calibration tasks and hardware connection.
 
-Host-side API and UI processes are a development workflow. Use
-[Development Environment Setup](../developer-guide/setup.md) instead of this page when changing
-QDash code.
+To change QDash code and run the API or UI on the host, use
+[Development Environment Setup](../developer-guide/setup.md).
 
 ## Prepare the Host
 

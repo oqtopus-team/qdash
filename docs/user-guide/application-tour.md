@@ -28,9 +28,6 @@ for the role to assign.
 | **Analysis** | Plot and compare chip parameters over a selected time range. | [Calibration Data and Provenance](./data-and-provenance.md) |
 | **AI Chat** | Ask questions using project calibration context. | [AI Chat](./ai-chat.md) |
 
-Use **Dashboard** for broad health checks, **Metrics** for a parameter-focused investigation, and
-**Chip** when the calibration task or physical target is the starting point.
-
 **Executions** on Home counts the runs started on every chip of the active project in the last 30
 days, one column of blocks per day colored by status. Each block represents one execution; on
 busy days the card labels how many executions a full block represents, and the top block of a
@@ -40,10 +37,9 @@ bar with its name and status; select the badge to open the run.
 
 ## Run Your First Calibration
 
-Project editors can follow a guided first calibration from **Home**, from chip to inspected
-result: select **Create a chip** under **First calibration** when the project has no chips, or
-**First calibration guide** in the Home header. The steps, the Qubex hardware confirmation, and
-how to pause and resume the guide are in [Run Your First Calibration](./first-calibration.md).
+Project editors can start the guide on **Home**. Follow
+[Run Your First Calibration](./first-calibration.md) to create a chip, run a workflow, and inspect
+its result.
 
 ## Operate
 
@@ -69,13 +65,9 @@ permission. See [Running Calibrations](./running-calibrations.md) for the end-to
 
 Mentions and replies arrive at the bell in the top bar, which shows the unread count. Select the
 bell to preview the newest notifications, or **View all** to open **Inbox**. See
-[Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) for the notification
-flow and the same page for how these records relate.
+[Reviewing and Sharing Results](./reviewing-results.md#follow-notifications) for details.
 
 ## Manage
-
-Project editors can use **Config** to edit Qubex configuration files and synchronize their
-repository. A guide for this page is not yet published.
 
 | Page | Purpose | Guide |
 | --- | --- | --- |

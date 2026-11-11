@@ -1,4 +1,4 @@
-![OQTOPUS](docs/public/images/oqtopus-logo.png)
+<img src="docs/public/images/oqtopus-logo.png" alt="OQTOPUS" width="100%" />
 
 # QDash
 
@@ -9,7 +9,7 @@
 QDash is a web platform for running qubit calibration workflows, reviewing measurement results,
 and tracking calibration parameters and their history.
 
-![qdash-demo](docs/public/images/qdash-demo.gif)
+<img src="docs/public/images/qdash-demo.gif" alt="QDash calibration demo" width="100%" />
 
 [Watch the demo with sound](https://oqtopus-team.github.io/qdash/user-guide/what-is-qdash#demo)
 

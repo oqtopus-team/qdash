@@ -17,25 +17,19 @@ AI chat needs a chat model endpoint; an administrator configures it as described
 | **Investigate with AI** in an **Error Log** | Finding the likely cause of a failed execution or task |
 | [Agent Calibration](./agent-calibration.md) | Running a separately authorized, bounded calibration plan through the client |
 
-Agent calibration performs hardware-affecting operations and has its own guide.
-
 ## Start a Conversation
 
 Open **AI Chat** for a project-wide conversation. Start a new session when the chip,
 investigation, or goal changes substantially. QDash stores sessions so you can return to earlier
 analysis.
 
-The assistant can inspect records such as chips, metrics, task results, forum threads, workflows,
-and provenance through the tools QDash gives it. Keep the active project and selected chip in mind
-when you interpret an answer, and open the referenced records to confirm important conclusions.
+The assistant can inspect chips, metrics, task results, forum threads, workflows, and provenance.
+Confirm the active project and chip, then check important conclusions against the cited records.
 
 ### Ask AI Beside Any Page
 
-**Ask AI** on the right edge opens the same chat as a sidebar next to the page you are on. The
-assistant is told which page is open with every message, so "what am I looking at?" or "compare
-this with last week" refer to the current page. Drag the sidebar's left edge to make it wider or
-narrower; double-click the edge to restore the default width. The width is remembered in your
-browser.
+**Ask AI** opens a sidebar with the current page as context. Drag its left edge to resize it, or
+double-click to restore the default width. Your browser remembers the width.
 
 On the **Workflow** editor the assistant also sees the flow's code as it is in the editor,
 unsaved changes included. Ask for a change in plain terms, for example "add a T2 echo check after
@@ -49,8 +43,8 @@ Apply is available only while the proposal's flow is open on the same chip.
 When the deployment enables it, the assistant has a private workspace for each chat: a shell with
 Python, NumPy, SciPy, pandas, Plotly and Matplotlib, no network, and no access to QDash. It uses
 it for arithmetic, fitting and data wrangling, writing data from tool results into files. The
-answer's trace shows each command, the file it wrote with the code typed out as it is written,
-and the output of each run. Files stay for the rest of the chat and are deleted with it.
+trace shows commands, generated code, and output. Files stay for the rest of the chat and are
+deleted with it.
 
 ### Thinking and Your Own Instructions
 
@@ -86,9 +80,8 @@ task details. It works when the execution failed before any task result was reco
 3. Read the answer, then ask follow-up questions in the same chat.
 
 The assistant reads available source code, starting from the code that raised the error. The
-answer is short: the likely cause, the evidence
-(a quoted log line and cited code locations), and one next step to check or a fix
-to review. The assistant reads more code only when the evidence is unclear; ask a follow-up
+answer gives a likely cause, supporting logs and code references, and a next step or proposed fix.
+The assistant reads more code only when the evidence is unclear; ask a follow-up
 question for a deeper analysis. It does not apply fixes or re-run anything.
 
 QDash does not record which source revision an execution ran with. The answer names the revision
@@ -135,6 +128,3 @@ starting another hardware run:
 3. Confirm the project, chip, target, and time context.
 4. Use the deterministic quality gates that the workflow provides.
 5. Record the decision in a note or a forum thread when others need the context.
-
-Available models depend on the deployment configuration. A missing AI provider disables that
-capability, not the rest of QDash.

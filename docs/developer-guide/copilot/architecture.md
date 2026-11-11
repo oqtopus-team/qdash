@@ -204,9 +204,8 @@ Tests: `tests/qdash/api/services/test_source_access_service.py`,
 <a id="cloudflare-access-authentication"></a>
 <a id="environment-variables"></a>
 
-The chat, evaluation, and classifier models, their endpoint variables, gateway compatibility keys,
-the classifier tools `present_results` and `classify`, and Cloudflare Access headers are described
-in [Copilot Model Configuration](./model-configuration.md).
+[Copilot Model Configuration](./model-configuration.md) covers models, endpoints, classifier tools,
+gateway compatibility, and Cloudflare Access authentication.
 
 ## Developing a pi extension against the runtime
 
@@ -270,10 +269,9 @@ received is stored in the tool result's `details.prompt`.
 
 The runtime's `/chat` body carries two image lists: `initial_images` (the
 task chat's opening figures, attached only when the conversation is new)
-and `images` (attachments of the current turn, attached every time). Restart the
-runtime after editing the extension; the startup log lists the local paths and
-the tools they contributed. Anything placed under `agent-runtime/extensions/` on
-the host is trusted the same way, so keep that directory empty on production hosts.
+and `images` (attachments of the current turn, attached every time). The startup log lists loaded
+extension paths and tools. Anything placed under `agent-runtime/extensions/` on the host is trusted
+the same way, so keep that directory empty on production hosts.
 
 ## Evaluation runs
 
