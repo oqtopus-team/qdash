@@ -125,12 +125,12 @@ flow and the same page for how these records relate.
 
 ## Manage
 
-The Config guide is under construction because its repository workflow still needs product-owner
-review. The page is available to project editors.
+Project editors can use **Config** to edit Qubex configuration files and synchronize their
+repository. A guide for this page is not yet published.
 
 | Page | Purpose | Guide |
 | --- | --- | --- |
-| **Config** | Edit Qubex configuration files and synchronize their repository. | **Under construction** |
+| **Config** | Edit Qubex configuration files and synchronize their repository. | Guidance under review. |
 | **Settings** | Change appearance, account settings, active project, and project membership. | [Authentication and Users](./authentication-and-users.md) and [Projects and Data Sharing](./projects-and-data-sharing.md) |
 | **Admin** | Manage system users, projects, and administrative settings. | [Authentication and Users](./authentication-and-users.md#create-users) and [Projects and Data Sharing](./projects-and-data-sharing.md#create-a-project) |
 

@@ -1,6 +1,7 @@
 # How to Contribute
 
-Thank you for your interest in our project. This project is built by the community. Please refer to the following guidelines on how to contribute to the project.
+Contribute to QDash through GitHub issues and pull requests on
+[oqtopus-team/qdash](https://github.com/oqtopus-team/qdash).
 
 ## Code of Conduct
 
@@ -8,22 +9,22 @@ This project adopts a [Code of Conduct](./CODE_OF_CONDUCT.md). Please adhere to 
 
 ## Reporting Bugs
 
-If you find a bug, please create an issue following the [Bug Report Template](https://github.com/oqtopus-team/qdash/tree/main/.github/ISSUE_TEMPLATE/BUG_REPORT.yaml).
+Report a bug with the [Bug Report Template](https://github.com/oqtopus-team/qdash/issues/new?template=BUG_REPORT.yaml). Include the QDash version or commit, the backend (`fake` or `qubex`), the steps to reproduce the problem, and relevant logs. Remove passwords, API tokens, and other credentials from logs and screenshots before you post them.
+
+Report security vulnerabilities by email as described in the [Security Policy](./SECURITY.md).
 
 ## Questions
 
-If you have any questions, please create an issue following the [Question Template](https://github.com/oqtopus-team/qdash/tree/main/.github/ISSUE_TEMPLATE/QUESTION.yaml).
+Ask a question with the [Question Template](https://github.com/oqtopus-team/qdash/issues/new?template=QUESTION.yaml).
 
 ## Feature Requests
 
-If you have a new feature request, please create an issue following the [Feature Request Template](https://github.com/oqtopus-team/qdash/tree/main/.github/ISSUE_TEMPLATE/FEATURE_REQUEST.yaml).
+Request a feature with the [Feature Request Template](https://github.com/oqtopus-team/qdash/issues/new?template=FEATURE_REQUEST.yaml).
 
 ## Coding Guidelines
 
-For developer information, please refer to the [Development Flow](/developer-guide/development-flow).
+For branch naming, commits, and the checks to run before pushing, see the [Development Flow](./developer-guide/development-flow.md).
 
 ## Commit Message Guidelines
 
-For how to write commit messages, please refer to the [Commit Message Format](/developer-guide/development-flow#commit-message-format).
-
-Thank you for your contributions!
+For how to write commit messages, see [Commit Message Format](./developer-guide/development-flow.md#commit-message-format).

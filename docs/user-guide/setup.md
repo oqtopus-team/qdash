@@ -9,7 +9,7 @@ connects QDash to a supported lab system.
 | --- | --- |
 | Evaluate QDash without quantum hardware | [Fake backend](./setup/fake-backend.md) |
 | Operate a Qubex-connected lab deployment | [Qubex backend](./setup/qubex-backend.md) |
-| Connect another hardware stack | Under construction — the current release accepts only `fake` and `qubex`; another backend requires QDash code changes, not deployment settings. |
+| Connect another hardware stack | Not supported by deployment settings, which accept only `fake` and `qubex`; an additional backend requires QDash code changes. |
 
 Both supported paths use the same Docker Compose stack. The backend choice changes the available
 calibration tasks and whether the workflow worker opens a hardware connection.

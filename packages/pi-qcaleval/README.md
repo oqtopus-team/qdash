@@ -88,7 +88,7 @@ Open pull requests against QDash's `develop` branch and report bugs in
 
 Open a [QDash issue](https://github.com/oqtopus-team/qdash/issues) or email us:
 
-- [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team[at]googlegroups.com)
+- [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team@googlegroups.com)
 
 ## License
 
