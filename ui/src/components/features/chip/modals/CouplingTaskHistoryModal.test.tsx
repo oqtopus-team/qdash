@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,21 +15,6 @@ const mocks = vi.hoisted(() => ({
     figure_path: ["/fig/a.png", "/fig/b.png", "/fig/c.png"],
     json_figure_path: ["/fig/a.json", "/fig/b.json", "/fig/c.json"],
   } as Record<string, unknown>,
-}));
-
-// Render the dynamically imported PlotlyRenderer as a probe exposing its props.
-vi.mock("next/dynamic", () => ({
-  default: () =>
-    function PlotlyProbe(props: { fullPath: string; sizing?: string; className?: string }) {
-      return (
-        <div
-          data-testid="plotly-renderer"
-          data-path={props.fullPath}
-          data-sizing={props.sizing ?? "figure"}
-          className={props.className}
-        />
-      );
-    },
 }));
 
 vi.mock("@/client/task-result/task-result", () => ({
@@ -54,7 +39,15 @@ vi.mock("@/hooks/useManualOverrides", () => ({
   useManualOverrides: () => ({}),
 }));
 vi.mock("@/components/charts/TaskFigure", () => ({
-  TaskFigure: ({ path }: { path?: string }) => <div data-testid="static-figure">{path}</div>,
+  // Probe exposing the props the modal passes, as the lightbox flow lives in TaskFigure.
+  TaskFigure: (props: { path?: string; jsonFigurePath?: string; taskId?: string }) => (
+    <div
+      data-testid="static-figure"
+      data-path={props.path ?? ""}
+      data-json-path={props.jsonFigurePath ?? ""}
+      data-task-id={props.taskId ?? ""}
+    />
+  ),
 }));
 vi.mock("@/components/features/chip/TaskArtifactDownloads", () => ({
   TaskArtifactDownloads: () => null,
@@ -96,83 +89,49 @@ function renderModal() {
   );
 }
 
-describe("CouplingTaskHistoryModal interactive figures", () => {
+describe("CouplingTaskHistoryModal figures", () => {
   beforeEach(() => {
+    mocks.task.figure_path = ["/fig/a.png", "/fig/b.png", "/fig/c.png"];
     mocks.task.json_figure_path = ["/fig/a.json", "/fig/b.json", "/fig/c.json"];
   });
   afterEach(() => cleanup());
 
-  it("keeps the static strip with every figure by default", () => {
+  it("pairs each static figure with its JSON figure, like the qubit modal", () => {
+    renderModal();
+    const figures = desktopDetails().getAllByTestId("static-figure");
+
+    expect(figures.map((f) => f.dataset.path)).toEqual(["/fig/a.png", "/fig/b.png", "/fig/c.png"]);
+    expect(figures.map((f) => f.dataset.jsonPath)).toEqual([
+      "/fig/a.json",
+      "/fig/b.json",
+      "/fig/c.json",
+    ]);
+  });
+
+  it("has no coupling-only interactive toggle; the lightbox owns that switch", () => {
     renderModal();
     const details = desktopDetails();
 
-    expect(details.getAllByTestId("static-figure")).toHaveLength(3);
-    expect(details.queryByTestId("plotly-renderer")).toBeNull();
+    expect(details.queryByRole("button", { name: "Interactive" })).toBeNull();
+    expect(details.queryByRole("button", { name: "Static" })).toBeNull();
+    expect(details.queryByRole("button", { name: "Next figure" })).toBeNull();
   });
 
-  it("shows one container-sized interactive figure at a time in a bounded frame", () => {
-    renderModal();
-    const details = desktopDetails();
-    fireEvent.click(details.getByRole("button", { name: "Interactive" }));
-
-    const renderers = details.getAllByTestId("plotly-renderer");
-    expect(renderers).toHaveLength(1);
-    expect(renderers[0].dataset.sizing).toBe("container");
-    expect(renderers[0].dataset.path).toContain(encodeURIComponent("/fig/a.json"));
-    expect(renderers[0].className).toContain("h-full");
-
-    const frame = renderers[0].parentElement as HTMLElement;
-    expect(frame.className).toContain("w-full");
-    expect(frame.className).toMatch(/max-h-\[/);
-    expect(frame.className).toContain("overflow-hidden");
-    expect(details.getByText("Figure 1 / 3")).toBeTruthy();
-  });
-
-  it("navigates between interactive figures without wrapping", () => {
-    renderModal();
-    const details = desktopDetails();
-    fireEvent.click(details.getByRole("button", { name: "Interactive" }));
-
-    const previous = details.getByRole("button", {
-      name: "Previous figure",
-    }) as HTMLButtonElement;
-    const next = details.getByRole("button", {
-      name: "Next figure",
-    }) as HTMLButtonElement;
-    expect(previous.disabled).toBe(true);
-
-    fireEvent.click(next);
-    expect(details.getByText("Figure 2 / 3")).toBeTruthy();
-    expect(details.getByTestId("plotly-renderer").dataset.path).toContain(
-      encodeURIComponent("/fig/b.json"),
-    );
-
-    fireEvent.click(next);
-    expect(details.getByText("Figure 3 / 3")).toBeTruthy();
-    expect(next.disabled).toBe(true);
-
-    fireEvent.click(previous);
-    expect(details.getByText("Figure 2 / 3")).toBeTruthy();
-  });
-
-  it("restarts at the first figure when interactive view is reopened", () => {
-    renderModal();
-    const details = desktopDetails();
-    fireEvent.click(details.getByRole("button", { name: "Interactive" }));
-    fireEvent.click(details.getByRole("button", { name: "Next figure" }));
-    fireEvent.click(details.getByRole("button", { name: "Static" }));
-    fireEvent.click(details.getByRole("button", { name: "Interactive" }));
-
-    expect(details.getByText("Figure 1 / 3")).toBeTruthy();
-  });
-
-  it("omits figure navigation for a single interactive figure", () => {
+  it("leaves a figure without a matching JSON figure static-only", () => {
     mocks.task.json_figure_path = ["/fig/a.json"];
     renderModal();
-    const details = desktopDetails();
-    fireEvent.click(details.getByRole("button", { name: "Interactive" }));
+    const figures = desktopDetails().getAllByTestId("static-figure");
 
-    expect(details.getByTestId("plotly-renderer")).toBeTruthy();
-    expect(details.queryByRole("button", { name: "Next figure" })).toBeNull();
+    expect(figures.map((f) => f.dataset.jsonPath)).toEqual(["/fig/a.json", "", ""]);
+  });
+
+  it("falls back to loading the figure by task ID when the task has no figure paths", () => {
+    mocks.task.figure_path = [];
+    renderModal();
+    const figures = desktopDetails().getAllByTestId("static-figure");
+
+    expect(figures).toHaveLength(1);
+    expect(figures[0].dataset.taskId).toBe("task-1");
+    expect(figures[0].dataset.path).toBe("");
   });
 });
