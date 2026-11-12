@@ -56,6 +56,16 @@ interface SaveSubmission {
 
 type SaveError = { kind: "conflict"; name: string } | { kind: "failed"; message: string };
 
+/** Metadata fields in form order, used to pick the first invalid one to reveal. */
+const METADATA_FIELD_ORDER: readonly (keyof FlowMetadataFormInput)[] = [
+  "name",
+  "description",
+  "flow_function_name",
+  "username",
+  "tags",
+  "folder",
+];
+
 type TemplateOption = {
   value: string;
   label: string;
@@ -338,9 +348,7 @@ export function NewFlowPageContent() {
 
   /** Reveals the first invalid metadata field, in form order, so a hidden panel never hides it. */
   const revealInvalidField = (fieldErrors: FieldErrors<FlowMetadataFormInput>) => {
-    const field = (Object.keys(getValues()) as (keyof FlowMetadataFormInput)[]).find(
-      (key) => fieldErrors[key],
-    );
+    const field = METADATA_FIELD_ORDER.find((key) => fieldErrors[key]);
     if (field) revealField(field);
   };
 
