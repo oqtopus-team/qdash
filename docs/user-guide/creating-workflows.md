@@ -182,12 +182,58 @@ and groups pairs that can run together without sharing qubits or conflicting har
 | Source setting | Meaning | Default |
 | --- | --- | --- |
 | `inverse` | Reverse the selected CR direction; check that your procedure supports this direction | `False` |
-| `max_parallel_ops` | Maximum coupling pairs in one parallel group; hardware conflicts can reduce this number | `10` |
+| `max_parallel_ops` | Most coupling pairs that one group can hold; conflicts can make groups smaller | `10` |
 
-Groups run one after another. Within a group, coupling pairs can run in parallel, and each pair
-runs its task list from top to bottom. A pair can advance to its next task while another pair is
-still measuring. Pairs within one MUX are scheduled before pairs across MUXes. If no eligible pair
-remains after direction and hardware checks, scheduling fails.
+QDash splits the scheduled pairs into groups and runs the groups one after another. Two pairs go
+to different groups when they share a qubit, use the same MUX, or use MUXes that share a readout
+or control module in the chip wiring. All groups of pairs inside one MUX run before the groups of
+pairs that span two MUXes. If no eligible pair remains after direction and hardware checks,
+scheduling fails.
+
+Inside a group, each pair runs the task list from top to bottom in its own worker. A pair moves
+to its next task without waiting for the other pairs, and a pair that finishes early waits until
+every pair of its group is done; only then does the next group start.
+
+![Execution timeline of five CR schedule groups with max_parallel_ops 2 and the task list CheckCrossResonance, CreateZX90, CheckZX90. Group 1 runs pairs 0 to 1 and 4 to 5; pair 4 to 5 reaches CreateZX90 while 0 to 1 is still on CheckCrossResonance, then finishes first and waits for 0 to 1. Group 2 runs 12 to 13 alone. Group 3 runs 3 to 1 and 8 to 9, and 3 to 1 waits for 8 to 9. Group 4 runs 3 to 2 and group 5 runs the inter-MUX pair 7 to 10. Each group starts only after every pair of the previous group finishes.](/images/guides/two-qubit-cr-schedule.gif)
+
+The animation uses an example selection of seven directed pairs on four MUXes with
+`max_parallel_ops = 2`. Task durations are illustrative, not measurements, and pairs in a group
+do not synchronize their pulses.
+
+| Group | Pairs (control → target) | Why the pairs are in this group |
+| --- | --- | --- |
+| 1 | 0 → 1, 4 → 5 | No shared qubit, MUX, or module |
+| 2 | 12 → 13 | Conflicts with no pair, but group 1 already holds `max_parallel_ops` pairs |
+| 3 | 3 → 1, 8 → 9 | 3 → 1 shares qubit 1 with 0 → 1; 8 → 9 shares a control module with 4 → 5 |
+| 4 | 3 → 2 | Shares qubit 3 with 3 → 1 and the MUX of 0 → 1 |
+| 5 | 7 → 10 | Spans two MUXes, so it runs after every single-MUX group |
+
+`max_parallel_ops` only limits the size of each group: raising it never puts conflicting pairs
+together, and it does not guarantee that every pair of a group runs at the same moment. Lower it
+to run fewer pairs at once. In **2Q Calibration**, change the default in the flow
+function's parameters:
+
+```python
+def two_qubit(
+    username: str,
+    chip_id: str,
+    qids: list[str] | None = None,
+    tasks: list[TaskCall] | None = None,
+    inverse: bool = False,
+    max_parallel_ops: int = 4,
+    tags: list[str] | None = None,
+    flow_name: str | None = None,
+    project_id: str | None = None,
+) -> Any:
+```
+
+The template passes this value to `GenerateCRSchedule(max_parallel_ops=max_parallel_ops,
+inverse=inverse)`, which builds the groups before any pair is measured. The two-qubit step that
+follows reuses those groups as they are, so a `max_parallel_ops` value set on that step does not
+change them. A `schedule` written by hand in **2Q Scheduled Calibration** runs exactly as
+written: QDash does not check its groups for conflicts or split them. Pairs entered in
+**Coupling pairs** when you run a workflow are grouped by the rules above, with at most 10 pairs
+per group.
 
 In a combined one-qubit and two-qubit workflow, filter the one-qubit results before generating
 the CR schedule so the two-qubit work uses only the remaining candidates.

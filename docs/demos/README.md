@@ -109,3 +109,17 @@ uv run --no-project --with pillow==13.0.0 python3 docs/demos/one_qubit_execution
 ```
 
 Add `--frames .tmp/execution-modes` to write every frame as a PNG for review.
+
+`two_qubit_cr_schedule.py` draws `docs/public/images/guides/two-qubit-cr-schedule.gif`, the
+execution of a two-qubit CR schedule with `max_parallel_ops = 2`, the same way. Its fixture
+(wiring, pairs, groups, and graph colors) is also drawn by
+`docs/diagrams/cr-schedule-conflict-graph.svg` and checked against the scheduler by
+`tests/qdash/workflow/engine/scheduler/test_cr_schedule_docs_example.py`. Change the three
+together, then regenerate and run the test:
+
+```bash
+uv run --no-project --with pillow==13.0.0 python3 docs/demos/two_qubit_cr_schedule.py
+uv run --package qdash-workflow --locked pytest tests/qdash/workflow/engine/scheduler/test_cr_schedule_docs_example.py
+```
+
+`--frames DIR` works here too.
