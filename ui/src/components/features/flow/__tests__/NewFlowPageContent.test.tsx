@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   projectId: "project-1",
+  currentUsername: "alice",
   query: {
     chip_id: "chip-a",
     backend: "fake",
@@ -58,7 +59,7 @@ vi.mock("@/components/ui/Toast", () => ({
 }));
 
 vi.mock("@/client/auth/auth", () => ({
-  useGetCurrentUser: () => ({ data: { data: { username: "alice" } } }),
+  useGetCurrentUser: () => ({ data: { data: { username: mocks.currentUsername } } }),
 }));
 
 vi.mock("@/client/chip/chip", () => ({
@@ -127,9 +128,12 @@ function nameInput() {
   return screen.getByLabelText("Flow Name *") as HTMLInputElement;
 }
 
+/** Waits for the suggested flow name, then clicks Save Flow. */
 async function save() {
   await waitFor(() => expect(nameInput().value).toBe("first_calibration"));
-  fireEvent.click(screen.getByRole("button", { name: /Save Flow/ }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /Save Flow/ }));
+  });
 }
 
 function conflict(name: string) {
@@ -154,6 +158,7 @@ describe("NewFlowPageContent", () => {
     cleanup();
     vi.clearAllMocks();
     window.localStorage.clear();
+    mocks.currentUsername = "alice";
   });
 
   it("creates the flow without overwriting and reports it to the guide", async () => {
@@ -266,5 +271,136 @@ describe("NewFlowPageContent", () => {
     });
 
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("NewFlowPageContent metadata form", () => {
+  beforeEach(() => {
+    mocks.projectId = "project-1";
+    mocks.query.journey = null;
+    window.localStorage.setItem(PROJECT_STORAGE_KEY, "project-1");
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    mocks.query.journey = "first-calibration";
+    mocks.currentUsername = "alice";
+  });
+
+  /** Waits for the default template, which fills the description and the entrypoint. */
+  async function waitForTemplate() {
+    await waitFor(() => expect(screen.getByTestId("editor").textContent).toBe(FAKE_TEMPLATE_CODE));
+  }
+
+  /** Clicks Save Flow and lets the form validate. */
+  async function clickSave() {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Save Flow/ }));
+    });
+  }
+
+  it("shows a missing or malformed flow name next to the field instead of saving", async () => {
+    renderPage();
+    await waitForTemplate();
+
+    await clickSave();
+
+    expect(nameInput()).toHaveAttribute("aria-invalid", "true");
+    const error = document.getElementById(nameInput().getAttribute("aria-describedby") ?? "");
+    expect(error).toHaveTextContent("Please enter a flow name");
+
+    fireEvent.change(nameInput(), { target: { value: "my-flow" } });
+    await waitFor(() =>
+      expect(
+        document.getElementById(nameInput().getAttribute("aria-describedby") ?? ""),
+      ).toHaveTextContent("Flow name must contain only alphanumeric characters and underscores"),
+    );
+
+    expect(mocks.saveFlow).not.toHaveBeenCalled();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("opens the hidden properties panel and focuses the invalid name on Save", async () => {
+    renderPage();
+    await waitForTemplate();
+    const toggle = screen.getAllByRole("button", { name: "Hide properties" })[0];
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await clickSave();
+
+    await waitFor(() => expect(document.activeElement).toBe(nameInput()));
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(nameInput()).toHaveAttribute("aria-invalid", "true");
+    expect(
+      document.getElementById(nameInput().getAttribute("aria-describedby") ?? ""),
+    ).toHaveTextContent("Please enter a flow name");
+    expect(mocks.saveFlow).not.toHaveBeenCalled();
+  });
+
+  it("shows a missing username next to the field instead of saving", async () => {
+    mocks.currentUsername = "";
+    renderPage();
+    await waitForTemplate();
+    fireEvent.change(nameInput(), { target: { value: "daily_t1" } });
+
+    await clickSave();
+
+    const username = screen.getByLabelText("Username *");
+    expect(username).toHaveAttribute("aria-invalid", "true");
+    expect(
+      document.getElementById(username.getAttribute("aria-describedby") ?? ""),
+    ).toHaveTextContent("Please enter a username");
+    expect(nameInput()).not.toHaveAttribute("aria-invalid");
+    expect(mocks.saveFlow).not.toHaveBeenCalled();
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it("submits the trimmed metadata and the normalized tags", async () => {
+    mocks.saveFlow.mockResolvedValue({ data: { name: "daily_t1" } });
+    renderPage();
+    await waitForTemplate();
+    fireEvent.change(nameInput(), { target: { value: "  daily_t1 " } });
+    fireEvent.change(screen.getByPlaceholderText("Describe your flow..."), {
+      target: { value: " Daily T1 check " },
+    });
+    fireEvent.change(screen.getByLabelText("Username *"), { target: { value: " bob " } });
+    fireEvent.change(screen.getByPlaceholderText("tag1, tag2, tag3"), {
+      target: { value: " t1, ,daily ,  " },
+    });
+    fireEvent.change(screen.getByPlaceholderText("daily/t1"), { target: { value: " daily/t1 " } });
+
+    await clickSave();
+
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/workflow/daily_t1"));
+    expect(mocks.saveFlow).toHaveBeenCalledWith({
+      create_only: true,
+      name: "daily_t1",
+      description: "Daily T1 check",
+      code: FAKE_TEMPLATE_CODE,
+      flow_function_name: "fake_calibration",
+      chip_id: "chip-a",
+      tags: ["t1", "daily"],
+      folder: "daily/t1",
+      default_parameters: { username: "bob", chip_id: "chip-a" },
+    });
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it("leaves an empty entrypoint out of the request", async () => {
+    mocks.saveFlow.mockResolvedValue({ data: { name: "daily_t1" } });
+    renderPage();
+    await waitForTemplate();
+    fireEvent.change(nameInput(), { target: { value: "daily_t1" } });
+    fireEvent.change(screen.getByPlaceholderText("simple_flow"), { target: { value: "  " } });
+
+    await clickSave();
+
+    await waitFor(() => expect(mocks.saveFlow).toHaveBeenCalledTimes(1));
+    expect(mocks.saveFlow.mock.calls[0][0].flow_function_name).toBeUndefined();
+    expect(mocks.saveFlow.mock.calls[0][0].tags).toEqual([]);
   });
 });
