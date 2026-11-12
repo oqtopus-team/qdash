@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -110,17 +110,19 @@ describe("Sidebar", () => {
     expect(mobile.className).not.toContain("w-72");
   });
 
-  it("makes the mobile menu rows fill the drawer instead of the widest label", () => {
+  it("makes the menu rows fill the drawer or rail instead of the widest label", () => {
     const { container } = render(<Sidebar />);
 
-    const menu = getAsides(container).mobile.querySelector("nav ul.menu");
-    const stack = menu?.parentElement?.closest("nav > div");
+    for (const aside of Object.values(getAsides(container))) {
+      const menu = aside.querySelector("nav ul.menu");
+      const stack = aside.querySelector("nav > div");
 
-    expect(stack?.className).toContain("w-fit");
-    expect(stack?.className).toContain("max-lg:w-full");
-    expect(menu?.className).toContain("w-full");
-    expect(menu?.className).toContain("max-lg:flex-nowrap");
-    expect(menu?.className).toContain("max-lg:[&>li]:flex-nowrap");
+      expect(stack?.className).toContain("w-full");
+      expect(stack?.className).not.toContain("w-fit");
+      expect(menu?.className).toContain("w-full");
+      expect(menu?.className).toContain("flex-nowrap");
+      expect(menu?.className).toContain("[&>li]:flex-nowrap");
+    }
   });
 
   it("shows the active-row indicator only in the section that owns the route", () => {
@@ -280,8 +282,371 @@ describe("Sidebar", () => {
     projectState.canEdit = true;
     const { container } = render(<Sidebar />);
 
-    const prefectLink = container.querySelector('a[title="Prefect"]');
+    const { desktop } = getAsides(container);
+    const prefectLink = within(desktop as HTMLElement).getByRole("link", { name: "Prefect" });
 
-    expect(prefectLink?.getAttribute("href")).toBe("/prefect/dashboard");
+    expect(prefectLink.getAttribute("href")).toBe("/prefect/dashboard");
+  });
+
+  describe("desktop rail toggle and tooltips", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Focuses `element` the way keyboard navigation does, flushing Radix updates. */
+    function focus(element: HTMLElement) {
+      act(() => element.focus());
+    }
+
+    function getDesktop(container: HTMLElement) {
+      return within(getAsides(container).desktop as HTMLElement);
+    }
+
+    it("uses a panel toggle that reports the rail state it controls", () => {
+      sidebarState.isOpen = false;
+      const { container, rerender } = render(<Sidebar />);
+
+      const { desktop } = getAsides(container);
+      const expand = within(desktop as HTMLElement).getByRole("button", {
+        name: "Expand sidebar",
+      });
+      expect(expand.getAttribute("aria-expanded")).toBe("false");
+      expect(expand.getAttribute("aria-controls")).toBe(desktop.id);
+      expect(expand.querySelector("svg.lucide-panel-left-open")).not.toBeNull();
+
+      fireEvent.click(expand);
+      expect(toggleSidebar).toHaveBeenCalledTimes(1);
+
+      sidebarState.isOpen = true;
+      rerender(<Sidebar />);
+      const collapse = getDesktop(container).getByRole("button", { name: "Collapse sidebar" });
+      expect(collapse.getAttribute("aria-expanded")).toBe("true");
+      expect(collapse.querySelector("svg.lucide-panel-left-close")).not.toBeNull();
+    });
+
+    it("animates the rail width only when motion is allowed", () => {
+      const { container } = render(<Sidebar />);
+
+      const { desktop } = getAsides(container);
+
+      expect(desktop.className).toContain("transition-[width]");
+      expect(desktop.className).toContain("motion-reduce:transition-none");
+      expect(desktop.className).toContain("overflow-hidden");
+    });
+
+    it("drops native title tooltips from every sidebar control", () => {
+      projectState.canEdit = true;
+      sidebarState.isOpen = false;
+      const { container } = render(<Sidebar />);
+
+      expect(container.querySelectorAll("aside [title]")).toHaveLength(0);
+    });
+
+    it("names collapsed icon rows and shows a right-side tooltip on keyboard focus", () => {
+      sidebarState.isOpen = false;
+      const { container } = render(<Sidebar />);
+
+      const { desktop } = getAsides(container);
+      const home = within(desktop as HTMLElement).getByRole("link", { name: "Home" });
+      focus(home);
+
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip.textContent).toBe("Home");
+      expect(home.getAttribute("aria-describedby")).toBe(tooltip.id);
+      // Portalled out of the scrolling nav, so the rail cannot clip it.
+      expect(desktop.contains(tooltip)).toBe(false);
+      expect(tooltip.getAttribute("data-side")).toBe("right");
+      expect(tooltip.className).toContain("bg-neutral");
+      expect(tooltip.className).toContain("text-neutral-content");
+    });
+
+    it("opens a collapsed row tooltip on hover after the shared delay", () => {
+      vi.useFakeTimers();
+      sidebarState.isOpen = false;
+      const { container } = render(<Sidebar />);
+
+      const docs = getDesktop(container).getByRole("link", { name: "Docs" });
+      fireEvent.pointerMove(docs, { pointerType: "mouse" });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      act(() => vi.advanceTimersByTime(350));
+
+      expect(screen.getByRole("tooltip").textContent).toBe("Docs");
+
+      fireEvent.pointerLeave(docs, { pointerType: "mouse" });
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("labels the collapsed profile button and gives it a tooltip", () => {
+      sidebarState.isOpen = false;
+      const { container } = render(<Sidebar />);
+
+      focus(getDesktop(container).getByRole("button", { name: "Open user profile" }));
+
+      expect(screen.getByRole("tooltip").textContent).toBe("tester");
+    });
+
+    it("keeps row tooltips off while labels are visible", () => {
+      const { container } = render(<Sidebar />);
+
+      focus(getDesktop(container).getByRole("link", { name: "Home" }));
+
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("never shows rail tooltips inside the mobile drawer", () => {
+      sidebarState.isOpen = false;
+      sidebarState.isMobileOpen = true;
+      const { container } = render(<Sidebar />);
+
+      const { mobile } = getAsides(container);
+      focus(within(mobile as HTMLElement).getByRole("link", { name: "Home" }));
+
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+
+    it("explains the toggle in a tooltip and dismisses it once the rail toggles", () => {
+      sidebarState.isOpen = false;
+      const { container, rerender } = render(<Sidebar />);
+
+      const expand = getDesktop(container).getByRole("button", { name: "Expand sidebar" });
+      focus(expand);
+      expect(screen.getByRole("tooltip").textContent).toBe("Expand sidebar");
+
+      sidebarState.isOpen = true;
+      rerender(<Sidebar />);
+
+      expect(screen.queryByRole("tooltip")).toBeNull();
+      // The toggle stays mounted, so keyboard focus survives the width change.
+      expect(document.activeElement).toBe(
+        getDesktop(container).getByRole("button", { name: "Collapse sidebar" }),
+      );
+    });
+
+    it("holds tooltips back while the rail is still moving", () => {
+      const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+      sidebarState.isOpen = false;
+      const { container, rerender } = render(<Sidebar />);
+
+      sidebarState.isOpen = true;
+      rerender(<Sidebar />);
+      sidebarState.isOpen = false;
+      rerender(<Sidebar />);
+
+      const expand = getDesktop(container).getByRole("button", { name: "Expand sidebar" });
+      focus(expand);
+      expect(screen.queryByRole("tooltip")).toBeNull();
+
+      act(() => expand.blur());
+      now.mockReturnValue(1000 + 240);
+      focus(expand);
+      expect(screen.getByRole("tooltip").textContent).toBe("Expand sidebar");
+    });
+
+    it("shows tooltips straight after a toggle when motion is reduced", () => {
+      vi.spyOn(performance, "now").mockReturnValue(1000);
+      vi.spyOn(window, "matchMedia").mockImplementation(
+        (query: string) =>
+          ({
+            matches: query === "(prefers-reduced-motion: reduce)",
+            media: query,
+            addEventListener: () => undefined,
+            removeEventListener: () => undefined,
+          }) as unknown as MediaQueryList,
+      );
+      sidebarState.isOpen = true;
+      const { container, rerender } = render(<Sidebar />);
+
+      sidebarState.isOpen = false;
+      rerender(<Sidebar />);
+
+      focus(getDesktop(container).getByRole("button", { name: "Expand sidebar" }));
+      expect(screen.getByRole("tooltip").textContent).toBe("Expand sidebar");
+    });
+
+    it("dismisses a stale row tooltip after navigation", () => {
+      sidebarState.isOpen = false;
+      const { container, rerender } = render(<Sidebar />);
+
+      focus(getDesktop(container).getByRole("link", { name: "Metrics" }));
+      expect(screen.getByRole("tooltip").textContent).toBe("Metrics");
+
+      mockPathname.mockReturnValue("/metrics");
+      rerender(<Sidebar />);
+
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    });
+  });
+
+  describe("rail motion", () => {
+    function getDesktopAside(container: HTMLElement) {
+      return getAsides(container).desktop as HTMLElement;
+    }
+
+    function toggleRail(rerender: (ui: React.ReactElement) => void) {
+      sidebarState.isOpen = !sidebarState.isOpen;
+      rerender(<Sidebar />);
+    }
+
+    it("keeps rows, labels, headings, logo, and toggle mounted across rapid toggles", () => {
+      const { container, rerender } = render(<Sidebar />);
+      const desktop = getDesktopAside(container);
+      const toggle = within(desktop).getByRole("button", { name: "Collapse sidebar" });
+      const home = within(desktop).getByRole("link", { name: "Home" });
+      const label = within(home).getByText("Home");
+      const logo = desktop.querySelector('a[aria-label="QDash home"]');
+      const heading = desktop.querySelector('[data-testid="sidebar-section-header"]');
+      act(() => toggle.focus());
+
+      for (let i = 0; i < 5; i += 1) toggleRail(rerender);
+
+      // Odd number of toggles: the rail ends collapsed, with every node reused.
+      expect(toggle.getAttribute("aria-label")).toBe("Expand sidebar");
+      expect(document.activeElement).toBe(toggle);
+      expect(desktop.contains(home) && home.contains(label)).toBe(true);
+      expect(desktop.querySelector('a[aria-label="QDash home"]')).toBe(logo);
+      expect(desktop.querySelector('[data-testid="sidebar-section-header"]')).toBe(heading);
+
+      toggleRail(rerender);
+      expect(toggle.getAttribute("aria-label")).toBe("Collapse sidebar");
+      expect(document.activeElement).toBe(toggle);
+    });
+
+    it("fades labels and headings out while keeping the row names", () => {
+      const { container, rerender } = render(<Sidebar />);
+      const desktop = getDesktopAside(container);
+      const label = within(desktop).getByText("Home");
+      const heading = desktop.querySelector('[data-testid="sidebar-section-header"]');
+
+      expect(label.className).toContain("opacity-100");
+      expect(heading?.className).toContain("grid-rows-[1fr]");
+
+      toggleRail(rerender);
+
+      const home = within(desktop).getByRole("link", { name: "Home" });
+      expect(home.hasAttribute("aria-label")).toBe(false);
+      expect(home.textContent).toBe("Home");
+      expect(label.className).toContain("opacity-0");
+      expect(heading?.className).toContain("grid-rows-[0fr]");
+      expect(heading?.getAttribute("data-state")).toBe("hidden");
+    });
+
+    it("names each section list by its heading in both rail states", () => {
+      const { container, rerender } = render(<Sidebar />);
+      const desktop = getDesktopAside(container);
+      const overview = within(desktop).getByRole("list", { name: "Overview" });
+
+      toggleRail(rerender);
+
+      expect(within(desktop).getByRole("list", { name: "Overview" })).toBe(overview);
+      for (const heading of desktop.querySelectorAll('[data-testid="sidebar-section-header"]')) {
+        expect(heading.getAttribute("aria-hidden")).toBe("true");
+      }
+    });
+
+    it("keeps the row geometry identical so icons hold their x position", () => {
+      const { container, rerender } = render(<Sidebar />);
+      const desktop = getDesktopAside(container);
+      const home = within(desktop).getByRole("link", { name: "Home" });
+      const expandedClass = home.className;
+
+      toggleRail(rerender);
+
+      expect(home.className).toBe(expandedClass);
+      expect(home.className).toContain("px-2.75");
+      expect(home.className).not.toContain("justify-center");
+    });
+
+    it("makes the hidden logo and profile details inert to focus and assistive tech", () => {
+      sidebarState.isOpen = false;
+      const { container } = render(<Sidebar />);
+      const desktop = getDesktopAside(container);
+      const logoSlot = desktop.querySelector('[data-testid="sidebar-desktop-logo"]');
+      const details = desktop.querySelector('[data-testid="sidebar-profile-details"]');
+
+      expect(logoSlot?.hasAttribute("inert")).toBe(true);
+      expect(logoSlot?.getAttribute("aria-hidden")).toBe("true");
+      expect(within(desktop).queryByRole("link", { name: "QDash home" })).toBeNull();
+      expect(details?.getAttribute("aria-hidden")).toBe("true");
+      expect(within(desktop).getAllByRole("button", { name: "Open user profile" })).toHaveLength(1);
+    });
+
+    it("keeps the profile avatar one size across rail states", () => {
+      const { container, rerender } = render(<Sidebar />);
+      const desktop = getDesktopAside(container);
+      const avatarWidth = () => desktop.querySelector("button img")?.getAttribute("width");
+      const expanded = avatarWidth();
+
+      toggleRail(rerender);
+
+      expect(expanded).toBe("32");
+      expect(avatarWidth()).toBe(expanded);
+    });
+
+    it("coordinates rail geometry and drops all motion when reduced", () => {
+      const { container } = render(<Sidebar />);
+      const desktop = getDesktopAside(container);
+      const header = desktop.querySelector('[data-testid="sidebar-desktop-header"]');
+      const heading = desktop.querySelector('[data-testid="sidebar-section-header"]');
+      const geometry = [desktop, header, heading];
+
+      for (const element of geometry) {
+        expect(element?.className).toContain("duration-[240ms]");
+        expect(element?.className).toContain("ease-[cubic-bezier(0.2,0,0,1)]");
+        expect(element?.className).toContain("motion-reduce:transition-none");
+      }
+      const faded = [
+        within(desktop).getByText("Home"),
+        desktop.querySelector('[data-testid="sidebar-desktop-logo"]'),
+        desktop.querySelector('[data-testid="sidebar-profile-details"]'),
+      ];
+      for (const element of faded) {
+        expect(element?.className).toContain("transition-opacity");
+        expect(element?.className).toContain("motion-reduce:transition-none");
+        expect(element?.className).toContain("motion-reduce:delay-0");
+      }
+    });
+
+    it("pins the active pill with insets so it tracks the rail width", () => {
+      const { container } = render(<Sidebar />);
+      const { indicator } = getSectionIndicator(getDesktopAside(container), "/dashboard");
+      const style = (indicator as HTMLElement).style;
+
+      expect(style.left).not.toBe("");
+      expect(style.right).not.toBe("");
+      expect(style.width).toBe("");
+      expect(style.transform).toMatch(/^translateY\(/);
+    });
+
+    it("reveals the active row after the rail settles, not when it toggles", () => {
+      const scroll = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+      const { container, rerender } = render(<Sidebar />);
+      const nav = getDesktopAside(container).querySelector("nav") as HTMLElement;
+      scroll.mockClear();
+
+      toggleRail(rerender);
+      expect(scroll).not.toHaveBeenCalled();
+
+      const opacityEnd = new Event("transitionend", { bubbles: true });
+      Object.defineProperty(opacityEnd, "propertyName", { value: "opacity" });
+      nav.querySelector("li a span")?.dispatchEvent(opacityEnd);
+      expect(scroll).not.toHaveBeenCalled();
+
+      const settled = new Event("transitionend", { bubbles: true });
+      Object.defineProperty(settled, "propertyName", { value: "grid-template-rows" });
+      nav.querySelector('[data-testid="sidebar-section-header"]')?.dispatchEvent(settled);
+      expect(scroll).toHaveBeenCalledTimes(1);
+      expect(scroll.mock.contexts[0]).toBe(within(nav).getByRole("link", { name: "Dashboard" }));
+    });
+
+    it("still reveals the active row on navigation", () => {
+      const scroll = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+      const { rerender } = render(<Sidebar />);
+      scroll.mockClear();
+
+      mockPathname.mockReturnValue("/metrics");
+      rerender(<Sidebar />);
+
+      expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+    });
   });
 });

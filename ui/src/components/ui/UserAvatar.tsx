@@ -44,10 +44,13 @@ export function UserAvatar({
   username,
   size = 28,
   className = "",
+  showTitle = true,
 }: {
   username: string;
   size?: number;
   className?: string;
+  /** False where a tooltip or visible label already names the user. */
+  showTitle?: boolean;
 }) {
   const customSpec = useCustomAvatarSpec(username);
 
@@ -72,7 +75,7 @@ export function UserAvatar({
       alt={username}
       size={size}
       className={className}
-      title={username}
+      title={showTitle ? username : undefined}
     />
   );
 }
