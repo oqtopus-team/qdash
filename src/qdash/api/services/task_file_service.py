@@ -171,10 +171,12 @@ class TaskFileService:
         """
         backend_path = self._base_path / backend
 
-        if not backend_path.exists():
+        # A backend that runs another backend's task classes, such as qm-fake, has no
+        # directory of its own; the generated catalog lists its tasks.
+        if not backend_path.exists() and self._load_catalog_tasks(backend) is None:
             raise HTTPException(status_code=404, detail=f"Backend directory not found: {backend}")
 
-        if not backend_path.is_dir():
+        if backend_path.exists() and not backend_path.is_dir():
             raise HTTPException(status_code=400, detail=f"Not a directory: {backend}")
 
         # Check cache

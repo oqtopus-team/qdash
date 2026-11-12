@@ -27,7 +27,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # Quantum Machines OPX support (QM backend). Both packages are BSD-3-Clause licensed;
-# see docs/reference/third-party-licenses.md. Install with:
+# see docs/reference/third-party-licenses.md. The qm-fake backend needs neither. Install with:
 #   uv sync --package qdash-workflow --extra qm
 qm = [
     "qm-qua==1.5.0",

@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException
 
 from qdash.api.dependencies import get_task_file_service
 from qdash.api.services.chip.service import _get_task_names_cached, get_task_names
@@ -291,6 +292,30 @@ def test_fake_backend_publishes_the_qubex_task_declarations() -> None:
     assert fake["CheckRabi"].run_parameters == qubex["CheckRabi"].run_parameters
     assert fake["FakeBringUp"].input_parameters == {}
     assert "FakeBringUp" not in qubex
+
+
+def test_qm_fake_backend_publishes_the_qm_task_declarations() -> None:
+    """The qm-fake backend has no task directory; the catalog lists the routed qm tasks."""
+    clear_backend_config_cache()
+    service = TaskFileService()
+
+    qm_fake = {t.name: t for t in service.list_task_info("qm-fake", enabled_only=True).tasks}
+    qm = {t.name: t for t in service.list_task_info("qm").tasks}
+
+    assert set(qm_fake) == {"QMAmplitudeRabi"}
+    assert qm_fake["QMAmplitudeRabi"].run_parameters == qm["QMAmplitudeRabi"].run_parameters
+    assert qm_fake["QMAmplitudeRabi"].output_parameters == ["qm_pi_amplitude_scale"]
+    assert qm_fake["QMAmplitudeRabi"].category == "One Qubit"
+    assert "qm-fake" not in [b.name for b in service.list_backends().backends]
+
+
+def test_unknown_backend_without_directory_or_catalog_entry_is_not_found() -> None:
+    clear_backend_config_cache()
+
+    with pytest.raises(HTTPException) as excinfo:
+        TaskFileService().list_task_info("no-such-backend")
+
+    assert excinfo.value.status_code == 404
 
 
 def test_coarse_readout_task_is_enabled_with_resolvable_input_metadata() -> None:

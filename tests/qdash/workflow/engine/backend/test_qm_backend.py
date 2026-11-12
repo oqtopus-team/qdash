@@ -546,7 +546,7 @@ class TestMissingDependency:
         assert backend.version() == "qm-qua (not installed)"
 
     def test_default_backends_import_without_qm_packages(self) -> None:
-        """Importing the task registry and creating qubex/fake/qm backends needs no QM SDK."""
+        """The task registry, the qubex/fake/qm backends and a qm-fake run need no QM SDK."""
         script = textwrap.dedent(
             """
             import sys
@@ -565,13 +565,25 @@ class TestMissingDependency:
             assert "CheckRabi" in calibtasks.BaseTask.registry["fake"]
             assert create_backend("fake", {}).name == "fake"
             assert create_backend("qm", {}).name == "qm"
+            assert calibtasks.BaseTask.registry["qm-fake"]["QMAmplitudeRabi"] is (
+                calibtasks.BaseTask.registry["qm"]["QMAmplitudeRabi"]
+            )
+            fake = create_backend("qm-fake", {"qm_fake_config_path": sys.argv[1]})
+            task = calibtasks.BaseTask.registry["qm-fake"]["QMAmplitudeRabi"]()
+            assert task.run(fake, "0").r2["0"] > 0.98
+            fake.disconnect()
             assert not any(
                 m.split(".")[0] in {"qm", "qualang_tools", "qm_saas"} for m in sys.modules
             )
             """
         )
         completed = subprocess.run(  # noqa: S603
-            [sys.executable, "-c", script],
+            [
+                sys.executable,
+                "-c",
+                script,
+                str(REPO_ROOT / "config/qm-config/example-fake/qm-fake.yaml"),
+            ],
             cwd=REPO_ROOT,
             env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
             capture_output=True,
@@ -584,5 +596,5 @@ class TestMissingDependency:
 
 def test_existing_backends_are_unchanged() -> None:
     assert isinstance(create_backend("fake", {}), FakeBackend)
-    with pytest.raises(ValueError, match="'qubex', 'fake' and 'qm'"):
+    with pytest.raises(ValueError, match="'qubex', 'fake', 'qm' and 'qm-fake'"):
         create_backend("unknown", {})

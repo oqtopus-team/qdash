@@ -112,14 +112,28 @@ backends:
         - CheckRamsey
 
   # ---------------------------------------------------------------------------
-  # Quantum Machines Backend (OPX hardware, QOP simulator or local mock)
+  # Quantum Machines Backend (OPX hardware or QOP simulator)
   # ---------------------------------------------------------------------------
   qm:
-    description: "Quantum Machines OPX backend; needs a QM settings file, and the workflow 'qm' extra except in mock mode"
+    description: "Quantum Machines OPX backend (hardware or QOP simulator); needs config/qm-config/<chip_id>/qm.yaml and the workflow 'qm' extra"
 
-    # The settings file (config/qm-config/<chip_id>/qm.yaml) selects hardware, simulator or
-    # mock mode. Only hardware runs replace calibration values; simulator runs record
-    # waveforms and mock runs record a synthetic response in the run history.
+    # The settings file (config/qm-config/<chip_id>/qm.yaml) selects hardware or simulator
+    # mode. Only hardware runs replace calibration values; simulator runs record controller
+    # waveforms in the run history.
+    tasks:
+      One Qubit:
+        - QMAmplitudeRabi
+
+  # ---------------------------------------------------------------------------
+  # Quantum Machines Fake Backend (Testing - No QM Hardware, Server or Package)
+  # ---------------------------------------------------------------------------
+  qm-fake:
+    description: "Testing backend that runs the QM task implementations on a local synthetic response; needs config/qm-config/<chip_id>/qm-fake.yaml only"
+
+    # Every task listed here is the qm task of the same name, routed to the qm-fake backend
+    # (see calibtasks/qm/__init__.py); only the device response is synthetic. Results stay in
+    # the run history and never replace calibration values. A qm-fake run does not check QUA
+    # compilation, OPX timing or wiring.
     tasks:
       One Qubit:
         - QMAmplitudeRabi

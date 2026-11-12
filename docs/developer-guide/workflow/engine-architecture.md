@@ -81,10 +81,11 @@ QDash keeps execution state and task state separate.
 - `TaskHistoryRecorder` writes task-result history and optional provenance records.
 - `BackendSaver` decides which validated outputs update the backend and accepted calibration
   state. The orchestrator passes it the call's resolved `update_calibration_parameters`; when
-  that is `False`, the task is recorded without promoting its outputs. For the `qm` backend it
-  promotes outputs only when the backend reports `is_hardware`, before `force_update_params` is
-  considered, so a QOP simulator or mock run cannot replace a measured value; mock outputs stay
-  in the task result with `database_updated` set to `False`.
+  that is `False`, the task is recorded without promoting its outputs. For QM tasks, which run
+  on the `qm` and `qm-fake` backends, it promotes outputs only when the backend reports
+  `is_hardware`, before `force_update_params` is considered, so a QOP simulator or `qm-fake` run
+  cannot replace a measured value; those outputs stay in the task result with
+  `database_updated` set to `False`.
 - `FilesystemCalibDataSaver` writes artifacts beneath the execution's project- and chip-scoped
   calibration directory.
 
@@ -206,6 +207,25 @@ qubex analysis is drift waiting to happen and is removed when found. `tests/qdas
 test_fake_backend_sync.py` fails when the list names a task qubex no longer has, when a fake
 class shadows a qubex task, or when the template's default chain can no longer resolve a
 required input from the tasks before it.
+
+### Add a QM task to the qm-fake backend
+
+The `qm-fake` backend (`QMFakeBackend` in `engine/backend/qm_fake.py`) runs the `qm` task
+classes against `QMFakeDevice`, a local synthetic response, so a fake run shares the task's
+parameters, fit, validation, figures, raw data and persistence with a hardware run; only the
+device response differs. Its task set is the `qm-fake` section of `config/app/backend.yaml`:
+`calibtasks/qm/__init__.py` routes every listed name to the `qm` class of the same name, and
+`scripts/generate_task_catalog.py` publishes the `qm` declaration under `qm-fake`. The task class
+keeps `backend = "qm"`, which names the task family; `BaseBackend.name` (`qm` or `qm-fake`)
+names the backend a run used.
+
+`QMFakeBackend.get_instance()` returns a `QMFakeSession`, which answers `is_fake`, `is_hardware`
+and `is_simulator` like the `QMSession` of the `qm` backend. To offer a new QM task on `qm-fake`,
+add a branch on that session that asks `QMFakeDevice` for a synthetic response in the same
+result type the hardware path returns, extend the device model when the task needs a response it
+does not produce, and list the task under `qm-fake`. A task with no fake response stays off the
+list. `calibtasks/qm/test_qm_fake.py` fails when the list names a task the `qm` backend does not
+define. A `qm-fake` run never compiles QUA or checks OPX timing or wiring.
 
 ### Add persistence behavior
 

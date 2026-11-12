@@ -18,10 +18,11 @@ results:
   bounded by ``simulation.duration_ns``; ``simulate_rabi`` refuses a sweep whose
   first averaging iteration is estimated not to fit in it. Actual sweep coverage in
   the returned waveforms must be checked by the caller.
-* Mock: no QUA program exists. ``run_rabi_on_mock`` asks the session's local
-  ``QMMockDevice`` for a synthetic averaged I/Q response and returns it in the same
-  ``RabiIQResult`` shape as hardware data, labelled ``mode="mock"``, so both go
-  through the same fit, validation, figure and raw data code.
+* Fake (the ``qm-fake`` backend): no QUA program exists. ``run_rabi_on_fake`` asks
+  the session's local ``QMFakeDevice`` for a synthetic averaged I/Q response and
+  returns it in the same ``RabiIQResult`` shape as hardware data, labelled
+  ``mode="fake"``, so both go through the same fit, validation, figure and raw data
+  code. It checks no QUA compilation, controller timing or wiring.
 
 Signed sweeps: the model ``offset + A cos(2 pi f a)`` is even in the amplitude scale
 ``a``, so a sweep covers the pi rotation when the fitted pi scale lies within the
@@ -38,7 +39,7 @@ import numpy as np
 import numpy.typing as npt
 
 from qdash.workflow.engine.backend.qm import QM_INSTALL_HINT, QMDependencyError, import_qm_sdk
-from qdash.workflow.engine.backend.qm_mock import QM_MOCK_SOURCE_TYPE, QMMockDevice
+from qdash.workflow.engine.backend.qm_fake import QM_FAKE_SOURCE_TYPE, QMFakeSession
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.qm import QMQubitSettings, QMSession
@@ -126,7 +127,7 @@ class RabiIQResult:
     """Averaged I/Q response of one amplitude sweep, measured or synthetic.
 
     ``mode`` says where the response came from: ``hardware`` for an OPX measurement,
-    ``mock`` for the local synthetic response of mock mode. ``source_type`` labels
+    ``fake`` for the local synthetic response of the ``qm-fake`` backend. ``source_type`` labels
     the raw data artifact and ``metadata`` records how the response was produced.
     """
 
@@ -136,7 +137,7 @@ class RabiIQResult:
     iq: npt.NDArray[np.complex128]
     magnitude: npt.NDArray[np.float64]
     phase: npt.NDArray[np.float64]
-    mode: Literal["hardware", "mock"] = "hardware"
+    mode: Literal["hardware", "fake"] = "hardware"
     source_type: str = HARDWARE_SOURCE_TYPE
     shots: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -286,28 +287,29 @@ def run_rabi_on_hardware(session: QMSession, qid: str, sweep: RabiSweep) -> Rabi
     )
 
 
-def run_rabi_on_mock(session: QMSession, qid: str, sweep: RabiSweep) -> RabiIQResult:
-    """Return the synthetic response of the local mock device for the Rabi sweep.
+def run_rabi_on_fake(session: QMFakeSession, qid: str, sweep: RabiSweep) -> RabiIQResult:
+    """Return the synthetic response of the qm-fake device for the Rabi sweep.
 
     Imports no QM package. The amplitude scales and shots of the sweep reach the
-    mock model; the cooldown has no effect on a synthetic response.
+    fake model; the cooldown has no effect on a synthetic response.
     """
-    if not session.is_mock or not isinstance(session.manager, QMMockDevice):
-        raise RuntimeError("run_rabi_on_mock needs a backend in mock mode")
-    device = session.manager
+    if not isinstance(session, QMFakeSession):
+        raise RuntimeError("run_rabi_on_fake needs a session of the qm-fake backend")
+    device = session.device
     params = device.qubit(qid)
     iq = device.rabi_iq(qid, sweep.amplitude_scales, sweep.shots)
     return RabiIQResult(
         qid=qid,
-        target=f"mock-q{qid}",
+        target=f"qm-fake-q{qid}",
         amplitude_scales=sweep.amplitude_scales,
         iq=iq,
         magnitude=np.abs(iq),
         phase=np.unwrap(np.angle(iq)),
-        mode="mock",
-        source_type=QM_MOCK_SOURCE_TYPE,
+        mode="fake",
+        source_type=QM_FAKE_SOURCE_TYPE,
         shots=sweep.shots,
         metadata={
+            "backend": "qm-fake",
             "seed": device.seed,
             "pi_amplitude_scale": params.pi_amplitude_scale,
             "iq_offset": list(params.iq_offset),

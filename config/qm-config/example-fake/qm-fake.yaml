@@ -1,0 +1,26 @@
+# Sample settings of the qm-fake backend: a local synthetic qubit response that needs no
+# OPX, no QOP server, no QM account and none of the Quantum Machines packages.
+# Copy this file to config/qm-config/<chip_id>/qm-fake.yaml to use it for a QDash chip;
+# it can sit next to the qm.yaml of the qm backend.
+#
+# The qm-fake backend runs the QM tasks with this response in place of a measurement.
+# Results go through the same fit, figures and raw data as hardware results and are
+# labelled QM-FAKE. They stay in the run history and never replace calibration values.
+# A qm-fake run checks QDash's pipeline and analysis, not QUA compilation, OPX timing or
+# wiring. Settings of the qm backend (mode, connection, cloud, simulation, qua_config,
+# qua_config_file) are rejected here.
+
+# Seed of the noise generator. A fixed seed makes every session reproduce the same
+# results; remove it to draw new noise on every session.
+seed: 1234
+
+# Synthetic response for each QDash qubit ID. Omitted values take the defaults shown.
+qubits:
+  "0":
+    pi_amplitude_scale: 0.6     # amplitude scale of a pi rotation, inside the default 0-1.5 sweep
+    iq_offset: [0.010, 0.002]   # averaged I/Q point of the ground state, in V
+    contrast: 0.015             # distance from the ground to the excited I/Q point, in V
+    phase_deg: 120.0            # direction of the excited point from the ground point
+    noise_per_shot: 0.01        # single-shot noise per quadrature in V, divided by sqrt(shots)
+  "1":
+    pi_amplitude_scale: 0.85

@@ -3,9 +3,9 @@
 The backend connects to a Quantum Orchestration Platform (QOP) server through the
 ``qm-qua`` SDK. The SDK and ``qualang-tools`` are optional dependencies (the workflow
 project's ``qm`` extra) and are imported only when the backend connects, so the
-qubex and fake backends keep working without them.
+qubex, fake and qm-fake backends keep working without them.
 
-Each backend runs in one of three explicit modes, set in the QM settings file:
+Each backend runs in one of two explicit modes, set in the QM settings file:
 
 ``hardware``
     Programs are executed on the OPX. Tasks may fit the measured response and
@@ -15,15 +15,12 @@ Each backend runs in one of three explicit modes, set in the QM settings file:
     The simulator returns the controller output waveforms only: it verifies pulse
     timing and amplitudes, not the physical response of a qubit. Tasks never
     publish calibration values in this mode.
-``mock``
-    No QOP server and no QM package is involved. A local ``QMMockDevice``
-    (``qm_mock.py``) answers with a synthetic averaged I/Q response, which tasks
-    analyze exactly like a hardware measurement. Results stay in the run history,
-    labelled as mock; they never replace calibration values. A mock settings file
-    holds a ``mock`` section and must not hold ``connection``, ``cloud``,
-    ``simulation``, ``qubits`` or a QUA configuration.
 
-In hardware and simulator mode the backend reaches the QOP server in one of two ways:
+Testing without any QM hardware, server or package is the job of the separate
+``qm-fake`` backend (``qm_fake.py``), which runs the same QM tasks against a local
+synthetic response. This backend never falls back to it.
+
+The backend reaches the QOP server in one of two ways:
 
 ``connection``
     A QOP server at a fixed host, as ``QuantumMachinesManager(host=...)`` takes it.
@@ -55,7 +52,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from qdash.common.config.loader import ConfigLoader
 from qdash.workflow.engine.backend.base import BaseBackend
-from qdash.workflow.engine.backend.qm_mock import QM_MOCK_VERSION, QMMockDevice, QMMockSettings
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -65,9 +61,11 @@ logger = logging.getLogger(__name__)
 QM_CONFIG_DIR_NAME = "qm-config"
 QM_SETTINGS_FILE_NAME = "qm.yaml"
 QM_CONFIG_ENV = "QDASH_QM_CONFIG"
+QM_CONFIG_OPTION = "qm_config_path"
 QM_INSTALL_HINT = (
     "The QM backend needs the optional Quantum Machines packages. "
-    "Install them with: uv sync --package qdash-workflow --extra qm"
+    "Install them with: uv sync --package qdash-workflow --extra qm. "
+    "To test QM tasks without QM hardware or packages, select backend 'qm-fake' instead."
 )
 QM_CLOUD_INSTALL_HINT = (
     "The QM cloud simulator needs the optional qm-saas package. "
@@ -84,9 +82,9 @@ QOP_MAJOR_OPX1000 = 3
 # Upper bound on the simulated program time, which bounds the samples the simulator returns.
 MAX_SIMULATION_DURATION_NS = 1_000_000
 
-QMMode = Literal["hardware", "simulator", "mock"]
-# Settings that only make sense with a QOP server; a mock settings file must not set them.
-QOP_ONLY_SETTINGS = ("connection", "cloud", "simulation", "qubits", "qua_config")
+QMMode = Literal["hardware", "simulator"]
+# Former in-backend mock mode, replaced by the qm-fake backend; rejected with a pointer to it.
+REMOVED_MOCK_MODES = ("mock", "fake")
 
 
 class QMDependencyError(ImportError):
@@ -213,6 +211,13 @@ class QMSimulationSettings(BaseModel):
         return self.duration_ns // 4
 
 
+def string_qids(value: Any) -> Any:
+    """Key a per-qubit mapping by string QDash qubit IDs, as YAML may parse ``0`` as an int."""
+    if isinstance(value, dict):
+        return {str(qid): settings for qid, settings in value.items()}
+    return value
+
+
 class QMBackendSettings(BaseModel):
     """Validated contents of a QM settings file."""
 
@@ -224,37 +229,27 @@ class QMBackendSettings(BaseModel):
     simulation: QMSimulationSettings = Field(default_factory=QMSimulationSettings)
     qubits: dict[str, QMQubitSettings] = Field(default_factory=dict)
     qua_config: dict[str, Any] = Field(default_factory=dict)
-    mock: QMMockSettings | None = None
 
     @field_validator("qubits", mode="before")
     @classmethod
     def _string_qids(cls, value: Any) -> Any:
-        if isinstance(value, dict):
-            return {str(qid): settings for qid, settings in value.items()}
-        return value
+        return string_qids(value)
 
     @model_validator(mode="before")
     @classmethod
-    def _reject_server_settings_in_mock_mode(cls, data: Any) -> Any:
-        # Checked before field validation, so a stray section gets this message instead
-        # of errors about its own fields.
-        if isinstance(data, dict) and data.get("mode") == "mock":
-            present = [name for name in QOP_ONLY_SETTINGS if name in data]
-            if present:
-                raise ValueError(
-                    "mode: mock runs locally without a QOP server or QUA configuration; "
-                    f"remove {', '.join(present)} (qua_config also comes from qua_config_file)"
-                )
+    def _reject_local_fake(cls, data: Any) -> Any:
+        # The qm backend always needs a QOP server; the local synthetic response is a
+        # separate backend, so a settings file can never route a run to it silently.
+        if isinstance(data, dict) and (data.get("mode") in REMOVED_MOCK_MODES or "mock" in data):
+            raise ValueError(
+                "the qm backend runs on the OPX or the QOP simulator only (mode: hardware or "
+                "simulator); for a local synthetic response select backend 'qm-fake' and put "
+                "the response parameters in qm-fake.yaml"
+            )
         return data
 
     @model_validator(mode="after")
     def _check_mode_sections(self) -> QMBackendSettings:
-        if self.mode == "mock":
-            if self.mock is None:
-                raise ValueError("mode: mock needs a 'mock' section with at least one qubit")
-            return self
-        if self.mock is not None:
-            raise ValueError(f"'mock' is only valid with mode: mock, not mode: {self.mode}")
         if not self.qubits:
             raise ValueError("qubits must configure at least one qubit")
         if not self.qua_config:
@@ -363,17 +358,26 @@ def _load_mapping_file(path: Path) -> dict[str, Any]:
     return loaded
 
 
-def resolve_qm_settings_path(config: Mapping[str, Any]) -> Path:
-    """Return the settings path for a session configuration."""
-    explicit = config.get("qm_config_path") or os.environ.get(QM_CONFIG_ENV)
+def resolve_qm_settings_path(
+    config: Mapping[str, Any],
+    *,
+    option: str = QM_CONFIG_OPTION,
+    env: str = QM_CONFIG_ENV,
+    file_name: str = QM_SETTINGS_FILE_NAME,
+) -> Path:
+    """Return the settings path for a session configuration.
+
+    The session option ``option`` wins over the environment variable ``env``; without
+    either, the file ``file_name`` in ``<config dir>/qm-config/<chip_id>/`` is used.
+    The qm-fake backend passes its own option, variable and file name.
+    """
+    explicit = config.get(option) or os.environ.get(env)
     if explicit:
         return Path(str(explicit))
     chip_id = config.get("chip_id")
     if not chip_id:
-        raise QMConfigurationError(
-            f"Cannot locate the QM settings: no chip_id, qm_config_path or {QM_CONFIG_ENV}"
-        )
-    return ConfigLoader.get_config_dir() / QM_CONFIG_DIR_NAME / str(chip_id) / QM_SETTINGS_FILE_NAME
+        raise QMConfigurationError(f"Cannot locate {file_name}: no chip_id, {option} or {env}")
+    return ConfigLoader.get_config_dir() / QM_CONFIG_DIR_NAME / str(chip_id) / file_name
 
 
 def import_qm_sdk() -> Any:
@@ -442,9 +446,9 @@ class QMSession:
         return self.settings.mode == "simulator"
 
     @property
-    def is_mock(self) -> bool:
-        """Whether a local synthetic response replaces the QOP server."""
-        return self.settings.mode == "mock"
+    def is_fake(self) -> bool:
+        """Always ``False``; the local synthetic response is the qm-fake backend."""
+        return False
 
     @property
     def is_hardware(self) -> bool:
@@ -453,7 +457,7 @@ class QMSession:
 
 
 class QMBackend(BaseBackend):
-    """Backend for Quantum Machines OPX controllers: hardware, QOP simulator or local mock."""
+    """Backend for Quantum Machines OPX controllers: hardware or QOP simulator."""
 
     name: str = "qm"
 
@@ -488,9 +492,9 @@ class QMBackend(BaseBackend):
         return self.mode == "simulator"
 
     @property
-    def is_mock(self) -> bool:
-        """Whether this backend answers with a local synthetic response."""
-        return self.mode == "mock"
+    def is_fake(self) -> bool:
+        """Always ``False``; the local synthetic response is the qm-fake backend."""
+        return False
 
     @property
     def is_hardware(self) -> bool:
@@ -502,12 +506,7 @@ class QMBackend(BaseBackend):
         return self.mode == "hardware"
 
     def version(self) -> str:
-        """Return the installed ``qm-qua`` SDK version, or the mock label in mock mode."""
-        try:
-            if self.settings.mode == "mock":
-                return QM_MOCK_VERSION
-        except QMConfigurationError:
-            pass
+        """Return the installed ``qm-qua`` SDK version."""
         try:
             qm = import_qm_sdk()
         except QMDependencyError:
@@ -518,19 +517,11 @@ class QMBackend(BaseBackend):
         """Validate the settings and open a ``QuantumMachinesManager``.
 
         With ``cloud`` settings, spawn a QM SaaS simulator instance first. A failed
-        connect closes the instance it spawned before the error propagates. In mock
-        mode, start a local ``QMMockDevice`` instead; no QM package is imported.
+        connect closes the instance it spawned before the error propagates.
         """
         if self._manager is not None:
             return
         settings = self.settings
-        if settings.mock is not None:
-            self._manager = QMMockDevice(settings.mock)
-            logger.info(
-                "Started the local QM mock (synthetic response, seed=%s); no QOP server is used",
-                settings.mock.seed,
-            )
-            return
         qm = import_qm_sdk()
         if settings.cloud is not None:
             self._connect_cloud(qm, settings.cloud)

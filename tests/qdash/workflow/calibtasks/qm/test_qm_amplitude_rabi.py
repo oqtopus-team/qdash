@@ -82,8 +82,9 @@ def _simulation_result(samples: np.ndarray | None = None) -> RunResult:
 
 
 class TestRegistration:
-    def test_task_is_registered_for_qm_backend_only(self) -> None:
+    def test_task_is_registered_for_qm_and_qm_fake_only(self) -> None:
         assert BaseTask.registry["qm"]["QMAmplitudeRabi"] is QMAmplitudeRabi
+        assert BaseTask.registry["qm-fake"]["QMAmplitudeRabi"] is QMAmplitudeRabi
         assert "QMAmplitudeRabi" not in BaseTask.registry["qubex"]
         assert "QMAmplitudeRabi" not in BaseTask.registry["fake"]
 

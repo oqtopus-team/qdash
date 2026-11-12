@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from qdash.api.schemas.task_file import TaskInfo
 
 DEFAULT_OUTPUT = Path("src/qdash/workflow/calibtasks/task_catalog.json")
+# Backends that run another backend's task classes, mapped to that backend. The workflow
+# routes them the same way (calibtasks/fake/__init__.py and calibtasks/qm/__init__.py).
+ROUTED_BACKENDS = {"fake": "qubex", "qm-fake": "qm"}
 
 
 def build_catalog(base_path: Path) -> dict[str, object]:
@@ -43,20 +46,21 @@ def build_catalog(base_path: Path) -> dict[str, object]:
                 tasks_by_name[task.name] = task
         discovered_backends[backend_path.name] = tasks_by_name
 
-    # The fake backend runs the qubex implementation of every configured task that the fake
-    # package does not define itself, so publish those qubex declarations under "fake" too.
-    qubex_tasks = discovered_backends.get("qubex", {})
-    fake_tasks = discovered_backends.setdefault("fake", {})
-    for task_name in get_tasks("fake"):
-        if task_name in fake_tasks:
-            continue
-        inherited = qubex_tasks.get(task_name)
-        if inherited is None:
-            raise RuntimeError(
-                f"backend.yaml lists '{task_name}' for the fake backend, "
-                "but no qubex task defines it"
-            )
-        fake_tasks[task_name] = inherited.model_copy(deep=True)
+    # A fake backend runs the implementation of every configured task that its own package
+    # does not define, so publish those declarations under the fake backend too.
+    for fake_backend, source_backend in ROUTED_BACKENDS.items():
+        source_tasks = discovered_backends.get(source_backend, {})
+        fake_tasks = discovered_backends.setdefault(fake_backend, {})
+        for task_name in get_tasks(fake_backend):
+            if task_name in fake_tasks:
+                continue
+            inherited = source_tasks.get(task_name)
+            if inherited is None:
+                raise RuntimeError(
+                    f"backend.yaml lists '{task_name}' for the {fake_backend} backend, "
+                    f"but no {source_backend} task defines it"
+                )
+            fake_tasks[task_name] = inherited.model_copy(deep=True)
 
     unresolved_defaults = [
         f"{backend}.{task.name}.{name}"

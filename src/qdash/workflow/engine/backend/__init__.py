@@ -23,9 +23,15 @@ QubexBackend
     Import directly: ``from qdash.workflow.engine.backend.qubex import QubexBackend``
 
 QMBackend
-    Quantum Machines OPX backend (hardware, QOP simulator or local mock mode). Its SDK
-    is an optional dependency imported on connect, except in mock mode, which needs none.
+    Quantum Machines OPX backend (hardware or QOP simulator mode). Its SDK is an
+    optional dependency imported on connect.
     Import directly: ``from qdash.workflow.engine.backend.qm import QMBackend``
+
+QMFakeBackend
+    Backend ``qm-fake``: runs the QM tasks against a local synthetic device response,
+    without an OPX, a QOP server or any Quantum Machines package. Its results never
+    become calibration values.
+    Import directly: ``from qdash.workflow.engine.backend.qm_fake import QMFakeBackend``
 
 create_backend
     Factory function to create backends by name.

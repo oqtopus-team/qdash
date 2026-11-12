@@ -1397,7 +1397,44 @@
     "qm": [
       {
         "class_name": "QMAmplitudeRabi",
-        "description": "Sweep the drive amplitude scale on a Quantum Machines OPX and fit the Rabi response.\n\nThe QUA program is the Rabi experiment of qualang-tools ``QUA_calibrations``: the\nconfigured qubit operation is played with ``amp(a)`` for each amplitude scale ``a``,\nthen the resonator is measured with dual demodulation. In hardware mode the\naveraged I/Q response is projected on its principal axis and fitted with a cosine\nto give the amplitude scale of a pi rotation. In mock mode a local synthetic I/Q\nresponse replaces the measurement and goes through the same fit; its result is\nlabelled as mock and stays in the run history. In simulator mode the task records\nthe simulated controller outputs and publishes no calibration value; use\n``simulator_run_parameters()`` for a run short enough to simulate.\n\nSweeps may be signed. The response depends on ``|a|`` only, so a fitted pi scale is\naccepted when it lies within the magnitudes the sweep covers.",
+        "description": "Sweep the drive amplitude scale on a Quantum Machines OPX and fit the Rabi response.\n\nThe QUA program is the Rabi experiment of qualang-tools ``QUA_calibrations``: the\nconfigured qubit operation is played with ``amp(a)`` for each amplitude scale ``a``,\nthen the resonator is measured with dual demodulation. In hardware mode the\naveraged I/Q response is projected on its principal axis and fitted with a cosine\nto give the amplitude scale of a pi rotation. On the qm-fake backend a local\nsynthetic I/Q response replaces the measurement and goes through the same fit; its\nresult is labelled as fake and stays in the run history. In simulator mode the task records\nthe simulated controller outputs and publishes no calibration value; use\n``simulator_run_parameters()`` for a run short enough to simulate.\n\nSweeps may be signed. The response depends on ``|a|`` only, so a fitted pi scale is\naccepted when it lies within the magnitudes the sweep covers.",
+        "file_path": "qm_amplitude_rabi.py",
+        "input_parameters": {},
+        "name": "QMAmplitudeRabi",
+        "output_parameters": [
+          "qm_pi_amplitude_scale"
+        ],
+        "run_parameters": {
+          "amplitude_scale_range": {
+            "description": "Scale factors applied to the configured qubit operation amplitude, within the QUA amp() range [-2, 2)",
+            "unit": "a.u.",
+            "value": [
+              0.0,
+              1.5,
+              51
+            ],
+            "value_type": "np.linspace"
+          },
+          "cooldown_time": {
+            "description": "Wait after each measurement, a multiple of 4 ns and at least 16 ns",
+            "unit": "ns",
+            "value": 100000,
+            "value_type": "int"
+          },
+          "shots": {
+            "description": "Number of averaging iterations",
+            "unit": "a.u.",
+            "value": 1000,
+            "value_type": "int"
+          }
+        },
+        "task_type": "qubit"
+      }
+    ],
+    "qm-fake": [
+      {
+        "class_name": "QMAmplitudeRabi",
+        "description": "Sweep the drive amplitude scale on a Quantum Machines OPX and fit the Rabi response.\n\nThe QUA program is the Rabi experiment of qualang-tools ``QUA_calibrations``: the\nconfigured qubit operation is played with ``amp(a)`` for each amplitude scale ``a``,\nthen the resonator is measured with dual demodulation. In hardware mode the\naveraged I/Q response is projected on its principal axis and fitted with a cosine\nto give the amplitude scale of a pi rotation. On the qm-fake backend a local\nsynthetic I/Q response replaces the measurement and goes through the same fit; its\nresult is labelled as fake and stays in the run history. In simulator mode the task records\nthe simulated controller outputs and publishes no calibration value; use\n``simulator_run_parameters()`` for a run short enough to simulate.\n\nSweeps may be signed. The response depends on ``|a|`` only, so a fitted pi scale is\naccepted when it lies within the magnitudes the sweep covers.",
         "file_path": "qm_amplitude_rabi.py",
         "input_parameters": {},
         "name": "QMAmplitudeRabi",

@@ -43,9 +43,10 @@ uv sync --locked --all-groups --all-packages --extra qm-cloud
 uv run pytest tests/qdash/workflow/calibtasks/qm tests/qdash/workflow/engine/backend/test_qm_backend.py -v
 ```
 
-`calibtasks/qm/test_qm_mock.py` covers mock mode without the extras: it makes the QM packages
-unimportable and outgoing sockets fail, then runs `QMAmplitudeRabi` through `TaskExecutor`
-with in-memory repositories to check results, artifacts, history, and the hardware-only write.
+`calibtasks/qm/test_qm_fake.py` covers the `qm-fake` backend without the extras: it makes the
+QM packages unimportable and outgoing sockets fail, then runs `QMAmplitudeRabi` from the
+`qm-fake` registry through `TaskExecutor` with in-memory repositories to check results,
+artifacts, history, and the hardware-only write.
 
 ## Follow Existing Fixtures
 
@@ -85,6 +86,6 @@ state instead of private call order unless call order is the contract.
 | `service/` | `service/` |
 | `templates/` | Top-level `test_*_template.py` files |
 | `calibtasks/fake/` | `calibtasks/test_fake_backend_sync.py`, `calibtasks/test_fake_bring_up.py` |
-| `engine/backend/qm.py`, `calibtasks/qm/` | `engine/backend/test_qm_backend.py`, `calibtasks/qm/` |
+| `engine/backend/qm.py`, `engine/backend/qm_fake.py`, `calibtasks/qm/` | `engine/backend/test_qm_backend.py`, `calibtasks/qm/` |
 
 Paths in the table are relative to `src/qdash/workflow/` and `tests/qdash/workflow/`.
