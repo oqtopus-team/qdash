@@ -41,6 +41,15 @@ describe("UserAvatar", () => {
     expect(screen.getByRole("img", { name: "alice" }).getAttribute("width")).toBe("32");
   });
 
+  it("titles the avatar with the username unless the caller opts out", () => {
+    listUserAvatars.mockReturnValue(new Promise(() => {}));
+    const { container, rerender } = render(<UserAvatar username="alice" />);
+    expect(container.querySelector('[title="alice"]')).not.toBeNull();
+
+    rerender(<UserAvatar username="alice" showTitle={false} />);
+    expect(container.querySelector("[title]")).toBeNull();
+  });
+
   it("gives the same username the same avatar in separate renders", () => {
     const { unmount } = render(<UserAvatar username="alice" />);
     const first = avatarSrc("alice");
