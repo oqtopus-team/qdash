@@ -128,7 +128,12 @@ and how to migrate arguments that `CalibService` no longer accepts.
 | `QubitTargets` | The caller selected individual qubits | Uses the supplied qubit IDs |
 | `CouplingTargets` | The flow starts from directed two-qubit pairs | Exposes both coupling IDs and their endpoint qubits |
 | `AllMuxTargets` | The flow targets every MUX of the chip | Expands the topology's declared MUXes (MUX IDs 0–15 without a topology) and applies exclusions |
-| `AllQubitTargets` | The flow targets every qubit, including standalone ones | Adds the topology's standalone qubits to its MUX members and applies exclusions |
+| `AllQubitTargets` | The flow targets every qubit, including standalone ones | Adds the topology's standalone qubits to its MUX members and applies exclusions; exclusions may remove every MUX member |
+
+`AllMuxTargets` raises `ValueError` when the topology declares no MUX; use `AllQubitTargets` or
+`QubitTargets` for standalone qubits. With a topology, a targeted MUX without a `wiring.yaml` row
+raises `MuxMappingError` instead of selecting part of the chip. Qubit IDs such as `Q07` are
+accepted and scheduled as `7`, the form the topology and the wiring use.
 
 When both `mux_ids` and `qids` are supplied, standard templates prefer `mux_ids`. Preserve that
 rule across templates so UI and scheduled executions resolve the same request consistently.
@@ -199,8 +204,8 @@ come from task and workflow settings. See [Parameter Resolution](./parameter-res
 precedence and snapshot re-execution, and [Calibration Data Lifecycle](./calibration-data-lifecycle.md)
 for output promotion.
 
-Parallel coupling workers receive the step session's `WorkerSpec` (the run's settings and the
-step's Execution ID), then open borrowed sessions. Within each coupling, tasks run sequentially;
+Parallel coupling workers receive the step session's `WorkerSpec` (the run's settings, its MUX
+mapping and the step's Execution ID), then open borrowed sessions. Within each coupling, tasks run sequentially;
 workers do not share Python objects. See [CR Gate Scheduler](../architecture/cr-scheduler.md#workflow-integration)
 for schedule reuse and group ordering.
 

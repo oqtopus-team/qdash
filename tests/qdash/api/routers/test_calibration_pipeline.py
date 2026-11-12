@@ -573,6 +573,43 @@ class TestValidate:
         assert len(backend) == 1
         assert "[4, 5, 6] are standalone" in backend[0]
 
+    @pytest.mark.parametrize(
+        "targets",
+        [{"qids": ["0"]}, {"mux_ids": [0], "exclude_qids": []}],
+        ids=["qubit-targets", "mux-targets"],
+    )
+    def test_configure_all_mux_ids_follow_the_chip_topology(
+        self, test_client, chip, auth_headers, targets
+    ):
+        # The public 16Q template defines MUX 0-3; an explicit step MUX 9 would reach the boxes.
+        chip_doc = ChipDocument.find_one({"project_id": "test_project", "chip_id": CHIP}).run()
+        assert chip_doc is not None
+        chip_doc.topology_id = "square-lattice-mux-16"
+        chip_doc.save()
+        spec = good_spec()
+        spec["targets"] = targets
+        spec["steps"] = [{"type": "ConfigureAll", "mux_ids": [1, 9]}, *spec["steps"]]
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is False
+        problems = {p["path"]: p["message"] for p in data["problems"]}
+        assert list(problems) == ["steps[0].mux_ids[1]"]
+        assert "MUX 9 is not defined" in problems["steps[0].mux_ids[1]"]
+        assert "(defined: 0-3)" in problems["steps[0].mux_ids[1]"]
+
+
+def test_describe_ids_does_not_expand_sparse_mux_ranges():
+    from qdash.api.services.calibration_pipeline_service import _describe_ids
+
+    # A range between these IDs would need about 8 TB; the check compares the span instead.
+    assert _describe_ids([0, 10**12]) == "0, 1000000000000"
+    assert _describe_ids([4, 5, 6]) == "4-6"
+    assert _describe_ids([7]) == "7"
+
 
 def prefect_gateway_mocks() -> tuple[AsyncMock, AsyncMock]:
     read_deployment = AsyncMock(return_value="deployment-1")

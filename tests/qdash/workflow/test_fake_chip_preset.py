@@ -106,8 +106,13 @@ def fake_deployment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator
         workflow_paths.PathResolver(calib_data_base=tmp_path / "calib_data"),
     )
     # The suite's Prefect stub leaves tasks as plain functions without ``with_options``.
-    run_task = task_runner.execute_dynamic_task_by_qid_service
-    monkeypatch.setattr(run_task, "with_options", lambda **_: run_task, raising=False)
+    for run_task in (
+        task_runner.execute_dynamic_task_by_qid_service,
+        task_runner.execute_dynamic_task_batch_service,
+    ):
+        monkeypatch.setattr(
+            run_task, "with_options", lambda _task=run_task, **_: _task, raising=False
+        )
     yield config_root
     app.dependency_overrides.pop(get_chip_config_scaffolder, None)
 
@@ -306,6 +311,7 @@ class _RecordingStageSession:
         self.stage_results: dict[str, Any] = {}
 
     def worker_spec(self) -> Any:
+        from qdash.common.mux_mapping import MuxMappingSnapshot
         from qdash.workflow.service._internal.settings import (
             SessionSettings,
             WorkerLease,
@@ -317,6 +323,8 @@ class _RecordingStageSession:
                 username=USERNAME, chip_id=CHIP_ID, project_id=PROJECT_ID, backend_name="fake"
             ).for_worker(),
             lease=WorkerLease(execution_id=self.execution_id),
+            # Pinned from the owner, as CalibSession.worker_spec does.
+            mux_mapping=MuxMappingSnapshot.of(self.mux_mapping),
         )
 
     @property

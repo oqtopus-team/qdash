@@ -95,7 +95,9 @@ def _describe_ids(ids: list[int]) -> str:
     """Compact ``0-11`` or ``0, 2, 5`` description of sorted MUX IDs."""
     if not ids:
         return "none"
-    if ids == list(range(ids[0], ids[-1] + 1)):
+    # Sorted and unique, so a span equal to the count is contiguous. Comparing
+    # with a range would allocate every ID between sparse MUX IDs.
+    if ids[-1] - ids[0] + 1 == len(ids):
         return f"{ids[0]}-{ids[-1]}" if len(ids) > 1 else str(ids[0])
     shown = ", ".join(str(mux_id) for mux_id in ids[:16])
     return shown if len(ids) <= 16 else f"{shown}, ..."
@@ -346,6 +348,31 @@ class CalibrationPipelineService:
                 )
             )
 
+    @staticmethod
+    def _validate_configure_all_mux_ids(
+        spec: CalibrationPipelineSpec,
+        groups: Mapping[int, Any],
+        chip_id: str,
+        problems: list[PipelineProblem],
+    ) -> None:
+        """Report a ConfigureAll step's explicit MUX IDs that the chip does not define.
+
+        Whatever the targets, these IDs replace the targets' MUXes and reach the
+        boxes as they are, so each one must be a MUX of the chip topology.
+        """
+        defined = _describe_ids(sorted(groups))
+        for step_index, step in enumerate(spec.steps):
+            if not isinstance(step, ConfigureAllStep) or step.mux_ids is None:
+                continue
+            for index, mux in enumerate(step.mux_ids):
+                if mux not in groups:
+                    problems.append(
+                        _problem(
+                            f"steps[{step_index}].mux_ids[{index}]",
+                            f"MUX {mux} is not defined for chip {chip_id} (defined: {defined})",
+                        )
+                    )
+
     def _validate_targets(
         self,
         project_id: str,
@@ -383,6 +410,12 @@ class CalibrationPipelineService:
                             f"qubit {qid!r} is not defined by topology {chip.topology_id!r}",
                         )
                     )
+            self._validate_configure_all_mux_ids(
+                spec,
+                mapping.groups_for_qubit_count(int(chip.size)),
+                chip_id,
+                problems,
+            )
             standalone = [qid for qid in targets.qids if mapping.is_standalone(qid)]
             for index, step in enumerate(spec.steps):
                 derives_muxes = step.type == "BringUp" or (
@@ -417,6 +450,7 @@ class CalibrationPipelineService:
                         f"MUX {mux} is not defined for chip {chip_id} (defined: {defined})",
                     )
                 )
+        self._validate_configure_all_mux_ids(spec, groups, chip_id, problems)
         for index, qid in enumerate(targets.exclude_qids):
             if qid not in known:
                 problems.append(

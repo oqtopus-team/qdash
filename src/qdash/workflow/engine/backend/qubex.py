@@ -108,7 +108,7 @@ class QubexBackend(BaseBackend):
         code path that builds or connects a Qubex ``Experiment`` calls this
         first, so an incompatible ``muxes`` layout fails before any hardware
         access. The mapping comes from, in order: the ``mux_mapping`` given
-        at construction, ``config["topology_id"]``, or the chip document for
+        at construction, a non-empty ``config["topology_id"]``, or the chip document for
         ``config["project_id"]`` and ``config["chip_id"]``. Without any of
         these the legacy layout, which is Qubex's own, is assumed.
 
@@ -125,8 +125,11 @@ class QubexBackend(BaseBackend):
         return self._mux_mapping
 
     def _resolve_mux_mapping(self) -> MuxMapping:
-        if "topology_id" in self._config:
-            return resolve_topology_mux_mapping(self._config["topology_id"])
+        # Only a non-empty topology ID overrides the chip; ``None`` or ``""``
+        # means "not given", never "use the legacy layout".
+        topology_id = self._config.get("topology_id")
+        if topology_id:
+            return resolve_topology_mux_mapping(topology_id)
         project_id = self._config.get("project_id")
         chip_id = self._config.get("chip_id")
         if project_id and chip_id:

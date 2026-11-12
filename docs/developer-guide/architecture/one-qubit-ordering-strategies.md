@@ -47,6 +47,11 @@ step 2: 2, 4, 10, 12
 step 3: 3, 5, 11, 13
 ```
 
+A slot's synchronized step is its position in the parity order, even when the MUX lacks some
+slots. For example, an odd MUX with only slots 0 and 1 leaves steps 0 and 1 empty and runs its
+slots in steps 2 and 3, together with slots 0 and 1 of the other odd MUXes. Slots beyond 3 in a
+larger MUX follow in slot order after step 3.
+
 This interleaving avoids selecting the same physical row position from every neighboring MUX at
 once. It is a scheduling policy based on the 2×2 slot layout of each MUX, not a replacement
 for measured-frequency validation.

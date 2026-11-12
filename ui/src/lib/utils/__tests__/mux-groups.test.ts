@@ -5,6 +5,8 @@ import {
   buildMuxGroupBoxes,
   buildQidToMux,
   clipMuxBoxes,
+  muxLabelAreaClass,
+  muxLabelPosition,
   standaloneQids,
   type GridPosition,
 } from "@/lib/utils/mux-groups";
@@ -123,15 +125,54 @@ describe("clipMuxBoxes", () => {
     // Top-left 3x3 window: MUX 3 whole, the top row of MUX 8, MUX 12 outside.
     const topLeft = clipMuxBoxes(boxes, { row: 0, col: 0, rows: 3, cols: 3 });
     expect(topLeft).toEqual([
-      { muxId: 3, row: 0, col: 1, rows: 2, cols: 2 },
-      { muxId: 8, row: 2, col: 0, rows: 1, cols: 2 },
+      { muxId: 3, row: 0, col: 1, rows: 2, cols: 2, singleCell: false },
+      { muxId: 8, row: 2, col: 0, rows: 1, cols: 2, singleCell: false },
     ]);
 
     // A window that cuts through MUX 8 and MUX 12 keeps only their visible cells.
     const partial = clipMuxBoxes(boxes, { row: 2, col: 1, rows: 2, cols: 3 });
     expect(partial).toEqual([
-      { muxId: 8, row: 0, col: 0, rows: 2, cols: 1 },
-      { muxId: 12, row: 0, col: 2, rows: 1, cols: 1 },
+      { muxId: 8, row: 0, col: 0, rows: 2, cols: 1, singleCell: false },
+      { muxId: 12, row: 0, col: 2, rows: 1, cols: 1, singleCell: true },
     ]);
+  });
+
+  it("labels a MUX only when the view shows one of its members", () => {
+    // Two far-apart members: the bounding box spans the whole 8x8 grid.
+    const positions: Record<number, GridPosition> = {
+      0: { row: 0, col: 0 },
+      1: { row: 7, col: 7 },
+      2: { row: 1, col: 5 },
+    };
+    const boxes = buildMuxGroupBoxes({ "5": [0, 1] }, positions);
+
+    // The top-right 4x4 window overlaps the box but holds only standalone qubit 2.
+    expect(clipMuxBoxes(boxes, { row: 0, col: 4, rows: 4, cols: 4 })).toEqual([]);
+    // A window with one member labels just that member's cell.
+    expect(clipMuxBoxes(boxes, { row: 4, col: 4, rows: 4, cols: 4 })).toEqual([
+      { muxId: 5, row: 3, col: 3, rows: 1, cols: 1, singleCell: true },
+    ]);
+  });
+});
+
+describe("MUX label placement", () => {
+  it("centers labels over several cells and anchors single-cell labels at an edge", () => {
+    const wide = { muxId: 1, row: 1, col: 2, rows: 2, cols: 2, singleCell: false };
+    const single = { muxId: 2, row: 1, col: 2, rows: 1, cols: 1, singleCell: true };
+
+    expect(muxLabelPosition(wide, 40, 4)).toEqual({
+      top: 2 * 44 - 2,
+      left: 3 * 44 - 2,
+      transform: "translate(-50%, -50%)",
+    });
+    // Bottom-left corner of the cell: clear of the centered value or qubit label.
+    expect(muxLabelPosition(single, 40, 4)).toEqual({
+      top: 2 * 44 - 4,
+      left: 2 * 44,
+      transform: "translate(0, -100%)",
+    });
+    expect(muxLabelAreaClass(wide)).toContain("justify-center");
+    expect(muxLabelAreaClass(single)).toContain("items-end");
+    expect(muxLabelAreaClass(single)).not.toContain("justify-center");
   });
 });

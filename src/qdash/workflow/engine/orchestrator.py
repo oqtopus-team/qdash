@@ -208,6 +208,7 @@ class CalibOrchestrator:
                 calib_dir=config.calib_data_path,
                 history_recorder=self._create_history_recorder(),
                 force_update_params=config.force_update_params,
+                mux_mapping=config.mux_mapping,
             )
 
             # Initialize Backend
@@ -657,6 +658,7 @@ class CalibOrchestrator:
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
             update_calibration_parameters=update_calibration_parameters,
+            mux_mapping=config.mux_mapping,
         )
 
         # Copy relevant calibration data
@@ -705,6 +707,7 @@ class CalibOrchestrator:
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
             update_calibration_parameters=update_calibration_parameters,
+            mux_mapping=config.mux_mapping,
         )
 
         relevant_qids: list[str] = []

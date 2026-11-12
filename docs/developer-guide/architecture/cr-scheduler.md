@@ -108,9 +108,11 @@ The built-in filters are `CandidateQubitFilter`, `MuxMembershipFilter`,
 `MuxConflictScheduler` and `IntraThenInterMuxScheduler`.
 
 When no plugins are supplied, `generate_with_plugins()` uses only the directionality filter and an
-intra-then-inter MUX conflict scheduler capped at 10 operations per group. Unlike `generate()`, its
-default filter pipeline does not add candidate or explicit MUX-membership filters. Callers that
-need those policies must supply them.
+intra-then-inter MUX conflict scheduler capped at 10 operations per group. Its default filter
+pipeline does not add a candidate filter; callers that need one must supply it. Whatever the
+filters, `generate_with_plugins()` then drops any pair with a qubit that is neither a wired MUX
+member nor a standalone qubit of the topology, as `generate()` does, and reports the count as
+`mux_filtered_out` in `filtering_stats`.
 
 Custom filters must preserve the `control-target` string format. Custom schedulers must not place
 conflicting pairs together and should return enough metadata to identify their policy in stored

@@ -107,6 +107,32 @@ def test_checkerboard_uses_slots_by_mux_parity(tmp_path: Path) -> None:
     ]
 
 
+def test_checkerboard_keeps_slot_steps_aligned_for_partial_muxes() -> None:
+    """A MUX without some slots leaves those steps empty; its other slots keep their step."""
+    context = OrderingContext(
+        chip_id="chip-x",
+        grid_size=8,
+        mux_grid_size=4,
+        # MUX 9 (odd) has slots 0-2 and MUX 15 (odd) slots 0-1; MUX 6 (even) has five slots.
+        mux_mapping=MuxMapping.from_groups(
+            {9: ["38", "36", "39"], 15: ["61", "60"], 6: ["24", "25", "26", "27", "28"]}
+        ),
+    )
+
+    steps = CheckerboardOrderingStrategy().generate_synchronized_steps(
+        [6, 9, 15], ["24", "25", "26", "27", "28", "38", "36", "39", "61", "60"], context
+    )
+
+    # Odd MUXes run slot 2 first: MUX 15 has none, so its slot 0 waits for step 2.
+    assert steps == [
+        ["24", "39"],
+        ["25"],
+        ["26", "38", "61"],
+        ["27", "36", "60"],
+        ["28"],
+    ]
+
+
 def test_simultaneous_spectroscopy_groups_by_local_slot(tmp_path: Path) -> None:
     schedule = _scheduler(tmp_path).generate_simultaneous_spectroscopy_batches_from_mux(
         mux_ids=[9, 4], exclude_qids=["30"]
@@ -211,3 +237,18 @@ def test_cr_scheduler_propagates_unusable_topology(monkeypatch: pytest.MonkeyPat
 
     with pytest.raises(MuxMappingError):
         scheduler._resolve_mux_mapping()
+
+
+def test_checkerboard_keeps_single_slot_neighbors_in_different_steps() -> None:
+    """Even MUX 0 = [1] and odd MUX 1 = [4] both use slot 0, which run in different steps."""
+    context = OrderingContext(
+        chip_id="chip-x",
+        grid_size=8,
+        mux_grid_size=4,
+        mux_mapping=MuxMapping.from_groups({0: ["1"], 1: ["4"]}),
+    )
+
+    steps = CheckerboardOrderingStrategy().generate_synchronized_steps([0, 1], ["1", "4"], context)
+
+    # Even MUXes run slot 0 in step 0; odd MUXes run it in step 2 (order [2, 3, 0, 1]).
+    assert steps == [["1"], ["4"]]

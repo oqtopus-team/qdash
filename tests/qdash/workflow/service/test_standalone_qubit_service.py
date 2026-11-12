@@ -79,6 +79,90 @@ def test_calib_session_refuses_mux_tasks_on_standalone_before_running() -> None:
         session._reject_mux_task_on_standalone("CheckRabi", ["6"])
 
 
+def test_worker_spec_rejects_owner_mapping_failure_before_worker_creation() -> None:
+    session = _session(_mapping())
+    session._mux_mapping = None
+    session.execution_id = "owner-execution"
+    with (
+        patch(
+            "qdash.workflow.service._internal.session.resolve_chip_mux_mapping",
+            side_effect=[MuxMappingError("Topology unavailable"), _no_mux_mapping()],
+        ) as resolve_mapping,
+        patch("qdash.workflow.service._internal.session.WorkerSpec") as worker_spec,
+    ):
+        with pytest.raises(MuxMappingError, match="Topology unavailable"):
+            session.worker_spec()
+        # Even if the next lookup would succeed with changed membership, no
+        # unresolved spec may escape for a worker to perform that lookup.
+        resolve_mapping.assert_called_once()
+        worker_spec.assert_not_called()
+
+
+def test_owner_mapping_failure_is_final_for_late_worker_specs() -> None:
+    """A failure seen earlier (e.g. a whole-chip scope) is not retried by worker_spec."""
+    session = _session(_mapping())
+    session._mux_mapping = None
+    session.execution_id = "owner-execution"
+    with (
+        patch(
+            "qdash.workflow.service._internal.session.resolve_chip_mux_mapping",
+            side_effect=[MuxMappingError("Topology unavailable"), _mapping()],
+        ) as resolve_mapping,
+        patch("qdash.workflow.service._internal.session.WorkerSpec") as worker_spec,
+    ):
+        # A non-qubex owner tolerates the failure by reserving the whole chip.
+        assert session.resource_scope({"qid": "0"}).exclusive
+        # The topology is repaired afterwards, but the owner never planned with it.
+        with pytest.raises(MuxMappingError, match="Topology unavailable"):
+            session.worker_spec()
+        with pytest.raises(MuxMappingError, match="Topology unavailable"):
+            _ = session.mux_mapping
+        resolve_mapping.assert_called_once()
+        worker_spec.assert_not_called()
+
+
+def test_worker_spec_pins_the_owner_mapping() -> None:
+    from qdash.common.mux_mapping import MuxMappingSnapshot
+
+    session = _session(_mapping())
+    session.execution_id = "owner-execution"
+    with patch(
+        "qdash.workflow.service._internal.session.resolve_chip_mux_mapping",
+        side_effect=AssertionError("the owner's mapping is already resolved"),
+    ):
+        spec = session.worker_spec()
+
+    assert spec.mux_mapping == MuxMappingSnapshot.of(_mapping())
+    assert spec.mux_mapping.to_mapping().groups == _mapping().groups
+
+
+def test_workers_never_resolve_a_mapping_of_their_own() -> None:
+    """A worker without its owner's mapping is refused before any backend exists."""
+    from pydantic import ValidationError
+
+    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.settings import (
+        GitHubPolicy,
+        SessionSettings,
+        WorkerLease,
+        WorkerSpec,
+    )
+
+    settings = SessionSettings(
+        username="alice",
+        chip_id="chip-x",
+        project_id="project-1",
+        backend_name="fake",
+        github=GitHubPolicy.disabled(),
+    ).for_worker()
+    lease = WorkerLease(execution_id="owner-execution")
+
+    with pytest.raises(ValidationError, match="mux_mapping"):
+        WorkerSpec(settings=settings, lease=lease)  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="MUX mapping its owner resolved"):
+        CalibSession(settings, lease=lease)
+
+
 def _reserved_session(mapping: MuxMapping) -> tuple[CalibSession, MagicMock]:
     """A session holding a whole-chip reservation, with a mocked orchestrator."""
     from qdash.common.execution_resources import ExecutionResourceScope
@@ -130,6 +214,29 @@ def test_whole_chip_reservation_still_runs_known_and_system_targets() -> None:
     assert orchestrator.run_task_batch.call_count == 2
 
 
+@pytest.mark.parametrize("mux_ids", [[7], [9, 7], [-1], "9"])
+def test_configure_all_rejects_mux_ids_outside_the_topology_before_dispatch(
+    mux_ids: Any,
+) -> None:
+    """A whole-chip reservation alone must not let an undefined MUX reach the boxes."""
+    session, orchestrator = _reserved_session(_mapping())
+
+    with pytest.raises(MuxMappingError):
+        session.execute_task("ConfigureAll", "", parameters={"run": {"mux_ids": mux_ids}})
+
+    orchestrator.run_task.assert_not_called()
+
+
+def test_configure_all_keeps_its_default_selection() -> None:
+    """Without mux_ids (or with []), ConfigureAll keeps its own default and a chip lock."""
+    session, orchestrator = _reserved_session(_mapping())
+
+    session.execute_task("ConfigureAll", "")
+    session.execute_task("ConfigureAll", "", parameters={"run": {"mux_ids": []}})
+
+    assert orchestrator.run_task.call_count == 2
+
+
 def test_legacy_unbounded_chip_skips_membership_checks() -> None:
     session, orchestrator = _reserved_session(MuxMapping.legacy())
 
@@ -157,6 +264,55 @@ def test_all_qubit_targets_include_mux_members_and_standalone_qubits() -> None:
 
     assert captured == [[4, 9]]
     assert qids == ["0", "1", "2", "3", "6", "12", "17"]
+
+
+def test_all_qubit_targets_may_exclude_every_mux_member() -> None:
+    """Exclusions that empty every MUX still select the standalone qubits."""
+    members = [qid for qids in GROUPS.values() for qid in qids]
+    with patch.object(MuxTargets, "to_qids", side_effect=AssertionError("no MUX member left")):
+        qids = AllQubitTargets(exclude_qids=members).to_qids("chip-x", mux_mapping=_mapping())
+
+    assert qids == ["1", "6", "20"]
+
+
+def test_all_qubit_targets_skip_muxes_emptied_by_prefixed_exclusions() -> None:
+    captured: list[list[int]] = []
+
+    def to_qids(self: MuxTargets, chip_id: str, *, mux_mapping: Any = None) -> list[str]:
+        captured.append(list(self.mux_ids))
+        return cast("MuxMapping", mux_mapping).qids_for_muxes(self.mux_ids, self.exclude_qids)
+
+    with patch.object(MuxTargets, "to_qids", to_qids):
+        qids = AllQubitTargets(exclude_qids=["Q12", "Q03", "Q06"]).to_qids(
+            "chip-x", mux_mapping=_mapping()
+        )
+
+    assert captured == [[9]]
+    assert qids == ["0", "1", "2", "5", "17", "20"]
+
+
+def test_all_mux_targets_reject_a_declared_mux_without_wiring(tmp_path) -> None:
+    """Every declared MUX must be wired; AllMuxTargets never returns part of the chip."""
+    import yaml
+
+    wiring = tmp_path / "wiring.yaml"
+    # Only MUX 9 is wired; the topology also declares MUX 4.
+    wiring.write_text(
+        yaml.safe_dump(
+            {"chip-x": [{"mux": 9, "ctrl": ["A-0", "A-1", "A-2", "A-3"], "read_out": "RA"}]}
+        )
+    )
+    paths = MagicMock()
+    paths.wiring_yaml.return_value = wiring
+    with patch("qdash.workflow.service.targets.get_qubex_paths", return_value=paths):
+        with pytest.raises(MuxMappingError, match=r"MUXes \[4\].*no row in the wiring"):
+            AllMuxTargets().to_qids("chip-x", mux_mapping=_mapping())
+        with pytest.raises(MuxMappingError, match=r"MUXes \[4\]"):
+            AllQubitTargets().to_qids("chip-x", mux_mapping=_mapping())
+        # Excluding MUX 4 entirely needs no wiring for it.
+        assert AllQubitTargets(exclude_qids=["12", "3"]).to_qids(
+            "chip-x", mux_mapping=_mapping()
+        ) == ["0", "1", "2", "5", "6", "17", "20"]
 
 
 def test_all_qubit_targets_on_a_chip_without_mux_skip_wiring() -> None:

@@ -140,6 +140,16 @@ backend when the block ends.
 | `force_update_params` | Inherited |
 | GitHub pull and push | Disabled; the owner pulls before and pushes after its Execution |
 | Execution and reservation | Borrowed through `WorkerLease`; never claimed, created, finished, locked, or unlocked |
+| MUX mapping | Inherited as the owner resolved it (`MuxMappingSnapshot`); the worker never rereads the chip topology, so an edit during the run changes neither representatives nor MUX result fan-out. An owner that cannot resolve its mapping creates no worker; it does not retry the lookup later |
+
+MUX result fan-out reads only the mapping pinned on the Execution's `CalibConfig.mux_mapping`. A
+chip without a topology is pinned as the legacy `qid // 4` mapping. A fake-backend owner whose
+topology fails to resolve pins no mapping: system and global tasks still run, but `TaskExecutor`
+rejects every MUX-level task with `MuxMappingError` before the task runs. Both `execute()` and
+`execute_batch()` apply this check, so a batch call fails every qid before `batch_run()` and saves
+no result. `MuxDistributor` never
+reads the chip topology itself, so a topology repaired or edited during the run cannot receive
+fanned-out results.
 
 Serial and batch strategies run in the owner's session, which an in-process Prefect task reads
 through `session_context.get_session()`.

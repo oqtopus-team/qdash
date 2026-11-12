@@ -201,6 +201,26 @@ def test_backend_resolves_an_explicit_topology_id(experiment: MagicMock) -> None
     experiment.assert_not_called()
 
 
+@pytest.mark.parametrize("topology_id", [None, ""])
+def test_backend_treats_an_empty_topology_id_as_absent(
+    experiment: MagicMock, topology_id: str | None
+) -> None:
+    """``topology_id: None`` must not select the legacy layout over the chip's own."""
+    backend = QubexBackend(_config(project_id="project-1", topology_id=topology_id))
+
+    with (
+        patch(
+            "qdash.workflow.engine.backend.qubex.resolve_chip_mux_mapping",
+            return_value=MuxMapping.from_groups(SWAPPED_MEMBERSHIP, topology_id="custom"),
+        ) as chip_lookup,
+        pytest.raises(MuxMappingError, match="topology custom"),
+    ):
+        backend.connect()
+
+    chip_lookup.assert_called_once_with("project-1", "chip-1")
+    experiment.assert_not_called()
+
+
 def test_unusable_configured_topology_blocks_the_connection(
     experiment: MagicMock, bundled_topologies
 ) -> None:
@@ -271,6 +291,40 @@ def test_configure_all_checks_the_layout_before_building_its_experiment(
         task.run(backend, "")
 
     experiment.assert_not_called()
+
+
+@pytest.mark.parametrize("mux_ids", [[99], [0, 99], [-1], [True]])
+def test_configure_all_rejects_mux_ids_outside_the_topology(
+    experiment: MagicMock, mux_ids: list[Any]
+) -> None:
+    """A direct call never hands Qubex a MUX that the chip topology does not define."""
+    from qdash.workflow.calibtasks.qubex.box_setup.configure_all import ConfigureAll
+
+    task = ConfigureAll()
+    task.run_parameters["mux_ids"].value = mux_ids
+    backend = QubexBackend({"chip_id": "chip-1"}, mux_mapping=MuxMapping.from_groups(COMPATIBLE))
+
+    with pytest.raises(MuxMappingError, match="not defined"):
+        task.run(backend, "")
+
+    experiment.assert_not_called()
+
+
+def test_configure_all_passes_defined_mux_ids_to_qubex(
+    experiment: MagicMock, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    from qdash.workflow.calibtasks.qubex.box_setup.configure_all import ConfigureAll
+
+    task = ConfigureAll()
+    task.run_parameters["mux_ids"].value = [1, 0]
+    backend = QubexBackend(
+        {"chip_id": "chip-1", "config_dir": str(tmp_path), "params_dir": str(tmp_path)},
+        mux_mapping=MuxMapping.from_groups(COMPATIBLE),
+    )
+
+    task.run(backend, "")
+
+    assert experiment.call_args.kwargs["muxes"] == [1, 0]
 
 
 # ------------------------------------------------------------ orchestrator
@@ -413,7 +467,9 @@ def test_calib_session_keeps_arbitrary_groups_on_the_fake_backend(
     session._initialize(["0"])
 
     orchestrator.assert_called_once()
-    assert orchestrator.call_args.kwargs["config"].mux_mapping is None
+    # The Execution carries the session's mapping for MUX result fan-out; only the
+    # Qubex backend checks it against its own layout.
+    assert orchestrator.call_args.kwargs["config"].mux_mapping is session.mux_mapping
     assert session.mux_mapping.groups[0] == ("4", "5", "6", "7")
 
 

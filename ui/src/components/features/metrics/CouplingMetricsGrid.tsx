@@ -13,7 +13,12 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
-import { buildMuxCellMap, clipMuxBoxes, type MuxGroupBox } from "@/lib/utils/mux-groups";
+import {
+  buildMuxCellMap,
+  clipMuxBoxes,
+  muxLabelPosition,
+  type MuxGroupBox,
+} from "@/lib/utils/mux-groups";
 import { pickColor } from "@/lib/utils/color-scale";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridDimension, cellFontSize } from "@/lib/utils/grid-layout";
@@ -346,9 +351,8 @@ export function CouplingMetricsGrid({
             rows: displayGridSize,
             cols: displayGridSize,
           }).map((box) => {
-            // Center of the visible part of the MUX group
-            const muxCenterX = (box.col + box.cols / 2) * (displayCellSize + gap) - gap / 2;
-            const muxCenterY = (box.row + box.rows / 2) * (displayCellSize + gap) - gap / 2;
+            // Centered over several cells; a single cell gets its label at an edge.
+            const position = muxLabelPosition(box, displayCellSize, gap);
 
             return (
               <div
@@ -357,9 +361,9 @@ export function CouplingMetricsGrid({
                   zoomMode === "full" ? "hidden md:flex" : "flex"
                 }`}
                 style={{
-                  top: muxCenterY,
-                  left: muxCenterX,
-                  transform: "translate(-50%, -50%)",
+                  top: position.top,
+                  left: position.left,
+                  transform: position.transform,
                 }}
               >
                 <div

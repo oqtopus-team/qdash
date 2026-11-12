@@ -18,6 +18,8 @@ export interface MuxGroupBox {
   muxId: number;
   /** Member qubit IDs in local slot order */
   qids: number[];
+  /** Grid cells of the positioned members */
+  cells: GridPosition[];
   minRow: number;
   maxRow: number;
   minCol: number;
@@ -34,13 +36,22 @@ export interface GridWindow {
   cols: number;
 }
 
-/** Part of a MUX box inside a view window, in window-local 0-based cells. */
+/**
+ * The visible members of a MUX inside a view window, in window-local 0-based
+ * cells: the bounding box of the member cells that the window shows.
+ */
 export interface ClippedMuxBox {
   muxId: number;
   row: number;
   col: number;
   rows: number;
   cols: number;
+  /**
+   * The label covers a single cell, whose center holds that cell's own value
+   * or qubit label. Anchor the MUX label at the cell's bottom-left edge
+   * instead of centering it (see {@link muxLabelPosition}).
+   */
+  singleCell: boolean;
 }
 
 /** The API's `muxes`: MUX ID -> member qubit IDs in local slot order. */
@@ -76,6 +87,7 @@ export function buildMuxGroupBoxes(
     boxes.push({
       muxId,
       qids: [...qids],
+      cells: placed.map((pos) => ({ row: pos.row, col: pos.col })),
       minRow,
       maxRow,
       minCol,
@@ -86,24 +98,82 @@ export function buildMuxGroupBoxes(
   return boxes.sort((a, b) => a.muxId - b.muxId);
 }
 
-/** Clip MUX boxes to a view window; boxes fully outside are dropped. */
+/**
+ * Clip MUX boxes to a view window.
+ *
+ * A MUX is labeled only when the window shows at least one of its members, and
+ * its label covers just the visible members. A window that overlaps the MUX's
+ * bounding box but holds none of its members (empty cells or standalone
+ * qubits) gets no label.
+ */
 export function clipMuxBoxes(boxes: MuxGroupBox[], view: GridWindow): ClippedMuxBox[] {
   const clipped: ClippedMuxBox[] = [];
   for (const box of boxes) {
-    const top = Math.max(box.minRow, view.row);
-    const left = Math.max(box.minCol, view.col);
-    const bottom = Math.min(box.maxRow, view.row + view.rows - 1);
-    const right = Math.min(box.maxCol, view.col + view.cols - 1);
-    if (top > bottom || left > right) continue;
+    const visible = box.cells.filter(
+      (cell) =>
+        cell.row >= view.row &&
+        cell.row < view.row + view.rows &&
+        cell.col >= view.col &&
+        cell.col < view.col + view.cols,
+    );
+    if (visible.length === 0) continue;
+    const top = Math.min(...visible.map((cell) => cell.row));
+    const left = Math.min(...visible.map((cell) => cell.col));
+    const rows = Math.max(...visible.map((cell) => cell.row)) - top + 1;
+    const cols = Math.max(...visible.map((cell) => cell.col)) - left + 1;
     clipped.push({
       muxId: box.muxId,
       row: top - view.row,
       col: left - view.col,
-      rows: bottom - top + 1,
-      cols: right - left + 1,
+      rows,
+      cols,
+      singleCell: rows === 1 && cols === 1,
     });
   }
   return clipped;
+}
+
+/** Absolute position of a MUX label over cells of `cellSize` separated by `gap`. */
+export interface MuxLabelPosition {
+  top: number;
+  left: number;
+  transform: string;
+}
+
+/**
+ * Where to place a MUX label in an absolutely positioned overlay.
+ *
+ * A label over several cells sits at the center of the visible members. A
+ * single-cell label sits at the cell's bottom-left edge, a corner that the
+ * grids leave free (the qubit label is top-left, units top-right, the status
+ * mark bottom-right), so it never covers the value centered in the cell.
+ */
+export function muxLabelPosition(
+  box: ClippedMuxBox,
+  cellSize: number,
+  gap: number,
+): MuxLabelPosition {
+  const pitch = cellSize + gap;
+  if (box.singleCell) {
+    return {
+      top: (box.row + 1) * pitch - gap,
+      left: box.col * pitch,
+      transform: "translate(0, -100%)",
+    };
+  }
+  return {
+    top: (box.row + box.rows / 2) * pitch - gap / 2,
+    left: (box.col + box.cols / 2) * pitch - gap / 2,
+    transform: "translate(-50%, -50%)",
+  };
+}
+
+/**
+ * Tailwind classes that place a MUX label inside its CSS grid area:
+ * centered over several cells, at the bottom-left edge of a single cell.
+ */
+export function muxLabelAreaClass(box: ClippedMuxBox): string {
+  return box.singleCell ? "flex items-end justify-start p-0.5" : "flex items-center justify-center";
 }
 
 /** Qubit ID -> MUX ID lookup. */

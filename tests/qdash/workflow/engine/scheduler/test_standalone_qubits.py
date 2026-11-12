@@ -244,3 +244,67 @@ def test_selected_pairs_without_any_mux_need_no_wiring(tmp_path: Path) -> None:
     schedule = scheduler.schedule_pairs([("0", "1"), ("2", "3")])
 
     assert sorted(schedule.parallel_groups) == [[("0", "1")], [("2", "3")]]
+
+
+@pytest.mark.parametrize("custom_filters", [False, True])
+def test_plugin_schedule_drops_pairs_outside_the_topology(
+    tmp_path: Path, custom_filters: bool
+) -> None:
+    """Default and custom filter lists never schedule a qubit the topology does not define."""
+    from qdash.workflow.engine.scheduler.plugins import FrequencyDirectionalityFilter
+
+    couplings = ["0-17", "1-6", "2-99"]
+    scheduler = _cr_scheduler(tmp_path, _mapping(), couplings)
+    filters = [FrequencyDirectionalityFilter(use_design_based=False)] if custom_filters else None
+
+    schedule = scheduler.generate_with_plugins(filters=filters)
+
+    scheduled = {f"{c}-{t}" for group in schedule.parallel_groups for c, t in group}
+    # 99 is neither a wired MUX member nor a standalone qubit: never scheduled as "slow".
+    assert scheduled == {"0-17", "1-6"}
+    assert schedule.filtering_stats["mux_filtered_out"] == 1
+
+
+def test_targeted_mux_without_a_wiring_row_is_rejected(tmp_path: Path) -> None:
+    """A topology MUX missing from wiring.yaml fails instead of dropping its qubits."""
+    # MUX 7 owns qubit 1 in the topology, but the wiring only lists MUXes 9 and 4.
+    mapping = MuxMapping.from_groups({**GROUPS, 7: ["1"]}, known_qids=KNOWN)
+    scheduler = _scheduler(tmp_path, mapping)
+
+    for generate in (
+        lambda: scheduler.generate(["1"]),
+        lambda: scheduler.generate(["0", "1"]),
+        lambda: scheduler.generate_synchronized(["1"]),
+        lambda: scheduler.generate_simultaneous_spectroscopy_batches(["1"]),
+        lambda: scheduler.generate_from_mux([7]),
+    ):
+        with pytest.raises(MuxMappingError, match=r"MUXes \[7\].*no row in the wiring"):
+            generate()
+    # A wired selection of the same topology still schedules.
+    assert scheduler.generate(["0"]).stages[0].qids == ["0"]
+
+
+def test_legacy_mapping_keeps_skipping_unwired_muxes(tmp_path: Path) -> None:
+    """Chips without a topology keep the historical drop of MUXes outside the wiring."""
+    path = tmp_path / "wiring.yaml"
+    path.write_text(yaml.safe_dump({"chip-x": [{"mux": 0, "ctrl": ["A-0"], "read_out": "A-8"}]}))
+    scheduler = OneQubitScheduler(chip_id="chip-x", wiring_config_path=path)
+
+    schedule = scheduler.generate(["0", "9"])
+
+    assert [qid for stage in schedule.stages for qid in stage.qids] == ["0"]
+
+
+def test_accepted_qubit_aliases_are_scheduled_by_canonical_id(tmp_path: Path) -> None:
+    """``Q17`` and ``Q06`` are accepted as 17 and 6, so they are scheduled, not lost."""
+    scheduler = _scheduler(tmp_path)
+
+    schedule = scheduler.generate(["Q17", "Q06", "17"])
+
+    assert [stage.qids for stage in schedule.stages] == [["17"], ["6"]]
+    assert scheduler.generate_synchronized(["Q06"]).steps[0].parallel_qids == ["6"]
+    batches = scheduler.generate_simultaneous_spectroscopy_batches(["Q17", "Q06"])
+    assert [batch for step in batches.steps for batch in step.parallel_batches] == [
+        ["17"],
+        ["6"],
+    ]

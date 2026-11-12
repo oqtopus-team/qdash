@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from qdash.common.mux_mapping import MuxMapping
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
 from qdash.workflow.calibtasks.qubex.box_setup.configure import Configure, ConfigureEF
 from qdash.workflow.calibtasks.qubex.box_setup.configure_all import ConfigureAll
@@ -206,6 +207,7 @@ def test_configure_all_applies_requested_or_default_configuration_mode(
         "config_dir": "/config",
         "params_dir": "/params",
     }
+    backend.ensure_mux_mapping_compatible.return_value = MuxMapping.legacy()
     exp = MagicMock()
     exp.chip_id = "chip"
     exp.config_path = "/config"

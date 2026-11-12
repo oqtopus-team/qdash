@@ -184,6 +184,23 @@ describe("QubitGrid MUX labels", () => {
     expect(mux0.style.gridColumn).toBe("5 / span 2");
   });
 
+  it("keeps a single-member MUX label off the center of its cell", () => {
+    const singleton = syntheticTopology();
+    singleton.muxes = { ...singleton.muxes, "2": [8] };
+    topologyResponse = singleton;
+
+    renderGrid();
+
+    const mux2 = screen.getByText("MUX2").parentElement as HTMLElement;
+    expect(mux2.style.gridColumn).toBe("6 / span 1");
+    expect(mux2.style.gridRow).toBe("6 / span 1");
+    expect(mux2.className).toContain("items-end");
+    expect(mux2.className).toContain("justify-start");
+    // Multi-cell MUX labels stay centered.
+    const mux0 = screen.getByText("MUX0").parentElement as HTMLElement;
+    expect(mux0.className).toContain("justify-center");
+  });
+
   it("hides labels when show_mux_boundaries is off, without changing membership", () => {
     const hidden = syntheticTopology();
     hidden.visualization = { show_mux_boundaries: false, region_size: 4 };

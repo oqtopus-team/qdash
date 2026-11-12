@@ -25,7 +25,12 @@ import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
-import { buildMuxCellMap, clipMuxBoxes, type MuxGroupBox } from "@/lib/utils/mux-groups";
+import {
+  buildMuxCellMap,
+  clipMuxBoxes,
+  muxLabelAreaClass,
+  type MuxGroupBox,
+} from "@/lib/utils/mux-groups";
 
 interface ExecutionTopologyViewProps {
   chipId: string;
@@ -496,7 +501,7 @@ export function ExecutionTopologyView({
               (box) => (
                 <div
                   key={box.muxId}
-                  className="flex items-center justify-center"
+                  className={muxLabelAreaClass(box)}
                   style={{
                     gridColumn: `${box.col + 1} / span ${box.cols}`,
                     gridRow: `${box.row + 1} / span ${box.rows}`,

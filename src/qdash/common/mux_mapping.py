@@ -26,7 +26,7 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from qdash.common.config.topology import LEGACY_QUBITS_PER_MUX, load_topology
 
@@ -54,6 +54,27 @@ def _qid_number(qid: str | int) -> int:
     if match is None:
         raise MuxMappingError(f"Invalid qubit ID: {qid!r}")
     return int(match.group(1))
+
+
+def normalize_qid(qid: str | int) -> str:
+    """Canonical string form of a qubit ID: ``"Q07"``, ``"7"`` and ``7`` become ``"7"``.
+
+    Raises:
+        MuxMappingError: If ``qid`` is not a qubit ID.
+    """
+    return str(_qid_number(qid))
+
+
+def canonical_qid(qid: str | int) -> str:
+    """:func:`normalize_qid`, or ``str(qid)`` when it is not a qubit ID.
+
+    Use it to compare user-supplied IDs, such as exclusions, that may also hold
+    values no mapping knows.
+    """
+    try:
+        return normalize_qid(qid)
+    except MuxMappingError:
+        return str(qid)
 
 
 @dataclass(frozen=True)
@@ -232,9 +253,41 @@ class MuxMapping:
     def qids_for_muxes(
         self, mux_ids: Iterable[int], exclude_qids: Iterable[str] | None = None
     ) -> list[str]:
-        """Members of ``mux_ids`` in MUX-then-slot order, minus ``exclude_qids``."""
-        excluded = {str(qid) for qid in exclude_qids or ()}
+        """Members of ``mux_ids`` in MUX-then-slot order, minus ``exclude_qids``.
+
+        Exclusions match by qubit number, so ``"Q05"`` excludes member ``"5"``.
+        """
+        excluded = {canonical_qid(qid) for qid in exclude_qids or ()}
         return [qid for mux_id in mux_ids for qid in self.qids_of(mux_id) if qid not in excluded]
+
+    def unknown_mux_ids(self, mux_ids: Iterable[Any]) -> list[Any]:
+        """Entries of ``mux_ids`` that are not MUX IDs of this mapping, in input order.
+
+        A MUX ID is a non-negative integer (or its decimal string); booleans and
+        other values are never MUX IDs.
+        """
+        unknown: list[Any] = []
+        for mux_id in mux_ids:
+            number = _mux_id_number(mux_id)
+            if number is None or not self.has_mux(number):
+                unknown.append(mux_id)
+        return unknown
+
+    def check_mux_ids(self, mux_ids: Iterable[Any]) -> list[int]:
+        """Selected MUX IDs as integers; raises ``MuxMappingError`` for an unknown one.
+
+        Call this before a MUX selection reaches hardware, so that no MUX
+        outside the chip topology is configured or driven.
+        """
+        selected = list(mux_ids)
+        unknown = self.unknown_mux_ids(selected)
+        if unknown:
+            defined = ", ".join(str(mux_id) for mux_id in self.mux_ids) or "none"
+            raise MuxMappingError(
+                f"MUX IDs {unknown} are not defined in {self._label()}"
+                + ("" if self.unbounded else f" (defined: {defined})")
+            )
+        return [number for mux_id in selected if (number := _mux_id_number(mux_id)) is not None]
 
     def mux_ids_for_qids(self, qids: Iterable[str | int]) -> list[int]:
         """Sorted MUX IDs that own ``qids``; raises when any qubit is standalone or unknown."""
@@ -316,6 +369,66 @@ class MuxMapping:
 
     def _label(self) -> str:
         return f"topology {self.topology_id}" if self.topology_id else "the MUX mapping"
+
+
+def _mux_id_number(mux_id: Any) -> int | None:
+    """``mux_id`` as a non-negative integer, or ``None`` when it is not a MUX ID."""
+    if isinstance(mux_id, bool):
+        return None
+    if isinstance(mux_id, int):
+        return mux_id if mux_id >= 0 else None
+    if isinstance(mux_id, str) and mux_id.strip().isdigit():
+        return int(mux_id.strip())
+    return None
+
+
+class MuxMappingSnapshot(BaseModel):
+    """Serializable form of a resolved :class:`MuxMapping`.
+
+    An owner session resolves the chip topology once and hands this snapshot
+    to its isolated workers, so every worker of the run schedules, locks and
+    fans out with the owner's membership even if the chip's topology changes
+    while the run is in progress. It survives JSON (Prefect, Dask) and pickle.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    source: MuxMappingSource
+    topology_id: str | None = None
+    unbounded: bool = False
+    groups: dict[int, tuple[str, ...]] = {}
+    slots: dict[str, int] = {}
+    known_qids: tuple[str, ...] | None = None
+
+    @classmethod
+    def of(cls, mapping: MuxMapping) -> MuxMappingSnapshot:
+        """Snapshot of ``mapping``."""
+        return cls(
+            source=mapping.source,
+            topology_id=mapping.topology_id,
+            unbounded=mapping.unbounded,
+            groups={mux_id: tuple(members) for mux_id, members in mapping.groups.items()},
+            slots=dict(mapping._slots),
+            known_qids=(
+                tuple(sorted(mapping.known_qids, key=int))
+                if mapping.known_qids is not None
+                else None
+            ),
+        )
+
+    def to_mapping(self) -> MuxMapping:
+        """The :class:`MuxMapping` this snapshot was taken from."""
+        if self.unbounded:
+            return MuxMapping(
+                groups={}, source=self.source, topology_id=self.topology_id, unbounded=True
+            )
+        return MuxMapping.from_groups(
+            self.groups,
+            source=self.source,
+            topology_id=self.topology_id,
+            slots=self.slots,
+            known_qids=self.known_qids,
+        )
 
 
 def resolve_topology_mux_mapping(topology_id: str | None) -> MuxMapping:

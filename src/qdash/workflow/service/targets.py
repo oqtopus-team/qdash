@@ -27,7 +27,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from qdash.common.mux_mapping import resolve_chip_mux_mapping
+from qdash.common.mux_mapping import canonical_qid, resolve_chip_mux_mapping
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
@@ -85,7 +85,9 @@ class MuxTargets(Target):
 
     This is the most common way to specify targets for chip-wide calibration.
     MUX IDs are resolved to qubit IDs through the chip topology's MUX
-    mapping, restricted to MUXes present in the wiring configuration.
+    mapping. With a topology, a selected MUX without a ``wiring.yaml`` row
+    raises ``MuxMappingError``; chips without a topology keep skipping MUXes
+    that the wiring does not list.
 
     Attributes:
         mux_ids: MUX IDs to calibrate, as defined by the chip topology
@@ -244,9 +246,12 @@ class AllMuxTargets(Target):
     """Target every MUX of the chip for full chip calibration.
 
     The MUX list comes from the chip topology's MUX mapping: only declared
-    MUXes, never the topology's standalone qubits. Chips without a topology
-    keep the legacy MUXes 0-15. Use ``AllQubitTargets`` to include standalone
-    qubits.
+    MUXes, never the topology's standalone qubits. Every declared MUX needs a
+    ``wiring.yaml`` row; a missing row raises ``MuxMappingError`` rather than
+    selecting part of the chip. A topology that declares no MUX raises
+    ``ValueError``. Chips without a topology keep the legacy MUXes 0-15,
+    limited to the MUXes the wiring lists. Use ``AllQubitTargets`` to include
+    standalone qubits.
 
     Attributes:
         exclude_qids: Qubit IDs to exclude from calibration
@@ -296,8 +301,9 @@ class AllMuxTargets(Target):
 class AllQubitTargets(Target):
     """Target every known qubit of the chip, multiplexed or standalone.
 
-    Multiplexed qubits resolve like ``AllMuxTargets`` (members of the wired
-    MUXes). Standalone qubits, which the topology lists in no MUX, are added
+    Multiplexed qubits resolve like ``AllMuxTargets`` (members of the
+    declared MUXes, each of which needs a wiring row); a MUX whose members are
+    all excluded is skipped. Standalone qubits, which the topology lists in no MUX, are added
     as they are. The schedulers run them after the MUX stages, one at a time,
     because the wiring maps no hardware for them. Chips without a topology
     keep the legacy MUXes 0-15.
@@ -317,10 +323,17 @@ class AllQubitTargets(Target):
             return AllMuxTargets(exclude_qids=self.exclude_qids).to_qids(
                 chip_id, mux_mapping=mux_mapping
             )
-        excluded = set(self.exclude_qids)
+        excluded = {canonical_qid(qid) for qid in self.exclude_qids}
+        # Only MUXes with a member left are resolved, so exclusions may remove
+        # every MUX member and still select the standalone qubits.
+        mux_ids = [
+            mux_id
+            for mux_id in mux_mapping.mux_ids
+            if any(qid not in excluded for qid in mux_mapping.qids_of(mux_id))
+        ]
         qids: list[str] = []
-        if mux_mapping.mux_ids:
-            qids = MuxTargets(mux_ids=mux_mapping.mux_ids, exclude_qids=self.exclude_qids).to_qids(
+        if mux_ids:
+            qids = MuxTargets(mux_ids=mux_ids, exclude_qids=self.exclude_qids).to_qids(
                 chip_id, mux_mapping=mux_mapping
             )
         qids += [qid for qid in mux_mapping.standalone_qids if qid not in excluded]

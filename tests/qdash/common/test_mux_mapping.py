@@ -479,3 +479,57 @@ def test_synthetic_template_keeps_authored_couplings(
         (4, 1),
         (7, 4),
     ]
+
+
+# ------------------------------------------------- aliases, MUX selection, snapshots
+
+
+def test_exclusions_match_members_by_qubit_number() -> None:
+    mapping = MuxMapping.from_groups({0: ["Q05", "12"]})
+
+    assert mapping.qids_for_muxes([0], exclude_qids=["Q05"]) == ["12"]
+    assert mapping.qids_for_muxes([0], exclude_qids=["012", "not-a-qubit"]) == ["5"]
+
+
+def test_selected_mux_ids_must_be_defined() -> None:
+    mapping = MuxMapping.from_groups({3: ["12"], 9: ["36"]})
+
+    assert mapping.check_mux_ids([9, "3"]) == [9, 3]
+    with pytest.raises(MuxMappingError, match=r"MUX IDs \[0, True, -1, 'x'\].*defined: 3, 9"):
+        mapping.check_mux_ids([0, True, -1, "x", 3])
+    # The unbounded legacy mapping knows every non-negative MUX, and nothing else.
+    assert MuxMapping.legacy().check_mux_ids([0, 15]) == [0, 15]
+    with pytest.raises(MuxMappingError):
+        MuxMapping.legacy().check_mux_ids([-1])
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        MuxMapping.from_groups(
+            {15: ["61", "60"], 3: ["14", "12"]},
+            topology_id="synthetic",
+            slots={"61": 1, "60": 0, "14": 2, "12": 3},
+            known_qids=["12", "14", "20", "60", "61"],
+        ),
+        MuxMapping.from_groups({}, known_qids=["0", "1"]),
+        MuxMapping.legacy(),
+    ],
+    ids=["explicit-with-standalone", "standalone-only", "legacy"],
+)
+def test_snapshot_round_trips_through_json_and_pickle(mapping: MuxMapping) -> None:
+    import pickle
+
+    from qdash.common.mux_mapping import MuxMappingSnapshot
+
+    snapshot = MuxMappingSnapshot.of(mapping)
+    for restored_snapshot in (
+        MuxMappingSnapshot.model_validate_json(snapshot.model_dump_json()),
+        pickle.loads(pickle.dumps(snapshot)),  # noqa: S301 - round trip of our own object
+    ):
+        restored = restored_snapshot.to_mapping()
+        assert restored == mapping
+        assert restored.standalone_qids == mapping.standalone_qids
+        for mux_id in mapping.mux_ids:
+            assert restored.slots_of(mux_id) == mapping.slots_of(mux_id)
+        assert restored.find_mux("61") == mapping.find_mux("61")

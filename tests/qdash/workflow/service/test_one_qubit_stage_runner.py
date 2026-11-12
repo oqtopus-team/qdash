@@ -3,6 +3,7 @@ from typing import Any, cast
 
 import pytest
 
+from qdash.common.mux_mapping import MuxMapping, MuxMappingSnapshot
 from qdash.datamodel.task_call import StepCalls, TaskCall, normalize_calls
 from qdash.workflow.service._internal.session import CalibSession
 from qdash.workflow.service._internal.settings import SessionSettings, WorkerLease, WorkerSpec
@@ -39,6 +40,7 @@ def _worker_spec() -> WorkerSpec:
             task_defaults={"CreateHPIPulse": {"run": {"hpi_duration": {"value": 52}}}},
         ).for_worker(),
         lease=WorkerLease(execution_id="exec-1"),
+        mux_mapping=MuxMappingSnapshot.of(MuxMapping.legacy()),
     )
 
 

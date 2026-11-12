@@ -37,9 +37,13 @@ class CalibConfig:
             :mod:`qdash.workflow.engine.task_parameters`
         default_run_parameters: Shared run fallbacks in the canonical form of
             :mod:`qdash.workflow.engine.task_parameters`.
-        mux_mapping: The chip's MUX membership, passed to the backend so the Qubex
-            backend can reject a layout it cannot drive. If None, the Qubex backend
-            resolves it from ``project_id`` and ``chip_id``.
+        mux_mapping: The MUX membership the session planned this Execution with.
+            The Qubex backend rejects a layout it cannot drive, and MUX result
+            fan-out distributes to its members, so neither reads the chip
+            topology again. A chip without a topology is pinned as the legacy
+            mapping. None means no mapping was pinned: the Qubex backend
+            resolves one before connecting, and a MUX-level task fails with
+            ``MuxMappingError`` because fan-out never resolves the topology.
     """
 
     username: str

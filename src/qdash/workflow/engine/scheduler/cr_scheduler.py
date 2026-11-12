@@ -332,6 +332,9 @@ class CRScheduler:
         Args:
             filters: List of CRPairFilter instances to apply in order.
                 If None, uses default filters (frequency directionality only).
+                After the filters, pairs with a qubit that is neither a wired
+                MUX member nor a standalone qubit of the topology are always
+                dropped, as ``MuxMembershipFilter`` would.
             scheduler: CRSchedulingStrategy instance for scheduling.
                 If None, uses default (IntraThenInterMuxScheduler with MuxConflictScheduler).
 
@@ -433,6 +436,24 @@ class CRScheduler:
                 f"  Filter {i} ({stats['filter_name']}): {stats['input_pairs']} → {stats['output_pairs']}"
             )
 
+        # Whatever the filters, a pair runs only when both qubits are wired MUX
+        # members or standalone qubits of the topology. Without this, a qubit the
+        # topology does not define would have no MUX and be scheduled as a slow pair.
+        pairs_before_mux_filter = len(filtered_pairs)
+        filtered_pairs = [
+            pair
+            for pair in filtered_pairs
+            if all(
+                qid in qid_to_mux or qid in filter_context.standalone_qids
+                for qid in pair.split("-")
+            )
+        ]
+        if pairs_before_mux_filter != len(filtered_pairs):
+            logger.warning(
+                f"Filtered out {pairs_before_mux_filter - len(filtered_pairs)} pairs "
+                f"with qubits missing from MUX configuration"
+            )
+
         if len(filtered_pairs) == 0:
             msg = "No valid CR pairs after filtering"
             logger.error(msg)
@@ -482,6 +503,7 @@ class CRScheduler:
         filtering_stats = {
             "all_coupling_pairs": len(all_pairs),
             "final_filtered_pairs": len(filtered_pairs),
+            "mux_filtered_out": pairs_before_mux_filter - len(filtered_pairs),
             "filter_pipeline": filter_stats,
         }
 

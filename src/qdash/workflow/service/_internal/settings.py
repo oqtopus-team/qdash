@@ -27,6 +27,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from qdash.common.execution_resources import ExecutionResourceScope
+from qdash.common.mux_mapping import MuxMappingSnapshot  # noqa: TC001 - pydantic field type
 from qdash.workflow.engine.task_parameters import (
     normalize_default_run_parameters,
     normalize_task_parameters,
@@ -178,9 +179,18 @@ class WorkerLease(BaseModel):
 
 
 class WorkerSpec(BaseModel):
-    """What an isolated worker process needs to run calls under its owner's Execution."""
+    """What an isolated worker process needs to run calls under its owner's Execution.
+
+    ``mux_mapping`` is the MUX membership the owner planned the run with. A
+    worker uses it for representatives, scope checks and MUX result fan-out
+    instead of reading the chip topology again, so an edit to the chip's
+    topology during the run cannot split the owner and its workers. It is
+    required: an owner that cannot resolve its mapping creates no worker, so
+    no worker ever resolves a topology the owner did not plan with.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     settings: SessionSettings
     lease: WorkerLease
+    mux_mapping: MuxMappingSnapshot

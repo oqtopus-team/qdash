@@ -97,10 +97,11 @@ visualization:
 
 - The key is the MUX ID: the `mux` key of the matching `wiring.yaml` row, which keeps the MUX's
   hardware resources. The order in which MUXes are declared carries no meaning.
-- The array index of a member is its local slot: the `i`-th port in that row's `ctrl` list, and
-  the step the synchronized and simultaneous-spectroscopy schedules give it. It is not the
-  calibration order, and QDash never sorts a member list. Slot 0 is the representative qubit that
-  runs MUX-level tasks.
+- The array index of a member is its local slot: the hardware assignment to the `i`-th port in
+  that row's `ctrl` list. A slot is not a step: the ordering strategy maps it to a synchronized
+  step, and `CheckerboardOrderingStrategy` runs slot 2 of an odd MUX in step 0 (see
+  [MUX Ordering Strategies](./one-qubit-ordering-strategies.md)). QDash never sorts a member
+  list. Slot 0 is the representative qubit that runs MUX-level tasks.
 - MUX IDs may be sparse, MUXes may have different sizes, and members need not be consecutive.
 - A qubit in `qubits` that no MUX lists is **standalone** (not multiplexed). `muxes: {}` declares a
   chip whose qubits are all standalone, as the bundled `linear-16` and `heavy-hex-27` templates
@@ -109,10 +110,14 @@ visualization:
 - `muxes` is required, so an empty declaration cannot be confused with a forgotten one. Loading
   also rejects a qubit in two MUXes or twice in one MUX, an empty member list, a member missing
   from `qubits`, negative or non-integer IDs, and qubit positions outside `grid_size`. A schedule
-  fails when a member slot has no `ctrl` port in the wiring.
+  fails when a member slot has no `ctrl` port in the wiring, or when a targeted MUX has no
+  `wiring.yaml` row; it never drops that MUX's qubits. Chips without a topology keep skipping
+  MUXes that the wiring does not list.
 - `visualization.show_mux_boundaries` only decides whether the UI and the metrics PDF draw MUX
   outlines and labels. The UI draws each MUX around its members' positions; standalone qubits and
-  cells without qubits get no MUX label.
+  cells without qubits get no MUX label. A zoomed region labels a MUX only when it shows one of
+  its members, and a label over a single cell sits at the cell's bottom-left edge so it does not
+  cover the cell's value.
 
 The topology API (`GET /topology/{topology_id}`) returns the normalized `muxes`, the template
 format it came from as `muxes_source`, `standalone_qubits`, and `mux_slots` (qubit ID to

@@ -32,7 +32,12 @@ import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
-import { buildMuxCellMap, clipMuxBoxes, type MuxGroupBox } from "@/lib/utils/mux-groups";
+import {
+  buildMuxCellMap,
+  clipMuxBoxes,
+  muxLabelAreaClass,
+  type MuxGroupBox,
+} from "@/lib/utils/mux-groups";
 
 const NO_MUX_GROUPS: MuxGroupBox[] = [];
 
@@ -641,7 +646,7 @@ export function QubitGrid({
             }).map((box) => (
               <div
                 key={box.muxId}
-                className="flex items-center justify-center"
+                className={muxLabelAreaClass(box)}
                 style={{
                   gridColumn: `${box.col + 1} / span ${box.cols}`,
                   gridRow: `${box.row + 1} / span ${box.rows}`,

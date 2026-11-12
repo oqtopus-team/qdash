@@ -298,10 +298,13 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
             # Determine slot order for this MUX
             offset_order = self.EVEN_MUX_ORDER if mux_id % 2 == 0 else self.ODD_MUX_ORDER
 
-            # Add qubits to corresponding steps
-            for step_idx, slot in enumerate(_ordered_slots(slots, offset_order)):
+            # The step is the slot's position in the parity order, so a MUX that lacks a
+            # slot leaves that step empty instead of shifting its later slots forward.
+            # Slots beyond the 2x2 order of a larger MUX follow in slot order.
+            for slot in _ordered_slots(slots, offset_order):
                 target_qid = slots[slot]
                 if target_qid in qid_set:
+                    step_idx = offset_order.index(slot) if slot in offset_order else slot
                     steps.setdefault(step_idx, []).append(target_qid)
 
         # Empty steps are never created

@@ -58,7 +58,12 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
-from qdash.common.mux_mapping import MuxMapping, MuxMappingError
+from qdash.common.mux_mapping import (
+    MuxMapping,
+    MuxMappingError,
+    canonical_qid,
+    normalize_qid,
+)
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
@@ -437,6 +442,8 @@ class OneQubitScheduler:
     def _split_standalone(self, qids: list[str]) -> tuple[list[str], list[str]]:
         """Split ``qids`` into multiplexed and standalone qubits.
 
+        Accepted aliases are normalized first (``"Q07"`` becomes ``"7"``, the
+        form the MUX mapping and the wiring use), and duplicates are dropped.
         Order is kept for multiplexed qubits; standalone qubits come back in
         ascending ID order. Qubits the chip topology does not define raise
         ``MuxMappingError``.
@@ -450,6 +457,7 @@ class OneQubitScheduler:
                 f"Qubits {unknown} are not defined by the chip topology"
                 + (f" {self.mux_mapping.topology_id}" if self.mux_mapping.topology_id else "")
             )
+        qids = list(dict.fromkeys(normalize_qid(qid) for qid in qids))
         muxed = [qid for qid in qids if self.mux_mapping.find_mux(qid) is not None]
         standalone = sorted(
             {qid for qid in qids if self.mux_mapping.find_mux(qid) is None}, key=int
@@ -467,10 +475,24 @@ class OneQubitScheduler:
         if not muxed_qids:
             return [], {}, {}
         wiring_config = self._load_wiring_config()
+        qid_to_mux = self._build_qubit_to_mux_map(wiring_config)
+        if not self.mux_mapping.unbounded:
+            # A targeted MUX of the topology without a wiring row has no hardware:
+            # fail instead of silently scheduling none of its qubits. Legacy chips
+            # keep their historical behavior of skipping MUXes outside the wiring.
+            unwired = sorted(
+                {self.mux_mapping.mux_of(qid) for qid in muxed_qids if qid not in qid_to_mux}
+            )
+            if unwired:
+                raise MuxMappingError(
+                    f"MUXes {unwired} of {self.mux_mapping._label()} have no row in the "
+                    f"wiring of chip {self.chip_id}; add them to wiring.yaml or leave them "
+                    "out of the targets"
+                )
         return (
             wiring_config,
             self._build_mux_box_map(wiring_config),
-            self._build_qubit_to_mux_map(wiring_config),
+            qid_to_mux,
         )
 
     def _get_qubit_box_type(
@@ -570,7 +592,7 @@ class OneQubitScheduler:
         qids = self.mux_mapping.qids_for_muxes(mux_ids)
         qids += [qid for qid in dict.fromkeys(standalone) if qid not in qids]
         if exclude_qids:
-            exclude_set = set(exclude_qids)
+            exclude_set = {canonical_qid(qid) for qid in exclude_qids}
             original_count = len(qids)
             qids = [qid for qid in qids if qid not in exclude_set]
             excluded_count = original_count - len(qids)
