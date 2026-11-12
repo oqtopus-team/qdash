@@ -35,7 +35,6 @@ from qdash.workflow.service.steps.base import (
     CalibrationStep,
     Step,
     TransformStep,
-    resolve_execution_mode,
 )
 
 # Box setup steps
@@ -99,5 +98,4 @@ __all__ = [
     "StepContext",
     "TransformStep",
     "TwoQubitCalibration",
-    "resolve_execution_mode",
 ]

@@ -194,7 +194,9 @@ class PipelineCatalogResponse(BaseModel):
 
     backend_name: str
     step_types: list[PipelineStepTypeInfo]
-    one_qubit_modes: list[str]
+    one_qubit_execution_modes: list[str] = Field(
+        description="Values a one-qubit step accepts for execution_mode."
+    )
     tasks: dict[str, list[str]] = Field(
         description='Available task names by task_type ("qubit", "coupling", ...).'
     )

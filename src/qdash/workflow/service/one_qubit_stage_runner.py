@@ -43,10 +43,10 @@ class OneQubitStageRunner:
     def __init__(self, session: CalibSession) -> None:
         self.session = session
 
-    def collect_scheduled_qids(
+    def collect_mux_group_qids(
         self, schedule: Any, allowed_qids: list[str] | None = None
     ) -> list[str]:
-        """Collect qids from a scheduled MUX plan."""
+        """Collect qids from the MUX groups of a ``OneQubitScheduleResult``."""
         qids: list[str] = []
         for stage_info in schedule.stages:
             for group in stage_info.parallel_groups:
@@ -74,7 +74,7 @@ class OneQubitStageRunner:
                 "simultaneous_spectroscopy cannot run this step: " + "; ".join(problems)
             )
 
-    def execute_scheduled_mux_schedule(
+    def execute_parallel_by_mux_schedule(
         self,
         schedule: Any,
         *,
@@ -82,7 +82,10 @@ class OneQubitStageRunner:
         worker: WorkerSpec,
         allowed_qids: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Run a scheduled MUX plan under the current parent execution."""
+        """Run a ``parallel_by_mux`` schedule under the current parent execution.
+
+        The MUX groups of a stage run in parallel; stages run one after another.
+        """
         stages_by_box: dict[str, list[Any]] = {}
         for stage_info in schedule.stages:
             stages_by_box.setdefault(stage_info.box_type, []).append(stage_info)

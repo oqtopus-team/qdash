@@ -672,67 +672,67 @@ class TestIntegration:
                     assert group == ["6", "7", "4", "5"]
 
 
-class TestSynchronizedScheduling:
-    """Tests for synchronized step-based scheduling."""
+class TestRoundScheduling:
+    """Tests for round-based scheduling."""
 
-    def test_generate_synchronized_basic(self, scheduler_simple):
-        """Test basic synchronized schedule generation."""
-        schedule = scheduler_simple.generate_synchronized(
+    def test_generate_rounds_basic(self, scheduler_simple):
+        """Test basic round schedule generation."""
+        schedule = scheduler_simple.generate_rounds(
             qids=["0", "1", "2", "3", "4", "5", "6", "7"],
             use_checkerboard=True,
         )
 
-        # Should have steps (number depends on box distribution)
-        assert len(schedule.steps) > 0
-        assert schedule.total_steps == len(schedule.steps)
+        # Should have rounds (number depends on box distribution)
+        assert len(schedule.rounds) > 0
+        assert schedule.total_rounds == len(schedule.rounds)
 
         # Verify metadata
         assert schedule.metadata["total_qubits"] == 8
         assert schedule.metadata["use_checkerboard"] is True
 
-    def test_generate_synchronized_default_strategy(self, scheduler_simple):
-        """Test synchronized schedule with default strategy."""
-        schedule = scheduler_simple.generate_synchronized(
+    def test_generate_rounds_default_strategy(self, scheduler_simple):
+        """Test round schedule with default strategy."""
+        schedule = scheduler_simple.generate_rounds(
             qids=["0", "1", "2", "3", "4", "5", "6", "7"],
             use_checkerboard=False,
         )
 
-        assert len(schedule.steps) > 0
-        assert schedule.metadata["strategy"] == "default_synchronized"
+        assert len(schedule.rounds) > 0
+        assert schedule.metadata["strategy"] == "default"
 
-    def test_synchronized_step_structure(self, scheduler_simple):
-        """Test that synchronized steps have correct structure."""
-        schedule = scheduler_simple.generate_synchronized(
+    def test_round_structure(self, scheduler_simple):
+        """Test that rounds have correct structure."""
+        schedule = scheduler_simple.generate_rounds(
             qids=["0", "1", "2", "3"],  # Only MUX 0
             use_checkerboard=True,
         )
 
-        for step in schedule.steps:
-            # Each step should have step_index, box_type, and parallel_qids
-            assert hasattr(step, "step_index")
-            assert hasattr(step, "box_type")
-            assert hasattr(step, "parallel_qids")
-            assert isinstance(step.parallel_qids, list)
+        for round_ in schedule.rounds:
+            # Each round should have round_index, box_type, and parallel_qids
+            assert hasattr(round_, "round_index")
+            assert hasattr(round_, "box_type")
+            assert hasattr(round_, "parallel_qids")
+            assert isinstance(round_.parallel_qids, list)
 
-    def test_synchronized_checkerboard_pattern(self, scheduler_simple):
+    def test_round_checkerboard_pattern(self, scheduler_simple):
         """Test that checkerboard pattern is applied correctly."""
-        schedule = scheduler_simple.generate_synchronized(
+        schedule = scheduler_simple.generate_rounds(
             qids=["0", "1", "2", "3", "4", "5", "6", "7"],
             use_checkerboard=True,
         )
 
-        # Collect all qids from steps
+        # Collect all qids from rounds
         all_qids = []
-        for step in schedule.steps:
-            all_qids.extend(step.parallel_qids)
+        for round_ in schedule.rounds:
+            all_qids.extend(round_.parallel_qids)
 
         # All input qubits should be scheduled
         assert set(all_qids) == {"0", "1", "2", "3", "4", "5", "6", "7"}
 
-    def test_synchronized_box_separation(self, scheduler_64qv3):
-        """Test that synchronized schedule separates box types."""
+    def test_round_box_separation(self, scheduler_64qv3):
+        """Test that round schedule separates box types."""
         # Use scheduler with 64Qv3 config that has mixed boxes
-        schedule = scheduler_64qv3.generate_synchronized(
+        schedule = scheduler_64qv3.generate_rounds(
             qids=["0", "1", "2", "3", "4", "5", "6", "7"],  # MUX 0 (MIXED) and MUX 1 (A)
             use_checkerboard=True,
         )
@@ -741,111 +741,111 @@ class TestSynchronizedScheduling:
         box_types = schedule.box_types
         assert len(box_types) > 0
 
-    def test_generate_synchronized_from_mux(self, scheduler_simple):
-        """Test synchronized schedule generation from MUX IDs."""
-        schedule = scheduler_simple.generate_synchronized_from_mux(
+    def test_generate_rounds_from_mux(self, scheduler_simple):
+        """Test round schedule generation from MUX IDs."""
+        schedule = scheduler_simple.generate_rounds_from_mux(
             mux_ids=[0, 1],
             use_checkerboard=True,
         )
 
         # Should schedule 8 qubits (4 per MUX)
-        total_qubits = sum(len(step.parallel_qids) for step in schedule.steps)
+        total_qubits = sum(len(round_.parallel_qids) for round_ in schedule.rounds)
         assert total_qubits == 8
 
-    def test_generate_synchronized_from_mux_with_exclude(self, scheduler_simple):
-        """Test synchronized schedule with excluded qubits."""
-        schedule = scheduler_simple.generate_synchronized_from_mux(
+    def test_generate_rounds_from_mux_with_exclude(self, scheduler_simple):
+        """Test round schedule with excluded qubits."""
+        schedule = scheduler_simple.generate_rounds_from_mux(
             mux_ids=[0, 1],
             exclude_qids=["0", "4"],
             use_checkerboard=True,
         )
 
         # Should schedule 6 qubits
-        total_qubits = sum(len(step.parallel_qids) for step in schedule.steps)
+        total_qubits = sum(len(round_.parallel_qids) for round_ in schedule.rounds)
         assert total_qubits == 6
 
         # Excluded qubits should not appear
         all_qids = []
-        for step in schedule.steps:
-            all_qids.extend(step.parallel_qids)
+        for round_ in schedule.rounds:
+            all_qids.extend(round_.parallel_qids)
         assert "0" not in all_qids
         assert "4" not in all_qids
 
-    def test_synchronized_result_to_dict(self, scheduler_simple):
-        """Test serialization of synchronized result."""
-        schedule = scheduler_simple.generate_synchronized(
+    def test_round_result_to_dict(self, scheduler_simple):
+        """Test serialization of round result."""
+        schedule = scheduler_simple.generate_rounds(
             qids=["0", "1", "2", "3"],
             use_checkerboard=True,
         )
 
         result_dict = schedule.to_dict()
 
-        assert "steps" in result_dict
+        assert "rounds" in result_dict
         assert "metadata" in result_dict
-        assert len(result_dict["steps"]) == len(schedule.steps)
+        assert len(result_dict["rounds"]) == len(schedule.rounds)
 
-        for step_dict in result_dict["steps"]:
-            assert "step_index" in step_dict
-            assert "box_type" in step_dict
-            assert "parallel_qids" in step_dict
+        for round_dict in result_dict["rounds"]:
+            assert "round_index" in round_dict
+            assert "box_type" in round_dict
+            assert "parallel_qids" in round_dict
 
-    def test_synchronized_get_steps_by_box(self, scheduler_64qv3):
-        """Test filtering steps by box type."""
-        schedule = scheduler_64qv3.generate_synchronized(
+    def test_round_get_rounds_by_box(self, scheduler_64qv3):
+        """Test filtering rounds by box type."""
+        schedule = scheduler_64qv3.generate_rounds(
             qids=[str(i) for i in range(8)],
             use_checkerboard=True,
         )
 
-        # Get steps by box type
-        box_a_steps = schedule.get_steps_by_box(BOX_A)
-        mixed_steps = schedule.get_steps_by_box(BOX_MIXED)
+        # Get rounds by box type
+        box_a_rounds = schedule.get_rounds_by_box(BOX_A)
+        mixed_rounds = schedule.get_rounds_by_box(BOX_MIXED)
 
-        # All returned steps should have the correct box type
-        for step in box_a_steps:
-            assert step.box_type == BOX_A
-        for step in mixed_steps:
-            assert step.box_type == BOX_MIXED
+        # All returned rounds should have the correct box type
+        for round_ in box_a_rounds:
+            assert round_.box_type == BOX_A
+        for round_ in mixed_rounds:
+            assert round_.box_type == BOX_MIXED
 
-    def test_synchronized_empty_qids_raises(self, scheduler_simple):
+    def test_round_empty_qids_raises(self, scheduler_simple):
         """Test that empty qids raises ValueError."""
         with pytest.raises(ValueError, match="No qubits provided"):
-            scheduler_simple.generate_synchronized(qids=[], use_checkerboard=True)
+            scheduler_simple.generate_rounds(qids=[], use_checkerboard=True)
 
-    def test_synchronized_from_mux_empty_raises(self, scheduler_simple):
+    def test_round_from_mux_empty_raises(self, scheduler_simple):
         """Test that empty mux_ids raises ValueError."""
         with pytest.raises(ValueError, match="No MUX IDs provided"):
-            scheduler_simple.generate_synchronized_from_mux(
+            scheduler_simple.generate_rounds_from_mux(
                 mux_ids=[],
                 use_checkerboard=True,
             )
 
-    def test_synchronized_repr(self, scheduler_simple):
-        """Test string representation of synchronized result."""
-        schedule = scheduler_simple.generate_synchronized(
+    def test_round_repr(self, scheduler_simple):
+        """Test string representation of round result."""
+        schedule = scheduler_simple.generate_rounds(
             qids=["0", "1", "2", "3"],
             use_checkerboard=True,
         )
 
         repr_str = repr(schedule)
-        assert "SynchronizedOneQubitScheduleResult" in repr_str
+        assert "OneQubitRoundScheduleResult" in repr_str
         assert "qubits=" in repr_str
-        assert "steps=" in repr_str
+        assert "rounds=" in repr_str
 
-    def test_synchronized_step_repr(self, scheduler_simple):
-        """Test string representation of synchronized step."""
-        schedule = scheduler_simple.generate_synchronized(
+    def test_round_repr_of_one_round(self, scheduler_simple):
+        """Test string representation of round."""
+        schedule = scheduler_simple.generate_rounds(
             qids=["0", "1", "2", "3"],
             use_checkerboard=True,
         )
 
-        if schedule.steps:
-            step = schedule.steps[0]
-            repr_str = repr(step)
-            assert "Step(" in repr_str
+        if schedule.rounds:
+            round_ = schedule.rounds[0]
+            repr_str = repr(round_)
+            assert "Round(" in repr_str
 
 
 class TestBoxBModuleSharing:
-    """Tests for Box B module sharing in synchronized scheduling."""
+    """Tests for Box B module sharing in round scheduling."""
 
     def test_box_b_module_map_construction(self, scheduler_64qv3):
         """Test Box B module map is built correctly."""
@@ -885,47 +885,47 @@ class TestBoxBModuleSharing:
         assert 4 in groups[1]
         assert 7 in groups[1]
 
-    def test_synchronized_mixed_8_steps(self, scheduler_64qv3):
-        """Test that MIXED scheduling generates 8 steps (4 steps × 2 groups)."""
+    def test_mixed_8_rounds(self, scheduler_64qv3):
+        """Test that MIXED scheduling generates 8 rounds (4 rounds × 2 groups)."""
         # Use all MIXED MUXes from mock config (0, 3, 4, 7)
         mixed_qids = []
         for mux_id in [0, 3, 4, 7]:
             for offset in range(4):
                 mixed_qids.append(str(mux_id * 4 + offset))
 
-        schedule = scheduler_64qv3.generate_synchronized(
+        schedule = scheduler_64qv3.generate_rounds(
             qids=mixed_qids,
             use_checkerboard=True,
         )
 
-        # All qubits are MIXED, so should have 8 steps
-        mixed_steps = schedule.get_steps_by_box(BOX_MIXED)
-        assert len(mixed_steps) == 8
+        # All qubits are MIXED, so should have 8 rounds
+        mixed_rounds = schedule.get_rounds_by_box(BOX_MIXED)
+        assert len(mixed_rounds) == 8
 
-    def test_mock_config_12_steps(self, scheduler_64qv3):
-        """Test mock config calibration generates 12 steps (4 A + 8 MIXED)."""
+    def test_mock_config_12_rounds(self, scheduler_64qv3):
+        """Test mock config calibration generates 12 rounds (4 A + 8 MIXED)."""
         # Mock config has 8 MUXes: 0-7
         # MUXes 1, 2, 5, 6 are Box A only
         # MUXes 0, 3, 4, 7 are MIXED
-        schedule = scheduler_64qv3.generate_synchronized(
+        schedule = scheduler_64qv3.generate_rounds(
             qids=[str(i) for i in range(32)],  # 8 MUXes × 4 qubits
             use_checkerboard=True,
         )
 
-        # Should have 12 steps total (4 A + 8 MIXED)
-        assert schedule.total_steps == 12
+        # Should have 12 rounds total (4 A + 8 MIXED)
+        assert schedule.total_rounds == 12
 
-        # Box A: 4 steps (4 MUXes)
-        box_a_steps = schedule.get_steps_by_box(BOX_A)
-        assert len(box_a_steps) == 4
+        # Box A: 4 rounds (4 MUXes)
+        box_a_rounds = schedule.get_rounds_by_box(BOX_A)
+        assert len(box_a_rounds) == 4
 
-        # MIXED: 8 steps (4 MUXes in 2 groups × 4 steps)
-        mixed_steps = schedule.get_steps_by_box(BOX_MIXED)
-        assert len(mixed_steps) == 8
+        # MIXED: 8 rounds (4 MUXes in 2 groups × 4 rounds)
+        mixed_rounds = schedule.get_rounds_by_box(BOX_MIXED)
+        assert len(mixed_rounds) == 8
 
-    def test_mixed_steps_no_box_b_sharing_conflict(self, scheduler_64qv3):
-        """Test that MUXes sharing Box B module are in different step groups."""
-        schedule = scheduler_64qv3.generate_synchronized(
+    def test_mixed_rounds_no_box_b_sharing_conflict(self, scheduler_64qv3):
+        """Test that MUXes sharing Box B module are in different round groups."""
+        schedule = scheduler_64qv3.generate_rounds(
             qids=[str(i) for i in range(32)],  # 8 MUXes
             use_checkerboard=True,
         )
@@ -934,20 +934,20 @@ class TestBoxBModuleSharing:
         box_b_map = scheduler_64qv3._build_box_b_module_map(wiring_config)
         qid_to_mux = scheduler_64qv3._build_qubit_to_mux_map(wiring_config)
 
-        # Check that within each step, no two qubits share a Box B module
-        mixed_steps = schedule.get_steps_by_box(BOX_MIXED)
+        # Check that within each round, no two qubits share a Box B module
+        mixed_rounds = schedule.get_rounds_by_box(BOX_MIXED)
 
-        for step in mixed_steps:
-            # Get MUX IDs in this step
-            mux_ids_in_step = {qid_to_mux[qid] for qid in step.parallel_qids}
+        for round_ in mixed_rounds:
+            # Get MUX IDs in this round
+            mux_ids_in_round = {qid_to_mux[qid] for qid in round_.parallel_qids}
 
             # Check no Box B module conflict
             for module_id, mux_list in box_b_map.items():
-                # Count how many MUXes from this Box B module are in the step
-                count = sum(1 for m in mux_list if m in mux_ids_in_step)
+                # Count how many MUXes from this Box B module are in the round
+                count = sum(1 for m in mux_list if m in mux_ids_in_round)
                 assert count <= 1, (
-                    f"Step {step.step_index} has {count} MUXes sharing {module_id}: "
-                    f"{[m for m in mux_list if m in mux_ids_in_step]}"
+                    f"Round {round_.round_index} has {count} MUXes sharing {module_id}: "
+                    f"{[m for m in mux_list if m in mux_ids_in_round]}"
                 )
 
 

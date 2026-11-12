@@ -1,15 +1,17 @@
 # 1-Qubit Ordering Strategies
 
-Ordering strategies control which qubit position each MUX contributes to a 1-qubit calibration
-step. Box classification and shared-module grouping remain the responsibility of
-`OneQubitScheduler`.
+Ordering strategies control the order of qubits within each MUX and which qubit position each
+MUX contributes to a round of the `parallel_by_round` execution mode. Box classification and
+shared-module grouping remain the responsibility of `OneQubitScheduler`.
 
 ## Strategy Contract
 
 `MuxOrderingStrategy` defines two operations:
 
 - `order_qids_in_mux()` orders the selected qubits within one MUX for a MUX-group schedule.
-- `generate_synchronized_steps()` creates chip-wide steps from a set of MUXes and qubits.
+- `generate_rounds()` creates chip-wide rounds from a set of MUXes and qubits. A round lists
+  qubits from different MUXes that run in parallel; each runs its full task list before the next
+  round starts.
 
 Both operations receive `OrderingContext`, which contains the chip ID, qubit-grid size, MUX-grid
 size, and qubit-to-MUX map. Strategies return qubit IDs only; they do not inspect wiring resources,
@@ -17,18 +19,15 @@ start Prefect tasks, or execute hardware operations.
 
 ## Built-in Strategies
 
-`DefaultOrderingStrategy` uses numeric qubit order within each MUX. Its synchronized form takes the
-same local offset from every selected MUX at each step:
+`DefaultOrderingStrategy` uses numeric qubit order within each MUX. Its rounds take the same
+local offset from every selected MUX:
 
 ```text
-step 0: 4N
-step 1: 4N + 1
-step 2: 4N + 2
-step 3: 4N + 3
+round 0: 4N
+round 1: 4N + 1
+round 2: 4N + 2
+round 3: 4N + 3
 ```
-
-`DefaultSynchronizedStrategy` has the same ordering behavior and a distinct metadata name for
-synchronized scheduling.
 
 `CheckerboardOrderingStrategy` alternates local offsets by MUX parity:
 
@@ -37,13 +36,13 @@ synchronized scheduling.
 | Even | `0, 1, 2, 3` |
 | Odd | `2, 3, 0, 1` |
 
-For MUXes 0 through 3, the synchronized steps begin as follows:
+For MUXes 0 through 3, the rounds are:
 
 ```text
-step 0: 0, 6, 8, 14
-step 1: 1, 7, 9, 15
-step 2: 2, 4, 10, 12
-step 3: 3, 5, 11, 13
+round 0: 0, 6, 8, 14
+round 1: 1, 7, 9, 15
+round 2: 2, 4, 10, 12
+round 3: 3, 5, 11, 13
 ```
 
 This interleaving avoids selecting the same physical row position from every neighboring MUX at
@@ -68,20 +67,23 @@ schedule = scheduler.generate_from_mux(
 )
 ```
 
-For `generate_synchronized()`, callers select the built-in policy with `use_checkerboard`. The
-scheduler creates A steps, then B steps, then one or more MIXED step sequences. Empty local-offset
-steps are removed, so a partial target set can produce fewer than four steps per sequence.
+For `generate_rounds()`, callers select the built-in policy with `use_checkerboard`:
+`CheckerboardOrderingStrategy` when true (the default and the `parallel_by_round` strategy's
+choice), `DefaultOrderingStrategy` when false. The scheduler creates A rounds, then B rounds, then
+one or more MIXED round sequences. Empty local-offset rounds are removed, so a partial target set
+can produce fewer than four rounds per sequence.
 
 ## Add a Strategy
 
 Subclass `MuxOrderingStrategy` and implement all three abstract methods:
 
 1. Return only qubits supplied to `order_qids_in_mux()`.
-2. Return synchronized steps whose union is exactly the supplied qubit set, without duplicates.
+2. Return rounds from `generate_rounds()` whose union is exactly the supplied qubit set, without
+   duplicates.
 3. Return stable metadata that identifies the policy and any parameters that affect ordering.
 
 Keep the strategy deterministic unless nondeterminism is an explicit, tested part of the policy.
-Test full and partial MUX selections, even and odd MUX IDs, and synchronized output. If the policy
+Test full and partial MUX selections, even and odd MUX IDs, and the rounds. If the policy
 depends on new wiring data, add that responsibility to the scheduler context deliberately rather
 than loading files inside the strategy.
 

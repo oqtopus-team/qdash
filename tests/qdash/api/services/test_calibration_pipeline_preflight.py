@@ -237,7 +237,7 @@ def test_batch_mode_rejects_input_overrides_before_dispatch() -> None:
     assert list(paths(batch_input_problems(defaults))) == ["steps[0]"]
     # A saved spec with the deprecated mode key is still checked the same way.
     legacy = spec(
-        [{"type": "OneQubitCheck", "mode": "simultaneous_spectroscopy"}],
+        [{"type": "OneQubitCheck", "execution_mode": "simultaneous_spectroscopy"}],
         task_parameters={"CheckRabi": {"input": {"readout_amplitude": 1}}},
     )
     assert list(paths(batch_input_problems(legacy))) == ["steps[0]"]

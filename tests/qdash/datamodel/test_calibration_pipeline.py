@@ -97,7 +97,7 @@ def test_unknown_step_types_and_fields_are_rejected() -> None:
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         parse(steps=[{"type": "OneQubitCheck", "command": "rm -rf /"}])
     with pytest.raises(ValidationError):
-        parse(steps=[{"type": "OneQubitCheck", "mode": "parallel"}])
+        parse(steps=[{"type": "OneQubitCheck", "execution_mode": "parallel"}])
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         parse(
             steps=[

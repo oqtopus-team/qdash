@@ -200,7 +200,7 @@ def test_repeated_calls_in_one_step_are_traceable_end_to_end(
         "ramsey_coarse",
         "ramsey_fine",
     ]
-    stage = note["stage_results"]["1q_serial"]["result"]
+    stage = note["stage_results"]["1q_sequential"]["result"]
     assert [call["call_id"] for call in stage["1"]["calls"]] == ["ramsey_coarse", "ramsey_fine"]
 
     # --- the filter on the fine call drops qubit 1 although its coarse call succeeded

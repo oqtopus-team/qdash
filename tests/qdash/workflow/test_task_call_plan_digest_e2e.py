@@ -53,13 +53,13 @@ SPEC: dict[str, Any] = {
         {
             "type": "CustomOneQubit",
             "step_name": "prepare",
-            "mode": "serial",
+            "execution_mode": "sequential",
             "tasks": [{"name": "FakeBringUp"}],
         },
         {
             "type": "CustomOneQubit",
             "step_name": "rabi_twice",
-            "mode": "scheduled",
+            "execution_mode": "parallel_by_mux",
             "tasks": [
                 {"name": "CheckRabi", "call_id": "rabi_first"},
                 {"name": "CheckRabi", "call_id": "rabi_again", "run": {"shots": 512}},

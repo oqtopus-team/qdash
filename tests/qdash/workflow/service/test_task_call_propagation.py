@@ -32,6 +32,7 @@ from qdash.workflow.service.targets import MuxTargets, QubitTargets
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode
     from qdash.workflow.service._internal.session import CalibSession
 
 REPEATED = [
@@ -166,18 +167,23 @@ def _schedule(monkeypatch: pytest.MonkeyPatch) -> None:
     from qdash.workflow.service import strategy
 
     schedule = SimpleNamespace(
-        # Box-scheduled MUX groups and synchronized rounds over the same four qubits.
+        # MUX groups (parallel_by_mux), rounds (parallel_by_round) and batch steps
+        # (simultaneous_spectroscopy) over the same four qubits.
         stages=[SimpleNamespace(box_type="A", parallel_groups=[["0", "1"], ["4", "5"]])],
+        rounds=[
+            SimpleNamespace(box_type="A", parallel_qids=["0", "4"], round_index=0),
+            SimpleNamespace(box_type="A", parallel_qids=["1", "5"], round_index=1),
+        ],
+        total_rounds=2,
         steps=[
             SimpleNamespace(box_type="A", parallel_qids=["0", "4"], step_index=0),
             SimpleNamespace(box_type="A", parallel_qids=["1", "5"], step_index=1),
         ],
-        total_steps=2,
         metadata={},
     )
     scheduler = SimpleNamespace(
         generate_from_mux=lambda **_: schedule,
-        generate_synchronized_from_mux=lambda **_: schedule,
+        generate_rounds_from_mux=lambda **_: schedule,
         generate_simultaneous_spectroscopy_batches_from_mux=lambda **_: schedule,
     )
     monkeypatch.setattr(strategy, "OneQubitScheduler", lambda **_: scheduler)
@@ -189,7 +195,7 @@ def _per_target(log: list[tuple[str, str, str, str]], qid: str) -> list[str]:
 
 @pytest.mark.parametrize("mode", ["parallel_by_round", "parallel_by_mux"])
 def test_parallel_modes_run_every_call_per_target_in_order(
-    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, mode: str
+    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, mode: OneQubitExecutionMode
 ) -> None:
     _schedule(monkeypatch)
     recorder.fail.add(("ramsey_coarse", "4"))
@@ -226,7 +232,7 @@ def test_parallel_modes_run_every_call_per_target_in_order(
         assert recorder.groups == [["0", "1"], ["4", "5"]]
         assert len(recorder.sessions) == 2
     else:
-        # Synchronized rounds; each qubit has its own worker.
+        # One parallel run per round; each qubit has its own worker.
         assert recorder.groups == [["0", "4"], ["1", "5"]]
         assert len(recorder.sessions) == 4
 
@@ -382,7 +388,7 @@ def test_batch_mode_rejects_input_overrides_before_any_batch(
 
 @pytest.mark.parametrize("mode", ["parallel_by_round", "parallel_by_mux"])
 def test_isolated_workers_receive_each_calls_input_and_writeback(
-    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, mode: str
+    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, mode: OneQubitExecutionMode
 ) -> None:
     """Call settings travel with the plan; workers have no session-wide write-back policy."""
     _schedule(monkeypatch)
@@ -536,7 +542,7 @@ def test_coherence_check_runs_one_step_with_per_target_fail_fast(
         "skipped"
     ] * 6
 
-    # No global barrier: the first synchronized round (qubits 0 and 4) finishes
+    # No per-task barrier: the first parallel_by_round round (qubits 0 and 4) finishes
     # its long Ramsey before the second round (qubits 1 and 5) starts its short pass.
     order = [(call_id, qid) for _, call_id, _, qid in recorder.log]
     assert order.index(("ramsey_long", "0")) < order.index(("configure_initial", "1"))

@@ -95,3 +95,17 @@ README and docs assets come from the full film in the
 `qdash-film` repository. Running `task docs-video`
 regenerates the previous demo and overwrites the current published assets. See
 `video/README.md` for the previous demo's source and editing instructions.
+
+## Generated diagrams
+
+`one_qubit_execution_modes.py` draws
+`docs/public/images/guides/one-qubit-execution-modes.gif`, the comparison of the
+one-qubit execution modes that splits each qubit's bar into its tasks, from a
+fixed illustrative timeline with Pillow and the font bundled with it, so the
+output does not depend on the local UI or fonts. Edit the timeline or labels in the script, then regenerate:
+
+```bash
+uv run --no-project --with pillow==13.0.0 python3 docs/demos/one_qubit_execution_modes.py
+```
+
+Add `--frames .tmp/execution-modes` to write every frame as a PNG for review.

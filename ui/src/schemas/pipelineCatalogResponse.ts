@@ -16,7 +16,8 @@ import type { PipelineStepTypeInfo } from './pipelineStepTypeInfo';
 export interface PipelineCatalogResponse {
   backend_name: string;
   step_types: PipelineStepTypeInfo[];
-  one_qubit_modes: string[];
+  /** Values a one-qubit step accepts for execution_mode. */
+  one_qubit_execution_modes: string[];
   /** Available task names by task_type ("qubit", "coupling", ...). */
   tasks: PipelineCatalogResponseTasks;
   /** The spec version this QDash accepts. */

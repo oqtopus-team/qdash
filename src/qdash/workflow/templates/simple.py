@@ -31,6 +31,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode
 from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
@@ -38,7 +39,7 @@ from qdash.workflow.service.calib_service import (
     on_flow_crashed,
     on_flow_failure,
 )
-from qdash.workflow.service.steps import CustomOneQubit, resolve_execution_mode
+from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 
@@ -54,11 +55,10 @@ def simple_calibration(
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
     tasks: list[TaskCall] | None = None,
-    execution_mode: str | None = None,
+    execution_mode: OneQubitExecutionMode = "parallel_by_mux",
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
-    mode: str | None = None,
 ) -> Any:
     """Simple calibration flow.
 
@@ -84,8 +84,6 @@ def simple_calibration(
             - "sequential": one MUX and one qubit at a time
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
-        mode: Deprecated alias of execution_mode. The old names "scheduled",
-            "synchronized" and "serial" are still accepted with a deprecation warning.
 
     Returns:
         Pipeline results
@@ -117,7 +115,7 @@ def simple_calibration(
                 TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
                 TaskCall(name="CheckHPIPulse"),
             ],
-            execution_mode=resolve_execution_mode(execution_mode, mode, default="parallel_by_mux"),
+            execution_mode=execution_mode,
         ),
     ]
 

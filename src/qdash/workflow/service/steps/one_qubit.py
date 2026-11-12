@@ -7,9 +7,8 @@ This module defines steps for 1-qubit calibration:
 
 Every step takes an ``execution_mode`` (default ``parallel_by_round``) that decides
 where and when its targets run; see :mod:`qdash.datamodel.one_qubit_execution_mode`
-for ``parallel_by_round`` versus ``parallel_by_mux``. The deprecated ``mode``
-argument and the old names ``synchronized``, ``scheduled`` and ``serial`` are
-still accepted with a ``DeprecationWarning``.
+for ``parallel_by_round`` versus ``parallel_by_mux``. Any other value raises
+``ValueError`` when the step is constructed.
 
 Every step lists its work as ``TaskCall`` entries. A step may run the same task
 more than once when each occurrence has its own ``call_id``; each call on each
@@ -28,6 +27,10 @@ from qdash.datamodel.calibration_pipeline import (
     ONE_QUBIT_FINE_TUNE_METRICS,
     calls_with_configure,
 )
+from qdash.datamodel.one_qubit_execution_mode import (
+    OneQubitExecutionMode,
+    validate_one_qubit_execution_mode,
+)
 from qdash.datamodel.task_call import StepCalls, TaskCall, normalize_calls
 from qdash.workflow.service._internal.call_runner import latest_call_output
 from qdash.workflow.service.results import (
@@ -35,7 +38,7 @@ from qdash.workflow.service.results import (
     build_one_qubit_result,
     normalize_metric_value,
 )
-from qdash.workflow.service.steps.base import CalibrationStep, OneQubitExecutionModeMixin
+from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_1Q_TASKS_AFTER_CHECK
 
 if TYPE_CHECKING:
@@ -75,7 +78,7 @@ def _execute_scheduled_one_qubit(
     qids: list[str],
     plan: StepCalls,
     stage_name: str,
-    mode: str,
+    execution_mode: OneQubitExecutionMode,
 ) -> dict[str, Any]:
     """Run explicit qubit targets through the same scheduler used by MUX targets."""
     from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
@@ -90,7 +93,7 @@ def _execute_scheduled_one_qubit(
         qids=qids,
         plan=plan,
     )
-    strategy = get_one_qubit_strategy(mode)
+    strategy = get_one_qubit_strategy(execution_mode)
     result: dict[str, Any] = strategy.execute(session, config)
     return result
 
@@ -101,7 +104,7 @@ def _execute_mux_one_qubit(
     targets: Any,
     plan: StepCalls,
     stage_name: str,
-    mode: str,
+    execution_mode: OneQubitExecutionMode,
 ) -> dict[str, Any]:
     """Run MUX targets through the selected one-qubit strategy."""
     from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
@@ -111,7 +114,7 @@ def _execute_mux_one_qubit(
         exclude_qids=targets.exclude_qids,
         plan=plan,
     )
-    result: dict[str, Any] = get_one_qubit_strategy(mode).execute(session, config)
+    result: dict[str, Any] = get_one_qubit_strategy(execution_mode).execute(session, config)
     return result
 
 
@@ -120,7 +123,7 @@ def _metric(raw: dict[str, Any], task_name: str, parameter: str) -> float | None
 
 
 @dataclass
-class CustomOneQubit(OneQubitExecutionModeMixin, CalibrationStep):
+class CustomOneQubit(CalibrationStep):
     """Custom 1-qubit calibration step with user-defined task calls.
 
     This is the most flexible 1-qubit step: you specify exactly which calls to
@@ -147,14 +150,13 @@ class CustomOneQubit(OneQubitExecutionModeMixin, CalibrationStep):
 
     step_name: str = "custom_one_qubit"
     tasks: list[TaskCall] = field(default_factory=list)
-    execution_mode: str | None = None
+    execution_mode: OneQubitExecutionMode = "parallel_by_round"
     continue_on_failure: bool = False
-    mode: str | None = None  # Deprecated alias of execution_mode
 
     step_metrics: ClassVar[tuple[str, ...]] = ()
 
     def __post_init__(self) -> None:
-        self._resolve_execution_mode("parallel_by_round")
+        self.execution_mode = validate_one_qubit_execution_mode(self.execution_mode)
         if self.step_id is not None and self.step_id != self.step_name:
             raise ValueError(
                 f"CustomOneQubit uses step_name as its step_id; got step_name="
@@ -192,7 +194,6 @@ class CustomOneQubit(OneQubitExecutionModeMixin, CalibrationStep):
             return ctx
 
         plan = self.step_calls(session)
-        self._log_execution_mode_deprecations(logger)
         logger.info(
             f"[{self.name}] Starting with {len(self.tasks)} calls: "
             f"{[call.resolved_call_id for call in self.tasks]}"
@@ -210,7 +211,7 @@ class CustomOneQubit(OneQubitExecutionModeMixin, CalibrationStep):
                     targets=targets,
                     plan=plan,
                     stage_name=self.name,
-                    mode=self.resolved_execution_mode,
+                    execution_mode=self.execution_mode,
                 )
             else:
                 raw_results = self._execute_scheduled(
@@ -241,7 +242,7 @@ class CustomOneQubit(OneQubitExecutionModeMixin, CalibrationStep):
             qids=qids,
             plan=plan or self.step_calls(session),
             stage_name=self.step_name,
-            mode=self.resolved_execution_mode,
+            execution_mode=self.execution_mode,
         )
 
     def _execute_direct(
@@ -272,7 +273,7 @@ class CustomOneQubit(OneQubitExecutionModeMixin, CalibrationStep):
 
 
 @dataclass
-class OneQubitCheck(OneQubitExecutionModeMixin, CalibrationStep):
+class OneQubitCheck(CalibrationStep):
     """Basic 1-qubit characterization step.
 
     Executes CHECK_1Q_TASKS by default: Rabi, then the HPI and PI pulse
@@ -281,15 +282,14 @@ class OneQubitCheck(OneQubitExecutionModeMixin, CalibrationStep):
     Provides: one_qubit_check
     """
 
-    execution_mode: str | None = None
+    execution_mode: OneQubitExecutionMode = "parallel_by_round"
     tasks: list[TaskCall] | None = None
     configure: bool = False
-    mode: str | None = None  # Deprecated alias of execution_mode
 
     step_metrics: ClassVar[tuple[str, ...]] = ONE_QUBIT_CHECK_METRICS
 
     def __post_init__(self) -> None:
-        self._resolve_execution_mode("parallel_by_round")
+        self.execution_mode = validate_one_qubit_execution_mode(self.execution_mode)
         self._calls = self._normalize()
 
     def _normalize(self) -> tuple[TaskCall, ...]:
@@ -317,7 +317,6 @@ class OneQubitCheck(OneQubitExecutionModeMixin, CalibrationStep):
         logger = get_run_logger()
         plan = self.step_calls(session)
 
-        self._log_execution_mode_deprecations(logger)
         logger.info(
             f"[{self.name}] Starting with execution_mode={self.execution_mode}, "
             f"{len(plan.calls)} calls"
@@ -331,7 +330,7 @@ class OneQubitCheck(OneQubitExecutionModeMixin, CalibrationStep):
                 targets=targets,
                 plan=plan,
                 stage_name=self.name,
-                mode=self.resolved_execution_mode,
+                execution_mode=self.execution_mode,
             )
         else:
             qids = targets.to_qids(session.chip_id)
@@ -359,7 +358,7 @@ class OneQubitCheck(OneQubitExecutionModeMixin, CalibrationStep):
             qids=qids,
             plan=plan or self.step_calls(session),
             stage_name=self.name,
-            mode=self.resolved_execution_mode,
+            execution_mode=self.execution_mode,
         )
 
     def _execute_direct(
@@ -390,7 +389,7 @@ class OneQubitCheck(OneQubitExecutionModeMixin, CalibrationStep):
 
 
 @dataclass
-class OneQubitFineTune(OneQubitExecutionModeMixin, CalibrationStep):
+class OneQubitFineTune(CalibrationStep):
     """Advanced 1-qubit calibration step.
 
     Executes FULL_1Q_TASKS_AFTER_CHECK: DRAG pulses, ReadoutClassification,
@@ -400,15 +399,14 @@ class OneQubitFineTune(OneQubitExecutionModeMixin, CalibrationStep):
     Provides: one_qubit_fine_tune
     """
 
-    execution_mode: str | None = None
+    execution_mode: OneQubitExecutionMode = "parallel_by_round"
     tasks: list[TaskCall] | None = None
     configure: bool = False
-    mode: str | None = None  # Deprecated alias of execution_mode
 
     step_metrics: ClassVar[tuple[str, ...]] = ONE_QUBIT_FINE_TUNE_METRICS
 
     def __post_init__(self) -> None:
-        self._resolve_execution_mode("parallel_by_round")
+        self.execution_mode = validate_one_qubit_execution_mode(self.execution_mode)
         calls = list(self.tasks if self.tasks is not None else FULL_1Q_TASKS_AFTER_CHECK)
         self._calls = calls_with_configure(
             calls, configure=self.configure, where=f"{self.name}.tasks"
@@ -443,7 +441,6 @@ class OneQubitFineTune(OneQubitExecutionModeMixin, CalibrationStep):
             else targets.to_qids(session.chip_id)
         )
 
-        self._log_execution_mode_deprecations(logger)
         logger.info(
             f"[{self.name}] Starting with execution_mode={self.execution_mode}, "
             f"{len(plan.calls)} calls, {len(qids)} qubits"
@@ -479,7 +476,7 @@ class OneQubitFineTune(OneQubitExecutionModeMixin, CalibrationStep):
             qids=qids,
             plan=plan or self.step_calls(session),
             stage_name=self.name,
-            mode=self.resolved_execution_mode,
+            execution_mode=self.execution_mode,
         )
 
     def _execute_direct(

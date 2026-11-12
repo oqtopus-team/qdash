@@ -27450,12 +27450,13 @@
             "type": "array",
             "title": "Step Types"
           },
-          "one_qubit_modes": {
+          "one_qubit_execution_modes": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "One Qubit Modes"
+            "title": "One Qubit Execution Modes",
+            "description": "Values a one-qubit step accepts for execution_mode."
           },
           "tasks": {
             "additionalProperties": {
@@ -27489,7 +27490,7 @@
         "required": [
           "backend_name",
           "step_types",
-          "one_qubit_modes",
+          "one_qubit_execution_modes",
           "tasks",
           "spec_version",
           "spec_schema"

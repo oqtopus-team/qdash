@@ -14,8 +14,9 @@ Default task order:
 
 Targets are MUXes, as on hardware. The flow resolves each MUX to its qubits from the chip's
 wiring and schedules them with the same box-aware scheduler the hardware templates use
-(``execution_mode="parallel_by_mux"``): MUX groups that share no box run in parallel, and the qubits of a MUX
-run one after another. Target arguments follow the hardware templates: ``mux_ids`` selects
+(``execution_mode="parallel_by_mux"`` by default): the scheduler places MUXes in box stages that
+run one after another, the MUX groups of one stage run in parallel, and the qubits of a MUX run
+one after another. Target arguments follow the hardware templates: ``mux_ids`` selects
 MUXes, otherwise ``qids`` selects qubits. With neither, the flow calibrates ``MUX_IDS``, MUX 0
 to 15, every qubit of the 64-qubit, 16-MUX virtual device that the Create Chip dialog
 configures on a fake deployment.
@@ -46,6 +47,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode
 from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService, resolve_calib_context
 from qdash.workflow.service.calib_service import (
@@ -53,7 +55,7 @@ from qdash.workflow.service.calib_service import (
     on_flow_crashed,
     on_flow_failure,
 )
-from qdash.workflow.service.steps import CustomOneQubit, resolve_execution_mode
+from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 # Tasks the template runs when none are given; every name is listed for the fake backend in
@@ -86,13 +88,12 @@ def fake_calibration(
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
-    execution_mode: str | None = None,
+    execution_mode: OneQubitExecutionMode = "parallel_by_mux",
     tasks: list[TaskCall] | None = None,
     backend_name: str | None = None,
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
-    mode: str | None = None,
 ) -> Any:
     """Calibration flow on the fake backend, scheduled like a hardware run.
 
@@ -117,8 +118,6 @@ def fake_calibration(
         tags: Flow tags
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
-        mode: Deprecated alias of execution_mode. The old names "scheduled",
-            "synchronized" and "serial" are still accepted with a deprecation warning.
 
     Returns:
         Pipeline results
@@ -139,7 +138,7 @@ def fake_calibration(
         CustomOneQubit(
             step_name="calibration",
             tasks=tasks,
-            execution_mode=resolve_execution_mode(execution_mode, mode, default="parallel_by_mux"),
+            execution_mode=execution_mode,
         ),
     ]
 

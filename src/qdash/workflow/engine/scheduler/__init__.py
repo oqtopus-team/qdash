@@ -23,17 +23,20 @@ OneQubitScheduler (1-Qubit)
 
     Features:
     - Box classification (BOX_A, BOX_B, BOX_MIXED)
-    - Synchronized execution mode
+    - Rounds for the parallel_by_round execution mode
     - Pluggable ordering strategies
 
 OneQubitScheduleResult
     Result of 1-qubit scheduling with stage information.
 
+OneQubitRoundScheduleResult
+    Rounds of the parallel_by_round execution mode (OneQubitRound entries).
+
 Conflict Types
 --------------
 1. **MUX Conflict**: Two qubits share the same MUX (multiplexer)
 2. **Qubit Conflict**: Same qubit appears in multiple CR pairs
-3. **Box Conflict**: Tasks from different boxes cannot be synchronized
+3. **Box Conflict**: Qubits of different box types are placed in separate stages
 
 Scheduling Example
 ------------------
@@ -66,6 +69,8 @@ from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_MIXED,
     MuxBatchScheduleResult,
     MuxBatchStepInfo,
+    OneQubitRound,
+    OneQubitRoundScheduleResult,
     OneQubitScheduleResult,
     OneQubitStageInfo,
 )
@@ -79,6 +84,8 @@ __all__ = [
     "CRScheduler",
     "MuxBatchScheduleResult",
     "MuxBatchStepInfo",
+    "OneQubitRound",
+    "OneQubitRoundScheduleResult",
     "OneQubitScheduleResult",
     # 1-Qubit Scheduler
     "OneQubitScheduler",

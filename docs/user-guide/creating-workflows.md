@@ -127,6 +127,8 @@ Each call appears as its own task in the execution, labeled with its call ID. A 
 names such as `"CheckT1"` stops the flow before it measures; see
 [Update a flow saved before task calls](#update-a-flow-saved-before-task-calls).
 
+### Choose an Execution Mode
+
 The `execution_mode` value controls how the selected qubits wait for each other. In every mode
 except `simultaneous_spectroscopy`, each qubit runs the step's whole task list before it counts as
 finished; no mode runs one task across all qubits before the next task.
@@ -138,17 +140,31 @@ finished; no mode runs one task across all qubits before the next task.
 | `sequential` | One MUX and one qubit at a time |
 | `simultaneous_spectroscopy` | Experimental: each supported spectroscopy task measures a batch of qubits together |
 
-For example, with qubits 0 and 1 on MUX 0 and qubits 4 and 5 on MUX 1, `parallel_by_mux` can
-start qubit 1 when qubit 0 finishes while qubit 4 is still running. `parallel_by_round` finishes
-both qubit 0 and qubit 4 before qubits 1 and 5 start. QDash chooses the actual grouping and order
-from the chip wiring. `sequential`, `parallel_by_mux`, and `parallel_by_round` keep the same
-hardware-sharing limits; changing between them changes only how qubits wait for each other.
+![Three timelines on one time axis for qubits 0 and 1 on MUX 0 and qubits 8 and 9 on MUX 2. Each qubit's bar is split into its tasks: CheckRabi, then CreateHPIPulse, then CheckT1. In sequential, the qubits run one at a time in the order 0, 1, 8, 9. In parallel_by_mux, qubit 0 moves to CreateHPIPulse while qubit 8 is still on CheckRabi, and qubit 1 starts CheckRabi when qubit 0 finishes CheckT1, while qubit 8 is still on CheckT1. In parallel_by_round, qubits 0 and 8 also move through their tasks independently, but qubit 1 waits until qubit 8 finishes CheckT1, its last task, then qubits 1 and 9 start together as round 2.](/images/guides/one-qubit-execution-modes.gif)
+
+The animation uses an illustrative task list and illustrative durations, not measurements. Every
+qubit runs CheckRabi, then CreateHPIPulse, then CheckT1. In total, qubit 0 takes 3 units, qubit 1
+takes 4, qubit 8 takes 5, and qubit 9 takes 3; qubit 8's CheckRabi takes 2 units, so qubit 0
+reaches CreateHPIPulse first. Both MUXes are in the same hardware stage. Each bar labels its tasks
+Rabi, HPI, and T1, and the left column names the task each MUX is running.
+
+| Execution mode | What happens in the example | All done at |
+| --- | --- | --- |
+| `sequential` | Qubits 0, 1, 8, and 9 run one at a time; MUX 2 waits for MUX 0 to finish | 15 |
+| `parallel_by_mux` | Qubit 1 starts at 3, when qubit 0 finishes CheckT1, while qubit 8 runs CheckT1 until 5 | 8 |
+| `parallel_by_round` | Round 1 runs qubits 0 and 8; qubit 1 waits from 3 to 5 for qubit 8's CheckT1, then round 2 runs qubits 1 and 9 | 9 |
+
+A round waits for every qubit's whole task list. It does not wait between tasks and does not
+synchronize pulses. QDash chooses the actual grouping and order from the chip wiring. The two
+rounds shown match the default checkerboard ordering for these four qubits when both MUXes
+can share a stage.
+`sequential`, `parallel_by_mux`, and `parallel_by_round` keep the same hardware-sharing limits;
+changing between them changes only how qubits wait for each other.
 
 Keep the template's execution mode unless the procedure requires a specific ordering. The
-selected tasks must support the chosen mode and backend. Flows written before this setting was
-renamed still run: the former `mode` parameter and the names `scheduled`, `synchronized`, and
-`serial` are deprecated aliases of `execution_mode`, `parallel_by_mux`, `parallel_by_round`, and
-`sequential`, and the run log shows a deprecation warning for them.
+selected tasks must support the chosen mode and backend. A flow or pipeline that still uses the
+former names stops before it measures; see
+[Update a Flow That Uses the Former Mode Names](#update-a-flow-that-uses-the-former-mode-names).
 
 ## Schedule Two-Qubit Calibration
 
@@ -262,6 +278,24 @@ targets. Results recorded before the update stay readable in **Execution**; they
 name without a call ID. Flows that read results by task name, filter on one call, or set
 per-occurrence settings need further edits:
 [Migrate Saved Flows](../developer-guide/workflow/task-calls.md#migrate-saved-flows).
+
+## Update a Flow That Uses the Former Mode Names
+
+The one-qubit `mode` setting was renamed to `execution_mode`, and its values were renamed. The
+former names are no longer accepted: a flow run, a step, or a calibration pipeline that uses them
+fails validation instead of running with a default.
+
+| Former | Current |
+| --- | --- |
+| `mode` parameter or pipeline step key | `execution_mode` |
+| `serial` | `sequential` |
+| `scheduled` | `parallel_by_mux` |
+| `synchronized` | `parallel_by_round` |
+
+For example, change `CustomOneQubit(..., mode="scheduled")` to
+`CustomOneQubit(..., execution_mode="parallel_by_mux")` and `{"type": "OneQubitCheck", "mode":
+"synchronized"}` to `{"type": "OneQubitCheck", "execution_mode": "parallel_by_round"}`. The
+behavior of each mode is unchanged.
 
 ## Save and Test the Workflow
 

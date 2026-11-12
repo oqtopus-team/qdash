@@ -36,7 +36,6 @@ from qdash.common.config.backend import (
     get_tasks,
 )
 from qdash.datamodel.calibration_pipeline import (
-    ONE_QUBIT_MODES,
     SPEC_VERSION,
     STEP_CATALOG,
     CalibrationPipelineSpec,
@@ -52,6 +51,7 @@ from qdash.datamodel.calibration_pipeline import (
     step_id,
     step_name,
 )
+from qdash.datamodel.one_qubit_execution_mode import ONE_QUBIT_EXECUTION_MODES
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.qubit import QubitDocument
 
@@ -173,7 +173,7 @@ class CalibrationPipelineService:
                 )
                 for entry in STEP_CATALOG.values()
             ],
-            one_qubit_modes=list(ONE_QUBIT_MODES),
+            one_qubit_execution_modes=list(ONE_QUBIT_EXECUTION_MODES),
             tasks=by_type,
             spec_version=SPEC_VERSION,
             spec_schema=pipeline_spec_json_schema(),

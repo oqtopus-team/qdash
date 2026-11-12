@@ -26,21 +26,10 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Annotated, Any, Literal
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    ModelWrapValidatorHandler,
-    PrivateAttr,
-    field_validator,
-    model_validator,
-)
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from qdash.datamodel.one_qubit_execution_mode import (
-    ONE_QUBIT_EXECUTION_MODES,
-    OneQubitExecutionMode,
-    normalize_one_qubit_execution_mode,
-)
+# Runtime import: Pydantic validates execution_mode against this Literal.
+from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode  # noqa: TC001
 from qdash.datamodel.task_call import (
     CALL_ID_PATTERN,
     TaskCall,
@@ -172,11 +161,6 @@ def calls_with_configure(
     return (implicit, *own)
 
 
-# Canonical one-qubit execution modes; see qdash.datamodel.one_qubit_execution_mode.
-# Kept under the old names for importers.
-ONE_QUBIT_MODES: tuple[str, ...] = ONE_QUBIT_EXECUTION_MODES
-OneQubitMode = OneQubitExecutionMode
-
 # ---------------------------------------------------------------------------
 # Targets
 # ---------------------------------------------------------------------------
@@ -239,39 +223,8 @@ _EXECUTION_MODE_DESCRIPTION = (
     "the next round starts after every qubit of the current round finishes. "
     "parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after "
     "another, each MUX advancing independently. sequential: one MUX and one qubit at a time. "
-    "simultaneous_spectroscopy: experimental batch spectroscopy. The deprecated `mode` "
-    "setting and the old names synchronized, scheduled and serial are still accepted."
+    "simultaneous_spectroscopy: experimental batch spectroscopy."
 )
-
-
-class _OneQubitModeStep(_StepBase):
-    """A step with a one-qubit ``execution_mode`` that also reads the deprecated ``mode``.
-
-    The deprecated key and old value names are converted before validation, so
-    the validated step and its dump carry only ``execution_mode``. What was
-    converted is kept for :func:`pipeline_warnings`.
-    """
-
-    _execution_mode_deprecations: list[str] = PrivateAttr(default_factory=list)
-
-    @model_validator(mode="wrap")
-    @classmethod
-    def _legacy_execution_mode(
-        cls, data: Any, handler: ModelWrapValidatorHandler[_OneQubitModeStep]
-    ) -> _OneQubitModeStep:
-        notes: list[str] = []
-        if isinstance(data, Mapping) and ("mode" in data or "execution_mode" in data):
-            data = dict(data)
-            mode = data.pop("mode", None)
-            explicit = data.get("execution_mode")
-            if mode is not None or explicit is not None:
-                default = cls.model_fields["execution_mode"].default
-                data["execution_mode"], notes = normalize_one_qubit_execution_mode(
-                    explicit, mode, default=default
-                )
-        step = handler(data)
-        step._execution_mode_deprecations = notes
-        return step
 
 
 def _check_configure_call(step: Any) -> Any:
@@ -338,14 +291,14 @@ class BringUpStep(_StepBase):
     _normalize_tasks = field_validator("tasks", mode="before")(_calls_or_none)
 
 
-class OneQubitCheckStep(_OneQubitModeStep):
+class OneQubitCheckStep(_StepBase):
     """Coarse one-qubit characterization (Rabi, HPI, PI pulses)."""
 
     type: Literal["OneQubitCheck"]
     step_id: str | None = Field(
         default=None, pattern=STEP_ID_PATTERN, description=_STEP_ID_DESCRIPTION
     )
-    execution_mode: OneQubitMode = Field(
+    execution_mode: OneQubitExecutionMode = Field(
         default="parallel_by_round", description=_EXECUTION_MODE_DESCRIPTION
     )
     tasks: list[TaskCall] | None = Field(
@@ -357,14 +310,14 @@ class OneQubitCheckStep(_OneQubitModeStep):
     _check_configure = model_validator(mode="after")(_check_configure_call)
 
 
-class OneQubitFineTuneStep(_OneQubitModeStep):
+class OneQubitFineTuneStep(_StepBase):
     """Fine one-qubit calibration (DRAG, readout classification, benchmarking)."""
 
     type: Literal["OneQubitFineTune"]
     step_id: str | None = Field(
         default=None, pattern=STEP_ID_PATTERN, description=_STEP_ID_DESCRIPTION
     )
-    execution_mode: OneQubitMode = Field(
+    execution_mode: OneQubitExecutionMode = Field(
         default="parallel_by_round", description=_EXECUTION_MODE_DESCRIPTION
     )
     tasks: list[TaskCall] | None = Field(
@@ -377,7 +330,7 @@ class OneQubitFineTuneStep(_OneQubitModeStep):
     _check_configure = model_validator(mode="after")(_check_configure_call)
 
 
-class CustomOneQubitStep(_OneQubitModeStep):
+class CustomOneQubitStep(_StepBase):
     """Any sequence of qubit task calls on the current candidate qubits."""
 
     type: Literal["CustomOneQubit"]
@@ -387,7 +340,7 @@ class CustomOneQubitStep(_OneQubitModeStep):
         description="Name and step_id of this step; unique within the pipeline.",
     )
     tasks: list[TaskCall] = Field(min_length=1, description=_TASKS_DESCRIPTION)
-    execution_mode: OneQubitMode = Field(
+    execution_mode: OneQubitExecutionMode = Field(
         default="parallel_by_round", description=_EXECUTION_MODE_DESCRIPTION
     )
     continue_on_failure: bool = Field(default=False, description=_CONTINUE_DESCRIPTION)
@@ -835,11 +788,6 @@ def pipeline_warnings(spec: CalibrationPipelineSpec) -> list[tuple[str, str]]:
 
     A non-empty ``task_parameters`` is deprecated in favor of settings on each call.
 
-    A one-qubit step's ``mode`` setting and the old execution mode names
-    (``synchronized``, ``scheduled``, ``serial``) are deprecated in favor of
-    ``execution_mode`` with ``parallel_by_round``, ``parallel_by_mux`` and
-    ``sequential``.
-
     A ``run.mux_ids`` for ConfigureAll, on a step's call or in ``task_parameters``,
     is replaced by the step's MUXes at run time, so it has no effect.
 
@@ -859,9 +807,6 @@ def pipeline_warnings(spec: CalibrationPipelineSpec) -> list[tuple[str, str]]:
             )
         )
     found.extend(_ignored_mux_ids_warnings(spec))
-    for index, step in enumerate(spec.steps):
-        if isinstance(step, _OneQubitModeStep):
-            found.extend((f"steps[{index}]", note) for note in step._execution_mode_deprecations)
     custom_since_builtin: list[str] = []
     for index, step in enumerate(spec.steps):
         if isinstance(step, OneQubitCheckStep | OneQubitFineTuneStep):

@@ -16,6 +16,10 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from prefect import get_run_logger
 
 from qdash.datamodel.calibration_pipeline import BRINGUP_METRICS
+from qdash.datamodel.one_qubit_execution_mode import (
+    OneQubitExecutionMode,
+    validate_one_qubit_execution_mode,
+)
 from qdash.datamodel.task_call import StepCalls, TaskCall, normalize_calls
 from qdash.workflow.service._internal.call_runner import (
     NOT_MUX_REPRESENTATIVE,
@@ -27,7 +31,7 @@ from qdash.workflow.service.results import (
     build_one_qubit_result,
     normalize_metric_value,
 )
-from qdash.workflow.service.steps.base import CalibrationStep, OneQubitExecutionModeMixin
+from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import BRINGUP_TASKS
 
 if TYPE_CHECKING:
@@ -37,7 +41,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class BringUp(OneQubitExecutionModeMixin, CalibrationStep):
+class BringUp(CalibrationStep):
     """Bring-up calibration step for initial qubit characterization.
 
     Executes BRINGUP_TASKS:
@@ -55,9 +59,8 @@ class BringUp(OneQubitExecutionModeMixin, CalibrationStep):
     Qubit-level tasks run for each qubit individually.
 
     ``execution_mode`` applies to MUX targets and defaults to ``parallel_by_mux``;
-    explicit qubit targets run directly in parallel. The deprecated ``mode``
-    argument and old mode names are still accepted with a ``DeprecationWarning``
-    (see :mod:`qdash.datamodel.one_qubit_execution_mode`).
+    explicit qubit targets run directly in parallel. The modes are described in
+    :mod:`qdash.datamodel.one_qubit_execution_mode`.
 
     Provides: bringup
 
@@ -78,15 +81,14 @@ class BringUp(OneQubitExecutionModeMixin, CalibrationStep):
         ])
     """
 
-    execution_mode: str | None = None
+    execution_mode: OneQubitExecutionMode = "parallel_by_mux"
     tasks: list[TaskCall] = field(default_factory=lambda: list(BRINGUP_TASKS))
     resonator_assignment_order: list[int] | None = None
-    mode: str | None = None  # Deprecated alias of execution_mode
 
     step_metrics: ClassVar[tuple[str, ...]] = BRINGUP_METRICS
 
     def __post_init__(self) -> None:
-        self._resolve_execution_mode("parallel_by_mux")
+        self.execution_mode = validate_one_qubit_execution_mode(self.execution_mode)
         self.tasks = list(normalize_calls(self.tasks, where=f"{self.name}.tasks"))
 
     @property
@@ -132,7 +134,6 @@ class BringUp(OneQubitExecutionModeMixin, CalibrationStep):
         logger = get_run_logger()
         plan = self.step_calls(session)
 
-        self._log_execution_mode_deprecations(logger)
         logger.info(
             f"[{self.name}] Starting with execution_mode={self.execution_mode}, "
             f"{len(plan.calls)} calls"
@@ -147,7 +148,7 @@ class BringUp(OneQubitExecutionModeMixin, CalibrationStep):
                 exclude_qids=targets.exclude_qids,
                 plan=plan,
             )
-            strategy = get_one_qubit_strategy(self.resolved_execution_mode)
+            strategy = get_one_qubit_strategy(self.execution_mode)
             raw_results = strategy.execute(session, config)
         else:
             qids = targets.to_qids(session.chip_id)

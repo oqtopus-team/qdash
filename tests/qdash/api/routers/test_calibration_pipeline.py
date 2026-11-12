@@ -138,8 +138,8 @@ class TestCatalog:
         assert data["spec_version"] == 2
         assert "CheckT1" in data["tasks"]["qubit"]
         assert "CheckCrossResonance" in data["tasks"]["coupling"]
-        assert "parallel_by_mux" in data["one_qubit_modes"]
-        assert "scheduled" not in data["one_qubit_modes"]
+        assert "parallel_by_mux" in data["one_qubit_execution_modes"]
+        assert "scheduled" not in data["one_qubit_execution_modes"]
         assert "CalibrationPipelineSpec" in data["spec_schema"]["title"]
 
     def test_catalog_requires_authentication(self, test_client, chip):
@@ -404,31 +404,9 @@ class TestValidate:
         assert data["valid"] is True, data["problems"]
         assert [warning["path"] for warning in data["warnings"]] == ["steps[3]"]
 
-    def test_legacy_mode_is_accepted_normalized_and_warned(self, test_client, chip, auth_headers):
+    def test_removed_mode_names_are_a_problem(self, test_client, chip, auth_headers):
         spec = good_spec()
-        spec["steps"][0] = {"type": "OneQubitCheck", "mode": "scheduled"}
-        spec["steps"][2]["mode"] = "serial"
-        response = test_client.post(
-            "/calibration-pipelines/validate",
-            headers=auth_headers,
-            json={"chip_id": CHIP, "spec": spec},
-        )
-        data = response.json()
-        assert data["valid"] is True, data["problems"]
-        steps = data["spec"]["steps"]
-        assert steps[0]["execution_mode"] == "parallel_by_mux"
-        assert steps[2]["execution_mode"] == "sequential"
-        assert "mode" not in steps[0] and "mode" not in steps[2]
-        warnings = {warning["path"]: warning["message"] for warning in data["warnings"]}
-        assert list(warnings) == ["steps[0]", "steps[2]"]
-        assert "execution_mode='parallel_by_mux'" in warnings["steps[0]"]
-        assert "execution_mode='sequential'" in warnings["steps[2]"]
-
-    def test_conflicting_mode_and_execution_mode_are_a_problem(
-        self, test_client, chip, auth_headers
-    ):
-        spec = good_spec()
-        spec["steps"][0]["mode"] = "serial"
+        spec["steps"][0] = {"type": "OneQubitCheck", "execution_mode": "scheduled"}
         response = test_client.post(
             "/calibration-pipelines/validate",
             headers=auth_headers,
@@ -436,7 +414,20 @@ class TestValidate:
         )
         data = response.json()
         assert data["valid"] is False
-        assert any("conflicts with the deprecated" in p["message"] for p in data["problems"])
+        assert any("execution_mode" in p["path"] for p in data["problems"]), data["problems"]
+
+    def test_removed_mode_key_is_a_problem(self, test_client, chip, auth_headers):
+        # A saved spec that still uses ``mode`` must not silently run the default.
+        spec = good_spec()
+        spec["steps"][2]["mode"] = "sequential"
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is False
+        assert any(p["path"].endswith("mode") for p in data["problems"]), data["problems"]
 
     def test_problems_carry_paths(self, test_client, chip, auth_headers):
         spec = good_spec()

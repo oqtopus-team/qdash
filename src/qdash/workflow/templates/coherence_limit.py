@@ -21,6 +21,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode
 from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
@@ -32,7 +33,6 @@ from qdash.workflow.service.steps import (
     CustomOneQubit,
     CustomTwoQubit,
     GenerateCRSchedule,
-    resolve_execution_mode,
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
@@ -48,11 +48,10 @@ def coherence_limit(
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
-    execution_mode: str | None = None,
+    execution_mode: OneQubitExecutionMode = "parallel_by_mux",
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
-    mode: str | None = None,
 ) -> Any:
     """Gate coherence limit calculation flow.
 
@@ -74,8 +73,6 @@ def coherence_limit(
             - "sequential": one MUX and one qubit at a time
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
-        mode: Deprecated alias of execution_mode. The old names "scheduled",
-            "synchronized" and "serial" are still accepted with a deprecation warning.
 
     Returns:
         Pipeline results
@@ -100,7 +97,7 @@ def coherence_limit(
         CustomOneQubit(
             step_name="coherence_limit_1q",
             tasks=[TaskCall(name="Check1QGateCoherenceLimit", run={"drag_hpi_duration": 16})],
-            execution_mode=resolve_execution_mode(execution_mode, mode, default="parallel_by_mux"),
+            execution_mode=execution_mode,
         ),
         # 2Q coherence limit
         GenerateCRSchedule(),
