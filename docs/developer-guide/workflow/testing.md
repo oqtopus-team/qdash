@@ -33,13 +33,12 @@ uv run pytest tests/qdash/workflow/service/test_pipeline_flow.py -v -k cancellat
 
 Run `task test` when the change also affects shared models, repositories, or API behavior.
 
-`calibtasks/qm/test_qm_rabi_sdk.py` checks the Quantum Machines backend against the real `qm-qua`,
-`qualang-tools`, and `qm-saas` packages offline and is skipped unless the workflow `qm` extra is
-installed; its QM SaaS test also needs the `qm-cloud` extra. Install that extra before changing
-the backend:
+`calibtasks/qm/test_qm_rabi_sdk.py` checks the Quantum Machines backend against the real `qm-qua`
+and `qualang-tools` packages offline, with the QOP server replaced by a stub, and is skipped
+unless the workflow `qm` extra is installed. Install that extra before changing the backend:
 
 ```bash
-uv sync --locked --all-groups --all-packages --extra qm-cloud
+uv sync --locked --all-groups --all-packages --extra qm
 uv run pytest tests/qdash/workflow/calibtasks/qm tests/qdash/workflow/engine/backend/test_qm_backend.py -v
 ```
 

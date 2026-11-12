@@ -34,13 +34,6 @@ qm = [
     # 0.24.0 caps pillow below 12, which conflicts with the workflow's pillow pin.
     "qualang-tools==0.23.0",
 ]
-# QM cloud simulator (QM SaaS) client, on top of the qm extra. qm-saas is BSD-3-Clause;
-# 1.2.0 is the minimum version the QM SaaS service accepts. Install with:
-#   uv sync --package qdash-workflow --extra qm-cloud
-qm-cloud = [
-    "qdash-workflow[qm]",
-    "qm-saas==1.2.0",
-]
 
 [tool.uv]
 package = false

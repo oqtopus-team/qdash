@@ -6,16 +6,13 @@ class and serialized by the real SDK; the QOP server is replaced by
 and simulated samples are synthetic arrays wrapped in the SDK's ``SimulatorSamples``
 type, so neither stands for OPX hardware data or output of the official simulator.
 
-They are skipped when the workflow ``qm`` extra is not installed. The QM SaaS checks
-also need ``qm-saas`` (the ``qm-cloud`` extra); they replace its HTTP client and the
-``QuantumMachinesManager`` with recorders, so no request leaves the process.
+They are skipped when the workflow ``qm`` extra is not installed. No request leaves the
+process: the connection check replaces ``QuantumMachinesManager`` with a recorder.
 """
 
 from __future__ import annotations
 
-import datetime
 import inspect
-import ssl
 from typing import Any
 
 import numpy as np
@@ -162,63 +159,23 @@ def test_simulation_refuses_a_sweep_longer_than_the_duration() -> None:
     assert manager.simulated == []
 
 
-class _RecordingSaasApi:
-    """Replaces ``qm_saas.api.Client``; records calls instead of sending HTTP requests."""
-
-    instances: list[_RecordingSaasApi] = []
-
-    def __init__(self, **kwargs: Any) -> None:
-        self.kwargs = kwargs
-        self.launched: list[tuple[str, dict[str, Any]]] = []
-        self.closed: list[str] = []
-        self.close_all_called = False
-        _RecordingSaasApi.instances.append(self)
-
-    def versions(self) -> list[str]:
-        return ["v2_4_4", "v2_6_0", "v3_8_1"]
-
-    def launch_simulator(self, version: str, cluster_config: dict[str, Any]) -> dict[str, Any]:
-        self.launched.append((version, cluster_config))
-        expires = datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=15)
-        return {
-            "id": "sim-1",
-            "token": "instance-token",
-            "host": "sim-1.qm-saas.test",
-            "port": 443,
-            "expires_at": expires.replace(tzinfo=None).isoformat(),
-        }
-
-    def close_simulator(self, instance_id: str) -> None:
-        self.closed.append(instance_id)
-
-    def close_all_simulators(self) -> None:
-        self.close_all_called = True
-
-
-def test_cloud_simulator_uses_qm_saas_connection_params(monkeypatch: pytest.MonkeyPatch) -> None:
-    qm_saas_client = pytest.importorskip("qm_saas.client")
-    from importlib.metadata import version
-
-    assert version("qm-saas") == "1.2.0"
-    _RecordingSaasApi.instances.clear()
-    monkeypatch.setattr(qm_saas_client, "Client", _RecordingSaasApi)
+def test_connection_settings_match_the_sdk_manager_signature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     managers: list[dict[str, Any]] = []
 
     def manager_factory(**kwargs: Any) -> StubQuantumMachinesManager:
-        # The real constructor must accept what qm-saas hands over.
+        # The real constructor must accept every argument the backend passes.
         inspect.signature(qm.QuantumMachinesManager).bind(**kwargs)
         managers.append(kwargs)
         return StubQuantumMachinesManager()
 
     monkeypatch.setattr(qm, "QuantumMachinesManager", manager_factory)
-    monkeypatch.setenv("TEST_QM_EMAIL", "user@example.test")
-    monkeypatch.setenv("TEST_QM_PASSWORD", "pw-value")
     settings = example_settings().model_copy(
         update={
-            "connection": None,
-            "cloud": qm_backend.QMCloudSettings(
-                qop_version="v2_6_0", email_env="TEST_QM_EMAIL", password_env="TEST_QM_PASSWORD"
-            ),
+            "connection": qm_backend.QMConnectionSettings(
+                host="qop.example.test", port=9510, cluster_name="Cluster_1", timeout=30.0
+            )
         }
     )
     backend = QMBackend({"qm_settings": settings})
@@ -227,21 +184,10 @@ def test_cloud_simulator_uses_qm_saas_connection_params(monkeypatch: pytest.Monk
     backend.disconnect()
     backend.disconnect()
 
-    (api,) = _RecordingSaasApi.instances
-    assert api.kwargs["email"] == "user@example.test"
-    assert api.kwargs["host"] == "qm-saas.quantum-machines.co"
-    assert api.launched == [("v2_6_0", {})]
-    (params,) = managers
-    assert params["host"] == "sim-1.qm-saas.test"
-    assert params["connection_headers"] == {
-        "simulation-id": "sim-1",
-        "simulation-auth": "instance-token",
-    }
-    assert isinstance(params["credentials"], ssl.SSLContext)
-    assert params["follow_gateway_redirections"] is False
+    assert managers == [
+        {"host": "qop.example.test", "port": 9510, "cluster_name": "Cluster_1", "timeout": 30.0}
+    ]
     assert session.is_simulator
-    assert api.closed == ["sim-1"]
-    assert not api.close_all_called
 
 
 def test_modes_cannot_be_mixed() -> None:

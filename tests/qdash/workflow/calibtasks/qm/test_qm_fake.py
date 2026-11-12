@@ -69,7 +69,7 @@ from tests.qdash.workflow.qm_helpers import (
 )
 
 FAKE_SETTINGS_PATH = REPO_ROOT / "config" / "qm-config" / "example-fake" / "qm-fake.yaml"
-QM_PACKAGES = ("qm", "qualang_tools", "qm_saas")
+QM_PACKAGES = ("qm", "qualang_tools")
 USERNAME = "alice"
 CHIP_ID = "fake-chip"
 PROJECT_ID = "project-1"
@@ -182,13 +182,12 @@ class TestSettings:
         [
             ({"mode": "hardware"}, "mode"),
             ({"connection": {"host": "127.0.0.1"}}, "connection"),
-            ({"cloud": {"qop_version": "v2_6_0"}}, "cloud"),
             ({"simulation": {"duration_ns": 40_000}}, "simulation"),
             ({"qua_config": {"elements": {}}}, "qua_config"),
             ({"qua_config_file": "qua_config.yaml"}, "qua_config_file"),
         ],
     )
-    def test_hardware_and_cloud_settings_are_rejected(
+    def test_qop_server_settings_are_rejected(
         self, tmp_path: Path, extra: dict[str, Any], named: str
     ) -> None:
         with pytest.raises(QMConfigurationError, match=rf"without a QOP server.*remove {named}"):

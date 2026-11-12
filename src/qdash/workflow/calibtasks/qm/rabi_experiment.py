@@ -2,7 +2,7 @@
 
 The QUA program comes from ``QUA_calibrations`` in
 ``qualang_tools.addons.calibration.calibrations`` (py-qua-tools, BSD-3-Clause,
-Copyright (c) 2021 Q.M. Technologies Ltd.), installed as a dependency and not
+Copyright 2021 Q.M. Technologies Ltd.), installed as a dependency and not
 copied here. This module only configures that class, runs it, and converts its
 results:
 

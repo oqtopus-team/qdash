@@ -1,7 +1,7 @@
 """QM fake backend (``qm-fake``): a local synthetic device response for QM tasks.
 
 ``QMFakeBackend`` lets the tasks of the ``qm`` backend run without an OPX, a QOP
-server, a QM account or any Quantum Machines package. The tasks, their analysis,
+server or any Quantum Machines package. The tasks, their analysis,
 figures, raw data and persistence are the ones the ``qm`` backend uses; only the
 device response is replaced. ``QMFakeDevice`` takes the place of the
 ``QuantumMachinesManager`` and returns an averaged I/Q response computed with NumPy
@@ -20,8 +20,8 @@ program, the OPX or its connections.
 The settings file defaults to ``<config dir>/qm-config/<chip_id>/qm-fake.yaml``. The
 ``qm_fake_config_path`` session option or the ``QDASH_QM_FAKE_CONFIG`` environment
 variable overrides that path. It holds the response of each qubit and nothing that
-reaches a QOP server: ``mode``, ``connection``, ``cloud``, ``simulation``,
-``qua_config`` and ``qua_config_file`` are rejected.
+reaches a QOP server: ``mode``, ``connection``, ``simulation``, ``qua_config`` and
+``qua_config_file`` are rejected.
 
 The ``qm-fake`` backend is never a calibration source: ``is_hardware`` is ``False``,
 so ``BackendSaver`` keeps its results in the run history only.
@@ -59,7 +59,7 @@ QM_FAKE_CONFIG_OPTION = "qm_fake_config_path"
 QM_FAKE_SOURCE_TYPE = "qdash.qm_fake.rabi_iq"
 QM_FAKE_VERSION = "qm-fake (QDash synthetic response, no QM SDK)"
 # Settings of the qm backend that reach a QOP server; a qm-fake settings file must not set them.
-QOP_ONLY_SETTINGS = ("mode", "connection", "cloud", "simulation", "qua_config", "qua_config_file")
+QOP_ONLY_SETTINGS = ("mode", "connection", "simulation", "qua_config", "qua_config_file")
 
 
 class QMFakeQubitSettings(BaseModel):
@@ -115,14 +115,14 @@ class QMFakeSettings(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _reject_qop_settings(cls, data: Any) -> Any:
-        # Checked before field validation, so a hardware or cloud section copied from
+        # Checked before field validation, so a QOP server section copied from
         # qm.yaml gets this message instead of an "extra field" error.
         if isinstance(data, dict):
             present = [name for name in QOP_ONLY_SETTINGS if name in data]
             if present:
                 raise ValueError(
-                    "the qm-fake backend runs locally without a QOP server, a QM account or a "
-                    f"QUA configuration; remove {', '.join(present)}. Use backend 'qm' with "
+                    "the qm-fake backend runs locally without a QOP server or a QUA "
+                    f"configuration; remove {', '.join(present)}. Use backend 'qm' with "
                     "qm.yaml for the OPX or the QOP simulator"
                 )
             if "mock" in data:

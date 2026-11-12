@@ -20,17 +20,9 @@ Testing without any QM hardware, server or package is the job of the separate
 ``qm-fake`` backend (``qm_fake.py``), which runs the same QM tasks against a local
 synthetic response. This backend never falls back to it.
 
-The backend reaches the QOP server in one of two ways:
-
-``connection``
-    A QOP server at a fixed host, as ``QuantumMachinesManager(host=...)`` takes it.
-``cloud``
-    A QM SaaS cloud simulator instance (``qm-saas``, the workflow ``qm-cloud`` extra),
-    simulator mode only. The backend logs in with credentials read from named
-    environment variables, spawns one instance of the configured QOP version, connects
-    with ``QuantumMachinesManager(**instance.qmm_connection_params)`` and closes that
-    instance again on disconnect or on a failed connect. It never closes instances it
-    did not spawn.
+Both modes need a QOP server that the worker can reach, set in ``connection`` as
+``QuantumMachinesManager(host=...)`` takes it. The QOP simulator runs on that server;
+this package neither hosts a simulator nor provisions one.
 
 The settings file defaults to ``<config dir>/qm-config/<chip_id>/qm.yaml``. The
 ``qm_config_path`` session option or the ``QDASH_QM_CONFIG`` environment variable
@@ -42,7 +34,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -67,18 +58,6 @@ QM_INSTALL_HINT = (
     "Install them with: uv sync --package qdash-workflow --extra qm. "
     "To test QM tasks without QM hardware or packages, select backend 'qm-fake' instead."
 )
-QM_CLOUD_INSTALL_HINT = (
-    "The QM cloud simulator needs the optional qm-saas package. "
-    "Install it with: uv sync --package qdash-workflow --extra qm-cloud"
-)
-QM_SAAS_DEFAULT_HOST = "qm-saas.quantum-machines.co"
-QM_SAAS_DEFAULT_EMAIL_ENV = "QM_SAAS_EMAIL"
-QM_SAAS_DEFAULT_PASSWORD_ENV = "QM_SAAS_PASSWORD"  # noqa: S105 - variable name, not a secret
-# QOP release names as qm-saas spells them, for example v2_6_0.
-QOP_VERSION_PATTERN = re.compile(r"^v(\d+)_(\d+)_(\d+)$")
-# QOP 2.x simulates OPX+ controllers, QOP 3.x simulates OPX1000 controllers.
-QOP_MAJOR_OPX_PLUS = 2
-QOP_MAJOR_OPX1000 = 3
 # Upper bound on the simulated program time, which bounds the samples the simulator returns.
 MAX_SIMULATION_DURATION_NS = 1_000_000
 
@@ -95,10 +74,6 @@ class QMConfigurationError(ValueError):
     """Raised when the QM settings file is missing or invalid."""
 
 
-class QMCloudError(RuntimeError):
-    """Raised when the QM SaaS cloud simulator cannot be reached or started."""
-
-
 class QMConnectionSettings(BaseModel):
     """Address of the QOP server, passed to ``QuantumMachinesManager``."""
 
@@ -108,56 +83,6 @@ class QMConnectionSettings(BaseModel):
     port: int | None = Field(default=None, gt=0, lt=65536)
     cluster_name: str | None = None
     timeout: float | None = Field(default=None, gt=0)
-
-
-class QMCloudSettings(BaseModel):
-    """QM SaaS cloud simulator, used instead of ``connection`` in simulator mode.
-
-    The settings hold the names of the environment variables with the credentials,
-    never the credentials themselves.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    qop_version: str = Field(
-        description="QOP version of the simulator instance, for example v2_6_0 (OPX+)"
-    )
-    email_env: str = Field(default=QM_SAAS_DEFAULT_EMAIL_ENV, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")
-    password_env: str = Field(
-        default=QM_SAAS_DEFAULT_PASSWORD_ENV, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$"
-    )
-    host: str = Field(default=QM_SAAS_DEFAULT_HOST, min_length=1)
-    port: int = Field(default=443, gt=0, lt=65536)
-
-    @field_validator("qop_version")
-    @classmethod
-    def _check_version(cls, value: str) -> str:
-        match = QOP_VERSION_PATTERN.match(value)
-        if match is None:
-            raise ValueError("qop_version must look like v<major>_<minor>_<patch>, e.g. v2_6_0")
-        if int(match.group(1)) not in (QOP_MAJOR_OPX_PLUS, QOP_MAJOR_OPX1000):
-            raise ValueError("qop_version must be a QOP 2.x (OPX+) or 3.x (OPX1000) version")
-        return value
-
-    @property
-    def qop_major(self) -> int:
-        """Major QOP version, which selects the simulated controller family."""
-        match = QOP_VERSION_PATTERN.match(self.qop_version)
-        assert match is not None
-        return int(match.group(1))
-
-    def read_credentials(self) -> tuple[str, str]:
-        """Return the email and password from the configured environment variables.
-
-        Error messages name the variables only, never their values.
-        """
-        missing = [name for name in (self.email_env, self.password_env) if not os.environ.get(name)]
-        if missing:
-            raise QMConfigurationError(
-                "QM cloud simulator credentials are missing; set the environment "
-                f"variable(s) {', '.join(missing)}"
-            )
-        return os.environ[self.email_env], os.environ[self.password_env]
 
 
 class QMQubitSettings(BaseModel):
@@ -224,8 +149,7 @@ class QMBackendSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mode: QMMode
-    connection: QMConnectionSettings | None = None
-    cloud: QMCloudSettings | None = None
+    connection: QMConnectionSettings
     simulation: QMSimulationSettings = Field(default_factory=QMSimulationSettings)
     qubits: dict[str, QMQubitSettings] = Field(default_factory=dict)
     qua_config: dict[str, Any] = Field(default_factory=dict)
@@ -254,29 +178,8 @@ class QMBackendSettings(BaseModel):
             raise ValueError("qubits must configure at least one qubit")
         if not self.qua_config:
             raise ValueError("set qua_config or qua_config_file")
-        self._check_server()
         self._check_names_exist()
         return self
-
-    def _check_server(self) -> None:
-        if (self.connection is None) == (self.cloud is None):
-            raise ValueError("set exactly one of 'connection' (QOP server) or 'cloud' (QM SaaS)")
-        if self.cloud is None:
-            return
-        if self.mode != "simulator":
-            raise ValueError("'cloud' runs the QM SaaS simulator and needs mode: simulator")
-        controllers = self.qua_config.get("controllers") or {}
-        uses_fems = any(
-            isinstance(controller, dict) and "fems" in controller
-            for controller in controllers.values()
-        )
-        expected = QOP_MAJOR_OPX1000 if uses_fems else QOP_MAJOR_OPX_PLUS
-        if self.cloud.qop_major != expected:
-            family = "OPX1000 (fems)" if uses_fems else "OPX+"
-            raise ValueError(
-                f"cloud.qop_version {self.cloud.qop_version} does not match the {family} "
-                f"controllers of qua_config; use a QOP {expected}.x version"
-            )
 
     def _check_names_exist(self) -> None:
         elements = self.qua_config.get("elements")
@@ -389,45 +292,6 @@ def import_qm_sdk() -> Any:
     return qm
 
 
-def import_qm_saas() -> Any:
-    """Import the ``qm_saas`` client or raise ``QMDependencyError`` with an install hint."""
-    try:
-        import qm_saas
-    except ImportError as exc:
-        raise QMDependencyError(QM_CLOUD_INSTALL_HINT) from exc
-    return qm_saas
-
-
-class _RedactingFilter(logging.Filter):
-    """Replace credential values in records logged by the ``qm-saas`` client."""
-
-    def __init__(self, secrets: tuple[str, ...]) -> None:
-        super().__init__()
-        self._secrets = tuple(secret for secret in secrets if secret)
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        message = record.getMessage()
-        redacted = message
-        for secret in self._secrets:
-            redacted = redacted.replace(secret, "***")
-        if redacted != message:
-            record.msg, record.args = redacted, None
-        return True
-
-
-def _sdk_logger(secrets: tuple[str, ...]) -> logging.Logger:
-    """Logger for the ``qm-saas`` client that redacts credentials before any handler.
-
-    qm-saas logs the login email when authentication fails. The logger is private to
-    one connection, so its filter does not leak to other backends, and it propagates
-    to this module's logger.
-    """
-    sdk_logger = logging.Logger(f"{__name__}.saas")
-    sdk_logger.parent = logger
-    sdk_logger.addFilter(_RedactingFilter(secrets))
-    return sdk_logger
-
-
 @dataclass
 class QMSession:
     """Live connection handed to QM tasks by ``QMBackend.get_instance``."""
@@ -466,8 +330,6 @@ class QMBackend(BaseBackend):
         self._config = config
         self._settings: QMBackendSettings | None = config.get("qm_settings")
         self._manager: Any | None = None
-        # QM SaaS instance spawned by this backend; only this instance is ever closed.
-        self._cloud_instance: Any | None = None
 
     @property
     def config(self) -> dict[str, Any]:
@@ -514,20 +376,12 @@ class QMBackend(BaseBackend):
         return f"qm-qua {getattr(qm, '__version__', 'unknown')}"
 
     def connect(self) -> None:
-        """Validate the settings and open a ``QuantumMachinesManager``.
-
-        With ``cloud`` settings, spawn a QM SaaS simulator instance first. A failed
-        connect closes the instance it spawned before the error propagates.
-        """
+        """Validate the settings and open a ``QuantumMachinesManager``."""
         if self._manager is not None:
             return
         settings = self.settings
         qm = import_qm_sdk()
-        if settings.cloud is not None:
-            self._connect_cloud(qm, settings.cloud)
-            return
         connection = settings.connection
-        assert connection is not None
         kwargs: dict[str, Any] = {"host": connection.host}
         if connection.port is not None:
             kwargs["port"] = connection.port
@@ -538,78 +392,12 @@ class QMBackend(BaseBackend):
         self._manager = qm.QuantumMachinesManager(**kwargs)
         logger.info("Connected to QOP at %s in %s mode", connection.host, settings.mode.upper())
 
-    def _connect_cloud(self, qm: Any, cloud: QMCloudSettings) -> None:
-        qm_saas = import_qm_saas()
-        email, password = cloud.read_credentials()
-        try:
-            client = qm_saas.QmSaas(
-                host=cloud.host,
-                port=cloud.port,
-                email=email,
-                password=password,
-                log=_sdk_logger((email, password)),
-            )
-        except Exception as exc:
-            # The SDK raises a bare Exception; the message carries no credentials.
-            raise QMCloudError(f"QM SaaS login at {cloud.host} failed: {exc}") from None
-
-        version = qm_saas.QOPVersion(cloud.qop_version)
-        try:
-            available = sorted(str(v) for v in client.versions())
-        except Exception as exc:
-            raise QMCloudError(f"Could not list QM SaaS QOP versions: {exc}") from None
-        if str(version) not in available:
-            raise QMConfigurationError(
-                f"QM SaaS does not offer QOP {version}; available: {', '.join(available) or 'none'}"
-            )
-
-        instance = client.simulator(version)
-        self._cloud_instance = instance
-        try:
-            instance.spawn()
-            self._manager = qm.QuantumMachinesManager(**instance.qmm_connection_params)
-        except Exception:
-            self._cloud_instance = None
-            self._close_cloud_instance(instance)
-            raise
-        logger.info(
-            "Connected to QM SaaS simulator instance %s (QOP %s), expires at %s",
-            instance.id,
-            version,
-            instance.expires_at,
-        )
-
     def disconnect(self) -> None:
-        """Close the ``QuantumMachinesManager`` and the cloud instance this backend spawned.
-
-        Safe to call repeatedly: both handles are cleared before they are closed.
-        """
+        """Close the ``QuantumMachinesManager``; safe to call repeatedly."""
         manager, self._manager = self._manager, None
-        instance, self._cloud_instance = self._cloud_instance, None
-        try:
-            close = getattr(manager, "close", None)
-            if callable(close):
-                close()
-        finally:
-            if instance is not None:
-                self._close_cloud_instance(instance)
-
-    @staticmethod
-    def _close_cloud_instance(instance: Any) -> None:
-        """Close a spawned instance; a failure is logged because the instance expires anyway."""
-        instance_id = getattr(instance, "id", None)
-        try:
-            instance.close()
-        except Exception:
-            logger.warning(
-                "Could not close QM SaaS simulator instance %s; it stays allocated until it "
-                "expires",
-                instance_id,
-                exc_info=True,
-            )
-        else:
-            if instance_id is not None:
-                logger.info("Closed QM SaaS simulator instance %s", instance_id)
+        close = getattr(manager, "close", None)
+        if callable(close):
+            close()
 
     @property
     def is_connected(self) -> bool:
@@ -617,15 +405,7 @@ class QMBackend(BaseBackend):
         return self._manager is not None
 
     def get_instance(self) -> QMSession:
-        """Return the live session, connecting first when needed.
-
-        An expired cloud instance (QM SaaS closes instances after a fixed lifetime) is
-        replaced by a new one before the session is returned.
-        """
-        instance = self._cloud_instance
-        if instance is not None and not instance.is_alive:
-            logger.warning("QM SaaS simulator instance %s expired; spawning a new one", instance.id)
-            self.disconnect()
+        """Return the live session, connecting first when needed."""
         if self._manager is None:
             self.connect()
         if self._manager is None:

@@ -915,18 +915,6 @@ wheels = [
 ]
 
 [[package]]
-name = "deprecation"
-version = "2.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/d3/8ae2869247df154b64c1884d7346d412fed0c49df84db635aab2d1c40e62/deprecation-2.1.0.tar.gz", hash = "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff", size = 173788, upload-time = "2020-04-20T14:23:38.738Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/c3/253a89ee03fc9b9682f1541728eb66db7db22148cd94f89ab22528cd1e1b/deprecation-2.1.0-py2.py3-none-any.whl", hash = "sha256:a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a", size = 11178, upload-time = "2020-04-20T14:23:36.581Z" },
-]
-
-[[package]]
 name = "distributed"
 version = "2026.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3518,11 +3506,6 @@ qm = [
     { name = "qm-qua" },
     { name = "qualang-tools" },
 ]
-qm-cloud = [
-    { name = "qm-qua" },
-    { name = "qm-saas" },
-    { name = "qualang-tools" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -3540,9 +3523,7 @@ requires-dist = [
     { name = "pymongo", specifier = "==4.18.3" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = "==6.0.3" },
-    { name = "qdash-workflow", extras = ["qm"], marker = "extra == 'qm-cloud'" },
     { name = "qm-qua", marker = "extra == 'qm'", specifier = "==1.5.0" },
-    { name = "qm-saas", marker = "extra == 'qm-cloud'", specifier = "==1.2.0" },
     { name = "qualang-tools", marker = "extra == 'qm'", specifier = "==0.23.0" },
     { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?branch=develop" },
     { name = "reportlab", specifier = ">=4.4.1" },
@@ -3550,7 +3531,7 @@ requires-dist = [
     { name = "slack-sdk", specifier = "==3.41.0" },
     { name = "uvicorn", extras = ["standard"] },
 ]
-provides-extras = ["qm", "qm-cloud"]
+provides-extras = ["qm"]
 
 [[package]]
 name = "qdldl"
@@ -3597,23 +3578,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/69/4f/35819e5e6d2906501f8ea4b11b3bf82248ab24a1965d6b6ebe120de66e3f/qm_qua-1.5.0.tar.gz", hash = "sha256:76f5a844c38fadd281f77bf7090403e51809fdb809d601eb4ea44d6dd447a667", size = 502019, upload-time = "2026-11-02T18:58:12.804Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/dd/62638bd8d6159d629f79aa3bae746a885f10e136a004bb9a7f04cf2a7463/qm_qua-1.5.0-py3-none-any.whl", hash = "sha256:d2eb0ecd7f5e9124692f7f7c24f79e2adc5895a1dfe2539ad6658370b0c12135", size = 622856, upload-time = "2026-11-02T18:58:11.344Z" },
-]
-
-[[package]]
-name = "qm-saas"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "deprecation" },
-    { name = "h11" },
-    { name = "h2" },
-    { name = "protobuf" },
-    { name = "requests" },
-    { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e5/57/2049e940d12db71b91d46ad633fbf34a721390291be174d126b317b56c11/qm_saas-1.2.0.tar.gz", hash = "sha256:e57532ba3c332876bc33300b0be45f78e8b62c9bbf1cc15539c45b272d146f45", size = 8840, upload-time = "2026-09-30T07:01:45.071Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/35/7d/5b497e4a9a977ec9812a4bab35d29cfbbb6099ec01523e16e84747ab5ed3/qm_saas-1.2.0-py3-none-any.whl", hash = "sha256:757b344c5826115426ce4654558b612e5386d6e7b0c1bd8a1d25a075a85ae0d7", size = 7958, upload-time = "2026-09-30T07:01:44.258Z" },
 ]
 
 [[package]]

@@ -15,8 +15,8 @@ configures and runs it rather than reimplementing it. Licenses of these packages
 ## Try QMAmplitudeRabi Without Hardware
 
 The `qm-fake` backend runs **QMAmplitudeRabi** against a synthetic qubit response that QDash
-computes on the workflow worker. It needs no OPX, no QOP server, no QM account, no network
-access, and none of the Quantum Machines packages, so it runs on the standard workflow image. A
+computes on the workflow worker. It needs no OPX, no QOP server, no network access, and none of
+the Quantum Machines packages, so it runs on the standard workflow image. A
 `qm-fake` run uses the task code of the `qm` backend and goes through the same fit, validation,
 figure, raw data, and task history as a hardware run; only the device response is synthetic. It
 checks QDash's pipeline and analysis; it does not compile a QUA program or check OPX pulse
@@ -58,18 +58,16 @@ noise, and a run with very few shots can fail its R² check, as a noisy hardware
 
 These requirements apply to the `qm` backend; the `qm-fake` backend needs only its settings file.
 
-- A QOP server that the workflow worker can reach, or a QM SaaS account for the QM cloud
-  simulator. The QOP simulator runs on a server; the SDK has no offline simulator.
-- The workflow `qm` extra, which installs `qm-qua` 1.5.0 and `qualang-tools` 0.23.0. For the
-  cloud simulator, install the `qm-cloud` extra instead; it adds `qm-saas` 1.2.0, the oldest
-  client version the service accepts:
+- A QOP server that the workflow worker can reach, for both modes. The QOP simulator runs on
+  that server; the SDK has no offline simulator, and QDash neither hosts nor provisions one. To
+  test without a server, use the [`qm-fake` backend](#try-qmamplituderabi-without-hardware).
+- The workflow `qm` extra, which installs `qm-qua` 1.5.0 and `qualang-tools` 0.23.0:
 
   ```bash
-  uv sync --package qdash-workflow --extra qm        # QOP server
-  uv sync --package qdash-workflow --extra qm-cloud  # QM cloud simulator
+  uv sync --package qdash-workflow --extra qm
   ```
 
-  The workflow Docker image does not install these extras, so run the worker from an
+  The workflow Docker image does not install this extra, so run the worker from an
   environment synchronized this way. Without them, a QM task fails when it connects and reports
   the command to run.
 - A chip in QDash whose qubit IDs match the `qubits` keys of the settings file.
@@ -87,13 +85,10 @@ cp -r config/qm-config/example config/qm-config/<chip_id>
 | Setting | Meaning | Default |
 | --- | --- | --- |
 | `mode` | `hardware` or `simulator`; see [Modes and the qm-fake Backend](#modes-and-the-qm-fake-backend) | Required |
-| `connection.host` | QOP server host; set `connection` or `cloud`, not both | Required with `connection` |
+| `connection.host` | QOP server host | Required |
 | `connection.port` | QOP server port | SDK default |
 | `connection.cluster_name` | QOP cluster name | SDK default |
 | `connection.timeout` | Connection timeout in seconds | SDK default |
-| `cloud.qop_version` | QOP version of the cloud simulator, such as `v2_6_0`; see [Use the QM Cloud Simulator](#use-the-qm-cloud-simulator) | Required with `cloud` |
-| `cloud.email_env` / `cloud.password_env` | Names of the environment variables that hold the QM SaaS email and password | `QM_SAAS_EMAIL` / `QM_SAAS_PASSWORD` |
-| `cloud.host` / `cloud.port` | QM SaaS service address | `qm-saas.quantum-machines.co` / `443` |
 | `simulation.duration_ns` | Program time to simulate, a multiple of 4 ns and at most 1000000 | `40000` |
 | `qubits.<qid>.qubit_element` / `qubit_operation` | QUA element and operation that drive the qubit; the Rabi sweep scales this operation's amplitude | Required |
 | `qubits.<qid>.readout_element` / `readout_operation` | QUA element and measurement operation of the readout resonator | Required |
@@ -101,9 +96,9 @@ cp -r config/qm-config/example config/qm-config/<chip_id>
 | `qubits.<qid>.integration_weights` | Four integration weights for two outputs, two for one output | `[cos, sin, minus_sin, cos]` |
 | `qua_config_file` or `qua_config` | QUA configuration, as a JSON or YAML file relative to `qm.yaml` or inline | Required |
 
-QDash checks the file when the task connects: an unknown key, a missing mode, both or neither of
-`connection` and `cloud`, or an element or operation that the QUA configuration does not define
-fails the task before any program runs.
+QDash checks the file when the task connects: an unknown key, a missing mode or `connection`, or
+an element or operation that the QUA configuration does not define fails the task before any
+program runs.
 
 A `mode: mock` or `fake` value, or a `mock` section, fails the task with a pointer to the
 `qm-fake` backend; the `qm` backend never falls back to a synthetic response.
@@ -124,53 +119,15 @@ every default:
 | `qubits.<qid>.phase_deg` | Direction of the excited point from the ground point, in degrees | `120.0` |
 | `qubits.<qid>.noise_per_shot` | Single-shot noise per quadrature, in V; the averaged noise is this value divided by √`shots` | `0.01` |
 
-Settings that reach a QOP server (`mode`, `connection`, `cloud`, `simulation`, `qua_config`, and
+Settings that reach a QOP server (`mode`, `connection`, `simulation`, `qua_config`, and
 `qua_config_file`) fail the task, so a copied `qm.yaml` cannot connect the `qm-fake` backend to a
-server or the cloud. A qubit that the file does not list fails the task and names the
+server. A qubit that the file does not list fails the task and names the
 configured qubits.
 
 The synthetic response is an ideal two-level qubit: the readout point moves along a straight
 line from the ground point toward the excited point as `(1 - cos(π a / pi_amplitude_scale)) / 2`,
 plus Gaussian noise. It has no decoherence, leakage, or pulse distortion, and `cooldown_time` has
 no effect on it.
-
-## Use the QM Cloud Simulator
-
-The QM cloud simulator (QM SaaS) runs the QOP simulator on Quantum Machines' servers, so
-simulator mode works without a QOP server of your own. It needs QM SaaS credentials from
-Quantum Machines and outgoing access to ports 443 and 9510.
-
-1. Install the `qm-cloud` extra, as in [Requirements](#requirements).
-2. In `qm.yaml`, set `mode: simulator` and replace the `connection` block with a `cloud` block:
-
-   ```yaml
-   mode: simulator
-   cloud:
-     qop_version: v2_6_0
-   ```
-
-3. Export the credentials in the environment of the workflow worker. Keep them out of `qm.yaml`
-   and out of version control:
-
-   ```bash
-   export QM_SAAS_EMAIL=<email>
-   export QM_SAAS_PASSWORD=<password>
-   ```
-
-`qop_version` is required: QDash never picks the latest version, which could change the
-simulated controller under an existing QUA configuration. A QOP 2 version simulates OPX+
-controllers, as in the example configuration; a QOP 3 version simulates OPX1000 controllers and
-needs a QUA configuration whose controllers declare `fems`. QDash rejects a version that does not
-match the configuration or that the service does not offer, and lists the offered versions.
-QOP 3 instances use the service's default cluster of OPX1000 controllers.
-
-The `cloud` block is accepted only in simulator mode. When the task connects, QDash starts one
-simulator instance and closes it when the session ends or the connection fails; it never closes
-other instances of the account. The service limits each account to three instances and closes
-an instance after 15 minutes; QDash starts a new instance when the previous one has expired.
-QDash replaces credential values in the QM SaaS client's log messages. SDK exceptions and
-server responses can contain additional details that this filter does not redact; review
-tracebacks before sharing them.
 
 ## Modes and the qm-fake Backend
 

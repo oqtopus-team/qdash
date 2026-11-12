@@ -12,7 +12,7 @@ theme, several deployments on one host, and remote access are optional and can b
 | --- | --- |
 | Evaluate QDash without quantum hardware | [Fake](./setup/fake-backend.md); no backend configuration before startup |
 | Operate a Qubex-connected lab deployment | [Qubex](./setup/qubex-backend.md); place the Qubex configuration before startup |
-| Run a Rabi sweep on a Quantum Machines OPX, the QOP simulator, or the QM cloud simulator | [Quantum Machines](./setup/qm-backend.md), backend `qm`; an initial integration with one task; needs an optional extra |
+| Run a Rabi sweep on a Quantum Machines OPX or on the QOP simulator of a QOP server | [Quantum Machines](./setup/qm-backend.md), backend `qm`; an initial integration with one task; needs an optional extra |
 | Try the Quantum Machines tasks without QM hardware, a QOP server, or the optional extra | [Quantum Machines](./setup/qm-backend.md#try-qmamplituderabi-without-hardware), backend `qm-fake`; a local synthetic response |
 | Connect another hardware stack | Not supported; an additional backend requires QDash code changes. |
 

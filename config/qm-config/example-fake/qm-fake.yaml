@@ -7,7 +7,7 @@
 # Results go through the same fit, figures and raw data as hardware results and are
 # labelled QM-FAKE. They stay in the run history and never replace calibration values.
 # A qm-fake run checks QDash's pipeline and analysis, not QUA compilation, OPX timing or
-# wiring. Settings of the qm backend (mode, connection, cloud, simulation, qua_config,
+# wiring. Settings of the qm backend (mode, connection, simulation, qua_config,
 # qua_config_file) are rejected here.
 
 # Seed of the noise generator. A fixed seed makes every session reproduce the same

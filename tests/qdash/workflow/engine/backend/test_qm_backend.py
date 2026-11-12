@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import logging
 import os
 import subprocess
 import sys
 import textwrap
-from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -28,8 +26,6 @@ from qdash.workflow.engine.backend.fake import FakeBackend
 from qdash.workflow.engine.backend.qm import (
     QM_CONFIG_ENV,
     QMBackend,
-    QMCloudError,
-    QMCloudSettings,
     QMConfigurationError,
     QMDependencyError,
     load_qm_settings,
@@ -129,64 +125,19 @@ class TestSettings:
             example_settings().qubit("5")
 
 
-CLOUD = {"qop_version": "v2_6_0"}
-
-
-class TestCloudSettings:
-    def test_cloud_replaces_connection(self, tmp_path: Path) -> None:
-        settings = load_qm_settings(_write_settings(tmp_path, connection=None, cloud=CLOUD))
-
-        assert settings.connection is None
-        assert settings.cloud is not None
-        assert settings.cloud.qop_major == 2
-        assert settings.cloud.email_env == "QM_SAAS_EMAIL"
-        assert settings.cloud.password_env == "QM_SAAS_PASSWORD"  # noqa: S105
-
-    @pytest.mark.parametrize(
-        ("changes", "message"),
-        [
-            ({"cloud": CLOUD}, "exactly one"),
-            ({"connection": None}, "exactly one"),
-            ({"connection": None, "cloud": CLOUD, "mode": "hardware"}, "mode: simulator"),
-            ({"connection": None, "cloud": {}}, "qop_version"),
-            ({"connection": None, "cloud": {"qop_version": "latest"}}, "v<major>"),
-            ({"connection": None, "cloud": {"qop_version": "v1_0_0"}}, "2.x"),
-            ({"connection": None, "cloud": {"qop_version": "v3_8_1"}}, r"OPX\+"),
-            ({"connection": None, "cloud": {**CLOUD, "password": "x"}}, "password"),
-            ({"connection": None, "cloud": {**CLOUD, "email_env": "a-b"}}, "email_env"),
-        ],
-    )
-    def test_rejects_invalid_cloud_settings(
-        self, tmp_path: Path, changes: dict[str, Any], message: str
-    ) -> None:
-        with pytest.raises(QMConfigurationError, match=message):
-            load_qm_settings(_write_settings(tmp_path, **changes))
-
-    def test_opx1000_config_needs_qop_3(self) -> None:
-        settings = example_settings()
-        qua_config = {
-            **settings.qua_config,
-            "controllers": {"con1": {"type": "opx1000", "fems": {}}},
-        }
-        data = settings.model_dump() | {"connection": None, "qua_config": qua_config}
-
-        with pytest.raises(ValueError, match="OPX1000"):
-            type(settings).model_validate(data | {"cloud": CLOUD})
-        assert type(settings).model_validate(data | {"cloud": {"qop_version": "v3_8_1"}})
+class TestServerSettings:
+    def test_connection_is_required(self, tmp_path: Path) -> None:
+        with pytest.raises(QMConfigurationError, match="connection"):
+            load_qm_settings(_write_settings(tmp_path, connection=None))
 
     def test_simulation_duration_is_bounded(self, tmp_path: Path) -> None:
         with pytest.raises(QMConfigurationError, match="duration_ns"):
             load_qm_settings(_write_settings(tmp_path, simulation={"duration_ns": 2_000_000}))
 
-    def test_missing_credentials_name_variables_only(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("QM_SAAS_EMAIL", "user@example.test")
-        monkeypatch.delenv("QM_SAAS_PASSWORD", raising=False)
-
-        with pytest.raises(QMConfigurationError) as excinfo:
-            QMCloudSettings(qop_version="v2_6_0").read_credentials()
-
-        assert "QM_SAAS_PASSWORD" in str(excinfo.value)
-        assert "user@example.test" not in str(excinfo.value)
+    def test_cloud_section_is_rejected(self, tmp_path: Path) -> None:
+        # The backend has no hosted simulator support; such a section is an unknown key.
+        with pytest.raises(QMConfigurationError, match="cloud"):
+            load_qm_settings(_write_settings(tmp_path, cloud={"qop_version": "v2_6_0"}))
 
 
 class TestSettingsPath:
@@ -298,243 +249,6 @@ class TestLifecycle:
         assert not backend.is_connected
 
 
-@dataclass
-class FakeSaasInstance:
-    """Mimics ``qm_saas.QmSaasInstance``: spawn/close and the connection parameters."""
-
-    version: str
-    fail_spawn: bool = False
-    fail_close: bool = False
-    alive: bool = True
-    spawned: int = 0
-    closed: int = 0
-    id: str = "sim-1"
-    expires_at: str = "2026-11-12T00:15:00"
-
-    def spawn(self) -> None:
-        if self.fail_spawn:
-            raise RuntimeError("spawn failed")
-        self.spawned += 1
-
-    def close(self) -> None:
-        self.closed += 1
-        if self.fail_close:
-            raise RuntimeError("close failed")
-
-    @property
-    def is_alive(self) -> bool:
-        return self.alive
-
-    @property
-    def qmm_connection_params(self) -> dict[str, Any]:
-        return {
-            "host": "sim-1.example.test",
-            "port": 443,
-            "connection_headers": {"simulation-id": self.id, "simulation-auth": "token"},
-            "credentials": "ssl-context",
-            "follow_gateway_redirections": False,
-        }
-
-
-@dataclass
-class FakeSaasSdk:
-    """Fake ``qm_saas`` module recording logins and spawned instances."""
-
-    versions: tuple[str, ...] = ("v2_6_0", "v3_8_1")
-    fail_login: bool = False
-    fail_spawn: bool = False
-    logins: list[dict[str, Any]] = field(default_factory=list)
-    instances: list[FakeSaasInstance] = field(default_factory=list)
-    close_all_calls: int = 0
-
-    def QOPVersion(self, name: str) -> str:
-        return name
-
-    def QmSaas(self, **kwargs: Any) -> SimpleNamespace:
-        self.logins.append(kwargs)
-        if self.fail_login:
-            kwargs["log"].error("Authentication for %s failed: HTTP401", kwargs["email"])
-            raise Exception("Authentication failed: invalid credentials")
-
-        def simulator(version: str) -> FakeSaasInstance:
-            instance = FakeSaasInstance(version=version, fail_spawn=self.fail_spawn)
-            self.instances.append(instance)
-            return instance
-
-        def close_all() -> None:
-            self.close_all_calls += 1
-
-        return SimpleNamespace(
-            versions=lambda: list(self.versions), simulator=simulator, close_all=close_all
-        )
-
-
-class TestCloudLifecycle:
-    @pytest.fixture
-    def sdks(self, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
-        managers: list[dict[str, Any]] = []
-        manager = StubQuantumMachinesManager()
-        state = SimpleNamespace(managers=managers, manager=manager, fail_manager=False)
-
-        def factory(**kwargs: Any) -> StubQuantumMachinesManager:
-            managers.append(kwargs)
-            if state.fail_manager:
-                raise RuntimeError("gRPC connection failed")
-            return manager
-
-        saas = FakeSaasSdk()
-        state.saas = saas
-        monkeypatch.setattr(
-            qm_backend, "import_qm_sdk", lambda: SimpleNamespace(QuantumMachinesManager=factory)
-        )
-        monkeypatch.setattr(qm_backend, "import_qm_saas", lambda: saas)
-        monkeypatch.setenv("QM_SAAS_EMAIL", "user@example.test")
-        monkeypatch.setenv("QM_SAAS_PASSWORD", "pw-value")
-        return state
-
-    @staticmethod
-    def _backend() -> QMBackend:
-        settings = example_settings().model_copy(
-            update={"connection": None, "cloud": QMCloudSettings(qop_version="v2_6_0")}
-        )
-        return QMBackend({"qm_settings": settings})
-
-    def test_connect_spawns_one_instance_and_uses_its_params(self, sdks: SimpleNamespace) -> None:
-        backend = self._backend()
-
-        backend.connect()
-        backend.connect()
-        session = backend.get_instance()
-
-        (login,) = sdks.saas.logins
-        assert login["email"] == "user@example.test"
-        assert login["password"] == "pw-value"  # noqa: S105
-        assert login["host"] == "qm-saas.quantum-machines.co"
-        assert login["port"] == 443
-        (instance,) = sdks.saas.instances
-        assert instance.version == "v2_6_0"
-        assert instance.spawned == 1
-        assert sdks.managers == [instance.qmm_connection_params]
-        assert session.manager is sdks.manager
-        assert session.is_simulator
-
-    def test_disconnect_closes_manager_and_instance_once(self, sdks: SimpleNamespace) -> None:
-        backend = self._backend()
-        backend.connect()
-
-        backend.disconnect()
-        backend.disconnect()
-
-        assert sdks.manager.closed == 1
-        assert sdks.saas.instances[0].closed == 1
-        assert sdks.saas.close_all_calls == 0
-        assert not backend.is_connected
-
-    def test_failed_manager_connection_closes_the_spawned_instance(
-        self, sdks: SimpleNamespace
-    ) -> None:
-        sdks.fail_manager = True
-        backend = self._backend()
-
-        with pytest.raises(RuntimeError, match="gRPC"):
-            backend.connect()
-
-        assert sdks.saas.instances[0].closed == 1
-        assert not backend.is_connected
-        backend.disconnect()
-        assert sdks.saas.instances[0].closed == 1
-
-    def test_failed_spawn_is_cleaned_up(self, sdks: SimpleNamespace) -> None:
-        sdks.saas.fail_spawn = True
-        backend = self._backend()
-
-        with pytest.raises(RuntimeError, match="spawn failed"):
-            backend.connect()
-
-        # Closing an unspawned qm-saas instance is a no-op in the SDK.
-        assert sdks.saas.instances[0].closed == 1
-        assert sdks.managers == []
-
-    def test_close_failure_is_logged_not_raised(
-        self, sdks: SimpleNamespace, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        backend = self._backend()
-        backend.connect()
-        sdks.saas.instances[0].fail_close = True
-
-        with caplog.at_level(logging.WARNING):
-            backend.disconnect()
-
-        assert sdks.manager.closed == 1
-        assert "stays allocated until it expires" in caplog.text
-        assert not backend.is_connected
-
-    def test_manager_close_failure_still_closes_instance(self, sdks: SimpleNamespace) -> None:
-        backend = self._backend()
-        backend.connect()
-
-        def fail() -> None:
-            raise RuntimeError("manager close failed")
-
-        sdks.manager.close = fail
-
-        with pytest.raises(RuntimeError, match="manager close failed"):
-            backend.disconnect()
-        assert sdks.saas.instances[0].closed == 1
-        assert not backend.is_connected
-
-    def test_expired_instance_is_replaced(self, sdks: SimpleNamespace) -> None:
-        backend = self._backend()
-        backend.connect()
-        sdks.saas.instances[0].alive = False
-
-        backend.get_instance()
-
-        first, second = sdks.saas.instances
-        assert first.closed == 1
-        assert second.spawned == 1
-
-    def test_unknown_version_fails_before_spawning(self, sdks: SimpleNamespace) -> None:
-        sdks.saas.versions = ("v2_4_4",)
-        backend = self._backend()
-
-        with pytest.raises(QMConfigurationError, match=r"v2_6_0; available: v2_4_4"):
-            backend.connect()
-        assert sdks.saas.instances == []
-
-    def test_login_failure_redacts_credentials(
-        self, sdks: SimpleNamespace, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        sdks.saas.fail_login = True
-        backend = self._backend()
-
-        with caplog.at_level(logging.DEBUG), pytest.raises(QMCloudError) as excinfo:
-            backend.connect()
-
-        for text in (str(excinfo.value), caplog.text):
-            assert "user@example.test" not in text
-            assert "pw-value" not in text
-        assert "Authentication for *** failed" in caplog.text
-        assert excinfo.value.__cause__ is None
-        assert not backend.is_connected
-
-    def test_missing_credentials_fail_before_login(
-        self, sdks: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.delenv("QM_SAAS_PASSWORD")
-
-        with pytest.raises(QMConfigurationError, match="QM_SAAS_PASSWORD"):
-            self._backend().connect()
-        assert sdks.saas.logins == []
-
-    def test_missing_qm_saas_reports_install_hint(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setitem(sys.modules, "qm_saas", None)
-        monkeypatch.setattr(qm_backend, "import_qm_sdk", SimpleNamespace)
-
-        with pytest.raises(QMDependencyError, match="--extra qm-cloud"):
-            self._backend().connect()
-
-
 class TestMissingDependency:
     def test_connect_reports_install_hint(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setitem(sys.modules, "qm", None)
@@ -553,7 +267,7 @@ class TestMissingDependency:
 
             class Block:
                 def find_spec(self, name, path=None, target=None):
-                    if name.split(".")[0] in {"qm", "qualang_tools", "qm_saas"}:
+                    if name.split(".")[0] in {"qm", "qualang_tools"}:
                         raise ImportError(f"blocked {name}")
                     return None
 
@@ -573,7 +287,7 @@ class TestMissingDependency:
             assert task.run(fake, "0").r2["0"] > 0.98
             fake.disconnect()
             assert not any(
-                m.split(".")[0] in {"qm", "qualang_tools", "qm_saas"} for m in sys.modules
+                m.split(".")[0] in {"qm", "qualang_tools"} for m in sys.modules
             )
             """
         )
