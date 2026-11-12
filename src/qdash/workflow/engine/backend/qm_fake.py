@@ -21,12 +21,15 @@ bindings. It does not check QUA compilation, controller timing, waveform output,
 firmware or wiring, and its response comes from the model described in
 ``qm_fake_qop``, not from a device.
 
-The settings file defaults to ``<config dir>/qm-config/<chip_id>/qm-fake.yaml``. The
-``qm_fake_config_path`` session option or the ``QDASH_QM_FAKE_CONFIG`` environment
-variable overrides that path. It holds the QUA configuration and qubit bindings in
-the same form as ``qm.yaml`` (``qua_config_file`` or ``qua_config`` and ``qubits``),
-plus ``seed``, ``qop_version`` and the ``device`` response of each qubit. Settings
-that reach a QOP server (``mode``, ``connection``, ``simulation``) are rejected.
+The settings file defaults to ``<config dir>/qm-backend/<chip_id>/qm-fake.yaml``. The
+``qm_fake_settings_path`` session option or the ``QDASH_QM_FAKE_SETTINGS`` environment
+variable overrides that path. It holds only what the fake device adds: ``seed``,
+``qop_version`` and the ``device`` response of each qubit. ``qm_settings_file`` names
+the ``qm.yaml`` of the same chip, relative to ``qm-fake.yaml``; the fake backend takes
+the ``qubits`` bindings and the native ``configuration.py`` (``qm_config_file``) from
+it, so both backends run the same QUA configuration. It ignores the QOP settings of
+``qm.yaml`` (``mode``, ``connection``, ``simulation``), and rejects them in
+``qm-fake.yaml``.
 
 The ``qm-fake`` backend is never a calibration source: ``is_hardware`` is ``False``,
 so ``BackendSaver`` keeps its results in the run history only.
@@ -48,6 +51,7 @@ from qdash.workflow.engine.backend.qm import (
     QMDependencyError,
     QMQuaSettings,
     import_qm_sdk,
+    read_settings_file,
     read_settings_mapping,
     resolve_qm_settings_path,
     string_qids,
@@ -62,15 +66,15 @@ logger = logging.getLogger(__name__)
 
 QM_FAKE_BACKEND_NAME = "qm-fake"
 QM_FAKE_SETTINGS_FILE_NAME = "qm-fake.yaml"
-QM_FAKE_CONFIG_ENV = "QDASH_QM_FAKE_CONFIG"
-QM_FAKE_CONFIG_OPTION = "qm_fake_config_path"
+QM_FAKE_SETTINGS_ENV = "QDASH_QM_FAKE_SETTINGS"
+QM_FAKE_SETTINGS_OPTION = "qm_fake_settings_path"
 # Labels that mark every fake artifact, so a fake result can never pass as measured data.
 QM_FAKE_SOURCE_TYPE = "qdash.qm_fake.qualang_tools.Rabi"
 QM_FAKE_VERSION_LABEL = "qm-fake (QDash fake QOP device)"
 # Settings of the qm backend that reach a QOP server; a qm-fake settings file must not set them.
 QOP_ONLY_SETTINGS = ("mode", "connection", "simulation")
-# Keys of the former response-only qm-fake qubit entries, rejected with a pointer to 'device'.
-FORMER_RESPONSE_KEYS = ("pi_amplitude_scale", "iq_offset", "contrast", "phase_deg")
+# Settings the qm-fake backend takes from the qm.yaml named by qm_settings_file.
+SHARED_SETTINGS = ("qubits", "qm_config_file")
 
 
 class QMFakeQubitDevice(BaseModel):
@@ -103,11 +107,22 @@ class QMFakeQubitDevice(BaseModel):
         return self
 
 
-class QMFakeSettings(QMQuaSettings):
-    """Validated contents of a ``qm-fake.yaml`` settings file.
+def _reject_qop_settings(data: dict[str, Any]) -> None:
+    present = [name for name in QOP_ONLY_SETTINGS if name in data]
+    if present:
+        raise ValueError(
+            "the qm-fake backend runs on a local fake device without a QOP server; "
+            f"remove {', '.join(present)}. Use backend 'qm' with qm.yaml for the OPX or "
+            "the QOP simulator"
+        )
 
-    ``qubits`` and ``qua_config`` follow ``qm.yaml`` and are validated by the same
-    rules; ``device`` adds the response of each bound qubit.
+
+class QMFakeSettings(QMQuaSettings):
+    """Validated qm-fake settings: ``qm-fake.yaml`` with the shared part of ``qm.yaml``.
+
+    ``qubits`` and ``qua_config`` come from the ``qm.yaml`` that ``qm_settings_file``
+    names and are validated by the same rules as for the ``qm`` backend; ``device``
+    adds the response of each bound qubit.
     """
 
     seed: int | None = Field(
@@ -128,24 +143,9 @@ class QMFakeSettings(QMQuaSettings):
         # qm.yaml gets this message instead of an "extra field" error.
         if not isinstance(data, dict):
             return data
-        present = [name for name in QOP_ONLY_SETTINGS if name in data]
-        if present:
-            raise ValueError(
-                "the qm-fake backend runs on a local fake device without a QOP server; "
-                f"remove {', '.join(present)}. Use backend 'qm' with qm.yaml for the OPX or "
-                "the QOP simulator"
-            )
+        _reject_qop_settings(data)
         if "mock" in data:
             raise ValueError("'mock' is not a qm-fake setting; describe the response in 'device'")
-        qubits = data.get("qubits")
-        if isinstance(qubits, dict) and any(
-            isinstance(entry, dict) and any(key in entry for key in FORMER_RESPONSE_KEYS)
-            for entry in qubits.values()
-        ):
-            raise ValueError(
-                "qubits holds the QUA bindings as in qm.yaml; describe the response of each "
-                "qubit under 'device' (pi_pulse_area, ground_iq, excited_iq, noise_per_shot)"
-            )
         return data
 
     @field_validator("device", mode="before")
@@ -182,8 +182,26 @@ class QMFakeSettings(QMQuaSettings):
 
 
 def load_qm_fake_settings(path: Path) -> QMFakeSettings:
-    """Load and validate a ``qm-fake.yaml`` settings file."""
-    data = read_settings_mapping(path, "qm-fake")
+    """Load ``qm-fake.yaml`` and the ``qubits`` and QM configuration of its ``qm.yaml``."""
+    data = read_settings_file(path, "qm-fake")
+    try:
+        _reject_qop_settings(data)
+    except ValueError as exc:
+        raise QMConfigurationError(f"Invalid qm-fake settings in {path}: {exc}") from exc
+    misplaced = [key for key in SHARED_SETTINGS if key in data]
+    if misplaced:
+        raise QMConfigurationError(
+            f"{', '.join(misplaced)} in {path} belong in qm.yaml; qm-fake.yaml names that file "
+            "in qm_settings_file and reads the qubit bindings and QM configuration from it"
+        )
+    qm_settings_file = data.pop("qm_settings_file", None)
+    if not isinstance(qm_settings_file, str) or not qm_settings_file:
+        raise QMConfigurationError(
+            f"Invalid qm-fake settings in {path}: set qm_settings_file to the qm.yaml of the "
+            "chip, relative to qm-fake.yaml"
+        )
+    shared = read_settings_mapping(path.parent / qm_settings_file, "QM")
+    data.update({key: shared[key] for key in ("qubits", "qua_config") if key in shared})
     try:
         return QMFakeSettings.model_validate(data)
     except ValueError as exc:
@@ -194,8 +212,8 @@ def resolve_qm_fake_settings_path(config: dict[str, Any]) -> Path:
     """Return the ``qm-fake.yaml`` path for a session configuration."""
     return resolve_qm_settings_path(
         config,
-        option=QM_FAKE_CONFIG_OPTION,
-        env=QM_FAKE_CONFIG_ENV,
+        option=QM_FAKE_SETTINGS_OPTION,
+        env=QM_FAKE_SETTINGS_ENV,
         file_name=QM_FAKE_SETTINGS_FILE_NAME,
     )
 

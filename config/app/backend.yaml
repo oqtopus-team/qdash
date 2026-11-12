@@ -115,9 +115,9 @@ backends:
   # Quantum Machines Backend (OPX hardware or QOP simulator)
   # ---------------------------------------------------------------------------
   qm:
-    description: "Quantum Machines OPX backend (hardware or QOP simulator); needs config/qm-config/<chip_id>/qm.yaml and the workflow 'qm' extra"
+    description: "Quantum Machines OPX backend (hardware or QOP simulator); needs the native QM configuration.py, config/qm-backend/<chip_id>/qm.yaml and the workflow 'qm' extra"
 
-    # The settings file (config/qm-config/<chip_id>/qm.yaml) selects hardware or simulator
+    # The settings file (config/qm-backend/<chip_id>/qm.yaml) selects hardware or simulator
     # mode. Only hardware runs replace calibration values; simulator runs record controller
     # waveforms in the run history.
     tasks:
@@ -128,7 +128,7 @@ backends:
   # Quantum Machines Fake Backend (Testing - No QM Hardware or QOP Server; needs the qm extra)
   # ---------------------------------------------------------------------------
   qm-fake:
-    description: "Testing backend that runs the QM tasks and their qm-qua/qualang-tools programs on a local fake QOP device; needs the workflow qm extra and config/qm-config/<chip_id>/qm-fake.yaml"
+    description: "Testing backend that runs the QM tasks and their qm-qua/qualang-tools programs on a local fake QOP device; needs the workflow qm extra and config/qm-backend/<chip_id>/qm-fake.yaml"
 
     # Every task listed here is the qm task of the same name, routed to the qm-fake backend
     # (see calibtasks/qm/__init__.py); only the device behind QuantumMachinesManager is fake.

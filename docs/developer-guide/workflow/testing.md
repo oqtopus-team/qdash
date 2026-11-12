@@ -42,7 +42,8 @@ backend:
 
 ```bash
 uv sync --locked --all-groups --all-packages --extra qm
-uv run --no-sync pytest tests/qdash/workflow/calibtasks/qm tests/qdash/workflow/engine/backend/test_qm_backend.py -v
+uv run --no-sync pytest tests/qdash/workflow/calibtasks/qm tests/qdash/workflow/engine/backend/test_qm_backend.py \
+  tests/qdash/workflow/engine/backend/test_qm_configuration.py -v
 ```
 
 - `calibtasks/qm/test_qm_fake_device.py` runs the `qm-fake` device against the real packages
@@ -55,6 +56,12 @@ uv run --no-sync pytest tests/qdash/workflow/calibtasks/qm tests/qdash/workflow/
   hardware and simulator paths with the QOP server replaced by a stub.
 - `calibtasks/qm/test_qm_fake.py` runs without the extra: it makes the QM packages unimportable
   and checks the settings, the routing, and that a `qm-fake` run fails with the install command.
+- `calibtasks/qm/test_qm_native_config_sdk.py` imports a native `configuration.py` directly
+  and through the loader, checks that the SDK accepts both, and runs **QMAmplitudeRabi** on
+  `qm-fake` from settings files that point at a configuration with a computed NumPy waveform.
+- `engine/backend/test_qm_configuration.py` runs without the extra and checks
+  `load_qm_configuration`: the returned `config` keeps tuples, integer keys and arrays, a missing
+  or non-dictionary export fails, and helper modules of two chips stay isolated.
 
 ## Follow Existing Fixtures
 
@@ -94,6 +101,6 @@ state instead of private call order unless call order is the contract.
 | `service/` | `service/` |
 | `templates/` | Top-level `test_*_template.py` files |
 | `calibtasks/fake/` | `calibtasks/test_fake_backend_sync.py`, `calibtasks/test_fake_bring_up.py` |
-| `engine/backend/qm.py`, `engine/backend/qm_fake.py`, `calibtasks/qm/` | `engine/backend/test_qm_backend.py`, `calibtasks/qm/` |
+| `engine/backend/qm.py`, `engine/backend/qm_configuration.py`, `engine/backend/qm_fake.py`, `calibtasks/qm/` | `engine/backend/test_qm_backend.py`, `engine/backend/test_qm_configuration.py`, `calibtasks/qm/` |
 
 Paths in the table are relative to `src/qdash/workflow/` and `tests/qdash/workflow/`.

@@ -1,5 +1,7 @@
-# Sample QM backend settings. Copy this directory to config/qm-config/<chip_id>/ and
-# replace the values with those of your QOP server and QUA configuration.
+# Sample QDash settings of the qm backend. Copy this directory to
+# config/qm-backend/<chip_id>/ and replace the values with those of your QOP server.
+# The QUA configuration itself is the native Quantum Machines configuration.py named by
+# qm_config_file; QDash reads its 'config' dictionary unchanged.
 
 # hardware: run programs on the OPX and publish fitted calibration values.
 # simulator: send programs to the QOP simulator; records controller waveforms only and
@@ -19,8 +21,13 @@ connection:
 simulation:
   duration_ns: 40000
 
-# QUA configuration names for each QDash qubit ID, as qualang-tools QUA_calibrations
-# expects them. The qubit operation is the pulse whose amplitude QMAmplitudeRabi scales.
+# Native QM configuration.py that defines 'config', relative to this file. QDash
+# executes it as trusted Python in the workflow worker.
+qm_config_file: ../../qm-config/example/configuration.py
+
+# Names in that configuration for each QDash qubit ID, as qualang-tools
+# QUA_calibrations expects them. The qubit operation is the pulse whose amplitude
+# QMAmplitudeRabi scales.
 qubits:
   "0":
     qubit_element: qubit
@@ -29,7 +36,3 @@ qubits:
     readout_operation: readout
     integration_weights: [cos, sin, minus_sin, cos]
     outputs: [out1, out2]
-
-# QUA configuration, relative to this file (JSON or YAML). Use qua_config instead to
-# write it inline.
-qua_config_file: qua_config.yaml

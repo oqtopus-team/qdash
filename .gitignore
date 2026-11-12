@@ -235,7 +235,8 @@ config/task-knowledge/
 config/quelware-client/*
 config/qm-config/*
 !config/qm-config/example/
-!config/qm-config/example-fake/
+config/qm-backend/*
+!config/qm-backend/example/
 src/tools/schedule/*
 .serena/
 .mcp.json

@@ -222,6 +222,16 @@ and `Q` handles and converts them with `demod2volts`. The fake path differs only
 The backend therefore needs the workflow `qm` extra; without it `connect` raises
 `QMDependencyError` and nothing falls back to another response.
 
+Both backends take the QUA configuration from the lab's native `configuration.py`, named by
+`qm_config_file` in `qm.yaml`; `qm-fake.yaml` names that `qm.yaml` in `qm_settings_file` and
+adds only the device model. `load_qm_configuration` in `engine/backend/qm_configuration.py`
+executes the file as trusted Python when the worker first reads the settings, and returns its
+`config` dictionary without conversion, so the SDK and the fake device receive what
+`from configuration import config` would give. It runs the module under a private name, puts
+the file's directory on `sys.path` only during execution, and removes the helper modules it
+imported from `sys.modules`, so chips do not share helpers and `__main__` blocks never run. The
+API never loads these files.
+
 The fake device implements only the SDK calls that path makes, with signatures that are
 subsets of the SDK's: `open_qm(config)` validates the configuration with the SDK's
 `qm.program.load_config` for the capabilities of `qop_version`, `execute(program)` accepts a

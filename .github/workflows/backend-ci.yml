@@ -14,6 +14,7 @@ on:
       - "compose.dev-local.yaml"
       - "config/caddy/**"
       - "config/qm-config/**"
+      - "config/qm-backend/**"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     branches: [main, develop]
@@ -28,6 +29,7 @@ on:
       - "compose.dev-local.yaml"
       - "config/caddy/**"
       - "config/qm-config/**"
+      - "config/qm-backend/**"
       - ".github/workflows/backend-ci.yml"
 
 permissions:
@@ -192,4 +194,5 @@ jobs:
       - name: Run QM backend and qm-fake tests
         run: >-
           uv run --no-sync pytest tests/qdash/workflow/calibtasks/qm
-          tests/qdash/workflow/engine/backend/test_qm_backend.py -v --tb=short
+          tests/qdash/workflow/engine/backend/test_qm_backend.py
+          tests/qdash/workflow/engine/backend/test_qm_configuration.py -v --tb=short

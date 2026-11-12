@@ -34,14 +34,15 @@ not compile the program for the OPX or check pulse timing, waveforms, or wiring.
    uv sync --package qdash-workflow --extra qm
    ```
 
-3. Copy the `qm-fake` example to the settings directory of that chip and point it at the QUA
-   configuration of the `qm` example:
+3. Copy the example QM configuration and the example settings to the directories of that
+   chip, and point `qm.yaml` at the copied configuration:
 
    ```bash
-   mkdir -p config/qm-config/<chip_id>
-   cp config/qm-config/example/qua_config.yaml config/qm-config/<chip_id>/
-   sed 's|../example/qua_config.yaml|qua_config.yaml|' \
-     config/qm-config/example-fake/qm-fake.yaml > config/qm-config/<chip_id>/qm-fake.yaml
+   cp -r config/qm-config/example config/qm-config/<chip_id>
+   mkdir -p config/qm-backend/<chip_id>
+   cp config/qm-backend/example/qm-fake.yaml config/qm-backend/<chip_id>/
+   sed 's|qm-config/example/|qm-config/<chip_id>/|' \
+     config/qm-backend/example/qm.yaml > config/qm-backend/<chip_id>/qm.yaml
    ```
 
 4. Run the task with the backend set to `qm-fake`:
@@ -87,14 +88,38 @@ The QM packages apply to both backends; the QOP server and the chip apply to the
   command to run.
 - A chip in QDash whose qubit IDs match the `qubits` keys of the settings file.
 
+## Prepare the QM Configuration
+
+Both backends run your native Quantum Machines configuration: a `configuration.py` that defines
+a module-level `config` dictionary, the one you pass to `QuantumMachinesManager.open_qm(config)`
+([QUA configuration](https://docs.quantum-machines.co/latest/docs/Introduction/config/)). QDash
+reads `config` unchanged, so integer port keys, tuples, NumPy arrays, and waveforms computed in
+Python keep the values your other QM scripts see with `from configuration import config`. QDash
+supports the single-dictionary configuration that `qm-qua` 1.5.0 takes; it adds no keys of its
+own to it.
+
+Keep the file in `config/qm-config/<chip_id>/`. The example in `config/qm-config/example/`
+defines a minimal one-qubit configuration for an OPX with controller `con1`. The configuration
+can import helper modules from its own directory, such as `from pulses import gaussian`; give
+them names that no installed package uses. Helpers of different chips do not affect each other.
+
+The configuration is Python, and the workflow worker executes it with the worker's permissions
+when a `qm` or `qm-fake` task starts. Only put files you trust in `config/qm-config/`. QDash
+never runs code under `if __name__ == "__main__":`, so keep anything that connects to a QOP
+server, runs a program, or plots there or in another script. A file that does not define
+`config` as a dictionary, or that raises an error, fails the task with that error.
+
 ## Write the Settings File
 
-The worker reads `config/qm-config/<chip_id>/qm.yaml`, where `<chip_id>` is the QDash chip ID.
-Set `QDASH_QM_CONFIG` to read another path. For hardware or simulator mode, start from the
-example, which pairs the settings with a minimal one-qubit QUA configuration:
+QDash keeps its own settings for a chip in `config/qm-backend/<chip_id>/qm.yaml`, separate from
+the QM configuration. Set `QDASH_QM_SETTINGS` to read another path. A missing file fails the
+task; QDash does not look elsewhere. For hardware or simulator mode, start from the example and
+point `qm_config_file` at the chip's configuration:
 
 ```bash
-cp -r config/qm-config/example config/qm-config/<chip_id>
+mkdir -p config/qm-backend/<chip_id>
+sed 's|qm-config/example/|qm-config/<chip_id>/|' \
+  config/qm-backend/example/qm.yaml > config/qm-backend/<chip_id>/qm.yaml
 ```
 
 | Setting | Meaning | Default |
@@ -105,48 +130,56 @@ cp -r config/qm-config/example config/qm-config/<chip_id>
 | `connection.cluster_name` | QOP cluster name | SDK default |
 | `connection.timeout` | Connection timeout in seconds | SDK default |
 | `simulation.duration_ns` | Program time to simulate, a multiple of 4 ns and at most 1000000 | `40000` |
-| `qubits.<qid>.qubit_element` / `qubit_operation` | QUA element and operation that drive the qubit; the Rabi sweep scales this operation's amplitude | Required |
-| `qubits.<qid>.readout_element` / `readout_operation` | QUA element and measurement operation of the readout resonator | Required |
+| `qm_config_file` | Path of the chip's `configuration.py`, relative to `qm.yaml`, such as `../../qm-config/<chip_id>/configuration.py` | Required |
+| `qubits.<qid>.qubit_element` / `qubit_operation` | Element and operation in `config` that drive the qubit; the Rabi sweep scales this operation's amplitude | Required |
+| `qubits.<qid>.readout_element` / `readout_operation` | Element and measurement operation in `config` of the readout resonator | Required |
 | `qubits.<qid>.outputs` | One or two outputs of the readout element | `[out1, out2]` |
 | `qubits.<qid>.integration_weights` | Four integration weights for two outputs, two for one output | `[cos, sin, minus_sin, cos]` |
-| `qua_config_file` or `qua_config` | QUA configuration, as a JSON or YAML file relative to `qm.yaml` or inline | Required |
 
 QDash checks the file when the task connects: an unknown key, a missing mode or `connection`, or
-an element or operation that the QUA configuration does not define fails the task before any
-program runs.
+an element or operation that `config` does not define fails the task before any program runs.
 
 A `mode: mock` or `fake` value, or a `mock` section, fails the task with a pointer to the
 `qm-fake` backend; the `qm` backend never falls back to the fake device.
 
+Settings written for an earlier build of this integration fail with a message that names the
+change: a `qua_config_file` or `qua_config` key, a `qm.yaml` or `qm-fake.yaml` under
+`config/qm-config/<chip_id>/`, and the `QDASH_QM_CONFIG` and `QDASH_QM_FAKE_CONFIG` variables. To
+migrate, write the QUA configuration as `config` in `configuration.py`, move the settings files
+to `config/qm-backend/<chip_id>/`, replace `qua_config_file` with `qm_config_file`, and rename
+the variables to `QDASH_QM_SETTINGS` and `QDASH_QM_FAKE_SETTINGS`.
+
 ## Write the qm-fake Settings File
 
-The `qm-fake` backend reads `config/qm-config/<chip_id>/qm-fake.yaml`, which can sit next to the
-`qm.yaml` of the same chip. Set `QDASH_QM_FAKE_CONFIG` to read another path; `QDASH_QM_CONFIG`
-does not apply to it. The file takes the QUA configuration and `qubits` entries in the same form
-as `qm.yaml`, checked by the same rules, plus a `device` entry for every qubit; `"0": {}` uses
-every default:
+The `qm-fake` backend reads `config/qm-backend/<chip_id>/qm-fake.yaml`. Set
+`QDASH_QM_FAKE_SETTINGS` to read another path; `QDASH_QM_SETTINGS` does not apply to it. The file
+names the chip's `qm.yaml`, and the fake device uses the same `configuration.py` and `qubits`
+entries from it, checked by the same rules. It ignores the `mode`, `connection`, and
+`simulation` of `qm.yaml`, so `qm-fake` needs no reachable QOP server. The file adds a `device`
+entry for every qubit; `"0": {}` uses every default:
 
 | Setting | Meaning | Default |
 | --- | --- | --- |
-| `qua_config_file` or `qua_config` | QUA configuration, as in `qm.yaml`; point it at the same file | Required |
-| `qubits.<qid>.*` | Elements, operations, outputs, and integration weights, as in `qm.yaml` | Required |
+| `qm_settings_file` | Path of the chip's `qm.yaml`, relative to `qm-fake.yaml` | Required |
 | `seed` | Seed of the noise; a fixed seed repeats the same results in every session | New noise each session |
-| `qop_version` | QOP major version, `2` or `3`, whose rules the SDK checks the QUA configuration against | `2` |
+| `qop_version` | QOP major version, `2` or `3`, whose rules the SDK checks `config` against | `2` |
 | `device.<qid>.pi_pulse_area` | Area of the drive pulse envelope, in V·ns, that rotates the qubit by π | `4.8` |
 | `device.<qid>.ground_iq` | Readout signal (I, Q) of the ground state, in V | `[0.010, 0.002]` |
 | `device.<qid>.excited_iq` | Readout signal (I, Q) of the excited state, in V | `[0.0025, 0.015]` |
 | `device.<qid>.noise_per_shot` | Gaussian noise per quadrature on every measurement, in V | `0.01` |
 
-Settings that reach a QOP server (`mode`, `connection`, and `simulation`) fail the task, so a
-copied `qm.yaml` cannot connect the `qm-fake` backend to a server. A file without a `device`
-entry for a listed qubit, or two qubits that share a drive or readout element, also fails.
+Settings that reach a QOP server (`mode`, `connection`, and `simulation`) fail the task when
+they appear in `qm-fake.yaml`, so a copied `qm.yaml` cannot connect the `qm-fake` backend to a
+server; `qubits` and `qm_config_file` there fail too, because they belong in `qm.yaml`. A file
+without a `device` entry for a listed qubit, or two qubits that share a drive or readout
+element, also fails.
 
 The fake device models an ideal qubit. Each played pulse rotates the qubit by π times the
 amplitude scale times the pulse's envelope area, divided by `pi_pulse_area`, so changing the
-drive waveform in the QUA configuration moves the π scale. Each measurement finds the qubit
+drive waveform in `config` moves the π scale. Each measurement finds the qubit
 excited with the probability that rotation gives, returns the ground or excited readout signal
 plus noise, and resets the qubit. The readout signal is demodulated with the integration weights
-of the QUA configuration. The model has no decoherence, leakage, pulse distortion, or timing,
+of `config`. The model has no decoherence, leakage, pulse distortion, or timing,
 and `cooldown_time` has no effect on it. The fake device runs only the statements of the
 amplitude Rabi program; any other statement or stream processing fails the task.
 

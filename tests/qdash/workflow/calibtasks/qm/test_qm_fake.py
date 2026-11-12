@@ -27,13 +27,14 @@ from qdash.workflow.engine.backend.qm import (
     load_qm_settings,
 )
 from qdash.workflow.engine.backend.qm_fake import (
-    QM_FAKE_CONFIG_ENV,
+    QM_FAKE_SETTINGS_ENV,
     QMFakeBackend,
     QMFakeQubitDevice,
     load_qm_fake_settings,
     resolve_qm_fake_settings_path,
 )
 from tests.qdash.workflow.qm_helpers import (
+    EXAMPLE_CONFIGURATION_PATH,
     EXAMPLE_FAKE_SETTINGS_PATH,
     EXAMPLE_SETTINGS_PATH,
     REPO_ROOT,
@@ -41,7 +42,6 @@ from tests.qdash.workflow.qm_helpers import (
 
 QM_PACKAGES = ("qm", "qualang_tools")
 CHIP_ID = "fake-chip"
-QUA_CONFIG_FILE = str(EXAMPLE_SETTINGS_PATH.parent / "qua_config.yaml")
 
 
 @pytest.fixture(autouse=True)
@@ -59,12 +59,13 @@ def without_qm_packages(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(socket.socket, "connect", no_network)
     monkeypatch.setattr(socket, "create_connection", no_network)
-    monkeypatch.delenv(QM_FAKE_CONFIG_ENV, raising=False)
+    for name in (QM_FAKE_SETTINGS_ENV, "QDASH_QM_SETTINGS", "QDASH_QM_CONFIG"):
+        monkeypatch.delenv(name, raising=False)
 
 
 def _fake_data(**changes: Any) -> dict[str, Any]:
     data: dict[str, Any] = yaml.safe_load(EXAMPLE_FAKE_SETTINGS_PATH.read_text(encoding="utf-8"))
-    data["qua_config_file"] = QUA_CONFIG_FILE
+    data["qm_settings_file"] = str(EXAMPLE_SETTINGS_PATH)
     for key, value in changes.items():
         if value is None:
             data.pop(key, None)
@@ -73,10 +74,23 @@ def _fake_data(**changes: Any) -> dict[str, Any]:
     return data
 
 
+def _hardware_data(**changes: Any) -> dict[str, Any]:
+    data: dict[str, Any] = yaml.safe_load(EXAMPLE_SETTINGS_PATH.read_text(encoding="utf-8"))
+    data["qm_config_file"] = str(EXAMPLE_CONFIGURATION_PATH)
+    data.update(changes)
+    return data
+
+
 def _write(tmp_path: Path, data: dict[str, Any], name: str = "qm-fake.yaml") -> Path:
     path = tmp_path / name
     path.write_text(yaml.safe_dump(data), encoding="utf-8")
     return path
+
+
+def _write_pair(tmp_path: Path, hardware: dict[str, Any], **fake: Any) -> Path:
+    """Write a qm.yaml and a qm-fake.yaml that names it, and return the qm-fake.yaml path."""
+    _write(tmp_path, hardware, "qm.yaml")
+    return _write(tmp_path, _fake_data(qm_settings_file="qm.yaml", **fake))
 
 
 class TestRegistration:
@@ -120,14 +134,14 @@ class TestRegistration:
 
 class TestWithoutQMPackages:
     def test_connect_fails_with_the_install_hint(self) -> None:
-        backend = create_backend("qm-fake", {"qm_fake_config_path": EXAMPLE_FAKE_SETTINGS_PATH})
+        backend = create_backend("qm-fake", {"qm_fake_settings_path": EXAMPLE_FAKE_SETTINGS_PATH})
 
         with pytest.raises(QMDependencyError, match=r"uv sync --package qdash-workflow --extra qm"):
             backend.connect()
         assert not backend.is_connected
 
     def test_task_run_fails_instead_of_producing_a_response(self) -> None:
-        backend = create_backend("qm-fake", {"qm_fake_config_path": EXAMPLE_FAKE_SETTINGS_PATH})
+        backend = create_backend("qm-fake", {"qm_fake_settings_path": EXAMPLE_FAKE_SETTINGS_PATH})
 
         assert isinstance(backend, QMFakeBackend)
 
@@ -136,7 +150,7 @@ class TestWithoutQMPackages:
         assert not backend.is_connected
 
     def test_invalid_settings_fail_before_the_package_check(self, tmp_path: Path) -> None:
-        backend = QMFakeBackend({"qm_fake_config_path": tmp_path / "absent.yaml"})
+        backend = QMFakeBackend({"qm_fake_settings_path": tmp_path / "absent.yaml"})
 
         with pytest.raises(QMConfigurationError, match="settings file not found"):
             backend.connect()
@@ -155,7 +169,7 @@ class TestSettings:
 
         assert settings.seed == 1234
         assert settings.qop_version == 2
-        # The fake device reads the same QUA configuration and bindings as qm.yaml.
+        # The fake device reads the same native configuration and bindings as qm.yaml.
         assert settings.qua_config == hardware.qua_config
         assert settings.qubits == hardware.qubits
         assert settings.device["0"] == QMFakeQubitDevice()
@@ -196,19 +210,44 @@ class TestSettings:
         with pytest.raises(QMConfigurationError, match="remove mode, connection, simulation"):
             load_qm_fake_settings(EXAMPLE_SETTINGS_PATH)
 
-    def test_former_response_only_layout_points_to_device(self, tmp_path: Path) -> None:
-        data = {"seed": 1, "qubits": {"0": {"pi_amplitude_scale": 0.6, "contrast": 0.01}}}
+    @pytest.mark.parametrize(
+        ("extra", "named"),
+        [
+            ({"qubits": {"0": {}}}, "qubits"),
+            ({"qm_config_file": "configuration.py"}, "qm_config_file"),
+        ],
+    )
+    def test_shared_settings_belong_in_qm_yaml(
+        self, tmp_path: Path, extra: dict[str, Any], named: str
+    ) -> None:
+        with pytest.raises(QMConfigurationError, match=rf"{named} in .* belong in qm\.yaml"):
+            load_qm_fake_settings(_write(tmp_path, _fake_data(**extra)))
 
-        with pytest.raises(QMConfigurationError, match="under 'device'"):
-            load_qm_fake_settings(_write(tmp_path, data))
+    @pytest.mark.parametrize("key", ["qua_config_file", "qua_config"])
+    def test_former_qua_config_keys_are_rejected(self, tmp_path: Path, key: str) -> None:
+        with pytest.raises(QMConfigurationError, match="no longer supported"):
+            load_qm_fake_settings(_write(tmp_path, _fake_data(**{key: "qua_config.yaml"})))
+
+    def test_qop_settings_of_qm_yaml_are_ignored(self, tmp_path: Path) -> None:
+        # qm.yaml may name an unreachable QOP server; the fake device never uses it.
+        hardware = _hardware_data(mode="hardware", connection={"host": "opx.invalid"})
+
+        settings = load_qm_fake_settings(_write_pair(tmp_path, hardware))
+
+        assert settings.qubit("0").qubit_element == "qubit"
+
+    def test_missing_qm_yaml_is_reported(self, tmp_path: Path) -> None:
+        path = _write(tmp_path, _fake_data(qm_settings_file="qm.yaml"))
+
+        with pytest.raises(QMConfigurationError, match="QM settings file not found"):
+            load_qm_fake_settings(path)
 
     @pytest.mark.parametrize(
         ("changes", "message"),
         [
             ({"device": {}}, "device has no entry for qubit"),
             ({"device": {"0": {}, "1": {}}}, "without a binding"),
-            ({"qua_config_file": None}, "set qua_config or qua_config_file"),
-            ({"qubits": {}}, "at least one qubit"),
+            ({"qm_settings_file": None}, "set qm_settings_file"),
             ({"qop_version": 4}, "qop_version"),
             ({"seed": -1}, "seed"),
         ],
@@ -235,12 +274,12 @@ class TestSettings:
             load_qm_fake_settings(_write(tmp_path, _fake_data(device={"0": device})))
 
     def test_two_qubits_cannot_share_a_drive_element(self, tmp_path: Path) -> None:
-        data = _fake_data()
-        data["qubits"]["1"] = dict(data["qubits"]["0"])
-        data["device"]["1"] = {}
+        hardware = _hardware_data()
+        hardware["qubits"]["1"] = dict(hardware["qubits"]["0"])
+        device: dict[str, Any] = {"0": {}, "1": {}}
 
         with pytest.raises(QMConfigurationError, match="share qubit_element 'qubit'"):
-            load_qm_fake_settings(_write(tmp_path, data))
+            load_qm_fake_settings(_write_pair(tmp_path, hardware, device=device))
 
     def test_missing_file_is_reported(self, tmp_path: Path) -> None:
         with pytest.raises(QMConfigurationError, match="qm-fake settings file not found"):
@@ -248,16 +287,14 @@ class TestSettings:
 
     @pytest.mark.parametrize("mode", ["mock", "fake"])
     def test_qm_backend_refuses_local_fake_mode(self, tmp_path: Path, mode: str) -> None:
-        data = yaml.safe_load(EXAMPLE_SETTINGS_PATH.read_text())
-        data["qua_config_file"] = QUA_CONFIG_FILE
-        data["mode"] = mode
+        data = _hardware_data(mode=mode)
 
         with pytest.raises(QMConfigurationError, match="select backend 'qm-fake'"):
             load_qm_settings(_write(tmp_path, data, "qm.yaml"))
 
 
 class TestSharedQuaValidation:
-    """qm.yaml and qm-fake.yaml check the QUA bindings with the same rules."""
+    """qm and qm-fake read the bindings of the same qm.yaml and check them the same way."""
 
     @pytest.mark.parametrize(
         ("binding", "message"),
@@ -275,16 +312,14 @@ class TestSharedQuaValidation:
     def test_invalid_binding_is_rejected_by_both_backends(
         self, tmp_path: Path, binding: dict[str, Any], message: str
     ) -> None:
-        fake = _fake_data()
-        fake["qubits"]["0"].update(binding)
-        hardware = yaml.safe_load(EXAMPLE_SETTINGS_PATH.read_text())
-        hardware["qua_config_file"] = QUA_CONFIG_FILE
+        hardware = _hardware_data()
         hardware["qubits"]["0"].update(binding)
+        fake_path = _write_pair(tmp_path, hardware)
 
         with pytest.raises(QMConfigurationError, match=message):
-            load_qm_fake_settings(_write(tmp_path, fake))
+            load_qm_fake_settings(fake_path)
         with pytest.raises(QMConfigurationError, match=message):
-            load_qm_settings(_write(tmp_path, hardware, "qm.yaml"))
+            load_qm_settings(tmp_path / "qm.yaml")
 
 
 class TestSettingsPath:
@@ -297,29 +332,48 @@ class TestSettingsPath:
 
         path = resolve_qm_fake_settings_path({"chip_id": CHIP_ID})
 
-        assert path == tmp_path / "qm-config" / CHIP_ID / "qm-fake.yaml"
+        assert path == tmp_path / "qm-backend" / CHIP_ID / "qm-fake.yaml"
 
-    def test_hardware_settings_variable_is_ignored(
+    def test_hardware_settings_overrides_do_not_apply(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         monkeypatch.setattr(
             "qdash.common.config.loader.ConfigLoader.get_config_dir", lambda: tmp_path
         )
-        monkeypatch.setenv("QDASH_QM_CONFIG", "/elsewhere/qm.yaml")
+        monkeypatch.setenv("QDASH_QM_SETTINGS", "/elsewhere/qm.yaml")
 
-        path = resolve_qm_fake_settings_path({"chip_id": CHIP_ID, "qm_config_path": "x.yaml"})
+        path = resolve_qm_fake_settings_path({"chip_id": CHIP_ID, "qm_settings_path": "x.yaml"})
 
-        assert path == tmp_path / "qm-config" / CHIP_ID / "qm-fake.yaml"
+        assert path == tmp_path / "qm-backend" / CHIP_ID / "qm-fake.yaml"
 
     def test_environment_variable_and_session_option_override(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv(QM_FAKE_CONFIG_ENV, "/env/qm-fake.yaml")
+        monkeypatch.setenv(QM_FAKE_SETTINGS_ENV, "/env/qm-fake.yaml")
 
         assert resolve_qm_fake_settings_path({"chip_id": CHIP_ID}) == Path("/env/qm-fake.yaml")
         assert resolve_qm_fake_settings_path(
-            {"chip_id": CHIP_ID, "qm_fake_config_path": "/opt/qm-fake.yaml"}
+            {"chip_id": CHIP_ID, "qm_fake_settings_path": "/opt/qm-fake.yaml"}
         ) == Path("/opt/qm-fake.yaml")
+
+    @pytest.mark.parametrize(
+        ("former", "current"),
+        [
+            ("qm_fake_config_path", "qm_fake_settings_path"),
+            ("QDASH_QM_FAKE_CONFIG", "QDASH_QM_FAKE_SETTINGS"),
+        ],
+    )
+    def test_renamed_overrides_are_rejected(
+        self, monkeypatch: pytest.MonkeyPatch, former: str, current: str
+    ) -> None:
+        config: dict[str, Any] = {"chip_id": CHIP_ID}
+        if former.isupper():
+            monkeypatch.setenv(former, "/old/qm-fake.yaml")
+        else:
+            config[former] = "/old/qm-fake.yaml"
+
+        with pytest.raises(QMConfigurationError, match=f"{former} was renamed to {current}"):
+            resolve_qm_fake_settings_path(config)
 
     def test_needs_a_chip_or_path(self) -> None:
         with pytest.raises(QMConfigurationError, match=r"Cannot locate qm-fake\.yaml"):

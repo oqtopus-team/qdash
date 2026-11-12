@@ -57,7 +57,7 @@ from qdash.workflow.calibtasks.qm.rabi_experiment import (  # noqa: E402
 )
 from qdash.workflow.engine.backend.factory import create_backend  # noqa: E402
 from qdash.workflow.engine.backend.qm_fake import (  # noqa: E402
-    QM_FAKE_CONFIG_ENV,
+    QM_FAKE_SETTINGS_ENV,
     QM_FAKE_SOURCE_TYPE,
     QMFakeBackend,
     QMFakeQubitDevice,
@@ -104,7 +104,7 @@ def offline(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(socket.socket, "connect", no_network)
     monkeypatch.setattr(socket, "create_connection", no_network)
-    monkeypatch.delenv(QM_FAKE_CONFIG_ENV, raising=False)
+    monkeypatch.delenv(QM_FAKE_SETTINGS_ENV, raising=False)
 
 
 def _settings(
@@ -819,7 +819,7 @@ class TestPipeline:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, force_update_params: bool
     ) -> None:
         env = _executor(tmp_path, monkeypatch, force_update_params=force_update_params)
-        monkeypatch.setenv(QM_FAKE_CONFIG_ENV, str(EXAMPLE_FAKE_SETTINGS_PATH))
+        monkeypatch.setenv(QM_FAKE_SETTINGS_ENV, str(EXAMPLE_FAKE_SETTINGS_PATH))
         backend = create_backend("qm-fake", {"chip_id": CHIP_ID})
         assert backend.name == "qm-fake"
         executed: list[Any] = []

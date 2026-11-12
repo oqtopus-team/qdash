@@ -17,7 +17,9 @@ import numpy as np
 from qdash.workflow.engine.backend.qm import QMBackend, QMBackendSettings, load_qm_settings
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-EXAMPLE_SETTINGS_PATH = REPO_ROOT / "config" / "qm-config" / "example" / "qm.yaml"
+EXAMPLE_SETTINGS_PATH = REPO_ROOT / "config" / "qm-backend" / "example" / "qm.yaml"
+EXAMPLE_FAKE_SETTINGS_PATH = REPO_ROOT / "config" / "qm-backend" / "example" / "qm-fake.yaml"
+EXAMPLE_CONFIGURATION_PATH = REPO_ROOT / "config" / "qm-config" / "example" / "configuration.py"
 
 
 def example_settings(mode: str = "simulator") -> QMBackendSettings:
@@ -131,6 +133,3 @@ class StubQuantumMachinesManager:
 
     def close(self) -> None:
         self.closed += 1
-
-
-EXAMPLE_FAKE_SETTINGS_PATH = REPO_ROOT / "config" / "qm-config" / "example-fake" / "qm-fake.yaml"

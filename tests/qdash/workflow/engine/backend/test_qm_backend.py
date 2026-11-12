@@ -13,6 +13,8 @@ from typing import Any
 import pytest
 import yaml
 from tests.qdash.workflow.qm_helpers import (
+    EXAMPLE_CONFIGURATION_PATH,
+    EXAMPLE_FAKE_SETTINGS_PATH,
     EXAMPLE_SETTINGS_PATH,
     REPO_ROOT,
     StubQuantumMachinesManager,
@@ -24,7 +26,7 @@ from qdash.workflow.engine.backend import qm as qm_backend
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.backend.fake import FakeBackend
 from qdash.workflow.engine.backend.qm import (
-    QM_CONFIG_ENV,
+    QM_SETTINGS_ENV,
     QMBackend,
     QMConfigurationError,
     QMDependencyError,
@@ -35,7 +37,7 @@ from qdash.workflow.engine.backend.qm import (
 
 def _write_settings(tmp_path: Path, **changes: Any) -> Path:
     data = yaml.safe_load(EXAMPLE_SETTINGS_PATH.read_text(encoding="utf-8"))
-    data["qua_config_file"] = str(EXAMPLE_SETTINGS_PATH.parent / data["qua_config_file"])
+    data["qm_config_file"] = str(EXAMPLE_CONFIGURATION_PATH)
     for key, value in changes.items():
         if value is None:
             data.pop(key, None)
@@ -110,15 +112,44 @@ class TestSettings:
         with pytest.raises(QMConfigurationError, match="credentials"):
             load_qm_settings(_write_settings(tmp_path, credentials="secret"))
 
-    def test_inline_and_file_qua_config_are_exclusive(self, tmp_path: Path) -> None:
-        with pytest.raises(QMConfigurationError, match="either qua_config"):
-            load_qm_settings(_write_settings(tmp_path, qua_config={"elements": {}}))
+    @pytest.mark.parametrize("key", ["qua_config_file", "qua_config"])
+    def test_former_qua_config_keys_point_to_the_native_configuration(
+        self, tmp_path: Path, key: str
+    ) -> None:
+        with pytest.raises(QMConfigurationError, match=rf"{key} .*no longer supported.*config"):
+            load_qm_settings(_write_settings(tmp_path, **{key: "qua_config.yaml"}))
+
+    def test_native_configuration_is_required(self, tmp_path: Path) -> None:
+        with pytest.raises(QMConfigurationError, match="set qm_config_file"):
+            load_qm_settings(_write_settings(tmp_path, qm_config_file=None))
 
     def test_missing_files_are_reported(self, tmp_path: Path) -> None:
         with pytest.raises(QMConfigurationError, match="settings file not found"):
             load_qm_settings(tmp_path / "absent.yaml")
-        with pytest.raises(QMConfigurationError, match="QUA configuration file not found"):
-            load_qm_settings(_write_settings(tmp_path, qua_config_file="absent.json"))
+        with pytest.raises(QMConfigurationError, match="QM configuration file not found"):
+            load_qm_settings(_write_settings(tmp_path, qm_config_file="absent.py"))
+
+    @pytest.mark.parametrize("name", ["qua_config.yaml", "qua_config.json"])
+    def test_configuration_must_be_python(self, tmp_path: Path, name: str) -> None:
+        (tmp_path / name).write_text("{}", encoding="utf-8")
+
+        with pytest.raises(QMConfigurationError, match="must be a Python file"):
+            load_qm_settings(_write_settings(tmp_path, qm_config_file=name))
+
+    def test_configuration_path_is_relative_to_the_settings_file(self, tmp_path: Path) -> None:
+        native = tmp_path / "qm-config" / "chip-1"
+        native.mkdir(parents=True)
+        (native / "configuration.py").write_text(
+            EXAMPLE_CONFIGURATION_PATH.read_text(encoding="utf-8"), encoding="utf-8"
+        )
+        settings_dir = tmp_path / "qm-backend" / "chip-1"
+        settings_dir.mkdir(parents=True)
+
+        path = _write_settings(
+            settings_dir, qm_config_file="../../qm-config/chip-1/configuration.py"
+        )
+
+        assert load_qm_settings(path).qubit("0").qubit_element == "qubit"
 
     def test_unconfigured_qubit_is_reported(self) -> None:
         with pytest.raises(QMConfigurationError, match=r"Qubit 5 .*configured: 0"):
@@ -141,30 +172,69 @@ class TestServerSettings:
 
 
 class TestSettingsPath:
+    @pytest.fixture(autouse=True)
+    def _clean_environment(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        for name in (QM_SETTINGS_ENV, "QDASH_QM_CONFIG", "QDASH_QM_FAKE_CONFIG"):
+            monkeypatch.delenv(name, raising=False)
+
     def test_defaults_to_chip_directory(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv(QM_CONFIG_ENV, raising=False)
         monkeypatch.setattr(ConfigLoader, "get_config_dir", classmethod(lambda cls: Path("/cfg")))
 
         path = resolve_qm_settings_path({"chip_id": "chip-1"})
 
-        assert path == Path("/cfg/qm-config/chip-1/qm.yaml")
+        assert path == Path("/cfg/qm-backend/chip-1/qm.yaml")
 
     def test_environment_variable_overrides_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv(QM_CONFIG_ENV, "/elsewhere/qm.yaml")
+        monkeypatch.setenv(QM_SETTINGS_ENV, "/elsewhere/qm.yaml")
 
         assert resolve_qm_settings_path({"chip_id": "chip-1"}) == Path("/elsewhere/qm.yaml")
 
     def test_session_option_overrides_environment(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv(QM_CONFIG_ENV, "/elsewhere/qm.yaml")
-        config = {"chip_id": "chip-1", "qm_config_path": "/explicit/qm.yaml"}
+        monkeypatch.setenv(QM_SETTINGS_ENV, "/elsewhere/qm.yaml")
+        config = {"chip_id": "chip-1", "qm_settings_path": "/explicit/qm.yaml"}
 
         assert resolve_qm_settings_path(config) == Path("/explicit/qm.yaml")
 
-    def test_needs_a_chip_or_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv(QM_CONFIG_ENV, raising=False)
-
+    def test_needs_a_chip_or_path(self) -> None:
         with pytest.raises(QMConfigurationError, match="chip_id"):
             resolve_qm_settings_path({})
+
+    def test_renamed_session_option_is_rejected(self) -> None:
+        with pytest.raises(
+            QMConfigurationError, match="qm_config_path was renamed to qm_settings_path"
+        ):
+            resolve_qm_settings_path({"chip_id": "chip-1", "qm_config_path": "/x/qm.yaml"})
+
+    def test_renamed_environment_variable_is_rejected(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("QDASH_QM_CONFIG", "/x/qm.yaml")
+
+        with pytest.raises(QMConfigurationError, match="renamed to QDASH_QM_SETTINGS"):
+            resolve_qm_settings_path({"chip_id": "chip-1"})
+
+    def test_former_layout_is_reported_instead_of_read(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setattr(ConfigLoader, "get_config_dir", classmethod(lambda cls: tmp_path))
+        former = tmp_path / "qm-config" / "chip-1" / "qm.yaml"
+        former.parent.mkdir(parents=True)
+        former.write_text("mode: simulator\n", encoding="utf-8")
+
+        with pytest.raises(
+            QMConfigurationError, match=r"former layout.*qm-backend/chip-1/qm\.yaml"
+        ):
+            resolve_qm_settings_path({"chip_id": "chip-1"})
+
+    def test_missing_default_file_is_not_replaced_by_another(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setattr(ConfigLoader, "get_config_dir", classmethod(lambda cls: tmp_path))
+
+        path = resolve_qm_settings_path({"chip_id": "chip-1"})
+
+        with pytest.raises(QMConfigurationError, match="settings file not found"):
+            load_qm_settings(path)
 
 
 class TestLifecycle:
@@ -195,7 +265,7 @@ class TestLifecycle:
             tmp_path,
             connection={"host": "opx.local", "port": 9510, "cluster_name": "c1", "timeout": 30},
         )
-        backend = QMBackend({"qm_config_path": str(path)})
+        backend = QMBackend({"qm_settings_path": str(path)})
 
         backend.connect()
         backend.connect()
@@ -242,7 +312,7 @@ class TestLifecycle:
             raise AssertionError("SDK must not be imported")
 
         monkeypatch.setattr(qm_backend, "import_qm_sdk", fail)
-        backend = QMBackend({"qm_config_path": str(_write_settings(tmp_path, mode=None))})
+        backend = QMBackend({"qm_settings_path": str(_write_settings(tmp_path, mode=None))})
 
         with pytest.raises(QMConfigurationError):
             backend.connect()
@@ -287,7 +357,7 @@ class TestMissingDependency:
             assert calibtasks.BaseTask.registry["qm-fake"]["QMAmplitudeRabi"] is (
                 calibtasks.BaseTask.registry["qm"]["QMAmplitudeRabi"]
             )
-            fake = create_backend("qm-fake", {"qm_fake_config_path": sys.argv[1]})
+            fake = create_backend("qm-fake", {"qm_fake_settings_path": sys.argv[1]})
             assert fake.settings.qubits["0"].qubit_element == "qubit"
             task = calibtasks.BaseTask.registry["qm-fake"]["QMAmplitudeRabi"]()
             try:
@@ -308,7 +378,7 @@ class TestMissingDependency:
                 sys.executable,
                 "-c",
                 script,
-                str(REPO_ROOT / "config/qm-config/example-fake/qm-fake.yaml"),
+                str(EXAMPLE_FAKE_SETTINGS_PATH),
             ],
             cwd=REPO_ROOT,
             env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},

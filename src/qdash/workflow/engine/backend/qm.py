@@ -25,14 +25,22 @@ Both modes need a QOP server that the worker can reach, set in ``connection`` as
 ``QuantumMachinesManager(host=...)`` takes it. The QOP simulator runs on that server;
 this package neither hosts a simulator nor provisions one.
 
-The settings file defaults to ``<config dir>/qm-config/<chip_id>/qm.yaml``. The
-``qm_config_path`` session option or the ``QDASH_QM_CONFIG`` environment variable
-overrides that path.
+Configuration is split in two files:
+
+- The QUA configuration is the lab's native Quantum Machines ``configuration.py``,
+  which defines the ``config`` dictionary passed to ``open_qm``. It conventionally
+  lives in ``<config dir>/qm-config/<chip_id>/`` and is loaded unchanged by
+  ``qm_configuration.load_qm_configuration``; it executes as trusted Python.
+- The QDash settings file ``qm.yaml`` holds what QDash adds: ``mode``,
+  ``connection``, ``simulation``, the ``qubits`` bindings from QDash qubit IDs to QUA
+  names, and ``qm_config_file``, the path of ``configuration.py`` relative to
+  ``qm.yaml``. It defaults to ``<config dir>/qm-backend/<chip_id>/qm.yaml``; the
+  ``qm_settings_path`` session option or the ``QDASH_QM_SETTINGS`` environment
+  variable overrides that path.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from dataclasses import dataclass
@@ -44,16 +52,35 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from qdash.common.config.loader import ConfigLoader
 from qdash.workflow.engine.backend.base import BaseBackend
+from qdash.workflow.engine.backend.qm_configuration import (
+    QMConfigurationLoadError,
+    load_qm_configuration,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
 
+# Directory of the QDash settings files, one subdirectory per chip.
+QM_SETTINGS_DIR_NAME = "qm-backend"
+# Conventional directory of the native QM configuration.py files, one per chip.
 QM_CONFIG_DIR_NAME = "qm-config"
 QM_SETTINGS_FILE_NAME = "qm.yaml"
-QM_CONFIG_ENV = "QDASH_QM_CONFIG"
-QM_CONFIG_OPTION = "qm_config_path"
+QM_SETTINGS_ENV = "QDASH_QM_SETTINGS"
+QM_SETTINGS_OPTION = "qm_settings_path"
+# Names used before the native configuration was split from the QDash settings.
+RENAMED_PATH_OVERRIDES = {
+    "qm_config_path": QM_SETTINGS_OPTION,
+    "QDASH_QM_CONFIG": QM_SETTINGS_ENV,
+    "qm_fake_config_path": "qm_fake_settings_path",
+    "QDASH_QM_FAKE_CONFIG": "QDASH_QM_FAKE_SETTINGS",
+}
+MIGRATION_HINT = (
+    "QDash now reads the native Quantum Machines configuration.py (which defines 'config') "
+    "and keeps its own settings in config/qm-backend/<chip_id>/qm.yaml; see "
+    "docs/user-guide/setup/qm-backend.md"
+)
 QM_INSTALL_HINT = (
     "The qm and qm-fake backends need the optional Quantum Machines packages qm-qua and "
     "qualang-tools, which the standard QDash workflow image does not include. "
@@ -147,9 +174,11 @@ def string_qids(value: Any) -> Any:
 class QMQuaSettings(BaseModel):
     """QUA configuration and qubit bindings shared by the ``qm`` and ``qm-fake`` backends.
 
-    Both backends hand ``qua_config`` to ``QuantumMachinesManager.open_qm`` (the real
-    one or the qm-fake stand-in) and build the Rabi program from the same ``qubits``
-    bindings, so both validate them with the same rules.
+    ``qua_config`` is the ``config`` dictionary of the native ``configuration.py``, as
+    that module built it. Both backends hand it to ``QuantumMachinesManager.open_qm``
+    (the real one or the qm-fake stand-in) and build the Rabi program from the same
+    ``qubits`` bindings, so both validate them with the same rules. The checks only
+    read the dictionary; they never rewrite it.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -167,7 +196,7 @@ class QMQuaSettings(BaseModel):
         if not self.qubits:
             raise ValueError("qubits must configure at least one qubit")
         if not self.qua_config:
-            raise ValueError("set qua_config or qua_config_file")
+            raise ValueError("set qm_config_file to the native QM configuration.py")
         self._check_names_exist()
         return self
 
@@ -255,29 +284,48 @@ class QMBackendSettings(QMQuaSettings):
         return data
 
 
-def read_settings_mapping(path: Path, kind: str) -> dict[str, Any]:
-    """Read a QM or qm-fake settings file and inline its ``qua_config_file``.
+# Keys of the former QDash-specific QUA configuration format, rejected with MIGRATION_HINT.
+FORMER_QUA_CONFIG_KEYS = ("qua_config_file", "qua_config")
 
-    ``qua_config_file``, when present, names a JSON or YAML QUA configuration
-    relative to the settings file; otherwise ``qua_config`` holds it inline.
-    """
+
+def read_settings_file(path: Path, kind: str) -> dict[str, Any]:
+    """Read a QM or qm-fake settings file as a mapping."""
     if not path.is_file():
         raise QMConfigurationError(f"{kind} settings file not found: {path}")
     with path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     if not isinstance(data, dict):
         raise QMConfigurationError(f"{kind} settings file must contain a mapping: {path}")
+    former = [key for key in FORMER_QUA_CONFIG_KEYS if key in data]
+    if former:
+        raise QMConfigurationError(
+            f"{', '.join(former)} in {path} is no longer supported. Move the QUA "
+            "configuration to a native configuration.py that defines 'config' and set "
+            f"qm_config_file to it. {MIGRATION_HINT}"
+        )
+    return data
 
-    qua_config_file = data.pop("qua_config_file", None)
-    if qua_config_file is not None:
-        if "qua_config" in data:
-            raise QMConfigurationError("Set either qua_config or qua_config_file, not both")
-        data["qua_config"] = _load_mapping_file(path.parent / str(qua_config_file))
+
+def read_settings_mapping(path: Path, kind: str = "QM") -> dict[str, Any]:
+    """Read ``qm.yaml`` and load the native configuration named by ``qm_config_file``.
+
+    ``qm_config_file`` is resolved relative to the settings file. The loaded ``config``
+    dictionary is returned under ``qua_config``, unchanged.
+    """
+    data = read_settings_file(path, kind)
+    qm_config_file = data.pop("qm_config_file", None)
+    if qm_config_file is not None:
+        if not isinstance(qm_config_file, str) or not qm_config_file:
+            raise QMConfigurationError(f"qm_config_file in {path} must be a path")
+        try:
+            data["qua_config"] = load_qm_configuration(path.parent / qm_config_file)
+        except QMConfigurationLoadError as exc:
+            raise QMConfigurationError(str(exc)) from exc
     return data
 
 
 def load_qm_settings(path: Path) -> QMBackendSettings:
-    """Load and validate a QM settings file."""
+    """Load and validate a QM settings file and the configuration it names."""
     data = read_settings_mapping(path, "QM")
     try:
         return QMBackendSettings.model_validate(data)
@@ -285,36 +333,45 @@ def load_qm_settings(path: Path) -> QMBackendSettings:
         raise QMConfigurationError(f"Invalid QM settings in {path}: {exc}") from exc
 
 
-def _load_mapping_file(path: Path) -> dict[str, Any]:
-    if not path.is_file():
-        raise QMConfigurationError(f"QUA configuration file not found: {path}")
-    with path.open(encoding="utf-8") as f:
-        loaded = json.load(f) if path.suffix == ".json" else yaml.safe_load(f)
-    if not isinstance(loaded, dict):
-        raise QMConfigurationError(f"QUA configuration must be a mapping: {path}")
-    return loaded
-
-
 def resolve_qm_settings_path(
     config: Mapping[str, Any],
     *,
-    option: str = QM_CONFIG_OPTION,
-    env: str = QM_CONFIG_ENV,
+    option: str = QM_SETTINGS_OPTION,
+    env: str = QM_SETTINGS_ENV,
     file_name: str = QM_SETTINGS_FILE_NAME,
 ) -> Path:
     """Return the settings path for a session configuration.
 
     The session option ``option`` wins over the environment variable ``env``; without
-    either, the file ``file_name`` in ``<config dir>/qm-config/<chip_id>/`` is used.
-    The qm-fake backend passes its own option, variable and file name.
+    either, the file ``file_name`` in ``<config dir>/qm-backend/<chip_id>/`` is used.
+    The qm-fake backend passes its own option, variable and file name. There is no
+    other fallback: a missing file fails when it is read.
     """
+    _reject_renamed_overrides(config)
     explicit = config.get(option) or os.environ.get(env)
     if explicit:
         return Path(str(explicit))
     chip_id = config.get("chip_id")
     if not chip_id:
         raise QMConfigurationError(f"Cannot locate {file_name}: no chip_id, {option} or {env}")
-    return ConfigLoader.get_config_dir() / QM_CONFIG_DIR_NAME / str(chip_id) / file_name
+    config_dir = ConfigLoader.get_config_dir()
+    path = config_dir / QM_SETTINGS_DIR_NAME / str(chip_id) / file_name
+    former = config_dir / QM_CONFIG_DIR_NAME / str(chip_id) / file_name
+    if not path.exists() and former.exists():
+        raise QMConfigurationError(
+            f"{former} uses the former layout and is not read. Move the QDash settings to "
+            f"{path} and the QUA configuration to a native configuration.py. {MIGRATION_HINT}"
+        )
+    return path
+
+
+def _reject_renamed_overrides(config: Mapping[str, Any]) -> None:
+    for former, current in RENAMED_PATH_OVERRIDES.items():
+        if config.get(former) or (former.isupper() and os.environ.get(former)):
+            raise QMConfigurationError(
+                f"{former} was renamed to {current}; it names a QDash settings file "
+                f"(qm.yaml or qm-fake.yaml), not the native QM configuration. {MIGRATION_HINT}"
+            )
 
 
 def import_qm_sdk() -> Any:

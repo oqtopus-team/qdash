@@ -3,11 +3,14 @@
 # It needs the workflow qm extra (uv sync --package qdash-workflow --extra qm) but no
 # OPX, no QOP server and no network.
 #
-# Copy this file to config/qm-config/<chip_id>/qm-fake.yaml next to the qm.yaml of the
-# chip, and point qua_config_file and qubits at the same QUA configuration and bindings.
+# Keep this file next to the qm.yaml of the chip, in config/qm-backend/<chip_id>/.
 # Results are labelled QM-FAKE, stay in the run history and never replace calibration
 # values. A qm-fake run does not check QUA compilation, OPX timing, waveforms or wiring.
-# Settings that reach a QOP server (mode, connection, simulation) are rejected here.
+
+# The qm.yaml of the chip, relative to this file. The fake device runs the same native
+# QM configuration (qm_config_file) and qubit bindings (qubits) as the qm backend, and
+# ignores its QOP server settings (mode, connection, simulation).
+qm_settings_file: qm.yaml
 
 # Seed of the noise generator. A fixed seed makes every session reproduce the same
 # results; remove it to draw new noise on every session.
@@ -15,17 +18,6 @@ seed: 1234
 
 # QOP major version (2 or 3) whose capabilities the SDK validates the configuration for.
 qop_version: 2
-
-# The QUA configuration and qubit bindings, in the same form as qm.yaml.
-qua_config_file: ../example/qua_config.yaml
-qubits:
-  "0":
-    qubit_element: qubit
-    qubit_operation: x180
-    readout_element: resonator
-    readout_operation: readout
-    integration_weights: [cos, sin, minus_sin, cos]
-    outputs: [out1, out2]
 
 # Response of each bound qubit. Omitted values take the defaults shown.
 device:
