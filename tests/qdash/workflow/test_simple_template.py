@@ -40,7 +40,7 @@ def test_simple_calibration_default_calls_carry_the_hpi_duration() -> None:
 
     step = _step(result)
     assert step.name == "simple_tasks"
-    assert step.mode == "scheduled"
+    assert step.execution_mode == "parallel_by_mux"
     assert effective_settings(step.tasks) == [
         ("CheckRabi", settings()),
         ("CreateHPIPulse", settings(run={"hpi_duration": 32})),
@@ -70,11 +70,11 @@ def test_simple_calibration_custom_calls_keep_only_their_own_settings() -> None:
     original = list(tasks)
 
     result = simple_module.simple_calibration(
-        username="alice", chip_id="64Q", qids=["0"], tasks=tasks, mode="serial"
+        username="alice", chip_id="64Q", qids=["0"], tasks=tasks, execution_mode="sequential"
     )
 
     step = _step(result)
-    assert step.mode == "serial"
+    assert step.execution_mode == "sequential"
     # Order, ids, duplicates, failure policy, and the user's own values are kept;
     # the default hpi_duration is not added to custom calls.
     assert [(call.resolved_call_id, call.on_failure) for call in step.tasks] == [

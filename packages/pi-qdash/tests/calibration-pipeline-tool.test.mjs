@@ -13,7 +13,7 @@ const SPEC = {
   name: "coarse-then-coherence",
   targets: { qids: ["0", "1"] },
   steps: [
-    { type: "OneQubitCheck", mode: "scheduled" },
+    { type: "OneQubitCheck", execution_mode: "parallel_by_mux" },
     { type: "FilterByStatus" },
     {
       type: "CustomOneQubit",
@@ -209,7 +209,7 @@ test("catalog lists step types and tasks by type and keeps the schema in details
       { type: "OneQubitCheck", kind: "calibration", description: "Coarse one-qubit characterization.", requires: [], provides: ["one_qubit_check", "candidate_qids"], task_scope: "qubit", default_step_id: "one_qubit_check", default_tasks: [{ name: "CheckRabi" }, { name: "CheckT1" }], step_metrics: ["t1_average"] },
       { type: "FilterByStatus", kind: "transform", description: "Keep the qubits whose latest one-qubit step succeeded.", requires: ["one_qubit_check", "one_qubit_fine_tune"], provides: ["candidate_qids"], task_scope: null, default_tasks: [] },
     ],
-    one_qubit_modes: ["synchronized", "scheduled"],
+    one_qubit_modes: ["parallel_by_round", "parallel_by_mux"],
     tasks: { qubit: ["CheckRabi", "CheckT1"], coupling: ["CheckCrossResonance"] },
     spec_version: 2,
     spec_schema: { title: "CalibrationPipelineSpec" },

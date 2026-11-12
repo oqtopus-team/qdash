@@ -189,7 +189,7 @@ export function formatPipelineCatalog(catalog: PipelineCatalog): string {
     const defaults = step.default_tasks.length ? `; default ${step.default_tasks.length} calls` : "";
     lines.push(`- ${step.type} [${step.kind}${scope}]: ${step.description}${needs}${defaults}`);
   }
-  lines.push("", `One-qubit modes: ${catalog.one_qubit_modes.join(", ")}`, "", "Tasks by type:");
+  lines.push("", `One-qubit execution_mode values: ${catalog.one_qubit_modes.join(", ")}`, "", "Tasks by type:");
   for (const [taskType, names] of Object.entries(catalog.tasks)) {
     lines.push(`- ${taskType} (${names.length}): ${names.join(", ")}`);
   }

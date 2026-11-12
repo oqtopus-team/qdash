@@ -109,7 +109,7 @@ def good_spec() -> dict[str, Any]:
         "name": "coarse-then-coherence",
         "targets": {"qids": ["0", "1"]},
         "steps": [
-            {"type": "OneQubitCheck", "mode": "scheduled"},
+            {"type": "OneQubitCheck", "execution_mode": "parallel_by_mux"},
             {"type": "FilterByStatus"},
             {
                 "type": "CustomOneQubit",
@@ -138,7 +138,8 @@ class TestCatalog:
         assert data["spec_version"] == 2
         assert "CheckT1" in data["tasks"]["qubit"]
         assert "CheckCrossResonance" in data["tasks"]["coupling"]
-        assert "scheduled" in data["one_qubit_modes"]
+        assert "parallel_by_mux" in data["one_qubit_modes"]
+        assert "scheduled" not in data["one_qubit_modes"]
         assert "CalibrationPipelineSpec" in data["spec_schema"]["title"]
 
     def test_catalog_requires_authentication(self, test_client, chip):
@@ -403,6 +404,40 @@ class TestValidate:
         assert data["valid"] is True, data["problems"]
         assert [warning["path"] for warning in data["warnings"]] == ["steps[3]"]
 
+    def test_legacy_mode_is_accepted_normalized_and_warned(self, test_client, chip, auth_headers):
+        spec = good_spec()
+        spec["steps"][0] = {"type": "OneQubitCheck", "mode": "scheduled"}
+        spec["steps"][2]["mode"] = "serial"
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is True, data["problems"]
+        steps = data["spec"]["steps"]
+        assert steps[0]["execution_mode"] == "parallel_by_mux"
+        assert steps[2]["execution_mode"] == "sequential"
+        assert "mode" not in steps[0] and "mode" not in steps[2]
+        warnings = {warning["path"]: warning["message"] for warning in data["warnings"]}
+        assert list(warnings) == ["steps[0]", "steps[2]"]
+        assert "execution_mode='parallel_by_mux'" in warnings["steps[0]"]
+        assert "execution_mode='sequential'" in warnings["steps[2]"]
+
+    def test_conflicting_mode_and_execution_mode_are_a_problem(
+        self, test_client, chip, auth_headers
+    ):
+        spec = good_spec()
+        spec["steps"][0]["mode"] = "serial"
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is False
+        assert any("conflicts with the deprecated" in p["message"] for p in data["problems"])
+
     def test_problems_carry_paths(self, test_client, chip, auth_headers):
         spec = good_spec()
         spec["targets"] = {"qids": ["0", "99"]}
@@ -510,7 +545,7 @@ class TestExecute:
         assert "pipeline" in parameters["tags"]
         # The worker gets the normalized spec, not the raw request body.
         assert parameters["spec"]["steps"][0]["configure"] is False
-        assert parameters["spec"]["steps"][2]["mode"] == "synchronized"
+        assert parameters["spec"]["steps"][2]["execution_mode"] == "parallel_by_round"
         assert parameters["spec"]["spec_version"] == 2
         assert [call["call_id"] for call in parameters["spec"]["steps"][2]["tasks"]] == [
             "t1_short",

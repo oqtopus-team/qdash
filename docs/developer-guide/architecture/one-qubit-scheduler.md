@@ -70,8 +70,9 @@ force sequential groups. `parallel_groups` is grouped by MUX and sorted by MUX I
 
 ### Synchronized schedule
 
-`generate_synchronized()` emits a flat list of steps. Box stages remain sequential, and every
-`parallel_qids` list is one synchronization barrier. Checkerboard ordering is enabled by default;
+`generate_synchronized()` emits a flat list of steps, which the `parallel_by_round` execution mode
+runs as rounds. Box stages remain sequential, and every `parallel_qids` list is one round: each of
+its qubits runs the step's full call list, and the next round starts when all of them finish. Checkerboard ordering is enabled by default;
 the exact ordering policy is described in
 [1-Qubit Ordering Strategies](./one-qubit-ordering-strategies.md).
 
@@ -94,9 +95,37 @@ conflicts. Its caller and backend operation must support the selected simultaneo
 - A result describes legal ordering only. It does not acquire a hardware reservation or execute a
   backend call.
 
-The high-level `OneQubitScheduledStrategy` consumes MUX-group schedules, while
-`OneQubitSynchronizedStrategy` consumes synchronized schedules. Both keep box stages sequential and
+## Execution Modes
+
+A one-qubit step's `execution_mode` selects a strategy in `ONE_QUBIT_STRATEGIES`
+(`workflow/service/strategy.py`), and the strategy selects a schedule form. Every strategy except
+`simultaneous_spectroscopy` runs a target's full call list as one unit of work, so a mode decides
+only when targets wait for each other.
+
+| `execution_mode` | Former name | Strategy | Schedule form | Waiting rule |
+| --- | --- | --- | --- | --- |
+| `parallel_by_mux` | `scheduled` | `OneQubitScheduledStrategy` | MUX-group | Each MUX group starts its next qubit when its current qubit finishes |
+| `parallel_by_round` | `synchronized` | `OneQubitSynchronizedStrategy` | Synchronized | A round of qubits from different MUXes finishes before the next round starts |
+| `sequential` | `serial` | `OneQubitSerialStrategy` | MUX-group | One qubit at a time, MUX group after MUX group |
+| `simultaneous_spectroscopy` | — | `OneQubitSimultaneousSpectroscopyStrategy` | Simultaneous spectroscopy | Each call is a barrier for its batch |
+
+A round is the set of qubits the scheduler places in one synchronized step. It is not a per-task
+barrier and does not align pulse timing. With MUX 0 holding qubits 0 and 1 and MUX 1 holding
+qubits 4 and 5, `parallel_by_mux` can start qubit 1 while qubit 4 is still running, and
+`parallel_by_round` finishes qubits 0 and 4 before qubits 1 and 5 start. The actual grouping and
+order come from the schedule. The three non-spectroscopy strategies keep box stages sequential and
 delegate parallel worker creation to the service scheduling helpers.
+
+`BringUp` and the flow templates that take an `execution_mode` parameter default to
+`parallel_by_mux`; `OneQubitCheck`,
+`OneQubitFineTune`, `CustomOneQubit`, and the pipeline spec default to `parallel_by_round`.
+`normalize_one_qubit_execution_mode()` in `datamodel/one_qubit_execution_mode.py` is the single
+place that maps the deprecated `mode` argument and the former names to the canonical mode. Each
+entry point treats an omitted value as `None`, so its own default never conflicts with an
+explicit legacy `mode`; explicit values that name different modes raise `ValueError`. Step
+classes and templates emit a `DeprecationWarning` and repeat it in the run log, and the pipeline
+spec reports it through validation warnings. The stage result keys (`1q_scheduled`,
+`1q_synchronized`, `1q_serial`) and the scheduler method names keep their former names.
 
 ## Source and Tests
 
@@ -104,9 +133,14 @@ delegate parallel worker creation to the service scheduling helpers.
   generation.
 - `workflow/engine/scheduler/one_qubit_types.py` defines the three result forms.
 - `workflow/engine/scheduler/one_qubit_plugins.py` defines ordering strategies.
-- `workflow/service/strategy.py` consumes schedules during calibration.
+- `workflow/service/strategy.py` maps execution modes to strategies that consume schedules.
+- `datamodel/one_qubit_execution_mode.py` defines the execution modes and their deprecated aliases.
 - `tests/qdash/workflow/engine/scheduler/test_one_qubit_scheduler.py` covers classification,
   grouping, synchronized steps, and spectroscopy modes.
 
-Run that test module after scheduler changes. Update the ordering tests as well when a change affects
+`tests/qdash/workflow/service/test_one_qubit_execution_mode.py` and
+`tests/qdash/datamodel/test_one_qubit_execution_mode.py` cover the execution modes, their defaults,
+and the deprecated aliases.
+
+Run the scheduler test module after scheduler changes. Update the ordering tests as well when a change affects
 the order within a MUX or across synchronized steps.

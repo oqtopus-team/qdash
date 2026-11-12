@@ -84,14 +84,14 @@ def build_step(step: PipelineStep) -> Step:
         return BringUp(step_id=step.step_id)
     if isinstance(step, OneQubitCheckStep):
         return OneQubitCheck(
-            mode=step.mode,
+            execution_mode=step.execution_mode,
             tasks=list(step.tasks) if step.tasks is not None else None,
             configure=step.configure,
             step_id=step.step_id,
         )
     if isinstance(step, OneQubitFineTuneStep):
         return OneQubitFineTune(
-            mode=step.mode,
+            execution_mode=step.execution_mode,
             tasks=list(step.tasks) if step.tasks is not None else None,
             configure=step.configure,
             step_id=step.step_id,
@@ -100,7 +100,7 @@ def build_step(step: PipelineStep) -> Step:
         return CustomOneQubit(
             step_name=step.step_name,
             tasks=list(step.tasks),
-            mode=step.mode,
+            execution_mode=step.execution_mode,
             continue_on_failure=step.continue_on_failure,
         )
     if isinstance(step, FilterByStatusStep):

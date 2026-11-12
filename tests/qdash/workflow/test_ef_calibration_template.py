@@ -41,7 +41,7 @@ def test_ef_calibration_runs_expected_tasks_in_one_synchronized_step() -> None:
     step = result["steps"][0]
     assert isinstance(step, CustomOneQubit)
     assert step.name == "ef_calibration"
-    assert step.mode == "synchronized"
+    assert step.execution_mode == "parallel_by_round"
     assert names(step.tasks) == [
         "ConfigureEF",
         "CheckRabi",

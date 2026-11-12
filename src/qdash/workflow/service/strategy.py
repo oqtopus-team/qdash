@@ -1,6 +1,10 @@
 """Calibration strategy classes for one-qubit calibration steps.
 
-Strategy pattern implementation for different calibration execution modes.
+Each one-qubit execution mode maps to one strategy here. The mode names, their
+deprecated aliases and the difference between rounds and MUX parallelism are
+defined in :mod:`qdash.datamodel.one_qubit_execution_mode`. Every strategy keeps
+the scheduler's hardware stage constraints; the strategies differ only in how
+targets wait for each other, and every target runs the step's full call list.
 """
 
 from __future__ import annotations
@@ -11,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
+from qdash.datamodel.one_qubit_execution_mode import resolve_one_qubit_execution_mode
 from qdash.workflow.engine import OneQubitScheduler
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.service._internal.scheduling_tasks import (
@@ -103,10 +108,13 @@ class OneQubitStrategy(ABC):
 
 
 class OneQubitScheduledStrategy(OneQubitStrategy):
-    """Box-based scheduled 1-qubit calibration.
+    """``parallel_by_mux`` (formerly ``scheduled``): MUXes in parallel, qubits per MUX in turn.
 
     Groups qubits by Box type (A/B/MIXED) and executes MUX groups in parallel
-    with qubits within each group running sequentially.
+    with qubits within each group running sequentially. MUXes do not wait for
+    each other between qubits: with MUX0 = {Q0, Q1} and MUX1 = {Q4, Q5}, Q1 may
+    start as soon as Q0 finishes while Q4 is still running (illustrative; the
+    scheduler decides grouping and order).
 
     Execution pattern:
         Box_A:
@@ -193,14 +201,21 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
 
 
 class OneQubitSynchronizedStrategy(OneQubitStrategy):
-    """Synchronized step-based 1-qubit calibration.
+    """``parallel_by_round`` (formerly ``synchronized``): rounds of qubits from different MUXes.
 
-    All MUXes execute the same step simultaneously before moving to the next.
-    Uses checkerboard pattern for frequency isolation.
+    The scheduler selects rounds (``SynchronizedOneQubitScheduleResult.steps``).
+    A round is a set of qubits from different MUXes; each qubit of the round
+    runs the step's full call list, and the next round starts only after every
+    qubit of the round has finished. A round is not a per-task barrier and does
+    not synchronize pulse timing. The order within a MUX follows the
+    checkerboard ordering strategy.
+
+    With MUX0 = {Q0, Q1} and MUX1 = {Q4, Q5}, Q0 and Q4 both finish before Q1
+    and Q5 start (illustrative; the scheduler decides the rounds).
 
     Execution pattern:
-        Step 1: [Q0, Q8, Q16, ...] all in parallel (different MUXes, same position)
-        Step 2: [Q1, Q9, Q17, ...] all in parallel
+        Round 1: [Q0, Q8, Q16, ...] all in parallel (different MUXes, same position)
+        Round 2: [Q1, Q9, Q17, ...] all in parallel
         ...
     """
 
@@ -209,7 +224,7 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
         session: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
-        """Execute synchronized step-based calibration."""
+        """Execute the rounds one after another, the qubits of a round in parallel."""
         logger = get_run_logger()
 
         wiring_config_path = self._get_wiring_config_path(session.chip_id)
@@ -222,7 +237,7 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             use_checkerboard=True,
         )
 
-        logger.info(f"Synchronized schedule: {schedule.total_steps} steps")
+        logger.info(f"parallel_by_round schedule: {schedule.total_steps} rounds")
 
         # Collect ALL qids across all steps for a single execution
         all_qids: list[str] = []
@@ -302,7 +317,7 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
 
 
 class OneQubitSerialStrategy(OneQubitStrategy):
-    """Fully serial 1-qubit calibration.
+    """``sequential`` (formerly ``serial``): fully sequential 1-qubit calibration.
 
     Executes all MUXes one by one, completely sequentially.
     Useful for debugging or when hardware constraints require no parallelism.
@@ -355,18 +370,21 @@ class OneQubitSerialStrategy(OneQubitStrategy):
 
 
 ONE_QUBIT_STRATEGIES: dict[str, type[OneQubitStrategy]] = {
-    "synchronized": OneQubitSynchronizedStrategy,
-    "scheduled": OneQubitScheduledStrategy,
+    "parallel_by_round": OneQubitSynchronizedStrategy,
+    "parallel_by_mux": OneQubitScheduledStrategy,
     "simultaneous_spectroscopy": OneQubitSimultaneousSpectroscopyStrategy,
-    "serial": OneQubitSerialStrategy,
+    "sequential": OneQubitSerialStrategy,
 }
 
 
 def get_one_qubit_strategy(mode: str) -> OneQubitStrategy:
-    """Get a 1-qubit calibration strategy by mode name.
+    """Get a 1-qubit calibration strategy by execution mode.
 
     Args:
-        mode: Strategy mode ("synchronized" or "scheduled")
+        mode: A canonical execution mode (``parallel_by_round``,
+            ``parallel_by_mux``, ``sequential`` or ``simultaneous_spectroscopy``).
+            The deprecated names ``synchronized``, ``scheduled`` and ``serial``
+            are still accepted with a ``DeprecationWarning``.
 
     Returns:
         Strategy instance
@@ -374,7 +392,5 @@ def get_one_qubit_strategy(mode: str) -> OneQubitStrategy:
     Raises:
         ValueError: If mode is not recognized
     """
-    if mode not in ONE_QUBIT_STRATEGIES:
-        valid_modes = ", ".join(ONE_QUBIT_STRATEGIES.keys())
-        raise ValueError(f"Unknown mode '{mode}'. Valid modes: {valid_modes}")
-    return ONE_QUBIT_STRATEGIES[mode]()
+    canonical, _ = resolve_one_qubit_execution_mode(mode, default="parallel_by_round")
+    return ONE_QUBIT_STRATEGIES[canonical]()

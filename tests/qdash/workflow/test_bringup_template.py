@@ -39,7 +39,7 @@ def test_bringup_step_accepts_resonator_assignment_order() -> None:
     from qdash.datamodel.task_call import TaskCall
     from qdash.workflow.service.steps import BringUp
 
-    step = BringUp(mode="scheduled", resonator_assignment_order=[0, 3, 1, 2])
+    step = BringUp(execution_mode="parallel_by_mux", resonator_assignment_order=[0, 3, 1, 2])
 
     resonator = [call for call in step.calls() if call.name == "CheckResonatorSpectroscopy"]
     assert resonator

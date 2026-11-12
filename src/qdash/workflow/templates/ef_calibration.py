@@ -92,7 +92,7 @@ def ef_calibration(
         CustomOneQubit(
             step_name="ef_calibration",
             tasks=ef_calibration_tasks(configuration_mode),
-            mode="synchronized",
+            execution_mode="parallel_by_round",
         )
     ]
 

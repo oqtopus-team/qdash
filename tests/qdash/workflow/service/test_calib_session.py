@@ -1184,7 +1184,7 @@ def pipeline_execution_env(mock_flow_session_deps, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "mode", ["synchronized", "scheduled", "serial", "simultaneous_spectroscopy"]
+    "mode", ["parallel_by_round", "parallel_by_mux", "sequential", "simultaneous_spectroscopy"]
 )
 def test_pipeline_owns_one_execution_per_calibration_step(
     pipeline_execution_env, monkeypatch, mode
@@ -1233,9 +1233,9 @@ def test_pipeline_owns_one_execution_per_calibration_step(
     session.run_pipeline(
         QubitTargets(["0", "1"]),
         steps=[
-            OneQubitCheck(mode=mode, tasks=[TaskCall(name=check_task)]),
+            OneQubitCheck(execution_mode=mode, tasks=[TaskCall(name=check_task)]),
             FilterByStatus(),
-            OneQubitFineTune(mode=mode, tasks=[TaskCall(name=fine_task)]),
+            OneQubitFineTune(execution_mode=mode, tasks=[TaskCall(name=fine_task)]),
         ],
     )
 

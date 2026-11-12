@@ -127,17 +127,28 @@ Each call appears as its own task in the execution, labeled with its call ID. A 
 names such as `"CheckT1"` stops the flow before it measures; see
 [Update a flow saved before task calls](#update-a-flow-saved-before-task-calls).
 
-The `mode` value controls how one-qubit work is arranged:
+The `execution_mode` value controls how the selected qubits wait for each other. In every mode
+except `simultaneous_spectroscopy`, each qubit runs the step's whole task list before it counts as
+finished; no mode runs one task across all qubits before the next task.
 
-| Mode | Behavior |
+| Execution mode | Behavior |
 | --- | --- |
-| `scheduled` | Groups work around hardware-sharing constraints; the default for **Simple Calibration** |
-| `synchronized` | Runs the same task across the selected qubits before moving to the next task |
-| `serial` | Runs the selected work sequentially |
-| `simultaneous_spectroscopy` | Batches supported spectroscopy tasks across compatible targets |
+| `parallel_by_mux` | MUXes run in parallel and the qubits of one MUX run one after another; each MUX moves on as soon as its current qubit finishes. The default for templates such as **Simple Calibration** |
+| `parallel_by_round` | Qubits run in rounds of qubits from different MUXes; the next round starts after every qubit of the current round finishes |
+| `sequential` | One MUX and one qubit at a time |
+| `simultaneous_spectroscopy` | Experimental: each supported spectroscopy task measures a batch of qubits together |
 
-Keep the template's mode unless the procedure requires a specific ordering. The selected tasks
-must support the chosen mode and backend.
+For example, with qubits 0 and 1 on MUX 0 and qubits 4 and 5 on MUX 1, `parallel_by_mux` can
+start qubit 1 when qubit 0 finishes while qubit 4 is still running. `parallel_by_round` finishes
+both qubit 0 and qubit 4 before qubits 1 and 5 start. QDash chooses the actual grouping and order
+from the chip wiring. `sequential`, `parallel_by_mux`, and `parallel_by_round` keep the same
+hardware-sharing limits; changing between them changes only how qubits wait for each other.
+
+Keep the template's execution mode unless the procedure requires a specific ordering. The
+selected tasks must support the chosen mode and backend. Flows written before this setting was
+renamed still run: the former `mode` parameter and the names `scheduled`, `synchronized`, and
+`serial` are deprecated aliases of `execution_mode`, `parallel_by_mux`, `parallel_by_round`, and
+`sequential`, and the run log shows a deprecation warning for them.
 
 ## Schedule Two-Qubit Calibration
 

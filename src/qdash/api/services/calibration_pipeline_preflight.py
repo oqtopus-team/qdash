@@ -324,7 +324,7 @@ def batch_input_problems(spec: CalibrationPipelineSpec) -> list[PipelineProblem]
     problems: list[PipelineProblem] = []
     defaults = spec.canonical_task_parameters()
     for step_index, step in enumerate(spec.steps):
-        if getattr(step, "mode", None) != "simultaneous_spectroscopy":
+        if getattr(step, "execution_mode", None) != "simultaneous_spectroscopy":
             continue
         own = getattr(step, "tasks", None)
         for task_index, call in enumerate(step_calls(step)):
@@ -341,7 +341,7 @@ def batch_input_problems(spec: CalibrationPipelineSpec) -> list[PipelineProblem]
                     path,
                     f"call {call.resolved_call_id!r} ({call.name}) sets calibration inputs "
                     f"{', '.join(sorted(effective['input']))}, which simultaneous_spectroscopy "
-                    "batch execution does not support; use another mode or drop the inputs",
+                    "batch execution does not support; use another execution_mode or drop the inputs",
                 )
             )
     return problems

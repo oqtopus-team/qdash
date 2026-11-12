@@ -34,7 +34,7 @@ def test_check_waveform_template_runs_check_waveform_step(monkeypatch) -> None:
     step = result["steps"][0]
     assert step.name == "check_waveform"
     assert names(step.tasks) == ["CheckWaveform"]
-    assert step.mode == "scheduled"
+    assert step.execution_mode == "parallel_by_mux"
 
 
 def test_check_waveform_template_sets_default_interval(monkeypatch) -> None:

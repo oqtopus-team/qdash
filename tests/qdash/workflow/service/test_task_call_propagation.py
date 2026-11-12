@@ -187,13 +187,13 @@ def _per_target(log: list[tuple[str, str, str, str]], qid: str) -> list[str]:
     return [call_id for _, call_id, _, target in log if target == qid]
 
 
-@pytest.mark.parametrize("mode", ["synchronized", "scheduled"])
+@pytest.mark.parametrize("mode", ["parallel_by_round", "parallel_by_mux"])
 def test_parallel_modes_run_every_call_per_target_in_order(
     recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, mode: str
 ) -> None:
     _schedule(monkeypatch)
     recorder.fail.add(("ramsey_coarse", "4"))
-    step = CustomOneQubit(step_name="ramsey", mode=mode, tasks=list(REPEATED))
+    step = CustomOneQubit(step_name="ramsey", execution_mode=mode, tasks=list(REPEATED))
 
     ctx = step.execute(_session(), QubitTargets(["0", "1", "4", "5"]), StepContext())
 
@@ -221,7 +221,7 @@ def test_parallel_modes_run_every_call_per_target_in_order(
         if call.task_id
     }
     assert len(task_ids) == 7
-    if mode == "scheduled":
+    if mode == "parallel_by_mux":
         # One worker per MUX group runs its qubits one after another.
         assert recorder.groups == [["0", "1"], ["4", "5"]]
         assert len(recorder.sessions) == 2
@@ -240,7 +240,7 @@ def test_serial_mode_runs_calls_in_the_parent_session(
     parent = RecordingSession(recorder.log, recorder.fail)
     set_current_session(cast("CalibSession", parent))
     try:
-        step = CustomOneQubit(step_name="ramsey", mode="serial", tasks=list(REPEATED))
+        step = CustomOneQubit(step_name="ramsey", execution_mode="sequential", tasks=list(REPEATED))
         ctx = step.execute(_session(), QubitTargets(["0", "1"]), StepContext())
     finally:
         clear_current_session()
@@ -260,7 +260,7 @@ def test_mux_tasks_run_on_representatives_and_are_skipped_on_the_others(
 ) -> None:
     _schedule(monkeypatch)
     step = BringUp(
-        mode="scheduled",
+        execution_mode="parallel_by_mux",
         tasks=[
             TaskCall(name="CheckResonatorSpectroscopy"),
             TaskCall(name="CheckT1"),
@@ -294,7 +294,7 @@ def test_batch_mode_runs_each_call_once_per_batch(
     monkeypatch.setattr("qdash.workflow.service.one_qubit_stage_runner.get_session", lambda: parent)
     step = CustomOneQubit(
         step_name="spectroscopy",
-        mode="simultaneous_spectroscopy",
+        execution_mode="simultaneous_spectroscopy",
         tasks=[
             TaskCall(name="CheckQubitSpectroscopy", call_id="spec_coarse"),
             TaskCall(name="CheckQubitSpectroscopy", call_id="spec_fine", run={"shots": 2048}),
@@ -337,7 +337,7 @@ def test_batch_missing_target_is_failed_and_obeys_call_policy(
     monkeypatch.setattr("qdash.workflow.service.one_qubit_stage_runner.get_session", lambda: parent)
     step = CustomOneQubit(
         step_name="spectroscopy",
-        mode="simultaneous_spectroscopy",
+        execution_mode="simultaneous_spectroscopy",
         tasks=[
             TaskCall(
                 name="CheckQubitSpectroscopy",
@@ -371,7 +371,7 @@ def test_batch_mode_rejects_input_overrides_before_any_batch(
     _schedule(monkeypatch)
     step = CustomOneQubit(
         step_name="spectroscopy",
-        mode="simultaneous_spectroscopy",
+        execution_mode="simultaneous_spectroscopy",
         tasks=[TaskCall(name="CheckQubitSpectroscopy", input={"qubit_frequency": 5.0})],
     )
 
@@ -380,7 +380,7 @@ def test_batch_mode_rejects_input_overrides_before_any_batch(
     assert recorder.log == []
 
 
-@pytest.mark.parametrize("mode", ["synchronized", "scheduled"])
+@pytest.mark.parametrize("mode", ["parallel_by_round", "parallel_by_mux"])
 def test_isolated_workers_receive_each_calls_input_and_writeback(
     recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, mode: str
 ) -> None:
@@ -393,7 +393,7 @@ def test_isolated_workers_receive_each_calls_input_and_writeback(
         update_calibration_parameters=False,
     )
     calibrate = TaskCall(name="CheckRabi", call_id="rabi_calibrate")
-    step = CustomOneQubit(step_name="rabi", mode=mode, tasks=[measure, calibrate])
+    step = CustomOneQubit(step_name="rabi", execution_mode=mode, tasks=[measure, calibrate])
 
     step.execute(_session(), QubitTargets(["0", "1", "4", "5"]), StepContext())
 
@@ -418,7 +418,7 @@ def test_stage_runner_batch_carries_measurement_only_calls(
     monkeypatch.setattr("qdash.workflow.service.one_qubit_stage_runner.get_session", lambda: parent)
     step = CustomOneQubit(
         step_name="spectroscopy",
-        mode="simultaneous_spectroscopy",
+        execution_mode="simultaneous_spectroscopy",
         tasks=[
             TaskCall(
                 name="CheckQubitSpectroscopy",
@@ -463,7 +463,10 @@ def test_pipeline_filter_reads_the_custom_step_call(
     session = _session()
     ctx = StepContext(candidate_qids=["0", "1"])
     step = CustomOneQubit(
-        step_name="ramsey", mode="scheduled", tasks=list(REPEATED), continue_on_failure=True
+        step_name="ramsey",
+        execution_mode="parallel_by_mux",
+        tasks=list(REPEATED),
+        continue_on_failure=True,
     )
     ctx = step.execute(session, QubitTargets(["0", "1"]), ctx)
     ctx = FilterByStatus(step="ramsey", call_id="ramsey_fine").execute(

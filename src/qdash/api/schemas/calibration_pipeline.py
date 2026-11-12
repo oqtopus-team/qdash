@@ -14,12 +14,12 @@ _SPEC_EXAMPLE: dict[str, Any] = {
     "name": "coarse-then-two-pass-ramsey",
     "targets": {"qids": ["0", "1"]},
     "steps": [
-        {"type": "OneQubitCheck", "mode": "scheduled"},
+        {"type": "OneQubitCheck", "execution_mode": "parallel_by_mux"},
         {"type": "FilterByStatus"},
         {
             "type": "CustomOneQubit",
             "step_name": "coherence",
-            "mode": "scheduled",
+            "execution_mode": "parallel_by_mux",
             "continue_on_failure": True,
             "tasks": [
                 {"name": "CheckT1"},

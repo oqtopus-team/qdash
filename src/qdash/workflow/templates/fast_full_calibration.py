@@ -130,9 +130,9 @@ def fast_full_calibration(
 
     steps = [
         ConfigureAll(),
-        OneQubitCheck(mode="synchronized", tasks=FAST_1Q_CHECK_TASKS),
+        OneQubitCheck(execution_mode="parallel_by_round", tasks=FAST_1Q_CHECK_TASKS),
         FilterByStatus(),
-        OneQubitFineTune(mode="synchronized", tasks=FAST_1Q_FINE_TUNE_TASKS),
+        OneQubitFineTune(execution_mode="parallel_by_round", tasks=FAST_1Q_FINE_TUNE_TASKS),
         FilterByMetric(metric="x90_fidelity", threshold=fidelity_threshold),
         GenerateCRSchedule(max_parallel_ops=max_parallel_ops, inverse=inverse),
         TwoQubitCalibration(tasks=FAST_2Q_TASKS),

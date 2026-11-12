@@ -114,7 +114,7 @@ Calls do not change how a step schedules its targets:
 
 | Path | Unit of work | Synchronization |
 | --- | --- | --- |
-| `serial`, `scheduled`, `synchronized`, two-qubit groups | One target runs every call in order (`run_target_calls`) | Targets do not wait for each other between calls |
+| `sequential`, `parallel_by_mux`, `parallel_by_round`, two-qubit groups | One target runs every call in order (`run_target_calls`) | Targets do not wait for each other between calls |
 | `simultaneous_spectroscopy` | One call runs once over a batch of qubits (`run_batch_calls`) | Each call is a barrier for its batch |
 | Step boundary | The pipeline finishes the step's Execution | All targets |
 

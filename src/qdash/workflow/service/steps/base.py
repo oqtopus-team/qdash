@@ -7,8 +7,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from qdash.datamodel.one_qubit_execution_mode import (
+    OneQubitExecutionMode,
+    resolve_one_qubit_execution_mode,
+)
 from qdash.datamodel.task_call import StepCalls, TaskCall
 
 if TYPE_CHECKING:
@@ -117,6 +121,82 @@ class CalibrationStep(Step):
             continue_on_failure=self.continue_on_failure,
             plan_digest=digest if isinstance(digest, str) else None,
         )
+
+
+class OneQubitExecutionModeMixin:
+    """``execution_mode`` handling shared by the one-qubit step dataclasses.
+
+    A step declares ``execution_mode: str | None = None`` where ``mode`` used to
+    be, so positional arguments still land on it, and the deprecated
+    ``mode: str | None = None`` as its last field. ``None`` means "not given",
+    so the step's default never conflicts with an explicit ``mode``. After
+    ``__post_init__`` the step holds the canonical mode in ``execution_mode`` and
+    ``mode`` is None. The modes are described in
+    :mod:`qdash.datamodel.one_qubit_execution_mode`.
+    """
+
+    execution_mode: str | None
+    mode: str | None
+    _execution_mode_deprecations: list[str]
+
+    def _resolve_execution_mode(self, default: OneQubitExecutionMode) -> None:
+        """Fold ``mode`` and old value names into ``execution_mode``; warn on legacy forms.
+
+        Raises ``ValueError`` when ``execution_mode`` and ``mode`` name different modes.
+        """
+        resolved, notes = resolve_one_qubit_execution_mode(
+            self.execution_mode,
+            self.mode,
+            default=default,
+            where=f"{type(self).__name__}.",
+            # warn -> resolve helper -> this method -> __post_init__ -> __init__ -> caller
+            stacklevel=4,
+        )
+        self.execution_mode = resolved
+        self.mode = None
+        self._execution_mode_deprecations = notes
+
+    @property
+    def resolved_execution_mode(self) -> OneQubitExecutionMode:
+        """The canonical execution mode set by ``__post_init__``."""
+        mode = self.execution_mode
+        if mode is None:  # pragma: no cover - __post_init__ always sets it
+            raise RuntimeError("execution_mode is resolved in __post_init__")
+        return mode  # type: ignore[return-value]
+
+    def _log_execution_mode_deprecations(self, logger: Any) -> None:
+        """Repeat the construction-time deprecation messages in the run log."""
+        for note in getattr(self, "_execution_mode_deprecations", ()):
+            logger.warning(note)
+
+
+def resolve_execution_mode(
+    execution_mode: str | None,
+    mode: str | None = None,
+    *,
+    default: OneQubitExecutionMode,
+) -> OneQubitExecutionMode:
+    """Resolve a flow's ``execution_mode`` and deprecated ``mode`` parameters.
+
+    Flow templates declare ``execution_mode: str | None = None`` and a trailing
+    ``mode: str | None = None`` and pass their own ``default``. Legacy forms
+    emit a ``DeprecationWarning`` and are repeated in the run log; values that
+    name different modes raise ``ValueError``.
+    """
+    resolved, notes = resolve_one_qubit_execution_mode(
+        execution_mode, mode, default=default, stacklevel=3
+    )
+    if notes:
+        from prefect import get_run_logger
+        from prefect.exceptions import MissingContextError
+
+        try:
+            logger = get_run_logger()
+        except MissingContextError:
+            return resolved
+        for note in notes:
+            logger.warning(note)
+    return resolved
 
 
 @dataclass

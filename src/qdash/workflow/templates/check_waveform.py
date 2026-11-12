@@ -21,7 +21,7 @@ from qdash.workflow.service.calib_service import (
     on_flow_crashed,
     on_flow_failure,
 )
-from qdash.workflow.service.steps import CustomOneQubit
+from qdash.workflow.service.steps import CustomOneQubit, resolve_execution_mode
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 
@@ -36,10 +36,11 @@ def check_waveform(
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
-    mode: str = "scheduled",
+    execution_mode: str | None = None,
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
+    mode: str | None = None,
 ) -> Any:
     """Run readout waveform checks for selected targets.
 
@@ -49,10 +50,18 @@ def check_waveform(
         mux_ids: MUX IDs to inspect (uses MUX-based scheduling)
         exclude_qids: Qubit IDs to exclude (only with mux_ids)
         qids: Qubit IDs to inspect (fallback if mux_ids not set)
-        mode: Execution mode for the one-qubit step
+        execution_mode: How the one-qubit targets run (default: "parallel_by_mux"):
+            - "parallel_by_mux": MUXes run in parallel within the scheduler's hardware
+              stages; the qubits of one MUX run one after another
+            - "parallel_by_round": the scheduler forms rounds of qubits from different
+              MUXes; the next round starts after every qubit of the round has run
+              all of its tasks
+            - "sequential": one MUX and one qubit at a time
         tags: Flow tags
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
+        mode: Deprecated alias of execution_mode. The old names "scheduled",
+            "synchronized" and "serial" are still accepted with a deprecation warning.
 
     Returns:
         Pipeline results
@@ -70,7 +79,9 @@ def check_waveform(
 
     steps = [
         CustomOneQubit(
-            step_name="check_waveform", tasks=[TaskCall(name="CheckWaveform")], mode=mode
+            step_name="check_waveform",
+            tasks=[TaskCall(name="CheckWaveform")],
+            execution_mode=resolve_execution_mode(execution_mode, mode, default="parallel_by_mux"),
         ),
     ]
 

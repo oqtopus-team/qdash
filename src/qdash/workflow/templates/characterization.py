@@ -282,7 +282,7 @@ def characterization(
         ),
         # 2. GE calibration: retain only qubits whose calibration succeeded.
         OneQubitCheck(
-            mode="synchronized",
+            execution_mode="parallel_by_round",
             tasks=GE_CALIBRATION_TASKS,
         ),
         FilterByStatus(),
@@ -303,7 +303,7 @@ def characterization(
             CustomOneQubit(
                 step_name="ge_characterization",
                 tasks=GE_CHARACTERIZATION_TASKS,
-                mode="synchronized",
+                execution_mode="parallel_by_round",
                 continue_on_failure=True,
             )
         )
@@ -313,14 +313,14 @@ def characterization(
         steps.extend(
             [
                 OneQubitFineTune(
-                    mode="synchronized",
+                    execution_mode="parallel_by_round",
                     tasks=EF_CALIBRATION_TASKS,
                 ),
                 FilterByStatus(),
                 CustomOneQubit(
                     step_name="ef_characterization",
                     tasks=EF_CHARACTERIZATION_TASKS,
-                    mode="synchronized",
+                    execution_mode="parallel_by_round",
                     continue_on_failure=True,
                 ),
             ]
