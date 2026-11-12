@@ -1,19 +1,27 @@
-"""Render the two-qubit CR schedule execution GIF for the docs.
+"""Render the two-qubit CR schedule execution GIF for the docs and the editor help.
 
-The animation runs a schedule of seven directed CR pairs on a schematic four-MUX wiring with
-``max_parallel_ops = 2``. ``GROUPS`` is the output of the QDash CR scheduler for ``PAIRS``,
+The animation runs a schedule of eight directed CR pairs on a schematic five-MUX wiring with
+``max_parallel_ops = 4``. ``GROUPS`` is the output of the QDash CR scheduler for ``PAIRS``,
 ``WIRING`` and ``MAX_PARALLEL_OPS``; the scheduler test
 ``tests/qdash/workflow/engine/scheduler/test_cr_schedule_docs_example.py`` recomputes it with
 the scheduler code and fails if it drifts. ``docs/diagrams/cr-schedule-conflict-graph.svg``
 draws the same fixture.
 
-Groups run one after another. Inside a group every pair runs CheckCrossResonance, then
-CreateZX90, then CheckZX90 in its own worker without waiting for the other pairs between
-tasks; a pair that finishes early waits until every pair of its group is done. The durations
-are illustrative units, not measurements.
+Groups run one after another. G1 holds four pairs, so four workers run at once. Inside a group
+every pair runs CheckCrossResonance, then CreateZX90, then CheckZX90 in its own worker without
+waiting for the other pairs between tasks; a pair that finishes early waits until every pair
+of its group is done. The four worker lanes are reused by later groups, and each bar is
+labeled with its pair. The durations are illustrative units, not measurements.
+
+Colors identify execution groups G1 to G4, the scheduler output, and match the group colors of
+``docs/diagrams/cr-schedule-conflict-graph.svg``. Task state is drawn independently of the group
+color: dashed outline for not started, hatched fill for running, solid fill for done, and gray
+hatching for a pair that waits for its group.
 
 The output is deterministic: the timeline is fixed below and the text uses the font bundled
-with Pillow. Regenerate from the repository root with:
+with Pillow. Besides the docs GIF, the script writes a copy of the GIF and a still poster frame
+to ``ui/public/images/execution-help/`` for the workflow editor's Execution help dialog.
+Regenerate from the repository root with:
 
     uv run --no-project --with pillow==13.0.0 python3 docs/demos/two_qubit_cr_schedule.py
 
@@ -24,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,6 +45,8 @@ OUTPUT = (
     / "guides"
     / "two-qubit-cr-schedule.gif"
 )
+# The workflow editor's Execution help dialog serves these from the UI bundle.
+UI_DIR = Path(__file__).resolve().parents[2] / "ui" / "public" / "images" / "execution-help"
 
 # Schematic wiring: MUX n holds qubits 4n to 4n + 3. MUX1 and MUX2 share control module C1;
 # every other module belongs to one MUX. Module names are illustrative.
@@ -44,6 +55,7 @@ WIRING = (
     {"mux": 1, "read_out": "R1:0", "ctrl": ["C1:0", "C1:1"]},
     {"mux": 2, "read_out": "R2:0", "ctrl": ["C1:2", "C1:3"]},
     {"mux": 3, "read_out": "R3:0", "ctrl": ["C3:0", "C3:1"]},
+    {"mux": 4, "read_out": "R4:0", "ctrl": ["C4:0", "C4:1"]},
 )
 # Directed (control, target) pairs that already passed direction and coupling checks, in the
 # order they are passed to CRScheduler.schedule_pairs().
@@ -54,23 +66,33 @@ PAIRS = (
     ("4", "5"),
     ("8", "9"),
     ("12", "13"),
+    ("16", "17"),
     ("7", "10"),
 )
-MAX_PARALLEL_OPS = 2
+MAX_PARALLEL_OPS = 4
 # Scheduler output for the fixture above with the default largest_first coloring.
 GROUPS = (
-    (("0", "1"), ("4", "5")),
-    (("12", "13"),),
+    (("0", "1"), ("4", "5"), ("12", "13"), ("16", "17")),
     (("3", "1"), ("8", "9")),
     (("3", "2"),),
     (("7", "10"),),
 )
-# Conflict-graph color of each pair before max_parallel_ops splits a color into groups.
-# The inter-MUX pair is colored in its own graph.
+# The same pairs with max_parallel_ops = 2: the cap splits graph color 1 into two groups. Only
+# the docs text and the scheduler test use it; the drawings show MAX_PARALLEL_OPS.
+GROUPS_AT_CAP_2 = (
+    (("0", "1"), ("4", "5")),
+    (("12", "13"), ("16", "17")),
+    (("3", "1"), ("8", "9")),
+    (("3", "2"),),
+    (("7", "10"),),
+)
+# Conflict-graph color of each pair. With max_parallel_ops = 4 each color becomes one group;
+# the inter-MUX pair is colored in its own graph. Used in the text; the drawing colors groups.
 COLOR_CLASS = {
     ("0", "1"): "intra 1",
     ("4", "5"): "intra 1",
     ("12", "13"): "intra 1",
+    ("16", "17"): "intra 1",
     ("3", "1"): "intra 2",
     ("8", "9"): "intra 2",
     ("3", "2"): "intra 3",
@@ -79,16 +101,22 @@ COLOR_CLASS = {
 
 # The task list every pair runs in order: (task name, number drawn in the bar).
 TASKS = (("CheckCrossResonance", "1"), ("CreateZX90", "2"), ("CheckZX90", "3"))
-# Per-task durations in illustrative time units.
+# Per-task durations in illustrative time units. In G1 the four pairs drift apart: at t = 2.5
+# they are on three different tasks, and 4->5, 12->13 and 16->17 finish before 0->1, the
+# slowest pair, so they wait for it before G2 starts.
 TASK_DURATIONS = {
-    ("0", "1"): (2, 1, 1),
+    ("0", "1"): (3, 1, 1),
     ("4", "5"): (1, 1, 1),
-    ("12", "13"): (1, 1, 1),
+    ("12", "13"): (1, 2, 1),
+    ("16", "17"): (2, 1, 1),
     ("3", "1"): (1, 1, 1),
-    ("8", "9"): (2, 1, 2),
+    ("8", "9"): (1, 2, 1),
     ("3", "2"): (1, 1, 1),
     ("7", "10"): (1, 1, 1),
 }
+# Time of the still poster shown before the editor help plays the GIF: tasks have drifted
+# apart and 4->5 already waits for the slowest pair.
+POSTER_T = 3.5
 
 Pair = tuple[str, str]
 Color = tuple[int, int, int]
@@ -98,7 +126,7 @@ Color = tuple[int, int, int]
 class Run:
     pair: Pair
     group: int  # 0-based index into GROUPS
-    lane: int
+    lane: int  # worker slot inside the group; later groups reuse the slots
     start: float
     end: float
     group_end: float
@@ -115,12 +143,11 @@ class Run:
 
 
 def _runs() -> tuple[tuple[Run, ...], tuple[tuple[float, float], ...]]:
-    runs, spans, t, lane = [], [], 0.0, 0
+    runs, spans, t = [], [], 0.0
     for index, group in enumerate(GROUPS):
         end = t + max(sum(TASK_DURATIONS[pair]) for pair in group)
-        for pair in group:
+        for lane, pair in enumerate(group):
             runs.append(Run(pair, index, lane, t, t + sum(TASK_DURATIONS[pair]), end))
-            lane += 1
         spans.append((t, end))
         t = end
     return tuple(runs), tuple(spans)
@@ -131,32 +158,38 @@ T_END = SPANS[-1][1]
 
 # Layout, in pixels. The docs column is about 728 px wide, so the canvas stays close to it.
 WIDTH = 860
-X0, X1 = 262, 844
+X0, X1 = 236, 844
 UNIT = (X1 - X0) / T_END
 AXIS_Y = 112
 BAND_TOP = 120  # group labels
 LANES_TOP = 146
-LANE_STEP = 36
+LANE_STEP = 52
 BAR_H = 24
-LANES_BOTTOM = LANES_TOP + LANE_STEP * len(RUNS)
+BAR_OFFSET = 22  # room for the pair label above each bar
+WORKERS = max(len(group) for group in GROUPS)
+LANES_BOTTOM = LANES_TOP + LANE_STEP * WORKERS
 HEIGHT = LANES_BOTTOM + 196
 
 INK = (31, 41, 55)
 MUTED = (90, 100, 115)
 GRID = (226, 230, 236)
-BAND = (246, 247, 249)
 QUEUED = (140, 148, 160)
-WAITING = (180, 83, 9)
-WAITING_BG = (254, 243, 199)
-PLAYHEAD = (190, 18, 60)
+# Waiting is neutral so it never reads as a group color.
+WAITING = (71, 85, 105)
+WAITING_BG = (241, 245, 249)
+WAIT_HATCH = (120, 130, 145)
+PLAYHEAD = INK
 WHITE = (255, 255, 255)
-# Conflict-graph colors, shared with docs/diagrams/cr-schedule-conflict-graph.svg.
-CLASS_COLOR: dict[str, Color] = {
-    "intra 1": (37, 99, 235),
-    "intra 2": (13, 148, 136),
-    "intra 3": (124, 58, 237),
-    "inter 1": (190, 24, 93),
-}
+# Neutral sample for the task-state legend, so no group color stands for a state.
+STATE_SAMPLE = (75, 85, 99)
+# One color per execution group, in GROUPS order: blue, orange, teal, purple. Shared with
+# the light-theme group colors in docs/diagrams/cr-schedule-conflict-graph.svg.
+GROUP_COLOR: tuple[Color, ...] = (
+    (37, 99, 235),
+    (194, 65, 12),
+    (15, 118, 110),
+    (124, 58, 237),
+)
 
 
 def _tint(color: Color, amount: float) -> Color:
@@ -166,6 +199,16 @@ def _tint(color: Color, amount: float) -> Color:
         round(g + (255 - g) * amount),
         round(b + (255 - b) * amount),
     )
+
+
+def _shade(color: Color) -> Color:
+    """Darken a group color for small text on white."""
+    r, g, b = color
+    return (round(r * 0.8), round(g * 0.8), round(b * 0.8))
+
+
+def _group_name(group: int) -> str:
+    return f"G{group + 1}"
 
 
 def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -179,8 +222,12 @@ def _x(t: float) -> float:
     return X0 + t * UNIT
 
 
+def _lane_top(lane: int) -> float:
+    return LANES_TOP + lane * LANE_STEP
+
+
 def _lane_y(lane: int) -> float:
-    return LANES_TOP + lane * LANE_STEP + (LANE_STEP - BAR_H) / 2
+    return _lane_top(lane) + BAR_OFFSET
 
 
 def _pair_name(pair: Pair) -> str:
@@ -266,25 +313,27 @@ def _vdash(draw: ImageDraw.ImageDraw, x: float, y0: float, y1: float, color: Col
 
 
 def _draw_run(draw: ImageDraw.ImageDraw, run: Run, t: float) -> None:
-    color = CLASS_COLOR[COLOR_CLASS[run.pair]]
+    color = GROUP_COLOR[run.group]
     y0 = _lane_y(run.lane)
     y1 = y0 + BAR_H
+    # Pair label above the bar, in the group color, so a reused worker lane stays readable.
+    _draw_pair(draw, _x(run.start) + 4, _lane_top(run.lane) + 4, run.pair, F_SMALL, _shade(color))
     # A pair that finished its list waits for the rest of its group.
     if run.end < run.group_end and t > run.end:
         box = (_x(run.end) + 1, y0 + 4, _x(min(t, run.group_end)) - 1, y1 - 4)
         if box[2] > box[0]:
             draw.rectangle(box, fill=WAITING_BG)
-            _hatch(draw, box, WAITING)
+            _hatch(draw, box, WAIT_HATCH)
     for task, a, b in run.segments():
         box = (_x(a) + 1, y0, _x(b) - 1, y1)
         if t >= b:
-            draw.rectangle(box, fill=_tint(color, 0.8), outline=color, width=2)
-            text_color, plate = color, _tint(color, 0.8)
+            draw.rectangle(box, fill=_tint(color, 0.72), outline=color, width=2)
+            text_color, plate = INK, _tint(color, 0.72)
         elif t >= a:
             draw.rectangle(box, fill=WHITE)
             progress = (box[0], y0, _x(t), y1)
             if progress[2] > progress[0]:
-                draw.rectangle(progress, fill=_tint(color, 0.85))
+                draw.rectangle(progress, fill=_tint(color, 0.9))
                 _hatch(draw, progress, color)
             draw.rectangle(box, outline=color, width=3)
             text_color, plate = color, WHITE
@@ -302,11 +351,11 @@ def _draw_run(draw: ImageDraw.ImageDraw, run: Run, t: float) -> None:
 def _readout(run: Run, t: float) -> tuple[str, Color]:
     task = run.task_at(t)
     if task is not None:
-        return TASKS[task][0], CLASS_COLOR[COLOR_CLASS[run.pair]]
+        return TASKS[task][0], INK
     if t < run.start:
         return "queued", QUEUED
     if t < run.group_end:
-        return "waits for group", WAITING
+        return f"done, waits for {_group_name(run.group)}", WAITING
     return "done", MUTED
 
 
@@ -314,58 +363,60 @@ def _current_group(t: float) -> int:
     return next((i for i, (a, b) in enumerate(SPANS) if a <= t < b), len(SPANS))
 
 
+def _joined(names: list[str]) -> str:
+    if len(names) < 3:
+        return " and ".join(names)
+    return ", ".join(names[:-1]) + " and " + names[-1]
+
+
 def _status(t: float) -> tuple[str, str]:
     """Return two lines that name what the frame shows."""
     group = _current_group(t)
-    running = {
-        _pair_name(r.pair): TASKS[r.task_at(t) or 0][0] for r in RUNS if r.task_at(t) is not None
-    }
-    waiting = [r for r in RUNS if r.group == group and r.end <= t < r.group_end]
     if t == 0:
         return (
-            "Group 1 starts: pairs 0->1 and 4->5 run in separate workers.",
-            "Every other group is queued until the group before it is done.",
+            f"G1 starts: four pairs run at once, one per worker (max_parallel_ops = "
+            f"{MAX_PARALLEL_OPS}).",
+            "G2 to G4 are queued until the group before them is done.",
         )
     if group == len(SPANS):
         return (
-            f"All {len(GROUPS)} groups done at t = {T_END:g}.",
-            "Each group started only after every pair of the group before it finished.",
+            f"All {len(GROUPS)} groups, G1 to G{len(GROUPS)}, done at t = {T_END:g}.",
+            "With max_parallel_ops = 2, the same pairs would need 5 groups: G1 splits in two.",
         )
-    if waiting:
-        w = waiting[0]
-        peers = [r for r in RUNS if r.group == group and r.task_at(t) is not None]
-        peer = peers[0]
+    if group == 0:
+        running = [r for r in RUNS if r.group == 0 and r.task_at(t) is not None]
+        waiting = [r for r in RUNS if r.group == 0 and r.end <= t]
+        if waiting:
+            slowest = max(running, key=lambda r: r.end)
+            names = _joined([_pair_name(r.pair) for r in waiting])
+            verb = "waits" if len(waiting) == 1 else "wait"
+            return (
+                f"{names} finished and {verb} for {_pair_name(slowest.pair)}, "
+                f"the slowest pair, still on {TASKS[slowest.task_at(t) or 0][0]}.",
+                "G2 starts only when every pair of G1 is done.",
+            )
+        by_task: dict[int, list[str]] = {}
+        for run in running:
+            by_task.setdefault(run.task_at(t) or 0, []).append(_pair_name(run.pair))
+        parts = [f"{TASKS[task][0]}: {', '.join(by_task[task])}" for task in sorted(by_task)]
         return (
-            f"{_pair_name(w.pair)} finished all three tasks and waits for "
-            f"{_pair_name(peer.pair)}, still on {TASKS[peer.task_at(t) or 0][0]}.",
-            f"Group {group + 2} starts only when every pair of group {group + 1} is done.",
-        )
-    if group == 0 and len(set(running.values())) > 1:
-        return (
-            f"4->5 is on {running['4->5']} while 0->1 is still on {running['0->1']}.",
-            "Pairs do not wait for each other between tasks.",
+            "; ".join(parts) + ".",
+            "Each pair moves to its next task without waiting for the other pairs.",
         )
     if group == 1:
         return (
-            "Group 2: 12->13 conflicts with no pair, yet runs alone.",
-            "Its graph color has three pairs; max_parallel_ops = 2 split them into two groups.",
+            "G2: 3->1 shares qubit 1 with 0->1, and 8->9 shares control module C1",
+            "with 4->5, so neither could join G1.",
         )
     if group == 2:
         return (
-            "Group 3: 3->1 and 8->9 share the second color of the conflict graph.",
-            "3->1 shares qubit 1 with 0->1; 8->9 shares control module C1 with 4->5.",
+            "G3: 3->2 shares qubit 3 with 3->1 and MUX0 with 0->1,",
+            "so it fits neither G1 nor G2 and runs alone.",
         )
-    if group == 3:
-        return (
-            "Group 4: 3->2 shares qubit 3 with 3->1 and MUX0 with 0->1,",
-            "so it needs a third color and runs alone.",
-        )
-    if group == 4:
-        return (
-            "Group 5: the inter-MUX pair 7->10 runs after every intra-MUX group.",
-            "Inter-MUX pairs are colored in their own conflict graph.",
-        )
-    return ("", "")
+    return (
+        "G4: the inter-MUX pair 7->10 runs after every intra-MUX group.",
+        "Inter-MUX pairs are colored in their own conflict graph.",
+    )
 
 
 def render(t: float) -> Image.Image:
@@ -374,8 +425,8 @@ def render(t: float) -> Image.Image:
     draw.text((16, 10), "Two-qubit CR schedule: running the groups", font=F_TITLE, fill=INK)
     draw.text(
         (16, 40),
-        f"max_parallel_ops = {MAX_PARALLEL_OPS}. Groups run in order; the pairs of a group run "
-        "in separate workers.",
+        f"max_parallel_ops = {MAX_PARALLEL_OPS}. Groups G1 to G{len(GROUPS)} run in order; each "
+        "pair of a group runs in its own worker.",
         font=F_TEXT,
         fill=INK,
     )
@@ -402,20 +453,23 @@ def render(t: float) -> Image.Image:
 
     # Group bands, labels and boundaries.
     for index, (a, b) in enumerate(SPANS):
-        if index % 2 == 0:
-            draw.rectangle((_x(a), BAND_TOP, _x(b), LANES_BOTTOM), fill=BAND)
-        label = f"Group {index + 1}"
+        color = GROUP_COLOR[index]
         active = _current_group(t) == index
+        draw.rectangle((_x(a), LANES_TOP, _x(b), LANES_BOTTOM), fill=_tint(color, 0.95))
+        # Heading band: stronger tint and a group-colored rule while the group runs.
+        head = (_x(a), BAND_TOP, _x(b), LANES_TOP - 2)
+        draw.rectangle(head, fill=_tint(color, 0.7 if active else 0.86))
+        draw.line([(head[0], head[1]), (head[2], head[1])], fill=color, width=3)
+        label = _group_name(index)
         font = F_HEAD if active else F_TEXT
         width = draw.textlength(label, font=font)
         draw.text(
-            ((_x(a) + _x(b) - width) / 2, BAND_TOP + 3),
+            ((_x(a) + _x(b) - width) / 2, BAND_TOP + 4),
             label,
             font=font,
-            fill=INK if active else MUTED,
+            fill=INK,
         )
-    draw.text((16, BAND_TOP + 4), "pair", font=F_SMALL, fill=MUTED)
-    draw.text((104, BAND_TOP + 4), "current task", font=F_SMALL, fill=MUTED)
+    draw.text((16, BAND_TOP + 4), "worker: pair, current task", font=F_SMALL, fill=MUTED)
     for tick in range(int(T_END) + 1):
         draw.line([(_x(tick), LANES_TOP), (_x(tick), LANES_BOTTOM)], fill=GRID, width=1)
     for a, _ in SPANS[1:]:
@@ -434,14 +488,30 @@ def render(t: float) -> Image.Image:
         fill=MUTED,
     )
 
-    # Pair names and current task.
+    # Worker lanes: the pair of the current group in each lane and its current task.
+    group = min(_current_group(t), len(GROUPS) - 1)
+    for lane in range(WORKERS):
+        top = _lane_top(lane)
+        if lane:
+            draw.line([(16, top), (X0 - 12, top)], fill=GRID, width=1)
+        draw.text((16, top + 6), f"W{lane + 1}", font=F_HEAD, fill=MUTED)
+        run = next((r for r in RUNS if r.group == group and r.lane == lane), None)
+        if run is None:
+            draw.text((52, top + 27), "idle", font=F_SMALL, fill=QUEUED)
+        else:
+            color = GROUP_COLOR[run.group]
+            tag = _group_name(run.group)
+            draw.rounded_rectangle((52, top + 5, 78, top + 23), radius=4, fill=color)
+            draw.text(
+                (65 - draw.textlength(tag, font=F_SMALL) / 2, top + 7),
+                tag,
+                font=F_SMALL,
+                fill=WHITE,
+            )
+            _draw_pair(draw, 86, top + 5, run.pair, F_HEAD, INK)
+            text, text_color = _readout(run, t)
+            draw.text((52, top + 28), text, font=F_SMALL, fill=text_color)
     for run in RUNS:
-        y = _lane_y(run.lane)
-        color = CLASS_COLOR[COLOR_CLASS[run.pair]]
-        draw.rectangle((16, y + 5, 28, y + 17), fill=color)
-        _draw_pair(draw, 34, y + 3, run.pair, F_HEAD, INK)
-        text, text_color = _readout(run, t)
-        draw.text((104, y + 5), text, font=F_SMALL, fill=text_color)
         _draw_run(draw, run, t)
 
     # Playhead.
@@ -449,7 +519,8 @@ def render(t: float) -> Image.Image:
     draw.line([(x, BAND_TOP + 22), (x, LANES_BOTTOM + 4)], fill=PLAYHEAD, width=2)
     label = f"t = {t:g}"
     width = draw.textlength(label, font=F_SMALL)
-    lx = min(max(x - width / 2, X0), X1 - width)
+    # Clamp to the canvas, not X1, so the tag covers the last tick label at t = T_END.
+    lx = min(max(x - width / 2, X0), WIDTH - width - 6)
     draw.rectangle((lx - 3, AXIS_Y - 23, lx + width + 3, AXIS_Y - 6), fill=PLAYHEAD)
     draw.text((lx, AXIS_Y - 22), label, font=F_SMALL, fill=WHITE)
 
@@ -468,25 +539,25 @@ def render(t: float) -> Image.Image:
         ("done", "done"),
         ("waits for its group", "wait"),
     )
-    sample = CLASS_COLOR["intra 1"]
+    sample = STATE_SAMPLE
     for text, kind in entries:
         box = (lx, ly, lx + 30, ly + 16)
         if kind == "queued":
             _dashed_rect(draw, box, QUEUED)
         elif kind == "running":
-            draw.rectangle(box, fill=_tint(sample, 0.85))
+            draw.rectangle(box, fill=_tint(sample, 0.9))
             _hatch(draw, box, sample)
             draw.rectangle(box, outline=sample, width=2)
         elif kind == "done":
-            draw.rectangle(box, fill=_tint(sample, 0.8), outline=sample, width=2)
+            draw.rectangle(box, fill=_tint(sample, 0.72), outline=sample, width=2)
         else:
             draw.rectangle(box, fill=WAITING_BG)
-            _hatch(draw, box, WAITING)
+            _hatch(draw, box, WAIT_HATCH)
         draw.text((lx + 38, ly + 1), text, font=F_TEXT, fill=INK)
         lx += 38 + draw.textlength(text, font=F_TEXT) + 24
     draw.text(
         (16, ly + 26),
-        "Square color = the pair's conflict-graph color. Groups 1 and 2 share a color: the cap split it.",
+        "Color and tag = execution group. Later groups reuse the workers; bars name their pair.",
         font=F_SMALL,
         fill=MUTED,
     )
@@ -505,18 +576,19 @@ def render(t: float) -> Image.Image:
     return image
 
 
-# (time, hold in ms). Pauses sit on the moments the docs describe: different tasks at the same
-# time (1.5), a finished pair waiting for its group (3.5, 10.5), each later group, and the end.
+# (time, hold in ms). Pauses sit on the moments the docs describe: G1 pairs on different tasks
+# (1.5, 2.5), finished pairs waiting for the slowest pair (3.5, 4.5), each later group, and
+# the end.
 HOLDS = {
     0.0: 1600,
-    1.5: 2800,
-    3.5: 3000,
-    5.5: 2600,
-    8.5: 2200,
-    10.5: 3000,
+    1.5: 2000,
+    2.5: 2800,
+    3.5: 2200,
+    4.5: 3000,
+    7.5: 2800,
+    10.5: 2600,
     13.5: 2400,
-    16.5: 2400,
-    18.0: 3400,
+    15.0: 3600,
 }
 
 
@@ -530,16 +602,25 @@ def _check() -> None:
     scheduled = [pair for group in GROUPS for pair in group]
     assert sorted(scheduled) == sorted(PAIRS), scheduled
     assert all(len(group) <= MAX_PARALLEL_OPS for group in GROUPS)
+    assert len(GROUPS[0]) == MAX_PARALLEL_OPS == WORKERS
+    assert sorted(p for group in GROUPS_AT_CAP_2 for p in group) == sorted(PAIRS)
     assert set(COLOR_CLASS) == set(PAIRS) == set(TASK_DURATIONS)
-    assert SPANS == ((0, 4), (4, 7), (7, 12), (12, 15), (15, 18)), SPANS
+    assert len(GROUP_COLOR) == len(GROUPS)
+    assert SPANS == ((0, 5), (5, 9), (9, 12), (12, 15)), SPANS
 
 
-def build(output: Path, frames_dir: Path | None) -> None:
+def build(output: Path, frames_dir: Path | None, ui_dir: Path | None) -> None:
     _check()
     frames = [(render(t), hold) for t, hold in timeline()]
-    # One shared palette keeps colors stable between frames and the file small.
-    palette_source = frames[len(frames) // 2][0].quantize(
-        colors=64, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE
+    # One shared palette keeps colors stable between frames and the file small. It is cut from
+    # a strip of frames that together show every group in every task state, so no group color
+    # is mapped to another hue.
+    samples = [render(t) for t in (2.5, 4.5, 7.5, 10.5, 13.5, T_END)]
+    strip = Image.new("RGB", (WIDTH * len(samples), HEIGHT), WHITE)
+    for index, sample in enumerate(samples):
+        strip.paste(sample, (WIDTH * index, 0))
+    palette_source = strip.quantize(
+        colors=96, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE
     )
     quantized = [
         image.quantize(palette=palette_source, dither=Image.Dither.NONE) for image, _ in frames
@@ -554,6 +635,11 @@ def build(output: Path, frames_dir: Path | None) -> None:
         optimize=True,
         disposal=1,
     )
+    if ui_dir is not None:
+        ui_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(output, ui_dir / output.name)
+        poster = render(POSTER_T).quantize(palette=palette_source, dither=Image.Dither.NONE)
+        poster.save(ui_dir / f"{output.stem}-poster.png", optimize=True)
     if frames_dir is not None:
         frames_dir.mkdir(parents=True, exist_ok=True)
         for (t, _), (image, _) in zip(timeline(), frames, strict=True):
@@ -564,8 +650,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--output", type=Path, default=OUTPUT)
     parser.add_argument("--frames", type=Path, default=None, help="Also write PNG frames here")
+    parser.add_argument(
+        "--ui-dir",
+        type=Path,
+        default=UI_DIR,
+        help="Directory for the editor help copy of the GIF and its poster",
+    )
+    parser.add_argument("--no-ui", action="store_true", help="Skip the editor help assets")
     args = parser.parse_args()
-    build(args.output, args.frames)
+    build(args.output, args.frames, None if args.no_ui else args.ui_dir)
     print(f"Wrote {args.output} ({args.output.stat().st_size / 1024:.0f} KiB)")
 
 

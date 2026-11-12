@@ -1,4 +1,4 @@
-"""Render the one-qubit execution mode comparison GIF for the docs.
+"""Render the one-qubit execution mode comparison GIF for the docs and the editor help.
 
 The animation compares ``sequential``, ``parallel_by_mux`` and ``parallel_by_round``
 on the same illustrative selection: Q0 and Q1 on MUX0, Q8 and Q9 on MUX2, both MUXes
@@ -8,7 +8,9 @@ illustrative units, not measurements. The rounds are {Q0, Q8} then {Q1, Q9}, and
 round waits for each qubit's whole task list, not for each task.
 
 The output is deterministic: the timeline is fixed below and the text uses the font
-bundled with Pillow. Regenerate from the repository root with:
+bundled with Pillow. Besides the docs GIF, the script writes a copy of the GIF and a
+still poster frame to ``ui/public/images/execution-help/`` for the workflow editor's
+Execution help dialog. Regenerate from the repository root with:
 
     uv run --no-project --with pillow==13.0.0 python3 docs/demos/one_qubit_execution_modes.py
 
@@ -18,6 +20,7 @@ Pass ``--frames DIR`` to also write every frame as a PNG for review.
 from __future__ import annotations
 
 import argparse
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,6 +33,8 @@ OUTPUT = (
     / "guides"
     / "one-qubit-execution-modes.gif"
 )
+# The workflow editor's Execution help dialog serves these from the UI bundle.
+UI_DIR = Path(__file__).resolve().parents[2] / "ui" / "public" / "images" / "execution-help"
 
 # The task list every qubit runs in order: (task name, short label drawn in the bar).
 TASKS = (("CheckRabi", "Rabi"), ("CreateHPIPulse", "HPI"), ("CheckT1", "T1"))
@@ -440,6 +445,9 @@ def render(t: float) -> Image.Image:
 # (time, hold in ms). Pauses sit on the moments that tell the modes apart: Q0 on
 # CreateHPIPulse while Q8 is on CheckRabi (1.5), Q1 started or waiting while Q8 is on
 # CheckT1 (3.5), round 2 starting (5), and each mode finishing.
+# Time of the still poster shown before the editor help plays the GIF: the three modes
+# already differ, with Q1 started under parallel_by_mux and waiting under parallel_by_round.
+POSTER_T = 3.5
 HOLDS = {0.0: 1500, 1.5: 2600, 3.5: 3000, 5.0: 2000, 8.0: 1400, 9.0: 1400, 15.0: 3200}
 
 
@@ -455,7 +463,7 @@ def _check() -> None:
     assert ends == {"sequential": 15, "parallel_by_mux": 8, "parallel_by_round": 9}, ends
 
 
-def build(output: Path, frames_dir: Path | None) -> None:
+def build(output: Path, frames_dir: Path | None, ui_dir: Path | None) -> None:
     _check()
     frames = [(render(t), hold) for t, hold in timeline()]
     # One shared palette keeps colors stable between frames and the file small.
@@ -475,6 +483,11 @@ def build(output: Path, frames_dir: Path | None) -> None:
         optimize=True,
         disposal=1,
     )
+    if ui_dir is not None:
+        ui_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(output, ui_dir / output.name)
+        poster = render(POSTER_T).quantize(palette=palette_source, dither=Image.Dither.NONE)
+        poster.save(ui_dir / f"{output.stem}-poster.png", optimize=True)
     if frames_dir is not None:
         frames_dir.mkdir(parents=True, exist_ok=True)
         for (t, _), (image, _) in zip(timeline(), frames, strict=True):
@@ -485,8 +498,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--output", type=Path, default=OUTPUT)
     parser.add_argument("--frames", type=Path, default=None, help="Also write PNG frames here")
+    parser.add_argument(
+        "--ui-dir",
+        type=Path,
+        default=UI_DIR,
+        help="Directory for the editor help copy of the GIF and its poster",
+    )
+    parser.add_argument("--no-ui", action="store_true", help="Skip the editor help assets")
     args = parser.parse_args()
-    build(args.output, args.frames)
+    build(args.output, args.frames, None if args.no_ui else args.ui_dir)
     print(f"Wrote {args.output} ({args.output.stat().st_size / 1024:.0f} KiB)")
 
 

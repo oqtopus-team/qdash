@@ -111,11 +111,12 @@ uv run --no-project --with pillow==13.0.0 python3 docs/demos/one_qubit_execution
 Add `--frames .tmp/execution-modes` to write every frame as a PNG for review.
 
 `two_qubit_cr_schedule.py` draws `docs/public/images/guides/two-qubit-cr-schedule.gif`, the
-execution of a two-qubit CR schedule with `max_parallel_ops = 2`, the same way. Its fixture
+execution of a two-qubit CR schedule with `max_parallel_ops = 4`, the same way. Its fixture
 (wiring, pairs, groups, and graph colors) is also drawn by
 `docs/diagrams/cr-schedule-conflict-graph.svg` and checked against the scheduler by
-`tests/qdash/workflow/engine/scheduler/test_cr_schedule_docs_example.py`. Change the three
-together, then regenerate and run the test:
+`tests/qdash/workflow/engine/scheduler/test_cr_schedule_docs_example.py`. Both drawings color
+pairs by execution group with the same four colors (`GROUP_COLOR` in the script) and write
+conflict-graph colors as text. Change the three together, then regenerate and run the test:
 
 ```bash
 uv run --no-project --with pillow==13.0.0 python3 docs/demos/two_qubit_cr_schedule.py
@@ -123,3 +124,13 @@ uv run --package qdash-workflow --locked pytest tests/qdash/workflow/engine/sche
 ```
 
 `--frames DIR` works here too.
+
+Both scripts also write the workflow editor's **Execution help** media to
+`ui/public/images/execution-help/`: a byte-identical copy of the GIF and a still poster PNG drawn
+from the same timeline at `POSTER_T`. Do not edit those files by hand; regenerate them with the
+scripts above, or pass `--no-ui` to skip them. `tests/docs/test_execution_help_assets.py` fails
+when a UI copy differs from its docs GIF:
+
+```bash
+uv run pytest tests/docs/test_execution_help_assets.py
+```

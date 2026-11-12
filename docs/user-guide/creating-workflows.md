@@ -161,6 +161,10 @@ can share a stage.
 `sequential`, `parallel_by_mux`, and `parallel_by_round` keep the same hardware-sharing limits;
 changing between them changes only how qubits wait for each other.
 
+To check these modes and the two-qubit groups below while you edit a flow, select
+**Execution help** in the workflow editor header; on a narrow screen it is in the action menu.
+The help opens over the editor and does not save or run the flow.
+
 Keep the template's execution mode unless the procedure requires a specific ordering. The
 selected tasks must support the chosen mode and backend. A flow or pipeline that still uses the
 former names stops before it measures; see
@@ -194,19 +198,23 @@ Inside a group, each pair runs the task list from top to bottom in its own worke
 to its next task without waiting for the other pairs, and a pair that finishes early waits until
 every pair of its group is done; only then does the next group start.
 
-![Execution timeline of five CR schedule groups with max_parallel_ops 2 and the task list CheckCrossResonance, CreateZX90, CheckZX90. Group 1 runs pairs 0 to 1 and 4 to 5; pair 4 to 5 reaches CreateZX90 while 0 to 1 is still on CheckCrossResonance, then finishes first and waits for 0 to 1. Group 2 runs 12 to 13 alone. Group 3 runs 3 to 1 and 8 to 9, and 3 to 1 waits for 8 to 9. Group 4 runs 3 to 2 and group 5 runs the inter-MUX pair 7 to 10. Each group starts only after every pair of the previous group finishes.](/images/guides/two-qubit-cr-schedule.gif)
+![Execution timeline of four CR schedule groups, G1 to G4, with max_parallel_ops 4 and the task list CheckCrossResonance, CreateZX90, CheckZX90, drawn on four worker lanes that later groups reuse. Each group has its own color and tag: blue G1, orange G2, teal G3, purple G4. G1 runs four pairs at once, 0 to 1, 4 to 5, 12 to 13 and 16 to 17, one per worker. The pairs move through their tasks at different rates: at one moment 0 to 1 is still on CheckCrossResonance, 12 to 13 and 16 to 17 are on CreateZX90, and 4 to 5 is on CheckZX90. 4 to 5, 12 to 13 and 16 to 17 finish first and wait for 0 to 1, the slowest pair. G2 then runs 3 to 1 and 8 to 9, G3 runs 3 to 2, and G4 runs the inter-MUX pair 7 to 10. Each group starts only after every pair of the previous group finishes.](/images/guides/two-qubit-cr-schedule.gif)
 
-The animation uses an example selection of seven directed pairs on four MUXes with
-`max_parallel_ops = 2`. Task durations are illustrative, not measurements, and pairs in a group
-do not synchronize their pulses.
+The animation uses an example selection of eight directed pairs on five MUXes with
+`max_parallel_ops = 4`. Each color and tag marks one group, G1 to G4; the bar outline, hatching,
+and fill show whether a task has not started, is running, or is done. Task durations are
+illustrative, not measurements, and pairs in a group do not synchronize their pulses.
 
 | Group | Pairs (control → target) | Why the pairs are in this group |
 | --- | --- | --- |
-| 1 | 0 → 1, 4 → 5 | No shared qubit, MUX, or module |
-| 2 | 12 → 13 | Conflicts with no pair, but group 1 already holds `max_parallel_ops` pairs |
-| 3 | 3 → 1, 8 → 9 | 3 → 1 shares qubit 1 with 0 → 1; 8 → 9 shares a control module with 4 → 5 |
-| 4 | 3 → 2 | Shares qubit 3 with 3 → 1 and the MUX of 0 → 1 |
-| 5 | 7 → 10 | Spans two MUXes, so it runs after every single-MUX group |
+| G1 | 0 → 1, 4 → 5, 12 → 13, 16 → 17 | No shared qubit, MUX, or module; four pairs fill `max_parallel_ops` |
+| G2 | 3 → 1, 8 → 9 | 3 → 1 shares qubit 1 with 0 → 1; 8 → 9 shares a control module with 4 → 5 |
+| G3 | 3 → 2 | Shares qubit 3 with 3 → 1 and the MUX of 0 → 1 |
+| G4 | 7 → 10 | Spans two MUXes, so it runs after every single-MUX group |
+
+With `max_parallel_ops = 2`, the same pairs need five groups: G1 splits into a group with 0 → 1
+and 4 → 5 and a group with 12 → 13 and 16 → 17, which run one after the other although none of
+the four pairs conflict.
 
 `max_parallel_ops` only limits the size of each group: raising it never puts conflicting pairs
 together, and it does not guarantee that every pair of a group runs at the same moment. Lower it

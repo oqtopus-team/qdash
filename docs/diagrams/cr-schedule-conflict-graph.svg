@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 748" role="img" aria-label="Schematic example of CR scheduling with max_parallel_ops 2. Panel 1: four MUXes; MUX n holds qubits 4n to 4n plus 3. Seven selected directed pairs, drawn as arrows from control to target: 0 to 1, 3 to 1 and 3 to 2 in MUX0, 4 to 5 in MUX1, 8 to 9 in MUX2, 12 to 13 in MUX3, and the inter-MUX pair 7 to 10. Each MUX has its own readout module; MUX1 and MUX2 share control module C1. Panel 2: the conflict graph has one node per pair. 0 to 1 and 3 to 1 conflict because they share qubit 1; 3 to 1 and 3 to 2 share qubit 3; 0 to 1 and 3 to 2 use the same MUX0; 4 to 5 and 8 to 9 use MUXes that share control module C1. 12 to 13 has no conflict. The inter-MUX pair 7 to 10 is colored in a separate graph. Greedy coloring gives color 1 to 0 to 1, 4 to 5 and 12 to 13, color 2 to 3 to 1 and 8 to 9, and color 3 to 3 to 2. Panel 3: groups run in order. Group 1: 0 to 1 and 4 to 5. Group 2: 12 to 13, split from color 1 because the cap is 2. Group 3: 3 to 1 and 8 to 9. Group 4: 3 to 2. Group 5, the only inter-MUX group: 7 to 10.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 764" role="img" aria-label="Schematic example of CR scheduling with max_parallel_ops 4. Panel 1: five MUXes; MUX n holds qubits 4n to 4n plus 3. Eight selected directed pairs, drawn as arrows from control to target and colored and tagged by their execution group: 0 to 1, 3 to 1 and 3 to 2 in MUX0, 4 to 5 in MUX1, 8 to 9 in MUX2, 12 to 13 in MUX3, 16 to 17 in MUX4, and the inter-MUX pair 7 to 10. Each MUX has its own readout module; MUX1 and MUX2 share control module C1. Panel 2: the conflict graph has one node per pair, drawn without group colors. 0 to 1 and 3 to 1 conflict because they share qubit 1; 3 to 1 and 3 to 2 share qubit 3; 0 to 1 and 3 to 2 use the same MUX0; 4 to 5 and 8 to 9 use MUXes that share control module C1. 12 to 13 and 16 to 17 have no conflict. The inter-MUX pair 7 to 10 is colored in a separate graph. Greedy coloring gives graph color 1 to 0 to 1, 4 to 5, 12 to 13 and 16 to 17, graph color 2 to 3 to 1 and 8 to 9, and graph color 3 to 3 to 2; 7 to 10 gets color 1 of the inter-MUX graph. Panel 3, execution groups, each with its own color: blue G1 holds the four pairs 0 to 1, 4 to 5, 12 to 13 and 16 to 17; orange G2 holds 3 to 1 and 8 to 9; teal G3 holds 3 to 2; purple G4, the only inter-MUX group, holds 7 to 10. Groups run in order from G1 to G4.">
   <style>
     .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
     .qd-crs-h { fill: var(--vp-c-text-1, #1f2328); font-size: 16px; font-weight: 600; }
@@ -15,178 +15,224 @@
     .qd-crs-idle { fill: var(--vp-c-text-3, #8c959f); font-size: 14px; text-anchor: middle; }
     .qd-crs-link { stroke: var(--vp-c-text-3, #8c959f); stroke-width: 1.2; fill: none; }
     .qd-crs-module { fill: var(--vp-c-bg, #ffffff); stroke: var(--vp-c-text-3, #8c959f); stroke-width: 1.2; }
-    .qd-crs-shared { fill: rgba(180, 83, 9, 0.12); stroke: #b45309; stroke-width: 1.8; }
+    .qd-crs-shared { fill: var(--vp-c-bg-soft, #f6f8fa); stroke: var(--vp-c-text-1, #1f2328); stroke-width: 1.8; stroke-dasharray: 6 3; }
     .qd-crs-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 2.2; fill: none; }
     .qd-crs-r2 { stroke-dasharray: 9 6; }
     .qd-crs-r3 { stroke-dasharray: 2 5; stroke-linecap: round; stroke-width: 2.6; }
     .qd-crs-badge { fill: var(--vp-c-bg, #ffffff); stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; }
     .qd-crs-badge-t { fill: var(--vp-c-text-1, #1f2328); font-size: 12.5px; font-weight: 700; text-anchor: middle; }
-    .qd-crs-c1 { fill: rgba(37, 99, 235, 0.14); stroke: #2563eb; stroke-width: 2; }
-    .qd-crs-c2 { fill: rgba(13, 148, 136, 0.14); stroke: #0d9488; stroke-width: 2; }
-    .qd-crs-c3 { fill: rgba(124, 58, 237, 0.14); stroke: #7c3aed; stroke-width: 2; }
-    .qd-crs-ci { fill: rgba(190, 24, 93, 0.14); stroke: #be185d; stroke-width: 2; }
-    .qd-crs-a1 { stroke: #2563eb; stroke-width: 3; fill: none; }
-    .qd-crs-a2 { stroke: #0d9488; stroke-width: 3; fill: none; }
-    .qd-crs-a3 { stroke: #7c3aed; stroke-width: 3; fill: none; }
-    .qd-crs-ai { stroke: #be185d; stroke-width: 3; fill: none; }
+    /* Execution group colors G1 to G4, shared with docs/demos/two_qubit_cr_schedule.py. */
+    .qd-crs-g1 { fill: rgba(37, 99, 235, 0.14); stroke: #2563eb; stroke-width: 2; }
+    .qd-crs-gb1 { fill: rgba(37, 99, 235, 0.16); stroke: #2563eb; stroke-width: 2; }
+    .qd-crs-ga1 { stroke: #2563eb; stroke-width: 3; fill: none; }
+    .qd-crs-gm1 { fill: #2563eb; }
+    .qd-crs-gt1 { fill: #1d4ed8; font-weight: 700; }
+    .dark .qd-crs-g1 { fill: rgba(96, 165, 250, 0.2); stroke: #60a5fa; }
+    .dark .qd-crs-gb1 { fill: rgba(96, 165, 250, 0.18); stroke: #60a5fa; }
+    .dark .qd-crs-ga1 { stroke: #60a5fa; }
+    .dark .qd-crs-gm1 { fill: #60a5fa; }
+    .dark .qd-crs-gt1 { fill: #93c5fd; }
+    .qd-crs-g2 { fill: rgba(194, 65, 12, 0.14); stroke: #c2410c; stroke-width: 2; }
+    .qd-crs-gb2 { fill: rgba(194, 65, 12, 0.16); stroke: #c2410c; stroke-width: 2; }
+    .qd-crs-ga2 { stroke: #c2410c; stroke-width: 3; fill: none; }
+    .qd-crs-gm2 { fill: #c2410c; }
+    .qd-crs-gt2 { fill: #c2410c; font-weight: 700; }
+    .dark .qd-crs-g2 { fill: rgba(251, 146, 60, 0.2); stroke: #fb923c; }
+    .dark .qd-crs-gb2 { fill: rgba(251, 146, 60, 0.18); stroke: #fb923c; }
+    .dark .qd-crs-ga2 { stroke: #fb923c; }
+    .dark .qd-crs-gm2 { fill: #fb923c; }
+    .dark .qd-crs-gt2 { fill: #fdba74; }
+    .qd-crs-g3 { fill: rgba(15, 118, 110, 0.14); stroke: #0f766e; stroke-width: 2; }
+    .qd-crs-gb3 { fill: rgba(15, 118, 110, 0.16); stroke: #0f766e; stroke-width: 2; }
+    .qd-crs-ga3 { stroke: #0f766e; stroke-width: 3; fill: none; }
+    .qd-crs-gm3 { fill: #0f766e; }
+    .qd-crs-gt3 { fill: #0f766e; font-weight: 700; }
+    .dark .qd-crs-g3 { fill: rgba(45, 212, 191, 0.2); stroke: #2dd4bf; }
+    .dark .qd-crs-gb3 { fill: rgba(45, 212, 191, 0.18); stroke: #2dd4bf; }
+    .dark .qd-crs-ga3 { stroke: #2dd4bf; }
+    .dark .qd-crs-gm3 { fill: #2dd4bf; }
+    .dark .qd-crs-gt3 { fill: #5eead4; }
+    .qd-crs-g4 { fill: rgba(124, 58, 237, 0.14); stroke: #7c3aed; stroke-width: 2; }
+    .qd-crs-gb4 { fill: rgba(124, 58, 237, 0.16); stroke: #7c3aed; stroke-width: 2; }
+    .qd-crs-ga4 { stroke: #7c3aed; stroke-width: 3; fill: none; }
+    .qd-crs-gm4 { fill: #7c3aed; }
+    .qd-crs-gt4 { fill: #6d28d9; font-weight: 700; }
+    .dark .qd-crs-g4 { fill: rgba(167, 139, 250, 0.2); stroke: #a78bfa; }
+    .dark .qd-crs-gb4 { fill: rgba(167, 139, 250, 0.18); stroke: #a78bfa; }
+    .dark .qd-crs-ga4 { stroke: #a78bfa; }
+    .dark .qd-crs-gm4 { fill: #a78bfa; }
+    .dark .qd-crs-gt4 { fill: #c4b5fd; }
+    .qd-crs-node { fill: var(--vp-c-bg, #ffffff); stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; }
+    .qd-crs-cset { fill: var(--vp-c-bg, #ffffff); stroke: var(--vp-c-text-3, #8c959f); stroke-width: 1; }
+    .qd-crs-tag { font-size: 12px; text-anchor: middle; }
+    .qd-crs-mod { fill: var(--vp-c-text-2, #59636e); font-size: 12px; text-anchor: middle; }
     .qd-crs-pair { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
     .qd-crs-order { fill: var(--vp-c-text-2, #59636e); }
   </style>
   <defs>
-    <marker id="qd-crs-head-1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
-    <marker id="qd-crs-head-2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0d9488"/></marker>
-    <marker id="qd-crs-head-3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
-    <marker id="qd-crs-head-i" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#be185d"/></marker>
+    <marker id="qd-crs-head-g1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="qd-crs-gm1"/></marker>
+    <marker id="qd-crs-head-g2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="qd-crs-gm2"/></marker>
+    <marker id="qd-crs-head-g3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="qd-crs-gm3"/></marker>
+    <marker id="qd-crs-head-g4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="qd-crs-gm4"/></marker>
   </defs>
   <g class="qd-root">
     <!-- 1. Selected pairs on the wiring -->
     <text x="30" y="30" class="qd-crs-num">1</text>
     <text x="50" y="30" class="qd-crs-h">Selected CR pairs on a schematic wiring</text>
-    <text x="50" y="50" class="qd-crs-sub">Arrows point from control to target. Example fixture, not a device layout.</text>
-
-    <rect x="30" y="66" width="195" height="150" rx="10" class="qd-crs-box"/>
-    <rect x="245" y="66" width="195" height="150" rx="10" class="qd-crs-box"/>
-    <rect x="460" y="66" width="195" height="150" rx="10" class="qd-crs-box"/>
-    <rect x="675" y="66" width="195" height="150" rx="10" class="qd-crs-box"/>
-    <text x="42" y="86" class="qd-crs-small qd-crs-bold">MUX0</text>
-    <text x="257" y="86" class="qd-crs-small qd-crs-bold">MUX1</text>
-    <text x="472" y="86" class="qd-crs-small qd-crs-bold">MUX2</text>
-    <text x="687" y="86" class="qd-crs-small qd-crs-bold">MUX3</text>
-
-    <!-- Pair arrows: control to target -->
-    <line x1="105" y1="116" x2="148" y2="116" class="qd-crs-a1" marker-end="url(#qd-crs-head-1)"/>
-    <line x1="170" y1="160" x2="170" y2="138" class="qd-crs-a2" marker-end="url(#qd-crs-head-2)"/>
-    <line x1="150" y1="180" x2="121" y2="180" class="qd-crs-a3" marker-end="url(#qd-crs-head-3)"/>
-    <line x1="320" y1="116" x2="363" y2="116" class="qd-crs-a1" marker-end="url(#qd-crs-head-1)"/>
-    <line x1="535" y1="116" x2="578" y2="116" class="qd-crs-a2" marker-end="url(#qd-crs-head-2)"/>
-    <line x1="750" y1="116" x2="793" y2="116" class="qd-crs-a1" marker-end="url(#qd-crs-head-1)"/>
-    <line x1="405" y1="180" x2="493" y2="180" class="qd-crs-ai" marker-end="url(#qd-crs-head-i)"/>
-
+    <text x="50" y="50" class="qd-crs-sub">Arrows point from control to target; color and tag give the execution group from panel 3.</text>
+    <rect x="26" y="66" width="160" height="150" rx="10" class="qd-crs-box"/>
+    <text x="38" y="86" class="qd-crs-small qd-crs-bold">MUX0</text>
+    <rect x="198" y="66" width="160" height="150" rx="10" class="qd-crs-box"/>
+    <text x="210" y="86" class="qd-crs-small qd-crs-bold">MUX1</text>
+    <rect x="370" y="66" width="160" height="150" rx="10" class="qd-crs-box"/>
+    <text x="382" y="86" class="qd-crs-small qd-crs-bold">MUX2</text>
+    <rect x="542" y="66" width="160" height="150" rx="10" class="qd-crs-box"/>
+    <text x="554" y="86" class="qd-crs-small qd-crs-bold">MUX3</text>
+    <rect x="714" y="66" width="160" height="150" rx="10" class="qd-crs-box"/>
+    <text x="726" y="86" class="qd-crs-small qd-crs-bold">MUX4</text>
+    <!-- Pair arrows: control to target, colored and tagged by execution group -->
+    <line x1="91" y1="116" x2="119" y2="116" class="qd-crs-ga1" marker-end="url(#qd-crs-head-g1)"/>
+    <line x1="263" y1="116" x2="291" y2="116" class="qd-crs-ga1" marker-end="url(#qd-crs-head-g1)"/>
+    <line x1="607" y1="116" x2="635" y2="116" class="qd-crs-ga1" marker-end="url(#qd-crs-head-g1)"/>
+    <line x1="779" y1="116" x2="807" y2="116" class="qd-crs-ga1" marker-end="url(#qd-crs-head-g1)"/>
+    <line x1="141" y1="160" x2="141" y2="138" class="qd-crs-ga2" marker-end="url(#qd-crs-head-g2)"/>
+    <line x1="435" y1="116" x2="463" y2="116" class="qd-crs-ga2" marker-end="url(#qd-crs-head-g2)"/>
+    <line x1="121" y1="180" x2="93" y2="180" class="qd-crs-ga3" marker-end="url(#qd-crs-head-g3)"/>
+    <line x1="333" y1="180" x2="393" y2="180" class="qd-crs-ga4" marker-end="url(#qd-crs-head-g4)"/>
+    <text x="106" y="107" class="qd-crs-tag qd-crs-gt1">G1</text>
+    <text x="278" y="107" class="qd-crs-tag qd-crs-gt1">G1</text>
+    <text x="622" y="107" class="qd-crs-tag qd-crs-gt1">G1</text>
+    <text x="794" y="107" class="qd-crs-tag qd-crs-gt1">G1</text>
+    <text x="163" y="152" class="qd-crs-tag qd-crs-gt2">G2</text>
+    <text x="450" y="107" class="qd-crs-tag qd-crs-gt2">G2</text>
+    <text x="106" y="171" class="qd-crs-tag qd-crs-gt3">G3</text>
+    <text x="364" y="171" class="qd-crs-tag qd-crs-gt4">G4</text>
     <!-- Qubits -->
-    <circle cx="85" cy="116" r="18" class="qd-crs-qubit"/><text x="85" y="121" class="qd-crs-qid">0</text>
-    <circle cx="170" cy="116" r="18" class="qd-crs-qubit"/><text x="170" y="121" class="qd-crs-qid">1</text>
-    <circle cx="85" cy="180" r="18" class="qd-crs-qubit"/><text x="85" y="185" class="qd-crs-qid">2</text>
-    <circle cx="170" cy="180" r="18" class="qd-crs-qubit"/><text x="170" y="185" class="qd-crs-qid">3</text>
-    <circle cx="300" cy="116" r="18" class="qd-crs-qubit"/><text x="300" y="121" class="qd-crs-qid">4</text>
-    <circle cx="385" cy="116" r="18" class="qd-crs-qubit"/><text x="385" y="121" class="qd-crs-qid">5</text>
-    <circle cx="300" cy="180" r="18" class="qd-crs-qubit"/><text x="300" y="185" class="qd-crs-idle">6</text>
-    <circle cx="385" cy="180" r="18" class="qd-crs-qubit"/><text x="385" y="185" class="qd-crs-qid">7</text>
-    <circle cx="515" cy="116" r="18" class="qd-crs-qubit"/><text x="515" y="121" class="qd-crs-qid">8</text>
-    <circle cx="600" cy="116" r="18" class="qd-crs-qubit"/><text x="600" y="121" class="qd-crs-qid">9</text>
-    <circle cx="515" cy="180" r="18" class="qd-crs-qubit"/><text x="515" y="185" class="qd-crs-qid">10</text>
-    <circle cx="600" cy="180" r="18" class="qd-crs-qubit"/><text x="600" y="185" class="qd-crs-idle">11</text>
-    <circle cx="730" cy="116" r="18" class="qd-crs-qubit"/><text x="730" y="121" class="qd-crs-qid">12</text>
-    <circle cx="815" cy="116" r="18" class="qd-crs-qubit"/><text x="815" y="121" class="qd-crs-qid">13</text>
-    <circle cx="730" cy="180" r="18" class="qd-crs-qubit"/><text x="730" y="185" class="qd-crs-idle">14</text>
-    <circle cx="815" cy="180" r="18" class="qd-crs-qubit"/><text x="815" y="185" class="qd-crs-idle">15</text>
-
-    <!-- Modules -->
-    <path d="M80,216 V234 M175,216 V234 M295,216 V234 M390,216 V234 M510,216 V234 M605,216 V234 M725,216 V234 M820,216 V234" class="qd-crs-link"/>
-    <rect x="38" y="234" width="84" height="32" rx="6" class="qd-crs-module"/>
-    <text x="80" y="255" class="qd-crs-small qd-crs-mid">readout R0</text>
-    <rect x="133" y="234" width="84" height="32" rx="6" class="qd-crs-module"/>
-    <text x="175" y="255" class="qd-crs-small qd-crs-mid">control C0</text>
-    <rect x="253" y="234" width="84" height="32" rx="6" class="qd-crs-module"/>
-    <text x="295" y="255" class="qd-crs-small qd-crs-mid">readout R1</text>
-    <rect x="348" y="234" width="204" height="32" rx="6" class="qd-crs-shared"/>
-    <text x="450" y="255" class="qd-crs-small qd-crs-mid qd-crs-bold">control C1, shared</text>
-    <rect x="563" y="234" width="84" height="32" rx="6" class="qd-crs-module"/>
-    <text x="605" y="255" class="qd-crs-small qd-crs-mid">readout R2</text>
-    <rect x="683" y="234" width="84" height="32" rx="6" class="qd-crs-module"/>
-    <text x="725" y="255" class="qd-crs-small qd-crs-mid">readout R3</text>
-    <rect x="778" y="234" width="84" height="32" rx="6" class="qd-crs-module"/>
-    <text x="820" y="255" class="qd-crs-small qd-crs-mid">control C3</text>
-
-    <g transform="translate(0,-30)">
+    <circle cx="71" cy="116" r="18" class="qd-crs-qubit"/><text x="71" y="121" class="qd-crs-qid">0</text>
+    <circle cx="141" cy="116" r="18" class="qd-crs-qubit"/><text x="141" y="121" class="qd-crs-qid">1</text>
+    <circle cx="71" cy="180" r="18" class="qd-crs-qubit"/><text x="71" y="185" class="qd-crs-qid">2</text>
+    <circle cx="141" cy="180" r="18" class="qd-crs-qubit"/><text x="141" y="185" class="qd-crs-qid">3</text>
+    <circle cx="243" cy="116" r="18" class="qd-crs-qubit"/><text x="243" y="121" class="qd-crs-qid">4</text>
+    <circle cx="313" cy="116" r="18" class="qd-crs-qubit"/><text x="313" y="121" class="qd-crs-qid">5</text>
+    <circle cx="243" cy="180" r="18" class="qd-crs-qubit"/><text x="243" y="185" class="qd-crs-idle">6</text>
+    <circle cx="313" cy="180" r="18" class="qd-crs-qubit"/><text x="313" y="185" class="qd-crs-qid">7</text>
+    <circle cx="415" cy="116" r="18" class="qd-crs-qubit"/><text x="415" y="121" class="qd-crs-qid">8</text>
+    <circle cx="485" cy="116" r="18" class="qd-crs-qubit"/><text x="485" y="121" class="qd-crs-qid">9</text>
+    <circle cx="415" cy="180" r="18" class="qd-crs-qubit"/><text x="415" y="185" class="qd-crs-qid">10</text>
+    <circle cx="485" cy="180" r="18" class="qd-crs-qubit"/><text x="485" y="185" class="qd-crs-idle">11</text>
+    <circle cx="587" cy="116" r="18" class="qd-crs-qubit"/><text x="587" y="121" class="qd-crs-qid">12</text>
+    <circle cx="657" cy="116" r="18" class="qd-crs-qubit"/><text x="657" y="121" class="qd-crs-qid">13</text>
+    <circle cx="587" cy="180" r="18" class="qd-crs-qubit"/><text x="587" y="185" class="qd-crs-idle">14</text>
+    <circle cx="657" cy="180" r="18" class="qd-crs-qubit"/><text x="657" y="185" class="qd-crs-idle">15</text>
+    <circle cx="759" cy="116" r="18" class="qd-crs-qubit"/><text x="759" y="121" class="qd-crs-qid">16</text>
+    <circle cx="829" cy="116" r="18" class="qd-crs-qubit"/><text x="829" y="121" class="qd-crs-qid">17</text>
+    <circle cx="759" cy="180" r="18" class="qd-crs-qubit"/><text x="759" y="185" class="qd-crs-idle">18</text>
+    <circle cx="829" cy="180" r="18" class="qd-crs-qubit"/><text x="829" y="185" class="qd-crs-idle">19</text>
+    <!-- Modules: R = readout, C = control. MUX1 and MUX2 share C1. -->
+    <path d="M68,216 V234 M144,216 V234 M240,216 V234 M316,216 V234 M412,216 V234 M488,216 V234 M584,216 V234 M660,216 V234 M756,216 V234 M832,216 V234" class="qd-crs-link"/>
+    <rect x="34" y="234" width="68" height="30" rx="6" class="qd-crs-module"/>
+    <text x="68" y="254" class="qd-crs-mod">R0</text>
+    <rect x="110" y="234" width="68" height="30" rx="6" class="qd-crs-module"/>
+    <text x="144" y="254" class="qd-crs-mod">C0</text>
+    <rect x="206" y="234" width="68" height="30" rx="6" class="qd-crs-module"/>
+    <text x="240" y="254" class="qd-crs-mod">R1</text>
+    <rect x="282" y="234" width="164" height="30" rx="6" class="qd-crs-shared"/>
+    <text x="364" y="254" class="qd-crs-mod qd-crs-bold">C1, shared</text>
+    <rect x="454" y="234" width="68" height="30" rx="6" class="qd-crs-module"/>
+    <text x="488" y="254" class="qd-crs-mod">R2</text>
+    <rect x="550" y="234" width="68" height="30" rx="6" class="qd-crs-module"/>
+    <text x="584" y="254" class="qd-crs-mod">R3</text>
+    <rect x="626" y="234" width="68" height="30" rx="6" class="qd-crs-module"/>
+    <text x="660" y="254" class="qd-crs-mod">C3</text>
+    <rect x="722" y="234" width="68" height="30" rx="6" class="qd-crs-module"/>
+    <text x="756" y="254" class="qd-crs-mod">R4</text>
+    <rect x="798" y="234" width="68" height="30" rx="6" class="qd-crs-module"/>
+    <text x="832" y="254" class="qd-crs-mod">C4</text>
+    <text x="30" y="284" class="qd-crs-small">R: readout module. C: control module. Module names are illustrative.</text>
     <!-- 2. Conflict graph -->
-    <text x="30" y="332" class="qd-crs-num">2</text>
-    <text x="50" y="332" class="qd-crs-h">Conflict graph: one node per pair, one edge per conflict</text>
-    <text x="50" y="352" class="qd-crs-sub">Edges are scheduling conflicts, not couplings. Linked nodes get different colors.</text>
-
-    <rect x="30" y="366" width="580" height="186" rx="10" class="qd-crs-panel"/>
-    <text x="44" y="388" class="qd-crs-small qd-crs-bold">intra-MUX pairs</text>
-    <rect x="630" y="366" width="240" height="186" rx="10" class="qd-crs-panel"/>
-    <text x="644" y="388" class="qd-crs-small qd-crs-bold">inter-MUX pairs</text>
-    <text x="644" y="406" class="qd-crs-small">colored in a separate graph</text>
-
-    <line x1="138" y1="428" x2="252" y2="428" class="qd-crs-edge"/>
-    <line x1="290" y1="445" x2="226" y2="497" class="qd-crs-edge"/>
-    <line x1="100" y1="445" x2="164" y2="497" class="qd-crs-edge qd-crs-r2"/>
-    <line x1="398" y1="514" x2="490" y2="514" class="qd-crs-edge qd-crs-r3"/>
-    <circle cx="195" cy="428" r="10" class="qd-crs-badge"/><text x="195" y="432.5" class="qd-crs-badge-t">1</text>
-    <circle cx="258" cy="471" r="10" class="qd-crs-badge"/><text x="258" y="475.5" class="qd-crs-badge-t">1</text>
-    <circle cx="132" cy="471" r="10" class="qd-crs-badge"/><text x="132" y="475.5" class="qd-crs-badge-t">2</text>
-    <circle cx="444" cy="514" r="10" class="qd-crs-badge"/><text x="444" y="518.5" class="qd-crs-badge-t">3</text>
-
-    <rect x="64" y="411" width="74" height="34" rx="17" class="qd-crs-c1"/><text x="101" y="433" class="qd-crs-pair">0 → 1</text>
-    <rect x="252" y="411" width="74" height="34" rx="17" class="qd-crs-c2"/><text x="289" y="433" class="qd-crs-pair">3 → 1</text>
-    <rect x="158" y="497" width="74" height="34" rx="17" class="qd-crs-c3"/><text x="195" y="519" class="qd-crs-pair">3 → 2</text>
-    <rect x="324" y="497" width="74" height="34" rx="17" class="qd-crs-c1"/><text x="361" y="519" class="qd-crs-pair">4 → 5</text>
-    <rect x="490" y="497" width="74" height="34" rx="17" class="qd-crs-c2"/><text x="527" y="519" class="qd-crs-pair">8 → 9</text>
-    <rect x="420" y="411" width="84" height="34" rx="17" class="qd-crs-c1"/><text x="462" y="433" class="qd-crs-pair">12 → 13</text>
-    <text x="101" y="403" class="qd-crs-small qd-crs-mid">color 1</text>
-    <text x="289" y="403" class="qd-crs-small qd-crs-mid">color 2</text>
-    <text x="195" y="546" class="qd-crs-small qd-crs-mid">color 3</text>
-    <text x="361" y="546" class="qd-crs-small qd-crs-mid">color 1</text>
-    <text x="527" y="546" class="qd-crs-small qd-crs-mid">color 2</text>
-    <text x="462" y="403" class="qd-crs-small qd-crs-mid">color 1, no conflict</text>
-    <rect x="708" y="455" width="84" height="34" rx="17" class="qd-crs-ci"/><text x="750" y="477" class="qd-crs-pair">7 → 10</text>
-    <text x="750" y="447" class="qd-crs-small qd-crs-mid">color 1</text>
-
+    <text x="30" y="324" class="qd-crs-num">2</text>
+    <text x="50" y="324" class="qd-crs-h">Conflict graph: one node per pair, one edge per conflict</text>
+    <text x="50" y="344" class="qd-crs-sub">Edges are scheduling conflicts, not couplings. Linked nodes get different graph colors, written as text.</text>
+    <rect x="30" y="358" width="580" height="186" rx="10" class="qd-crs-panel"/>
+    <text x="44" y="380" class="qd-crs-small qd-crs-bold">intra-MUX pairs</text>
+    <rect x="630" y="358" width="240" height="186" rx="10" class="qd-crs-panel"/>
+    <text x="644" y="380" class="qd-crs-small qd-crs-bold">inter-MUX pairs</text>
+    <text x="644" y="398" class="qd-crs-small">colored in a separate graph</text>
+    <line x1="138" y1="420" x2="252" y2="420" class="qd-crs-edge"/>
+    <line x1="290" y1="437" x2="226" y2="489" class="qd-crs-edge"/>
+    <line x1="100" y1="437" x2="164" y2="489" class="qd-crs-edge qd-crs-r2"/>
+    <line x1="398" y1="506" x2="490" y2="506" class="qd-crs-edge qd-crs-r3"/>
+    <circle cx="195" cy="420" r="10" class="qd-crs-badge"/><text x="195" y="424.5" class="qd-crs-badge-t">1</text>
+    <circle cx="258" cy="463" r="10" class="qd-crs-badge"/><text x="258" y="467.5" class="qd-crs-badge-t">1</text>
+    <circle cx="132" cy="463" r="10" class="qd-crs-badge"/><text x="132" y="467.5" class="qd-crs-badge-t">2</text>
+    <circle cx="444" cy="506" r="10" class="qd-crs-badge"/><text x="444" y="510.5" class="qd-crs-badge-t">3</text>
+    <rect x="64" y="403" width="74" height="34" rx="17" class="qd-crs-node"/><text x="101" y="425" class="qd-crs-pair">0 → 1</text>
+    <rect x="252" y="403" width="74" height="34" rx="17" class="qd-crs-node"/><text x="289" y="425" class="qd-crs-pair">3 → 1</text>
+    <rect x="158" y="489" width="74" height="34" rx="17" class="qd-crs-node"/><text x="195" y="511" class="qd-crs-pair">3 → 2</text>
+    <rect x="324" y="489" width="74" height="34" rx="17" class="qd-crs-node"/><text x="361" y="511" class="qd-crs-pair">4 → 5</text>
+    <rect x="490" y="489" width="74" height="34" rx="17" class="qd-crs-node"/><text x="527" y="511" class="qd-crs-pair">8 → 9</text>
+    <rect x="386" y="403" width="84" height="34" rx="17" class="qd-crs-node"/><text x="428" y="425" class="qd-crs-pair">12 → 13</text>
+    <rect x="482" y="403" width="84" height="34" rx="17" class="qd-crs-node"/><text x="524" y="425" class="qd-crs-pair">16 → 17</text>
+    <text x="101" y="395" class="qd-crs-small qd-crs-mid">color 1 → <tspan class="qd-crs-gt1">G1</tspan></text>
+    <text x="289" y="395" class="qd-crs-small qd-crs-mid">color 2 → <tspan class="qd-crs-gt2">G2</tspan></text>
+    <text x="195" y="538" class="qd-crs-small qd-crs-mid">color 3 → <tspan class="qd-crs-gt3">G3</tspan></text>
+    <text x="361" y="538" class="qd-crs-small qd-crs-mid">color 1 → <tspan class="qd-crs-gt1">G1</tspan></text>
+    <text x="527" y="538" class="qd-crs-small qd-crs-mid">color 2 → <tspan class="qd-crs-gt2">G2</tspan></text>
+    <text x="476" y="395" class="qd-crs-small qd-crs-mid">no conflict: color 1 → <tspan class="qd-crs-gt1">G1</tspan></text>
+    <rect x="708" y="447" width="84" height="34" rx="17" class="qd-crs-node"/><text x="750" y="469" class="qd-crs-pair">7 → 10</text>
+    <text x="750" y="439" class="qd-crs-small qd-crs-mid">color 1 → <tspan class="qd-crs-gt4">G4</tspan></text>
     <!-- Conflict reasons -->
-    <line x1="34" y1="582" x2="74" y2="582" class="qd-crs-edge"/>
-    <circle cx="54" cy="582" r="10" class="qd-crs-badge"/><text x="54" y="586.5" class="qd-crs-badge-t">1</text>
-    <text x="84" y="579" class="qd-crs-text qd-crs-bold">Share a qubit</text>
-    <text x="84" y="597" class="qd-crs-small">0 → 1 and 3 → 1 share qubit 1</text>
-    <line x1="284" y1="582" x2="324" y2="582" class="qd-crs-edge qd-crs-r2"/>
-    <circle cx="304" cy="582" r="10" class="qd-crs-badge"/><text x="304" y="586.5" class="qd-crs-badge-t">2</text>
-    <text x="334" y="579" class="qd-crs-text qd-crs-bold">Same MUX, other qubits</text>
-    <text x="334" y="597" class="qd-crs-small">0 → 1 and 3 → 2 both use MUX0</text>
-    <line x1="544" y1="582" x2="584" y2="582" class="qd-crs-edge qd-crs-r3"/>
-    <circle cx="564" cy="582" r="10" class="qd-crs-badge"/><text x="564" y="586.5" class="qd-crs-badge-t">3</text>
-    <text x="594" y="579" class="qd-crs-text qd-crs-bold">Other MUXes, shared module</text>
-    <text x="594" y="597" class="qd-crs-small">4 → 5 and 8 → 9: MUX1, MUX2 share C1</text>
-
+    <line x1="34" y1="574" x2="74" y2="574" class="qd-crs-edge"/>
+    <circle cx="54" cy="574" r="10" class="qd-crs-badge"/><text x="54" y="578.5" class="qd-crs-badge-t">1</text>
+    <text x="84" y="571" class="qd-crs-text qd-crs-bold">Share a qubit</text>
+    <text x="84" y="589" class="qd-crs-small">0 → 1 and 3 → 1 share qubit 1</text>
+    <line x1="284" y1="574" x2="324" y2="574" class="qd-crs-edge qd-crs-r2"/>
+    <circle cx="304" cy="574" r="10" class="qd-crs-badge"/><text x="304" y="578.5" class="qd-crs-badge-t">2</text>
+    <text x="334" y="571" class="qd-crs-text qd-crs-bold">Same MUX, other qubits</text>
+    <text x="334" y="589" class="qd-crs-small">0 → 1 and 3 → 2 both use MUX0</text>
+    <line x1="544" y1="574" x2="584" y2="574" class="qd-crs-edge qd-crs-r3"/>
+    <circle cx="564" cy="574" r="10" class="qd-crs-badge"/><text x="564" y="578.5" class="qd-crs-badge-t">3</text>
+    <text x="594" y="571" class="qd-crs-text qd-crs-bold">Other MUXes, shared module</text>
+    <text x="594" y="589" class="qd-crs-small">4 → 5 and 8 → 9: MUX1, MUX2 share C1</text>
     <!-- 3. Groups -->
-    <text x="30" y="640" class="qd-crs-num">3</text>
-    <text x="50" y="640" class="qd-crs-h">Groups with max_parallel_ops = 2, run left to right</text>
-    <text x="50" y="660" class="qd-crs-sub">Color 1 holds three pairs, so the cap splits it into groups 1 and 2.</text>
+    <text x="30" y="630" class="qd-crs-num">3</text>
+    <text x="50" y="630" class="qd-crs-h">Execution groups (max_parallel_ops = 4), run left to right</text>
+    <text x="50" y="650" class="qd-crs-sub">Each graph color fits in one group, so G1 runs four pairs at once. A cap of 2 would split G1 in two.</text>
 
-    <rect x="30" y="672" width="152" height="62" rx="10" class="qd-crs-box"/>
-    <text x="42" y="692" class="qd-crs-text qd-crs-bold">Group 1</text>
-    <text x="170" y="692" class="qd-crs-small" text-anchor="end">color 1</text>
-    <rect x="38" y="700" width="66" height="26" rx="13" class="qd-crs-c1"/><text x="71" y="718" class="qd-crs-pair">0 → 1</text>
-    <rect x="108" y="700" width="66" height="26" rx="13" class="qd-crs-c1"/><text x="141" y="718" class="qd-crs-pair">4 → 5</text>
-    <path d="M186,703 L196,703 L196,698 L204,704 L196,710 L196,705 L186,705 z" class="qd-crs-order"/>
+    <rect x="30" y="662" width="316" height="62" rx="10" class="qd-crs-gb1" style="fill: none"/>
+    <path d="M30,688 V672 Q30,662 40,662 H336 Q346,662 346,672 V688 Z" class="qd-crs-gb1" style="stroke: none"/>
+    <text x="42" y="681" class="qd-crs-text qd-crs-gt1">G1</text>
+    <text x="334" y="681" class="qd-crs-small" text-anchor="end">from color 1</text>
+    <rect x="38" y="690" width="66" height="26" rx="13" class="qd-crs-g1"/><text x="71" y="708" class="qd-crs-pair">0 → 1</text>
+    <rect x="108" y="690" width="66" height="26" rx="13" class="qd-crs-g1"/><text x="141" y="708" class="qd-crs-pair">4 → 5</text>
+    <rect x="178" y="690" width="78" height="26" rx="13" class="qd-crs-g1"/><text x="217" y="708" class="qd-crs-pair">12 → 13</text>
+    <rect x="260" y="690" width="78" height="26" rx="13" class="qd-crs-g1"/><text x="299" y="708" class="qd-crs-pair">16 → 17</text>
+    <path d="M350,693 L360,693 L360,688 L368,694 L360,700 L360,695 L350,695 z" class="qd-crs-order"/>
 
-    <rect x="208" y="672" width="152" height="62" rx="10" class="qd-crs-box"/>
-    <text x="220" y="692" class="qd-crs-text qd-crs-bold">Group 2</text>
-    <text x="348" y="692" class="qd-crs-small" text-anchor="end">color 1</text>
-    <rect x="216" y="700" width="78" height="26" rx="13" class="qd-crs-c1"/><text x="255" y="718" class="qd-crs-pair">12 → 13</text>
-    <path d="M364,703 L374,703 L374,698 L382,704 L374,710 L374,705 L364,705 z" class="qd-crs-order"/>
+    <rect x="372" y="662" width="152" height="62" rx="10" class="qd-crs-gb2" style="fill: none"/>
+    <path d="M372,688 V672 Q372,662 382,662 H514 Q524,662 524,672 V688 Z" class="qd-crs-gb2" style="stroke: none"/>
+    <text x="384" y="681" class="qd-crs-text qd-crs-gt2">G2</text>
+    <text x="512" y="681" class="qd-crs-small" text-anchor="end">from color 2</text>
+    <rect x="380" y="690" width="66" height="26" rx="13" class="qd-crs-g2"/><text x="413" y="708" class="qd-crs-pair">3 → 1</text>
+    <rect x="450" y="690" width="66" height="26" rx="13" class="qd-crs-g2"/><text x="483" y="708" class="qd-crs-pair">8 → 9</text>
+    <path d="M528,693 L538,693 L538,688 L546,694 L538,700 L538,695 L528,695 z" class="qd-crs-order"/>
 
-    <rect x="386" y="672" width="152" height="62" rx="10" class="qd-crs-box"/>
-    <text x="398" y="692" class="qd-crs-text qd-crs-bold">Group 3</text>
-    <text x="526" y="692" class="qd-crs-small" text-anchor="end">color 2</text>
-    <rect x="394" y="700" width="66" height="26" rx="13" class="qd-crs-c2"/><text x="427" y="718" class="qd-crs-pair">3 → 1</text>
-    <rect x="464" y="700" width="66" height="26" rx="13" class="qd-crs-c2"/><text x="497" y="718" class="qd-crs-pair">8 → 9</text>
-    <path d="M542,703 L552,703 L552,698 L560,704 L552,710 L552,705 L542,705 z" class="qd-crs-order"/>
+    <rect x="550" y="662" width="140" height="62" rx="10" class="qd-crs-gb3" style="fill: none"/>
+    <path d="M550,688 V672 Q550,662 560,662 H680 Q690,662 690,672 V688 Z" class="qd-crs-gb3" style="stroke: none"/>
+    <text x="562" y="681" class="qd-crs-text qd-crs-gt3">G3</text>
+    <text x="678" y="681" class="qd-crs-small" text-anchor="end">from color 3</text>
+    <rect x="558" y="690" width="66" height="26" rx="13" class="qd-crs-g3"/><text x="591" y="708" class="qd-crs-pair">3 → 2</text>
+    <path d="M694,693 L704,693 L704,688 L712,694 L704,700 L704,695 L694,695 z" class="qd-crs-order"/>
 
-    <rect x="564" y="672" width="140" height="62" rx="10" class="qd-crs-box"/>
-    <text x="576" y="692" class="qd-crs-text qd-crs-bold">Group 4</text>
-    <text x="692" y="692" class="qd-crs-small" text-anchor="end">color 3</text>
-    <rect x="572" y="700" width="66" height="26" rx="13" class="qd-crs-c3"/><text x="605" y="718" class="qd-crs-pair">3 → 2</text>
-    <path d="M708,703 L718,703 L718,698 L726,704 L718,710 L718,705 L708,705 z" class="qd-crs-order"/>
+    <rect x="716" y="662" width="154" height="62" rx="10" class="qd-crs-gb4" style="fill: none"/>
+    <path d="M716,688 V672 Q716,662 726,662 H860 Q870,662 870,672 V688 Z" class="qd-crs-gb4" style="stroke: none"/>
+    <text x="728" y="681" class="qd-crs-text qd-crs-gt4">G4</text>
+    <text x="858" y="681" class="qd-crs-small" text-anchor="end">inter color 1</text>
+    <rect x="724" y="690" width="78" height="26" rx="13" class="qd-crs-g4"/><text x="763" y="708" class="qd-crs-pair">7 → 10</text>
 
-    <rect x="730" y="672" width="140" height="62" rx="10" class="qd-crs-box"/>
-    <text x="742" y="692" class="qd-crs-text qd-crs-bold">Group 5</text>
-    <text x="858" y="692" class="qd-crs-small" text-anchor="end">color 1</text>
-    <rect x="738" y="700" width="78" height="26" rx="13" class="qd-crs-ci"/><text x="777" y="718" class="qd-crs-pair">7 → 10</text>
-
-    <path d="M32,744 V750 H702 V744" class="qd-crs-link"/>
-    <text x="367" y="760" class="qd-crs-small qd-crs-mid">intra-MUX groups</text>
-    <path d="M732,744 V750 H868 V744" class="qd-crs-link"/>
-    <text x="800" y="760" class="qd-crs-small qd-crs-mid">inter-MUX group</text>
-    </g>
+    <path d="M32,734 V740 H688 V734" class="qd-crs-link"/>
+    <text x="360" y="754" class="qd-crs-small qd-crs-mid">intra-MUX groups</text>
+    <path d="M718,734 V740 H868 V734" class="qd-crs-link"/>
+    <text x="793" y="754" class="qd-crs-small qd-crs-mid">inter-MUX group</text>
   </g>
 </svg>

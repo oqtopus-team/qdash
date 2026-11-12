@@ -64,8 +64,27 @@ def test_docs_groups_match_schedule_pairs(demo: ModuleType, tmp_path: Path) -> N
     result = scheduler.schedule_pairs(list(demo.PAIRS), max_parallel_ops=demo.MAX_PARALLEL_OPS)
 
     assert result.parallel_groups == [list(group) for group in demo.GROUPS]
-    assert result.metadata["fast_pairs"] == 6
+    assert result.metadata["fast_pairs"] == 7
     assert result.metadata["slow_pairs"] == 1
+    # G1 fills the cap: every pair of graph color 1 runs at once.
+    assert len(result.parallel_groups[0]) == demo.MAX_PARALLEL_OPS
+
+
+def test_docs_cap_2_splits_color_1(demo: ModuleType, tmp_path: Path) -> None:
+    """The docs text says a cap of 2 splits G1 in two; the other groups stay the same."""
+    scheduler = CRScheduler(
+        username="docs",
+        chip_id="docs_chip",
+        wiring_config_path=str(tmp_path / "unused.yaml"),
+    )
+    scheduler._coupling_ids = _ids(demo.PAIRS)
+    scheduler._wiring_config = _wiring(demo)
+
+    result = scheduler.schedule_pairs(list(demo.PAIRS), max_parallel_ops=2)
+
+    assert result.parallel_groups == [list(group) for group in demo.GROUPS_AT_CAP_2]
+    assert [*demo.GROUPS_AT_CAP_2[0], *demo.GROUPS_AT_CAP_2[1]] == list(demo.GROUPS[0])
+    assert demo.GROUPS_AT_CAP_2[2:] == demo.GROUPS[1:]
 
 
 def test_docs_groups_match_plugin_pipeline(demo: ModuleType) -> None:
@@ -83,7 +102,7 @@ def test_docs_groups_match_plugin_pipeline(demo: ModuleType) -> None:
     assert groups == [_ids(group) for group in demo.GROUPS]
 
 
-def test_docs_graph_colors_before_the_cap(demo: ModuleType) -> None:
+def test_docs_graph_colors(demo: ModuleType) -> None:
     wiring = _wiring(demo)
     qid_to_mux = build_qubit_to_mux_map(wiring)
     conflicts = build_mux_conflict_map(wiring)
@@ -125,3 +144,14 @@ def test_docs_conflict_edges(demo: ModuleType) -> None:
     unshared = _wiring(demo)
     unshared[2]["ctrl"] = ["C2:0", "C2:1"]
     assert edges(build_mux_conflict_map(unshared)) == shared_qubit | same_mux
+
+
+def test_docs_group_colors(demo: ModuleType) -> None:
+    """Each execution group has its own color, and the SVG uses the GIF's light colors."""
+    assert len(demo.GROUP_COLOR) == len(demo.GROUPS)
+    assert len(set(demo.GROUP_COLOR)) == len(demo.GROUP_COLOR)
+
+    svg = (_DEMO.parents[1] / "diagrams" / "cr-schedule-conflict-graph.svg").read_text()
+    for index, (red, green, blue) in enumerate(demo.GROUP_COLOR, start=1):
+        rule = f".qd-crs-g{index} {{ fill: rgba({red}, {green}, {blue}, 0.14);"
+        assert rule in svg, rule
