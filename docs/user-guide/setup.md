@@ -12,7 +12,8 @@ theme, several deployments on one host, and remote access are optional and can b
 | --- | --- |
 | Evaluate QDash without quantum hardware | [Fake](./setup/fake-backend.md); no backend configuration before startup |
 | Operate a Qubex-connected lab deployment | [Qubex](./setup/qubex-backend.md); place the Qubex configuration before startup |
-| Connect another hardware stack | Not supported by deployment settings, which accept only `fake` and `qubex`; an additional backend requires QDash code changes. |
+| Run a Rabi sweep on a Quantum Machines OPX, the QOP simulator, the QM cloud simulator, or a local mock without hardware | [Quantum Machines](./setup/qm-backend.md); an initial integration with one task; hardware and simulator mode need an optional extra |
+| Connect another hardware stack | Not supported; an additional backend requires QDash code changes. |
 
 The backend determines the available calibration tasks and hardware connection.
 

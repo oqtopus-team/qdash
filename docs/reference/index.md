@@ -23,3 +23,9 @@ Explanations and change procedures remain in the Developer Guide.
 | --- | --- |
 | QDash tools, slash commands, and bundled skills | [pi-qdash](./pi-qdash.md) |
 | Calibration evaluation inputs, outputs, and model configuration | [pi-qcaleval](./pi-qcaleval.md) |
+
+## Licenses
+
+| Information | Reference |
+| --- | --- |
+| Licenses of the optional Quantum Machines packages | [Third-Party Licenses](./third-party-licenses.md) |

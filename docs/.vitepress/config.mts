@@ -102,6 +102,7 @@ export default withMermaid(
                     { text: "Install and Sign In", link: "/user-guide/setup" },
                     { text: "Fake Backend", link: "/user-guide/setup/fake-backend" },
                     { text: "Qubex Backend", link: "/user-guide/setup/qubex-backend" },
+                    { text: "Quantum Machines Backend", link: "/user-guide/setup/qm-backend" },
                     { text: "AI Setup", link: "/user-guide/setup/ai" },
                   ],
                 },
@@ -254,6 +255,7 @@ export default withMermaid(
                 { text: "TypeScript Client", link: "/reference/clients/typescript" },
                 { text: "pi-qdash", link: "/reference/pi-qdash" },
                 { text: "pi-qcaleval", link: "/reference/pi-qcaleval" },
+                { text: "Third-Party Licenses", link: "/reference/third-party-licenses" },
               ],
             },
             {

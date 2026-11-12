@@ -22,6 +22,11 @@ QubexBackend
     Not exported by default to avoid import errors when qubex is not installed.
     Import directly: ``from qdash.workflow.engine.backend.qubex import QubexBackend``
 
+QMBackend
+    Quantum Machines OPX backend (hardware, QOP simulator or local mock mode). Its SDK
+    is an optional dependency imported on connect, except in mock mode, which needs none.
+    Import directly: ``from qdash.workflow.engine.backend.qm import QMBackend``
+
 create_backend
     Factory function to create backends by name.
 

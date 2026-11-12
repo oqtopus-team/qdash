@@ -81,7 +81,10 @@ QDash keeps execution state and task state separate.
 - `TaskHistoryRecorder` writes task-result history and optional provenance records.
 - `BackendSaver` decides which validated outputs update the backend and accepted calibration
   state. The orchestrator passes it the call's resolved `update_calibration_parameters`; when
-  that is `False`, the task is recorded without promoting its outputs.
+  that is `False`, the task is recorded without promoting its outputs. For the `qm` backend it
+  promotes outputs only when the backend reports `is_hardware`, before `force_update_params` is
+  considered, so a QOP simulator or mock run cannot replace a measured value; mock outputs stay
+  in the task result with `database_updated` set to `False`.
 - `FilesystemCalibDataSaver` writes artifacts beneath the execution's project- and chip-scoped
   calibration directory.
 

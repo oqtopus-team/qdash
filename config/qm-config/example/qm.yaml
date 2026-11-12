@@ -1,0 +1,44 @@
+# Sample QM backend settings. Copy this directory to config/qm-config/<chip_id>/ and
+# replace the values with those of your QOP server and QUA configuration.
+
+# hardware: run programs on the OPX and publish fitted calibration values.
+# simulator: send programs to the QOP simulator; records controller waveforms only and
+#            never publishes calibration values.
+mode: simulator
+
+# Set exactly one of connection (a QOP server you run) or cloud (the QM SaaS simulator).
+
+# Arguments for qm.QuantumMachinesManager. The simulator also runs on a QOP server.
+connection:
+  host: 127.0.0.1
+  port: 80
+  # cluster_name: Cluster_1
+  # timeout: 60
+
+# QM SaaS cloud simulator (simulator mode only; needs the workflow qm-cloud extra).
+# Replace the connection block above with this one. Credentials come from the named
+# environment variables and never from this file.
+# cloud:
+#   qop_version: v2_6_0          # QOP 2.x simulates OPX+ (this QUA configuration)
+#   email_env: QM_SAAS_EMAIL
+#   password_env: QM_SAAS_PASSWORD
+
+# Simulator mode only: how much program time to simulate (multiple of 4 ns, at most
+# 1000000). QMAmplitudeRabi needs one full sweep to fit; see simulator_run_parameters().
+simulation:
+  duration_ns: 40000
+
+# QUA configuration names for each QDash qubit ID, as qualang-tools QUA_calibrations
+# expects them. The qubit operation is the pulse whose amplitude QMAmplitudeRabi scales.
+qubits:
+  "0":
+    qubit_element: qubit
+    qubit_operation: x180
+    readout_element: resonator
+    readout_operation: readout
+    integration_weights: [cos, sin, minus_sin, cos]
+    outputs: [out1, out2]
+
+# QUA configuration, relative to this file (JSON or YAML). Use qua_config instead to
+# write it inline.
+qua_config_file: qua_config.yaml

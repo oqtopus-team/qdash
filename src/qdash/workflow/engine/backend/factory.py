@@ -9,7 +9,11 @@ def create_backend(backend: str, config: dict[str, Any]) -> BaseBackend:
         return _load_qubex_backend(config)
     if backend == "fake":
         return _load_fake_backend(config)
-    raise ValueError(f"Unsupported BACKEND: {backend}. Supported backends are 'qubex' and 'fake'.")
+    if backend == "qm":
+        return _load_qm_backend(config)
+    raise ValueError(
+        f"Unsupported BACKEND: {backend}. Supported backends are 'qubex', 'fake' and 'qm'."
+    )
 
 
 def _load_qubex_backend(config: dict[str, Any]) -> BaseBackend:
@@ -26,3 +30,11 @@ def _load_fake_backend(config: dict[str, Any]) -> BaseBackend:
     from qdash.workflow.engine.backend.fake import FakeBackend
 
     return FakeBackend(config)
+
+
+def _load_qm_backend(config: dict[str, Any]) -> BaseBackend:
+    # The Quantum Machines SDK is imported lazily when the backend connects, so
+    # creating the backend does not require the optional ``qm`` extra.
+    from qdash.workflow.engine.backend.qm import QMBackend
+
+    return QMBackend(config)

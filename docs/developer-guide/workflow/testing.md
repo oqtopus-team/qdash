@@ -33,6 +33,20 @@ uv run pytest tests/qdash/workflow/service/test_pipeline_flow.py -v -k cancellat
 
 Run `task test` when the change also affects shared models, repositories, or API behavior.
 
+`calibtasks/qm/test_qm_rabi_sdk.py` checks the Quantum Machines backend against the real `qm-qua`,
+`qualang-tools`, and `qm-saas` packages offline and is skipped unless the workflow `qm` extra is
+installed; its QM SaaS test also needs the `qm-cloud` extra. Install that extra before changing
+the backend:
+
+```bash
+uv sync --locked --all-groups --all-packages --extra qm-cloud
+uv run pytest tests/qdash/workflow/calibtasks/qm tests/qdash/workflow/engine/backend/test_qm_backend.py -v
+```
+
+`calibtasks/qm/test_qm_mock.py` covers mock mode without the extras: it makes the QM packages
+unimportable and outgoing sockets fail, then runs `QMAmplitudeRabi` through `TaskExecutor`
+with in-memory repositories to check results, artifacts, history, and the hardware-only write.
+
 ## Follow Existing Fixtures
 
 Search the nearest test module and parent `conftest.py` before adding a fixture. Prefer the
@@ -71,5 +85,6 @@ state instead of private call order unless call order is the contract.
 | `service/` | `service/` |
 | `templates/` | Top-level `test_*_template.py` files |
 | `calibtasks/fake/` | `calibtasks/test_fake_backend_sync.py`, `calibtasks/test_fake_bring_up.py` |
+| `engine/backend/qm.py`, `calibtasks/qm/` | `engine/backend/test_qm_backend.py`, `calibtasks/qm/` |
 
 Paths in the table are relative to `src/qdash/workflow/` and `tests/qdash/workflow/`.

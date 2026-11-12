@@ -188,6 +188,12 @@ dev = [
     "setuptools>=80.9.0",
 ]
 
+[tool.uv]
+# qualang-tools (optional QM extra) pins grpclib==0.4.5 in every release, while quelware
+# (qubex[backend]) needs grpclib>=0.4.8. qualang-tools 0.23.0 does not import grpclib, and
+# qm-qua 1.5.0 uses grpcio, so the workspace overrides the stale pin.
+override-dependencies = ["grpclib>=0.4.8"]
+
 [tool.uv.workspace]
 members = [
     "clients/python",

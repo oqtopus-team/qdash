@@ -52,7 +52,7 @@ class BackendSaver:
     """Handles backend-specific persistence for calibration task results.
 
     Responsibilities:
-    - Dispatching to the correct backend saver (qubex, fake, etc.)
+    - Dispatching to the correct backend saver (qubex, fake, qm hardware)
     - Saving calibration data to MongoDB (qubit and coupling repositories)
     - Updating calibration notes on the backend
     - Updating backend parameter files (e.g. Qubex YAML)
@@ -118,6 +118,31 @@ class BackendSaver:
             # Fake tasks run on a QUBEX-compatible simulator and persist their outputs the
             # same way, so the qubex tasks routed to the fake backend find their inputs.
             self._save_calibration(task, execution_service, qid, backend, success)
+        elif task.backend == "qm":
+            if getattr(backend, "is_hardware", False) is not True:
+                # Only OPX measurements may become calibration values. QOP simulator
+                # waveforms and mock responses stay in the run history, whatever
+                # force_update_params or update_calibration_parameters say.
+                self._skip_non_hardware_calibration(task, qid, backend)
+                return
+            self._save_calibration(task, execution_service, qid, backend, success)
+
+    def _skip_non_hardware_calibration(
+        self, task: TaskProtocol, qid: str, backend: BaseBackend
+    ) -> None:
+        """Mark the outputs of a simulator or mock run as not written to the database."""
+        task_name = task.get_name()
+        task_model = self._state_manager.get_task(task_name, task.get_task_type(), qid)
+        output_parameters = dict(task_model.output_parameters)
+        logger.info(
+            "Skipping calibration write-back for %s on qid=%s: backend mode is %s, not hardware",
+            task_name,
+            qid,
+            getattr(backend, "mode", "unknown"),
+        )
+        if output_parameters:
+            _, publish_targets = self._build_persistence_plan(task, output_parameters)
+            self._mark_database_not_updated(task_model, output_parameters, publish_targets)
 
     def save_mux_qid(
         self,

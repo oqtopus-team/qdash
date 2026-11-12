@@ -110,3 +110,16 @@ backends:
         - CheckT1
         - CheckT2Echo
         - CheckRamsey
+
+  # ---------------------------------------------------------------------------
+  # Quantum Machines Backend (OPX hardware, QOP simulator or local mock)
+  # ---------------------------------------------------------------------------
+  qm:
+    description: "Quantum Machines OPX backend; needs a QM settings file, and the workflow 'qm' extra except in mock mode"
+
+    # The settings file (config/qm-config/<chip_id>/qm.yaml) selects hardware, simulator or
+    # mock mode. Only hardware runs replace calibration values; simulator runs record
+    # waveforms and mock runs record a synthetic response in the run history.
+    tasks:
+      One Qubit:
+        - QMAmplitudeRabi
