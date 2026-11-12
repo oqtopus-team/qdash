@@ -925,7 +925,9 @@ export function QubitGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <div className="min-w-0 min-h-0 flex-1 self-stretch overflow-auto flex justify-center-safe items-start">
+            {gridContent}
+          </div>
         )}
       </div>
 

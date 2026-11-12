@@ -43,22 +43,15 @@ vi.mock("@xyflow/react", () => {
       );
     },
     Background: () => null,
-    Controls: (props: {
-      onInteractiveChange?: (interactive: boolean) => void;
-      [key: string]: unknown;
-    }) => {
+    Controls: (props: { children?: ReactNode; [key: string]: unknown }) => {
       mocks.capturedControlsProps = props;
-      const interactive = mocks.capturedProps?.zoomOnScroll === true;
-      return (
-        <button
-          type="button"
-          data-testid="controls-interactive"
-          onClick={() => props.onInteractiveChange?.(!interactive)}
-        >
-          toggle-lock
-        </button>
-      );
+      return <div data-testid="controls">{props.children}</div>;
     },
+    ControlButton: ({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) => (
+      <button type="button" {...props}>
+        {children}
+      </button>
+    ),
     Handle: () => null,
     Position: { Left: "left", Right: "right" },
     ReactFlowProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -135,7 +128,7 @@ describe("ExecutionDAG lock control", () => {
   it("starts unlocked with pan/zoom enabled and node dragging disabled", () => {
     render(<ExecutionDAG tasks={tasks} />);
 
-    expect(screen.getByTestId("controls-interactive")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Lock view" })).toBeTruthy();
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: true,
       panOnScroll: false,
@@ -148,7 +141,7 @@ describe("ExecutionDAG lock control", () => {
       elementsSelectable: false,
     });
     expect(mocks.capturedControlsProps).toMatchObject({
-      showInteractive: true,
+      showInteractive: false,
       showZoom: true,
       showFitView: true,
       fitViewOptions: { padding: 0.05, minZoom: 0.1, maxZoom: 1.5 },
@@ -156,11 +149,11 @@ describe("ExecutionDAG lock control", () => {
     expect(screen.getByTitle("Fit to view")).toBeTruthy();
   });
 
-  it("locks pan/zoom when the lock control is toggled", () => {
+  it("locks pan/zoom on the first click of the lock control", () => {
     render(<ExecutionDAG tasks={tasks} />);
     mocks.fitView.mockClear();
 
-    fireEvent.click(screen.getByTestId("controls-interactive"));
+    fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
 
     expect(mocks.fitView).toHaveBeenCalledWith({
       padding: 0.05,
@@ -180,29 +173,34 @@ describe("ExecutionDAG lock control", () => {
       elementsSelectable: false,
     });
     expect(mocks.capturedControlsProps).toMatchObject({
-      showInteractive: true,
+      showInteractive: false,
       showZoom: false,
       showFitView: false,
     });
     expect(screen.queryByTitle("Fit to view")).toBeNull();
+    expect(screen.getByRole("button", { name: "Unlock view" })).toHaveAttribute(
+      "title",
+      "Unlock view",
+    );
   });
 
-  it("restores pan/zoom and the Controls buttons when unlocked again", () => {
+  it("restores pan/zoom and the Controls buttons on the second click", () => {
     render(<ExecutionDAG tasks={tasks} />);
 
-    fireEvent.click(screen.getByTestId("controls-interactive"));
+    fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
     expect(mocks.capturedControlsProps).toMatchObject({ showZoom: false, showFitView: false });
     mocks.fitView.mockClear();
 
-    fireEvent.click(screen.getByTestId("controls-interactive"));
+    fireEvent.click(screen.getByRole("button", { name: "Unlock view" }));
 
     expect(mocks.fitView).not.toHaveBeenCalled();
     expect(mocks.capturedControlsProps).toMatchObject({
-      showInteractive: true,
+      showInteractive: false,
       showZoom: true,
       showFitView: true,
     });
     expect(screen.getByTitle("Fit to view")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Lock view" })).toBeTruthy();
     expect(mocks.capturedProps).toMatchObject({
       zoomOnScroll: true,
       panOnDrag: true,
@@ -258,7 +256,7 @@ describe("ExecutionDAG fullscreen", () => {
     vi.useFakeTimers();
     try {
       render(<ExecutionDAG tasks={tasks} />);
-      fireEvent.click(screen.getByTestId("controls-interactive"));
+      fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
       act(() => {
         vi.runAllTimers();
       });
@@ -322,7 +320,7 @@ describe("ExecutionDAG node interaction", () => {
 
   it("gives the canvas up to the preview and re-fits the locked graph afterwards", async () => {
     render(<ExecutionDAG tasks={tasks} />);
-    fireEvent.click(screen.getByTestId("controls-interactive"));
+    fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
     const canvas = screen.getByTestId("execution-flow-canvas");
     expect(canvas).not.toHaveClass("lg:mr-[calc(40vw-2.5rem)]");
     const fitCallsBefore = mocks.fitView.mock.calls.length;

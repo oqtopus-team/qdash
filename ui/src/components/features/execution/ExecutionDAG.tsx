@@ -6,6 +6,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  ControlButton,
   Handle,
   Position,
   ReactFlowProvider,
@@ -14,6 +15,7 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import dagre from "dagre";
+import { Lock, LockOpen } from "lucide-react";
 
 import type { Node, Edge, NodeProps, NodeTypes } from "@xyflow/react";
 
@@ -223,17 +225,28 @@ function FlowContent({
     >
       <Background />
       <Controls
-        showInteractive
+        showInteractive={false}
         showZoom={!isLocked}
         showFitView={!isLocked}
         fitViewOptions={FIT_VIEW_OPTIONS}
-        onInteractiveChange={(interactive) => {
-          if (!interactive) {
-            fitView({ ...FIT_VIEW_OPTIONS, duration: 0 });
-          }
-          setIsLocked(!interactive);
-        }}
-      />
+      >
+        <ControlButton
+          onClick={() => {
+            if (!isLocked) {
+              fitView({ ...FIT_VIEW_OPTIONS, duration: 0 });
+            }
+            setIsLocked(!isLocked);
+          }}
+          title={isLocked ? "Unlock view" : "Lock view"}
+          aria-label={isLocked ? "Unlock view" : "Lock view"}
+        >
+          {isLocked ? (
+            <Lock size={12} style={{ fill: "none" }} />
+          ) : (
+            <LockOpen size={12} style={{ fill: "none" }} />
+          )}
+        </ControlButton>
+      </Controls>
       <Panel position="top-left" className="bg-base-100 p-2 rounded flex items-center gap-2">
         <div className="text-sm">Select a node to preview its result</div>
         {!isLocked && (
