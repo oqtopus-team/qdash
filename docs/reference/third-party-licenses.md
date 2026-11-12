@@ -1,17 +1,19 @@
 # Third-Party Licenses
 
-QDash is licensed under Apache 2.0. The optional workflow `qm` extra, used only by the
-`qm` backend of the [Quantum Machines backend](../user-guide/setup/qm-backend.md), installs the
-Quantum Machines packages below; each package stays under its own license. The QDash adapter includes no copied
-Quantum Machines source code; installed SDK dependencies retain their own source and notices, the workflow Docker images do not install the extra, and the `qm-fake`
-backend needs none of these packages.
+QDash is licensed under Apache 2.0. The optional workflow `qm` extra, used by the `qm` and
+`qm-fake` backends of the [Quantum Machines backend](../user-guide/setup/qm-backend.md), installs
+the Quantum Machines packages below; each package stays under its own license. The QDash
+adapter and the `qm-fake` device include no copied Quantum Machines source code; they call the
+installed packages, which retain their own source and notices. The workflow Docker images do not
+install the extra, so a deployment that runs either backend installs it itself and takes on the
+redistribution terms below when it distributes the result.
 
 ## Quantum Machines Packages
 
 | Package | Version | License | Copyright | Used for |
 | --- | --- | --- | --- | --- |
-| [`qm-qua`](https://github.com/qm-labs/qm-qua-sdk-public) | 1.5.0 | BSD-3-Clause | Copyright 2021 Q.M Technologies Ltd. | QOP server connection, QUA programs, simulator requests |
-| [`qualang-tools`](https://github.com/qua-platform/py-qua-tools) | 0.23.0 | BSD-3-Clause | Copyright 2021 Q.M. Technologies Ltd. | Rabi experiment (`QUA_calibrations`) run by **QMAmplitudeRabi** |
+| [`qm-qua`](https://github.com/qm-labs/qm-qua-sdk-public) | 1.5.0 | BSD-3-Clause | Copyright 2021 Q.M Technologies Ltd. | QOP server connection, QUA programs, simulator requests; offline configuration validation and program decoding on `qm-fake` |
+| [`qualang-tools`](https://github.com/qua-platform/py-qua-tools) | 0.23.0 | BSD-3-Clause | Copyright 2021 Q.M. Technologies Ltd. | Rabi experiment (`QUA_calibrations`) and `demod2volts`, run by **QMAmplitudeRabi** on `qm` and `qm-fake` |
 
 These facts come from the distributions that `uv.lock` pins, identified by their SHA-256 hashes.
 Each wheel and its source distribution ship the same `LICENSE` file, with no other license or

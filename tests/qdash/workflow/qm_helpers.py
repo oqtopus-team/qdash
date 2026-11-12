@@ -131,3 +131,6 @@ class StubQuantumMachinesManager:
 
     def close(self) -> None:
         self.closed += 1
+
+
+EXAMPLE_FAKE_SETTINGS_PATH = REPO_ROOT / "config" / "qm-config" / "example-fake" / "qm-fake.yaml"

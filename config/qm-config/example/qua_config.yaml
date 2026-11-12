@@ -1,6 +1,5 @@
 # Minimal QUA configuration for one qubit with an IQ-mixer drive and readout on an OPX
 # (controller con1). Frequencies are in Hz, lengths in ns, amplitudes in V.
-version: 1
 controllers:
   con1:
     analog_outputs:

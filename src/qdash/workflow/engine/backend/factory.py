@@ -44,8 +44,8 @@ def _load_qm_backend(config: dict[str, Any]) -> BaseBackend:
 
 
 def _load_qm_fake_backend(config: dict[str, Any]) -> BaseBackend:
-    # The QM fake backend answers with a local synthetic response and never imports the
-    # Quantum Machines packages, so it runs on the standard workflow image.
+    # Creating the backend imports no Quantum Machines package; connecting it does, because
+    # the qm-fake device runs the real qm-qua and qualang-tools program path.
     from qdash.workflow.engine.backend.qm_fake import QMFakeBackend
 
     return QMFakeBackend(config)

@@ -1,27 +1,32 @@
-"""QM fake backend (``qm-fake``): a local synthetic device response for QM tasks.
+"""QM fake backend (``qm-fake``): the QM tasks against a local fake QOP device.
 
-``QMFakeBackend`` lets the tasks of the ``qm`` backend run without an OPX, a QOP
-server or any Quantum Machines package. The tasks, their analysis,
-figures, raw data and persistence are the ones the ``qm`` backend uses; only the
-device response is replaced. ``QMFakeDevice`` takes the place of the
-``QuantumMachinesManager`` and returns an averaged I/Q response computed with NumPy
-from a small model of one qubit.
+``QMFakeBackend`` plays the role for the ``qm`` backend that the ``fake`` backend
+plays for qubex: the tasks run the same experiment code as on hardware, and only the
+device boundary is replaced. A QM task on ``qm-fake`` builds its program with the real
+``qualang-tools`` ``QUA_calibrations`` class, runs it through ``run_calibrations``,
+and fetches and converts the results with the real SDK and ``qualang-tools`` helpers.
+``QMFakeQuantumMachinesManager`` (``qm_fake_qop.py``) takes the place of
+``qm.QuantumMachinesManager``: it validates the QUA configuration with the installed
+SDK, decodes the generated QUA program, interprets the supported 1D amplitude Rabi
+subset and answers with demodulated values drawn from a small qubit model.
 
-The model is deliberately minimal. For an amplitude scale ``a`` the excited-state
-population of an ideal two-level system is ``(1 - cos(pi a / a_pi)) / 2``. The
-averaged readout point moves on a straight line from the ground-state point
-``iq_offset`` towards the excited-state point ``iq_offset + contrast * exp(i phase)``,
-and each averaged point carries complex Gaussian noise whose standard deviation per
-quadrature is ``noise_per_shot / sqrt(shots)``. There is no decoherence, leakage,
-pulse distortion, QUA program, QUA compilation, controller timing or wiring: a
-``qm-fake`` run checks QDash's task, analysis and persistence pipeline, never a QUA
-program, the OPX or its connections.
+The backend therefore needs the workflow ``qm`` extra (``qm-qua`` and
+``qualang-tools``) but no OPX, no QOP server and no network. Without the extra,
+``connect`` raises ``QMDependencyError`` with the install command; it never falls
+back to another response.
+
+A ``qm-fake`` run checks that the task builds, executes, fetches and analyses a
+program the way a hardware run does, against the same QUA configuration and qubit
+bindings. It does not check QUA compilation, controller timing, waveform output,
+firmware or wiring, and its response comes from the model described in
+``qm_fake_qop``, not from a device.
 
 The settings file defaults to ``<config dir>/qm-config/<chip_id>/qm-fake.yaml``. The
 ``qm_fake_config_path`` session option or the ``QDASH_QM_FAKE_CONFIG`` environment
-variable overrides that path. It holds the response of each qubit and nothing that
-reaches a QOP server: ``mode``, ``connection``, ``simulation``, ``qua_config`` and
-``qua_config_file`` are rejected.
+variable overrides that path. It holds the QUA configuration and qubit bindings in
+the same form as ``qm.yaml`` (``qua_config_file`` or ``qua_config`` and ``qubits``),
+plus ``seed``, ``qop_version`` and the ``device`` response of each qubit. Settings
+that reach a QOP server (``mode``, ``connection``, ``simulation``) are rejected.
 
 The ``qm-fake`` backend is never a calibration source: ``is_hardware`` is ``False``,
 so ``BackendSaver`` keeps its results in the run history only.
@@ -30,24 +35,28 @@ so ``BackendSaver`` keeps its results in the run history only.
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any, Literal
 
-import numpy as np
-import numpy.typing as npt
-import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.backend.qm import (
+    QM_INSTALL_HINT,
     QMConfigurationError,
+    QMDependencyError,
+    QMQuaSettings,
+    import_qm_sdk,
+    read_settings_mapping,
     resolve_qm_settings_path,
     string_qids,
 )
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from qdash.workflow.engine.backend.qm_fake_qop import QMFakeQuantumMachinesManager
 
 logger = logging.getLogger(__name__)
 
@@ -56,108 +65,125 @@ QM_FAKE_SETTINGS_FILE_NAME = "qm-fake.yaml"
 QM_FAKE_CONFIG_ENV = "QDASH_QM_FAKE_CONFIG"
 QM_FAKE_CONFIG_OPTION = "qm_fake_config_path"
 # Labels that mark every fake artifact, so a fake result can never pass as measured data.
-QM_FAKE_SOURCE_TYPE = "qdash.qm_fake.rabi_iq"
-QM_FAKE_VERSION = "qm-fake (QDash synthetic response, no QM SDK)"
+QM_FAKE_SOURCE_TYPE = "qdash.qm_fake.qualang_tools.Rabi"
+QM_FAKE_VERSION_LABEL = "qm-fake (QDash fake QOP device)"
 # Settings of the qm backend that reach a QOP server; a qm-fake settings file must not set them.
-QOP_ONLY_SETTINGS = ("mode", "connection", "simulation", "qua_config", "qua_config_file")
+QOP_ONLY_SETTINGS = ("mode", "connection", "simulation")
+# Keys of the former response-only qm-fake qubit entries, rejected with a pointer to 'device'.
+FORMER_RESPONSE_KEYS = ("pi_amplitude_scale", "iq_offset", "contrast", "phase_deg")
 
 
-class QMFakeQubitSettings(BaseModel):
-    """Parameters of the synthetic response of one qubit."""
+class QMFakeQubitDevice(BaseModel):
+    """Response of one qubit on the fake device."""
 
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
-    pi_amplitude_scale: float = Field(
-        default=0.6, gt=0, lt=2, description="Amplitude scale that gives a pi rotation"
+    pi_pulse_area: float = Field(
+        default=4.8,
+        gt=0,
+        description=(
+            "Area in V*ns of the drive pulse envelope that rotates the qubit by pi; "
+            "a played pulse rotates it by pi * amp * |envelope area| / pi_pulse_area"
+        ),
     )
-    iq_offset: tuple[float, float] = Field(
-        default=(0.010, 0.002), description="Averaged I/Q point of the ground state in V"
+    ground_iq: tuple[float, float] = Field(
+        default=(0.010, 0.002), description="Readout amplitude (I, Q) of the ground state in V"
     )
-    contrast: float = Field(
-        default=0.015, gt=0, description="Distance in V between the ground and excited I/Q points"
-    )
-    phase_deg: float = Field(
-        default=120.0, description="Direction in degrees of the excited state from the ground state"
+    excited_iq: tuple[float, float] = Field(
+        default=(0.0025, 0.015), description="Readout amplitude (I, Q) of the excited state in V"
     )
     noise_per_shot: float = Field(
-        default=0.01,
-        ge=0,
-        description="Single-shot noise in V per quadrature; averaging divides it by sqrt(shots)",
+        default=0.01, ge=0, description="Gaussian noise in V per quadrature on every measurement"
     )
 
-    def ideal_iq(self, amplitude_scales: npt.NDArray[np.float64]) -> npt.NDArray[np.complex128]:
-        """Noise-free averaged I/Q response for each amplitude scale."""
-        scales = np.asarray(amplitude_scales, dtype=float)
-        population = (1.0 - np.cos(np.pi * scales / self.pi_amplitude_scale)) / 2.0
-        ground = complex(*self.iq_offset)
-        direction = self.contrast * np.exp(1j * math.radians(self.phase_deg))
-        return np.asarray(ground + direction * population, dtype=np.complex128)
-
-    def averaged_noise_std(self, shots: int) -> float:
-        """Standard deviation per quadrature of one averaged point after ``shots`` shots."""
-        if shots < 1:
-            raise ValueError("shots must be a positive integer")
-        return self.noise_per_shot / math.sqrt(shots)
+    @model_validator(mode="after")
+    def _distinct_states(self) -> QMFakeQubitDevice:
+        if self.ground_iq == self.excited_iq:
+            raise ValueError("ground_iq and excited_iq must differ")
+        return self
 
 
-class QMFakeSettings(BaseModel):
-    """Validated contents of a ``qm-fake.yaml`` settings file."""
+class QMFakeSettings(QMQuaSettings):
+    """Validated contents of a ``qm-fake.yaml`` settings file.
 
-    model_config = ConfigDict(extra="forbid")
+    ``qubits`` and ``qua_config`` follow ``qm.yaml`` and are validated by the same
+    rules; ``device`` adds the response of each bound qubit.
+    """
 
     seed: int | None = Field(
         default=None,
         ge=0,
         description="Seed of the noise generator; omit it for different noise on every session",
     )
-    qubits: dict[str, QMFakeQubitSettings] = Field(min_length=1)
+    qop_version: Literal[2, 3] = Field(
+        default=2,
+        description="QOP major version whose capabilities the SDK validates the configuration for",
+    )
+    device: dict[str, QMFakeQubitDevice] = Field(default_factory=dict)
 
     @model_validator(mode="before")
     @classmethod
     def _reject_qop_settings(cls, data: Any) -> Any:
         # Checked before field validation, so a QOP server section copied from
         # qm.yaml gets this message instead of an "extra field" error.
-        if isinstance(data, dict):
-            present = [name for name in QOP_ONLY_SETTINGS if name in data]
-            if present:
-                raise ValueError(
-                    "the qm-fake backend runs locally without a QOP server or a QUA "
-                    f"configuration; remove {', '.join(present)}. Use backend 'qm' with "
-                    "qm.yaml for the OPX or the QOP simulator"
-                )
-            if "mock" in data:
-                raise ValueError(
-                    "qm-fake settings hold seed and qubits at the top level; "
-                    "move the contents of 'mock' up one level"
-                )
+        if not isinstance(data, dict):
+            return data
+        present = [name for name in QOP_ONLY_SETTINGS if name in data]
+        if present:
+            raise ValueError(
+                "the qm-fake backend runs on a local fake device without a QOP server; "
+                f"remove {', '.join(present)}. Use backend 'qm' with qm.yaml for the OPX or "
+                "the QOP simulator"
+            )
+        if "mock" in data:
+            raise ValueError("'mock' is not a qm-fake setting; describe the response in 'device'")
+        qubits = data.get("qubits")
+        if isinstance(qubits, dict) and any(
+            isinstance(entry, dict) and any(key in entry for key in FORMER_RESPONSE_KEYS)
+            for entry in qubits.values()
+        ):
+            raise ValueError(
+                "qubits holds the QUA bindings as in qm.yaml; describe the response of each "
+                "qubit under 'device' (pi_pulse_area, ground_iq, excited_iq, noise_per_shot)"
+            )
         return data
 
-    @field_validator("qubits", mode="before")
+    @field_validator("device", mode="before")
     @classmethod
-    def _string_qids(cls, value: Any) -> Any:
+    def _string_device_qids(cls, value: Any) -> Any:
         if isinstance(value, dict):
-            value = {qid: settings or {} for qid, settings in value.items()}
+            value = {qid: entry or {} for qid, entry in value.items()}
         return string_qids(value)
 
-    def qubit(self, qid: str) -> QMFakeQubitSettings:
-        """Return the response parameters of ``qid`` or fail with the configured qubit IDs."""
-        try:
-            return self.qubits[qid]
-        except KeyError:
-            configured = ", ".join(sorted(self.qubits)) or "none"
-            raise QMConfigurationError(
-                f"Qubit {qid} is not configured for the qm-fake backend (configured: {configured})"
-            ) from None
+    @model_validator(mode="after")
+    def _check_device(self) -> QMFakeSettings:
+        missing = sorted(set(self.qubits) - set(self.device))
+        unbound = sorted(set(self.device) - set(self.qubits))
+        if missing:
+            raise ValueError(f"device has no entry for qubit(s) {', '.join(missing)}")
+        if unbound:
+            raise ValueError(f"device describes qubit(s) {', '.join(unbound)} without a binding")
+        for role in ("qubit_element", "readout_element"):
+            seen: dict[str, str] = {}
+            for qid, binding in self.qubits.items():
+                element = getattr(binding, role)
+                if element in seen:
+                    raise ValueError(
+                        f"qubits {seen[element]} and {qid} share {role} '{element}'; the fake "
+                        "device models one qubit per drive and readout element"
+                    )
+                seen[element] = qid
+        return self
+
+    def qubit_device(self, qid: str) -> QMFakeQubitDevice:
+        """Return the fake response parameters of ``qid``."""
+        self.qubit(qid)
+        return self.device[qid]
 
 
 def load_qm_fake_settings(path: Path) -> QMFakeSettings:
     """Load and validate a ``qm-fake.yaml`` settings file."""
-    if not path.is_file():
-        raise QMConfigurationError(f"qm-fake settings file not found: {path}")
-    with path.open(encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    if not isinstance(data, dict):
-        raise QMConfigurationError(f"qm-fake settings file must contain a mapping: {path}")
+    data = read_settings_mapping(path, "qm-fake")
     try:
         return QMFakeSettings.model_validate(data)
     except ValueError as exc:
@@ -174,58 +200,33 @@ def resolve_qm_fake_settings_path(config: dict[str, Any]) -> Path:
     )
 
 
-class QMFakeDevice:
-    """Stand-in for ``QuantumMachinesManager`` that answers with a synthetic response.
+def import_qm_fake_packages() -> None:
+    """Import the SDK and ``qualang-tools`` that a qm-fake run executes, or explain how."""
+    import_qm_sdk()
+    try:
+        import qualang_tools.addons.calibration.calibrations  # noqa: F401
+    except ImportError as exc:
+        raise QMDependencyError(QM_INSTALL_HINT) from exc
 
-    One device lives for one backend session. Its noise generator is seeded once, so
-    a session with a fixed ``seed`` reproduces the same sequence of results.
-    """
 
-    def __init__(self, settings: QMFakeSettings) -> None:
-        self._settings = settings
-        self._rng = np.random.default_rng(settings.seed)
-        self._closed = False
-
-    @property
-    def closed(self) -> bool:
-        """Whether the session that owns the device has ended."""
-        return self._closed
-
-    @property
-    def seed(self) -> int | None:
-        """Seed of the noise generator, recorded with every result."""
-        return self._settings.seed
-
-    def qubit(self, qid: str) -> QMFakeQubitSettings:
-        """Return the response parameters of ``qid``."""
-        return self._settings.qubit(qid)
-
-    def rabi_iq(
-        self, qid: str, amplitude_scales: npt.NDArray[np.float64], shots: int
-    ) -> npt.NDArray[np.complex128]:
-        """Return the averaged I/Q response of ``qid`` to an amplitude sweep, in V."""
-        if self._closed:
-            raise RuntimeError("The qm-fake session is closed; connect the backend again")
-        params = self.qubit(qid)
-        ideal = params.ideal_iq(amplitude_scales)
-        std = params.averaged_noise_std(shots)
-        noise = self._rng.standard_normal(ideal.size) + 1j * self._rng.standard_normal(ideal.size)
-        return np.asarray(ideal + std * noise, dtype=np.complex128)
-
-    def close(self) -> None:
-        """End the session; later calls to ``rabi_iq`` fail."""
-        self._closed = True
+def _package_version(name: str) -> str:
+    try:
+        return version(name)
+    except PackageNotFoundError:
+        return "not installed"
 
 
 @dataclass
 class QMFakeSession:
     """Session handed to QM tasks by ``QMFakeBackend.get_instance``.
 
-    It answers the same questions as ``QMSession`` (``mode``, ``is_hardware``,
-    ``is_simulator``, ``is_fake``), so a QM task picks its path from the session alone.
+    ``manager`` has the ``open_qm`` API of ``QuantumMachinesManager``, so the task's
+    shared hardware code path runs against it unchanged. The session answers the same
+    questions as ``QMSession`` (``mode``, ``is_hardware``, ``is_simulator``,
+    ``is_fake``).
     """
 
-    device: QMFakeDevice
+    manager: QMFakeQuantumMachinesManager
     settings: QMFakeSettings
 
     @property
@@ -240,7 +241,7 @@ class QMFakeSession:
 
     @property
     def is_fake(self) -> bool:
-        """A fake session answers with a local synthetic response."""
+        """A fake session executes programs on the local fake device."""
         return True
 
     @property
@@ -248,9 +249,21 @@ class QMFakeSession:
         """A fake session never measures a device."""
         return False
 
+    def result_metadata(self, qid: str, job: Any) -> dict[str, Any]:
+        """Describe the fake device and what it executed, for labelling a result."""
+        return {
+            "backend": QM_FAKE_BACKEND_NAME,
+            "seed": self.settings.seed,
+            "qop_version": self.settings.qop_version,
+            "device": self.settings.qubit_device(qid).model_dump(mode="json"),
+            "execution": dict(getattr(job, "fake_report", {})),
+            "qm_qua": _package_version("qm-qua"),
+            "qualang_tools": _package_version("qualang-tools"),
+        }
+
 
 class QMFakeBackend(BaseBackend):
-    """Backend that runs QM tasks against ``QMFakeDevice`` instead of an OPX."""
+    """Backend that runs QM tasks against ``QMFakeQuantumMachinesManager`` instead of a QOP."""
 
     name: str = QM_FAKE_BACKEND_NAME
 
@@ -258,7 +271,7 @@ class QMFakeBackend(BaseBackend):
         """Store the session configuration; settings are read on first use."""
         self._config = config
         self._settings: QMFakeSettings | None = config.get("qm_fake_settings")
-        self._device: QMFakeDevice | None = None
+        self._manager: QMFakeQuantumMachinesManager | None = None
 
     @property
     def config(self) -> dict[str, Any]:
@@ -284,7 +297,7 @@ class QMFakeBackend(BaseBackend):
 
     @property
     def is_fake(self) -> bool:
-        """The fake backend answers with a local synthetic response."""
+        """The fake backend executes programs on the local fake device."""
         return True
 
     @property
@@ -293,36 +306,43 @@ class QMFakeBackend(BaseBackend):
         return False
 
     def version(self) -> str:
-        """Return the fake backend label; no QM SDK is involved."""
-        return QM_FAKE_VERSION
+        """Return the fake device label with the SDK versions it runs."""
+        return (
+            f"{QM_FAKE_VERSION_LABEL}; qm-qua {_package_version('qm-qua')}, "
+            f"qualang-tools {_package_version('qualang-tools')}"
+        )
 
     def connect(self) -> None:
-        """Start a local ``QMFakeDevice``; no QM package and no network is used."""
-        if self._device is not None:
+        """Validate the settings, import the QM packages and start the fake device."""
+        if self._manager is not None:
             return
         settings = self.settings
-        self._device = QMFakeDevice(settings)
+        import_qm_fake_packages()
+        from qdash.workflow.engine.backend.qm_fake_qop import QMFakeQuantumMachinesManager
+
+        self._manager = QMFakeQuantumMachinesManager(settings)
         logger.info(
-            "Started the qm-fake device (synthetic response, seed=%s); no QOP server is used",
+            "Started the qm-fake device (seed=%s, QOP %s capabilities); no QOP server is used",
             settings.seed,
+            settings.qop_version,
         )
 
     def disconnect(self) -> None:
-        """Close the device; safe to call repeatedly."""
-        device, self._device = self._device, None
-        if device is not None:
-            device.close()
+        """Close the fake manager and its machines; safe to call repeatedly."""
+        manager, self._manager = self._manager, None
+        if manager is not None:
+            manager.close()
 
     @property
     def is_connected(self) -> bool:
-        """Return whether a device is open."""
-        return self._device is not None
+        """Return whether the fake manager is open."""
+        return self._manager is not None
 
     def get_instance(self) -> QMFakeSession:
-        """Return the live session, starting the device first when needed."""
-        if self._device is None:
+        """Return the live session, starting the fake device first when needed."""
+        if self._manager is None:
             self.connect()
-        if self._device is None:
+        if self._manager is None:
             msg = "Backend instance is not initialized. Please call connect() first."
             raise RuntimeError(msg)
-        return QMFakeSession(device=self._device, settings=self.settings)
+        return QMFakeSession(manager=self._manager, settings=self.settings)

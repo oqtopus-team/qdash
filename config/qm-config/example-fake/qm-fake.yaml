@@ -1,26 +1,38 @@
-# Sample settings of the qm-fake backend: a local synthetic qubit response that needs no
-# OPX, no QOP server, no QM account and none of the Quantum Machines packages.
-# Copy this file to config/qm-config/<chip_id>/qm-fake.yaml to use it for a QDash chip;
-# it can sit next to the qm.yaml of the qm backend.
+# Sample settings of the qm-fake backend: the QM tasks run their real qualang-tools
+# programs through the qm-qua SDK against a local fake QOP device instead of an OPX.
+# It needs the workflow qm extra (uv sync --package qdash-workflow --extra qm) but no
+# OPX, no QOP server and no network.
 #
-# The qm-fake backend runs the QM tasks with this response in place of a measurement.
-# Results go through the same fit, figures and raw data as hardware results and are
-# labelled QM-FAKE. They stay in the run history and never replace calibration values.
-# A qm-fake run checks QDash's pipeline and analysis, not QUA compilation, OPX timing or
-# wiring. Settings of the qm backend (mode, connection, simulation, qua_config,
-# qua_config_file) are rejected here.
+# Copy this file to config/qm-config/<chip_id>/qm-fake.yaml next to the qm.yaml of the
+# chip, and point qua_config_file and qubits at the same QUA configuration and bindings.
+# Results are labelled QM-FAKE, stay in the run history and never replace calibration
+# values. A qm-fake run does not check QUA compilation, OPX timing, waveforms or wiring.
+# Settings that reach a QOP server (mode, connection, simulation) are rejected here.
 
 # Seed of the noise generator. A fixed seed makes every session reproduce the same
 # results; remove it to draw new noise on every session.
 seed: 1234
 
-# Synthetic response for each QDash qubit ID. Omitted values take the defaults shown.
+# QOP major version (2 or 3) whose capabilities the SDK validates the configuration for.
+qop_version: 2
+
+# The QUA configuration and qubit bindings, in the same form as qm.yaml.
+qua_config_file: ../example/qua_config.yaml
 qubits:
   "0":
-    pi_amplitude_scale: 0.6     # amplitude scale of a pi rotation, inside the default 0-1.5 sweep
-    iq_offset: [0.010, 0.002]   # averaged I/Q point of the ground state, in V
-    contrast: 0.015             # distance from the ground to the excited I/Q point, in V
-    phase_deg: 120.0            # direction of the excited point from the ground point
-    noise_per_shot: 0.01        # single-shot noise per quadrature in V, divided by sqrt(shots)
-  "1":
-    pi_amplitude_scale: 0.85
+    qubit_element: qubit
+    qubit_operation: x180
+    readout_element: resonator
+    readout_operation: readout
+    integration_weights: [cos, sin, minus_sin, cos]
+    outputs: [out1, out2]
+
+# Response of each bound qubit. Omitted values take the defaults shown.
+device:
+  "0":
+    # Drive envelope area (V*ns) of a pi rotation. x180 in the example configuration is
+    # 0.2 V for 40 ns (8 V*ns), so the pi rotation is at an amplitude scale of 0.6.
+    pi_pulse_area: 4.8
+    ground_iq: [0.010, 0.002]     # readout amplitude (I, Q) of the ground state, in V
+    excited_iq: [0.0025, 0.015]   # readout amplitude (I, Q) of the excited state, in V
+    noise_per_shot: 0.01          # Gaussian noise per quadrature on every measurement, in V

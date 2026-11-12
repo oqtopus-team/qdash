@@ -13,6 +13,7 @@ on:
       - "compose.yaml"
       - "compose.dev-local.yaml"
       - "config/caddy/**"
+      - "config/qm-config/**"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     branches: [main, develop]
@@ -26,6 +27,7 @@ on:
       - "compose.yaml"
       - "compose.dev-local.yaml"
       - "config/caddy/**"
+      - "config/qm-config/**"
       - ".github/workflows/backend-ci.yml"
 
 permissions:
@@ -154,3 +156,40 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  test-qm:
+    name: Test QM SDK (Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: typecheck
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      # The qm extra is optional and the default jobs do not install it, so the SDK tests skip
+      # there. This job installs the locked extra and runs them without hardware or network.
+      - name: Install dependencies with the qm extra
+        run: uv sync --locked --all-packages --all-groups --extra qm
+
+      # Fail here instead of letting pytest.importorskip skip the SDK tests silently.
+      - name: Verify QM SDK imports
+        run: >-
+          uv run --no-sync python -c "import qm, qm.qua,
+          qualang_tools.addons.calibration.calibrations;
+          from importlib.metadata import version;
+          print('qm-qua', version('qm-qua'), 'qualang-tools', version('qualang-tools'))"
+
+      - name: Run QM backend and qm-fake tests
+        run: >-
+          uv run --no-sync pytest tests/qdash/workflow/calibtasks/qm
+          tests/qdash/workflow/engine/backend/test_qm_backend.py -v --tb=short

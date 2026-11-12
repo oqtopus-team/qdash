@@ -3,7 +3,8 @@
 The backend connects to a Quantum Orchestration Platform (QOP) server through the
 ``qm-qua`` SDK. The SDK and ``qualang-tools`` are optional dependencies (the workflow
 project's ``qm`` extra) and are imported only when the backend connects, so the
-qubex, fake and qm-fake backends keep working without them.
+qubex and fake backends keep working without them. The qm-fake backend imports them
+too: it runs the same SDK program path against a local fake device.
 
 Each backend runs in one of two explicit modes, set in the QM settings file:
 
@@ -16,9 +17,9 @@ Each backend runs in one of two explicit modes, set in the QM settings file:
     timing and amplitudes, not the physical response of a qubit. Tasks never
     publish calibration values in this mode.
 
-Testing without any QM hardware, server or package is the job of the separate
-``qm-fake`` backend (``qm_fake.py``), which runs the same QM tasks against a local
-synthetic response. This backend never falls back to it.
+Testing without QM hardware or a QOP server is the job of the separate ``qm-fake``
+backend (``qm_fake.py``), which runs the same QM tasks and SDK program path against
+a local fake device. This backend never falls back to it.
 
 Both modes need a QOP server that the worker can reach, set in ``connection`` as
 ``QuantumMachinesManager(host=...)`` takes it. The QOP simulator runs on that server;
@@ -54,9 +55,9 @@ QM_SETTINGS_FILE_NAME = "qm.yaml"
 QM_CONFIG_ENV = "QDASH_QM_CONFIG"
 QM_CONFIG_OPTION = "qm_config_path"
 QM_INSTALL_HINT = (
-    "The QM backend needs the optional Quantum Machines packages. "
-    "Install them with: uv sync --package qdash-workflow --extra qm. "
-    "To test QM tasks without QM hardware or packages, select backend 'qm-fake' instead."
+    "The qm and qm-fake backends need the optional Quantum Machines packages qm-qua and "
+    "qualang-tools, which the standard QDash workflow image does not include. "
+    "Install them with: uv sync --package qdash-workflow --extra qm"
 )
 # Upper bound on the simulated program time, which bounds the samples the simulator returns.
 MAX_SIMULATION_DURATION_NS = 1_000_000
@@ -143,14 +144,16 @@ def string_qids(value: Any) -> Any:
     return value
 
 
-class QMBackendSettings(BaseModel):
-    """Validated contents of a QM settings file."""
+class QMQuaSettings(BaseModel):
+    """QUA configuration and qubit bindings shared by the ``qm`` and ``qm-fake`` backends.
+
+    Both backends hand ``qua_config`` to ``QuantumMachinesManager.open_qm`` (the real
+    one or the qm-fake stand-in) and build the Rabi program from the same ``qubits``
+    bindings, so both validate them with the same rules.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    mode: QMMode
-    connection: QMConnectionSettings
-    simulation: QMSimulationSettings = Field(default_factory=QMSimulationSettings)
     qubits: dict[str, QMQubitSettings] = Field(default_factory=dict)
     qua_config: dict[str, Any] = Field(default_factory=dict)
 
@@ -159,21 +162,8 @@ class QMBackendSettings(BaseModel):
     def _string_qids(cls, value: Any) -> Any:
         return string_qids(value)
 
-    @model_validator(mode="before")
-    @classmethod
-    def _reject_local_fake(cls, data: Any) -> Any:
-        # The qm backend always needs a QOP server; the local synthetic response is a
-        # separate backend, so a settings file can never route a run to it silently.
-        if isinstance(data, dict) and (data.get("mode") in REMOVED_MOCK_MODES or "mock" in data):
-            raise ValueError(
-                "the qm backend runs on the OPX or the QOP simulator only (mode: hardware or "
-                "simulator); for a local synthetic response select backend 'qm-fake' and put "
-                "the response parameters in qm-fake.yaml"
-            )
-        return data
-
     @model_validator(mode="after")
-    def _check_mode_sections(self) -> QMBackendSettings:
+    def _check_qua_bindings(self) -> QMQuaSettings:
         if not self.qubits:
             raise ValueError("qubits must configure at least one qubit")
         if not self.qua_config:
@@ -185,6 +175,7 @@ class QMBackendSettings(BaseModel):
         elements = self.qua_config.get("elements")
         if not isinstance(elements, dict):
             raise ValueError("qua_config must define 'elements'")
+        pulses = self.qua_config.get("pulses") or {}
         for qid, qubit in self.qubits.items():
             for element, operation in (
                 (qubit.qubit_element, qubit.qubit_operation),
@@ -197,6 +188,22 @@ class QMBackendSettings(BaseModel):
                     raise ValueError(
                         f"qubit {qid}: operation '{operation}' is not defined for '{element}'"
                     )
+            readout = elements[qubit.readout_element]
+            missing_outputs = [o for o in qubit.outputs if o not in (readout.get("outputs") or {})]
+            if missing_outputs:
+                raise ValueError(
+                    f"qubit {qid}: output(s) {', '.join(missing_outputs)} are not defined for "
+                    f"'{qubit.readout_element}'"
+                )
+            pulse_name = readout["operations"][qubit.readout_operation]
+            pulse = pulses.get(pulse_name)
+            weights = (pulse.get("integration_weights") or {}) if isinstance(pulse, dict) else {}
+            missing_weights = sorted({w for w in qubit.integration_weights if w not in weights})
+            if missing_weights:
+                raise ValueError(
+                    f"qubit {qid}: integration weight(s) {', '.join(missing_weights)} are not "
+                    f"defined for pulse '{pulse_name}'"
+                )
 
     def qubit(self, qid: str) -> QMQubitSettings:
         """Return the settings of ``qid`` or fail with the configured qubit IDs."""
@@ -227,24 +234,51 @@ class QMBackendSettings(BaseModel):
         return int(pulse["length"])
 
 
-def load_qm_settings(path: Path) -> QMBackendSettings:
-    """Load and validate a QM settings file.
+class QMBackendSettings(QMQuaSettings):
+    """Validated contents of a QM settings file."""
+
+    mode: QMMode
+    connection: QMConnectionSettings
+    simulation: QMSimulationSettings = Field(default_factory=QMSimulationSettings)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_local_fake(cls, data: Any) -> Any:
+        # The qm backend always needs a QOP server; the local fake device is a
+        # separate backend, so a settings file can never route a run to it silently.
+        if isinstance(data, dict) and (data.get("mode") in REMOVED_MOCK_MODES or "mock" in data):
+            raise ValueError(
+                "the qm backend runs on the OPX or the QOP simulator only (mode: hardware or "
+                "simulator); for a local fake device select backend 'qm-fake' and put "
+                "its settings in qm-fake.yaml"
+            )
+        return data
+
+
+def read_settings_mapping(path: Path, kind: str) -> dict[str, Any]:
+    """Read a QM or qm-fake settings file and inline its ``qua_config_file``.
 
     ``qua_config_file``, when present, names a JSON or YAML QUA configuration
     relative to the settings file; otherwise ``qua_config`` holds it inline.
     """
     if not path.is_file():
-        raise QMConfigurationError(f"QM settings file not found: {path}")
+        raise QMConfigurationError(f"{kind} settings file not found: {path}")
     with path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     if not isinstance(data, dict):
-        raise QMConfigurationError(f"QM settings file must contain a mapping: {path}")
+        raise QMConfigurationError(f"{kind} settings file must contain a mapping: {path}")
 
     qua_config_file = data.pop("qua_config_file", None)
     if qua_config_file is not None:
         if "qua_config" in data:
             raise QMConfigurationError("Set either qua_config or qua_config_file, not both")
         data["qua_config"] = _load_mapping_file(path.parent / str(qua_config_file))
+    return data
+
+
+def load_qm_settings(path: Path) -> QMBackendSettings:
+    """Load and validate a QM settings file."""
+    data = read_settings_mapping(path, "QM")
     try:
         return QMBackendSettings.model_validate(data)
     except ValueError as exc:
@@ -311,7 +345,7 @@ class QMSession:
 
     @property
     def is_fake(self) -> bool:
-        """Always ``False``; the local synthetic response is the qm-fake backend."""
+        """Always ``False``; the local fake device is the qm-fake backend."""
         return False
 
     @property
@@ -355,7 +389,7 @@ class QMBackend(BaseBackend):
 
     @property
     def is_fake(self) -> bool:
-        """Always ``False``; the local synthetic response is the qm-fake backend."""
+        """Always ``False``; the local fake device is the qm-fake backend."""
         return False
 
     @property

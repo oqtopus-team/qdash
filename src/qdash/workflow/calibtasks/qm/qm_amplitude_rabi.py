@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import numpy as np
 import plotly.graph_objects as go
@@ -22,14 +22,12 @@ from qdash.workflow.calibtasks.qm.rabi_experiment import (
     covered_magnitude_range,
     fit_amplitude_rabi,
     project_iq,
-    run_rabi_on_fake,
-    run_rabi_on_hardware,
+    run_rabi,
     simulate_rabi,
 )
-from qdash.workflow.engine.backend.qm_fake import QMFakeSession
 
 if TYPE_CHECKING:
-    from qdash.workflow.engine.backend.qm import QMBackend
+    from qdash.workflow.engine.backend.qm import QMBackend, QMSession
     from qdash.workflow.engine.backend.qm_fake import QMFakeBackend
 
 SIMULATION_NOTICE = (
@@ -37,12 +35,12 @@ SIMULATION_NOTICE = (
     "The simulator does not model the qubit, so no Rabi response or calibration value exists."
 )
 FAKE_NOTICE = (
-    "QM-FAKE: synthetic response generated locally by QDash, not measured on a device. "
+    "QM-FAKE: response of the local qm-fake device model, not measured on a device. "
     "The value is kept in the run history and never replaces a calibration value."
 )
 FIGURE_MODE_LABEL = {
     "hardware": "hardware",
-    "fake": "QM-FAKE synthetic response, not measured",
+    "fake": "QM-FAKE device model, not measured",
 }
 
 # Relative slack on the swept interval, so a fit at the first or last point is accepted
@@ -73,11 +71,12 @@ class QMAmplitudeRabi(QMTask):
     configured qubit operation is played with ``amp(a)`` for each amplitude scale ``a``,
     then the resonator is measured with dual demodulation. In hardware mode the
     averaged I/Q response is projected on its principal axis and fitted with a cosine
-    to give the amplitude scale of a pi rotation. On the qm-fake backend a local
-    synthetic I/Q response replaces the measurement and goes through the same fit; its
-    result is labelled as fake and stays in the run history. In simulator mode the task records
-    the simulated controller outputs and publishes no calibration value; use
-    ``simulator_run_parameters()`` for a run short enough to simulate.
+    to give the amplitude scale of a pi rotation. On the qm-fake backend the same
+    program is executed by a local fake QOP device and its results go through the same
+    fetch, conversion and fit; the result is labelled as fake and stays in the run
+    history. In simulator mode the task records the simulated controller outputs and
+    publishes no calibration value; use ``simulator_run_parameters()`` for a run short
+    enough to simulate.
 
     Sweeps may be signed. The response depends on ``|a|`` only, so a fitted pi scale is
     accepted when it lies within the magnitudes the sweep covers.
@@ -134,16 +133,16 @@ class QMAmplitudeRabi(QMTask):
         )
 
     def run(self, backend: QMBackend | QMFakeBackend, qid: str) -> RunResult:
-        """Run the sweep on hardware, the simulator or the qm-fake device, as the backend selects."""
+        """Run the sweep on hardware, the simulator or the qm-fake device, as the backend selects.
+
+        Hardware and qm-fake share ``run_rabi``; only the session's device differs.
+        """
         sweep = self.sweep()
         session = backend.get_instance()
-        if isinstance(session, QMFakeSession):
-            measurement = run_rabi_on_fake(session, qid, sweep)
-        elif session.is_simulator:
+        if session.is_simulator:
             # No r2: the simulator returns waveforms, not a response to fit.
-            return RunResult(raw_result=simulate_rabi(session, qid, sweep))
-        else:
-            measurement = run_rabi_on_hardware(session, qid, sweep)
+            return RunResult(raw_result=simulate_rabi(cast("QMSession", session), qid, sweep))
+        measurement = run_rabi(session, qid, sweep)
         fit = fit_amplitude_rabi(measurement.amplitude_scales, project_iq(measurement.iq))
         return RunResult(raw_result={"measurement": measurement, "fit": fit}, r2={qid: fit.r2})
 
@@ -272,8 +271,8 @@ class QMAmplitudeRabi(QMTask):
                 annotations=[
                     {
                         "text": (
-                            "QM-FAKE: synthetic response generated locally by QDash, "
-                            "not measured. "
+                            "QM-FAKE: qualang-tools program run on the local qm-fake device "
+                            "model, not measured. "
                             f"{measurement.shots} shots, seed {measurement.metadata.get('seed')}."
                             "<br>Never written to the calibration database."
                         ),

@@ -260,7 +260,11 @@ class TestMissingDependency:
         assert backend.version() == "qm-qua (not installed)"
 
     def test_default_backends_import_without_qm_packages(self) -> None:
-        """The task registry, the qubex/fake/qm backends and a qm-fake run need no QM SDK."""
+        """The task registry and the qubex/fake/qm/qm-fake backends import without the QM SDK.
+
+        A qm-fake run needs the SDK: connecting fails with the install hint instead of
+        falling back to another response.
+        """
         script = textwrap.dedent(
             """
             import sys
@@ -274,6 +278,7 @@ class TestMissingDependency:
             sys.meta_path.insert(0, Block())
             import qdash.workflow.calibtasks as calibtasks
             from qdash.workflow.engine.backend.factory import create_backend
+            from qdash.workflow.engine.backend.qm import QMDependencyError
 
             assert "QMAmplitudeRabi" in calibtasks.BaseTask.registry["qm"]
             assert "CheckRabi" in calibtasks.BaseTask.registry["fake"]
@@ -283,9 +288,16 @@ class TestMissingDependency:
                 calibtasks.BaseTask.registry["qm"]["QMAmplitudeRabi"]
             )
             fake = create_backend("qm-fake", {"qm_fake_config_path": sys.argv[1]})
+            assert fake.settings.qubits["0"].qubit_element == "qubit"
             task = calibtasks.BaseTask.registry["qm-fake"]["QMAmplitudeRabi"]()
-            assert task.run(fake, "0").r2["0"] > 0.98
-            fake.disconnect()
+            try:
+                task.run(fake, "0")
+            except QMDependencyError as exc:
+                assert "--extra qm" in str(exc), exc
+                assert "standard QDash workflow image" in str(exc), exc
+            else:
+                raise AssertionError("qm-fake must not run without the QM packages")
+            assert not fake.is_connected
             assert not any(
                 m.split(".")[0] in {"qm", "qualang_tools"} for m in sys.modules
             )

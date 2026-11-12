@@ -33,19 +33,28 @@ uv run pytest tests/qdash/workflow/service/test_pipeline_flow.py -v -k cancellat
 
 Run `task test` when the change also affects shared models, repositories, or API behavior.
 
-`calibtasks/qm/test_qm_rabi_sdk.py` checks the Quantum Machines backend against the real `qm-qua`
-and `qualang-tools` packages offline, with the QOP server replaced by a stub, and is skipped
-unless the workflow `qm` extra is installed. Install that extra before changing the backend:
+The Quantum Machines tests that load the real `qm-qua` and `qualang-tools` packages are skipped
+unless the workflow `qm` extra is installed. The default CI test jobs do not install it; the
+`Test QM SDK (Python 3.11)` job in `.github/workflows/backend-ci.yml` installs the locked extra,
+fails if the SDK packages cannot be imported, and runs these tests without hardware, network
+access, or QM credentials. Run the same commands locally before changing the `qm` or `qm-fake`
+backend:
 
 ```bash
 uv sync --locked --all-groups --all-packages --extra qm
-uv run pytest tests/qdash/workflow/calibtasks/qm tests/qdash/workflow/engine/backend/test_qm_backend.py -v
+uv run --no-sync pytest tests/qdash/workflow/calibtasks/qm tests/qdash/workflow/engine/backend/test_qm_backend.py -v
 ```
 
-`calibtasks/qm/test_qm_fake.py` covers the `qm-fake` backend without the extras: it makes the
-QM packages unimportable and outgoing sockets fail, then runs `QMAmplitudeRabi` from the
-`qm-fake` registry through `TaskExecutor` with in-memory repositories to check results,
-artifacts, history, and the hardware-only write.
+- `calibtasks/qm/test_qm_fake_device.py` runs the `qm-fake` device against the real packages
+  with outgoing sockets blocked. It checks that `run_rabi` executes the program that
+  `QUA_calibrations` generates, that amplitudes, shots, elements, streams, and QUA configuration
+  changes in a program change the result or fail, that unsupported programs fail, that the fake
+  API signatures are subsets of the SDK's, and that a run through `TaskExecutor` records
+  labelled artifacts without writing a calibration value.
+- `calibtasks/qm/test_qm_rabi_sdk.py` checks the `qm` backend's program generation and its
+  hardware and simulator paths with the QOP server replaced by a stub.
+- `calibtasks/qm/test_qm_fake.py` runs without the extra: it makes the QM packages unimportable
+  and checks the settings, the routing, and that a `qm-fake` run fails with the install command.
 
 ## Follow Existing Fixtures
 

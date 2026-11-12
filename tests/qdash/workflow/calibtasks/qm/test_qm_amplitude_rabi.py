@@ -201,7 +201,7 @@ class TestRun:
         monkeypatch.setattr(qm_amplitude_rabi, "simulate_rabi", simulate)
         monkeypatch.setattr(
             qm_amplitude_rabi,
-            "run_rabi_on_hardware",
+            "run_rabi",
             MagicMock(side_effect=AssertionError("hardware must not run")),
         )
 
@@ -214,7 +214,7 @@ class TestRun:
     def test_hardware_mode_fits_measurement(self, monkeypatch: pytest.MonkeyPatch) -> None:
         backend = connected_backend(StubQuantumMachinesManager(), mode="hardware")
         measurement = _hardware_result().raw_result["measurement"]
-        monkeypatch.setattr(qm_amplitude_rabi, "run_rabi_on_hardware", lambda *_: measurement)
+        monkeypatch.setattr(qm_amplitude_rabi, "run_rabi", lambda *_: measurement)
         monkeypatch.setattr(
             qm_amplitude_rabi,
             "simulate_rabi",

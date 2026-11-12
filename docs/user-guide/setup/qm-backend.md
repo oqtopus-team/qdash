@@ -2,11 +2,11 @@
 
 QDash has two Quantum Machines (QM) backends. The `qm` backend runs calibration tasks on a
 Quantum Machines OPX, or on the QOP simulator, through a Quantum Orchestration Platform (QOP)
-server. The `qm-fake` backend runs the same tasks against a synthetic qubit response that QDash
-computes locally, for testing without QM hardware. This is an initial integration: the only task
-is **QMAmplitudeRabi**, a one-qubit amplitude Rabi sweep, and it calibrates one qubit at a time.
-Qubex and Fake deployments are unaffected and need none of the packages below; the `fake`
-backend stays a Qubex simulator and does not run QM tasks.
+server. The `qm-fake` backend runs the same tasks, and the same QM programs, against a fake
+QOP device on the workflow worker, for testing without QM hardware or a QOP server. This is an
+initial integration: the only task is **QMAmplitudeRabi**, a one-qubit amplitude Rabi sweep, and
+it calibrates one qubit at a time. Qubex and Fake deployments are unaffected and need none of
+the packages below; the `fake` backend stays a Qubex simulator and does not run QM tasks.
 
 The Rabi experiment is the one in Quantum Machines' open-source `qualang-tools` package; QDash
 configures and runs it rather than reimplementing it. Licenses of these packages:
@@ -14,24 +14,37 @@ configures and runs it rather than reimplementing it. Licenses of these packages
 
 ## Try QMAmplitudeRabi Without Hardware
 
-The `qm-fake` backend runs **QMAmplitudeRabi** against a synthetic qubit response that QDash
-computes on the workflow worker. It needs no OPX, no QOP server, no network access, and none of
-the Quantum Machines packages, so it runs on the standard workflow image. A
-`qm-fake` run uses the task code of the `qm` backend and goes through the same fit, validation,
-figure, raw data, and task history as a hardware run; only the device response is synthetic. It
-checks QDash's pipeline and analysis; it does not compile a QUA program or check OPX pulse
-timing or wiring.
+The `qm-fake` backend runs **QMAmplitudeRabi** exactly as a hardware run does up to the device:
+the task builds the Rabi program of `qualang-tools`, executes it, fetches the averaged I/Q
+results, and fits them. In place of the OPX, a fake QOP device on the workflow worker checks the
+QUA configuration with the QM SDK, reads the amplitudes, shots, elements, and result streams from
+the program, and answers with the measurements of a simple qubit model. A program or setting
+the fake device does not support fails the task instead of returning made-up data.
+
+The backend needs no OPX, no QOP server, and no network access, but it needs the same `qm`
+extra as the `qm` backend (see [Requirements](#requirements)). The standard workflow image does
+not include it, so a `qm-fake` run fails there with the install command. A `qm-fake` run does
+not compile the program for the OPX or check pulse timing, waveforms, or wiring.
 
 1. Start QDash and create a chip, as for the [Fake backend](./fake-backend.md#create-a-chip). Its
    qubit IDs must include `0`, the qubit of the example.
-2. Copy the `qm-fake` example to the settings directory of that chip:
+2. Run the workflow worker from an environment with the `qm` extra installed:
+
+   ```bash
+   uv sync --package qdash-workflow --extra qm
+   ```
+
+3. Copy the `qm-fake` example to the settings directory of that chip and point it at the QUA
+   configuration of the `qm` example:
 
    ```bash
    mkdir -p config/qm-config/<chip_id>
-   cp config/qm-config/example-fake/qm-fake.yaml config/qm-config/<chip_id>/
+   cp config/qm-config/example/qua_config.yaml config/qm-config/<chip_id>/
+   sed 's|../example/qua_config.yaml|qua_config.yaml|' \
+     config/qm-config/example-fake/qm-fake.yaml > config/qm-config/<chip_id>/qm-fake.yaml
    ```
 
-3. Run the task with the backend set to `qm-fake`:
+4. Run the task with the backend set to `qm-fake`:
 
    ```python
    from qdash.workflow import TaskCall
@@ -46,19 +59,20 @@ timing or wiring.
    )
    ```
 
-4. Open the task result. The figure title reads **QM-FAKE synthetic response, not measured** and shows
+5. Open the task result. The figure title reads **QM-FAKE device model, not measured** and shows
    the fitted π scale and R². `qm_pi_amplitude_scale` is listed as
    **Not applied to calibration database**, and the raw I/Q sweep is saved with the result.
 
-The example sets a π scale of 0.6 for qubit `0` and 0.85 for qubit `1`, inside the default sweep
-from 0 to 1.5. With the default 1000 shots the fit recovers the configured value. Fewer shots add
-noise, and a run with very few shots can fail its R² check, as a noisy hardware run would.
+In the example the drive pulse of qubit `0` is 0.2 V for 40 ns and a π rotation takes 4.8 V·ns,
+so the π scale is 0.6, inside the default sweep from 0 to 1.5. With the default 1000 shots the
+fit recovers that value. Fewer shots add noise, and a run with very few shots can fail its R²
+check, as a noisy hardware run would.
 
 ## Requirements
 
-These requirements apply to the `qm` backend; the `qm-fake` backend needs only its settings file.
+The QM packages apply to both backends; the QOP server and the chip apply to the `qm` backend.
 
-- A QOP server that the workflow worker can reach, for both modes. The QOP simulator runs on
+- A QOP server that the workflow worker can reach, for both modes of the `qm` backend. The QOP simulator runs on
   that server; the SDK has no offline simulator, and QDash neither hosts nor provisions one. To
   test without a server, use the [`qm-fake` backend](#try-qmamplituderabi-without-hardware).
 - The workflow `qm` extra, which installs `qm-qua` 1.5.0 and `qualang-tools` 0.23.0:
@@ -67,9 +81,10 @@ These requirements apply to the `qm` backend; the `qm-fake` backend needs only i
   uv sync --package qdash-workflow --extra qm
   ```
 
-  The workflow Docker image does not install this extra, so run the worker from an
-  environment synchronized this way. Without them, a QM task fails when it connects and reports
-  the command to run.
+  The workflow Docker images do not install this extra, so run the worker from an
+  environment synchronized this way, or build a custom worker image that installs it. Without
+  the packages, a task on the `qm` or `qm-fake` backend fails when it connects and reports the
+  command to run.
 - A chip in QDash whose qubit IDs match the `qubits` keys of the settings file.
 
 ## Write the Settings File
@@ -101,33 +116,39 @@ an element or operation that the QUA configuration does not define fails the tas
 program runs.
 
 A `mode: mock` or `fake` value, or a `mock` section, fails the task with a pointer to the
-`qm-fake` backend; the `qm` backend never falls back to a synthetic response.
+`qm-fake` backend; the `qm` backend never falls back to the fake device.
 
 ## Write the qm-fake Settings File
 
 The `qm-fake` backend reads `config/qm-config/<chip_id>/qm-fake.yaml`, which can sit next to the
 `qm.yaml` of the same chip. Set `QDASH_QM_FAKE_CONFIG` to read another path; `QDASH_QM_CONFIG`
-does not apply to it. The file holds a seed and one entry per QDash qubit ID; `"0": {}` uses
+does not apply to it. The file takes the QUA configuration and `qubits` entries in the same form
+as `qm.yaml`, checked by the same rules, plus a `device` entry for every qubit; `"0": {}` uses
 every default:
 
 | Setting | Meaning | Default |
 | --- | --- | --- |
+| `qua_config_file` or `qua_config` | QUA configuration, as in `qm.yaml`; point it at the same file | Required |
+| `qubits.<qid>.*` | Elements, operations, outputs, and integration weights, as in `qm.yaml` | Required |
 | `seed` | Seed of the noise; a fixed seed repeats the same results in every session | New noise each session |
-| `qubits.<qid>.pi_amplitude_scale` | Amplitude scale of a π rotation, greater than 0 and less than 2 | `0.6` |
-| `qubits.<qid>.iq_offset` | Averaged I/Q point of the ground state, in V | `[0.010, 0.002]` |
-| `qubits.<qid>.contrast` | Distance from the ground to the excited I/Q point, in V | `0.015` |
-| `qubits.<qid>.phase_deg` | Direction of the excited point from the ground point, in degrees | `120.0` |
-| `qubits.<qid>.noise_per_shot` | Single-shot noise per quadrature, in V; the averaged noise is this value divided by √`shots` | `0.01` |
+| `qop_version` | QOP major version, `2` or `3`, whose rules the SDK checks the QUA configuration against | `2` |
+| `device.<qid>.pi_pulse_area` | Area of the drive pulse envelope, in V·ns, that rotates the qubit by π | `4.8` |
+| `device.<qid>.ground_iq` | Readout signal (I, Q) of the ground state, in V | `[0.010, 0.002]` |
+| `device.<qid>.excited_iq` | Readout signal (I, Q) of the excited state, in V | `[0.0025, 0.015]` |
+| `device.<qid>.noise_per_shot` | Gaussian noise per quadrature on every measurement, in V | `0.01` |
 
-Settings that reach a QOP server (`mode`, `connection`, `simulation`, `qua_config`, and
-`qua_config_file`) fail the task, so a copied `qm.yaml` cannot connect the `qm-fake` backend to a
-server. A qubit that the file does not list fails the task and names the
-configured qubits.
+Settings that reach a QOP server (`mode`, `connection`, and `simulation`) fail the task, so a
+copied `qm.yaml` cannot connect the `qm-fake` backend to a server. A file without a `device`
+entry for a listed qubit, or two qubits that share a drive or readout element, also fails.
 
-The synthetic response is an ideal two-level qubit: the readout point moves along a straight
-line from the ground point toward the excited point as `(1 - cos(π a / pi_amplitude_scale)) / 2`,
-plus Gaussian noise. It has no decoherence, leakage, or pulse distortion, and `cooldown_time` has
-no effect on it.
+The fake device models an ideal qubit. Each played pulse rotates the qubit by π times the
+amplitude scale times the pulse's envelope area, divided by `pi_pulse_area`, so changing the
+drive waveform in the QUA configuration moves the π scale. Each measurement finds the qubit
+excited with the probability that rotation gives, returns the ground or excited readout signal
+plus noise, and resets the qubit. The readout signal is demodulated with the integration weights
+of the QUA configuration. The model has no decoherence, leakage, pulse distortion, or timing,
+and `cooldown_time` has no effect on it. The fake device runs only the statements of the
+amplitude Rabi program; any other statement or stream processing fails the task.
 
 ## Modes and the qm-fake Backend
 
@@ -136,9 +157,9 @@ backend is selected by name and has no mode.
 
 | | `qm`, `hardware` | `qm`, `simulator` | `qm-fake` |
 | --- | --- | --- | --- |
-| Runs the program on | The OPX | The QOP simulator | No program; QDash computes a synthetic response |
-| Result | Averaged I/Q response for each amplitude scale | Simulated controller output waveforms | Synthetic averaged I/Q response for each amplitude scale |
-| Figure | Response with its cosine fit and R² | Output waveforms, titled **SIMULATED waveforms** | Response with its cosine fit and R², titled **QM-FAKE synthetic response, not measured** |
+| Runs the program on | The OPX | The QOP simulator | A fake QOP device on the worker, using a qubit model |
+| Result | Averaged I/Q response for each amplitude scale | Simulated controller output waveforms | Averaged I/Q response of the model for each amplitude scale |
+| Figure | Response with its cosine fit and R² | Output waveforms, titled **SIMULATED waveforms** | Response with its cosine fit and R², titled **QM-FAKE device model, not measured** |
 | Raw data | I/Q sweep | One waveform per analog output | I/Q sweep, labelled as `qm-fake` |
 | Calibration value | `qm_pi_amplitude_scale`, written to the calibration database | None | `qm_pi_amplitude_scale` in the task result only, never written to the calibration database |
 

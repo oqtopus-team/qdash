@@ -3,15 +3,16 @@
 The tasks wrap experiments from Quantum Machines' open-source ``qualang-tools``
 package (BSD-3-Clause) instead of reimplementing their QUA programs. Importing this
 package does not import the QM SDK; each task imports it when it runs on the ``qm``
-backend.
+or ``qm-fake`` backend.
 
-The ``qm-fake`` backend runs these same task classes against a local synthetic
-device response, so a fake run exercises the task's parameters, analysis, figures,
-raw data and persistence rules. Which tasks it offers is decided in one place, the
+The ``qm-fake`` backend runs these same task classes and the same SDK code path
+against a local fake QOP device (``engine/backend/qm_fake_qop.py``), so a fake run
+exercises program generation, execution, result fetching, analysis, figures, raw
+data and persistence rules. Which tasks it offers is decided in one place, the
 ``qm-fake`` section of ``config/app/backend.yaml``: each task listed there is routed
-to the ``qm`` class of the same name. To make a new QM task available on ``qm-fake``,
-give it a branch for ``session.is_fake`` that asks the fake device for its response,
-then list it under ``qm-fake``. ``tests/qdash/workflow/calibtasks/qm/test_qm_fake.py``
+to the ``qm`` class of the same name. The fake device interprets only the QUA subset
+of the 1D amplitude Rabi; before listing a new QM task under ``qm-fake``, extend that
+subset (and its tests) to the statements the task's program uses. ``tests/qdash/workflow/calibtasks/qm/test_qm_fake.py``
 fails when that list names a task the ``qm`` backend does not define.
 """
 

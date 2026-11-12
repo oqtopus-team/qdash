@@ -28,9 +28,9 @@ QMBackend
     Import directly: ``from qdash.workflow.engine.backend.qm import QMBackend``
 
 QMFakeBackend
-    Backend ``qm-fake``: runs the QM tasks against a local synthetic device response,
-    without an OPX, a QOP server or any Quantum Machines package. Its results never
-    become calibration values.
+    Backend ``qm-fake``: runs the QM tasks and their qm-qua/qualang-tools programs
+    against a local fake QOP device, without an OPX or a QOP server. It needs the
+    workflow ``qm`` extra. Its results never become calibration values.
     Import directly: ``from qdash.workflow.engine.backend.qm_fake import QMFakeBackend``
 
 create_backend

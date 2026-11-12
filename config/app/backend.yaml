@@ -125,15 +125,16 @@ backends:
         - QMAmplitudeRabi
 
   # ---------------------------------------------------------------------------
-  # Quantum Machines Fake Backend (Testing - No QM Hardware, Server or Package)
+  # Quantum Machines Fake Backend (Testing - No QM Hardware or QOP Server; needs the qm extra)
   # ---------------------------------------------------------------------------
   qm-fake:
-    description: "Testing backend that runs the QM task implementations on a local synthetic response; needs config/qm-config/<chip_id>/qm-fake.yaml only"
+    description: "Testing backend that runs the QM tasks and their qm-qua/qualang-tools programs on a local fake QOP device; needs the workflow qm extra and config/qm-config/<chip_id>/qm-fake.yaml"
 
     # Every task listed here is the qm task of the same name, routed to the qm-fake backend
-    # (see calibtasks/qm/__init__.py); only the device response is synthetic. Results stay in
-    # the run history and never replace calibration values. A qm-fake run does not check QUA
-    # compilation, OPX timing or wiring.
+    # (see calibtasks/qm/__init__.py); only the device behind QuantumMachinesManager is fake.
+    # The fake device interprets the 1D amplitude Rabi QUA subset only. Results stay in the
+    # run history and never replace calibration values. A qm-fake run does not check QUA
+    # compilation, OPX timing, waveforms or wiring.
     tasks:
       One Qubit:
         - QMAmplitudeRabi

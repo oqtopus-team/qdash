@@ -6,10 +6,16 @@ Copyright 2021 Q.M. Technologies Ltd.), installed as a dependency and not
 copied here. This module only configures that class, runs it, and converts its
 results:
 
-* Hardware: ``QUA_calibrations.run_calibrations`` executes the program on an open
-  quantum machine. The quantum machine is wrapped so the adapter can also fetch the
-  averaged I/Q streams of the same job; the library itself keeps only magnitude and
-  detrended phase.
+* Hardware and qm-fake (``run_rabi``): one code path. ``QUA_calibrations.run_calibrations``
+  builds the program and executes it on a quantum machine opened with
+  ``session.manager.open_qm(qua_config)``, then fetches the ``I``/``Q`` handles and
+  converts them with ``demod2volts``. The quantum machine is wrapped so the adapter
+  can also fetch the averaged I/Q streams of the same job; the library itself keeps
+  only magnitude and detrended phase. The session decides the device: a
+  ``QuantumMachinesManager`` on hardware, or the ``qm-fake`` backend's
+  ``QMFakeQuantumMachinesManager``, which decodes and interprets the generated program
+  locally. A fake result is labelled ``mode="fake"`` and carries the fake device's
+  execution report; nothing else differs.
 * Simulator: ``QUA_calibrations.simulate_calibrations`` builds the same program but
   plots the result with matplotlib for a controller named ``con1`` and does not
   return the job. The adapter therefore builds the program the way that method does
@@ -18,11 +24,6 @@ results:
   bounded by ``simulation.duration_ns``; ``simulate_rabi`` refuses a sweep whose
   first averaging iteration is estimated not to fit in it. Actual sweep coverage in
   the returned waveforms must be checked by the caller.
-* Fake (the ``qm-fake`` backend): no QUA program exists. ``run_rabi_on_fake`` asks
-  the session's local ``QMFakeDevice`` for a synthetic averaged I/Q response and
-  returns it in the same ``RabiIQResult`` shape as hardware data, labelled
-  ``mode="fake"``, so both go through the same fit, validation, figure and raw data
-  code. It checks no QUA compilation, controller timing or wiring.
 
 Signed sweeps: the model ``offset + A cos(2 pi f a)`` is even in the amplitude scale
 ``a``, so a sweep covers the pi rotation when the fitted pi scale lies within the
@@ -39,10 +40,11 @@ import numpy as np
 import numpy.typing as npt
 
 from qdash.workflow.engine.backend.qm import QM_INSTALL_HINT, QMDependencyError, import_qm_sdk
-from qdash.workflow.engine.backend.qm_fake import QM_FAKE_SOURCE_TYPE, QMFakeSession
+from qdash.workflow.engine.backend.qm_fake import QM_FAKE_SOURCE_TYPE
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.qm import QMQubitSettings, QMSession
+    from qdash.workflow.engine.backend.qm_fake import QMFakeSession
 
 # QUA ``amp()`` scales accept values in [-2, 2).
 AMPLITUDE_SCALE_MIN = -2.0
@@ -124,10 +126,10 @@ def covered_magnitude_range(scales: npt.NDArray[np.float64]) -> tuple[float, flo
 
 @dataclass
 class RabiIQResult:
-    """Averaged I/Q response of one amplitude sweep, measured or synthetic.
+    """Averaged I/Q response of one amplitude sweep, measured or from the qm-fake device.
 
     ``mode`` says where the response came from: ``hardware`` for an OPX measurement,
-    ``fake`` for the local synthetic response of the ``qm-fake`` backend. ``source_type`` labels
+    ``fake`` for the local fake device of the ``qm-fake`` backend. ``source_type`` labels
     the raw data artifact and ``metadata`` records how the response was produced.
     """
 
@@ -257,10 +259,16 @@ def build_rabi_program(calibration: Any) -> Any:
         calibration.simulation = False
 
 
-def run_rabi_on_hardware(session: QMSession, qid: str, sweep: RabiSweep) -> RabiIQResult:
-    """Execute the Rabi sweep on the OPX and return the averaged response."""
-    if not session.is_hardware:
-        raise RuntimeError("run_rabi_on_hardware needs a backend in hardware mode")
+def run_rabi(session: QMSession | QMFakeSession, qid: str, sweep: RabiSweep) -> RabiIQResult:
+    """Execute the Rabi sweep on the session's device and return the averaged response.
+
+    The same code runs for the OPX (a ``qm`` session in hardware mode) and for the
+    ``qm-fake`` device: build the ``QUA_calibrations`` Rabi, open a quantum machine
+    with the QUA configuration, let ``run_calibrations`` generate and execute the
+    program, then fetch and convert the ``I``/``Q`` results.
+    """
+    if not (session.is_hardware or session.is_fake):
+        raise RuntimeError("run_rabi needs a backend in hardware mode or the qm-fake backend")
     settings = session.settings
     qubit = settings.qubit(qid)
     calibration = build_rabi_calibration(settings.qua_config, qubit, sweep)
@@ -276,7 +284,7 @@ def run_rabi_on_hardware(session: QMSession, qid: str, sweep: RabiSweep) -> Rabi
         machine.close()
 
     results = calibration.results[RABI_CALIBRATION]
-    return RabiIQResult(
+    measurement = RabiIQResult(
         qid=qid,
         target=qubit.qubit_element,
         amplitude_scales=sweep.amplitude_scales,
@@ -285,40 +293,13 @@ def run_rabi_on_hardware(session: QMSession, qid: str, sweep: RabiSweep) -> Rabi
         phase=np.asarray(results["phase"], dtype=float),
         shots=sweep.shots,
     )
-
-
-def run_rabi_on_fake(session: QMFakeSession, qid: str, sweep: RabiSweep) -> RabiIQResult:
-    """Return the synthetic response of the qm-fake device for the Rabi sweep.
-
-    Imports no QM package. The amplitude scales and shots of the sweep reach the
-    fake model; the cooldown has no effect on a synthetic response.
-    """
-    if not isinstance(session, QMFakeSession):
-        raise RuntimeError("run_rabi_on_fake needs a session of the qm-fake backend")
-    device = session.device
-    params = device.qubit(qid)
-    iq = device.rabi_iq(qid, sweep.amplitude_scales, sweep.shots)
-    return RabiIQResult(
-        qid=qid,
-        target=f"qm-fake-q{qid}",
-        amplitude_scales=sweep.amplitude_scales,
-        iq=iq,
-        magnitude=np.abs(iq),
-        phase=np.unwrap(np.angle(iq)),
-        mode="fake",
-        source_type=QM_FAKE_SOURCE_TYPE,
-        shots=sweep.shots,
-        metadata={
-            "backend": "qm-fake",
-            "seed": device.seed,
-            "pi_amplitude_scale": params.pi_amplitude_scale,
-            "iq_offset": list(params.iq_offset),
-            "contrast": params.contrast,
-            "phase_deg": params.phase_deg,
-            "noise_per_shot": params.noise_per_shot,
-            "averaged_noise_std": params.averaged_noise_std(sweep.shots),
-        },
-    )
+    if session.is_fake:
+        fake_session: Any = session
+        measurement.mode = "fake"
+        measurement.source_type = QM_FAKE_SOURCE_TYPE
+        measurement.target = f"qm-fake-q{qid}"
+        measurement.metadata = fake_session.result_metadata(qid, recorder.job)
+    return measurement
 
 
 def _fetch_iq_volts(job: Any, readout_length_ns: int) -> npt.NDArray[np.complex128]:
@@ -328,9 +309,14 @@ def _fetch_iq_volts(job: Any, readout_length_ns: int) -> npt.NDArray[np.complex1
     handles = job.result_handles
     handles.wait_for_all_values()
     u = unit()
-    i_data = np.asarray(u.demod2volts(handles.get("I").fetch_all(), readout_length_ns), float)
-    q_data = np.asarray(u.demod2volts(handles.get("Q").fetch_all(), readout_length_ns), float)
-    return i_data + 1j * q_data
+    streams = []
+    for name in ("I", "Q"):
+        handle = handles.get(name)
+        values = None if handle is None else handle.fetch_all()
+        if values is None:
+            raise RuntimeError(f"The Rabi job returned no '{name}' result")
+        streams.append(np.asarray(u.demod2volts(values, readout_length_ns), float))
+    return streams[0] + 1j * streams[1]
 
 
 def simulate_rabi(session: QMSession, qid: str, sweep: RabiSweep) -> RabiSimulationResult:

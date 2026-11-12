@@ -210,22 +210,40 @@ required input from the tasks before it.
 
 ### Add a QM task to the qm-fake backend
 
-The `qm-fake` backend (`QMFakeBackend` in `engine/backend/qm_fake.py`) runs the `qm` task
-classes against `QMFakeDevice`, a local synthetic response, so a fake run shares the task's
-parameters, fit, validation, figures, raw data and persistence with a hardware run; only the
-device response differs. Its task set is the `qm-fake` section of `config/app/backend.yaml`:
-`calibtasks/qm/__init__.py` routes every listed name to the `qm` class of the same name, and
+The `qm-fake` backend (`QMFakeBackend` in `engine/backend/qm_fake.py`) plays the role for `qm`
+that the `fake` backend plays for qubex: the task runs its real experiment code and only the
+device is replaced. `QMFakeBackend.get_instance()` returns a `QMFakeSession` whose `manager` is a
+`QMFakeQuantumMachinesManager` (`engine/backend/qm_fake_qop.py`) instead of a
+`qm.QuantumMachinesManager`. `run_rabi` in `calibtasks/qm/rabi_experiment.py` is the one code
+path for both: it builds the `QUA_calibrations` Rabi, opens a quantum machine with the QUA
+configuration, lets `run_calibrations` generate and execute the program, then fetches the `I`
+and `Q` handles and converts them with `demod2volts`. The fake path differs only in labelling:
+`mode="fake"`, its raw data source type, and the device's execution report in the metadata.
+The backend therefore needs the workflow `qm` extra; without it `connect` raises
+`QMDependencyError` and nothing falls back to another response.
+
+The fake device implements only the SDK calls that path makes, with signatures that are
+subsets of the SDK's: `open_qm(config)` validates the configuration with the SDK's
+`qm.program.load_config` for the capabilities of `qop_version`, `execute(program)` accepts a
+`qm.Program`, and the job's `result_handles` offers `wait_for_all_values()` and
+`get(name).fetch_all()`. `execute` decodes `program.qua_program` and interprets a fixed QUA
+subset: scalar variables, `for_` loops evaluated in QUA fixed-point and int arithmetic,
+`play(op * amp(a))` on a bound drive element, `measure` with `demod.full` or `dual_demod.full` on
+a bound readout element, `align`, `wait`, `save`, and the stream operators `buffer`, `average`
+and `save`. Any other statement, operator, or protobuf field raises `QMFakeUnsupportedError`,
+so a newer SDK that emits a different program fails instead of producing data. The model is
+described in the module docstring of `qm_fake_qop.py`; it checks no compilation, timing,
+waveform output or wiring.
+
+The task set is the `qm-fake` section of `config/app/backend.yaml`: `calibtasks/qm/__init__.py`
+routes every listed name to the `qm` class of the same name, and
 `scripts/generate_task_catalog.py` publishes the `qm` declaration under `qm-fake`. The task class
 keeps `backend = "qm"`, which names the task family; `BaseBackend.name` (`qm` or `qm-fake`)
-names the backend a run used.
-
-`QMFakeBackend.get_instance()` returns a `QMFakeSession`, which answers `is_fake`, `is_hardware`
-and `is_simulator` like the `QMSession` of the `qm` backend. To offer a new QM task on `qm-fake`,
-add a branch on that session that asks `QMFakeDevice` for a synthetic response in the same
-result type the hardware path returns, extend the device model when the task needs a response it
-does not produce, and list the task under `qm-fake`. A task with no fake response stays off the
-list. `calibtasks/qm/test_qm_fake.py` fails when the list names a task the `qm` backend does not
-define. A `qm-fake` run never compiles QUA or checks OPX timing or wiring.
+names the backend a run used. To offer a new QM task on `qm-fake`, keep the task on the shared
+SDK path, extend the interpreter and the model to the statements its program uses with tests in
+`calibtasks/qm/test_qm_fake_device.py`, and list the task under `qm-fake`. A task whose program
+the fake device cannot run stays off the list. `calibtasks/qm/test_qm_fake.py` fails when the
+list names a task the `qm` backend does not define.
 
 ### Add persistence behavior
 

@@ -32,7 +32,7 @@ from qdash.workflow.calibtasks.qm.rabi_experiment import (  # noqa: E402
     build_rabi_program,
     fit_amplitude_rabi,
     project_iq,
-    run_rabi_on_hardware,
+    run_rabi,
     simulate_rabi,
 )
 from qdash.workflow.engine.backend import qm as qm_backend  # noqa: E402
@@ -76,7 +76,7 @@ def test_hardware_run_executes_library_program_and_closes_machine() -> None:
     manager = StubQuantumMachinesManager(machine=machine)
     session = connected_backend(manager, mode="hardware").get_instance()
 
-    result = run_rabi_on_hardware(session, "0", SWEEP)
+    result = run_rabi(session, "0", SWEEP)
 
     assert len(machine.executed) == 1
     assert isinstance(machine.executed[0], qm.Program)
@@ -97,7 +97,7 @@ def test_hardware_failure_still_closes_machine() -> None:
     ).get_instance()
 
     with pytest.raises(RuntimeError, match="execution failed"):
-        run_rabi_on_hardware(session, "0", SWEEP)
+        run_rabi(session, "0", SWEEP)
     assert machine.closed == 1
 
 
@@ -195,7 +195,7 @@ def test_modes_cannot_be_mixed() -> None:
     hardware = connected_backend(StubQuantumMachinesManager(), mode="hardware").get_instance()
 
     with pytest.raises(RuntimeError, match="hardware mode"):
-        run_rabi_on_hardware(simulator, "0", SWEEP)
+        run_rabi(simulator, "0", SWEEP)
     with pytest.raises(RuntimeError, match="simulator mode"):
         simulate_rabi(hardware, "0", SWEEP)
 
