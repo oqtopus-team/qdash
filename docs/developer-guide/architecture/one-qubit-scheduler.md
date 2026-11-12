@@ -5,21 +5,33 @@ MUX, and shared-module constraints.
 
 ## Wiring Model
 
-Each wiring entry names a MUX and its control, read-in, read-out, and pump modules. Module IDs whose
-base name ends in `A` or `B` determine the box classification of that MUX.
+Each wiring entry names a MUX and its `ctrl`, `read_in`, `read_out`, and `pump` channels.
+`_extract_box_type()` matches each channel ID against `^([A-Za-z0-9]+)(?:-\d+)?$` and reads the
+last character of the base name: `R21B-5` is Box B and `Q73A` is Box A. Any other ID is
+unrecognized and ignored. The scheduler does not read `box.yaml`, so a box `type` such as
+`quel1-a` or `quel3` has no effect.
 
-| Classification | Meaning | Scheduling consequence |
+| Recognized box types of a MUX | Classification | Scheduling consequence |
 | --- | --- | --- |
-| `A` | All recognized modules belong to Box A | Run in the A stage |
-| `B` | All recognized modules belong to Box B | Run in the B stage |
-| `MIXED` | Modules span both boxes, are unrecognized, or mapping is missing | Isolate from A and B stages |
+| Only `A` | `A` | Run in the A stage |
+| Only `B` | `B` | Run in the B stage |
+| Both `A` and `B`, or none | `MIXED` | Run after the A and B stages |
+
+A MUX with one recognized `A` channel and otherwise unrecognized channels is therefore `A`, not
+`MIXED`. IDs in the `<box ID>:<port>` form of the `quel1` and `quel3` templates, such as
+`BOX_A:4` or `quel3-02-a01:4`, contain `:` and never match, so every MUX of such a chip is
+`MIXED`.
 
 Qubit-to-MUX mapping follows the hardware convention that MUX `N` owns qubits `4N` through
 `4N + 3`. Within a stage, different MUX groups may run in parallel, while qubits in the same MUX
 group run sequentially.
 
-MIXED MUXes need one additional constraint. MUXes that use the same Box B control-module base ID
-are placed in different sequential groups.
+MIXED MUXes get one additional constraint: MUXes whose `ctrl` channels share a Box B base ID,
+such as `R21B`, go to different sequential stages. This is the only resource check between MUXes;
+the scheduler is not a general conflict checker. Without Box B `ctrl` names, as with
+`<box ID>:<port>` wiring, all MIXED MUXes form one stage and run in parallel even when they use
+the same box. [Check Parallel Execution on QuEL-3](../../user-guide/setup/qubex-backend.md#check-parallel-execution-on-quel-3)
+gives the operating guidance for such wiring.
 
 ```mermaid
 flowchart LR
@@ -92,10 +104,13 @@ conflicts. Its caller and backend operation must support the selected simultaneo
 
 - An empty qubit or MUX selection raises `ValueError`; excluding every expanded qubit does too.
 - A missing wiring file raises `FileNotFoundError`.
-- An unmapped qubit is classified as MIXED conservatively.
+- In stage and round schedules, a qubit outside every MUX's `4N` to `4N + 3` range is logged
+  as a warning and omitted. Simultaneous-spectroscopy batches retain the requested qubits.
 - Stage and MUX order are deterministic.
-- A result describes legal ordering only. It does not acquire a hardware reservation or execute a
-  backend call.
+- A result is an ordering under the A, B, and Box B `ctrl` rules above, not a check of the
+  hardware. It does not acquire a hardware reservation or execute a backend call; reservations
+  between executions are described in
+  [Hardware Reservations](../workflow/engine-architecture.md#hardware-reservations).
 
 ## Execution Modes
 
@@ -117,7 +132,10 @@ in the same hardware stage, `parallel_by_mux` can start qubit 1 while qubit 8 is
 running. The default checkerboard ordering pairs qubits 0 and 8, then qubits 1 and 9.
 `parallel_by_round` finishes both qubit 0 and qubit 8 before qubits 1 and 9 start.
 The three non-spectroscopy strategies keep box stages sequential and delegate parallel
-worker creation to the service scheduling helpers.
+worker creation to the service scheduling helpers in `service/_internal/scheduling_tasks.py`.
+Each parallel call runs on a Dask cluster of `_DEFAULT_DASK_WORKERS` (16) single-threaded
+processes; MUX groups or round qubits beyond that wait for a free process. There is no
+per-step setting for the number of parallel qubits, and the pool size is not a hardware limit.
 
 `BringUp` and the flow templates that take an `execution_mode` parameter default to
 `parallel_by_mux`; `OneQubitCheck`, `OneQubitFineTune`, `CustomOneQubit`, and the pipeline spec

@@ -105,7 +105,7 @@ CustomOneQubit(
         TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
         TaskCall(name="CheckHPIPulse"),
     ],
-    mode=mode,
+    execution_mode=execution_mode,
 ),
 ```
 
@@ -129,9 +129,12 @@ names such as `"CheckT1"` stops the flow before it measures; see
 
 ### Choose an Execution Mode
 
-The `execution_mode` value controls how the selected qubits wait for each other. In every mode
-except `simultaneous_spectroscopy`, each qubit runs the step's whole task list before it counts as
-finished; no mode runs one task across all qubits before the next task.
+The `execution_mode` value of a one-qubit step controls how the selected qubits wait for each
+other. You set it in the source; QDash does not inspect the task list to choose between serial and
+parallel execution. In `sequential`, `parallel_by_mux`, and `parallel_by_round`, each qubit runs
+the step's whole task list before it counts as finished, and none of the three runs one task
+across all qubits before starting the next task. `simultaneous_spectroscopy` is the exception
+described in the table.
 
 | Execution mode | Behavior |
 | --- | --- |
@@ -158,12 +161,41 @@ A round waits for every qubit's whole task list. It does not wait between tasks 
 synchronize pulses. QDash chooses the actual grouping and order from the chip wiring. The two
 rounds shown match the default checkerboard ordering for these four qubits when both MUXes
 can share a stage.
-`sequential`, `parallel_by_mux`, and `parallel_by_round` keep the same hardware-sharing limits;
-changing between them changes only how qubits wait for each other.
+`sequential`, `parallel_by_mux`, and `parallel_by_round` use the same box stages; changing
+between them changes only how qubits wait for each other.
 
 To check these modes and the two-qubit groups below while you edit a flow, select
 **Execution help** in the workflow editor header; on a narrow screen it is in the action menu.
 The help opens over the editor and does not save or run the flow.
+
+For the three non-spectroscopy modes, QDash decides the grouping automatically: it reads the chip's
+`wiring.yaml`, runs Box A MUXes, then Box B MUXes, then the remaining MUXes, and keeps the
+qubits of one MUX one after another. The box classification comes only from
+module names whose base ends in `A` or `B`, such as `R21B-5`; QDash does not read the box type
+in `box.yaml`. Wiring written as `<box ID>:<port>`, the form the QuEL-1 and QuEL-3 templates use
+(for example `quel3-02-a01:4`), has no such name, so every MUX lands in one stage and MUXes on
+the same box can run in parallel. QDash checks no shared box resources between those MUXes;
+until your deployment has verified that parallel MUXes are safe, use `sequential` with
+such wiring. See
+[Check Parallel Execution on QuEL-3](./setup/qubex-backend.md#check-parallel-execution-on-quel-3).
+
+Templates with an `execution_mode` parameter, such as **Simple Calibration** and **Bring-up**,
+default to `parallel_by_mux`. Steps written directly in the source, such as `CustomOneQubit`,
+`OneQubitCheck`, and `OneQubitFineTune`, default to `parallel_by_round` when `execution_mode` is
+omitted. To make a **Simple Calibration** flow run one qubit at a time, change the default in the
+flow function's parameters:
+
+```python
+execution_mode: OneQubitExecutionMode = "sequential",
+```
+
+There is no setting for the number of qubits that run at once. In `parallel_by_mux`, one worker
+runs per MUX of the current stage; in `parallel_by_round`, a round holds at most one qubit per MUX.
+To run fewer qubits at once, select fewer MUXes per execution and run the selections one after
+another, or use `sequential`. Each parallel stage or round runs on a pool of 16 worker processes
+that QDash sets internally; more MUXes wait for a free worker. That pool is not a hardware limit
+and not a setting. How many qubits your hardware can measure at once depends on the boxes, ports,
+and backend, and QDash cannot determine it from the configuration.
 
 Keep the template's execution mode unless the procedure requires a specific ordering. The
 selected tasks must support the chosen mode and backend. A flow or pipeline that still uses the
@@ -216,10 +248,16 @@ With `max_parallel_ops = 2`, the same pairs need five groups: G1 splits into a g
 and 4 → 5 and a group with 12 → 13 and 16 → 17, which run one after the other although none of
 the four pairs conflict.
 
+Two-qubit steps never use `execution_mode`, and one-qubit steps never use this grouping; the
+steps of a workflow run one after another. To calibrate one pair at a time, set
+`max_parallel_ops` to `1`.
+
 `max_parallel_ops` only limits the size of each group: raising it never puts conflicting pairs
-together, and it does not guarantee that every pair of a group runs at the same moment. Lower it
-to run fewer pairs at once. In **2Q Calibration**, change the default in the flow
-function's parameters:
+together, and it does not guarantee that every pair of a group runs at the same moment. QDash
+does not derive a maximum from the hardware: a calibration pipeline accepts 1 to 100, and each
+group runs on a pool of 16 worker processes, like a one-qubit stage, so pairs beyond 16 wait for
+a free worker. Lower it to run fewer pairs at once. In **2Q Calibration**, change the default in
+the flow function's parameters:
 
 ```python
 def two_qubit(
@@ -242,6 +280,12 @@ change them. A `schedule` written by hand in **2Q Scheduled Calibration** runs e
 written: QDash does not check its groups for conflicts or split them. Pairs entered in
 **Coupling pairs** when you run a workflow are grouped by the rules above, with at most 10 pairs
 per group.
+
+On QuEL-3, the module of a wiring ID such as `quel3-02-a01:4` is the whole box ID, so pairs whose
+MUXes use control ports of the same box, or readout ports of the same box, go to different
+groups. QDash does not compare a control port with a readout port, does not consider read-in or
+pump ports, and does not model finer QuEL-3 port independence; see
+[Check Parallel Execution on QuEL-3](./setup/qubex-backend.md#check-parallel-execution-on-quel-3).
 
 In a combined one-qubit and two-qubit workflow, filter the one-qubit results before generating
 the CR schedule so the two-qubit work uses only the remaining candidates.

@@ -96,6 +96,14 @@ conflicts. A module is the part of a channel ID before the first `:`, or before 
 when the ID has no `:`, so `C1:0` and `C1:2` share module `C1`. Readout and control modules are
 compared separately: a readout module and a control module with the same name do not conflict.
 These rules cover the shared resources the scheduler models, not every hardware constraint.
+With `<box ID>:<port>` wiring from the `quel1` or `quel3` template, the module is the whole box ID,
+so `quel3-02-a01:4` and `quel3-02-a01:2` share module `quel3-02-a01`, and two MUXes with `ctrl`
+ports on the same box conflict. The rules do not model finer QuEL-3 port independence, read-in or
+pump ports, or a collision between a control port and a readout port of the same box; see
+[Check Parallel Execution on QuEL-3](../../user-guide/setup/qubex-backend.md#check-parallel-execution-on-quel-3).
+The same function feeds hardware reservations between executions, which are separate from the
+grouping inside one execution; see
+[Hardware Reservations](../workflow/engine-architecture.md#hardware-reservations).
 
 `split_fast_slow_pairs()` puts pairs whose two qubits share a MUX in the intra-MUX list and the
 rest in the inter-MUX list. Each list gets its own graph and coloring, and every intra-MUX group
