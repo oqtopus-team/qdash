@@ -88,7 +88,7 @@ class ExecutionCoordinator:
         scope = (
             resolve_workflow_resource_scope(chip_id)
             if workflow
-            else resolve_execution_resource_scope(chip_id, parameters)
+            else resolve_execution_resource_scope(chip_id, parameters, project_id=project_id)
         )
         if self._locks.has_conflict(project_id, scope):
             return False, _WHOLE_CHIP_REASON if workflow else _SCOPED_CONFLICT_REASON
@@ -196,7 +196,7 @@ class ExecutionCoordinator:
         scope = (
             resolve_workflow_resource_scope(chip_id)
             if workflow
-            else resolve_execution_resource_scope(chip_id, parameters)
+            else resolve_execution_resource_scope(chip_id, parameters, project_id=project_id)
         )
         if not self._locks.try_lock(
             project_id=project_id,

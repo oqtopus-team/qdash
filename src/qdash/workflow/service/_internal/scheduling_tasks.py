@@ -61,6 +61,7 @@ except Exception as exc:
     DaskTaskRunner = None
 
 if TYPE_CHECKING:
+    from qdash.common.mux_mapping import MuxMapping
     from qdash.workflow.service._internal.session import CalibSession
 
 # Module-level logger for subprocess execution (Prefect logger not available in subprocesses)
@@ -145,25 +146,41 @@ def _format_exception_details(e: Exception) -> str:
     return format_exception_details(e)
 
 
-def _is_mux_representative(qid: str) -> bool:
-    """Check if the qubit is the MUX representative (first qubit in MUX).
+def _is_mux_representative(qid: str, mux_mapping: MuxMapping | None = None) -> bool:
+    """Check if the qubit is the MUX representative (local slot 0 of its MUX).
 
-    For MUX tasks, only the representative qubit (qid % 4 == 0) executes the task.
+    For MUX tasks, only the representative qubit executes the task. The slot
+    comes from the chip topology's MUX mapping (``qid % 4`` for the legacy
+    mapping).
 
     Args:
         qid: Qubit ID
+        mux_mapping: MUX membership; the legacy mapping if None
 
     Returns:
         True if this qubit is the MUX representative
+
+    Raises:
+        MuxMappingError: If an explicit mapping does not contain the qubit
     """
+    from qdash.common.mux_mapping import MuxMapping, MuxMappingError
+
+    mapping = mux_mapping if mux_mapping is not None else MuxMapping.legacy()
     try:
-        return int(qid) % 4 == 0
-    except ValueError:
-        # If qid is not a simple integer, assume it's a representative
-        return True
+        return mapping.slot_of(qid) == 0
+    except MuxMappingError:
+        if mapping.unbounded:
+            # If qid is not a simple integer, assume it's a representative
+            return True
+        raise
 
 
-def _should_skip_task_for_qid(task_name: str, qid: str, backend_name: str) -> bool:
+def _should_skip_task_for_qid(
+    task_name: str,
+    qid: str,
+    backend_name: str,
+    session: CalibSession | None = None,
+) -> bool:
     """Check if a task should be skipped for the given qubit.
 
     MUX tasks are only executed for the representative qubit of each MUX.
@@ -172,23 +189,40 @@ def _should_skip_task_for_qid(task_name: str, qid: str, backend_name: str) -> bo
         task_name: Name of the task
         qid: Qubit ID
         backend_name: Backend name (e.g., 'qubex', 'fake')
+        session: Session whose MUX mapping decides the representative
 
     Returns:
         True if the task should be skipped for this qubit
+
+    Raises:
+        MuxMappingError: If a MUX task targets a standalone qubit
     """
+    from qdash.common.mux_mapping import MuxMappingError
     from qdash.workflow.calibtasks.active_protocols import is_mux_task
 
     if is_mux_task(task_name, backend_name):
-        if not _is_mux_representative(qid):
+        mapping = session.mux_mapping if session is not None else None
+        if mapping is not None and mapping.is_standalone(qid):
+            # Never pick an arbitrary MUX for a qubit that is not multiplexed.
+            raise MuxMappingError(
+                f"{task_name} is a MUX-level task and cannot run on standalone qubit {qid}; "
+                "it is in no MUX of the chip topology"
+            )
+        if not _is_mux_representative(qid, mapping):
             return True
     return False
 
 
-def _mux_skip(backend_name: str) -> Any:
-    """A ``skip_call`` that skips MUX tasks on non-representative qubits."""
+def _mux_skip(session: CalibSession) -> Any:
+    """A ``skip_call`` that skips MUX tasks on non-representative qubits.
+
+    The session's MUX mapping decides the representative; a MUX task on a
+    standalone qubit raises, and the caller records that call as failed.
+    """
+    backend_name = session.backend_name
 
     def skip(call: TaskCall, qid: str) -> bool:
-        return _should_skip_task_for_qid(call.name, qid, backend_name)
+        return _should_skip_task_for_qid(call.name, qid, backend_name, session)
 
     return skip
 
@@ -205,12 +239,8 @@ def _mux_task_run_name() -> str:
     params = task_run.parameters
     qids = params.get("qids", [])
     if qids:
-        # Show MUX number based on first qubit ID
-        try:
-            mux_num = int(qids[0]) // 4
-            return f"mux-{mux_num:02d}-Q{qids[0]}-{qids[-1]}"
-        except (ValueError, IndexError):
-            return f"mux-Q{qids[0]}-{qids[-1]}"
+        # MUX membership lives in the chip topology, so label by qubit range.
+        return f"mux-Q{qids[0]}-{qids[-1]}"
     return "mux-calibration"
 
 
@@ -239,7 +269,7 @@ def _execute_mux_qubits_with_session(
     logger: Any,
 ) -> dict[str, Any]:
     """Run the step's calls for each qubit of a MUX group, one qubit after another."""
-    skip = _mux_skip(session.backend_name)
+    skip = _mux_skip(session)
     return {qid: run_target_calls(session, qid, plan, logger, skip_call=skip) for qid in qids}
 
 
@@ -251,7 +281,7 @@ def calibrate_mux_qubits(
 ) -> dict[str, Any]:
     """Execute a step's calls for qubits in a single MUX sequentially (Prefect task).
 
-    For MUX-level tasks, only the representative qubit (qid % 4 == 0) executes
+    For MUX-level tasks, only the representative qubit (local slot 0) executes
     the task. Other qubits in the MUX are skipped for MUX tasks.
 
     Note: This Prefect task uses threading. For true parallel execution with
@@ -290,7 +320,7 @@ def _execute_single_qubit_with_session(
     logger: Any,
 ) -> dict[str, Any]:
     """Run the step's calls for a single qubit using the provided session."""
-    return run_target_calls(session, qid, plan, logger, skip_call=_mux_skip(session.backend_name))
+    return run_target_calls(session, qid, plan, logger, skip_call=_mux_skip(session))
 
 
 @task(task_run_name=_single_qubit_task_run_name, log_prints=True)
@@ -301,7 +331,7 @@ def calibrate_single_qubit(
 ) -> tuple[str, dict[str, Any]]:
     """Execute a step's calls for a single qubit (Prefect task).
 
-    For MUX-level tasks, only the representative qubit (qid % 4 == 0) executes
+    For MUX-level tasks, only the representative qubit (local slot 0) executes
     the task. Other qubits in the MUX are skipped for MUX tasks.
 
     Args:

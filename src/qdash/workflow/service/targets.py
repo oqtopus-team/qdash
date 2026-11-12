@@ -10,6 +10,9 @@ Example:
     # Target by MUX IDs
     targets = MuxTargets([0, 1, 2, 3])
 
+    # Target every qubit of the chip, multiplexed or standalone
+    targets = AllQubitTargets()
+
     # Target specific qubits
     targets = QubitTargets(["0", "1", "4", "5"])
 
@@ -22,8 +25,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
+from qdash.common.mux_mapping import resolve_chip_mux_mapping
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+
+if TYPE_CHECKING:
+    from qdash.common.mux_mapping import MuxMapping
+
+# MUX count assumed by AllMuxTargets when the chip has no topology (legacy 64Q).
+LEGACY_ALL_MUX_COUNT = 16
 
 
 @dataclass
@@ -36,22 +47,32 @@ class Target(ABC):
     """
 
     @abstractmethod
-    def to_qids(self, chip_id: str) -> list[str]:
+    def to_qids(self, chip_id: str, *, mux_mapping: MuxMapping | None = None) -> list[str]:
         """Convert target to a list of qubit IDs.
 
         Args:
             chip_id: Chip ID for resolving MUX-based targets
+            mux_mapping: MUX membership from the chip topology. If None, MUX
+                targets use the legacy convention (MUX N = qubits 4N..4N+3).
 
         Returns:
             List of qubit IDs
         """
 
     @abstractmethod
-    def to_coupling_ids(self, chip_id: str, *, project_id: str | None = None) -> list[str]:
+    def to_coupling_ids(
+        self,
+        chip_id: str,
+        *,
+        project_id: str | None = None,
+        mux_mapping: MuxMapping | None = None,
+    ) -> list[str]:
         """Convert target to a list of coupling IDs.
 
         Args:
             chip_id: Chip ID for resolving topology
+            project_id: Project of the chip
+            mux_mapping: MUX membership; resolved from the chip topology if None
 
         Returns:
             List of coupling IDs (e.g., ["0-1", "2-3"])
@@ -63,10 +84,11 @@ class MuxTargets(Target):
     """Target qubits by MUX IDs.
 
     This is the most common way to specify targets for chip-wide calibration.
-    MUX IDs are resolved to qubit IDs using the chip's wiring configuration.
+    MUX IDs are resolved to qubit IDs through the chip topology's MUX
+    mapping, restricted to MUXes present in the wiring configuration.
 
     Attributes:
-        mux_ids: List of MUX IDs to calibrate (0-15 for 64Q chip)
+        mux_ids: MUX IDs to calibrate, as defined by the chip topology
         exclude_qids: Qubit IDs to exclude from calibration
 
     Example:
@@ -77,12 +99,14 @@ class MuxTargets(Target):
     mux_ids: list[int]
     exclude_qids: list[str] = field(default_factory=list)
 
-    def to_qids(self, chip_id: str) -> list[str]:
-        """Resolve MUX IDs to qubit IDs using wiring configuration."""
+    def to_qids(self, chip_id: str, *, mux_mapping: MuxMapping | None = None) -> list[str]:
+        """Resolve MUX IDs to qubit IDs using the MUX mapping and wiring."""
         from qdash.workflow.engine import OneQubitScheduler
 
         wiring_config_path = str(get_qubex_paths().wiring_yaml(chip_id))
-        scheduler = OneQubitScheduler(chip_id=chip_id, wiring_config_path=wiring_config_path)
+        scheduler = OneQubitScheduler(
+            chip_id=chip_id, wiring_config_path=wiring_config_path, mux_mapping=mux_mapping
+        )
         schedule = scheduler.generate_from_mux(
             mux_ids=self.mux_ids,
             exclude_qids=self.exclude_qids,
@@ -94,14 +118,22 @@ class MuxTargets(Target):
             all_qids.extend(stage.qids)
         return sorted(set(all_qids))
 
-    def to_coupling_ids(self, chip_id: str, *, project_id: str | None = None) -> list[str]:
+    def to_coupling_ids(
+        self,
+        chip_id: str,
+        *,
+        project_id: str | None = None,
+        mux_mapping: MuxMapping | None = None,
+    ) -> list[str]:
         """Get coupling IDs for qubits in targeted MUXes."""
         from qdash.workflow.engine import CRScheduler
 
         if not project_id:
             raise ValueError("project_id is required to resolve coupling targets")
 
-        qids = self.to_qids(chip_id)
+        if mux_mapping is None:
+            mux_mapping = resolve_chip_mux_mapping(project_id, chip_id)
+        qids = self.to_qids(chip_id, mux_mapping=mux_mapping)
         wiring_config_path = str(get_qubex_paths().wiring_yaml(chip_id))
 
         # Use CRScheduler to get valid coupling pairs
@@ -111,6 +143,7 @@ class MuxTargets(Target):
             chip_id=chip_id,
             wiring_config_path=wiring_config_path,
             project_id=project_id,
+            mux_mapping=mux_mapping,
         )
         schedule = scheduler.generate(candidate_qubits=qids, max_parallel_ops=100)
 
@@ -137,11 +170,17 @@ class QubitTargets(Target):
 
     qids: list[str]
 
-    def to_qids(self, chip_id: str) -> list[str]:
+    def to_qids(self, chip_id: str, *, mux_mapping: MuxMapping | None = None) -> list[str]:
         """Return the qubit IDs directly."""
         return list(self.qids)
 
-    def to_coupling_ids(self, chip_id: str, *, project_id: str | None = None) -> list[str]:
+    def to_coupling_ids(
+        self,
+        chip_id: str,
+        *,
+        project_id: str | None = None,
+        mux_mapping: MuxMapping | None = None,
+    ) -> list[str]:
         """Get coupling IDs for the specified qubits."""
         from qdash.workflow.engine import CRScheduler
 
@@ -154,6 +193,7 @@ class QubitTargets(Target):
             chip_id=chip_id,
             wiring_config_path=wiring_config_path,
             project_id=project_id,
+            mux_mapping=mux_mapping,
         )
         schedule = scheduler.generate(candidate_qubits=self.qids, max_parallel_ops=100)
 
@@ -180,7 +220,7 @@ class CouplingTargets(Target):
 
     pairs: list[tuple[str, str]]
 
-    def to_qids(self, chip_id: str) -> list[str]:
+    def to_qids(self, chip_id: str, *, mux_mapping: MuxMapping | None = None) -> list[str]:
         """Extract unique qubit IDs from coupling pairs."""
         qids = set()
         for control, target in self.pairs:
@@ -188,16 +228,25 @@ class CouplingTargets(Target):
             qids.add(target)
         return sorted(qids)
 
-    def to_coupling_ids(self, chip_id: str, *, project_id: str | None = None) -> list[str]:
+    def to_coupling_ids(
+        self,
+        chip_id: str,
+        *,
+        project_id: str | None = None,
+        mux_mapping: MuxMapping | None = None,
+    ) -> list[str]:
         """Return coupling IDs directly."""
         return [f"{c}-{t}" for c, t in self.pairs]
 
 
 @dataclass
 class AllMuxTargets(Target):
-    """Target all MUXes (0-15) for full chip calibration.
+    """Target every MUX of the chip for full chip calibration.
 
-    Convenience class for full chip calibration.
+    The MUX list comes from the chip topology's MUX mapping: only declared
+    MUXes, never the topology's standalone qubits. Chips without a topology
+    keep the legacy MUXes 0-15. Use ``AllQubitTargets`` to include standalone
+    qubits.
 
     Attributes:
         exclude_qids: Qubit IDs to exclude from calibration
@@ -208,16 +257,88 @@ class AllMuxTargets(Target):
 
     exclude_qids: list[str] = field(default_factory=list)
 
-    def to_qids(self, chip_id: str) -> list[str]:
+    @staticmethod
+    def _mux_ids(mux_mapping: MuxMapping | None) -> list[int]:
+        if mux_mapping is None or mux_mapping.unbounded:
+            return list(range(LEGACY_ALL_MUX_COUNT))
+        if not mux_mapping.mux_ids:
+            msg = (
+                "The chip topology declares no MUX, so AllMuxTargets selects nothing; "
+                "use AllQubitTargets or QubitTargets for standalone qubits"
+            )
+            raise ValueError(msg)
+        return mux_mapping.mux_ids
+
+    def to_qids(self, chip_id: str, *, mux_mapping: MuxMapping | None = None) -> list[str]:
         """Resolve all MUXes to qubit IDs."""
         return MuxTargets(
-            mux_ids=list(range(16)),
+            mux_ids=self._mux_ids(mux_mapping),
             exclude_qids=self.exclude_qids,
-        ).to_qids(chip_id)
+        ).to_qids(chip_id, mux_mapping=mux_mapping)
 
-    def to_coupling_ids(self, chip_id: str, *, project_id: str | None = None) -> list[str]:
+    def to_coupling_ids(
+        self,
+        chip_id: str,
+        *,
+        project_id: str | None = None,
+        mux_mapping: MuxMapping | None = None,
+    ) -> list[str]:
         """Get all coupling IDs for the chip."""
+        if mux_mapping is None and project_id:
+            mux_mapping = resolve_chip_mux_mapping(project_id, chip_id)
         return MuxTargets(
-            mux_ids=list(range(16)),
+            mux_ids=self._mux_ids(mux_mapping),
             exclude_qids=self.exclude_qids,
-        ).to_coupling_ids(chip_id, project_id=project_id)
+        ).to_coupling_ids(chip_id, project_id=project_id, mux_mapping=mux_mapping)
+
+
+@dataclass
+class AllQubitTargets(Target):
+    """Target every known qubit of the chip, multiplexed or standalone.
+
+    Multiplexed qubits resolve like ``AllMuxTargets`` (members of the wired
+    MUXes). Standalone qubits, which the topology lists in no MUX, are added
+    as they are. The schedulers run them after the MUX stages, one at a time,
+    because the wiring maps no hardware for them. Chips without a topology
+    keep the legacy MUXes 0-15.
+
+    Attributes:
+        exclude_qids: Qubit IDs to exclude from calibration
+
+    Example:
+        targets = AllQubitTargets(exclude_qids=["5"])
+    """
+
+    exclude_qids: list[str] = field(default_factory=list)
+
+    def to_qids(self, chip_id: str, *, mux_mapping: MuxMapping | None = None) -> list[str]:
+        """Resolve the chip's MUX members and standalone qubits to qubit IDs."""
+        if mux_mapping is None or mux_mapping.unbounded:
+            return AllMuxTargets(exclude_qids=self.exclude_qids).to_qids(
+                chip_id, mux_mapping=mux_mapping
+            )
+        excluded = set(self.exclude_qids)
+        qids: list[str] = []
+        if mux_mapping.mux_ids:
+            qids = MuxTargets(mux_ids=mux_mapping.mux_ids, exclude_qids=self.exclude_qids).to_qids(
+                chip_id, mux_mapping=mux_mapping
+            )
+        qids += [qid for qid in mux_mapping.standalone_qids if qid not in excluded]
+        if not qids:
+            msg = "All qubits were excluded"
+            raise ValueError(msg)
+        return sorted(set(qids), key=int)
+
+    def to_coupling_ids(
+        self,
+        chip_id: str,
+        *,
+        project_id: str | None = None,
+        mux_mapping: MuxMapping | None = None,
+    ) -> list[str]:
+        """Get coupling IDs among every known qubit of the chip."""
+        if mux_mapping is None and project_id:
+            mux_mapping = resolve_chip_mux_mapping(project_id, chip_id)
+        return QubitTargets(qids=self.to_qids(chip_id, mux_mapping=mux_mapping)).to_coupling_ids(
+            chip_id, project_id=project_id, mux_mapping=mux_mapping
+        )

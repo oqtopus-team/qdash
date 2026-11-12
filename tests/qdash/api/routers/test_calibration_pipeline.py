@@ -470,6 +470,109 @@ class TestValidate:
         assert paths == {"targets.mux_ids[1]", "targets.exclude_qids[1]"}
         assert data["targets"]["mux_ids"] == [0, 16]
 
+    def test_mux_targets_follow_the_chip_topology(self, test_client, chip, auth_headers):
+        # The public 16Q template defines MUX 0-3; MUX 4 does not exist.
+        chip_doc = ChipDocument.find_one({"project_id": "test_project", "chip_id": CHIP}).run()
+        assert chip_doc is not None
+        chip_doc.topology_id = "square-lattice-mux-16"
+        chip_doc.save()
+        spec = good_spec()
+        spec["targets"] = {"mux_ids": [0, 3, 4], "exclude_qids": []}
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        problems = response.json()["problems"]
+        assert [problem["path"] for problem in problems] == ["targets.mux_ids[2]"]
+        assert "MUX 4 is not defined" in problems[0]["message"]
+        assert "0-3" in problems[0]["message"]
+
+    def test_missing_configured_topology_is_a_target_problem(self, test_client, chip, auth_headers):
+        chip_doc = ChipDocument.find_one({"project_id": "test_project", "chip_id": CHIP}).run()
+        assert chip_doc is not None
+        chip_doc.topology_id = "deleted-template"
+        chip_doc.save()
+        spec = good_spec()
+        spec["targets"] = {"mux_ids": [0], "exclude_qids": []}
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        problems = response.json()["problems"]
+        assert any(
+            problem["path"] == "targets.mux_ids" and "not found" in problem["message"]
+            for problem in problems
+        )
+
+    def test_qubex_rejects_mux_groups_it_cannot_drive(self, test_client, chip, auth_headers):
+        from qdash.common.mux_mapping import MuxMapping
+
+        chip_doc = ChipDocument.find_one({"project_id": "test_project", "chip_id": CHIP}).run()
+        assert chip_doc is not None
+        chip_doc.topology_id = "custom-layout"
+        chip_doc.save()
+        swapped = MuxMapping.from_groups({0: [1, 0, 2, 3], 1: [4, 5, 6, 7]})
+        with patch(
+            "qdash.api.services.calibration_pipeline_service.resolve_topology_mux_mapping",
+            return_value=swapped,
+        ):
+            qubex = test_client.post(
+                "/calibration-pipelines/validate",
+                headers=auth_headers,
+                json={"chip_id": CHIP, "spec": good_spec()},
+            ).json()
+            fake = test_client.post(
+                "/calibration-pipelines/validate",
+                headers=auth_headers,
+                json={"chip_id": CHIP, "spec": good_spec(), "backend_name": "fake"},
+            ).json()
+
+        messages = [p["message"] for p in qubex["problems"] if p["path"] == "backend_name"]
+        assert len(messages) == 1
+        assert "custom-layout" in messages[0]
+        assert "MUX 0 lists qubits [1, 0, 2, 3]" in messages[0]
+        assert not any(p["path"] == "backend_name" for p in fake["problems"])
+
+    def test_qid_targets_follow_standalone_semantics(self, test_client, chip, auth_headers):
+        from qdash.common.mux_mapping import MuxMapping
+
+        chip_doc = ChipDocument.find_one({"project_id": "test_project", "chip_id": CHIP}).run()
+        assert chip_doc is not None
+        chip_doc.topology_id = "partial-layout"
+        chip_doc.save()
+        # Qubits 0-3 share MUX 0, 4-6 are standalone, 7 is not in the topology.
+        partial = MuxMapping.from_groups(
+            {0: [0, 1, 2, 3]}, known_qids=[str(q) for q in range(7)], topology_id="partial-layout"
+        )
+        spec = good_spec()
+        spec["targets"] = {"qids": ["0", "4", "7"]}
+        spec["steps"] = [{"type": "BringUp"}, *spec["steps"]]
+        with patch(
+            "qdash.api.services.calibration_pipeline_service.resolve_topology_mux_mapping",
+            return_value=partial,
+        ):
+            fake = test_client.post(
+                "/calibration-pipelines/validate",
+                headers=auth_headers,
+                json={"chip_id": CHIP, "spec": spec, "backend_name": "fake"},
+            ).json()
+            qubex = test_client.post(
+                "/calibration-pipelines/validate",
+                headers=auth_headers,
+                json={"chip_id": CHIP, "spec": good_spec()},
+            ).json()
+
+        problems = {p["path"]: p["message"] for p in fake["problems"]}
+        assert "not defined by topology" in problems["targets.qids[2]"]
+        assert "targets.qids[1]" not in problems  # standalone is a valid target
+        assert "standalone qubits ['4']" in problems["steps[0]"]
+        assert not any(path.startswith("steps[") and path != "steps[0]" for path in problems)
+        backend = [p["message"] for p in qubex["problems"] if p["path"] == "backend_name"]
+        assert len(backend) == 1
+        assert "[4, 5, 6] are standalone" in backend[0]
+
 
 def prefect_gateway_mocks() -> tuple[AsyncMock, AsyncMock]:
     read_deployment = AsyncMock(return_value="deployment-1")

@@ -14,9 +14,17 @@ base name ends in `A` or `B` determine the box classification of that MUX.
 | `B` | All recognized modules belong to Box B | Run in the B stage |
 | `MIXED` | Modules span both boxes, are unrecognized, or mapping is missing | Isolate from A and B stages |
 
-Qubit-to-MUX mapping follows the hardware convention that MUX `N` owns qubits `4N` through
-`4N + 3`. Within a stage, different MUX groups may run in parallel, while qubits in the same MUX
-group run sequentially.
+Qubit-to-MUX mapping comes from the `mux_mapping` passed to the scheduler, which the workflow
+service resolves from the chip's topology template (see
+[MUX Membership in Topology Templates](./square-lattice-topology.md#mux-membership-in-topology-templates)).
+Without a mapping, MUX `N` owns qubits `4N` through `4N + 3`. A MUX or qubit outside an explicit
+mapping is an error. Within a stage, different MUX groups may run in parallel, while qubits in the
+same MUX group run sequentially.
+
+A standalone qubit, which the topology lists in no MUX, has no wiring row, so its hardware sharing
+is unknown. Every schedule form runs standalone qubits after the MUX stages, one at a time: one
+`STANDALONE` stage with a single sequential group, or one step per qubit. A selection of only
+standalone qubits does not read the wiring.
 
 MIXED MUXes need one additional constraint. MUXes that use the same Box B control-module base ID
 are placed in different sequential groups.
@@ -34,7 +42,7 @@ flowchart LR
     mixedStages --> order
 ```
 
-The result executes A, B, and then every MIXED stage. MUX groups inside one stage are parallel;
+The result executes A, B, every MIXED stage, and then the `STANDALONE` stage. MUX groups inside one stage are parallel;
 the qubits inside each group remain sequential.
 
 ## Schedule Forms
@@ -47,8 +55,8 @@ The scheduler exposes three forms for different execution APIs.
 | `generate_synchronized()` | `SynchronizedOneQubitScheduleResult` | All MUXes must finish position N before position N+1 starts |
 | `generate_simultaneous_spectroscopy_batches()` | `MuxBatchScheduleResult` | One spectroscopy call measures a whole selected batch |
 
-Each form has a corresponding `*_from_mux()` convenience method that expands MUX IDs and applies
-`exclude_qids` before scheduling.
+Each form has a corresponding `*_from_mux()` convenience method that expands MUX IDs, adds any
+`standalone_qids`, and applies `exclude_qids` before scheduling.
 
 ### MUX-group schedule
 
@@ -65,7 +73,7 @@ for stage in schedule.stages:
     run_mux_groups_in_parallel(stage.parallel_groups)
 ```
 
-Stages are ordered A, B, then MIXED. Multiple MIXED stages can appear when shared Box B modules
+Stages are ordered A, B, MIXED, then STANDALONE. Multiple MIXED stages can appear when shared Box B modules
 force sequential groups. `parallel_groups` is grouped by MUX and sorted by MUX ID.
 
 ### Synchronized schedule
@@ -79,8 +87,10 @@ the exact ordering policy is described in
 
 The spectroscopy API accepts `mode="local_index"` or `mode="all"`.
 
-- `local_index` creates up to four steps based on `int(qid) % 4`.
-- `all` creates one step containing all selected qubits.
+- `local_index` creates one step per local MUX slot.
+- `all` creates one step containing all selected multiplexed qubits.
+
+In both modes each standalone qubit gets a step of its own after the MUX steps.
 
 This API reports box classification for observability but does not split the batch on A/B resource
 conflicts. Its caller and backend operation must support the selected simultaneous measurement.

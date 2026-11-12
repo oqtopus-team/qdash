@@ -242,6 +242,10 @@ class MuxDetailResponse(BaseModel):
     """MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details."""
 
     mux_id: int
+    qids: list[str] = Field(
+        default_factory=list,
+        description="Member qubit IDs in local slot order, from the chip topology",
+    )
     detail: dict[str, dict[str, MuxTask]]
 
 

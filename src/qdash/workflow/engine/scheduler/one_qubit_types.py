@@ -13,6 +13,9 @@ from typing import Any
 BOX_A = "A"
 BOX_B = "B"
 BOX_MIXED = "MIXED"  # Uses both A and B
+# Qubits outside every MUX. The wiring only maps MUXes to hardware, so their
+# physical resources are unknown and they run one at a time, after the MUX stages.
+BOX_STANDALONE = "STANDALONE"
 
 
 @dataclass
@@ -20,7 +23,7 @@ class OneQubitStageInfo:
     """Information about a single execution stage.
 
     Attributes:
-        box_type: Type of box ("A", "B", or "MIXED")
+        box_type: Type of box ("A", "B", "MIXED", or "STANDALONE")
         qids: List of qubit IDs in this stage (executed sequentially if not using parallel_groups)
         mux_ids: Set of MUX IDs included in this stage
         parallel_groups: MUX-based parallel groups. Each group (list of qids) can run in parallel

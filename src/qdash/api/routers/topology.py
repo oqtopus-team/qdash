@@ -42,11 +42,24 @@ async def get_topology(topology_id: str) -> dict[str, Any]:
 
     Returns:
     -------
-        dict: Complete topology definition with qubits and couplings
+        dict: Complete topology definition with qubits, couplings and the
+        normalized ``muxes`` (MUX ID to member qubits in local slot order).
+        Qubits that no MUX lists are standalone. Legacy ``mux`` templates are
+        normalized too, and ``muxes_source`` says which format the template
+        used, so every client renders the same membership the schedulers use.
+        ``mux_slots`` maps each multiplexed qubit to its hardware slot; legacy
+        slot gaps are preserved and can differ from normalized array indices.
 
     """
     try:
         topology = load_topology(topology_id)
-        return {"data": topology.model_dump()}
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        # Pydantic validation errors subclass ValueError: the template itself is broken.
+        logger.warning("Invalid topology %s: %s", topology_id, e)
+        raise HTTPException(status_code=422, detail=f"Invalid topology {topology_id}: {e}") from e
+    data = topology.model_dump()
+    data["mux_slots"] = topology.mux_slots()
+    data["standalone_qubits"] = topology.standalone_qubits()
+    return {"data": data}

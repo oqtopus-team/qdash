@@ -124,10 +124,11 @@ and how to migrate arguments that `CalibService` no longer accepts.
 
 | Target | Use when | Resolution |
 | --- | --- | --- |
-| `MuxTargets` | Hardware scheduling starts from MUX IDs | Expands each MUX to four qubits and removes `exclude_qids` |
+| `MuxTargets` | Hardware scheduling starts from MUX IDs | Expands each MUX to its topology members and removes `exclude_qids` |
 | `QubitTargets` | The caller selected individual qubits | Uses the supplied qubit IDs |
 | `CouplingTargets` | The flow starts from directed two-qubit pairs | Exposes both coupling IDs and their endpoint qubits |
-| `AllMuxTargets` | The flow targets a 64-qubit layout's MUX IDs 0–15 | Expands that fixed MUX set and applies exclusions |
+| `AllMuxTargets` | The flow targets every MUX of the chip | Expands the topology's declared MUXes (MUX IDs 0–15 without a topology) and applies exclusions |
+| `AllQubitTargets` | The flow targets every qubit, including standalone ones | Adds the topology's standalone qubits to its MUX members and applies exclusions |
 
 When both `mux_ids` and `qids` are supplied, standard templates prefer `mux_ids`. Preserve that
 rule across templates so UI and scheduled executions resolve the same request consistently.

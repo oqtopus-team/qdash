@@ -14,9 +14,11 @@ Extracted from TaskExecutor to isolate MUX distribution concerns.
 import logging
 from typing import TYPE_CHECKING
 
+from qdash.common.mux_mapping import resolve_chip_mux_mapping
 from qdash.workflow.engine.task.backend_saver import resolve_publish_targets
 
 if TYPE_CHECKING:
+    from qdash.common.mux_mapping import MuxMapping
     from qdash.datamodel.task_invocation import TaskInvocation
     from qdash.repository import FilesystemCalibDataSaver
     from qdash.workflow.calibtasks.results import RunResult
@@ -48,6 +50,8 @@ class MuxDistributor:
         Recorder for task history
     backend_saver : BackendSaver
         Backend-specific persistence handler
+    mux_mapping : MuxMapping | None
+        MUX membership; resolved from the execution's chip topology if None
     """
 
     def __init__(
@@ -58,6 +62,7 @@ class MuxDistributor:
         data_saver: "FilesystemCalibDataSaver",
         history_recorder: "TaskHistoryRecorder",
         backend_saver: "BackendSaver",
+        mux_mapping: "MuxMapping | None" = None,
     ) -> None:
         self._state_manager = state_manager
         self._execution_id = execution_id
@@ -65,6 +70,7 @@ class MuxDistributor:
         self._data_saver = data_saver
         self._history_recorder = history_recorder
         self._backend_saver = backend_saver
+        self._mux_mapping = mux_mapping
 
     def distribute(
         self,
@@ -94,22 +100,27 @@ class MuxDistributor:
         representative_qid : str
             The representative qubit ID (the one that executed the task)
         """
-        # Calculate other qids in the MUX (assuming 4 qubits per MUX)
-        try:
-            mux_base_qid = (int(representative_qid) // 4) * 4
-        except ValueError:
+        # Members come from the chip topology; an explicit mapping that does not
+        # know the representative raises instead of fanning out to guessed qids.
+        mapping = self._mux_mapping
+        if mapping is None:
+            mapping = resolve_chip_mux_mapping(
+                execution_service.project_id, execution_service.chip_id
+            )
+            self._mux_mapping = mapping
+        if mapping.unbounded and mapping.find_mux(representative_qid) is None:
             logger.warning(
                 "Could not parse representative_qid=%s as integer, skipping MUX distribution",
                 representative_qid,
             )
             return
+        mux_id = mapping.mux_of(representative_qid)
 
         # Distributed results belong to the same planned call as the representative.
         representative = self._state_manager.get_task(
             task.get_name(), task.get_task_type(), representative_qid
         )
-        for pos_in_mux in range(4):
-            target_qid = str(mux_base_qid + pos_in_mux)
+        for target_qid in mapping.qids_of(mux_id):
             if target_qid == representative_qid:
                 continue
             self._distribute_to_qid(

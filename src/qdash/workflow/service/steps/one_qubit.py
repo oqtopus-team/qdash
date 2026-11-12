@@ -77,11 +77,13 @@ def _execute_scheduled_one_qubit(
     if not qids:
         return {}
 
-    mux_ids = sorted({int(qid) // 4 for qid in qids})
+    # Standalone qubits are scheduled after the MUX stages, one at a time.
+    mux_ids, standalone_qids = session.mux_mapping.partition_qids(qids)
     config = OneQubitConfig(
         mux_ids=mux_ids,
         exclude_qids=[],
         qids=qids,
+        standalone_qids=standalone_qids,
         plan=plan,
     )
     strategy = get_one_qubit_strategy(mode)
@@ -201,7 +203,9 @@ class CustomOneQubit(CalibrationStep):
                 )
             else:
                 raw_results = self._execute_scheduled(
-                    session, targets.to_qids(session.chip_id), plan
+                    session,
+                    targets.to_qids(session.chip_id, mux_mapping=session.mux_mapping),
+                    plan,
                 )
 
         result = self._build_result(raw_results)
@@ -311,7 +315,7 @@ class OneQubitCheck(CalibrationStep):
                 session, targets=targets, plan=plan, stage_name=self.name, mode=self.mode
             )
         else:
-            qids = targets.to_qids(session.chip_id)
+            qids = targets.to_qids(session.chip_id, mux_mapping=session.mux_mapping)
             raw_results = self._execute_scheduled(session, qids, plan)
 
         result = self._build_result(raw_results)
@@ -415,7 +419,7 @@ class OneQubitFineTune(CalibrationStep):
         qids = (
             ctx.candidate_qids
             if ctx.candidate_qids or has_previous_selection
-            else targets.to_qids(session.chip_id)
+            else targets.to_qids(session.chip_id, mux_mapping=session.mux_mapping)
         )
 
         logger.info(

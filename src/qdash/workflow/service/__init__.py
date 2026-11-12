@@ -14,6 +14,7 @@ Targets:
     QubitTargets: Target specific qubit IDs
     CouplingTargets: Target specific coupling pairs
     AllMuxTargets: Target all MUXes (full chip)
+    AllQubitTargets: Target every qubit, multiplexed or standalone
 
 Steps:
     Step: Abstract base class for calibration steps
@@ -83,6 +84,7 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import (
     AllMuxTargets,
+    AllQubitTargets,
     CouplingTargets,
     MuxTargets,
     QubitTargets,
@@ -102,6 +104,7 @@ __all__ = [
     "FULL_1Q_TASKS_AFTER_CHECK",
     "FULL_2Q_TASKS",
     "AllMuxTargets",
+    "AllQubitTargets",
     # === High-level API ===
     "CalibContext",
     "CalibContextError",

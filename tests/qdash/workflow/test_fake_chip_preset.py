@@ -319,6 +319,13 @@ class _RecordingStageSession:
             lease=WorkerLease(execution_id=self.execution_id),
         )
 
+    @property
+    def mux_mapping(self) -> Any:
+        """The created chip's topology mapping, resolved as CalibSession does."""
+        from qdash.common.mux_mapping import resolve_chip_mux_mapping
+
+        return resolve_chip_mux_mapping(self.project_id, self.chip_id)
+
     def record_stage_result(self, stage_name: str, result: dict[str, Any]) -> None:
         self.stage_results[stage_name] = result
 

@@ -4,7 +4,7 @@ This module defines steps for initial qubit characterization:
 - BringUp: Resonator and qubit spectroscopy for frequency estimation
 
 Tasks include:
-- MUX-level tasks: Executed once per MUX for representative qubit (qid % 4 == 0)
+- MUX-level tasks: Executed once per MUX for representative qubit (local slot 0)
 - Qubit-level tasks: Executed for each qubit individually
 """
 
@@ -51,7 +51,7 @@ class BringUp(CalibrationStep):
     task outputs are passed through QDash state without reloading backend params
     between tasks.
 
-    MUX-level tasks run once per MUX for the representative qubit (qid % 4 == 0).
+    MUX-level tasks run once per MUX for the representative qubit (local slot 0).
     Qubit-level tasks run for each qubit individually.
 
     Provides: bringup
@@ -139,7 +139,15 @@ class BringUp(CalibrationStep):
             strategy = get_one_qubit_strategy(self.mode)
             raw_results = strategy.execute(session, config)
         else:
-            qids = targets.to_qids(session.chip_id)
+            qids = targets.to_qids(session.chip_id, mux_mapping=session.mux_mapping)
+            _, standalone_qids = session.mux_mapping.partition_qids(qids)
+            if standalone_qids:
+                # Bring-up runs MUX-level tasks; a standalone qubit has no MUX.
+                msg = (
+                    f"[{self.name}] MUX-level bring-up cannot target standalone qubits "
+                    f"{standalone_qids}; target MUXes or multiplexed qubits only"
+                )
+                raise ValueError(msg)
             raw_results = self._execute_direct(session, qids, plan)
 
         # Build typed result

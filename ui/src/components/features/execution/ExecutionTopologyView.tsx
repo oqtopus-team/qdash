@@ -25,6 +25,7 @@ import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
+import { buildMuxCellMap, clipMuxBoxes, type MuxGroupBox } from "@/lib/utils/mux-groups";
 
 interface ExecutionTopologyViewProps {
   chipId: string;
@@ -44,6 +45,8 @@ function aggregateStatus(tasks: Task[]): string {
   if (tasks.every((t) => t.status === "completed")) return "completed";
   return "pending";
 }
+
+const NO_MUX_GROUPS: MuxGroupBox[] = [];
 
 const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }) {
   return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
@@ -296,7 +299,14 @@ export function ExecutionTopologyView({
     showMuxBoundaries = false,
     qubits: topologyQubits,
     gridSize: topologyGridSize,
+    muxGroups = NO_MUX_GROUPS,
   } = useTopologyConfig(topologyId) ?? {};
+
+  // Cell -> MUX box, so boundaries follow the topology's actual MUX groups
+  const muxCellMap = useMemo(
+    () => buildMuxCellMap(muxGroups, topologyQubits),
+    [muxGroups, topologyQubits],
+  );
 
   const defaultGridSize = Math.ceil(Math.sqrt(chipSize));
 
@@ -425,12 +435,10 @@ export function ExecutionTopologyView({
         const row = Math.floor(index / gridCols);
         const col = index % gridCols;
 
-        const muxRow = Math.floor(row / muxSize);
-        const muxCol = Math.floor(col / muxSize);
-        const isEvenMux = (muxRow + muxCol) % 2 === 0;
+        const muxBox = muxCellMap.get(`${row},${col}`);
         const muxBgClass =
-          hasMux && showMuxBoundaries
-            ? isEvenMux
+          hasMux && showMuxBoundaries && muxBox
+            ? muxBox.isEven
               ? "ring-2 ring-inset ring-primary/20"
               : "ring-2 ring-inset ring-secondary/20"
             : "";
@@ -484,36 +492,22 @@ export function ExecutionTopologyView({
               gridTemplateRows: `repeat(${gridRows}, minmax(${baseCellSize}px, 1fr))`,
             }}
           >
-            {Array.from({
-              length: Math.pow(Math.ceil(gridCols / muxSize), 2),
-            }).map((_, idx) => {
-              const numMuxCols = Math.ceil(gridCols / muxSize);
-              const muxLocalRow = Math.floor(idx / numMuxCols);
-              const muxLocalCol = idx % numMuxCols;
-              const muxActualRow = muxLocalRow;
-              const muxActualCol = muxLocalCol;
-              const muxIndex = muxActualRow * Math.floor(gridSize / muxSize) + muxActualCol;
-              const startCol = muxLocalCol * muxSize + 1;
-              const startRow = muxLocalRow * muxSize + 1;
-              const spanCols = Math.min(muxSize, gridCols - muxLocalCol * muxSize);
-              const spanRows = Math.min(muxSize, gridRows - muxLocalRow * muxSize);
-              if (spanCols <= 0 || spanRows <= 0) return null;
-
-              return (
+            {clipMuxBoxes(muxGroups, { row: 0, col: 0, rows: gridRows, cols: gridCols }).map(
+              (box) => (
                 <div
-                  key={idx}
+                  key={box.muxId}
                   className="flex items-center justify-center"
                   style={{
-                    gridColumn: `${startCol} / span ${spanCols}`,
-                    gridRow: `${startRow} / span ${spanRows}`,
+                    gridColumn: `${box.col + 1} / span ${box.cols}`,
+                    gridRow: `${box.row + 1} / span ${box.rows}`,
                   }}
                 >
                   <div className="text-[0.45rem] md:text-[0.6rem] font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
-                    MUX{muxIndex}
+                    MUX{box.muxId}
                   </div>
                 </div>
-              );
-            })}
+              ),
+            )}
           </div>
         </div>
       )}

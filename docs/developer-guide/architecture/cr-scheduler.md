@@ -43,7 +43,7 @@ flowchart TD
     candidates -->|Yes| filterCandidates[Keep pairs with two candidates]
     candidates -->|No| direction
     filterCandidates --> direction[Select CR direction]
-    direction --> muxFilter[Remove pairs missing MUX mappings]
+    direction --> muxFilter[Remove pairs with unwired MUX qubits]
     muxFilter --> split{Same MUX?}
     split -->|Yes| fast[Intra-MUX pairs]
     split -->|No| slow[Inter-MUX pairs]
@@ -71,8 +71,10 @@ schedule.
 directed `(control, target)` pairs without the candidate, direction, or MUX-membership filters.
 It never adds, drops, or reverses a pair, so a run calibrates exactly the selection. It raises
 `ValueError` when the list is empty or repeats a pair, when a pair's exact `control-target` ID is
-not a repository coupling, or when either qubit is missing from `wiring.yaml`. Valid pairs then go
-through the same intra/inter-MUX split, conflict coloring, and chunking as `generate()`.
+not a repository coupling, or when either qubit is neither a member of a wired topology MUX nor a
+standalone qubit. MUX membership comes from the chip topology, as in `generate()`, and a chip whose
+topology declares no MUX needs no `wiring.yaml`. Valid pairs then go through the same
+intra/inter-MUX split, conflict coloring, and chunking as `generate()`.
 `metadata["direction_method"]` and `filtering_stats["direction_method"]` are `explicit`.
 
 ## Conflict Invariants
@@ -80,8 +82,14 @@ through the same intra/inter-MUX split, conflict coloring, and chunking as `gene
 Two CR pairs receive different colors when they:
 
 - share a qubit;
+- include a qubit without a MUX;
 - use any of the same MUXes; or
 - use MUXes whose wiring entries share a control, read-in, read-out, or pump module.
+
+A standalone qubit (one the topology lists in no MUX) has no wiring row, so its pairs are kept
+but always run alone in their group. A pair is intra-MUX only when both qubits are in the same
+declared MUX; two standalone qubits are not. `MuxMembershipFilter` keeps standalone pairs through
+`FilterContext.standalone_qids`.
 
 The final chunking step can reduce parallelism but cannot introduce a conflict. Execution code must
 preserve group order: the scheduler deliberately places all intra-MUX groups before inter-MUX

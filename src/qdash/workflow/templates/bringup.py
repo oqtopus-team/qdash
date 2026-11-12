@@ -97,7 +97,7 @@ def bringup(
 
     This flow runs MUX-level tasks (e.g., CheckResonatorSpectroscopy) that
     characterize the entire MUX unit. Tasks are executed only for the representative qubit
-    (qid % 4 == 0) of each MUX.
+    (local slot 0) of each MUX.
 
     Args:
         username: User name (from UI)

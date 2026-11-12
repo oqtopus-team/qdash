@@ -32,6 +32,9 @@ import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
+import { buildMuxCellMap, clipMuxBoxes, type MuxGroupBox } from "@/lib/utils/mux-groups";
+
+const NO_MUX_GROUPS: MuxGroupBox[] = [];
 
 interface QubitGridProps {
   chipId: string;
@@ -266,7 +269,14 @@ export function QubitGrid({
     showMuxBoundaries = false,
     qubits: topologyQubits,
     gridSize: topologyGridSize,
+    muxGroups = NO_MUX_GROUPS,
   } = useTopologyConfig(topologyId) ?? {};
+
+  // Cell -> MUX box, so boundaries follow the topology's actual MUX groups
+  const muxCellMap = useMemo(
+    () => buildMuxCellMap(muxGroups, topologyQubits),
+    [muxGroups, topologyQubits],
+  );
 
   // Calculate actual grid dimensions from topology qubit positions
   const { gridRows, gridCols } = useMemo(() => {
@@ -557,15 +567,11 @@ export function QubitGrid({
         const actualRow = displayGridStart.row + localRow;
         const actualCol = displayGridStart.col + localCol;
 
-        // Calculate MUX index for this cell
-        const muxRow = Math.floor(actualRow / muxSize);
-        const muxCol = Math.floor(actualCol / muxSize);
-        const isEvenMux = (muxRow + muxCol) % 2 === 0;
-
-        // MUX background class
+        // MUX background class from the MUX group covering this cell, if any
+        const muxBox = muxCellMap.get(`${actualRow},${actualCol}`);
         const muxBgClass =
-          hasMux && showMuxBoundaries
-            ? isEvenMux
+          hasMux && showMuxBoundaries && muxBox
+            ? muxBox.isEven
               ? "ring-2 ring-inset ring-primary/20"
               : "ring-2 ring-inset ring-secondary/20"
             : "";
@@ -627,36 +633,25 @@ export function QubitGrid({
               gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
             }}
           >
-            {Array.from({
-              length: Math.pow(Math.ceil(displayCols / muxSize), 2),
-            }).map((_, idx) => {
-              const numMuxCols = Math.ceil(displayCols / muxSize);
-              const muxLocalRow = Math.floor(idx / numMuxCols);
-              const muxLocalCol = idx % numMuxCols;
-              const muxActualRow = Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-              const muxActualCol = Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-              const muxIndex = muxActualRow * Math.floor(gridSize / muxSize) + muxActualCol;
-              const startCol = muxLocalCol * muxSize + 1;
-              const startRow = muxLocalRow * muxSize + 1;
-              const spanCols = Math.min(muxSize, displayCols - muxLocalCol * muxSize);
-              const spanRows = Math.min(muxSize, displayRows - muxLocalRow * muxSize);
-              if (spanCols <= 0 || spanRows <= 0) return null;
-
-              return (
-                <div
-                  key={idx}
-                  className="flex items-center justify-center"
-                  style={{
-                    gridColumn: `${startCol} / span ${spanCols}`,
-                    gridRow: `${startRow} / span ${spanRows}`,
-                  }}
-                >
-                  <div className="text-[0.45rem] md:text-[0.6rem] font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
-                    MUX{muxIndex}
-                  </div>
+            {clipMuxBoxes(muxGroups, {
+              row: displayGridStart.row,
+              col: displayGridStart.col,
+              rows: displayRows,
+              cols: displayCols,
+            }).map((box) => (
+              <div
+                key={box.muxId}
+                className="flex items-center justify-center"
+                style={{
+                  gridColumn: `${box.col + 1} / span ${box.cols}`,
+                  gridRow: `${box.row + 1} / span ${box.rows}`,
+                }}
+              >
+                <div className="text-[0.45rem] md:text-[0.6rem] font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
+                  MUX{box.muxId}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}
