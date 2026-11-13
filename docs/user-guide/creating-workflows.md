@@ -205,11 +205,11 @@ former names stops before it measures; see
 
 ## Schedule Two-Qubit Calibration
 
-Use **2Q Calibration** after the candidate qubits have the one-qubit calibration values
+Use **2Q Calibration from Qubits** after the candidate qubits have the one-qubit calibration values
 required by the selected tasks. CR (cross-resonance) scheduling chooses directed coupling pairs
 and groups pairs that can run together without sharing qubits or conflicting hardware.
 
-1. Open **New Flow** and choose **2Q Calibration** under **TEMPLATE**.
+1. Open **New Flow** and choose **2Q Calibration from Qubits** under **TEMPLATE**.
 2. Set a default `qids` list in the source for runs started from the application, as described in
    [Choose the Targets](#choose-the-targets). Include at least two connected qubits.
 3. Set the direction and parallelism defaults in the source using the settings below.
@@ -259,7 +259,7 @@ use `execution_mode="manual"`; see
 together, and it does not guarantee that every pair of a group runs at the same moment. QDash
 does not derive a maximum from the hardware: a calibration pipeline accepts 1 to 100, and each
 group runs on a pool of 16 worker processes, like a one-qubit stage, so pairs beyond 16 wait for
-a free worker. Lower it to run fewer pairs at once. In **2Q Calibration**, change the default in
+a free worker. Lower it to run fewer pairs at once. In **2Q Calibration from Qubits**, change the default in
 the flow function's parameters; this example lowers the template's `10` to `4`:
 
 ```python
@@ -279,10 +279,23 @@ def two_qubit(
 The template passes this value to `GenerateCRSchedule(max_parallel_ops=max_parallel_ops,
 inverse=inverse)`, which builds the groups before any pair is measured. The two-qubit step that
 follows reuses those groups as they are, so a `max_parallel_ops` value set on that step does not
-change them. A `schedule` written by hand in **2Q Scheduled Calibration** runs exactly as
-written: QDash does not check its groups for conflicts or split them. Pairs entered in
-**Coupling pairs** when you run a workflow are grouped by the rules above, with at most 10 pairs
-per group.
+change them. If a later filter removes a qubit, pairs containing that qubit are left out of the
+stored groups without regrouping the remaining pairs.
+
+To choose the directed pairs yourself and let QDash form their groups, select **2Q Automatic
+Pairs** in **New Flow**. Set `coupling_pairs` in the source, or select **Coupling pairs** in
+**Execute** for that run. `("0", "1")` and `("1", "0")` are different pairs. QDash checks each
+selected direction against the chip, adds no other pairs, and groups the selection using the
+rules above and the template's `max_parallel_ops` (10 by default). Earlier filters can remove
+pairs by removing either qubit.
+
+To write exact groups and their order, choose **2Q Manual Rounds** and follow
+[Write Two-Qubit Rounds](./manual-execution-rounds.md#write-two-qubit-rounds). Its rounds are
+validated before execution and cannot be replaced through **Execute**.
+
+Existing workflows using `SetCRSchedule` must migrate: move explicit groups into a two-qubit
+step's `rounds` with `execution_mode="manual"`, or select pairs with `CouplingTargets` for
+automatic grouping. The unchecked setter and **2Q Scheduled Calibration** template were removed.
 
 On QuEL-3, the module of a wiring ID such as `quel3-02-a01:4` is the whole box ID, so pairs whose
 MUXes use control ports of the same box, or readout ports of the same box, go to different

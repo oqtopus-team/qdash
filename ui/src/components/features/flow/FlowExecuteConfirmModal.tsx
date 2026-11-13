@@ -107,8 +107,8 @@ export function FlowExecuteConfirmModal({
       : targetDefaults?.mux_ids
         ? "mux"
         : null;
-  // Code defaults the flow cannot accept as an override (for example pairs
-  // without SetCRSchedule) are treated as unknown so they are never submitted.
+  // Code defaults the flow cannot accept as an override (for example pairs of
+  // a pipeline with custom steps) are treated as unknown so they are never submitted.
   const defaults = resolvedMode && modes.includes(resolvedMode) ? targetDefaults : null;
   const defaultMode: TargetMode = (defaults && resolvedMode) || modes[0];
   const defaultIds = defaults?.coupling_pairs
@@ -271,7 +271,7 @@ export function FlowExecuteConfirmModal({
                 <p className="label whitespace-normal">
                   {changed
                     ? mode === "pairs"
-                      ? "These pairs replace the coupling targets and CR schedule of each CalibService in this flow run. Parallel groups are generated from hardware constraints."
+                      ? "These directed pairs replace the coupling targets of each CalibService in this flow run. The scheduler groups exactly these pairs from hardware constraints; later filtering steps still apply."
                       : "These targets replace the initial targets of each CalibService in this flow run. Later filtering steps still apply."
                     : defaults
                       ? "Defaults from the saved workflow. Edit to override for this execution only."

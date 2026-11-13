@@ -109,21 +109,30 @@
   },
   {
     "id": "two_qubit",
-    "name": "2Q Calibration",
-    "description": "Two-qubit calibration from candidate qubits. Auto-generates optimal CR schedule with explicit checkerboard direction (forward/reverse). Default: forward.",
+    "name": "2Q Calibration from Qubits",
+    "description": "Two-qubit calibration from candidate qubits. The CR scheduler picks the coupling pairs among the given qids with an explicit checkerboard direction (forward/reverse, default forward) and groups them automatically.",
     "category": "production",
     "backend": "qubex",
     "filename": "two_qubit.py",
     "function_name": "two_qubit"
   },
   {
-    "id": "two_qubit_scheduled",
-    "name": "2Q Scheduled Calibration",
-    "description": "Two-qubit calibration with user-defined schedule. Specify qubit pairs and parallel groups directly.",
+    "id": "two_qubit_pairs",
+    "name": "2Q Automatic Pairs",
+    "description": "Two-qubit calibration on exactly the directed (control, target) pairs you select. The CR scheduler groups the pairs into parallel groups at run time without adding, dropping or reversing any pair. Accepts the execution dialog's coupling pair selection.",
     "category": "production",
     "backend": "qubex",
-    "filename": "two_qubit_scheduled.py",
-    "function_name": "two_qubit_scheduled"
+    "filename": "two_qubit_pairs.py",
+    "function_name": "two_qubit_pairs"
+  },
+  {
+    "id": "two_qubit_manual_rounds",
+    "name": "2Q Manual Rounds",
+    "description": "Two-qubit calibration in rounds of directed pairs written in the source. Rounds run in the written order and are checked against the chip before any pair runs; QDash never regroups them, and the execution dialog offers no target override.",
+    "category": "production",
+    "backend": "qubex",
+    "filename": "two_qubit_manual_rounds.py",
+    "function_name": "two_qubit_manual_rounds"
   },
   {
     "id": "fake_calibration",

@@ -254,7 +254,9 @@ def test_automatic_steps_keep_the_default_group_cap(monkeypatch: pytest.MonkeyPa
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             mappings.append(kwargs["mux_mapping"])
 
-        def generate(self, candidate_qubits: list[str], max_parallel_ops: int) -> Any:
+        def generate(
+            self, candidate_qubits: list[str], max_parallel_ops: int, inverse: bool = False
+        ) -> Any:
             requested.append(max_parallel_ops)
             return SimpleNamespace(parallel_groups=[])
 
@@ -297,9 +299,9 @@ def test_target_overrides_never_replace_manual_rounds() -> None:
         with pytest.raises(
             ValueError, match=r"Target overrides are not accepted.*custom_two_qubit"
         ):
-            override_pipeline(QubitTargets(["0"]), steps, override, _forbid)
+            override_pipeline(QubitTargets(["0"]), steps, override)
     # Without an override the steps pass through untouched.
-    assert override_pipeline(QubitTargets(["0"]), steps, None, _forbid)[1] == steps
+    assert override_pipeline(QubitTargets(["0"]), steps, None)[1] == steps
 
 
 def test_pipeline_specs_build_manual_steps() -> None:

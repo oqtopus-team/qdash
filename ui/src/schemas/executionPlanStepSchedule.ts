@@ -7,7 +7,7 @@
  */
 
 /**
- * manual: the exact rounds of the source, checked before execution. automatic: groups are formed by the scheduler at run time. fixed: a SetCRSchedule schedule used as written without checks. none: the step does not schedule targets.
+ * manual: the exact rounds of the source, checked before execution. automatic: groups are formed by the scheduler at run time. none: the step does not schedule targets.
  */
 export type ExecutionPlanStepSchedule = typeof ExecutionPlanStepSchedule[keyof typeof ExecutionPlanStepSchedule];
 
@@ -15,6 +15,5 @@ export type ExecutionPlanStepSchedule = typeof ExecutionPlanStepSchedule[keyof t
 export const ExecutionPlanStepSchedule = {
   manual: 'manual',
   automatic: 'automatic',
-  fixed: 'fixed',
   none: 'none',
 } as const;

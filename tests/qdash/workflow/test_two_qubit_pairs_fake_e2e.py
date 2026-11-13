@@ -1,11 +1,11 @@
-"""A UI-saved 2Q Scheduled Calibration flow runs a pair override end to end on the fake backend.
+"""A UI-saved 2Q Automatic Pairs flow runs its directed pairs end to end on the fake backend.
 
 The flow is saved and executed through the API exactly as the workflow editor does: the template
 source comes from the template catalog, and the saved default parameters hold only the username
 and chip ID. The test records the parameters and run context the API hands to Prefect, then runs
 the saved entrypoint file with exactly those values. CalibService, the target override, the CR
-scheduler on the wiring of a fake chip created through the API, SetCRSchedule and
-TwoQubitCalibration all run for real, with the in-memory MongoDB of ``tests/conftest.py``.
+scheduler on the wiring of a fake chip created through the API and TwoQubitCalibration all run
+for real, with the in-memory MongoDB of ``tests/conftest.py``.
 
 What is stubbed:
 
@@ -45,7 +45,7 @@ if TYPE_CHECKING:
 
 FLOW_NAME = "pairs_2q"
 TEMPLATES_DIR = REPO_ROOT / "src" / "qdash" / "workflow" / "templates"
-TEMPLATE_ID = "two_qubit_scheduled"
+TEMPLATE_ID = "two_qubit_pairs"
 
 
 class _RecordingDeployment:
@@ -216,6 +216,10 @@ def _assert_hardware_safe(groups: list[list[str]]) -> None:
                 assert not blocked & muxes_b, (first, second)
 
 
+def _executed(groups: list[list[str]]) -> list[str]:
+    return sorted(pair for group in groups for pair in group)
+
+
 def test_selected_pairs_run_in_their_direction_on_the_fake_backend(
     saved_flow: dict[str, Any],
     test_client: TestClient,
@@ -229,75 +233,91 @@ def test_selected_pairs_run_in_their_direction_on_the_fake_backend(
     )
 
     # The API forwards the selection to the template parameter of the same name
-    # and to the run context; it never fills in ``schedule``.
+    # and to the run context.
     assert run["parameters"]["coupling_pairs"] == pairs
-    assert "schedule" not in run["parameters"]
     assert run["context"]["qdash_target_override"]["coupling_pairs"] == pairs
 
-    # Exactly the selected directed pairs run, 1-0 as well as 0-1.
-    executed = [pair for group in executed_pairs for pair in group]
-    assert sorted(executed) == ["0-1", "1-0", "4-5"]
-    assert sorted(result["candidate_couplings"]) == ["0-1", "1-0", "4-5"]
+    # Exactly the selected directed pairs run, 1-0 as well as 0-1, and no other pair.
+    assert _executed(executed_pairs) == ["0-1", "1-0", "4-5"]
+    assert sorted(result["two_qubit"].couplings) == ["0-1", "1-0", "4-5"]
     # The run grouped the pairs by the fake chip's wiring instead of one pair per
     # group: 0-1 and 4-5 (MUX 0 and 1) run together, 1-0 shares qubits with 0-1.
     assert len(executed_pairs) == 2
     assert any({"0-1", "4-5"} <= set(group) for group in executed_pairs)
     _assert_hardware_safe(executed_pairs)
-    assert result["metadata"]["cr_schedule"] == [
-        [tuple(pair.split("-")) for pair in group] for group in executed_pairs
-    ]
 
 
-def test_selected_pairs_replace_a_schedule_passed_at_execution(
+def test_selected_pairs_replace_the_saved_pairs(
     saved_flow: dict[str, Any],
     test_client: TestClient,
     coordinator: _RecordingCoordinator,
     executed_pairs: list[list[str]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    source_schedule = [[["4", "5"]], [["0", "1"]]]
     run, _ = _execute(
         test_client,
         coordinator,
         monkeypatch,
         {
-            "parameters": {"schedule": source_schedule},
+            "parameters": {"coupling_pairs": [["4", "5"], ["0", "1"]]},
             "target_override": {"coupling_pairs": [["5", "4"]]},
         },
     )
 
-    assert run["parameters"]["schedule"] == source_schedule
+    assert run["parameters"]["coupling_pairs"] == [["5", "4"]]
     assert executed_pairs == [["5-4"]]
 
 
-def test_without_an_override_the_source_schedule_runs_unchanged(
+def test_without_an_override_the_saved_pairs_are_grouped_automatically(
     saved_flow: dict[str, Any],
     test_client: TestClient,
     coordinator: _RecordingCoordinator,
     executed_pairs: list[list[str]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The source groups stay as written: with an override the scheduler would
-    # run 0-1 and 4-5 together, without one nothing is regrouped.
-    source_schedule = [[["0", "1"]], [["4", "5"]], [["5", "4"]]]
+    pairs = [["0", "1"], ["4", "5"], ["5", "4"]]
     run, result = _execute(
-        test_client, coordinator, monkeypatch, {"parameters": {"schedule": source_schedule}}
+        test_client, coordinator, monkeypatch, {"parameters": {"coupling_pairs": pairs}}
     )
 
     assert "context" not in run
-    assert "coupling_pairs" not in run["parameters"]
-    assert executed_pairs == [["0-1"], ["4-5"], ["5-4"]]
-    assert result["candidate_couplings"] == ["0-1", "4-5", "5-4"]
+    # Only the listed pairs run; 0-1 and 4-5 share a group, 5-4 shares qubits with 4-5.
+    assert _executed(executed_pairs) == ["0-1", "4-5", "5-4"]
+    assert len(executed_pairs) == 2
+    assert any({"0-1", "4-5"} <= set(group) for group in executed_pairs)
+    _assert_hardware_safe(executed_pairs)
+    assert sorted(result["two_qubit"].couplings) == ["0-1", "4-5", "5-4"]
 
 
-def test_without_targets_the_run_fails_before_calibrating(
+def test_the_preview_describes_automatic_groups_of_the_listed_pairs(
+    saved_flow: dict[str, Any],
+    test_client: TestClient,
+) -> None:
+    response = test_client.get(
+        f"/flows/{FLOW_NAME}/execution-plan", headers=HEADERS, params={"chip_id": CHIP_ID}
+    )
+    assert response.status_code == 200, response.text
+    plan = response.json()
+
+    assert plan["status"] == "resolved"
+    assert plan["target_override_allowed"] is True
+    [run] = plan["runs"]
+    [step] = run["steps"]
+    assert step["type"] == "TwoQubitCalibration"
+    assert step["schedule"] == "automatic"
+    assert step["rounds"] == []
+    assert "exactly the listed directed pairs" in step["summary"]
+    assert "at most 10 pairs" in step["summary"]
+
+
+def test_without_pairs_the_run_fails_before_calibrating(
     saved_flow: dict[str, Any],
     test_client: TestClient,
     coordinator: _RecordingCoordinator,
     executed_pairs: list[list[str]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    with pytest.raises(ValueError, match="Specify a non-empty schedule or coupling_pairs"):
+    with pytest.raises(ValueError, match="Specify coupling_pairs"):
         _execute(test_client, coordinator, monkeypatch, {})
 
     assert executed_pairs == []
@@ -317,3 +337,21 @@ def test_unknown_pairs_are_rejected_before_dispatch(
     assert response.status_code == 400
     assert "0-63" in response.json()["detail"]
     assert coordinator.runs == []
+
+
+def test_unknown_saved_pairs_stop_the_run_before_any_pair(
+    saved_flow: dict[str, Any],
+    test_client: TestClient,
+    coordinator: _RecordingCoordinator,
+    executed_pairs: list[list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(ValueError, match="not found on chip"):
+        _execute(
+            test_client,
+            coordinator,
+            monkeypatch,
+            {"parameters": {"coupling_pairs": [["0", "1"], ["0", "63"]]}},
+        )
+
+    assert executed_pairs == []

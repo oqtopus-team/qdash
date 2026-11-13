@@ -168,6 +168,9 @@ def two_qubit(
     # Define Pipeline Steps
     # =========================================================================
 
+    # GenerateCRSchedule picks and groups the pairs at run time. To calibrate
+    # selected directed pairs, use the 2Q Automatic Pairs template; to write
+    # the rounds yourself, use the 2Q Manual Rounds template.
     steps: list[Step] = [
         # Generate CR schedule from candidate qubits with explicit direction
         GenerateCRSchedule(

@@ -94,7 +94,7 @@ conflict rules of `group_cr_pairs_by_conflict()` (shared MUX, MUXes in `mux_conf
 pairs fail in `parse_pair_rounds()`. Unlike automatic grouping, manual rounds may mix intra- and
 inter-MUX pairs. A pair with a standalone qubit must be alone in its round, as
 `schedule_pairs()` never groups it. `pair_candidate_issues()` requires both qubits of each pair among the current
-candidates. `SetCRSchedule` remains the unchecked path. The user procedure is
+candidates. The user procedure is
 [Write Two-Qubit Rounds](../../user-guide/manual-execution-rounds.md#write-two-qubit-rounds).
 
 ## Conflict Graph and Groups
@@ -202,18 +202,18 @@ diagnostics.
 
 `GenerateCRSchedule` reads `StepContext.candidate_qids`, stores `parallel_groups` in
 `StepContext.metadata["cr_schedule"]`, and publishes the flattened coupling IDs in
-`candidate_couplings`. `SetCRSchedule` supplies an explicit schedule through the same metadata key
-as written: it neither checks the groups for conflicts nor colors or chunks them.
-`MuxTargets` and `QubitTargets` also use `CRScheduler` to resolve eligible coupling IDs. A
-per-run coupling pair override replaces each `SetCRSchedule` schedule with the result of
-`schedule_pairs()` with its default `max_parallel_ops=10` before the pipeline starts; see
-[Per-run Target Overrides](../workflow/services.md#per-run-target-overrides).
+`candidate_couplings`. With `CouplingTargets`, it calls `schedule_pairs()` on only the listed
+directed pairs whose qubits remain candidates. `inverse=True` is rejected for these targets,
+because their direction is explicit. With `MuxTargets` or `QubitTargets`, it generates pairs
+from the current candidate qubits. A per-run pair override replaces the `CouplingTargets` before
+the pipeline starts; see [Per-run Target Overrides](../workflow/services.md#per-run-target-overrides).
 
 `CustomTwoQubit` and `TwoQubitCalibration` reuse the stored schedule when present; otherwise they
-generate one internally. When reusing a schedule, their own `max_parallel_ops` does not regroup
-it. Set direction and parallelism on `GenerateCRSchedule` before execution. Changing candidate
-qubits or calibration values after generation does not refresh the stored groups: place filters
-before schedule generation, or regenerate the schedule after a change.
+schedule pairs using the same target-dependent rules. Reuse drops pairs whose qubits were
+filtered out since generation and drops empty groups, without regrouping the remaining pairs.
+Their own `max_parallel_ops` does not change stored groups: set the cap on `GenerateCRSchedule`,
+or regenerate after a change. An empty generated schedule replaces any previously stored groups.
+Manual steps validate and run their own rounds and ignore stored automatic groups.
 
 The execution steps run groups sequentially through `_run_coupling_groups()` and submit the
 coupling pairs of a group to isolated worker processes with

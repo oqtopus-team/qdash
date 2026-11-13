@@ -50,7 +50,6 @@ def plan_pipeline_resources(
         GenerateCRSchedule,
         OneQubitCheck,
         OneQubitFineTune,
-        SetCRSchedule,
         TwoQubitCalibration,
     )
 
@@ -77,16 +76,11 @@ def plan_pipeline_resources(
             assert isinstance(step, ConfigureAll)
             if step.mux_ids is not None:
                 scope = merge_resource_scopes(scope, scope_of({"mux_ids": step.mux_ids}))
-        elif type(step) is SetCRSchedule:
-            assert isinstance(step, SetCRSchedule)
-            qids = [qid for group in step.schedule for pair in group for qid in pair]
-            if qids:
-                scope = merge_resource_scopes(scope, scope_of({"qids": qids}))
         elif type(step) not in target_scoped_steps:
             return ExecutionResourceScope(chip_id, exclusive=True)
         manual = getattr(step, "rounds", None) if type(step) in target_scoped_steps else None
         if manual and getattr(step, "execution_mode", None) == "manual":
-            # Manual rounds name their own qubits; reserve them as SetCRSchedule does.
+            # Manual rounds name their own qubits; reserve them too.
             qids = [
                 qid
                 for round_ in manual

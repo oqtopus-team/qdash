@@ -53,7 +53,8 @@ TEMPLATES: dict[str, tuple[str, dict[str, Any]]] = {
     "simple": ("simple_calibration", {"mux_ids": [0]}),
     "fake_backend": ("fake_calibration", {"qids": ["0"]}),
     "two_qubit": ("two_qubit", {"qids": ["0", "1"]}),
-    "two_qubit_scheduled": ("two_qubit_scheduled", {"schedule": [[["0", "1"]]]}),
+    "two_qubit_pairs": ("two_qubit_pairs", {"coupling_pairs": [["0", "1"]]}),
+    "two_qubit_manual_rounds": ("two_qubit_manual_rounds", {}),
 }
 
 

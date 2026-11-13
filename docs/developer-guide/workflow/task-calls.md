@@ -31,7 +31,7 @@ pointer to the [migration](#migrate-saved-flows). Built-in steps (`OneQubitCheck
 `qdash.workflow.service.tasks`.
 
 A flow parameter annotated `list[TaskCall] | None`, as in the Simple Calibration, Fake Backend
-Calibration, 2Q Calibration, and 2Q Scheduled Calibration templates, takes calls as JSON objects
+Calibration, 2Q Calibration from Qubits, 2Q Automatic Pairs, and 2Q Manual Rounds templates, takes calls as JSON objects
 in the `parameters` of `POST /flows/{name}/execute` (the pi `qdash_execute_flow` tool sends the
 same body; the workflow editor's run dialog sends no `tasks`, so the source default applies), for
 example:

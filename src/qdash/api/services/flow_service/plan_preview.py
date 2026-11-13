@@ -71,11 +71,51 @@ _OTHER_SUMMARIES = {
     "ConfigureAll": "Configures every box of the targeted MUXes once.",
     "FilterByStatus": "Keeps the qubits whose referenced step succeeded, at run time.",
     "FilterByMetric": "Keeps the qubits whose metric meets the threshold, at run time.",
-    "GenerateCRSchedule": (
-        "Generates a CR schedule from the candidate qubits at run time for later automatic "
-        "two-qubit steps."
+}
+
+# Where the pairs of an automatic two-qubit step or GenerateCRSchedule come from,
+# by the run's target class; None when the source does not state the class.
+_PAIR_SOURCES: dict[str | None, str] = {
+    "CouplingTargets": (
+        "groups exactly the listed directed pairs of the targets whose qubits are still "
+        "candidates; no pair is added or reversed"
+    ),
+    "MuxTargets": "picks the pairs among the candidate qubits and groups them",
+    "QubitTargets": "picks the pairs among the candidate qubits and groups them",
+    None: (
+        "groups the listed pairs of CouplingTargets, or picks pairs among the candidate qubits "
+        "for other targets"
     ),
 }
+
+_GROUP_LIMITS = (
+    "Groups avoid shared qubits, MUXes and modeled modules and hold at most {cap} pairs "
+    "(max_parallel_ops)."
+)
+
+
+def _pair_source(target_type: str | None) -> str:
+    return _PAIR_SOURCES.get(target_type) or _PAIR_SOURCES[None]
+
+
+def _generate_summary(step: StaticStep, target_type: str | None) -> str:
+    cap = step.max_parallel_ops or DEFAULT_MAX_PARALLEL_OPS
+    return (
+        f"At run time the CR scheduler {_pair_source(target_type)}, for later automatic "
+        f"two-qubit steps. " + _GROUP_LIMITS.format(cap=cap)
+    )
+
+
+def _automatic_pair_summary(step: StaticStep, target_type: str | None, after_generate: bool) -> str:
+    if after_generate:
+        return (
+            "Runs the groups of the earlier GenerateCRSchedule. Pairs whose qubits a filter "
+            "removed since are left out; the remaining groups are not regrouped."
+        )
+    cap = step.max_parallel_ops or DEFAULT_MAX_PARALLEL_OPS
+    return f"At run time the CR scheduler {_pair_source(target_type)}. " + _GROUP_LIMITS.format(
+        cap=cap
+    )
 
 
 def _issue(issue: RoundIssue) -> ExecutionPlanIssue:
@@ -125,6 +165,9 @@ def _plan_step(
     step: StaticStep,
     candidates: list[str] | None,
     model: Callable[[], ChipRoundModel],
+    *,
+    target_type: str | None = None,
+    after_generate: bool = False,
 ) -> ExecutionPlanStep:
     entry = STEP_CATALOG.get(step.type)
     scope = (entry.task_scope if entry is not None else None) or "none"
@@ -136,34 +179,14 @@ def _plan_step(
         "execution_mode": step.execution_mode,
         "tasks": list(step.tasks) if step.tasks is not None else None,
     }
-    if step.type == "SetCRSchedule":
-        schedule = step.schedule if isinstance(step.schedule, (list, tuple)) else []
-        return ExecutionPlanStep(
-            **{**base, "scope": "coupling", "execution_mode": None},
-            schedule="fixed",
-            rounds=[
-                ExecutionPlanRound(
-                    number=number,
-                    targets=[
-                        f"{pair[0]}-{pair[1]}"
-                        for pair in group
-                        if isinstance(pair, (list, tuple)) and len(pair) == 2
-                    ],
-                )
-                for number, group in enumerate(schedule, start=1)
-                if isinstance(group, (list, tuple))
-            ],
-            summary=(
-                "Sets the CR schedule that later automatic two-qubit steps run as written. "
-                "SetCRSchedule groups are not checked against the chip; use a manual step to "
-                "have rounds checked before execution."
-            ),
-        )
     if step.type not in ONE_QUBIT_MODE_STEPS | TWO_QUBIT_MODE_STEPS:
         mode_summary = _AUTOMATIC_SUMMARIES.get(step.execution_mode or "")
-        summary = _OTHER_SUMMARIES.get(step.type) or (
-            f"Scheduled automatically at run time. {mode_summary}" if mode_summary else ""
-        )
+        if step.type == "GenerateCRSchedule":
+            summary = _generate_summary(step, target_type)
+        else:
+            summary = _OTHER_SUMMARIES.get(step.type) or (
+                f"Scheduled automatically at run time. {mode_summary}" if mode_summary else ""
+            )
         return ExecutionPlanStep(
             **base,
             schedule="automatic" if step.type == "BringUp" else "none",
@@ -173,12 +196,7 @@ def _plan_step(
     rounds, issues = _parse_rounds(step)
     if step.execution_mode != "manual" or rounds is None:
         if step.type in TWO_QUBIT_MODE_STEPS:
-            cap = step.max_parallel_ops or DEFAULT_MAX_PARALLEL_OPS
-            summary = (
-                "Pairs come from an earlier GenerateCRSchedule or SetCRSchedule, or are generated "
-                "from the candidate qubits at run time. Groups avoid shared qubits, MUXes and "
-                f"modeled modules and hold at most {cap} pairs (max_parallel_ops)."
-            )
+            summary = _automatic_pair_summary(step, target_type, after_generate)
         else:
             summary = _AUTOMATIC_SUMMARIES.get(step.execution_mode or "", "")
         return ExecutionPlanStep(
@@ -240,14 +258,25 @@ def build_execution_plan(
                 else None
             )
             selection_changed = False
+            generated = False
             steps: list[ExecutionPlanStep] = []
             for index, step in enumerate(run.steps, start=1):
                 # OneQubitCheck always runs on the run's targets; other steps read
-                # the candidates, which a filter or SetCRSchedule replaces at run time.
+                # the candidates, which a filter replaces at run time.
                 known = step.type == "OneQubitCheck" or not selection_changed
-                steps.append(_plan_step(index, step, initial if known else None, model))
-                if step.type in {"FilterByStatus", "FilterByMetric", "SetCRSchedule"}:
+                steps.append(
+                    _plan_step(
+                        index,
+                        step,
+                        initial if known else None,
+                        model,
+                        target_type=run.target_type,
+                        after_generate=generated,
+                    )
+                )
+                if step.type in {"FilterByStatus", "FilterByMetric"}:
                     selection_changed = True
+                generated = generated or step.type == "GenerateCRSchedule"
             runs.append(ExecutionPlanRun(targets=run.targets, steps=steps))
     else:
         for step in static.manual_steps:

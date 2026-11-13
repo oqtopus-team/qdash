@@ -22642,11 +22642,10 @@
             "enum": [
               "manual",
               "automatic",
-              "fixed",
               "none"
             ],
             "title": "Schedule",
-            "description": "manual: the exact rounds of the source, checked before execution. automatic: groups are formed by the scheduler at run time. fixed: a SetCRSchedule schedule used as written without checks. none: the step does not schedule targets."
+            "description": "manual: the exact rounds of the source, checked before execution. automatic: groups are formed by the scheduler at run time. none: the step does not schedule targets."
           },
           "rounds": {
             "items": {

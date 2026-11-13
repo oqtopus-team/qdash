@@ -1428,14 +1428,15 @@ def pipeline_wiring(tmp_path, monkeypatch):
     monkeypatch.setattr(execution_resources, "resolve_config_base_path", lambda: tmp_path)
 
 
-def test_pipeline_plan_includes_later_configuration_and_schedule(pipeline_wiring):
+def test_pipeline_plan_includes_later_configuration_and_target_pairs(pipeline_wiring):
     from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
-    from qdash.workflow.service.steps import ConfigureAll, OneQubitCheck, SetCRSchedule
+    from qdash.workflow.service.steps import ConfigureAll, OneQubitCheck, TwoQubitCalibration
+    from qdash.workflow.service.targets import CouplingTargets
 
     scope = plan_pipeline_resources(
         "chip-1",
-        QubitTargets(["0"]),
-        [OneQubitCheck(), ConfigureAll(mux_ids=[1]), SetCRSchedule(schedule=[[("8", "12")]])],
+        CouplingTargets([("0", "1"), ("8", "12")]),
+        [OneQubitCheck(), ConfigureAll(mux_ids=[1]), TwoQubitCalibration()],
     )
     assert not scope.exclusive
     assert {r for r in scope.resources if r.startswith("mux:")} == {
@@ -1447,18 +1448,17 @@ def test_pipeline_plan_includes_later_configuration_and_schedule(pipeline_wiring
 
 
 def test_coupling_override_plans_only_the_selected_pairs(pipeline_wiring):
-    """A source schedule replaced by a pair override no longer reserves its qubits."""
+    """Source pairs replaced by a pair override no longer reserve their qubits."""
     from qdash.datamodel.flow_targets import FlowTargetOverride
     from qdash.workflow.service.flow_targets import override_pipeline
     from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
-    from qdash.workflow.service.steps import SetCRSchedule, TwoQubitCalibration
+    from qdash.workflow.service.steps import TwoQubitCalibration
     from qdash.workflow.service.targets import CouplingTargets
 
     targets, steps = override_pipeline(
         CouplingTargets([("8", "12")]),
-        [SetCRSchedule(schedule=[[("8", "12")]]), TwoQubitCalibration()],
+        [TwoQubitCalibration()],
         FlowTargetOverride(coupling_pairs=[["1", "0"]]),
-        lambda pairs: [pairs],
     )
     scope = plan_pipeline_resources("chip-1", targets, steps)
     assert not scope.exclusive
@@ -1549,14 +1549,14 @@ def test_pipeline_rejects_unplanned_targets_before_later_hardware_step(
     pipeline_wiring,
     monkeypatch,
 ):
-    from qdash.workflow.service.steps import CustomOneQubit, SetCRSchedule
+    from qdash.workflow.service.steps import CustomOneQubit, GenerateCRSchedule
 
     def change_targets(self, session, targets, ctx):
-        ctx.candidate_qids = ["12"]  # The declared schedule only reserved MUX 0.
+        ctx.candidate_qids = ["12"]  # The declared targets only reserved MUX 0.
         return ctx
 
     run_step = MagicMock()
-    monkeypatch.setattr(SetCRSchedule, "execute", change_targets)
+    monkeypatch.setattr(GenerateCRSchedule, "execute", change_targets)
     monkeypatch.setattr(CustomOneQubit, "execute", run_step)
     session = _session(
         username="alice",
@@ -1565,9 +1565,7 @@ def test_pipeline_rejects_unplanned_targets_before_later_hardware_step(
         lock_repo=pipeline_execution_env.lock,
     )
     with pytest.raises(RuntimeError, match="outside the workflow"):
-        session.run_pipeline(
-            QubitTargets(["0"]), [SetCRSchedule(schedule=[[("0", "1")]]), CustomOneQubit()]
-        )
+        session.run_pipeline(QubitTargets(["0", "1"]), [GenerateCRSchedule(), CustomOneQubit()])
     run_step.assert_not_called()
     assert not pipeline_execution_env.lock.locked
 

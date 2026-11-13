@@ -132,6 +132,7 @@ describe("coupling pair targets", () => {
       target: { value: " 63-85, 85-63\n64-42  39-61\n" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+    expect(screen.getByText(/scheduler groups exactly these pairs/)).toBeInTheDocument();
     expect(onConfirm).toHaveBeenCalledWith({
       coupling_pairs: [
         ["63", "85"],

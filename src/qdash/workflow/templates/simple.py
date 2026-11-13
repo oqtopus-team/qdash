@@ -25,6 +25,33 @@ Example:
         mux_ids=[0, 1],
         tasks=[TaskCall(name="CheckRamsey"), TaskCall(name="CheckT1")],
     )
+
+Manual rounds:
+    The ``execution_mode`` parameter of this flow is meant for the scheduled
+    modes; passing ``"manual"`` to ``simple_calibration`` fails because the
+    flow has no ``rounds`` parameter to give the step. To choose the rounds
+    yourself, edit a copy of this template: replace the entire target-selection
+    block (including its ``mux_ids or qids is required`` check) with the exact
+    qubits of the rounds and set ``execution_mode="manual"`` and ``rounds`` on
+    the step itself::
+
+        targets = QubitTargets(qids=["0", "8", "1", "9"])
+        steps = [
+            CustomOneQubit(
+                step_name="simple_tasks",
+                execution_mode="manual",
+                rounds=[["0", "8"], ["1", "9"]],
+                tasks=[TaskCall(name="CheckRabi"), TaskCall(name="CheckT1")],
+            ),
+        ]
+
+    Rounds run one after another in the written order, and the qubits of one
+    round run in parallel; each qubit runs the whole task list. The rounds must
+    name exactly the step's current qubits (the targets, without excluded
+    qubits), and QDash checks them against the chip's topology and wiring (for
+    example, the qubits of one round must use different MUXes) before any qubit
+    runs. Execute offers no target override for a manual workflow, so keep the
+    targets in the source. See docs/user-guide/manual-execution-rounds.md.
 """
 
 from typing import Any
@@ -104,7 +131,9 @@ def simple_calibration(
     else:
         raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
-    # Define steps; a custom task list runs as given
+    # Define steps; a custom task list runs as given.
+    # For manual rounds, edit this step as shown in the module docstring
+    # ("Manual rounds"); the execution_mode parameter cannot enable them.
     steps = [
         CustomOneQubit(
             step_name="simple_tasks",

@@ -1197,7 +1197,7 @@ async def test_target_override_uses_context_without_adding_unknown_parameters(tm
 PAIR_FLOW = """
 def my_flow(username, chip_id, schedule, project_id=None):
     targets = CouplingTargets(pairs=[pair for group in schedule for pair in group])
-    steps = [SetCRSchedule(schedule=schedule), TwoQubitCalibration()]
+    steps = [GenerateCRSchedule(), TwoQubitCalibration()]
     return CalibService(username, chip_id, project_id=project_id).run(targets, steps=steps)
 """
 
@@ -1214,7 +1214,7 @@ def _pair_service(tmp_path: Path, coordinator: _StubCoordinator, **flow: Any) ->
 
 
 @pytest.mark.asyncio
-async def test_get_flow_offers_pairs_only_for_scheduled_coupling_flows(tmp_path: Path) -> None:
+async def test_get_flow_offers_pairs_only_for_automatic_coupling_flows(tmp_path: Path) -> None:
     coordinator = _StubCoordinator()
     response = await _pair_service(tmp_path, coordinator).get_flow("my_flow", "op", "project-1")
     assert response.target_modes == ["coupling_pairs"]

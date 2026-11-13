@@ -20,7 +20,8 @@ leaves the plan unresolved. Without manual rounds the execution dialog may
 replace the target parameters, so their saved values count as unknown.
 
 The plan reports what the source states: exact manual rounds, and for
-automatic modes only that the scheduler forms the groups at run time.
+automatic modes only that the scheduler forms the groups at run time (from
+the listed pairs of ``CouplingTargets``, or from the candidate qubits).
 """
 
 from __future__ import annotations
@@ -57,10 +58,8 @@ STEP_TYPES = frozenset(
         "FilterByStatus",
         "FilterByMetric",
         "GenerateCRSchedule",
-        "SetCRSchedule",
     }
 )
-_DEFAULT_NAMES = {"SetCRSchedule": "set_cr_schedule"}
 _DEFAULT_MODES = {
     **dict.fromkeys(ONE_QUBIT_MODE_STEPS, "parallel_by_round"),
     **dict.fromkeys(TWO_QUBIT_MODE_STEPS, "automatic"),
@@ -149,7 +148,6 @@ class StaticStep:
     tasks: tuple[str, ...] | None = None
     max_parallel_ops: int | None = None
     max_parallel_ops_set: bool = False
-    schedule: Any = None
     literal: bool = True
     """False when an argument could not be read; such a step is not checked."""
 
@@ -160,6 +158,8 @@ class StaticRun:
 
     targets: FlowTargetOverride | None
     steps: tuple[StaticStep, ...]
+    target_type: str | None = None
+    """Target class, e.g. ``CouplingTargets``, even when its values are not literal."""
 
 
 @dataclass(frozen=True)
@@ -185,6 +185,7 @@ class _PlanResolver(_Resolver):
         self.step_lists: dict[str, tuple[StaticStep, ...]] = {}
         self.step_values: dict[str, StaticStep] = {}
         self.target_values: dict[str, FlowTargetOverride | None] = {}
+        self.target_types: dict[str, str] = {}
         self.unresolved: dict[str, str] = {}
 
     def rebind(self, name: str) -> None:
@@ -198,6 +199,7 @@ class _PlanResolver(_Resolver):
         self.step_lists.pop(name, None)
         self.step_values.pop(name, None)
         self.target_values.pop(name, None)
+        self.target_types.pop(name, None)
         self.unresolved.pop(name, None)
 
     def assign(self, name: str, value: ast.expr | None) -> None:
@@ -213,6 +215,7 @@ class _PlanResolver(_Resolver):
                 assert isinstance(value, ast.Call)
                 self.step_values[name] = _static_step(value, self)
             elif isinstance(value, ast.Call) and _call_name(value) in _OVERRIDABLE_TARGETS:
+                self.target_types[name] = _call_name(value)
                 self.target_values[name] = _target(value, self)
         except _Unresolved as exc:
             self.unresolved[name] = str(exc)
@@ -269,10 +272,7 @@ def _static_step(node: ast.Call, resolver: _Resolver) -> StaticStep:
         raise _Unresolved(f"{label} unpacks its arguments")
     keywords = {kw.arg: kw.value for kw in node.keywords if kw.arg is not None}
     if node.args:
-        if step_type == "SetCRSchedule" and len(node.args) == 1:
-            keywords.setdefault("schedule", node.args[0])
-        else:
-            raise _Unresolved(f"{label} takes positional arguments; pass them by keyword")
+        raise _Unresolved(f"{label} takes positional arguments; pass them by keyword")
 
     def value(key: str, default: Any = None) -> Any:
         return (
@@ -283,7 +283,7 @@ def _static_step(node: ast.Call, resolver: _Resolver) -> StaticStep:
     if step_type in {"CustomOneQubit", "CustomTwoQubit"}:
         name = value("step_name", entry.name if entry else step_type)
     else:
-        name = value("step_id") or (entry.name if entry else _DEFAULT_NAMES[step_type])
+        name = value("step_id") or (entry.name if entry else step_type)
     if step_type == "FilterByMetric" and "step_id" not in keywords:
         metric = value("metric")
         name = f"filter_by_{metric}" if isinstance(metric, str) else name
@@ -315,7 +315,6 @@ def _static_step(node: ast.Call, resolver: _Resolver) -> StaticStep:
         tasks=tasks,
         max_parallel_ops=cap if isinstance(cap, int) and not isinstance(cap, bool) else None,
         max_parallel_ops_set="max_parallel_ops" in keywords,
-        schedule=value("schedule") if step_type == "SetCRSchedule" else None,
     )
 
 
@@ -521,13 +520,22 @@ def _resolve_runs(
         targets, steps = arguments.get("targets"), arguments.get("steps")
         if targets is None or steps is None:
             raise _Unresolved("CalibService.run is called without targets and steps")
+        target_type: str | None = None
         if isinstance(targets, ast.Call) and _call_name(targets) in _OVERRIDABLE_TARGETS:
             target = _target(targets, resolver)
+            target_type = _call_name(targets)
         elif isinstance(targets, ast.Name):
             target = resolver.target_values.get(targets.id)
+            target_type = resolver.target_types.get(targets.id)
         else:
             target = None
-        runs.append(StaticRun(targets=target, steps=_static_steps(steps, resolver)))
+        runs.append(
+            StaticRun(
+                targets=target,
+                steps=_static_steps(steps, resolver),
+                target_type=target_type,
+            )
+        )
 
     def may_end(statement: ast.stmt, in_with: bool, why: str) -> None:
         nonlocal may_skip

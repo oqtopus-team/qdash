@@ -224,7 +224,9 @@ def test_custom_two_qubit_uses_saved_schedule_after_candidate_filtering(monkeypa
         worker_spec=lambda: spec,
         record_stage_result=lambda *args: None,
     )
-    ctx = StepContext(candidate_qids=[], metadata={"cr_schedule": [[("0", "1")]]})
+    ctx = StepContext(
+        candidate_qids=["0", "1"], metadata={"cr_schedule": [[("0", "1"), ("4", "5")]]}
+    )
     step = CustomTwoQubit(
         step_name="jazz_characterization",
         tasks=[TaskCall(name="CheckJAZZ")],
