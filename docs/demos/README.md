@@ -89,7 +89,15 @@ for an explicit selector.
 
 `video/` holds the Remotion project for the previous 30-second product demo. The current
 README and docs assets come from the full film in the
-`qdash-film` repository. Running `task docs-video`
+[qdash-film repository](https://github.com/orangekame3/qdash-film), merged in
+[PR #4](https://github.com/orangekame3/qdash-film/pull/4) at
+`b5eb360447d1338396d540454ffd14bdce6f9c3a`. The published
+`docs/public/images/qdash-demo.gif` and `docs/public/videos/qdash-demo.mp4` are
+byte-identical copies of `media/qdash-film.gif` and `media/qdash-film.mp4` at that
+revision: both are the full 72-second film. The UI uses QDash fake-backend data;
+the AI Chat response is illustrative and redrawn, as disclosed on screen. See the
+film’s [asset provenance and licence notes](https://github.com/orangekame3/qdash-film/blob/b5eb360447d1338396d540454ffd14bdce6f9c3a/ASSETS.md).
+Running `task docs-video`
 regenerates the previous demo and overwrites the current published assets. See
 `video/README.md` for the previous demo's source and editing instructions.
 
