@@ -15,7 +15,12 @@ can require a backup or a release-specific procedure.
    that none is still running.
 2. Back up MongoDB, PostgreSQL, calibration data, and Qubex configuration when required by the
    release notes or your recovery policy.
-3. Confirm that the checkout is on `main` and has no tracked changes:
+3. Keep MongoDB on the release that runs now. The `mongo` service uses the unversioned `mongo`
+   image, so do not run `docker compose pull`; pin the running release first as in
+   [Pin the Running Release](./mongodb-upgrade.md#pin-the-running-release). After this update,
+   upgrade MongoDB to 9.0 as described in [Upgrade MongoDB](./mongodb-upgrade.md) before the next
+   QDash release, which pins the MongoDB image.
+4. Confirm that the checkout is on `main` and has no tracked changes:
 
    ```bash
    git branch --show-current

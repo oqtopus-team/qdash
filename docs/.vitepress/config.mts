@@ -107,6 +107,7 @@ export default withMermaid(
                 },
                 { text: "Operations", link: "/user-guide/operations" },
                 { text: "System Updates", link: "/user-guide/system-updates" },
+                { text: "Upgrade MongoDB", link: "/user-guide/mongodb-upgrade" },
               ],
             },
             {
