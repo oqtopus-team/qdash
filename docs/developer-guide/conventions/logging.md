@@ -26,7 +26,7 @@ The configuration lives in `src/qdash/api/logging_config.py` and uses `pythonjso
 Third-party loggers are set to `WARNING` to reduce noise:
 
 | Logger | Level |
-|--------|-------|
+| --- | --- |
 | `uvicorn`, `uvicorn.access`, `uvicorn.error` | WARNING |
 | `gunicorn`, `gunicorn.access`, `gunicorn.error` | WARNING |
 | `pymongo`, `pymongo.command`, `pymongo.topology`, `pymongo.connection` | WARNING |
@@ -36,18 +36,14 @@ Third-party loggers are set to `WARNING` to reduce noise:
 Each log entry is a JSON object with the following fields:
 
 | Field | Description | Example |
-|-------|-------------|---------|
+| --- | --- | --- |
 | `timestamp` | ISO 8601 timestamp | `"2025-12-21 10:30:45,123"` |
 | `name` | Logger name (module path) | `"qdash.api.routers.chip"` |
 | `level` | Log level | `"INFO"` |
 | `message` | Log message | `"Chip data updated"` |
 | `request_id` | Correlation ID from middleware | `"a1b2c3d4"` |
 
-Example output:
-
-```json
-{"timestamp": "2025-12-21 10:30:45,123", "name": "qdash.api.routers.chip", "level": "INFO", "message": "Chip data updated", "request_id": "a1b2c3d4"}
-```
+The request filter adds `request_id` automatically.
 
 ## Request ID
 
@@ -84,23 +80,16 @@ The `request_id` field is injected automatically by the logging filter. You do n
 
 ## Log File Access
 
-In Docker, the API container writes logs to `/app/logs/api.log` in a named volume:
-
-```yaml
-# compose.yaml
-volumes:
-  - api-logs:/app/logs
-```
+The API writes a rotating log file in Docker:
 
 | Setting | Value |
-|---------|-------|
+| --- | --- |
 | Docker volume | `api-logs` |
 | Container path | `/app/logs/api.log` |
 | Max file size | 10 MB |
 | Backup count | 5 |
 | Rotation | `RotatingFileHandler` (automatic) |
 
-When the log file reaches 10 MB, it is rotated to `api.log.1`, `api.log.2`, etc., keeping up to 5 backups.
 Host-side API runs write to `${XDG_STATE_HOME:-$HOME/.local/state}/qdash/logs/api.log`.
 
 ## Filtering & Querying

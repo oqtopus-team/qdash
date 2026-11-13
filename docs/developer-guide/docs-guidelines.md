@@ -1,8 +1,7 @@
 # Documentation Guidelines
 
-QDash documentation is written for two readers: people who use QDash and people who change
-its code. Every page belongs to one of them, lives in that reader's section, and is written the
-way that reader works.
+QDash documentation serves users operating the product and developers changing its code.
+Give each page one audience and purpose.
 
 ## Readers and Sections
 
@@ -12,42 +11,20 @@ way that reader works.
 | Developer Guide | `docs/developer-guide/` | Changes QDash code | How the system is built, where things live, how to extend and test them |
 | Reference | `docs/reference/` | Either, when they need a fact | Tables and generated material: database collections, OpenAPI, client packages |
 
-Setting up and operating QDash belongs to the User Guide. In a lab the people who deploy
-QDash are the people who use it, and a setup page reads the same way as any other procedure.
-
-A page serves one reader. When a topic needs both a procedure and an explanation of the
-mechanism behind it, write two pages, one in each section, and link them in one line.
+Setup and operations belong to the User Guide. When a topic needs both a procedure and a
+mechanism explanation, write one page in each guide and link them inline.
 
 ## Layout
 
-```
-docs/
-  index.md                 Two entry points: User Guide, Developer Guide
-  user-guide/
-    index.md               Reading order: set up, operate, work with calibrations
-    setup.md               Choose a backend, then clone, configure, start, sign in
-    setup/                 Fake and Qubex backends, optional AI configuration
-    first-calibration.md   Guided first run from chip to inspected result
-    operations.md          Start, stop, logs, recovery
-    system-updates.md      Select a stable release and rebuild from the host
-    application-tour.md    One page per job after that: running calibrations,
-    ...                    reviewing results, AI chat, projects, cryostats, ...
-  developer-guide/
-    index.md               Reading order: setup, codebase, commands, testing
-    setup.md  codebase.md  commands.md  testing.md  development-flow.md
-    docs-guidelines.md     This page
-    conventions/           Rules that apply across the code: datetime, logging,
-                           credential scanning
-    api/  ui/  workflow/  copilot/
-      ...                  Design, architecture, testing, and deep dives
-    architecture/          Cross-component design: schedulers, topology,
-                           provenance, notes, agent platform
-  reference/
-    index.md               Entry point for generated and tabular reference
-    database-structure.md  Collection-to-document source map
-    openapi.md             Generated HTTP operations and schemas
-    clients/               Python and TypeScript client packages
-```
+| Directory | Content |
+| --- | --- |
+| `docs/index.md` | User Guide and Developer Guide entry points |
+| `docs/user-guide/` | Setup, operations, and application procedures |
+| `docs/developer-guide/` | Development setup, conventions, component design, and testing |
+| `docs/reference/` | Database collections, OpenAPI, and client APIs |
+
+Each guide's index gives its reading order. Group component-specific development pages under
+`api/`, `ui/`, `workflow/`, or `copilot/`; cross-component designs belong under `architecture/`.
 
 Name files by topic (`reviewing-results.md`), not by audience or form (`user-...`,
 `...-overview`). Every page is linked from the sidebar in `docs/.vitepress/config.mts`; a page
@@ -75,22 +52,9 @@ cryostat. Start each section with when to use it, then give the steps.
 - **No roles the application does not show.** Say "project editors" when the application calls
   them that; do not invent personas.
 
-```markdown
-## Request an AI evaluation                       ← a job, in the user's words
-
-Open **Chip page → Evaluate** to judge the latest result of the selected task for
-every qubit on the chip. Untick qubits under **Targets** to narrow the run.
-
-The evaluation model reads the task's reference from **Knowledge**; keep that
-current. How this works: [Copilot architecture](./copilot/architecture.md).
-```
-
-```markdown
-## Evaluation                                      ← not a user page
-
-The runtime asks `qcal_evaluate` the six questions in separate calls; the API
-derives `missing_keys` over the questions asked on every read ...
-```
+For example: "Open **Chip page → Evaluate** to judge the latest result of the selected task
+for each qubit. Clear qubits under **Targets** to narrow the run." Leave evaluation storage and
+completeness rules to the developer page.
 
 ## Writing for Developers
 
@@ -190,22 +154,17 @@ page by test kind, a reference by collection group.
 
 ## Checks
 
-Documentation changes must build and keep their external links reachable. Run `task build-docs`
-to validate VitePress routes and local links. Run `task check-docs-links` to validate external
-links and anchors against the local VitePress layout. `task dev-local-setup` installs Lychee when
-the active development environment does not provide it.
+Run `task build-docs` for VitePress routes and local links, and `task check-docs-links` for
+external links and generated-site anchors. `task dev-local-setup` installs Lychee if the
+environment lacks it.
 
-`task build-docs` does not parse Mermaid. The browser renders each diagram, and a syntax error
-leaves an empty block on the published page. Run `task check-docs-mermaid` after changing a
-Mermaid block: it opens every page of the built site that contains one in headless Chromium and
-fails unless each block renders an SVG, printing the Mermaid parse error. In a sequence diagram
-message, a semicolon ends the statement, so write `#59;` or reword the label.
+After changing Mermaid, run `task check-docs-mermaid`: the build alone does not parse diagrams.
+The checker renders every Mermaid page in headless Chromium and requires an SVG per block.
+In sequence-diagram messages, escape a semicolon as `#59;` or reword it.
 
-CI builds the documentation, renders every Mermaid diagram, checks external links in changed
-Markdown files, and checks every internal link and anchor in the generated site on each pull
-request. The Pages deployment runs the same Mermaid check before it publishes the site. A weekly
-scan checks every Markdown file under `docs/` so an external page that later moves or disappears
-is detected without blocking unrelated pull requests.
+PR CI builds docs, renders Mermaid, checks changed files' external links, and checks all
+generated internal links and anchors. Deployment repeats the Mermaid check. A weekly scan
+checks every Markdown file for external-link changes.
 
 ## Sidebar
 

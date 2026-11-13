@@ -1,7 +1,5 @@
 # Copilot Architecture
 
-## Responsibility Boundary
-
 QDash Copilot is the chat assistant that helps experimentalists interpret qubit calibration
 results. It owns the chat request path from the UI through the API to the Pi Agent Runtime
 (`agent-runtime/`), the pi-qdash tools the runtime calls back into the API with, and the per-chat
@@ -168,18 +166,11 @@ QDash does not record the revision an execution ran with. The opening message an
 `qdash_list_source_roots` say so, and the prompt tells the model not to claim that served source
 matches the failed run.
 
-The `qdash_query` actions `files_tree` and `file_content` read the calibration config directory
-through `FileService`, not source. The opening message and the `qdash_query` description say so.
-`qdash_query` does not read source for these actions; it returns the source tool call to use:
-
-- `files_tree` with a `path` lists nothing. The result names `qdash_list_source_roots` and
-  `qdash_search_source`. For a file path, the suggested search uses its filename across the
-  source root so a missing parent directory does not exclude a relocated file. Directory paths
-  retain their search prefix. A renamed file may require a different search term.
-- `file_content` returns matching `qdash_read_source` arguments after HTTP 400 or 404
-  only for source-looking paths: Python files, installed-package paths, paths starting with
-  a source root name, or absolute paths containing a source root name.
-  Config files, other misses, 403, and server errors behave as before.
+`qdash_query` reads calibration configuration through `FileService`, not source. It redirects
+source-looking requests to the source tools: `files_tree` with a path returns search guidance;
+`file_content` returns read guidance only after HTTP 400 or 404. Config reads, other misses,
+403, and server errors retain their behavior. See
+[Fallback tools](../../reference/pi-qdash.md#fallback-tools) for the contract.
 
 When a source endpoint returns a generic 404, `qdash_read_source` reports that the endpoint
 may be unavailable and suggests checking API routing, proxy configuration, and the API image
@@ -242,30 +233,18 @@ as a whole. Additional checkouts are trusted by path, with these limits:
 - A trusted checkout that reuses a bundled tool's name replaces it, with a
   replacement message in the startup log.
 
-Checkout tools receive the same extension context as pi-qdash tools, including
-`modelRegistry` for calling a model other than the conversation's. Their pi
-`promptSnippet` and `promptGuidelines` are inlined into the system prompt under
-"Additional tools", since the pi-qdash tool guide does not know them. A checkout
-tool that declares an `images` parameter (for example `qcal_evaluate`) gets it
-filled by the runtime: the newest figure in the conversation, whether a user
-attachment or a figure a pi-qdash tool returned, is taken from the durable
-transcript, so the model never has to copy image bytes into a call. Bytes the
-model copies anyway are replaced by that figure, since a retyped base64 string
-is usually corrupt; they are kept only when the conversation holds no figure.
+Checkout tools receive `modelRegistry` and the same context as pi-qdash tools. Their
+`promptSnippet` and `promptGuidelines` appear under "Additional tools" in the system prompt.
 
-A checkout tool that declares `task_name` and `knowledge` parameters (again
-`qcal_evaluate`) gets `knowledge` filled the same way: when the model names the
-task and passes no reference of its own, the runtime fetches the task's
-knowledge from the QDash API as the user (`GET /tasks/{task_name}/knowledge`)
-and passes its `reference`: the experiment background as `knowledge` (a few
-sentences: what the experiment does, what the expected plot looks like) and,
-when the tool declares it, `criteria` (the parameters to extract and the
-status codes with their criteria, derived from the task's Common failures).
-A task without a derived reference gets its full `prompt_text`, cut at 6000
-characters. Every evaluation of a task is thus read against the same
-host-maintained reference, kept in the task knowledge repository, rather than
-against a summary the planner improvised. The exact text the evaluation model
-received is stored in the tool result's `details.prompt`.
+For tools declaring `images`, the runtime supplies the newest durable conversation figure,
+replacing any model-copied bytes. Supplied bytes are kept only when the conversation has no
+figure.
+
+For tools declaring `task_name` and `knowledge`, a named task without a supplied reference
+triggers an authenticated `GET /tasks/{task_name}/knowledge`. The runtime fills `knowledge`
+and, when declared, `criteria` from the derived reference, falling back to `prompt_text` cut
+at 6000 characters. See [Calibration Evaluation](./evaluation.md#from-task-knowledge-to-the-prompt)
+for derivation. `details.prompt` records the text sent to the evaluation model.
 
 The runtime's `/chat` body carries two image lists: `initial_images` (the
 task chat's opening figures, attached only when the conversation is new)

@@ -5,7 +5,7 @@ QDash combines system-wide user accounts with project-specific roles.
 ## Sign In
 
 Open the QDash sign-in page and enter your username and password. After authentication, QDash
-opens the Execution page in your default project.
+opens **Execution** in your default project.
 
 ![Signing in to QDash](/images/guides/login.gif)
 
@@ -48,8 +48,7 @@ reset.
 
 ## Change Your Avatar
 
-Every user has an avatar. QDash generates it in the browser from your username, so the same
-username gets the same automatic avatar on any QDash instance that runs the same QDash release.
+QDash generates an avatar from your username, consistently across instances of the same release.
 
 To choose a different avatar:
 

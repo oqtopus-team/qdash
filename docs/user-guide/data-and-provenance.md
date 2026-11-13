@@ -19,14 +19,10 @@ what these pages show. Include that scope when sharing an observation.
 
 ## Scan Current State
 
-1. Open **Dashboard** and select a chip.
-2. Set the time range or cool-down and choose the latest, best, or average value selection.
-3. Review coverage and distributions, then select a metric or target that needs investigation.
-
-Open **Metrics** when one parameter across many targets is the focus. For coupling data, confirm
-the displayed direction before comparing values. Narrow the **Color range** above the topology when
-an outlier flattens the other colors; the range is shared with **Dashboard** and described in
-[Dashboard](./dashboard.md#scan-chip-health).
+Follow [Dashboard](./dashboard.md#select-the-data-scope) to choose a chip, time range, and value
+selection, then review coverage and distributions. Use **Metrics** to compare one parameter
+across targets, checking direction for couplings. The
+[Color range](./dashboard.md#scan-chip-health) control is shared by both pages.
 
 ## Inspect Measurements
 

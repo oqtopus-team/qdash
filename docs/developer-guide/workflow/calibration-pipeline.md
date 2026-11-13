@@ -1,6 +1,7 @@
 # Calibration Pipeline Spec
 
-A calibration pipeline spec is a JSON description of a calibration run: the spec version, the targets, an ordered list of steps with their task calls, and the settings of those calls. It lets an agent or a client start a calibration without writing a Python flow, while the steps it can use are exactly the Step classes the templates are built from.
+A calibration pipeline spec describes targets and ordered task calls as JSON. Agents and clients
+can run it without writing Python; each step maps to the same Step class used by flow templates.
 
 ```json
 {
@@ -40,7 +41,13 @@ A calibration pipeline spec is a JSON description of a calibration run: the spec
 }
 ```
 
-Each entry in `tasks` is a [task call](./task-calls.md): `name`, an optional `call_id`, `run`, `input`, `update_calibration_parameters`, and `on_failure`. The same task may run several times in one step when every occurrence has its own `call_id`. `default_run_parameters` holds run values shared by every task that declares them. The top-level `task_parameters`, per-task defaults keyed by task name that every call of the task starts from, is deprecated: the schema marks it `deprecated`, `validate` reports a warning at `task_parameters`, and QDash still applies it under each call's own values, so saved and queued specs run unchanged. Move its values onto the calls as [Task Calls](./task-calls.md#migrate-per-task-defaults) describes. The models are shared with Python flows, so the spec and a flow normalize and validate calls identically.
+Each `tasks` entry is a [TaskCall](./task-calls.md), with the same normalization and validation
+as Python flows. Repeated tasks need distinct `call_id` values. `default_run_parameters` supplies
+shared run values.
+
+The deprecated top-level `task_parameters` supplies per-task defaults below each call's settings.
+It remains supported for saved and queued specs, but validation reports a warning.
+[Migrate these defaults onto calls](./task-calls.md#migrate-per-task-defaults).
 
 The spec cannot reference code. Each `type` maps to one Step class, task names must be enabled for the backend and match the step's task type, and anything else is rejected before dispatch.
 
@@ -52,11 +59,32 @@ The spec cannot reference code. Each `type` maps to one Step class, task names m
 | `POST /calibration-pipelines/validate` | viewer | Dry run: every problem with a path into the spec, warnings, and the resolved steps with each call's id, failure policy, and effective settings |
 | `POST /calibration-pipelines/execute` | editor | Validate, then run the spec as one execution through the worker's `system-calibration-pipeline` deployment |
 
-`validate` never fails with a 422 for a bad spec. It returns `valid: false` and a `problems` list such as `targets.qids[1]: qubit '99' is not on chip 64Qv3`, so a caller can correct the spec. `valid` is true exactly when `problems` is empty; `warnings` point at allowed but probably unintended choices, such as a filter without `step` placed after a custom step it will not read, or deprecated ones such as a non-empty `task_parameters`, and never make a spec invalid. The response also carries `plan_digest`, the digest of the validated spec, which each step execution stores as `note.pipeline.spec_digest`; task results carry the digest of the plan the worker resolved (`note.calibration_plan.digest`) in `invocation.plan_digest`. `execute` returns the same problems in the 422 detail when the spec is not valid, and 503 when the worker has not registered the deployment yet.
+For a bad spec, `validate` returns `valid: false` and path-specific `problems`, such as
+`targets.qids[1]: qubit '99' is not on chip 64Qv3`, rather than HTTP 422. Warnings identify
+allowed but suspect choices, including deprecated `task_parameters`; they do not invalidate a spec.
+
+The response includes `plan_digest`, stored as `note.pipeline.spec_digest` by each step execution.
+Task results store the worker-resolved plan digest in `invocation.plan_digest`, matching
+`note.calibration_plan.digest`. `execute` returns HTTP 422 with the validation problems, or 503
+when the worker deployment is not registered.
 
 ### Version 1 specs
 
-A version 1 spec (no `spec_version`, or `spec_version: 1`) is rejected with one problem at `spec_version` and a `migrated_spec` that runs the same tasks with the same settings: every task name becomes a call, a name listed more than once in one step gets `call_id` values `<Task>`, `<Task>_2`, and so on, skipping ids the step already uses, a built-in step repeated in the pipeline gets `step_id` values `<name>_2`, `<name>_3`, and so on, skipping ids a custom step already uses, and `task_run_parameters` moves to `task_parameters.<task>.run`, so the migrated spec can carry the deprecated `task_parameters` and its validation reports the warning. Filters without `step` keep reading the latest `OneQubitFineTune` or `OneQubitCheck`, so the new step ids do not change what they read. `migrate_pipeline_spec` performs the conversion; it is pure and deterministic. The conversion does not choose an execution mode: a version 1 `OneQubitCheck`, `OneQubitFineTune`, or `CustomOneQubit` step that sets `mode`, or sets `execution_mode` to `synchronized`, `scheduled`, or `serial`, raises `LegacyExecutionModeError`, and `validate` returns one problem at `steps[i]` per such step, naming the current value to set (for `mode: "scheduled"`, `execution_mode: "parallel_by_mux"`), and no `migrated_spec`. Once the owner sets `execution_mode`, the spec converts. Any other `spec_version` is rejected with a problem at `spec_version` and no `migrated_spec`. The worker applies the same conversion only to a version 1 spec that was queued before the upgrade, and logs it; a queued spec with `mode` fails with the same message before any step runs.
+A missing `spec_version` means version 1. The API rejects version 1 with a problem at
+`spec_version` and a deterministic `migrated_spec`:
+
+- Task names become calls; repeated names get `<Task>`, `<Task>_2`, and subsequent unused IDs.
+- Repeated built-in steps get `<name>_2` and subsequent unused step IDs.
+- `task_run_parameters` becomes deprecated `task_parameters.<task>.run`, which produces a warning.
+- Filters without `step` still read the latest `OneQubitFineTune` or `OneQubitCheck`.
+
+`migrate_pipeline_spec` does not migrate execution modes. A one-qubit step using `mode` or
+`serial`, `scheduled`, or `synchronized` raises `LegacyExecutionModeError`. Validation reports
+the required replacement at each `steps[i]` and returns no migrated spec until the owner fixes
+those fields. Other spec versions are rejected without conversion.
+
+The worker converts and logs version 1 specs queued before the upgrade. A queued spec with an
+obsolete mode fails before execution with the same migration message.
 
 ### Preflight checks
 
@@ -89,7 +117,37 @@ Coupling steps are not checked for required inputs; their inputs span two qubits
 | `TwoQubitCalibration` | calibration | `FULL_2Q_TASKS` or `tasks` | candidate qubits |
 | `CustomTwoQubit` | calibration | `tasks` (coupling tasks) | candidate qubits |
 
-One-qubit steps take `execution_mode` (`parallel_by_round`, the default, `parallel_by_mux`, `sequential`, or `simultaneous_spectroscopy`); [1-Qubit Scheduler](../architecture/one-qubit-scheduler.md#execution-modes) defines them. A spec that still uses the removed `mode` key or the former names `synchronized`, `scheduled`, or `serial` is invalid at `steps[i]` and does not run; [1-Qubit Scheduler](../architecture/one-qubit-scheduler.md#migrate-from-the-former-names) maps them to the current names. One-qubit calibration steps also accept `manual` with `rounds`, and `TwoQubitCalibration` and `CustomTwoQubit` take `execution_mode` `automatic` (default) or `manual` with `rounds` of `[control, target]` pairs; `rounds` without `manual`, `manual` without `rounds`, and an explicitly set `max_parallel_ops` on a manual two-qubit step are invalid at `steps[i]`. Defaults are left out of dumps, so specs without these fields keep their plan digest. `validate` checks manual rounds against the chip at `steps[i].rounds`, and their candidates while no filter has run ([Manual Rounds](../architecture/one-qubit-scheduler.md#manual-rounds)). The catalog lists the accepted values in `one_qubit_execution_modes` and `two_qubit_execution_modes`. Custom steps take a `step_name` and `continue_on_failure`. Every calibration step has a `step_id`: a custom step's `step_name`, a built-in step's `step_id` field, or the catalog name (`one_qubit_check`); it must be unique within the pipeline, so a spec that runs `OneQubitCheck` twice sets `step_id` on at least one of them. `configure: true` on `OneQubitCheck` or `OneQubitFineTune` runs a `Configure` call with `call_id` `Configure` before the step's calls; a step that sets it and also lists a `Configure` call, or another call with that `call_id`, is invalid at `steps[i]`. `ConfigureAll` takes an optional `call`, a task call that must name `ConfigureAll`, such as `{"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr"}}`; it replaces a `task_parameters.ConfigureAll` entry, and without it the step runs a call with no settings of its own. The step's `mux_ids`, or the targets' MUXes when it is unset, replace any `run.mux_ids` from the call or `task_parameters`, so `validate` warns at that value. Targets are either `qids` or `mux_ids` with optional `exclude_qids`.
+### Execution Modes
+
+One-qubit steps support `parallel_by_round` (default), `parallel_by_mux`, `sequential`, and
+`simultaneous_spectroscopy`; see [Execution Modes](../architecture/one-qubit-scheduler.md#execution-modes).
+Removed names and the `mode` key fail at `steps[i]`; use the
+[migration map](../architecture/one-qubit-scheduler.md#migrate-from-the-former-names).
+
+One-qubit calibration steps also accept `manual` with `rounds`. Two-qubit steps accept
+`automatic` (default) or `manual` with `[control, target]` rounds. Validation rejects rounds
+without manual mode, manual mode without rounds, and an explicit `max_parallel_ops` on a manual
+two-qubit step. It checks rounds against the chip and, before filters run, the candidates. See
+[Manual Rounds](../architecture/one-qubit-scheduler.md#manual-rounds).
+
+The catalog exposes `one_qubit_execution_modes` and `two_qubit_execution_modes`. Default fields
+are omitted from dumps to preserve existing plan digests.
+
+### Step Identity and Configuration
+
+Every calibration step needs a unique `step_id`: a custom step uses `step_name`; a built-in
+step uses its explicit `step_id` or catalog name. Custom steps also accept `continue_on_failure`.
+
+`configure: true` on `OneQubitCheck` or `OneQubitFineTune` prepends a `Configure` call with that
+call ID. An explicit Configure call or a colliding ID makes the step invalid.
+
+`ConfigureAll` accepts an optional `call` naming that task, for example
+`{"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr"}}`. It replaces the
+`task_parameters.ConfigureAll` entry; without it, the call has no settings of its own. The
+step's `mux_ids`, or the target MUXes, override `run.mux_ids` and produce a validation warning
+when replacing a supplied value. Targets use either `qids` or `mux_ids` with optional `exclude_qids`.
+
+### Filters
 
 A filter with `step` reads that earlier step, and with `call_id` one of its calls; a failed or missing call removes the qubit without falling back to another call of the same task. A metric filter on a step without `call_id` reads the step-level metrics the catalog lists for it; custom steps have none. A filter without `step` reads the latest `OneQubitFineTune` or `OneQubitCheck`, as in version 1. [Task Calls](./task-calls.md#results) describes the selection in full.
 

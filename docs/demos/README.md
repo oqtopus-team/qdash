@@ -1,10 +1,7 @@
 # Docs demo GIFs
 
-Animated GIFs for the user guide are recorded from declarative YAML scenarios by
-driving the real UI with Playwright, then converting the recording to a GIF with
-ffmpeg. Scenarios and the recorder live here; the GIFs are written to
-`docs/public/images/guides/` and referenced from guide pages as
-`/images/guides/<name>.gif`.
+Playwright records YAML scenarios against the real UI; ffmpeg converts them to GIFs under
+`docs/public/images/guides/`. Guide pages reference `/images/guides/<name>.gif`.
 
 ## Recording
 

@@ -4,14 +4,7 @@ layout: doc
 
 # Architecture
 
-QDash consists of three major components.
-
-- UI
-  - Next.js frontend for workflow operation, monitoring, and analysis
-- API
-  - FastAPI backend that handles user requests, authentication, project access, and database access
-- Workflow
-  - Prefect-based calibration workflow runtime, deployment service, and user flow worker
+QDash separates the Next.js UI, FastAPI API, and Prefect calibration runtime.
 
 <Diagram name="platform-architecture" caption="QDash runtime services and the requests between them." />
 
@@ -52,8 +45,6 @@ and extension points.
 
 ### Calibration Flow
 
-Calibration follows this flow.
-
 1. The user selects a project, chip, targets, and workflow or task in the UI or client.
 2. When the user saves a flow, the API asks the deployment service to register its Prefect deployment. Running the flow reuses that deployment.
 3. On execution, the API claims the execution lock for the hardware the run needs and mints the execution ID in the same step. It returns 409 if another run holds the lock. The execution ID links the run, task results, logs, and artifacts.
@@ -90,6 +81,8 @@ publish no host port, not even on loopback. Two stacks on one host therefore con
 `UI_PORT` and the Compose project name, which comes from `ENV`; the internal port settings can
 stay identical. Deployment tasks and a plain `docker compose up -d` load `compose.yaml` alone.
 
+### Development Routing
+
 `compose.yaml` sets `QDASH_API_UPSTREAM` to `api:${API_PORT}` and `QDASH_UI_UPSTREAM` to
 `ui:${UI_PORT}`. Under `task dev-local`, the same `caddy` service and Caddyfile serve
 development: `compose.dev-local.yaml` points both upstreams at
@@ -115,6 +108,8 @@ publishes MongoDB, Prefect, the deployment service, and the runtime on `127.0.0.
 API. The browser still reaches only Caddy; the runtime port accepts only the runtime credential,
 which `task dev-api-local` reads from the running container unless `AGENT_RUNTIME_TOKEN` is set.
 In the DevContainer, the API uses the service names instead.
+
+### Proxy Trust and Prefect Access
 
 Caddy trusts no client's `X-Forwarded-*` headers. It sends every upstream its own
 `X-Forwarded-Proto`: `https` when the request's host is the host of an `https://` `CLIENT_URL`,
@@ -149,6 +144,8 @@ other hostname in `NEXT_ALLOWED_DEV_ORIGINS`.
 
 The `ui` service sets `pull_policy: build`, so a plain `docker compose up -d` rebuilds the UI
 image from the current checkout instead of reusing an image built from older code.
+
+### Proxy Tests
 
 `tests/infra/test_compose_ingress.py` renders `compose.yaml` with an unchanged older `.env` and
 checks the published ports and Prefect settings, and renders `compose.dev-local.yaml` for the

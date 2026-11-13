@@ -103,10 +103,9 @@ pause. On **Home**, select:
 - **Resume** to continue from the recorded step.
 - **Start over** to discard the guide.
 
-The guide is kept in this browser for your account and the active project. A chip, flow, or run
-that finishes after you switch project, pause, or start over is not added to the guide. The guide
-checks each step against the chip, flow, and run that QDash recorded, so deleting one of them
-returns the guide to the step that needs it.
+The guide is saved in this browser for your account and project. Work that finishes after you
+switch project, pause, or restart is not added. Deleting a recorded chip, flow, or run returns
+the guide to the step that needs it.
 
 ## Continue After the First Run
 

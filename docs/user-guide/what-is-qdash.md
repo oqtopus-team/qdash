@@ -8,9 +8,8 @@ QDash keeps calibration execution, results, and operator context together for ea
 
 ## What QDash Manages
 
-Calibration work produces more than a final parameter value. Operators also need the inputs,
-measurement artifacts, execution status, history, and discussion that explain where the value
-came from. QDash records these parts in one project-scoped workspace.
+QDash records calibration inputs, artifacts, status, history, and discussion in a project-scoped
+workspace.
 
 | Concept | Meaning in QDash |
 | --- | --- |

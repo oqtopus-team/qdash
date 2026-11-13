@@ -11,7 +11,6 @@ code itself.
 | --- | --- | --- |
 | `agent-exec` container (`agent-runtime/exec/`) | Running commands and file operations, one pi-env daemon per conversation as the owner's own uid | Authentication, QDash data, model access |
 | Agent Runtime (`agent-runtime/src/exec-env.ts`) | One connection per open conversation, the conversation's directory, the four tools | Executing anything locally |
-| QDash API | Nothing | The former `/copilot/sandbox/python` route and its Bubblewrap sandbox are gone |
 
 The model gets data into the workspace by writing it into a file. The container uses
 `network_mode: none`; the runtime connects through a shared Unix socket.

@@ -21,7 +21,7 @@ The smallest useful flow has four parts:
 
 1. A Prefect `@flow` with QDash terminal hooks.
 2. A `Target` selected from MUX IDs or explicit qubit IDs.
-3. An explicit list of task names inside one or more `Step` objects.
+3. Explicit `TaskCall` lists inside one or more `Step` objects.
 4. A `CalibService` that runs those steps.
 
 ## Define a Flow
@@ -263,17 +263,11 @@ settings take precedence over `default_run_parameters`; a field the call leaves 
 `task_run_parameters` with a `TypeError`; see
 [Migrate per-task defaults](./task-calls.md#migrate-per-task-defaults).
 
-`TaskCall.run` and `default_run_parameters` use the same
-value syntax. `run` sets run parameters the task declares in its `run_spec`. `input` replaces
-calibration inputs the task declares in its `input_spec`; the value applies to every qid the call
-runs on. Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or `sweep.range` for generated
-run ranges, `sweep.values(...)` for explicit points, and plain values for other run values and
-`input` entries. The helper records the constructor without creating an array in the workflow
-process, and a parameter that declares one sweep constructor accepts any of them. Setting
-`update_calibration_parameters=False` retains task history without promoting validated outputs to
-the current calibration state. A name in the wrong section, or one the task does not declare,
-fails when the task is created. The complete precedence rules are in [Task Calls](./task-calls.md#settings)
-and [Parameter Resolution](./parameter-resolution.md).
+Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, `sweep.range`, or `sweep.values` for
+sweeps; other run and input values are plain values. Input overrides apply to every selected
+target. `update_calibration_parameters=False` keeps outputs in history without publishing them.
+See [Task Calls](./task-calls.md#settings) for syntax and precedence, and
+[Parameter Resolution](./parameter-resolution.md) for declaration validation and snapshots.
 
 ## Preserve Terminal Handling
 

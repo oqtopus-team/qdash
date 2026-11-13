@@ -1,63 +1,34 @@
 # Notes Architecture
 
-QDash's note system is designed in three layers so that day-to-day reads stay
-fast while every annotation is also captured for knowledge mining.
-
-```
-┌─────────────────────────────────────────────────────┐
-│ Layer 1 — Inline notes (read-optimized)             │
-│   QubitDocument.note / metric_notes                 │
-│   CouplingDocument.note / metric_notes              │
-│   TaskResultHistoryDocument.user_note               │
-│   → Fetched together with the parent doc            │
-├─────────────────────────────────────────────────────┤
-│ Layer 2 — NoteEvent (write-through audit log)       │
-│   note_event collection                             │
-│   scope / target_id / metric_key / action / actor   │
-│   content / extra / created_at                      │
-│   → History, timeline, text search, LLM context     │
-├─────────────────────────────────────────────────────┤
-│ Layer 3 — Indexes                                   │
-│   task_result_history: partial sparse on            │
-│     user_note.updated_at != null                    │
-│   note_event: text(content) + chrono compound idx   │
-└─────────────────────────────────────────────────────┘
-```
+QDash stores current notes for fast reads and appends note events for history and search.
 
 ## Why three layers
 
-1. **Inline** is the source of truth for the current state. The dashboard reads
-   notes alongside qubits / couplings / task results — no join, no extra
-   request.
-2. **NoteEvent** turns "current state" into an append-only history. It enables
-   uses that inline alone cannot serve:
-   - Per-target timeline ("everything ever written about Q5")
-   - Cross-chip text search ("which qubits have been called 'unstable'?")
-   - LLM context feeds without scanning every parent collection
-3. **Indexes** keep the dashboard's chip-wide notes summary cheap even when a
-   chip has hundreds of thousands of task results.
+| Layer | Purpose |
+| --- | --- |
+| Inline global notes and scoped note documents | Read the current annotation for the selected target and scope |
+| `note_event` collection | Preserve edits for target timelines, text search, and model context |
+| Note timestamp and event indexes | Avoid scanning all task results for chip-wide summaries |
 
 ## Data flow
 
-`NoteService` is the single entry point for every note edit:
+`NoteService` writes current qubit, coupling, metric, and task-result notes, then appends their
+audit events through `MongoNoteEventRepository`. Current storage depends on scope:
 
-```
-PUT /chips/{chip}/qubits/{qid}/note
-        │
-        ▼
-NoteService.upsert_qubit_note(...)
-        │
-        ├─► QubitDocument.find_one(...).save()       # Layer 1: inline
-        │
-        └─► MongoNoteEventRepository.append(...)     # Layer 2: audit log
-```
+| Note | Current storage |
+| --- | --- |
+| Global qubit or coupling summary | Parent document's `note` |
+| Cool-down or time-range target summary | `TargetNoteDocument` |
+| Scoped metric note | `MetricNoteDocument` |
+| Task-result note | `TaskResultHistoryDocument.user_note` |
+| Scoped chip summary | `ChipNoteDocument` |
 
-Same shape for the other six write paths (qubit metric, coupling, coupling
-metric, task result — each with upsert + delete).
+The dashboard combines these stores for the selected scope. Per-metric notes remain readable
+as legacy context; new dashboard annotations use pinned summaries or discussions.
 
 ## Schemas
 
-`NoteModel` is the shared schema for all inline notes:
+`NoteModel` stores current note content and edit metadata:
 
 ```python
 class NoteModel(BaseModel):
@@ -66,7 +37,8 @@ class NoteModel(BaseModel):
     updated_at: datetime | None = None
 ```
 
-`updated_at = None` distinguishes "never noted" from "noted then cleared".
+An empty `NoteModel` has no timestamp. Deleting an inline note resets it to that state; consult
+the event log to distinguish deletion from a note that never existed.
 
 `NoteEventDocument` is the audit row. Its fields and indexes are defined in
 `src/qdash/dbmodel/note_event.py`; the collection is listed in
@@ -76,43 +48,40 @@ class NoteModel(BaseModel):
 
 ### Note CRUD
 
-| Method | Path                                                                    | Purpose                                  |
-| ------ | ----------------------------------------------------------------------- | ---------------------------------------- |
-| PUT    | `/chips/{chip_id}/qubits/{qid}/note`                                    | Upsert qubit's general note              |
-| PUT    | `/chips/{chip_id}/qubits/{qid}/metric-notes/{metric_key}`               | Upsert per-metric note on a qubit        |
-| PUT    | `/chips/{chip_id}/couplings/{coupling_id}/note`                         | Upsert coupling's general note           |
-| PUT    | `/chips/{chip_id}/couplings/{coupling_id}/metric-notes/{metric_key}`    | Upsert per-metric note on a coupling     |
-| PUT    | `/task-results/{task_id}/note`                                          | Upsert per-measurement note              |
-| DELETE | (same paths)                                                            | Clear the corresponding note             |
-| GET    | `/task-results/{task_id}/note`                                          | Fetch a single task-result note          |
+| Method | Path | Purpose |
+| --- | --- | --- |
+| PUT | `/chips/{chip_id}/qubits/{qid}/note` | Upsert qubit's general note |
+| PUT | `/chips/{chip_id}/qubits/{qid}/metric-notes/{metric_key}` | Upsert per-metric note on a qubit |
+| PUT | `/chips/{chip_id}/couplings/{coupling_id}/note` | Upsert coupling's general note |
+| PUT | `/chips/{chip_id}/couplings/{coupling_id}/metric-notes/{metric_key}` | Upsert per-metric note on a coupling |
+| PUT | `/task-results/{task_id}/note` | Upsert per-measurement note |
+| DELETE | (same paths) | Clear the corresponding note |
+| GET | `/task-results/{task_id}/note` | Fetch a single task-result note |
 
-DELETE clears the inline note (resets to an empty `NoteModel`) and appends a
-`delete` event.
+DELETE clears the current note and appends a `delete` event. Scoped documents may be removed;
+an inline note resets to an empty `NoteModel`.
 
 ### Aggregation
 
-| Method | Path                                | Purpose                                                |
-| ------ | ----------------------------------- | ------------------------------------------------------ |
-| GET    | `/chips/{chip_id}/notes-summary`    | One-fetch view: qubit notes + coupling notes + task notes for the chip. Drives the dashboard. |
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/chips/{chip_id}/notes-summary` | One-fetch view: qubit notes + coupling notes + task notes for the chip. Drives the dashboard. |
 
-The summary uses the partial sparse index on `task_result_history.user_note.updated_at` to avoid scanning the full history.
+The summary uses a partial index on `task_result_history.user_note.updated_at` that includes
+records with a date-valued timestamp.
 
 ### Knowledge feed
 
-| Method | Path                                              | Purpose                                          |
-| ------ | ------------------------------------------------- | ------------------------------------------------ |
-| GET    | `/chips/{chip_id}/note-events`                    | Chip-scoped chronological feed                   |
-| GET    | `/note-events/by-target?scope=&target_id=`        | Per-target timeline (e.g. all events on Q5)      |
-| GET    | `/note-events/search?q=`                          | Full-text search across note contents            |
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/chips/{chip_id}/note-events` | Chip-scoped chronological feed |
+| GET | `/note-events/by-target?scope=&target_id=` | Per-target timeline (e.g. all events on Q5) |
+| GET | `/note-events/search?q=` | Full-text search across note contents |
 
-## Why this works
+## Source and Tests
 
-- **Read latency**: dashboard's primary path (`notes-summary`) hits indexed
-  fields only — qubit and coupling collections are bounded in size, and the
-  task-result side uses the partial sparse index.
-- **Write cost**: each note write is one inline save plus one append. Both are
-  sub-millisecond Mongo operations.
-- **Auditability**: every state change is an immutable event; nothing is lost.
-- **Knowledge enablement**: text-search + per-target timeline open the door for
-  LLM context, automated summaries, and cross-chip pattern discovery without
-  changing the inline schema.
+- `src/qdash/api/services/note_service.py`: note writes, scope resolution, summaries, and events
+- `src/qdash/dbmodel/target_note.py`, `metric_note.py`, and `chip_note.py`: scoped current state
+- `src/qdash/dbmodel/note_event.py`: audit event fields and indexes
+
+Run `uv run pytest tests/qdash/api/routers/test_note.py` after changing storage or scope rules.

@@ -6,8 +6,6 @@ QDash stores native `datetime` objects in MongoDB, returns ISO8601 UTC strings v
 
 <Diagram name="datetime-flow" caption="Timestamps stay in UTC until the UI formats them; elapsed time travels as seconds, then as an H:MM:SS string." />
 
-The diagram above shows the complete datetime and elapsed time handling flow across Backend, API, and Frontend layers.
-
 ## Backend (Python)
 
 ### Calendar Timezone Configuration
@@ -25,7 +23,7 @@ timezone: str = "Asia/Tokyo"
 All datetime operations should use `src/qdash/common/utils/datetime.py`:
 
 | Function | Description |
-|----------|-------------|
+| --- | --- |
 | `now()` | Get current UTC datetime for DB/API storage |
 | `local_now()` | Get current datetime in configured calendar timezone for server labels such as YYYYMMDD |
 | `now_iso()` | Get current UTC datetime as ISO8601 string |
@@ -71,7 +69,7 @@ def _ensure_timezone(cls, v: Any) -> datetime | None:
 All datetime formatting should use `ui/src/lib/utils/datetime.ts`:
 
 | Function | Format | Example Output |
-|----------|--------|----------------|
+| --- | --- | --- |
 | `formatDateTime(utcString)` | `yyyy-MM-dd HH:mm:ss` | `2025-12-21 10:30:45` |
 | `formatDate(utcString)` | `yyyy-MM-dd` | `2025-12-21` |
 | `formatTime(utcString)` | `HH:mm:ss` | `10:30:45` |

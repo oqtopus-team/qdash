@@ -6,9 +6,13 @@ QDash supports superconducting quantum processors with square lattice topology, 
 
 ### Supported Chip Sizes
 
-- **16-qubit chip**: 4×4 grid
-- **64-qubit chip**: 8×8 grid (e.g., 64Qv3)
-- **144-qubit chip**: 12×12 grid (e.g., 144Qv2)
+| Qubits | Grid | MUX grid | Nearest-neighbor edges |
+| --- | --- | --- | --- |
+| 16 | 4×4 | 2×2 | 24 |
+| 64 (64Qv3) | 8×8 | 4×4 | 112 |
+| 144 (144Qv2) | 12×12 | 6×6 | 264 |
+
+An N×N grid has `2N(N−1)` undirected nearest-neighbor edges.
 
 ## Physical Layout
 
@@ -27,29 +31,7 @@ MUX Structure (4 qubits per MUX):
 
 ### 64-Qubit Chip (8×8 Grid)
 
-- **Grid size**: 8×8 = 64 qubits
-- **MUX grid**: 4×4 = 16 MUXes
-- **Each MUX**: Controls 4 qubits
-
-**MUX Layout (4×4 grid of MUXes):**
-
-```
-┌──────┬──────┬──────┬──────┐
-│ MUX0 │ MUX1 │ MUX2 │ MUX3 │
-├──────┼──────┼──────┼──────┤
-│ MUX4 │ MUX5 │ MUX6 │ MUX7 │
-├──────┼──────┼──────┼──────┤
-│ MUX8 │ MUX9 │MUX10 │MUX11 │
-├──────┼──────┼──────┼──────┤
-│MUX12 │MUX13 │MUX14 │MUX15 │
-└──────┴──────┴──────┴──────┘
-```
-
-**Qubit ID Mapping:**
-
-- MUX 0 controls qubits: 0, 1, 2, 3
-- MUX 1 controls qubits: 4, 5, 6, 7
-- MUX N controls qubits: 4N, 4N+1, 4N+2, 4N+3
+The standard layout assigns qubits `4N` through `4N+3` to MUX `N`, with MUXes in row-major order.
 
 **Full 64-qubit layout (8×8 grid):**
 
@@ -69,9 +51,7 @@ MUX Structure (4 qubits per MUX):
 
 ### 144-Qubit Chip (12×12 Grid)
 
-- **Grid size**: 12×12 = 144 qubits
-- **MUX grid**: 6×6 = 36 MUXes
-- **Each MUX**: Controls 4 qubits
+The same 2×2 MUX layout extends to a 6×6 grid of MUXes.
 
 ## MUX Membership in Topology Templates
 
@@ -224,14 +204,14 @@ def qid_to_coords(qid: int, grid_size: int) -> tuple[int, int]:
 ### Examples (64-qubit chip, N=8)
 
 | Qubit ID | MUX | Pos in MUX | MUX Position | Local (r,c) | Global (row, col) |
-| -------- | --- | ---------- | ------------ | ----------- | ----------------- |
-| 0        | 0   | 0 (TL)     | (0, 0)       | (0, 0)      | (0, 0)            |
-| 1        | 0   | 1 (TR)     | (0, 0)       | (0, 1)      | (0, 1)            |
-| 2        | 0   | 2 (BL)     | (0, 0)       | (1, 0)      | (1, 0)            |
-| 3        | 0   | 3 (BR)     | (0, 0)       | (1, 1)      | (1, 1)            |
-| 4        | 1   | 0 (TL)     | (0, 1)       | (0, 0)      | (0, 2)            |
-| 16       | 4   | 0 (TL)     | (1, 0)       | (0, 0)      | (2, 0)            |
-| 17       | 4   | 1 (TR)     | (1, 0)       | (0, 1)      | (2, 1)            |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 0 | 0 (TL) | (0, 0) | (0, 0) | (0, 0) |
+| 1 | 0 | 1 (TR) | (0, 0) | (0, 1) | (0, 1) |
+| 2 | 0 | 2 (BL) | (0, 0) | (1, 0) | (1, 0) |
+| 3 | 0 | 3 (BR) | (0, 0) | (1, 1) | (1, 1) |
+| 4 | 1 | 0 (TL) | (0, 1) | (0, 0) | (0, 2) |
+| 16 | 4 | 0 (TL) | (1, 0) | (0, 0) | (2, 0) |
+| 17 | 4 | 1 (TR) | (1, 0) | (0, 1) | (2, 1) |
 
 ## Coupling Topology
 
@@ -251,109 +231,32 @@ Edges can be classified as:
    - Faster execution due to shared MUX resources
 
 2. **Inter-MUX edges**: Qubits in different MUXes
-   - Example: 1-4 (MUX 0 → MUX 1), 0-16 (MUX 0 → MUX 4)
+   - Example: 1-4 (MUX 0 → MUX 1), 2-16 (MUX 0 → MUX 4)
    - Slower execution due to cross-MUX communication
 
 ### Total Edge Counts
 
-**16-qubit chip (4×4 grid):**
-
-- Horizontal edges: 4 rows × 3 edges/row = 12 edges
-- Vertical edges: 3 rows × 4 edges/row = 12 edges
-- **Total: 24 nearest-neighbor edges**
-
-**64-qubit chip (8×8 grid):**
-
-- Horizontal edges: 8 rows × 7 edges/row = 56 edges
-- Vertical edges: 7 rows × 8 edges/row = 56 edges
-- **Total: 112 nearest-neighbor edges**
-
-**144-qubit chip (12×12 grid):**
-
-- Horizontal edges: 12 rows × 11 edges/row = 132 edges
-- Vertical edges: 11 rows × 12 edges/row = 132 edges
-- **Total: 264 nearest-neighbor edges**
+See [Supported Chip Sizes](#supported-chip-sizes) for counts before direction selection.
 
 ## MUX Resource Conflicts
 
-### Conflict Types
-
-MUXes conflict if they share:
-
-1. **Readout module**: Cannot measure simultaneously
-2. **Control module**: Cannot apply control pulses simultaneously
-
-### Wiring Configuration
-
-The wiring configuration (`wiring.yaml`) defines:
-
-```yaml
-64Qv3:
-  - mux: 0
-    read_out: "M0-ch0"
-    ctrl: ["OPX1-ch1", "OPX1-ch2"]
-  - mux: 1
-    read_out: "M0-ch1"
-    ctrl: ["OPX1-ch3", "OPX1-ch4"]
-  # ... more MUXes
-```
-
-### Conflict Detection Algorithm
-
-```python
-def build_mux_conflict_map(wiring_config):
-    """Build conflict map from wiring configuration."""
-    conflicts = {}
-
-    # Group MUXes by shared readout module
-    readout_groups = group_by_module(wiring_config, "read_out")
-
-    # Group MUXes by shared control module
-    control_groups = group_by_module(wiring_config, "ctrl")
-
-    # Merge conflicts
-    for mux_a, mux_b in all_pairs_in_same_group(readout_groups):
-        conflicts[mux_a].add(mux_b)
-
-    for mux_a, mux_b in all_pairs_in_same_group(control_groups):
-        conflicts[mux_a].add(mux_b)
-
-    return conflicts
-```
+The CR scheduler separates pairs that share a qubit, MUX, or readout/control module. A pair
+containing a standalone qubit runs alone. Module identity comes from `wiring.yaml`; the exact
+checks and their limits are in [Conflict Graph and Groups](./cr-scheduler.md#conflict-graph-and-groups).
 
 ## CR Gate Constraints
 
 ### Frequency Directionality
 
-CR (Cross-Resonance) gates require:
-
-**f_control < f_target**
-
-This constraint filters out approximately 50% of coupling edges, leaving only valid CR pairs.
+The scheduler selects direction from the topology convention, checkerboard design, or measured
+frequencies, in that priority order. The measured-frequency rule uses `f_control < f_target`;
+`inverse=True` reverses the applicable direction. See
+[Scheduling Pipeline](./cr-scheduler.md#scheduling-pipeline).
 
 ### Distance-2 Constraint
 
-For parallel CR gate execution, pairs must satisfy the **distance-2 constraint**:
-
-- No two pairs share a qubit (distance-0)
-- No two pairs are adjacent in the coupling graph (distance-1)
-- Pairs must be at least **2 hops apart** (distance-2)
-
-**Example violation:**
-
-```
-Pair A: 0-1
-Pair B: 1-4
-Violation: Share qubit 1 (distance-0)
-
-Pair A: 0-1
-Pair B: 1-2
-Violation: Adjacent via qubit 1 (distance-1)
-
-Pair A: 0-1
-Pair B: 4-5
-Valid: Distance-2 separation ✓
-```
+The current scheduler checks shared qubits and hardware resources, not graph-hop distance.
+Geometric separation alone does not establish that two pairs can run together.
 
 ## Coordinate System
 
@@ -365,19 +268,12 @@ Valid: Distance-2 separation ✓
 
 ### Edge Naming Convention
 
-Edges are named as `"q1-q2"` where:
-
-- `q1` is the lower qubit ID
-- `q2` is the higher qubit ID
-- Example: `"0-1"`, `"16-17"`, `"1-4"`
+Coupling IDs use `control-target`, such as `0-1`; reversing the order selects the other
+direction. Coordinate rows and columns both start at the top-left.
 
 ## Topology Generation
 
-### Available Script
-
-1. **`scripts/generate_topology.py`**
-   - Generates device topology configurations
-   - Exports coupling graph data
+`scripts/generate_topology.py` generates topology configurations and their coupling graph.
 
 ### Usage
 

@@ -1,7 +1,7 @@
 # CR Gate Scheduler
 
-`CRScheduler` converts valid chip couplings into sequential groups of CR operations that are safe
-to run in parallel within each group.
+`CRScheduler` converts valid chip couplings into sequential groups of CR operations that satisfy
+its modeled wiring constraints.
 
 ## Inputs and Output
 
@@ -105,8 +105,9 @@ must not share a group; it is not a coupling. The checks run in this order, and 
 adds the edge:
 
 1. The pairs share a qubit.
-2. Any MUX of one pair equals any MUX of the other, even with four different qubits.
-3. A MUX of one pair conflicts with a MUX of the other in the MUX conflict map.
+2. Either pair contains a qubit without a known MUX.
+3. Any MUX of one pair equals any MUX of the other, even with four different qubits.
+4. A MUX of one pair conflicts with a MUX of the other in the MUX conflict map.
 
 <Diagram name="cr-schedule-conflict-graph" caption="Example fixture with max_parallel_ops = 4: selected pairs on a schematic wiring, their conflict graph with the graph color of each pair, and the execution groups G1 to G4. Colors mark execution groups, not graph colors." />
 
@@ -152,20 +153,15 @@ which the coloring visited them. `max_parallel_ops` then cuts each color into co
 of at most that many pairs. Chunking only splits a conflict-free color, so it cannot introduce a
 conflict; the remainder becomes its own group even when its pairs conflict with nothing.
 
-In the diagram, MUX1 and MUX2 share control module `C1`, so `4-5` and `8-9` conflict under rule 3
-without sharing a qubit or a MUX. Color 1 holds `0-1`, `4-5`, `12-13`, and `16-17`; with
-`max_parallel_ops=4` it stays one group, G1, whose four pairs run at once. `3-2` conflicts with
-`0-1` under rule 2 and with `3-1` under rule 1, so it needs a third color. The inter-MUX pair
-`7-10` is colored alone in its own graph and runs last. The four groups therefore come from three
-intra-MUX colors and one inter-MUX color. The diagram and the execution GIF give each group its
-own color and tag, and write graph colors as text:
+In the diagram, `4-5` and `8-9` conflict through shared control module `C1`. `3-2` conflicts
+with `0-1` through a MUX and with `3-1` through qubit 3. The inter-MUX pair `7-10` runs last.
+At `max_parallel_ops=4`, the three intra-MUX colors and one inter-MUX color produce:
 
 ```text
 [[("0", "1"), ("4", "5"), ("12", "13"), ("16", "17")], [("3", "1"), ("8", "9")], [("3", "2")], [("7", "10")]]
 ```
 
-With `max_parallel_ops=2` the same pairs give five groups: chunking cuts color 1 into
-`[("0", "1"), ("4", "5")]` and `[("12", "13"), ("16", "17")]`, and the other groups stay the same.
+At a cap of 2, the first group splits in half, producing five groups.
 
 `tests/qdash/workflow/engine/scheduler/test_cr_schedule_docs_example.py` recomputes these groups,
 the groups at a cap of 2, the colors, and the edges with `schedule_pairs()`, the plugin

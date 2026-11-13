@@ -15,9 +15,7 @@ connects dispatched flow runs to QDash execution history, hardware reservations,
 | `CalibService` | The workflow author's contract: a checked context, run metadata, and `run(targets, steps)` | Execution IDs, reservations, workers, or cleanup |
 | `CalibSession` | In-process pipeline, execution, reservation, worker, and terminal lifecycle | Deployment registration or project authorization |
 
-The API is the authority for project context and QDash metadata. Prefect is the orchestration
-authority. MongoDB execution documents remain the QDash-facing history even though each record can
-carry a Prefect `flow_run_id`.
+MongoDB execution documents provide QDash history; `flow_run_id` links them to Prefect orchestration.
 
 ## Workflow Author Contract
 
@@ -303,11 +301,9 @@ never pull or push.
 
 ## Handle Terminal States
 
-Top-level flow hooks reconcile cancellations, failures, and crashes that interrupt normal runtime
-cleanup. They find QDash executions by `flow_run_id`, finalize unfinished tasks, and release the
-owning reservation. Nested worker flows use keep-lock variants because the parent pipeline owns
-the reservation. See [Workflow Engine Architecture](./engine-architecture.md#cancellation) for the
-in-process rules.
+Top-level hooks reconcile interrupted executions and tasks and release the owning reservation.
+Nested flows use keep-lock variants. See
+[Cancellation](./engine-architecture.md#cancellation) for the shared lifecycle policy.
 
 ## Source and Tests
 

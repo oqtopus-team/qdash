@@ -129,12 +129,9 @@ names such as `"CheckT1"` stops the flow before it measures; see
 
 ### Choose an Execution Mode
 
-The `execution_mode` value of a one-qubit step controls how the selected qubits wait for each
-other. You set it in the source; QDash does not inspect the task list to choose between serial and
-parallel execution. In `sequential`, `parallel_by_mux`, and `parallel_by_round`, each qubit runs
-the step's whole task list before it counts as finished, and none of the three runs one task
-across all qubits before starting the next task. `simultaneous_spectroscopy` is the exception
-described in the table.
+Set `execution_mode` in the source to control how qubits wait for each other. Except for
+`simultaneous_spectroscopy`, each qubit runs the whole task list independently; modes differ in
+when the next qubit starts.
 
 | Execution mode | Behavior |
 | --- | --- |
@@ -146,39 +143,21 @@ described in the table.
 
 ![Three timelines on one time axis for qubits 0 and 1 on MUX 0 and qubits 8 and 9 on MUX 2. Each qubit's bar is split into its tasks: CheckRabi, then CreateHPIPulse, then CheckT1. In sequential, the qubits run one at a time in the order 0, 1, 8, 9. In parallel_by_mux, qubit 0 moves to CreateHPIPulse while qubit 8 is still on CheckRabi, and qubit 1 starts CheckRabi when qubit 0 finishes CheckT1, while qubit 8 is still on CheckT1. In parallel_by_round, qubits 0 and 8 also move through their tasks independently, but qubit 1 waits until qubit 8 finishes CheckT1, its last task, then qubits 1 and 9 start together as round 2.](/images/guides/one-qubit-execution-modes.gif)
 
-The animation uses an illustrative task list and illustrative durations, not measurements. Every
-qubit runs CheckRabi, then CreateHPIPulse, then CheckT1. In total, qubit 0 takes 3 units, qubit 1
-takes 4, qubit 8 takes 5, and qubit 9 takes 3; qubit 8's CheckRabi takes 2 units, so qubit 0
-reaches CreateHPIPulse first. Both MUXes are in the same hardware stage. Each bar labels its tasks
-Rabi, HPI, and T1, and the left column names the task each MUX is running.
-
-| Execution mode | What happens in the example | All done at |
-| --- | --- | --- |
-| `sequential` | Qubits 0, 1, 8, and 9 run one at a time; MUX 2 waits for MUX 0 to finish | 15 |
-| `parallel_by_mux` | Qubit 1 starts at 3, when qubit 0 finishes CheckT1, while qubit 8 runs CheckT1 until 5 | 8 |
-| `parallel_by_round` | Round 1 runs qubits 0 and 8; qubit 1 waits from 3 to 5 for qubit 8's CheckT1, then round 2 runs qubits 1 and 9 | 9 |
-
-A round waits for every qubit's whole task list. It does not wait between tasks and does not
-synchronize pulses. QDash chooses the actual grouping and order from the chip wiring. The two
-rounds shown match the default checkerboard ordering for these four qubits when both MUXes
-can share a stage.
-`sequential`, `parallel_by_mux`, and `parallel_by_round` use the same box stages; changing
-between them changes only how qubits wait for each other.
+The animation uses illustrative durations. Each qubit runs CheckRabi, CreateHPIPulse, then
+CheckT1. In `parallel_by_mux`, a MUX starts its next qubit as soon as its current one finishes.
+In `parallel_by_round`, the next round waits for all qubits to finish. Neither mode synchronizes
+pulses or waits between individual tasks. All three non-spectroscopy modes use the same hardware
+stages; QDash derives their grouping and order from the chip wiring.
 
 To check these modes and the two-qubit groups below while you edit a flow, select
 **Execution help** in the workflow editor header; on a narrow screen it is in the action menu.
 The help opens over the editor and does not save or run the flow.
 
-For the three non-spectroscopy modes, QDash decides the grouping automatically: it reads the chip's
-`wiring.yaml`, runs Box A MUXes, then Box B MUXes, then the remaining MUXes, and keeps the
-qubits of one MUX one after another. The box classification comes only from
-module names whose base ends in `A` or `B`, such as `R21B-5`; QDash does not read the box type
-in `box.yaml`. Wiring written as `<box ID>:<port>`, the form the QuEL-1 and QuEL-3 templates use
-(for example `quel3-02-a01:4`), has no such name, so every MUX lands in one stage and MUXes on
-the same box can run in parallel. QDash checks no shared box resources between those MUXes;
-until your deployment has verified that parallel MUXes are safe, use `sequential` with
-such wiring. See
-[Check Parallel Execution on QuEL-3](./setup/qubex-backend.md#check-parallel-execution-on-quel-3).
+With `<box ID>:<port>` wiring, including the QuEL-1 and QuEL-3 templates, MUXes on the same box
+can run in parallel without shared-box resource checks. Use `sequential` until your deployment
+has verified that this is safe. See
+[Check Parallel Execution on QuEL-3](./setup/qubex-backend.md#check-parallel-execution-on-quel-3)
+for wiring classification and hardware limits.
 
 Templates with an `execution_mode` parameter, such as **Simple Calibration** and **Bring-up**,
 default to `parallel_by_mux`. Steps written directly in the source, such as `CustomOneQubit`,
@@ -190,13 +169,10 @@ flow function's parameters:
 execution_mode: OneQubitExecutionMode = "sequential",
 ```
 
-There is no setting for the number of qubits that run at once. In `parallel_by_mux`, one worker
-runs per MUX of the current stage; in `parallel_by_round`, a round holds at most one qubit per MUX.
-To run fewer qubits at once, select fewer MUXes per execution and run the selections one after
-another, or use `sequential`. Each parallel stage or round runs on a pool of 16 worker processes
-that QDash sets internally; more MUXes wait for a free worker. That pool is not a hardware limit
-and not a setting. How many qubits your hardware can measure at once depends on the boxes, ports,
-and backend, and QDash cannot determine it from the configuration.
+One-qubit concurrency has no user setting: `parallel_by_mux` runs one worker per MUX in the
+current stage, and `parallel_by_round` includes at most one qubit per MUX. Each stage or round
+has 16 worker slots; additional targets wait. This software limit does not establish hardware
+capacity. To reduce concurrency, select fewer MUXes per run or use `sequential`.
 
 Keep the template's execution mode unless the procedure requires a specific ordering. The
 selected tasks must support the chosen mode and backend. A flow or pipeline that still uses the
@@ -233,21 +209,9 @@ every pair of its group is done; only then does the next group start.
 
 ![Execution timeline of four CR schedule groups, G1 to G4, with max_parallel_ops 4 and the task list CheckCrossResonance, CreateZX90, CheckZX90, drawn on four worker lanes that later groups reuse. Each group has its own color and tag: blue G1, orange G2, teal G3, purple G4. G1 runs four pairs at once, 0 to 1, 4 to 5, 12 to 13 and 16 to 17, one per worker. The pairs move through their tasks at different rates: at one moment 0 to 1 is still on CheckCrossResonance, 12 to 13 and 16 to 17 are on CreateZX90, and 4 to 5 is on CheckZX90. 4 to 5, 12 to 13 and 16 to 17 finish first and wait for 0 to 1, the slowest pair. G2 then runs 3 to 1 and 8 to 9, G3 runs 3 to 2, and G4 runs the inter-MUX pair 7 to 10. Each group starts only after every pair of the previous group finishes.](/images/guides/two-qubit-cr-schedule.gif)
 
-The animation uses an example selection of eight directed pairs on five MUXes with
-`max_parallel_ops = 4`. Each color and tag marks one group, G1 to G4; the bar outline, hatching,
-and fill show whether a task has not started, is running, or is done. Task durations are
-illustrative, not measurements, and pairs in a group do not synchronize their pulses.
-
-| Group | Pairs (control → target) | Why the pairs are in this group |
-| --- | --- | --- |
-| G1 | 0 → 1, 4 → 5, 12 → 13, 16 → 17 | No shared qubit, MUX, or module; four pairs fill `max_parallel_ops` |
-| G2 | 3 → 1, 8 → 9 | 3 → 1 shares qubit 1 with 0 → 1; 8 → 9 shares a control module with 4 → 5 |
-| G3 | 3 → 2 | Shares qubit 3 with 3 → 1 and the MUX of 0 → 1 |
-| G4 | 7 → 10 | Spans two MUXes, so it runs after every single-MUX group |
-
-With `max_parallel_ops = 2`, the same pairs need five groups: G1 splits into a group with 0 → 1
-and 4 → 5 and a group with 12 → 13 and 16 → 17, which run one after the other although none of
-the four pairs conflict.
+The animation shows eight directed pairs grouped with `max_parallel_ops = 4`. Colors identify
+groups; outlines, hatching, and fills show pending, running, and completed tasks. Durations are
+illustrative. Pairs within a group do not synchronize pulses.
 
 This grouping is the two-qubit `execution_mode="automatic"`, the default; one-qubit steps never
 use it, and the steps of a workflow run one after another. To calibrate one pair at a time, set
@@ -255,25 +219,12 @@ use it, and the steps of a workflow run one after another. To calibrate one pair
 use `execution_mode="manual"`; see
 [Write Two-Qubit Rounds](./manual-execution-rounds.md#write-two-qubit-rounds).
 
-`max_parallel_ops` only limits the size of each group: raising it never puts conflicting pairs
-together, and it does not guarantee that every pair of a group runs at the same moment. QDash
-does not derive a maximum from the hardware: a calibration pipeline accepts 1 to 100, and each
-group runs on a pool of 16 worker processes, like a one-qubit stage, so pairs beyond 16 wait for
-a free worker. Lower it to run fewer pairs at once. In **2Q Calibration from Qubits**, change the default in
-the flow function's parameters; this example lowers the template's `10` to `4`:
+`max_parallel_ops` caps group size without relaxing hardware conflicts. Pipelines accept 1–100,
+but each group has 16 worker slots, so additional pairs wait. To lower the template default
+from 10 to 4, change this parameter in the flow function:
 
 ```python
-def two_qubit(
-    username: str,
-    chip_id: str,
-    qids: list[str] | None = None,
-    tasks: list[TaskCall] | None = None,
-    inverse: bool = False,
-    max_parallel_ops: int = 4,
-    tags: list[str] | None = None,
-    flow_name: str | None = None,
-    project_id: str | None = None,
-) -> Any:
+max_parallel_ops: int = 4,
 ```
 
 The template passes this value to `GenerateCRSchedule(max_parallel_ops=max_parallel_ops,
@@ -431,12 +382,9 @@ How this works: [Workflow Authoring Quickstart](../developer-guide/workflow/quic
 
 ## Organize Your Workflows
 
-The **Workflow** page lists each workflow under its creator and, inside that space, under the
-folders you choose. Filing happens in the editor's **Explorer** panel, which shows one creator's
-space as `folder/name.py`; the selector at its top switches to another creator, and **Open in
-editor** on a creator's folder on the **Workflow** page opens the editor on that space. Moving a
-workflow changes only where it is listed: its name, source file, schedules, and running
-executions are untouched.
+Use the editor's **Explorer** to organize workflows within their creator's space. Its selector
+switches creators; **Open in editor** on the Workflow page opens that creator's space. Moving
+a workflow changes its listing only, preserving its name, source, schedules, and executions.
 
 - **Move a workflow**: drag its row onto a folder, or onto the empty area below the tree for the
   top of the space; or right-click it and pick a folder from **Move … to**. Dragging a folder

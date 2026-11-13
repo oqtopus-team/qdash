@@ -22,9 +22,8 @@ projects and switch between them without copying data.
 | Editor | Viewer access plus calibration runs and changes to shared operational state. |
 | Owner | Editor access plus project settings, membership, and deletion. |
 
-Assign Viewer when a member only reviews or discusses work. Assign Editor when they run
-calibrations or change project data. Each project has one Owner; transfer ownership before that
-person leaves the project. The previous Owner remains an Editor after a transfer.
+Each project has one Owner; transfer ownership before that person leaves. The previous Owner
+remains an Editor.
 
 Project roles are independent of the system Admin role. A system Admin can manage accounts and
 projects from **Admin**, but needs project membership to open that project's calibration data.

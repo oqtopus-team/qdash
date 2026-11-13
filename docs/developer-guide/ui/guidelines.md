@@ -62,18 +62,9 @@ Use established aliases:
 
 ## Keep Boundaries Explicit
 
-Choose the narrowest owner that preserves the required behavior:
-
-| State | Owner |
-| --- | --- |
-| API records and mutation status | Generated TanStack Query hook |
-| Shareable filters, selections, and date ranges | Existing `use*UrlState` hook |
-| Authentication, active project, theme, or global layout | Existing context |
-| One component subtree | Local state or a focused hook |
-| Validated multi-field form | React Hook Form with Zod |
-
-Do not copy query results into Context or synchronize duplicate response state by hand. Invalidate
-the affected generated query keys after a mutation.
+Follow [State Ownership](./architecture.md#state-ownership): generated queries own API data,
+URL hooks own shareable filters, contexts own cross-route state, and local state owns a component
+subtree. Do not copy query results into context; invalidate affected query keys after mutations.
 
 Keep feature-specific composition in `components/features/`. Move a component to
 `components/ui/` only when its API no longer depends on a feature model and at least two callers
@@ -192,27 +183,8 @@ when data crosses a generic boundary, not to repeat inference that is already pr
 
 ## Run the Development Loop
 
-From the repository root:
-
-```bash
-task dev-local-setup
-task dev-local
-task test-ui
-task ci-ui
-task ci-ui-build
-```
-
-Use focused commands from `ui/` while iterating:
-
-```bash
-bun run test:run src/components/features/tasks/__tests__/TaskWorkbenchRun.test.tsx
-bun run lint
-bun run fmt:check
-bunx tsc --noEmit
-```
-
-`task ci-ui` runs tests, Next.js type generation, TypeScript, lint, formatting, Knip, and the Bun
-audit. `task ci-ui-build` performs the production build separately.
+Start development with `task dev-local-setup` and `task dev-local` from the repository root.
+Use [UI Testing](./testing.md#run-tests) for focused tests, static checks, and production builds.
 
 ## Regenerate the API Client
 
