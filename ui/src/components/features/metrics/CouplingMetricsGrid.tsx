@@ -630,7 +630,7 @@ export function CouplingMetricsGrid({
         className={`flex-1 relative flex justify-center ${
           viewMode === "pan-zoom"
             ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "bg-base-200/60 rounded-lg"
+            : "items-start overflow-hidden bg-base-200/60 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
       >
@@ -663,7 +663,9 @@ export function CouplingMetricsGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <div className="min-w-0 min-h-0 flex-1 self-stretch overflow-auto flex justify-center-safe items-start">
+            {gridContent}
+          </div>
         )}
       </div>
 
