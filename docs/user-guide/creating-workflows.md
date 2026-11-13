@@ -260,7 +260,7 @@ together, and it does not guarantee that every pair of a group runs at the same 
 does not derive a maximum from the hardware: a calibration pipeline accepts 1 to 100, and each
 group runs on a pool of 16 worker processes, like a one-qubit stage, so pairs beyond 16 wait for
 a free worker. Lower it to run fewer pairs at once. In **2Q Calibration**, change the default in
-the flow function's parameters:
+the flow function's parameters; this example lowers the template's `10` to `4`:
 
 ```python
 def two_qubit(

@@ -223,6 +223,58 @@ class TestValidate:
         )
         assert response.json()["valid"] is True, response.json()["problems"]
 
+    def test_version_1_legacy_mode_is_rejected_without_a_converted_spec(
+        self, test_client, chip, auth_headers
+    ):
+        legacy: dict[str, Any] = {
+            "targets": {"qids": ["0", "1"]},
+            "steps": [
+                {"type": "OneQubitCheck"},
+                {
+                    "type": "CustomOneQubit",
+                    "step_name": "t1",
+                    "tasks": ["CheckT1"],
+                    "mode": "scheduled",
+                },
+            ],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": legacy},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        assert data["spec_version"] == 1
+        # No converted spec is offered, and nothing tells the caller to submit one.
+        assert data["migrated_spec"] is None
+        [problem] = data["problems"]
+        assert problem["path"] == "steps[1]"
+        assert "steps[1].execution_mode='parallel_by_mux'" in problem["message"]
+        assert "migrated_spec" not in problem["message"]
+
+        # After the owner sets execution_mode, the spec converts and validates.
+        legacy["steps"][1] = {
+            "type": "CustomOneQubit",
+            "step_name": "t1",
+            "tasks": ["CheckT1"],
+            "execution_mode": "parallel_by_mux",
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": legacy},
+        )
+        migrated = response.json()["migrated_spec"]
+        assert migrated["steps"][1]["execution_mode"] == "parallel_by_mux"
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": migrated},
+        )
+        assert response.json()["valid"] is True, response.json()["problems"]
+
     def test_version_1_repeated_builtin_steps_convert_to_unique_step_ids(
         self, test_client, chip, auth_headers
     ):

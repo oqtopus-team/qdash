@@ -43,8 +43,12 @@ from qdash.common.manual_rounds import (
     qubit_rounds_for_mode,
 )
 
-# Runtime imports: Pydantic validates execution_mode against these Literals.
-from qdash.datamodel.one_qubit_execution_mode import OneQubitStepExecutionMode  # noqa: TC001
+# Runtime imports: Pydantic validates execution_mode against these Literals,
+# and the migration names the accepted modes.
+from qdash.datamodel.one_qubit_execution_mode import (
+    ONE_QUBIT_STEP_EXECUTION_MODES,
+    OneQubitStepExecutionMode,
+)
 from qdash.datamodel.task_call import (
     CALL_ID_PATTERN,
     TaskCall,
@@ -1079,6 +1083,59 @@ def _migrate_step_ids(steps: list[Any], notes: list[str]) -> None:
         )
 
 
+# One-qubit steps of a version 1 spec carried ``mode``. Version 2 replaced it with
+# ``execution_mode`` and renamed the values; the old names are listed here only
+# to name the replacement in the rejection message, never to convert a spec.
+_V1_MODE_STEPS = frozenset({"OneQubitCheck", "OneQubitFineTune", "CustomOneQubit"})
+_FORMER_ONE_QUBIT_MODE_NAMES: dict[str, str] = {
+    "synchronized": "parallel_by_round",
+    "scheduled": "parallel_by_mux",
+    "serial": "sequential",
+}
+
+
+class LegacyExecutionModeError(ValueError):
+    """A version 1 spec uses the removed one-qubit ``mode`` or a former mode name.
+
+    The migration does not convert these: the step owner chooses the
+    ``execution_mode``. ``problems`` holds one ``(path, message)`` per step.
+    """
+
+    def __init__(self, problems: list[tuple[str, str]]) -> None:
+        self.problems = problems
+        super().__init__("; ".join(f"{path}: {message}" for path, message in problems))
+
+
+def _legacy_execution_mode_problems(steps: Sequence[Any]) -> list[tuple[str, str]]:
+    problems: list[tuple[str, str]] = []
+    for index, step in enumerate(steps):
+        if not isinstance(step, Mapping) or step.get("type") not in _V1_MODE_STEPS:
+            continue
+        where = f"steps[{index}]"
+        for key in ("mode", "execution_mode"):
+            if key not in step:
+                continue
+            value = step[key]
+            former = value if isinstance(value, str) else None
+            if key == "execution_mode" and former not in _FORMER_ONE_QUBIT_MODE_NAMES:
+                continue
+            if key == "mode":
+                removed = f"{where}.mode={value!r} uses the removed mode setting"
+            else:
+                removed = f"{where}.execution_mode={value!r} uses a removed mode name"
+            current = _FORMER_ONE_QUBIT_MODE_NAMES.get(former, former) if former else None
+            replacement = (
+                f"set {where}.execution_mode={current!r} instead"
+                if current in ONE_QUBIT_STEP_EXECUTION_MODES
+                else f"set {where}.execution_mode to one of "
+                + ", ".join(ONE_QUBIT_STEP_EXECUTION_MODES)
+            )
+            problems.append(
+                (where, f"{removed}, which is not converted; {replacement} and resubmit")
+            )
+    return problems
+
+
 def migrate_pipeline_spec(spec: Mapping[str, Any]) -> SpecMigration:
     """Convert a pipeline spec to version 2 without changing what it runs.
 
@@ -1092,6 +1149,11 @@ def migrate_pipeline_spec(spec: Mapping[str, Any]) -> SpecMigration:
     version 1 overrides applied to every occurrence of the task. A version 2 spec
     is returned unchanged. The function is pure and deterministic; it does not
     validate the result.
+
+    A version 1 one-qubit step with ``mode``, or with ``execution_mode`` set to
+    a former name (``synchronized``, ``scheduled``, ``serial``), raises
+    :class:`LegacyExecutionModeError` naming the step and its
+    ``execution_mode`` replacement: the conversion does not choose a mode.
     """
     version = spec.get("spec_version", 1)
     if version == SPEC_VERSION:
@@ -1104,6 +1166,9 @@ def migrate_pipeline_spec(spec: Mapping[str, Any]) -> SpecMigration:
     notes: list[str] = []
     steps = converted.get("steps")
     if isinstance(steps, list):
+        legacy_modes = _legacy_execution_mode_problems(steps)
+        if legacy_modes:
+            raise LegacyExecutionModeError(legacy_modes)
         for index, step in enumerate(steps):
             if not isinstance(step, dict) or step.get("type") not in _V1_TASK_STEPS:
                 continue

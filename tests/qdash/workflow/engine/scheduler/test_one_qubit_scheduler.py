@@ -721,13 +721,22 @@ class TestRoundScheduling:
             use_checkerboard=True,
         )
 
-        # Collect all qids from rounds
-        all_qids = []
-        for round_ in schedule.rounds:
-            all_qids.extend(round_.parallel_qids)
-
-        # All input qubits should be scheduled
-        assert set(all_qids) == {"0", "1", "2", "3", "4", "5", "6", "7"}
+        # MUX 0 is on Box A and MUX 1 on Box B, so no round mixes them. Checkerboard
+        # keeps MUX 0 (even) in natural order and runs MUX 1 (odd) as 6, 7, 4, 5;
+        # natural ordering would give 4, 5, 6, 7.
+        assert [
+            (round_.round_index, round_.box_type, round_.parallel_qids)
+            for round_ in schedule.rounds
+        ] == [
+            (0, BOX_A, ["0"]),
+            (1, BOX_A, ["1"]),
+            (2, BOX_A, ["2"]),
+            (3, BOX_A, ["3"]),
+            (4, BOX_B, ["6"]),
+            (5, BOX_B, ["7"]),
+            (6, BOX_B, ["4"]),
+            (7, BOX_B, ["5"]),
+        ]
 
     def test_round_box_separation(self, scheduler_64qv3):
         """Test that round schedule separates box types."""
@@ -737,9 +746,18 @@ class TestRoundScheduling:
             use_checkerboard=True,
         )
 
-        # Should have different box types
-        box_types = schedule.box_types
-        assert len(box_types) > 0
+        # Box A rounds (MUX 1, checkerboard order) run before the MIXED rounds (MUX 0).
+        assert schedule.box_types == [BOX_A, BOX_MIXED]
+        assert [(round_.box_type, round_.parallel_qids) for round_ in schedule.rounds] == [
+            (BOX_A, ["6"]),
+            (BOX_A, ["7"]),
+            (BOX_A, ["4"]),
+            (BOX_A, ["5"]),
+            (BOX_MIXED, ["0"]),
+            (BOX_MIXED, ["1"]),
+            (BOX_MIXED, ["2"]),
+            (BOX_MIXED, ["3"]),
+        ]
 
     def test_generate_rounds_from_mux(self, scheduler_simple):
         """Test round schedule generation from MUX IDs."""

@@ -143,7 +143,8 @@ class ValidatePipelineResponse(BaseModel):
     migrated_spec: dict[str, Any] | None = Field(
         default=None,
         description=(
-            "For a version 1 spec: the same pipeline converted to version 2. Review it, "
+            "For a convertible version 1 spec: the same pipeline converted to version 2. "
+            "Absent when a one-qubit step uses a removed mode setting or name. Review it, "
             "rename generated call_ids if you like, and submit it instead."
         ),
     )

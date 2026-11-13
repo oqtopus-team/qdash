@@ -126,7 +126,8 @@ After the update, each owner edits their workflows as described in
 [Update a flow saved before task calls](./creating-workflows.md#update-a-flow-saved-before-task-calls)
 and tests each one on the Fake backend before it measures on hardware again. Pipeline specs queued
 before the update run after conversion, and a new version 1 spec is rejected with a converted
-spec to submit instead. The full list of edits:
+spec to submit instead. A spec whose one-qubit step still sets `mode` is not converted, queued or
+new: set `execution_mode` on that step as the rejection message names, then submit it again. The full list of edits:
 [Migrate Saved Flows](../developer-guide/workflow/task-calls.md#migrate-saved-flows).
 
 ## Recover from a Failed Update

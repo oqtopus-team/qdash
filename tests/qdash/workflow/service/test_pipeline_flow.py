@@ -10,6 +10,7 @@ import pytest
 from qdash.datamodel.calibration_pipeline import (
     STEP_CATALOG,
     CalibrationPipelineSpec,
+    LegacyExecutionModeError,
     PipelineStep,
     step_calls,
     step_provides,
@@ -184,6 +185,16 @@ def test_queued_version_1_spec_is_converted_at_the_flow_boundary() -> None:
         "CheckRabi": {"run": {"shots": {"value": 512}}, "input": {}}
     }
     logger.warning.assert_called_once()
+
+
+def test_queued_version_1_spec_with_legacy_mode_fails_with_the_replacement() -> None:
+    logger = MagicMock()
+    with pytest.raises(LegacyExecutionModeError, match=r"steps\[0\]\.execution_mode='sequential'"):
+        parse_dispatched_spec(
+            {"targets": {"qids": ["0"]}, "steps": [{"type": "OneQubitCheck", "mode": "serial"}]},
+            logger,
+        )
+    logger.warning.assert_not_called()
 
 
 def test_queued_version_1_spec_with_repeated_builtin_steps_builds() -> None:

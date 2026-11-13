@@ -15,6 +15,7 @@ from qdash.datamodel.calibration_pipeline import (
     FULL_2Q_TASKS,
     STEP_CATALOG,
     CalibrationPipelineSpec,
+    LegacyExecutionModeError,
     migrate_pipeline_spec,
     pipeline_spec_json_schema,
     pipeline_warnings,
@@ -576,6 +577,66 @@ def test_migration_keeps_unique_builtin_steps_on_their_default_ids() -> None:
     migration = migrate_pipeline_spec(v1)
     assert all("step_id" not in step for step in migration.spec["steps"])
     assert migration.notes == []
+
+
+@pytest.mark.parametrize(
+    ("step", "replacement"),
+    [
+        ({"type": "OneQubitCheck", "mode": "synchronized"}, "'parallel_by_round'"),
+        ({"type": "OneQubitFineTune", "mode": "scheduled"}, "'parallel_by_mux'"),
+        (
+            {"type": "CustomOneQubit", "step_name": "t1", "tasks": ["CheckT1"], "mode": "serial"},
+            "'sequential'",
+        ),
+        (
+            {"type": "OneQubitCheck", "mode": "simultaneous_spectroscopy"},
+            "'simultaneous_spectroscopy'",
+        ),
+        ({"type": "OneQubitCheck", "execution_mode": "scheduled"}, "'parallel_by_mux'"),
+        ({"type": "OneQubitCheck", "mode": "bogus"}, "one of parallel_by_round"),
+        ({"type": "OneQubitCheck", "mode": ["synchronized"]}, "one of parallel_by_round"),
+    ],
+)
+def test_version_1_legacy_mode_is_rejected_not_migrated(
+    step: dict[str, object], replacement: str
+) -> None:
+    v1 = {
+        "targets": {"qids": ["0"]},
+        "steps": [{"type": "FilterByStatus"}, step],
+    }
+    with pytest.raises(LegacyExecutionModeError) as caught:
+        migrate_pipeline_spec(v1)
+    [(path, message)] = caught.value.problems
+    assert path == "steps[1]"
+    assert "steps[1].execution_mode" in message
+    assert replacement in message
+    assert "not converted" in message
+    # The rejection is a ValueError, so callers that only catch that still stop.
+    assert isinstance(caught.value, ValueError)
+
+
+def test_version_1_legacy_mode_reports_every_step() -> None:
+    v1 = {
+        "targets": {"qids": ["0"]},
+        "steps": [
+            {"type": "OneQubitCheck", "mode": "scheduled"},
+            {"type": "FilterByStatus"},
+            {"type": "OneQubitFineTune", "step_id": "fine", "mode": "serial"},
+        ],
+    }
+    with pytest.raises(LegacyExecutionModeError) as caught:
+        migrate_pipeline_spec(v1)
+    assert [path for path, _ in caught.value.problems] == ["steps[0]", "steps[2]"]
+
+
+def test_version_1_current_execution_mode_still_migrates() -> None:
+    v1 = {
+        "targets": {"qids": ["0"]},
+        "steps": [{"type": "OneQubitCheck", "execution_mode": "parallel_by_mux"}],
+    }
+    migration = migrate_pipeline_spec(v1)
+    migrated = CalibrationPipelineSpec.model_validate(migration.spec)
+    assert migrated.steps[0].execution_mode == "parallel_by_mux"  # type: ignore[union-attr]
 
 
 def test_version_2_spec_is_returned_unchanged() -> None:

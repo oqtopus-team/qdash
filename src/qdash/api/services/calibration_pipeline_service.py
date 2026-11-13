@@ -48,6 +48,7 @@ from qdash.datamodel.calibration_pipeline import (
     ConfigureAllStep,
     FilterByMetricStep,
     FilterByStatusStep,
+    LegacyExecutionModeError,
     PipelineStep,
     migrate_pipeline_spec,
     pipeline_spec_json_schema,
@@ -312,9 +313,22 @@ class CalibrationPipelineService:
         backend: str,
         problems: list[PipelineProblem],
     ) -> ValidatePipelineResponse:
-        """A version 1 spec is rejected with the same pipeline converted to version 2."""
+        """A version 1 spec is rejected with the same pipeline converted to version 2.
+
+        A version 1 spec whose one-qubit step uses the removed ``mode`` gets no
+        converted spec, only a problem at that step naming its ``execution_mode``
+        replacement, so callers are never told to submit a spec that is invalid.
+        """
         try:
             migration = migrate_pipeline_spec(spec)
+        except LegacyExecutionModeError as exc:
+            problems.extend(_problem(path, message) for path, message in exc.problems)
+            return ValidatePipelineResponse(
+                valid=False,
+                problems=problems,
+                backend_name=backend,
+                spec_version=version if isinstance(version, int) else None,
+            )
         except (ValueError, TypeError, AttributeError) as exc:
             problems.append(
                 _problem(

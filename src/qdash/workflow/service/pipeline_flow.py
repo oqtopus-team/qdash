@@ -183,7 +183,9 @@ def parse_dispatched_spec(spec: dict[str, Any], logger: Any) -> CalibrationPipel
     The API only dispatches version 2 specs. A run queued before the upgrade can
     still carry a version 1 spec; it is converted here, at the flow boundary,
     with :func:`migrate_pipeline_spec` (the same conversion the API offers), and
-    the conversion is logged. Nothing else accepts version 1.
+    the conversion is logged. Nothing else accepts version 1. A queued spec that
+    still uses the removed one-qubit ``mode`` raises
+    :class:`~qdash.datamodel.calibration_pipeline.LegacyExecutionModeError`.
     """
     migration = migrate_pipeline_spec(spec)
     if migration.changed:
