@@ -1872,8 +1872,9 @@ const listChips = (
  * false or the directory already exists. Wiring and hardware files are copied
  * from ``config.source_system_id`` when given; parameter files always start
  * from QDash's templates. ``config.preset`` writes a complete virtual
- * configuration instead; the ``fake`` preset is accepted only when the
- * deployment backend is fake and the chip uses the preset's topology.
+ * configuration instead; a preset is accepted only when the deployment backend
+ * is the preset's backend and the chip uses the preset's topology. The
+ * ``qibocal`` preset writes no files.
  *
  * Parameters
  * ----------

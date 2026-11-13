@@ -10,7 +10,8 @@ import type { JourneyProgress } from "@/components/features/first-calibration/jo
 import type { JourneyState } from "@/lib/firstCalibrationJourney";
 
 const FAKE: ChipSetupMode = {
-  kind: "fake",
+  kind: "preset",
+  backend: "fake",
   configAvailable: true,
   preset: {
     preset_id: "fake",

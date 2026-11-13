@@ -110,3 +110,19 @@ backends:
         - CheckT1
         - CheckT2Echo
         - CheckRamsey
+
+  # ---------------------------------------------------------------------------
+  # Qibocal Backend (Emulator Only - Measurement-Only Results)
+  # ---------------------------------------------------------------------------
+  qibocal:
+    description: "Qibocal protocols on a Qibolab emulator; results are synthetic and measurement-only"
+
+    # Connection settings are in config/app/qibocal.yaml and the Qibolab platform in
+    # config/domain/qibocal/platforms. Outputs never update accepted calibration state.
+
+    # The emulator has no MUXes or boxes: chips have no Qubex wiring, and workflows target
+    # qubits with qids, which run without the hardware scheduler.
+    requires_wiring: false
+    tasks:
+      One Qubit:
+        - QibocalRabiAmplitude

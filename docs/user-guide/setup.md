@@ -12,7 +12,8 @@ theme, several deployments on one host, and remote access are optional and can b
 | --- | --- |
 | Evaluate QDash without quantum hardware | [Fake](./setup/fake-backend.md); no backend configuration before startup |
 | Operate a Qubex-connected lab deployment | [Qubex](./setup/qubex-backend.md); place the Qubex configuration before startup |
-| Connect another hardware stack | Not supported by deployment settings, which accept only `fake` and `qubex`; an additional backend requires QDash code changes. |
+| Try a Qibocal protocol on one emulated qubit, with measurement-only results | [Qibocal emulator](./setup/qibocal-backend.md); an opt-in Compose overlay, no backend configuration |
+| Connect another hardware stack | Not supported by deployment settings, which accept only `fake`, `qubex`, and `qibocal`; an additional backend requires QDash code changes. |
 
 The backend determines the available calibration tasks and hardware connection.
 

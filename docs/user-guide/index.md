@@ -7,7 +7,9 @@ Set up QDash, run calibrations, and review results. Start with
 
 1. [Setup](./setup.md): choose a backend, configure `.env`, start QDash, and sign in. The
    [Fake backend](./setup/fake-backend.md) evaluates QDash without hardware; the
-   [Qubex backend](./setup/qubex-backend.md) connects a supported control system.
+   [Qubex backend](./setup/qubex-backend.md) connects a supported control system; the
+   [Qibocal emulator backend](./setup/qibocal-backend.md) runs a Qibocal measurement on one
+   emulated qubit.
 2. [Run Your First Calibration](./first-calibration.md): create a chip, run a workflow, and
    inspect its first result with the guide on **Home**.
 

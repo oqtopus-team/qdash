@@ -19,4 +19,6 @@ export interface ConfigPresetResponse {
   mux_count: number;
   /** Flow template that brings up and calibrates a chip created from the preset */
   workflow_template_id: string;
+  /** Whether the preset writes files into the Qubex configuration tree, so a chip can be created only while one is mounted */
+  requires_config_tree?: boolean;
 }

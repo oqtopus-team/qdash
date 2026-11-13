@@ -28,7 +28,13 @@ packages = [
 
 [tool.ruff]
 line-length = 100
-exclude = ["tools", "scripts", "postgres_data"]
+exclude = [
+    "tools",
+    "scripts",
+    "postgres_data",
+    # Upstream Qibocal platform, kept byte-identical (see config/domain/qibocal/UPSTREAM.md)
+    "config/domain/qibocal/platforms",
+]
 src = ["src", "clients/python/src"]
 target-version = "py310"
 lint.unfixable = ["F401"]

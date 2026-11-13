@@ -1,0 +1,17 @@
+# Opt-in overlay for the Qibocal emulator backend.
+#
+#   docker compose -f compose.yaml -f compose.qibocal.yaml up -d --build
+#
+# `task deploy-local-qibocal` runs this with DEFAULT_BACKEND=qibocal and ENV=dev-qibocal.
+# Only the user-flow worker changes: it builds the `qibocal` target of the workflow
+# Dockerfile, which adds the isolated Qibocal runner environment under
+# /app/tools/qibocal-runner. Without this file no image contains Qibocal.
+# Runner settings are in config/app/qibocal.yaml and the Qibolab platform in
+# config/domain/qibocal/platforms, both mounted through ./config.
+services:
+  user-flow-worker:
+    build:
+      target: qibocal
+    # Reap a runner that outlives a killed flow process; the runner also exits on its own
+    # when its parent disappears.
+    init: true

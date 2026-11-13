@@ -29,6 +29,11 @@ addresses, their wiring and skew, and operating parameters for every qubit taken
 :mod:`qdash.common.fake_device`. Every generated file says it describes virtual
 hardware.
 
+When the deployment runs the qibocal backend, the ``qibocal`` preset creates a one-qubit chip
+for the upstream Qibolab emulator platform (see :data:`QIBOCAL_PRESET`). That backend reads its
+platform from ``config/domain/qibocal/platforms`` and never reads the Qubex tree, so the preset
+writes no files there.
+
 An existing chip directory is never modified.
 """
 
@@ -99,6 +104,9 @@ class ConfigPreset:
     n_qubits: int
     mux_count: int
     workflow_template_id: str
+    # Whether the preset writes ``<chip_id>/`` into the Qubex configuration tree, and so
+    # needs one mounted.
+    requires_config_tree: bool = True
 
 
 FAKE_PRESET = ConfigPreset(
@@ -114,7 +122,24 @@ FAKE_PRESET = ConfigPreset(
     mux_count=fake_device.FAKE_DEVICE_MUXES,
     workflow_template_id="fake_calibration",
 )
-PRESETS: dict[str, ConfigPreset] = {FAKE_PRESET.preset_id: FAKE_PRESET}
+QIBOCAL_PRESET = ConfigPreset(
+    preset_id="qibocal",
+    name="Qibocal emulator qubit",
+    description=(
+        "The single qubit (0) of the upstream Qibolab `qubit` emulator platform. Results are "
+        "synthetic and measurement-only; no hardware is contacted and no Qubex configuration "
+        "is written."
+    ),
+    deployment_backend="qibocal",
+    topology_id="qibocal-emulator-1",
+    n_qubits=1,
+    mux_count=0,
+    workflow_template_id="qibocal_rabi_amplitude",
+    requires_config_tree=False,
+)
+PRESETS: dict[str, ConfigPreset] = {
+    preset.preset_id: preset for preset in (FAKE_PRESET, QIBOCAL_PRESET)
+}
 
 # The virtual hardware of the fake preset: one QuEL-1 A box per MUX. 192.0.2.0/24
 # (TEST-NET-1, RFC 5737) is reserved for documentation and never routed, so a hardware backend
@@ -453,6 +478,17 @@ class ChipConfigScaffolder:
             raise ChipConfigError(
                 f"The '{preset.preset_id}' preset describes a {preset.n_qubits}-qubit chip; "
                 f"use the {preset.topology_id} topology"
+            )
+        if not preset.requires_config_tree:
+            logger.info("Chip %s uses preset %s; no configuration files", chip_id, preset.preset_id)
+            return ScaffoldResult(
+                status="skipped",
+                path=chip_id,
+                preset=preset.preset_id,
+                message=(
+                    f"{chip_id} uses the {preset.name}; this backend reads its own platform "
+                    "and needs no files in the configuration tree."
+                ),
             )
         if not self.available:
             # A preset chip is only usable with its configuration, so never create it without.

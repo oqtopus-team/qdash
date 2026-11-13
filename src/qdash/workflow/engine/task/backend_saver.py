@@ -15,6 +15,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 from qdash.datamodel.task import OutputParameterSpec
 from qdash.workflow.engine.params_updater import get_params_updater
+from qdash.workflow.engine.task.measurement_only import (
+    measurement_only_reason,
+    output_provenance,
+)
 
 if TYPE_CHECKING:
     from qdash.datamodel.task import TaskResultOutputParameter
@@ -114,6 +118,9 @@ class BackendSaver:
         success : bool
             Whether backend updates should be applied
         """
+        if measurement_only_reason(task) is not None:
+            self._save_measurement_only(task, qid)
+            return
         if task.backend in ("qubex", "fake"):
             # Fake tasks run on a QUBEX-compatible simulator and persist their outputs the
             # same way, so the qubex tasks routed to the fake backend find their inputs.
@@ -139,6 +146,9 @@ class BackendSaver:
         backend : BaseBackend | None
             Backend used to sync parameter files for immediate downstream tasks.
         """
+        if measurement_only_reason(task) is not None:
+            self._save_measurement_only(task, qid)
+            return
         task_name = task.get_name()
         task_type = task.get_task_type()
 
@@ -172,6 +182,40 @@ class BackendSaver:
         self._attach_previous_database_values(
             task_model, output_parameters, publish_targets, previous_data
         )
+
+    def _save_measurement_only(self, task: TaskProtocol, qid: str) -> None:
+        """Record outputs of a measurement-only task without any write-back.
+
+        The task's declared reason and per-run provenance are stored with every output, so
+        task-result history states why the value was not applied. No setting can change
+        this: the calibration database, backend parameter files, and calibration notes are
+        not touched even when ``update_calibration_parameters`` or ``force_update_params``
+        is enabled.
+        """
+        reason = measurement_only_reason(task)
+        assert reason is not None
+        task_name = task.get_name()
+        task_model = self._state_manager.get_task(task_name, task.get_task_type(), qid)
+        output_parameters = dict(task_model.output_parameters)
+        _, publish_targets = self._build_persistence_plan(task, output_parameters)
+        if self._update_calibration_parameters or self._force_update_params:
+            logger.warning(
+                "%s is measurement-only (%s); calibration write-back was requested and ignored",
+                task_name,
+                reason,
+            )
+        self._mark_database_not_updated(task_model, output_parameters, publish_targets)
+        provenance = output_provenance(task)
+        recorded: dict[str, Any] = {}
+        for name, parameter in task_model.output_parameters.items():
+            current = (
+                parameter.model_dump() if hasattr(parameter, "model_dump") else dict(parameter)
+            )
+            current["measurement_only_reason"] = reason
+            if provenance:
+                current["provenance"] = deepcopy(provenance)
+            recorded[name] = current
+        task_model.output_parameters = recorded
 
     def _save_calibration(
         self,

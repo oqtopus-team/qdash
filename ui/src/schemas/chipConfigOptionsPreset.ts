@@ -7,6 +7,12 @@
  */
 
 /**
- * Write a complete virtual configuration instead of hardware files. 'fake' is offered only when the deployment backend is fake and needs its preset topology
+ * Create the chip from the deployment backend's preset instead of hardware files. 'fake' writes the virtual device's configuration and is offered only on the fake backend; 'qibocal' creates the one-qubit emulator chip, writes no files, and is offered only on the qibocal backend. Each preset needs its own topology
  */
-export type ChipConfigOptionsPreset = 'fake' | null;
+export type ChipConfigOptionsPreset = typeof ChipConfigOptionsPreset[keyof typeof ChipConfigOptionsPreset] | null;
+
+
+export const ChipConfigOptionsPreset = {
+  fake: 'fake',
+  qibocal: 'qibocal',
+} as const;

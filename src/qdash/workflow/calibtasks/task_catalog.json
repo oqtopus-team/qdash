@@ -1394,6 +1394,58 @@
         "task_type": "qubit"
       }
     ],
+    "qibocal": [
+      {
+        "class_name": "QibocalRabiAmplitude",
+        "description": "Find the pi-pulse amplitude with Qibocal's ``rabi_amplitude`` on an emulator.\n\nAcquisition, fit, and figure are Qibocal's own; QDash converts the runner result into\ntask outputs. The sweep must start above zero: at zero amplitude the excited-state\nprobability is exactly zero, its binomial error is zero, and Qibocal's weighted fit\nfails.\n\nThe task fails, keeping its figure and raw data, when Qibocal reports no fit, when the\namplitude, its error, chi-squared, or a fitted parameter is not finite, or when the\namplitude lies outside the swept range.",
+        "file_path": "rabi_amplitude.py",
+        "input_parameters": {},
+        "name": "QibocalRabiAmplitude",
+        "output_parameters": [
+          "qibocal_pi_amplitude",
+          "qibocal_rabi_chi2"
+        ],
+        "run_parameters": {
+          "max_amp": {
+            "description": "Last drive amplitude of the sweep",
+            "unit": "a.u.",
+            "value": 0.5,
+            "value_type": "float"
+          },
+          "min_amp": {
+            "description": "First drive amplitude of the sweep; must be greater than 0",
+            "unit": "a.u.",
+            "value": 0.01,
+            "value_type": "float"
+          },
+          "nshots": {
+            "description": "Number of single shots per amplitude",
+            "unit": "a.u.",
+            "value": 1024,
+            "value_type": "int"
+          },
+          "relaxation_time": {
+            "description": "Wait time between shots",
+            "unit": "ns",
+            "value": 0.0,
+            "value_type": "float"
+          },
+          "seed": {
+            "description": "NumPy seed of the emulator run, for reproducible results",
+            "unit": "",
+            "value": 1234,
+            "value_type": "int"
+          },
+          "step_amp": {
+            "description": "Drive amplitude step",
+            "unit": "a.u.",
+            "value": 0.01,
+            "value_type": "float"
+          }
+        },
+        "task_type": "qubit"
+      }
+    ],
     "qubex": [
       {
         "class_name": "Check1QGateCoherenceLimit",

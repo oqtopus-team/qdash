@@ -1,4 +1,4 @@
-import type { ChipSetupMode } from "@/components/features/chip/chipSetupMode";
+import { type ChipSetupMode, presetTemplateName } from "@/components/features/chip/chipSetupMode";
 import { JOURNEY_QUERY_VALUE, type JourneyState } from "@/lib/firstCalibrationJourney";
 
 import {
@@ -190,7 +190,7 @@ function chipSteps(input: CoachmarkPlanInput): CoachmarkStep[] {
         side: "bottom",
         align: "start",
       },
-      ...(setup.kind === "fake"
+      ...(setup.kind === "preset"
         ? []
         : [
             {
@@ -211,8 +211,8 @@ function chipSteps(input: CoachmarkPlanInput): CoachmarkStep[] {
         kind: "action",
         title: "Create the chip",
         description:
-          setup.kind === "fake"
-            ? "Select Create Chip. The virtual device is configured for it; no hardware is contacted."
+          setup.kind === "preset"
+            ? "Select Create Chip. The deployment's device is set up for it; no hardware is contacted."
             : "Check the topology and configuration, then select Create Chip.",
         targets: [COACHMARK_TARGETS.createChipSubmit],
         optional: true,
@@ -265,8 +265,8 @@ function flowSteps(input: CoachmarkPlanInput, label: string | null): CoachmarkSt
         kind: "info",
         title: "Review the calibration",
         description:
-          setup.kind === "fake"
-            ? "The editor holds the Fake Backend Calibration. This summary lists its tasks in run order and the MUXes they target. A first run can use it unchanged."
+          setup.kind === "preset"
+            ? `The editor holds the ${presetTemplateName(setup)}. This summary lists its tasks in run order and the targets they run on. A first run can use it unchanged.`
             : `Choose a template for ${chipId} under Template, then check its tasks and targets. A first run can use it unchanged.`,
         // The summary of the code in the editor, or the template choice while no summary is shown.
         targets: [COACHMARK_TARGETS.flowSummaryReady, COACHMARK_TARGETS.flowTemplateReady],

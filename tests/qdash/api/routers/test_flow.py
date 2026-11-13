@@ -409,7 +409,7 @@ class TestFlowTemplates:
         assert response.status_code == 200
         templates = response.json()
         assert templates
-        assert {template["backend"] for template in templates} == {"qubex", "fake"}
+        assert {template["backend"] for template in templates} == {"qubex", "fake", "qibocal"}
 
     def test_list_templates_filters_by_backend(self, test_client, test_project, auth_headers):
         """The backend query keeps fake templates out of a qubex deployment and vice versa."""
@@ -420,6 +420,10 @@ class TestFlowTemplates:
 
         assert fake.status_code == 200
         assert [template["id"] for template in fake.json()] == ["fake_calibration"]
+        qibocal = test_client.get(
+            "/flows/templates", params={"backend": "qibocal"}, headers=auth_headers
+        )
+        assert [template["id"] for template in qibocal.json()] == ["qibocal_rabi_amplitude"]
         assert qubex.status_code == 200
         qubex_ids = [template["id"] for template in qubex.json()]
         assert "simple" in qubex_ids

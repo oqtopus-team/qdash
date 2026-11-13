@@ -13,6 +13,17 @@ const FAKE_PRESET = {
   workflow_template_id: "fake_calibration",
 };
 
+const QIBOCAL_PRESET = {
+  preset_id: "qibocal",
+  name: "Qibocal emulator qubit",
+  description: "The single qubit (0) of the upstream Qibolab `qubit` emulator platform.",
+  topology_id: "qibocal-emulator-1",
+  n_qubits: 1,
+  mux_count: 0,
+  workflow_template_id: "qibocal_rabi_amplitude",
+  requires_config_tree: false,
+};
+
 const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
   push: vi.fn(),
@@ -292,7 +303,7 @@ describe("CreateChipModal", () => {
       expect(screen.queryByRole("checkbox")).toBeNull();
       // The fixed device is shown as information
       expect(screen.getByText("Fake backend")).toBeTruthy();
-      expect(screen.getByTestId("fake-device-topology")).toHaveTextContent(
+      expect(screen.getByTestId("preset-device-topology")).toHaveTextContent(
         "Square Lattice with MUX square-lattice-mux-64",
       );
       expect(screen.getByText("64 qubits, 16 MUX")).toBeTruthy();
@@ -337,7 +348,7 @@ describe("CreateChipModal", () => {
       fireEvent.change(input, { target: { value: "fake-64q" } });
 
       expect(screen.getByRole("alert")).toHaveTextContent(
-        "the virtual configuration cannot be generated",
+        "the device configuration cannot be generated",
       );
       expect(screen.queryByLabelText("Topology Template")).toBeNull();
       expect(screen.queryByText(/only the chip record is created/)).toBeNull();
@@ -410,6 +421,66 @@ describe("CreateChipModal", () => {
 
       // The message stays; its shortcut, which would open the editor outside the guide, does not.
       expect(mocks.toastSuccess).toHaveBeenCalledWith(config.message, undefined);
+    });
+  });
+
+  describe("on a qibocal deployment", () => {
+    function qibocalDeployment() {
+      mocks.configSources.deployment_backend = "qibocal";
+      mocks.configSources.presets = [QIBOCAL_PRESET];
+    }
+
+    it("creates the one-qubit emulator chip without a configuration tree", async () => {
+      qibocalDeployment();
+      mocks.configSources.available = false;
+      render(<CreateChipModal isOpen onClose={vi.fn()} />);
+
+      expect(screen.queryByLabelText("Topology Template")).toBeNull();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.getByText("Qibocal emulator backend")).toBeTruthy();
+      expect(screen.getByText("1 qubit")).toBeTruthy();
+      expect(screen.getByText(/None; the backend uses its own platform files/)).toBeTruthy();
+      expect(screen.getByText(/Qibocal Emulator Rabi Amplitude/)).toBeTruthy();
+
+      fireEvent.change(screen.getByPlaceholderText("e.g., 64Q, Chip001"), {
+        target: { value: "QIBOCAL" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Create Chip" }));
+      await waitFor(() =>
+        expect(mocks.mutate).toHaveBeenCalledWith({
+          data: {
+            chip_id: "QIBOCAL",
+            size: 1,
+            topology_id: "qibocal-emulator-1",
+            config: { preset: "qibocal" },
+          },
+        }),
+      );
+    });
+
+    it("offers the Qibocal template for the created chip", () => {
+      qibocalDeployment();
+      render(<CreateChipModal isOpen onClose={vi.fn()} />);
+      const config = {
+        status: "skipped",
+        path: "QIBOCAL",
+        preset: "qibocal",
+        files: [],
+        message: "QIBOCAL uses the Qibocal emulator qubit.",
+      };
+
+      act(() =>
+        mocks.mutationOptions?.onSuccess({
+          data: { chip_id: "QIBOCAL", config },
+        }),
+      );
+
+      const [message, options] = mocks.toastSuccess.mock.calls[0];
+      expect(message).toBe(config.message);
+      options.action.onClick();
+      expect(mocks.push).toHaveBeenCalledWith(
+        "/workflow/new?backend=qibocal&template=qibocal_rabi_amplitude&chip_id=QIBOCAL",
+      );
     });
   });
 });

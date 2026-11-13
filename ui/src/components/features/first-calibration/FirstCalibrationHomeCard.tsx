@@ -6,7 +6,11 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { CircleAlert, CircleCheck } from "lucide-react";
 
-import { canCreateFakeChip, type ChipSetupMode } from "@/components/features/chip/chipSetupMode";
+import {
+  canCreatePresetChip,
+  type ChipSetupMode,
+  presetBackendLabel,
+} from "@/components/features/chip/chipSetupMode";
 import { JOURNEY_CREATE_CHIP_QUERY_VALUE, type JourneyState } from "@/lib/firstCalibrationJourney";
 import type { ChipResponse } from "@/schemas";
 
@@ -37,7 +41,7 @@ interface FirstCalibrationHomeCardProps {
 
 /**
  * What the chip choice may offer once the deployment and the chip list are known, or why it
- * cannot be offered yet. Nothing is offered while either is unknown, so a fake deployment never
+ * cannot be offered yet. Nothing is offered while either is unknown, so a preset deployment never
  * gets the hardware path by accident.
  */
 type ChipChoiceState =
@@ -46,16 +50,16 @@ type ChipChoiceState =
   | { status: "unavailable"; message: string }
   | { status: "ready"; options: ChipResponse[]; allowCreate: boolean };
 
-/** Chips a first run can use: on the fake backend, only chips the size of its virtual device. */
+/** Chips a first run can use: on a preset backend, only chips the size of its device. */
 function eligibleChips(chips: readonly ChipResponse[], setup: ChipSetupMode): ChipResponse[] {
   if (setup.kind === "pending") return [];
-  if (setup.kind === "fake" && !setup.preset) return [];
+  if (setup.kind === "preset" && !setup.preset) return [];
   const sorted = [...chips].sort((a, b) => {
     const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
     const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
     return dateB - dateA;
   });
-  if (setup.kind === "fake" && setup.preset) {
+  if (setup.kind === "preset" && setup.preset) {
     const qubits = setup.preset.n_qubits;
     return sorted.filter((chip) => chip.size === qubits);
   }
@@ -67,15 +71,14 @@ function chipChoiceState(setup: ChipSetupMode, chipList: JourneyChipList): ChipC
     return { status: "error" };
   }
   if (setup.kind === "pending" || chipList.status === "loading") return { status: "loading" };
-  if (setup.kind === "fake" && !setup.preset) {
+  if (setup.kind === "preset" && !setup.preset) {
     return {
       status: "unavailable",
-      message:
-        "This deployment runs the fake backend, but the API does not offer its virtual device. Ask an administrator to check the API configuration.",
+      message: `This deployment runs the ${presetBackendLabel(setup.backend)}, but the API does not offer its device. Ask an administrator to check the API configuration.`,
     };
   }
   const options = eligibleChips(chipList.chips, setup);
-  const allowCreate = setup.kind === "hardware" || canCreateFakeChip(setup);
+  const allowCreate = setup.kind === "hardware" || canCreatePresetChip(setup);
   if (options.length === 0 && !allowCreate) {
     return {
       status: "unavailable",
@@ -182,7 +185,10 @@ function ChipChoice({
 }
 
 function introText(setup: ChipSetupMode): string {
-  if (setup.kind === "fake" && setup.preset) {
+  if (setup.kind === "preset" && setup.preset) {
+    if (setup.preset.n_qubits === 1) {
+      return "Run a measurement on the emulated qubit and inspect a result, without contacting hardware";
+    }
     return `Calibrate the ${setup.preset.n_qubits}-qubit virtual device and inspect a result, without contacting hardware`;
   }
   return "Run a calibration on a chip and inspect a result";
@@ -281,8 +287,8 @@ function CompletedJourney({
  * Home entry point of the first calibration journey: starts it, shows its stages and resumes it.
  * Progress comes from the chip, flow and execution records the journey points at.
  *
- * A chip can only be chosen once the deployment kind and the project's chips are known. On a fake
- * deployment the choice opens the fake template; on hardware the guide first asks the user to
+ * A chip can only be chosen once the deployment kind and the project's chips are known. On a preset
+ * deployment the choice opens the preset's template; on hardware the guide first asks the user to
  * confirm the chip's configuration here, before it links to the editor or the run.
  */
 export function FirstCalibrationHomeCard({
@@ -320,7 +326,7 @@ export function FirstCalibrationHomeCard({
   const chipDestination = (chipId: string): { href: string | null } | null => {
     if (choice.status !== "ready") return null;
     if (!choice.options.some((chip) => chip.chip_id === chipId)) return null;
-    if (setup.kind === "fake") {
+    if (setup.kind === "preset") {
       const href = journeyNewFlowHref(setup, chipId);
       return href ? { href } : null;
     }

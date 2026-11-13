@@ -24,6 +24,7 @@ from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.task.context import TaskContext
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
+from qdash.workflow.engine.task.measurement_only import measurement_only_reason
 from qdash.workflow.engine.task_parameters import (
     INPUT,
     RUN,
@@ -271,6 +272,7 @@ class CalibOrchestrator:
             "chip_id": config.chip_id,
             "classifier_dir": config.classifier_dir,
             "project_id": config.project_id,
+            "calib_data_path": config.calib_data_path,
         }
 
         if config.muxes is not None:
@@ -626,7 +628,21 @@ class CalibOrchestrator:
         )
         if not isinstance(value, bool):
             raise ValueError(f"update_calibration_parameters for {task_name} must be a boolean")
+        reason = measurement_only_reason(self._task_class(task_name))
+        if reason is not None:
+            if value:
+                logger.warning(
+                    "%s is measurement-only (%s); ignoring update_calibration_parameters=True",
+                    task_name,
+                    reason,
+                )
+            return False
         return value
+
+    def _task_class(self, task_name: str) -> type[Any] | None:
+        from qdash.workflow.calibtasks.base import BaseTask
+
+        return BaseTask.registry.get(self.config.backend_name, {}).get(task_name)
 
     def _prepare_execution_context(
         self,

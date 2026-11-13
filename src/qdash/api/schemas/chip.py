@@ -53,11 +53,13 @@ class ChipConfigOptions(BaseModel):
         default=None,
         description="Backend of the new system; taken from the source system when one is given",
     )
-    preset: Literal["fake"] | None = Field(
+    preset: Literal["fake", "qibocal"] | None = Field(
         default=None,
         description=(
-            "Write a complete virtual configuration instead of hardware files. 'fake' is "
-            "offered only when the deployment backend is fake and needs its preset topology"
+            "Create the chip from the deployment backend's preset instead of hardware files. "
+            "'fake' writes the virtual device's configuration and is offered only on the fake "
+            "backend; 'qibocal' creates the one-qubit emulator chip, writes no files, and is "
+            "offered only on the qibocal backend. Each preset needs its own topology"
         ),
     )
 
@@ -139,6 +141,13 @@ class ConfigPresetResponse(BaseModel):
     workflow_template_id: str = Field(
         description="Flow template that brings up and calibrates a chip created from the preset"
     )
+    requires_config_tree: bool = Field(
+        default=True,
+        description=(
+            "Whether the preset writes files into the Qubex configuration tree, so a chip can "
+            "be created only while one is mounted"
+        ),
+    )
 
 
 class ListConfigSourcesResponse(BaseModel):
@@ -148,13 +157,16 @@ class ListConfigSourcesResponse(BaseModel):
     sources: list[ConfigSourceResponse]
     deployment_backend: str | None = Field(
         default=None,
-        description="Backend this deployment calibrates with (DEFAULT_BACKEND), e.g. qubex or fake",
+        description=(
+            "Backend this deployment calibrates with (DEFAULT_BACKEND), e.g. qubex, fake or qibocal"
+        ),
     )
     presets: list[ConfigPresetResponse] = Field(
         default_factory=list,
         description=(
             "Presets of the deployment backend, listed even when no tree is mounted; "
-            "the fake preset only on the fake backend"
+            "the fake preset only on the fake backend and the qibocal preset only on the "
+            "qibocal backend"
         ),
     )
 

@@ -28,3 +28,6 @@ config/qubex-config/
 config/quelware-client/
 # Local pi extension checkouts (see compose.extensions.yaml).
 agent-runtime/extensions/
+
+# Host-side Qibocal runner environment; images build their own from the lock.
+tools/qibocal-runner/.venv/

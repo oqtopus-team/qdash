@@ -95,6 +95,12 @@ default. Tasks quick runs default to disabled because the single-task flow turns
 top-level `update_calibration_parameters` field into the task's setting. The resolved value is
 passed into the task context.
 
+A task class that declares `measurement_only_reason` overrides the control: its outputs are
+recorded as measurement-only with that reason for every value of
+`update_calibration_parameters` and `force_update_params`, and an agent session cannot commit
+them. The [Qibocal Emulator Backend](./qibocal-backend.md) uses this for synthetic emulator
+results.
+
 The control is independent of parameter resolution. It changes where validated outputs are
 published, not which Input or Run parameters the experiment uses. See
 [Parameter Resolution](./parameter-resolution.md) for precedence, snapshots, and overrides.

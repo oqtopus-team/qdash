@@ -494,7 +494,15 @@ class AgentSessionService:
                 continue
             parameter_name, value, error, unit, value_type = candidate
             bounds = session.policy.allowed_overrides.get(parameter_name)
-            if bounds is None:
+            measurement_only = raw.get("measurement_only_reason") if isinstance(raw, dict) else None
+            if measurement_only:
+                # Outputs a task declared measurement-only (for example synthetic emulator
+                # results) can never be committed to accepted calibration state.
+                accepted = False
+                reason = f"Output is measurement-only: {measurement_only}"
+                minimum = bounds.minimum if bounds is not None else None
+                maximum = bounds.maximum if bounds is not None else None
+            elif bounds is None:
                 accepted = False
                 reason = f"Parameter '{parameter_name}' is not allowed by the session policy"
                 minimum = None

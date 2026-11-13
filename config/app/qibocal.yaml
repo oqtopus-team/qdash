@@ -1,0 +1,27 @@
+# Qibocal Backend Connection
+# ==========================
+# QDash-side settings for the `qibocal` backend. The backend never imports Qibocal or
+# Qibolab: it runs the runner script below in the runner's own environment
+# (tools/qibocal-runner) as a subprocess.
+#
+# Relative runner paths resolve against the parent of the QDash config directory (the
+# repository root on a host, /app in the `qibocal` worker image), and relative platform paths
+# against the config directory. Environment variables are expanded.
+#
+# Qibolab platform files stay in their native format under `platform.directory`; this file
+# only says where they are. Results from this backend are always measurement-only.
+
+runner:
+  # Python interpreter of the runner environment created by `uv sync --frozen` in
+  # tools/qibocal-runner, or installed by the `qibocal` target of the workflow Dockerfile.
+  python: tools/qibocal-runner/.venv/bin/python
+  script: tools/qibocal-runner/run_rabi_amplitude.py
+  # Seconds before the runner is terminated. Includes library import and emulation.
+  timeout_seconds: 600
+  # Seconds between SIGTERM and SIGKILL when the runner must be stopped.
+  terminate_grace_seconds: 5
+
+platform:
+  # Directory containing Qibolab platform folders, relative to the config directory.
+  directory: domain/qibocal/platforms
+  name: qubit
