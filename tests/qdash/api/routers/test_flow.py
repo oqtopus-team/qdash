@@ -447,6 +447,8 @@ class TestFlowTemplates:
         data = response.json()
         assert data["id"] == "fast_full_calibration"
         assert "Shortened full calibration" in data["description"]
+        assert "Filter -> ConfigureAll -> 1Q fine-tune" in data["description"]
+        assert 'ConfigureAll(step_id="configure_all_before_fine_tune")' in data["code"]
         fine_tune_tasks_block = data["code"].split("FAST_1Q_FINE_TUNE_TASKS", 1)[1].split("]", 1)[0]
         assert "CheckT1Average" not in fine_tune_tasks_block
 
