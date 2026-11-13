@@ -1,5 +1,8 @@
 """Check the rendered compose.yaml: Caddy on UI_PORT is the only published port.
 
+The MongoDB image tests check that MONGO_VERSION in .env selects the image and that
+Compose refuses an .env without it, since no default release fits existing data.
+
 These tests need the Docker Compose CLI and skip without it. The two-stack smoke
 test at the end also starts containers and runs only with QDASH_COMPOSE_SMOKE=1.
 """
@@ -23,7 +26,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEV_OVERLAY = REPO_ROOT / "compose.dev-local.yaml"
 
 # URL and port settings of the .env.example shipped before Caddy, which existing
-# deployments still use unchanged.
+# deployments still use unchanged, plus the one MONGO_VERSION line that such a
+# deployment adds with the MongoDB release it runs now.
 LEGACY_ENV = """\
 ENV="dev-fake"
 DEFAULT_BACKEND="fake"
@@ -45,6 +49,7 @@ MONGO_INITDB_ROOT_PASSWORD=example
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=prefect
 POSTGRES_DB=prefect
+MONGO_VERSION=7.0.12
 """
 
 
@@ -57,13 +62,14 @@ def clean_environment() -> dict[str, str]:
     }
 
 
-def render(
+def run_config(
     tmp_path: Path,
     env: str = LEGACY_ENV,
     *profiles: str,
     files: tuple[Path, ...] = (REPO_ROOT / "compose.yaml",),
-) -> dict[str, Any]:
-    """Render the compose files with only the given .env content for interpolation."""
+    shell_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run `docker compose config` with only the given .env content and shell variables."""
     if shutil.which("docker") is None:
         pytest.skip("Docker Compose CLI is not installed")
     env_file = tmp_path / "env"
@@ -76,14 +82,24 @@ def render(
         command += ["--profile", profile]
     command += ["config", "--format", "json", "--no-env-resolution"]
     # Keep the caller's shell variables (UI_PORT and so on) out of the result.
-    result = subprocess.run(  # noqa: S603
+    return subprocess.run(  # noqa: S603
         command,
         capture_output=True,
         check=False,
         cwd=tmp_path,
-        env=clean_environment(),
+        env={**clean_environment(), **(shell_env or {})},
         text=True,
     )
+
+
+def render(
+    tmp_path: Path,
+    env: str = LEGACY_ENV,
+    *profiles: str,
+    files: tuple[Path, ...] = (REPO_ROOT / "compose.yaml",),
+) -> dict[str, Any]:
+    """Render the compose files with only the given .env content for interpolation."""
+    result = run_config(tmp_path, env, *profiles, files=files)
     assert result.returncode == 0, result.stderr
     compose: dict[str, Any] = json.loads(result.stdout)
     return compose
@@ -317,6 +333,66 @@ def test_caddy_reads_the_repository_caddyfile(tmp_path: Path) -> None:
         for volume in caddy["volumes"]
     )
     assert set(caddy["depends_on"]) == {"ui", "api", "prefect-server"}
+
+
+def mongo_image(tmp_path: Path, env: str) -> str:
+    """Return the image Compose resolves for the mongo service."""
+    image: str = render(tmp_path, env)["services"]["mongo"]["image"]
+    return image
+
+
+def without_mongo_version(env: str) -> str:
+    """Return the .env content with its MONGO_VERSION line removed."""
+    return "".join(
+        line for line in env.splitlines(keepends=True) if not line.startswith("MONGO_VERSION=")
+    )
+
+
+@pytest.mark.parametrize("value", [None, ""], ids=["missing", "empty"])
+@pytest.mark.parametrize(
+    "files",
+    [(REPO_ROOT / "compose.yaml",), (REPO_ROOT / "compose.yaml", DEV_OVERLAY)],
+    ids=["compose", "dev-overlay"],
+)
+def test_compose_refuses_an_env_without_mongo_version(
+    tmp_path: Path, value: str | None, files: tuple[Path, ...]
+) -> None:
+    """Without a release in .env, Compose fails before it creates any container."""
+    env = without_mongo_version(LEGACY_ENV)
+    assert "MONGO_VERSION" not in env
+    if value is not None:
+        env += f"MONGO_VERSION={value}\n"
+
+    result = run_config(tmp_path, env, files=files)
+
+    assert result.returncode != 0
+    assert "Set MONGO_VERSION in .env" in result.stderr
+
+
+@pytest.mark.parametrize("example", [".env.example", ".env.example.qubex"])
+def test_env_examples_pin_new_installations_to_mongodb_9(tmp_path: Path, example: str) -> None:
+    """A .env copied from either example starts MongoDB 9.0.8 without other edits."""
+    env = (REPO_ROOT / example).read_text()
+
+    assert mongo_image(tmp_path, env) == "mongo:9.0.8"
+
+
+@pytest.mark.parametrize("version", ["7.0.12", "8.0.38", "8.3.17", "9.0.8"])
+def test_mongo_version_in_env_selects_the_image(tmp_path: Path, version: str) -> None:
+    """An existing deployment pins its running release, or each upgrade step, in .env."""
+    env = without_mongo_version(LEGACY_ENV) + f"MONGO_VERSION={version}\n"
+
+    assert mongo_image(tmp_path, env) == f"mongo:{version}"
+    overlay = render(tmp_path, env, files=(REPO_ROOT / "compose.yaml", DEV_OVERLAY))
+    assert overlay["services"]["mongo"]["image"] == f"mongo:{version}"
+
+
+def test_shell_mongo_version_overrides_env(tmp_path: Path) -> None:
+    """A MONGO_VERSION exported in the shell takes precedence over .env."""
+    result = run_config(tmp_path, LEGACY_ENV, shell_env={"MONGO_VERSION": "8.0.38"})
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["services"]["mongo"]["image"] == "mongo:8.0.38"
 
 
 def free_port() -> int:

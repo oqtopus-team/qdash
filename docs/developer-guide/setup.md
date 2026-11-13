@@ -160,7 +160,10 @@ task dev-local
 ```
 
 This starts the supporting services in Docker Compose and runs the API and UI with hot reload,
-on the host or in the DevContainer. Use this flow when editing backend or frontend code
+on the host or in the DevContainer. It needs a `.env` with `MONGO_VERSION`, which Compose
+requires: a `.env` copied from an example has `9.0.8`, and an older `.env` needs the release that
+already wrote its `MONGO_DATA_PATH`, read as in
+[Prepare the Update](../user-guide/system-updates.md#prepare-the-update). Use this flow when editing backend or frontend code
 frequently. The `caddy` service of the Compose deployment serves the browser on `UI_PORT` with
 the same Caddyfile, so `/api`, `/prefect` with its sign-in check, and the Copilot chat stream
 behave as in production.

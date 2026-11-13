@@ -15,7 +15,31 @@ can require a backup or a release-specific procedure.
    that none is still running.
 2. Back up MongoDB, PostgreSQL, calibration data, and Qubex configuration when required by the
    release notes or your recovery policy.
-3. Confirm that the checkout is on `main` and has no tracked changes:
+3. Record the MongoDB release that runs now, before you change the checkout or stop QDash.
+   QDash v1.10.0 and later read it from `MONGO_VERSION` in `.env` and refuse to start without
+   it. With QDash running, print the release:
+
+   ```bash
+   docker compose exec -T mongo sh -c 'mongosh --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.version()"'
+   ```
+
+   The command uses the credentials inside the `mongo` container, so do not type them. For a
+   MongoDB without authentication, drop the `--username`, `--password`, and
+   `--authenticationDatabase` options. Set the printed release, such as `7.0.12`, in the existing
+   `.env`: change its `MONGO_VERSION` line, or add one line if it has none:
+
+   ```dotenv
+   MONGO_VERSION=7.0.12
+   ```
+
+   Keep the existing `.env`. Do not copy an example over it or take `9.0.8` from an example: that
+   value is for an empty `MONGO_DATA_PATH`. Do not run `docker compose pull` on a checkout older
+   than QDash v1.10.0, which uses the unversioned `mongo` image. If Compose already reports that
+   `MONGO_VERSION` is missing, see
+   [Find the Release When Compose Fails](./mongodb-upgrade.md#find-the-release-when-compose-fails).
+   After installing QDash v1.10.0, upgrade MongoDB to 9.0 as described in
+   [Upgrade MongoDB](./mongodb-upgrade.md) before installing QDash v1.11.0.
+4. Confirm that the checkout is on `main` and has no tracked changes:
 
    ```bash
    git branch --show-current

@@ -25,7 +25,10 @@ services:
     networks:
       - custom_net
   mongo:
-    image: mongo
+    # Required, with no default: the release must match the data in MONGO_DATA_PATH.
+    # The .env examples set it for new installations; existing ones set the running
+    # release (docs/user-guide/mongodb-upgrade.md).
+    image: mongo:${MONGO_VERSION:?Set MONGO_VERSION in .env to the running MongoDB release; see docs/user-guide/mongodb-upgrade.md}
     restart: always
     env_file:
       - .env
