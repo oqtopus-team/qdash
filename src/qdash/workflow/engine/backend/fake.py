@@ -1,14 +1,25 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from qdash.datamodel.task import TaskTypes
 from qdash.workflow.engine.backend.base import BaseBackend
+from qdash.workflow.engine.backend.persistence import PersistencePolicy
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+
+if TYPE_CHECKING:
+    from qdash.common.config.params_updater import ParamsUpdater
 
 
 class FakeBackend(BaseBackend):
     """Backend management for QUBEX-compatible fake experiments."""
 
     name: str = "fake"
+    persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
+
+    def create_params_updater(self, chip_id: str | None = None) -> "ParamsUpdater":
+        """Synchronize QUBEX-compatible YAML without opening a session."""
+        from qdash.workflow.engine.params_updater import _QubexParamsUpdater
+
+        return _QubexParamsUpdater(self, chip_id)
 
     def __init__(self, config: dict[str, Any]) -> None:
         """Initialize the Fake backend with a configuration dictionary."""

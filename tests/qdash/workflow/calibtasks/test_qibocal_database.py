@@ -327,3 +327,67 @@ def test_catalog_exposes_the_runtime_input_and_output_contract():
         assert set(metadata["input_parameters"]) == set(task_class.input_spec)
         assert set(metadata["output_parameters"]) == set(task_class.output_spec)
         assert set(metadata["run_parameters"]) == set(task_class.run_spec)
+
+
+@pytest.mark.parametrize("mux", [False, True])
+@pytest.mark.parametrize(
+    "mismatch", [None, "simulation_binding", "project_id", "chip_id", "origin"]
+)
+def test_saver_checks_simulation_destination_on_each_save_path(
+    qibocal_bound, tmp_path, mux, mismatch
+):
+    from copy import deepcopy
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from qdash.workflow.engine.task.backend_saver import BackendSaver
+
+    task = QibocalBringUp()
+    _, entry = execute(task, qibocal_bound, tmp_path, update=False)
+    task.output_provenance = deepcopy(task.output_provenance)
+    if mismatch == "origin":
+        task.output_provenance.update(source="unknown", synthetic=False)
+    elif mismatch is not None:
+        task.output_provenance[mismatch] = "invalid"
+    state = MagicMock()
+    state.get_task.return_value = entry
+    saver = BackendSaver(state, "alice", str(tmp_path), "tm")
+    execution = cast("ExecutionService", SimpleNamespace(chip_id="emulator", project_id="proj-1"))
+
+    def save():
+        if mux:
+            saver.save_mux_qid(task, execution, "0", qibocal_bound)
+        else:
+            saver.save(task, execution, "0", qibocal_bound, True)
+
+    if mismatch is None:
+        save()
+        assert values()["qibocal_pi_duration"]["value"] == 40
+        assert entry.output_parameters["qibocal_pi_duration"]["database_updated"] is True
+    else:
+        with pytest.raises(ValueError):
+            save()
+        assert values() == {}
+
+
+@pytest.mark.parametrize("success,update", [(False, True), (True, False)])
+def test_simulation_force_cannot_override_adoption_gate(qibocal_bound, tmp_path, success, update):
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from qdash.workflow.engine.task.backend_saver import BackendSaver
+
+    task = QibocalBringUp()
+    _, entry = execute(task, qibocal_bound, tmp_path, update=False)
+    state = MagicMock()
+    state.get_task.return_value = entry
+    saver = BackendSaver(state, "alice", str(tmp_path), "tm", True, update)
+    saver.save(
+        task,
+        cast("ExecutionService", SimpleNamespace(chip_id="emulator", project_id="proj-1")),
+        "0",
+        qibocal_bound,
+        success,
+    )
+    assert values() == {}
+    assert entry.output_parameters["qibocal_pi_duration"]["database_updated"] is False

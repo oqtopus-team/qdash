@@ -9,10 +9,11 @@ import subprocess
 import sys
 import threading
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
+from tests.qdash.workflow.engine.backend.test_qibocal_process import _alive, _wait_dead
 from tests.qdash.workflow.qibocal_helpers import (
     REPO_ROOT,
     RUNNER_SCRIPT,
@@ -32,6 +33,9 @@ from qdash.workflow.engine.backend.qibocal import (
     QibocalRunnerTimeoutError,
     hash_tree,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 REQUEST = QibocalRequest(
     calibration=template_values(load_platform_template().parameters(), 0),
@@ -60,38 +64,6 @@ UPSTREAM_SHA256 = {
     ),
     "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
 }
-
-
-def _alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    # A zombie still answers kill(0); reap it if it is our child.
-    try:
-        waited, _ = os.waitpid(pid, os.WNOHANG)
-    except ChildProcessError:
-        # Not our child: an orphan the init process has not reaped yet is a zombie.
-        stat = Path(f"/proc/{pid}/stat")
-        if stat.exists():
-            return stat.read_text().rsplit(")", 1)[-1].split()[0] != "Z"
-        state = subprocess.run(  # noqa: S603 - fixed argv
-            ["ps", "-o", "stat=", "-p", str(pid)],  # noqa: S607
-            capture_output=True,
-            text=True,
-            check=False,
-        ).stdout.strip()
-        return bool(state) and not state.startswith("Z")
-    return waited == 0
-
-
-def _wait_dead(pid: int, timeout: float = 5.0) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if not _alive(pid):
-            return True
-        time.sleep(0.05)
-    return False
 
 
 class TestUpstreamPlatform:
@@ -181,7 +153,7 @@ class TestRun:
 
         with (
             patch.dict(os.environ, {"QDASH_SECRET_FOR_TEST": "leak"}),
-            patch("qdash.workflow.engine.backend.qibocal.subprocess.Popen", spy),
+            patch("qdash.workflow.engine.backend.qibocal_process.subprocess.Popen", spy),
         ):
             run = backend.run_protocol(REQUEST, label="env")
 
@@ -330,7 +302,10 @@ class TestRun:
         assert (run_dir / "platforms" / "qubit" / "platform.py").is_file()
         assert not (run_dir / "result.json").exists()
 
-    def test_cancellation_stops_the_runner_and_propagates(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("error", [KeyboardInterrupt, RuntimeError])
+    def test_cancellation_or_exception_stops_the_runner_and_propagates(
+        self, tmp_path: Path, error: type[BaseException]
+    ) -> None:
         backend = fake_backend(tmp_path, "sleep", terminate_grace_seconds=1)
         real_wait = subprocess.Popen.wait
         cancelled = {"done": False}
@@ -342,12 +317,12 @@ class TestRun:
                 run_root = tmp_path / "calib" / "qibocal"
                 while time.monotonic() < deadline and not any(run_root.glob("*/child_pid")):
                     time.sleep(0.05)
-                raise KeyboardInterrupt
+                raise error
             return real_wait(self, timeout=timeout)
 
         with (
             patch.object(subprocess.Popen, "wait", cancel_once),
-            pytest.raises(KeyboardInterrupt),
+            pytest.raises(error),
         ):
             backend.run_protocol(REQUEST, label="cancel")
 

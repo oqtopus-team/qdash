@@ -212,6 +212,9 @@ subprocess. Validated outputs may update only a matching simulation-bound chip i
 
 ### Add persistence behavior
 
+Declare the backend's save policy and native hooks as described in the
+[backend persistence boundary](./calibration-data-lifecycle.md#backend-persistence-boundary).
+
 Depend on repository protocols and inject an in-memory implementation in tests. State-transition
 rules belong in a state manager or service; database-specific query logic belongs in the repository
 implementation.

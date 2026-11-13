@@ -2,10 +2,14 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from qdash.datamodel.task import (
     OutputParameterSpec,
     ParameterModel,
 )
+from qdash.workflow.engine.backend.fake import FakeBackend
+from qdash.workflow.engine.backend.persistence import PersistencePolicy
 from qdash.workflow.engine.task.backend_saver import BackendSaver, resolve_publish_targets
 
 if TYPE_CHECKING:
@@ -29,9 +33,11 @@ def test_save_mux_qid_syncs_backend_params_for_distributed_outputs() -> None:
         ),
     )
     task = MagicMock()
+    task.backend = "qubex"
     task.get_name.return_value = "CheckResonatorSpectroscopy"
     task.get_task_type.return_value = "qubit"
     backend = MagicMock()
+    backend.persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
     updater = MagicMock()
 
     saver = BackendSaver(
@@ -86,6 +92,7 @@ def test_save_calibration_stages_outputs_when_persistence_is_disabled() -> None:
     task.is_qubit_task.return_value = True
     task.is_coupling_task.return_value = False
     backend = MagicMock()
+    backend.persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
     backend.name = "qubex"
     updater = MagicMock()
 
@@ -127,9 +134,11 @@ def test_save_mux_qid_marks_outputs_when_persistence_is_disabled() -> None:
         SimpleNamespace(chip_id="chip-1", project_id="proj-1"),
     )
     task = MagicMock()
+    task.backend = "qubex"
     task.get_name.return_value = "CheckResonatorSpectroscopy"
     task.get_task_type.return_value = "qubit"
     backend = MagicMock()
+    backend.persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
 
     saver = BackendSaver(
         state_manager=state_manager,
@@ -170,6 +179,7 @@ def test_save_calibration_records_previous_database_value_for_persisted_output()
     task.is_qubit_task.return_value = True
     task.is_coupling_task.return_value = False
     backend = MagicMock()
+    backend.persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
     backend.name = "qubex"
 
     saver = BackendSaver(
@@ -217,6 +227,7 @@ def test_save_calibration_records_previous_database_value_for_coupling() -> None
     task.is_qubit_task.return_value = False
     task.is_coupling_task.return_value = True
     backend = MagicMock()
+    backend.persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
     backend.name = "qubex"
     saver = BackendSaver(state_manager, "alice", "/tmp/calib", "tm-1")
 
@@ -295,6 +306,7 @@ def test_save_calibration_publishes_measurement_and_operational_frequency() -> N
         SimpleNamespace(execution_id="exec-1", chip_id="chip-1", project_id="proj-1"),
     )
     backend = MagicMock()
+    backend.persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
     backend.name = "qubex"
     updater = MagicMock()
     saver = BackendSaver(state_manager, "alice", "/tmp/calib", "tm-1")
@@ -362,8 +374,7 @@ def test_save_persists_fake_task_outputs_like_qubex() -> None:
     task.is_qubit_task.return_value = True
     task.is_coupling_task.return_value = False
     task.__class__.output_spec = {}
-    backend = MagicMock()
-    backend.name = "fake"
+    backend = FakeBackend({})
     updater = MagicMock()
 
     saver = BackendSaver(
@@ -384,8 +395,76 @@ def test_save_persists_fake_task_outputs_like_qubex() -> None:
         qubit_repo_cls.return_value.get_qubit_data.return_value = {}
         saver.save(task, execution_service, "1", backend, success=True)
 
-    backend.update_note.assert_not_called()
     qubit_repo_cls.return_value.update_calib_data.assert_called_once()
     persisted = qubit_repo_cls.return_value.update_calib_data.call_args.kwargs["output_parameters"]
     assert "qubit_frequency" in persisted
     updater.update.assert_called_once()
+
+
+@pytest.mark.parametrize("success", [False, True])
+@pytest.mark.parametrize("force", [False, True])
+@pytest.mark.parametrize("update", [False, True])
+def test_compatible_policy_preserves_note_database_native_order(success, force, update):
+    """DB adoption and native validation gates intentionally differ for this policy."""
+    task = MagicMock()
+    task.backend = "qubex"
+    task.get_name.return_value = "CheckRabi"
+    task.is_qubit_task.return_value = True
+    task.is_coupling_task.return_value = False
+    model = SimpleNamespace(output_parameters={"control_amplitude": ParameterModel(value=0.2)})
+    state = MagicMock()
+    state.get_task.return_value = model
+    backend = MagicMock()
+    backend.persistence_policy = PersistencePolicy.QUBEX_COMPATIBLE
+    events = []
+    backend.update_note.side_effect = lambda **_: events.append("note")
+    updater = MagicMock()
+    updater.update.side_effect = lambda *_: events.append("native")
+    execution = cast(
+        "ExecutionService",
+        SimpleNamespace(chip_id="chip", project_id="project", execution_id="exec"),
+    )
+    saver = BackendSaver(state, "alice", "/tmp/calib", "tm", force, update)
+    with (
+        patch("qdash.repository.MongoQubitCalibrationRepository") as repo,
+        patch("qdash.repository.MongoCouplingCalibrationRepository"),
+        patch("qdash.workflow.engine.task.backend_saver.get_params_updater", return_value=updater),
+    ):
+        repo.return_value.get_calibration_data_for_update.return_value = {}
+        repo.return_value.update_calib_data.side_effect = lambda **_: events.append("database")
+        saver.save(task, execution, "0", backend, success)
+    expected = ["note"]
+    if update:
+        expected.append("database")
+        if success or force:
+            expected.append("native")
+    assert events == expected
+    assert model.output_parameters["control_amplitude"]["database_updated"] is update
+
+
+@pytest.mark.parametrize("mux", [False, True])
+@pytest.mark.parametrize("policy", [None, "qubex-compatible", MagicMock()])
+def test_unknown_policy_fails_before_side_effects(mux, policy):
+    backend = MagicMock()
+    backend.name = "unknown"
+    backend.persistence_policy = policy
+    state = MagicMock()
+    task = MagicMock()
+    task.backend = "qubex"
+    saver = BackendSaver(state, "alice", "/tmp/calib", "tm")
+    with pytest.raises(ValueError, match="persistence policy"):
+        if mux:
+            saver.save_mux_qid(task, MagicMock(), "0", backend)
+        else:
+            saver.save(task, MagicMock(), "0", backend, True)
+    state.get_task.assert_not_called()
+    backend.update_note.assert_not_called()
+
+
+def test_mux_requires_backend_for_adoption():
+    task = MagicMock()
+    task.backend = "qubex"
+    state = MagicMock()
+    with pytest.raises(ValueError, match="policy is required"):
+        BackendSaver(state, "alice", "/tmp/calib", "tm").save_mux_qid(task, MagicMock(), "0")
+    state.get_task.assert_not_called()
