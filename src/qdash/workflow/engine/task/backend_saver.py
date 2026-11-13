@@ -14,6 +14,11 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, Any, cast
 
 from qdash.datamodel.task import OutputParameterSpec
+from qdash.workflow.engine.backend.persistence import (
+    PersistencePolicy,
+    policy_for_task,
+    prepare_simulation_outputs,
+)
 from qdash.workflow.engine.params_updater import get_params_updater
 from qdash.workflow.engine.task.measurement_only import (
     measurement_only_reason,
@@ -56,7 +61,7 @@ class BackendSaver:
     """Handles backend-specific persistence for calibration task results.
 
     Responsibilities:
-    - Dispatching to the correct backend saver (qubex, fake, etc.)
+    - Applying the persistence policy explicitly declared by the backend
     - Saving calibration data to MongoDB (qubit and coupling repositories)
     - Updating calibration notes on the backend
     - Updating backend parameter files (e.g. Qubex YAML)
@@ -121,72 +126,45 @@ class BackendSaver:
         if measurement_only_reason(task) is not None:
             self._save_measurement_only(task, qid)
             return
-        if task.backend == "qibocal":
-            self._save_qibocal(task, execution_service, qid, backend, success)
-            return
-        if task.backend not in ("qubex", "fake"):
-            raise ValueError(f"No calibration persistence policy for backend '{task.backend}'")
-        if task.backend in ("qubex", "fake"):
-            # Fake tasks run on a QUBEX-compatible simulator and persist their outputs the
-            # same way, so the qubex tasks routed to the fake backend find their inputs.
+        policy = policy_for_task(backend, task)
+        if policy is PersistencePolicy.BOUND_SIMULATION:
+            self._save_bound_simulation(task, execution_service, qid, backend, success)
+        else:
             self._save_calibration(task, execution_service, qid, backend, success)
 
-    def _save_qibocal(
+    def _save_bound_simulation(
         self,
         task: TaskProtocol,
         execution_service: ExecutionService,
         qid: str,
-        backend: Any,
+        backend: BaseBackend,
         success: bool,
     ) -> None:
-        import math
-
-        from qdash.common.qibocal_platform import CALIBRATION_FIELDS_BY_NAME
         from qdash.repository import MongoQubitCalibrationRepository
 
-        binding = backend.binding()
-        provenance = output_provenance(task)
-        if (
-            provenance.get("simulation_binding") != binding.model_dump(mode="json")
-            or provenance.get("chip_id") != execution_service.chip_id
-            or provenance.get("project_id") != execution_service.project_id
-        ):
-            raise ValueError("Simulation output does not match the destination chip binding")
         model = self._state_manager.get_task(task.get_name(), task.get_task_type(), qid)
-        model.note["provenance"] = deepcopy(provenance)
-        outputs = {
-            name: value.model_dump() if hasattr(value, "model_dump") else dict(value)
-            for name, value in model.output_parameters.items()
-        }
-        for name, parameter in outputs.items():
-            parameter["provenance"] = deepcopy(provenance)
-            value = parameter.get("value")
-            if name in CALIBRATION_FIELDS_BY_NAME:
-                CALIBRATION_FIELDS_BY_NAME[name].validate(value)
-            elif (
-                not name.startswith("qibocal_")
-                or not isinstance(value, (int, float))
-                or not math.isfinite(value)
-            ):
-                raise ValueError(f"Invalid Qibocal output {name}")
-        model.output_parameters = outputs
+        outputs = prepare_simulation_outputs(
+            task,
+            backend,
+            chip_id=execution_service.chip_id,
+            project_id=execution_service.project_id,
+            task_model=model,
+        )
         persisted, targets = self._build_persistence_plan(task, outputs)
         if not self._update_calibration_parameters or not success:
             self._mark_database_not_updated(model, outputs, targets)
             return
         repo = MongoQubitCalibrationRepository()
-        previous = self._get_previous_calibration_data(repo, execution_service, qid)
-        if task.get_name() == "QibocalBringUp":
-            persisted = {name: value for name, value in persisted.items() if name not in previous}
-        if persisted:
-            repo.update_calib_data(
-                username=self._username,
-                qid=qid,
-                chip_id=execution_service.chip_id,
-                project_id=execution_service.project_id,
-                output_parameters=persisted,
-            )
-        self._attach_previous_database_values(model, outputs, targets, previous)
+        self._save_database(
+            repo,
+            execution_service,
+            qid,
+            model,
+            outputs,
+            persisted,
+            targets,
+            preserve_existing=task.get_name() == "QibocalBringUp",
+        )
 
     def save_mux_qid(
         self,
@@ -206,10 +184,17 @@ class BackendSaver:
         qid : str
             The qubit ID
         backend : BaseBackend | None
-            Backend used to sync parameter files for immediate downstream tasks.
+            Backend declaring the adoption policy and native synchronization. Required
+            unless the task is explicitly measurement-only.
         """
         if measurement_only_reason(task) is not None:
             self._save_measurement_only(task, qid)
+            return
+        if backend is None:
+            raise ValueError("A backend with a calibration persistence policy is required for MUX")
+        policy = policy_for_task(backend, task)
+        if policy is PersistencePolicy.BOUND_SIMULATION:
+            self._save_bound_simulation(task, execution_service, qid, backend, success=True)
             return
         task_name = task.get_name()
         task_type = task.get_task_type()
@@ -230,17 +215,14 @@ class BackendSaver:
         from qdash.repository import MongoQubitCalibrationRepository
 
         qubit_repo = MongoQubitCalibrationRepository()
-        previous_data = self._get_previous_calibration_data(qubit_repo, execution_service, qid)
-        qubit_repo.update_calib_data(
-            username=self._username,
-            qid=qid,
-            chip_id=execution_service.chip_id,
-            output_parameters=persisted_parameters,
-            project_id=execution_service.project_id,
+        previous_data = self._write_database(
+            qubit_repo,
+            execution_service,
+            qid,
+            persisted_parameters,
         )
         # Note: calib_data is already updated by put_output_parameters
-        if backend is not None:
-            self._update_backend_params(backend, execution_service, qid, persisted_parameters)
+        self._update_backend_params(backend, execution_service, qid, persisted_parameters)
         self._attach_previous_database_values(
             task_model, output_parameters, publish_targets, previous_data
         )
@@ -322,17 +304,16 @@ class BackendSaver:
         coupling_repo = MongoCouplingCalibrationRepository()
 
         # Always update calibration note regardless of success/failure
-        if backend.name == "qubex":
-            note_qid = qid if task.is_qubit_task() or task.is_coupling_task() else None
-            backend.update_note(
-                username=self._username,
-                chip_id=execution_service.chip_id,
-                calib_dir=self._calib_dir,
-                execution_id=execution_service.execution_id,
-                task_manager_id=self._task_manager_id,
-                project_id=execution_service.project_id,
-                qid=note_qid,
-            )
+        note_qid = qid if task.is_qubit_task() or task.is_coupling_task() else None
+        backend.update_note(
+            username=self._username,
+            chip_id=execution_service.chip_id,
+            calib_dir=self._calib_dir,
+            execution_id=execution_service.execution_id,
+            task_manager_id=self._task_manager_id,
+            project_id=execution_service.project_id,
+            qid=note_qid,
+        )
 
         if not self._update_calibration_parameters:
             logger.info(
@@ -344,33 +325,22 @@ class BackendSaver:
 
         # Save to the authoritative calibration database only when persistence is enabled.
         if output_parameters:
-            if task.is_qubit_task():
-                previous_data = self._get_previous_calibration_data(
-                    qubit_repo, execution_service, qid
-                )
-                qubit_repo.update_calib_data(
-                    username=self._username,
-                    qid=qid,
-                    chip_id=execution_service.chip_id,
-                    output_parameters=persisted_parameters,
-                    project_id=execution_service.project_id,
-                )
-                self._attach_previous_database_values(
-                    task_model, output_parameters, publish_targets, previous_data
-                )
-            elif task.is_coupling_task():
-                previous_data = self._get_previous_calibration_data(
-                    coupling_repo, execution_service, qid
-                )
-                coupling_repo.update_calib_data(
-                    username=self._username,
-                    qid=qid,
-                    chip_id=execution_service.chip_id,
-                    output_parameters=persisted_parameters,
-                    project_id=execution_service.project_id,
-                )
-                self._attach_previous_database_values(
-                    task_model, output_parameters, publish_targets, previous_data
+            repository = (
+                qubit_repo
+                if task.is_qubit_task()
+                else coupling_repo
+                if task.is_coupling_task()
+                else None
+            )
+            if repository is not None:
+                self._save_database(
+                    repository,
+                    execution_service,
+                    qid,
+                    task_model,
+                    output_parameters,
+                    persisted_parameters,
+                    publish_targets,
                 )
 
         # Update backend params on success, or when force_update_params is enabled
@@ -388,6 +358,57 @@ class BackendSaver:
                     task_name,
                 )
             self._update_backend_params(backend, execution_service, qid, persisted_parameters)
+
+    def _write_database(
+        self,
+        repository: Any,
+        execution_service: ExecutionService,
+        qid: str,
+        persisted_parameters: dict[str, Any],
+        *,
+        preserve_existing: bool = False,
+    ) -> dict[str, Any]:
+        """Adopt values in QDash and return the pre-write state for task history."""
+        previous = self._get_previous_calibration_data(repository, execution_service, qid)
+        if preserve_existing:
+            persisted_parameters = {
+                name: value for name, value in persisted_parameters.items() if name not in previous
+            }
+        if persisted_parameters:
+            repository.update_calib_data(
+                username=self._username,
+                qid=qid,
+                chip_id=execution_service.chip_id,
+                project_id=execution_service.project_id,
+                output_parameters=persisted_parameters,
+            )
+        return previous
+
+    def _save_database(
+        self,
+        repository: Any,
+        execution_service: ExecutionService,
+        qid: str,
+        task_model: Any,
+        output_parameters: dict[str, Any],
+        persisted_parameters: dict[str, Any],
+        publish_targets: dict[str, tuple[str, ...]],
+        *,
+        preserve_existing: bool = False,
+    ) -> None:
+        previous = self._write_database(
+            repository,
+            execution_service,
+            qid,
+            persisted_parameters,
+            preserve_existing=preserve_existing,
+        )
+        self._attach_previous_database_values(
+            task_model,
+            output_parameters,
+            publish_targets,
+            previous,
+        )
 
     @staticmethod
     def _build_persistence_plan(

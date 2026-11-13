@@ -35,6 +35,7 @@ from qdash.common.config.loader import ConfigLoader
 from qdash.common.qibocal_platform import PlatformTemplate, native_assignments, readback_mismatches
 from qdash.common.simulation_binding import require_qibocal_binding
 from qdash.workflow.engine.backend.base import BaseBackend
+from qdash.workflow.engine.backend.persistence import PersistencePolicy
 
 if TYPE_CHECKING:
     from qdash.datamodel.simulation import SimulationBindingModel
@@ -183,6 +184,7 @@ class QibocalBackend(BaseBackend):
     """Run Qibocal protocols on a Qibolab emulator through the isolated runner."""
 
     name: str = "qibocal"
+    persistence_policy = PersistencePolicy.BOUND_SIMULATION
 
     def __init__(self, config: dict[str, Any]) -> None:
         self._config = config
