@@ -1,4 +1,5 @@
 import "./globals.css";
+import type { Viewport } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import NextTopLoader from "nextjs-toploader";
@@ -12,6 +13,14 @@ export const metadata = {
   icons: {
     icon: "/favicon.png",
   },
+};
+
+// `viewport-fit=cover` exposes the safe-area insets that the app chrome and the
+// mobile tab bar pad themselves by.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

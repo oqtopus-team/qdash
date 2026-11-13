@@ -43,18 +43,25 @@ vi.mock("@/contexts/ThemeContext", () => ({
 }));
 
 /**
- * Pulls the desktop and mobile navigation asides out of a render. Both carry the
- * same aria-label, so they are told apart by their `lg:` visibility class.
- * Throws when either is missing so a broken render fails here, not on undefined.
+ * Pulls the desktop rail and, when open, the mobile drawer dialog out of a render.
+ * The drawer is portalled, so it is found by role rather than inside `container`.
+ * Throws when the rail is missing so a broken render fails here, not on undefined.
  */
 function getAsides(container: HTMLElement) {
-  const asides = container.querySelectorAll('aside[aria-label="Primary navigation"]');
-  const desktop = Array.from(asides).find((aside) => aside.className.includes("lg:flex"));
-  const mobile = Array.from(asides).find((aside) => aside.className.includes("lg:hidden"));
-  if (!desktop || !mobile) {
-    throw new Error("Expected both desktop and mobile Primary navigation asides");
+  const desktop = container.querySelector('aside[aria-label="Primary navigation"]');
+  if (!desktop || !desktop.className.includes("lg:flex")) {
+    throw new Error("Expected the desktop Primary navigation aside");
   }
-  return { desktop, mobile };
+  return {
+    desktop,
+    get mobile() {
+      return getMobileDrawer();
+    },
+  };
+}
+
+function getMobileDrawer() {
+  return screen.getByRole("dialog", { name: "Navigation menu" });
 }
 
 /** Returns the shared active-row pill of the section that contains `href`. */
@@ -102,18 +109,28 @@ describe("Sidebar", () => {
   });
 
   it("narrows the mobile drawer to w-56 and drops w-72", () => {
-    const { container } = render(<Sidebar />);
+    sidebarState.isMobileOpen = true;
+    render(<Sidebar />);
 
-    const { mobile } = getAsides(container);
+    const mobile = getMobileDrawer();
 
     expect(mobile.className).toContain("w-56");
     expect(mobile.className).not.toContain("w-72");
+    expect(mobile.className).toContain("lg:hidden");
+  });
+
+  it("mounts the mobile drawer only while it is open", () => {
+    render(<Sidebar />);
+
+    expect(screen.queryByRole("dialog", { name: "Navigation menu" })).toBeNull();
   });
 
   it("makes the menu rows fill the drawer or rail instead of the widest label", () => {
+    sidebarState.isMobileOpen = true;
     const { container } = render(<Sidebar />);
 
-    for (const aside of Object.values(getAsides(container))) {
+    const { desktop, mobile } = getAsides(container);
+    for (const aside of [desktop, mobile]) {
       const menu = aside.querySelector("nav ul.menu");
       const stack = aside.querySelector("nav > div");
 
@@ -216,9 +233,10 @@ describe("Sidebar", () => {
     const { container } = render(<Sidebar />);
 
     const { mobile } = getAsides(container);
-    const header = within(mobile.firstElementChild as HTMLElement);
+    const home = within(mobile).getByRole("link", { name: "QDash home" });
+    const header = within(home.parentElement as HTMLElement);
 
-    expect(header.getByRole("link", { name: "QDash home" }).textContent).toBe("QDash");
+    expect(home.textContent).toBe("QDash");
     expect(header.getByRole("button", { name: "Close menu" })).toBeTruthy();
   });
 
@@ -248,6 +266,7 @@ describe("Sidebar", () => {
   });
 
   it("renders exactly one home logo per sidebar and none inside the nav", () => {
+    sidebarState.isMobileOpen = true;
     const { container } = render(<Sidebar />);
 
     const { desktop, mobile } = getAsides(container);
@@ -286,6 +305,72 @@ describe("Sidebar", () => {
     const prefectLink = within(desktop as HTMLElement).getByRole("link", { name: "Prefect" });
 
     expect(prefectLink.getAttribute("href")).toBe("/prefect/dashboard");
+  });
+
+  describe("mobile drawer", () => {
+    it("lists the destinations the tab bar does not show", () => {
+      projectState.canEdit = true;
+      sidebarState.isMobileOpen = true;
+      render(<Sidebar />);
+
+      const drawer = within(getMobileDrawer());
+      const nav = within(drawer.getByRole("navigation", { name: "Menu navigation" }));
+
+      for (const label of ["Dashboard", "Workflow", "Execution", "AI Chat"]) {
+        expect(nav.queryByRole("link", { name: label })).toBeNull();
+      }
+      for (const label of ["Home", "Metrics", "Task Results", "Tasks", "Config", "Settings"]) {
+        expect(nav.getByRole("link", { name: label })).toBeTruthy();
+      }
+      expect(nav.getByRole("link", { name: "Prefect" })).toBeTruthy();
+    });
+
+    it("keeps the project role visibility rules for menu destinations", () => {
+      sidebarState.isMobileOpen = true;
+      render(<Sidebar />);
+
+      const nav = within(getMobileDrawer());
+
+      for (const label of ["Tasks", "Config", "Prefect", "Admin"]) {
+        expect(nav.queryByRole("link", { name: label })).toBeNull();
+      }
+      expect(nav.getByRole("link", { name: "Settings" })).toBeTruthy();
+    });
+
+    it("marks a nested menu route as the current page", () => {
+      mockPathname.mockReturnValue("/task-results/abc");
+      sidebarState.isMobileOpen = true;
+      render(<Sidebar />);
+
+      const link = within(getMobileDrawer()).getByRole("link", { name: "Task Results" });
+
+      expect(link.getAttribute("aria-current")).toBe("page");
+    });
+
+    it("closes on Escape through the Radix dialog", () => {
+      sidebarState.isMobileOpen = true;
+      render(<Sidebar />);
+
+      fireEvent.keyDown(getMobileDrawer(), { key: "Escape" });
+
+      expect(setMobileSidebarOpen).toHaveBeenCalledWith(false);
+    });
+
+    it("moves focus into the drawer when it opens", () => {
+      sidebarState.isMobileOpen = true;
+      render(<Sidebar />);
+
+      expect(getMobileDrawer().contains(document.activeElement)).toBe(true);
+    });
+
+    it("keeps the profile actions reachable from the drawer", () => {
+      sidebarState.isMobileOpen = true;
+      render(<Sidebar />);
+
+      fireEvent.click(within(getMobileDrawer()).getByRole("button", { name: /tester/ }));
+
+      expect(screen.getByRole("dialog", { name: "User profile" })).toBeTruthy();
+    });
   });
 
   describe("desktop rail toggle and tooltips", () => {
