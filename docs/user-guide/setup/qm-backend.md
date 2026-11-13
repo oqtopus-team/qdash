@@ -1,25 +1,37 @@
 # Quantum Machines Backend
 
+**Status: Under development.** The `qm` and `qm-fake` backends have not been validated for production
+calibration. Neither has run against a live OPX or the official QOP simulator; the tests of the
+`qm` backend replace the QOP server with stubs.
+
 QDash has two Quantum Machines (QM) backends. The `qm` backend runs calibration tasks on a
 Quantum Machines OPX, or on the QOP simulator, through a Quantum Orchestration Platform (QOP)
 server. The `qm-fake` backend runs the same tasks, and the same QM programs, against a fake
-QOP device on the workflow worker, for testing without QM hardware or a QOP server. This is an
-initial integration: the only task is **QMAmplitudeRabi**, a one-qubit amplitude Rabi sweep, and
-it calibrates one qubit at a time. Qubex and Fake deployments are unaffected and need none of
-the packages below; the `fake` backend stays a Qubex simulator and does not run QM tasks.
+QOP device on the workflow worker, for testing without QM hardware or a QOP server. The only
+task is **QMAmplitudeRabi**, a one-qubit amplitude Rabi sweep, and it calibrates one qubit at a
+time. Qubex and Fake deployments are unaffected and need none of the packages below; the `fake`
+backend stays a Qubex simulator and does not run QM tasks.
 
-The Rabi experiment is the one in Quantum Machines' open-source `qualang-tools` package; QDash
-configures and runs it rather than reimplementing it. Licenses of these packages:
-[Third-Party Licenses](../../reference/third-party-licenses.md).
+QDash takes the Rabi program from Quantum Machines' open-source `qualang-tools` package and does
+not reimplement it: `qualang-tools` and the `qm-qua` SDK generate the QUA program on every
+backend. Only a hardware run measures a Rabi response, executed on the OPX through the QOP
+server. The QOP simulator runs the program through `QuantumMachinesManager.simulate` and returns
+controller output waveforms; it does not model the qubit, so it shows no Rabi oscillation. The
+`qm-fake` backend answers the program with QDash's own code, an interpreter for the Rabi subset
+of QUA and a simple qubit model, so its Rabi response is synthetic. It is not the official QM
+simulator and does not emulate the QM SDK beyond the calls the Rabi task makes. Licenses of these
+packages: [Third-Party Licenses](../../reference/third-party-licenses.md).
 
 ## Try QMAmplitudeRabi Without Hardware
 
 The `qm-fake` backend runs **QMAmplitudeRabi** exactly as a hardware run does up to the device:
 the task builds the Rabi program of `qualang-tools`, executes it, fetches the averaged I/Q
-results, and fits them. In place of the OPX, a fake QOP device on the workflow worker checks the
-QUA configuration with the QM SDK, reads the amplitudes, shots, elements, and result streams from
-the program, and answers with the measurements of a simple qubit model. A program or setting
-the fake device does not support fails the task instead of returning made-up data.
+results, and fits them. In place of the OPX, a fake QOP device that QDash implements on the
+workflow worker checks the QUA configuration with the QM SDK, interprets the amplitudes, shots,
+elements, and result streams of the program, and answers with the measurements of a simple qubit
+model. The response shows that the task's program, fetch, and fit work together; it does not
+show how a real qubit responds. A program or setting the fake device does not support fails the
+task instead of returning a response the model cannot produce.
 
 The backend needs no OPX, no QOP server, and no network access, but it needs the same `qm`
 extra as the `qm` backend (see [Requirements](#requirements)). The standard workflow image does
@@ -190,7 +202,7 @@ backend is selected by name and has no mode.
 
 | | `qm`, `hardware` | `qm`, `simulator` | `qm-fake` |
 | --- | --- | --- | --- |
-| Runs the program on | The OPX | The QOP simulator | A fake QOP device on the worker, using a qubit model |
+| Runs the program on | The OPX | The QOP simulator | A fake QOP device that QDash implements on the worker, using a qubit model |
 | Result | Averaged I/Q response for each amplitude scale | Simulated controller output waveforms | Averaged I/Q response of the model for each amplitude scale |
 | Figure | Response with its cosine fit and R² | Output waveforms, titled **SIMULATED waveforms** | Response with its cosine fit and R², titled **QM-FAKE device model, not measured** |
 | Raw data | I/Q sweep | One waveform per analog output | I/Q sweep, labelled as `qm-fake` |
