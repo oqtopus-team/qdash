@@ -69,6 +69,13 @@ function selectBox(name: string) {
   return first(screen.getAllByRole("checkbox", { name: `Select workflow ${name}` }));
 }
 
+function folderBox(creator: string, hidden = false) {
+  return screen.getByRole("checkbox", {
+    name: `Select all workflows by ${creator}`,
+    hidden,
+  }) as HTMLInputElement;
+}
+
 function deleteButton(name: string) {
   return first(screen.getAllByRole("button", { name: `Delete workflow ${name}` }));
 }
@@ -146,30 +153,78 @@ describe("WorkflowPageContent", () => {
     renderPage();
     await screen.findByTestId("flow-folder-mia");
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    expect(screen.queryByRole("checkbox", { name: /^Select all workflows by/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Delete/ })).toBeNull();
   });
 
-  it("selects every listed workflow, counts the selection, and clears it", async () => {
+  it("selects one creator's workflows, nested and closed folders included, and clears them", async () => {
+    mocks.flows = [...mocks.flows, flow("zoe_nested", "zoe", "lab/t1")];
     renderPage();
     await screen.findByTestId("flow-folder-mia");
-    const selectAll = screen.getByRole("checkbox", { name: "Select all 3 workflows" });
+    // There is no page-wide select all; each creator folder has its own.
+    expect(screen.queryByRole("checkbox", { name: /^Select all \d/ })).toBeNull();
+    expect(screen.queryByText(/every creator/i)).toBeNull();
+    const zoeFolder = screen.getByTestId("flow-folder-zoe");
+    const mia = folderBox("mia");
+    const zoe = folderBox("zoe");
     const deleteSelected = screen.getByRole("button", { name: "Delete selected" });
     expect(screen.getByText("0 selected")).toBeInTheDocument();
     expect(deleteSelected).toBeDisabled();
 
-    fireEvent.click(selectBox("my_flow"));
-    expect(screen.getByText("1 selected")).toBeInTheDocument();
-    expect((selectAll as HTMLInputElement).indeterminate).toBe(true);
+    // Zoe's folder is closed; selecting it neither opens it nor touches Mia's flows.
+    expect(zoeFolder).not.toHaveAttribute("open");
+    fireEvent.click(zoe);
+    expect(zoeFolder).not.toHaveAttribute("open");
+    expect(zoe).toBeChecked();
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+    expect(selectBox("zoe_flow")).toBeChecked();
+    expect(selectBox("zoe_nested")).toBeChecked();
+    expect(selectBox("my_flow")).not.toBeChecked();
+    expect(selectBox("daily_flow")).not.toBeChecked();
+    expect(mia).not.toBeChecked();
+    expect(mia.indeterminate).toBe(false);
     expect(deleteSelected).toBeEnabled();
 
-    fireEvent.click(selectAll);
-    expect(screen.getByText("3 selected")).toBeInTheDocument();
-    // Flows in the closed folder of another creator are included.
-    expect(selectBox("zoe_flow")).toBeChecked();
+    // Several creators can be selected together.
+    fireEvent.click(mia);
+    expect(screen.getByText("4 selected")).toBeInTheDocument();
+    expect(selectBox("daily_flow")).toBeChecked();
+
+    // Deselecting Mia leaves Zoe's selection alone.
+    fireEvent.click(mia);
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+    expect(zoe).toBeChecked();
 
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
     expect(screen.getByText("0 selected")).toBeInTheDocument();
-    expect(selectBox("my_flow")).not.toBeChecked();
+    expect(zoe).not.toBeChecked();
+    expect(selectBox("zoe_flow")).not.toBeChecked();
+  });
+
+  it("shows a creator folder as mixed while only some of its workflows are selected", async () => {
+    renderPage();
+    await screen.findByTestId("flow-folder-mia");
+    const mia = folderBox("mia");
+
+    fireEvent.click(selectBox("daily_flow"));
+    expect(mia.indeterminate).toBe(true);
+    expect(mia).not.toBeChecked();
+    expect(folderBox("zoe").indeterminate).toBe(false);
+
+    // A mixed folder selects the rest of its workflows.
+    fireEvent.click(mia);
+    expect(mia.indeterminate).toBe(false);
+    expect(mia).toBeChecked();
+    expect(selectBox("my_flow")).toBeChecked();
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+
+    // Deselecting one workflow by hand makes the folder mixed again.
+    fireEvent.click(selectBox("my_flow"));
+    expect(mia.indeterminate).toBe(true);
+
+    // The folder checkbox is not inside the disclosure toggle or a link.
+    expect(mia.closest("summary")).toBeNull();
+    expect(mia.closest("a")).toBeNull();
   });
 
   it("asks before deleting one workflow and does nothing on cancel", async () => {
@@ -273,6 +328,8 @@ describe("WorkflowPageContent", () => {
     expect(
       first(screen.getAllByRole("button", { name: "Delete workflow zoe_flow", hidden: true })),
     ).toBeDisabled();
+    expect(folderBox("zoe", true)).toBeDisabled();
+    expect(folderBox("mia", true)).toBeDisabled();
     // Escape does not close the dialog mid-request.
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -280,5 +337,6 @@ describe("WorkflowPageContent", () => {
     finish();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(deleteButton("zoe_flow")).toBeEnabled();
+    expect(folderBox("zoe")).toBeEnabled();
   });
 });

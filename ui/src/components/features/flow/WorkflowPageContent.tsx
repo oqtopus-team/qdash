@@ -104,9 +104,6 @@ export function WorkflowPageContent() {
   const tagCount = new Set(flows.flatMap((flow) => flow.tags || [])).size;
   const folders = groupFlowsByCreator(flows, username);
 
-  const allSelected = flowNames.length > 0 && selectedNames.length === flowNames.length;
-  const someSelected = selectedNames.length > 0 && !allSelected;
-
   const selection: FlowSelection | undefined = canEdit
     ? {
         selected,
@@ -116,6 +113,15 @@ export function WorkflowPageContent() {
             const next = new Set(current);
             if (next.has(name)) next.delete(name);
             else next.add(name);
+            return next;
+          }),
+        onSetMany: (names, select) =>
+          setSelected((current) => {
+            const next = new Set(current);
+            for (const name of names) {
+              if (select) next.add(name);
+              else next.delete(name);
+            }
             return next;
           }),
         onDelete: (name) => setConfirmTargets([name]),
@@ -180,27 +186,11 @@ export function WorkflowPageContent() {
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="min-w-0 space-y-4">
             {canEdit && (
-              <div className="flex flex-col gap-3 rounded-box bg-base-200 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:px-6">
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-sm"
-                    ref={(element) => {
-                      if (element) element.indeterminate = someSelected;
-                    }}
-                    checked={allSelected}
-                    disabled={deleting}
-                    onChange={() => setSelected(allSelected ? new Set() : new Set(flowNames))}
-                  />
-                  Select all {workflowCount(flowNames.length)}
-                </label>
-                <span className="text-xs text-base-content/60">
-                  Includes every creator's folder, open or closed
+              <div className="flex flex-wrap items-center gap-2 rounded-box bg-base-200 px-4 py-3 sm:px-6">
+                <span className="text-sm text-base-content/70" aria-live="polite">
+                  {selectedNames.length} selected
                 </span>
-                <div className="flex items-center gap-2 sm:ml-auto">
-                  <span className="text-sm text-base-content/70" aria-live="polite">
-                    {selectedNames.length} selected
-                  </span>
+                <div className="ml-auto flex items-center gap-2">
                   {selectedNames.length > 0 && (
                     <button
                       type="button"
