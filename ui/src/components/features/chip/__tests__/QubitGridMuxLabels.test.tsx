@@ -122,6 +122,27 @@ afterEach(() => {
 });
 
 describe("QubitGrid MUX labels", () => {
+  it("cancels pending zoom updates when unmounted", () => {
+    const schedule = vi.spyOn(globalThis, "setTimeout");
+    const cancel = vi.spyOn(globalThis, "clearTimeout");
+    try {
+      const { unmount } = renderGrid();
+      const zoomUpdates = schedule.mock.calls.flatMap((args, index) =>
+        args[1] === 100 ? [schedule.mock.results[index].value] : [],
+      );
+      expect(zoomUpdates.length).toBeGreaterThan(0);
+
+      unmount();
+
+      for (const timer of zoomUpdates) {
+        expect(cancel).toHaveBeenCalledWith(timer);
+      }
+    } finally {
+      schedule.mockRestore();
+      cancel.mockRestore();
+    }
+  });
+
   it("labels a sparse layout with its topology MUX IDs on the member cells", () => {
     renderGrid();
 
