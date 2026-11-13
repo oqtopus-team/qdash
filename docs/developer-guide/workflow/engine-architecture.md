@@ -207,7 +207,7 @@ required input from the tasks before it.
 ### Run Qibocal protocols on an emulator
 
 The `qibocal` backend runs upstream Qibocal protocols in a separate runner environment through a
-subprocess, and its outputs are always measurement-only. See
+subprocess. Validated outputs may update only a matching simulation-bound chip in QDash. See
 [Qibocal Emulator Backend](./qibocal-backend.md).
 
 ### Add persistence behavior

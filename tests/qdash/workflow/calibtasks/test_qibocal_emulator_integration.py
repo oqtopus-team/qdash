@@ -1,149 +1,94 @@
-"""End-to-end runs of QibocalRabiAmplitude with the real Qibocal and Qibolab emulator.
-
-These tests start the real runner environment from ``tools/qibocal-runner`` and take
-about a minute. They run only when ``QDASH_QIBOCAL_INTEGRATION=1`` and the runner
-environment exists::
-
-    (cd tools/qibocal-runner && uv sync --frozen)
-    QDASH_QIBOCAL_INTEGRATION=1 uv run pytest -m qibocal_emulator
-
-They cover the path that unit tests replace with a stand-in runner: acquisition and fit
-by Qibocal on the upstream emulator platform, conversion into task outputs, figure, raw
-data and measurement-only history, and rejection of a ``DummyInstrument`` platform by the
-instantiated controller before acquisition.
-"""
+"""Real official protocols through the orchestrator, with qibocal_bound simulation storage."""
 
 from __future__ import annotations
 
 import os
-from pathlib import Path
-from typing import Any
+import shutil
+from dataclasses import replace
 
 import pytest
 
-from qdash.datamodel.task import validate_task_result_output_parameters
-from qdash.workflow.calibtasks.qibocal import QibocalRabiAmplitude
-from qdash.workflow.calibtasks.qibocal.base import EMULATOR_MEASUREMENT_ONLY_REASON
-from qdash.workflow.engine.backend.qibocal import QibocalPlatformRejectedError, hash_tree
-from tests.qdash.workflow.qibocal_helpers import (
-    EMULATOR,
-    RUNNER_PYTHON,
-    UPSTREAM_PLATFORMS,
-    real_backend,
-    run_task_through_executor,
+from qdash.common.qibocal_platform import structural_fingerprint
+from qdash.dbmodel.chip import ChipDocument
+from qdash.workflow.calibtasks.qibocal import QibocalBringUp, QibocalRabiAmplitude
+from qdash.workflow.engine.backend.qibocal import QibocalPlatformRejectedError
+from tests.qdash.workflow.calibtasks.test_qibocal_database import (
+    execute,
+    values,
 )
 
 pytestmark = [
     pytest.mark.qibocal_emulator,
-    pytest.mark.skipif(
-        os.environ.get("QDASH_QIBOCAL_INTEGRATION") != "1" or not RUNNER_PYTHON.exists(),
-        reason="set QDASH_QIBOCAL_INTEGRATION=1 and run `uv sync --frozen` in tools/qibocal-runner",
-    ),
+    pytest.mark.skipif(os.getenv("QDASH_QIBOCAL_INTEGRATION") != "1", reason="real runner opt-in"),
 ]
 
-DUMMY_PLATFORM = """
-from qibolab._core.dummy.platform import create_dummy
 
-
-def create():
-    return create_dummy()
-"""
-
-
-def _run(tmp_path: Path, **kwargs: Any) -> tuple[Any, Any]:
-    backend = real_backend(tmp_path)
-    result, history_repo, _ = run_task_through_executor(
-        QibocalRabiAmplitude(), backend, tmp_path / "calib", **kwargs
+def test_dummy_instrument_rejected_before_acquisition(qibocal_bound, tmp_path):
+    directory = tmp_path / "platforms" / "dummy"
+    shutil.copytree(qibocal_bound.settings.platform_dir, directory)
+    (directory / "platform.py").write_text(
+        "from qibolab._core.dummy.platform import create_dummy\n\ndef create():\n    return create_dummy()\n"
     )
-    return result, history_repo.get_all()[-1]
-
-
-def test_rabi_amplitude_runs_on_the_emulator_and_stays_measurement_only(
-    tmp_path: Path,
-) -> None:
-    upstream_hash = hash_tree(UPSTREAM_PLATFORMS / "qubit")
-
-    result, entry = _run(
-        tmp_path / "a", update_calibration_parameters=True, force_update_params=True
+    chip = ChipDocument.find_one({"chip_id": "emulator"}).run()
+    assert chip is not None and chip.simulation_binding is not None
+    chip.simulation_binding = chip.simulation_binding.model_copy(
+        update={"platform": "dummy", "template_fingerprint": structural_fingerprint(directory)}
     )
-    repeated, repeated_entry = _run(tmp_path / "b")
-
-    assert not isinstance(result, Exception), result
-    assert not isinstance(repeated, Exception), repeated
-    assert entry.status == "completed"
-    stored = validate_task_result_output_parameters(entry.output_parameters)
-    amplitude = stored["qibocal_pi_amplitude"]
-    # The upstream platform's native RX amplitude is 0.12698.
-    assert amplitude["value"] == pytest.approx(0.127, abs=0.005)
-    assert 0 < amplitude["error"] < 0.01
-    assert stored["qibocal_rabi_chi2"]["value"] > 0
-    # Same seed, same result.
-    repeated_stored = validate_task_result_output_parameters(repeated_entry.output_parameters)
-    assert repeated_stored["qibocal_pi_amplitude"]["value"] == amplitude["value"]
-
-    for parameter in stored.values():
-        assert parameter["database_updated"] is False
-        assert parameter["measurement_only_reason"] == EMULATOR_MEASUREMENT_ONLY_REASON
-        provenance = parameter["provenance"]
-        assert provenance["source"] == "qibolab-emulator"
-        assert provenance["controllers"] == [f"dummy={EMULATOR}"]
-        assert provenance["executor_update"] is False
-        assert provenance["platform_sha256"] == upstream_hash
-        versions = provenance["versions"]
-        assert (versions["qibocal"], versions["qibolab"], versions["qibo"]) == (
-            "0.2.6",
-            "0.2.16",
-            "0.3.3",
-        )
-        assert versions["python"].startswith("3.11.")
-        lock = RUNNER_PYTHON.parents[2] / "uv.lock"
-        assert provenance["runner_lock_sha256"] == hash_tree(lock.parent)["uv.lock"]
-
-    run_dir = Path(stored["qibocal_pi_amplitude"]["provenance"]["run_dir"])
-    assert (run_dir / "qibocal" / "meta.json").exists()
-    assert (run_dir / "result.json").exists()
-    assert entry.figure_path and entry.json_figure_path
-    assert all(Path(path).exists() for path in entry.figure_path + entry.json_figure_path)
-    assert len(entry.raw_data_path) == 2
-    assert hash_tree(UPSTREAM_PLATFORMS / "qubit") == upstream_hash
-
-
-def test_dummy_instrument_platform_is_rejected_before_acquisition(tmp_path: Path) -> None:
-    platforms = tmp_path / "platforms"
-    (platforms / "dummy").mkdir(parents=True)
-    (platforms / "dummy" / "platform.py").write_text(DUMMY_PLATFORM, encoding="utf-8")
-    backend = real_backend(tmp_path, platforms_dir=str(platforms), platform="dummy")
-
+    chip.save()
+    qibocal_bound._settings = replace(
+        qibocal_bound.settings, platforms_dir=directory.parent, platform="dummy"
+    )
+    execute(QibocalBringUp(), qibocal_bound, tmp_path)
+    task = QibocalRabiAmplitude()
+    task.preprocess(qibocal_bound, "0")
     with pytest.raises(QibocalPlatformRejectedError, match="DummyInstrument"):
-        backend.run_rabi_amplitude(QibocalRabiAmplitude().build_request("0"), label="dummy")
-
-    (run_dir,) = (tmp_path / "calib" / "qibocal").iterdir()
-    # Executor.open creates this folder; rejection happens before it.
-    assert not (run_dir / "qibocal").exists()
+        qibocal_bound.run_protocol(task.build_request("0"), label="rejected")
 
 
-def test_orchestrator_run_task_on_the_emulator_writes_history_only(
-    init_db: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """``CalibOrchestrator.run_task`` with Mongo history (mongomock) and the real runner."""
-    from qdash.dbmodel.qubit import QubitDocument
+def test_orchestrator_chain_twice_reads_adopted_values(qibocal_bound, tmp_path, monkeypatch):
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-    from tests.qdash.workflow.qibocal_helpers import run_task_through_orchestrator
+    from qdash.workflow.engine import orchestrator as module
+    from qdash.workflow.engine import task_runner
+    from qdash.workflow.engine.backend.factory import create_backend
+    from qdash.workflow.engine.config import CalibConfig
 
-    monkeypatch.setenv("DEFAULT_BACKEND", "qibocal")
-    _, outcome = run_task_through_orchestrator(
-        tmp_path,
-        monkeypatch,
-        {},
-        call_parameters={"update_calibration_parameters": True},
+    monkeypatch.setattr(
+        module,
+        "create_backend",
+        lambda backend, config: create_backend(backend, {**config, **qibocal_bound.config}),
     )
-
-    assert not isinstance(outcome, Exception), outcome
-    (document,) = TaskResultHistoryDocument.find({"name": "QibocalRabiAmplitude"}).run()
-    assert document.status == "completed"
-    amplitude = document.output_parameters["qibocal_pi_amplitude"]
-    assert amplitude["value"] == pytest.approx(0.127, abs=0.005)
-    assert amplitude["database_updated"] is False
-    assert amplitude["provenance"]["versions"]["qibocal"] == "0.2.6"
-    assert document.figure_path and document.json_figure_path and document.raw_data_path
-    assert QubitDocument.find({}).count() == 0
+    wrapped = task_runner.execute_dynamic_task_by_qid_service
+    monkeypatch.setattr(
+        task_runner,
+        "execute_dynamic_task_by_qid_service",
+        type("TaskStub", (), {"with_options": staticmethod(lambda **_: wrapped)}),
+    )
+    previous = None
+    for index in range(2):
+        config = CalibConfig(
+            username="alice",
+            chip_id="emulator",
+            qids=["0"],
+            execution_id=f"20261113-00{index}",
+            project_id="proj-1",
+            backend_name="qibocal",
+            enable_github_pull=False,
+        )
+        config.calib_data_path = str(tmp_path / f"run{index}")
+        config.classifier_dir = str(tmp_path / "classifier")
+        orchestrator = module.CalibOrchestrator(config)
+        orchestrator.initialize()
+        orchestrator.run_task("QibocalBringUp", "0")
+        if previous is not None:
+            assert values() == previous
+        for name in ("QibocalRabiAmplitude", "QibocalFlipping"):
+            before = values()["qibocal_pi_amplitude"]["value"]
+            orchestrator.run_task(name, "0")
+            record = TaskResultHistoryDocument.find_one(
+                {"execution_id": config.execution_id, "name": name}
+            ).run()
+            assert record is not None
+            assert record.input_parameters["qibocal_pi_amplitude"]["value"] == before
+            assert record.note["provenance"]["calibration"]["qibocal_pi_amplitude"] == before
+        previous = values()
+        orchestrator.complete()

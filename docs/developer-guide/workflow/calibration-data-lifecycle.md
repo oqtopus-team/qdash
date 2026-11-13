@@ -98,8 +98,8 @@ passed into the task context.
 A task class that declares `measurement_only_reason` overrides the control: its outputs are
 recorded as measurement-only with that reason for every value of
 `update_calibration_parameters` and `force_update_params`, and an agent session cannot commit
-them. The [Qibocal Emulator Backend](./qibocal-backend.md) uses this for synthetic emulator
-results.
+them. This also protects legacy emulator results. The [Qibocal Emulator Backend](./qibocal-backend.md)
+now adopts validated synthetic values only on a matching simulation-bound chip.
 
 The control is independent of parameter resolution. It changes where validated outputs are
 published, not which Input or Run parameters the experiment uses. See

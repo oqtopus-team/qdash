@@ -21,24 +21,29 @@ from tests.qdash.workflow.qibocal_helpers import (
     fake_backend,
 )
 
+from qdash.common.qibocal_platform import load_platform_template, template_values
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.backend.qibocal import (
     QibocalBackend,
     QibocalPlatformRejectedError,
+    QibocalRequest,
     QibocalRunnerError,
     QibocalRunnerSettings,
     QibocalRunnerTimeoutError,
-    RabiAmplitudeRequest,
     hash_tree,
 )
 
-REQUEST = RabiAmplitudeRequest(
+REQUEST = QibocalRequest(
+    calibration=template_values(load_platform_template().parameters(), 0),
     qubit=0,
-    min_amp=0.01,
-    max_amp=0.5,
-    step_amp=0.01,
-    nshots=1024,
-    relaxation_time=0.0,
+    protocol="rabi_amplitude",
+    parameters={
+        "min_amp": 0.01,
+        "max_amp": 0.5,
+        "step_amp": 0.01,
+        "nshots": 1024,
+        "relaxation_time": 0.0,
+    },
     seed=1234,
 )
 
@@ -108,7 +113,9 @@ class TestUpstreamPlatform:
         backend = backends["qibocal"]
         assert set(backend) == {"description", "requires_wiring", "tasks"}
         assert backend["requires_wiring"] is False
-        assert backend["tasks"] == {"One Qubit": ["QibocalRabiAmplitude"]}
+        assert backend["tasks"] == {
+            "One Qubit": ["QibocalBringUp", "QibocalRabiAmplitude", "QibocalFlipping"]
+        }
         # Hardware-scheduled backends keep the default.
         assert "requires_wiring" not in backends["qubex"]
         assert "requires_wiring" not in backends["fake"]
@@ -118,8 +125,8 @@ class TestSettings:
     def test_default_settings_point_at_the_runner_and_upstream_platform(self) -> None:
         settings = QibocalRunnerSettings.load()
 
-        assert settings.python == REPO_ROOT / "tools/qibocal-runner/.venv/bin/python"
-        assert settings.script == REPO_ROOT / "tools/qibocal-runner/run_rabi_amplitude.py"
+        assert settings.python == REPO_ROOT / "src/qdash/workflow/qibocal_runner/.venv/bin/python"
+        assert settings.script == REPO_ROOT / "src/qdash/workflow/qibocal_runner/run_protocol.py"
         assert settings.platform_dir.resolve() == (UPSTREAM_PLATFORMS / "qubit").resolve()
         assert settings.timeout_seconds == 600
 
@@ -152,7 +159,7 @@ class TestRun:
         source = backend.settings.platform_dir
         before = hash_tree(source)
 
-        run = backend.run_rabi_amplitude(REQUEST, label="QibocalRabiAmplitude_q0")
+        run = backend.run_protocol(REQUEST, label="QibocalRabiAmplitude_q0")
 
         assert run.fit["pi_amplitude"] == pytest.approx(0.127)
         assert run.run_dir.parent == tmp_path / "calib" / "qibocal"
@@ -176,7 +183,7 @@ class TestRun:
             patch.dict(os.environ, {"QDASH_SECRET_FOR_TEST": "leak"}),
             patch("qdash.workflow.engine.backend.qibocal.subprocess.Popen", spy),
         ):
-            run = backend.run_rabi_amplitude(REQUEST, label="env")
+            run = backend.run_protocol(REQUEST, label="env")
 
         (call,) = calls
         assert call["shell"] is False
@@ -198,7 +205,7 @@ class TestRun:
 
         def run(index: int) -> None:
             try:
-                runs.append(backend.run_rabi_amplitude(REQUEST, label="parallel"))
+                runs.append(backend.run_protocol(REQUEST, label="parallel"))
             except BaseException as exc:
                 errors.append(exc)
 
@@ -220,7 +227,7 @@ class TestRun:
     def test_runner_rejection_raises_platform_rejected(self, tmp_path: Path) -> None:
         backend = fake_backend(tmp_path, "rejected")
         with pytest.raises(QibocalPlatformRejectedError, match="DummyInstrument"):
-            backend.run_rabi_amplitude(REQUEST, label="rejected")
+            backend.run_protocol(REQUEST, label="rejected")
 
     @pytest.mark.parametrize(
         "controller",
@@ -234,7 +241,7 @@ class TestRun:
     ) -> None:
         backend = fake_backend(tmp_path, overrides={"provenance": {"controllers": [controller]}})
         with pytest.raises(QibocalPlatformRejectedError, match="non-emulator"):
-            backend.run_rabi_amplitude(REQUEST, label="controller")
+            backend.run_protocol(REQUEST, label="controller")
 
     @pytest.mark.parametrize(
         ("provenance", "message"),
@@ -250,17 +257,17 @@ class TestRun:
     ) -> None:
         backend = fake_backend(tmp_path, overrides={"provenance": provenance})
         with pytest.raises(QibocalRunnerError, match=message):
-            backend.run_rabi_amplitude(REQUEST, label="invariant")
+            backend.run_protocol(REQUEST, label="invariant")
 
     def test_runner_crash_reports_stderr(self, tmp_path: Path) -> None:
         backend = fake_backend(tmp_path, "crash")
         with pytest.raises(QibocalRunnerError, match="boom from runner"):
-            backend.run_rabi_amplitude(REQUEST, label="crash")
+            backend.run_protocol(REQUEST, label="crash")
 
     def test_runner_without_result_fails(self, tmp_path: Path) -> None:
         backend = fake_backend(tmp_path, "no_result")
         with pytest.raises(QibocalRunnerError, match="without a readable result"):
-            backend.run_rabi_amplitude(REQUEST, label="none")
+            backend.run_protocol(REQUEST, label="none")
 
     def test_changing_the_configured_platform_fails_the_run(self, tmp_path: Path) -> None:
         platforms = copy_platforms(tmp_path)
@@ -271,13 +278,13 @@ class TestRun:
             platforms_dir=platforms,
         )
         with pytest.raises(QibocalRunnerError, match="changed during the run"):
-            backend.run_rabi_amplitude(REQUEST, label="touch")
+            backend.run_protocol(REQUEST, label="touch")
 
     def test_timeout_stops_the_whole_process_group(self, tmp_path: Path) -> None:
         backend = fake_backend(tmp_path, "sleep", timeout_seconds=2, terminate_grace_seconds=1)
         started = time.monotonic()
         with pytest.raises(QibocalRunnerTimeoutError, match="exceeded 2 s"):
-            backend.run_rabi_amplitude(REQUEST, label="timeout")
+            backend.run_protocol(REQUEST, label="timeout")
         assert time.monotonic() - started < 20
 
         (run_dir,) = (tmp_path / "calib" / "qibocal").iterdir()
@@ -295,9 +302,10 @@ class TestRun:
                 "-c",
                 "import json, sys\n"
                 "from qdash.workflow.engine.backend.qibocal import QibocalBackend, "
-                "RabiAmplitudeRequest\n"
+                "QibocalRequest\n"
                 "backend = QibocalBackend(json.loads(sys.argv[1]))\n"
-                "backend.run_rabi_amplitude(RabiAmplitudeRequest(**json.loads(sys.argv[2])), "
+                "backend.binding = lambda: None\n"
+                "backend.run_protocol(QibocalRequest(**json.loads(sys.argv[2])), "
                 "label='orphan')\n",
                 config,
                 request,
@@ -341,7 +349,7 @@ class TestRun:
             patch.object(subprocess.Popen, "wait", cancel_once),
             pytest.raises(KeyboardInterrupt),
         ):
-            backend.run_rabi_amplitude(REQUEST, label="cancel")
+            backend.run_protocol(REQUEST, label="cancel")
 
         (run_dir,) = (tmp_path / "calib" / "qibocal").iterdir()
         assert _wait_dead(int((run_dir / "pid").read_text()))

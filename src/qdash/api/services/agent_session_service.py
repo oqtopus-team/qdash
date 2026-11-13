@@ -495,6 +495,12 @@ class AgentSessionService:
             parameter_name, value, error, unit, value_type = candidate
             bounds = session.policy.allowed_overrides.get(parameter_name)
             measurement_only = raw.get("measurement_only_reason") if isinstance(raw, dict) else None
+            from qdash.common.simulation_binding import is_synthetic_output
+
+            if is_synthetic_output(raw):
+                measurement_only = (
+                    measurement_only or "Synthetic outputs cannot enter hardware approval state"
+                )
             if measurement_only:
                 # Outputs a task declared measurement-only (for example synthetic emulator
                 # results) can never be committed to accepted calibration state.
@@ -962,6 +968,11 @@ class AgentSessionService:
         """Dispatch a committed candidate to the worker-side backend apply flow."""
         request_hash = self._backend_apply_request_hash(body)
         session = self._get_session_document(project_id, session_id)
+        from qdash.common.simulation_binding import check_hardware_export, chip_binding
+
+        check_hardware_export(
+            chip_binding(project_id, session.chip_id), session.chip_id, "agent hardware apply"
+        )
         if session.status != AgentSessionStatus.ACTIVE:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

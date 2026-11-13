@@ -423,7 +423,7 @@ class TestFlowTemplates:
         qibocal = test_client.get(
             "/flows/templates", params={"backend": "qibocal"}, headers=auth_headers
         )
-        assert [template["id"] for template in qibocal.json()] == ["qibocal_rabi_amplitude"]
+        assert [template["id"] for template in qibocal.json()] == ["qibocal_emulator_calibration"]
         assert qubex.status_code == 200
         qubex_ids = [template["id"] for template in qubex.json()]
         assert "simple" in qubex_ids

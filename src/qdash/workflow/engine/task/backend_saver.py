@@ -121,10 +121,72 @@ class BackendSaver:
         if measurement_only_reason(task) is not None:
             self._save_measurement_only(task, qid)
             return
+        if task.backend == "qibocal":
+            self._save_qibocal(task, execution_service, qid, backend, success)
+            return
+        if task.backend not in ("qubex", "fake"):
+            raise ValueError(f"No calibration persistence policy for backend '{task.backend}'")
         if task.backend in ("qubex", "fake"):
             # Fake tasks run on a QUBEX-compatible simulator and persist their outputs the
             # same way, so the qubex tasks routed to the fake backend find their inputs.
             self._save_calibration(task, execution_service, qid, backend, success)
+
+    def _save_qibocal(
+        self,
+        task: TaskProtocol,
+        execution_service: ExecutionService,
+        qid: str,
+        backend: Any,
+        success: bool,
+    ) -> None:
+        import math
+
+        from qdash.common.qibocal_platform import CALIBRATION_FIELDS_BY_NAME
+        from qdash.repository import MongoQubitCalibrationRepository
+
+        binding = backend.binding()
+        provenance = output_provenance(task)
+        if (
+            provenance.get("simulation_binding") != binding.model_dump(mode="json")
+            or provenance.get("chip_id") != execution_service.chip_id
+            or provenance.get("project_id") != execution_service.project_id
+        ):
+            raise ValueError("Simulation output does not match the destination chip binding")
+        model = self._state_manager.get_task(task.get_name(), task.get_task_type(), qid)
+        model.note["provenance"] = deepcopy(provenance)
+        outputs = {
+            name: value.model_dump() if hasattr(value, "model_dump") else dict(value)
+            for name, value in model.output_parameters.items()
+        }
+        for name, parameter in outputs.items():
+            parameter["provenance"] = deepcopy(provenance)
+            value = parameter.get("value")
+            if name in CALIBRATION_FIELDS_BY_NAME:
+                CALIBRATION_FIELDS_BY_NAME[name].validate(value)
+            elif (
+                not name.startswith("qibocal_")
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+            ):
+                raise ValueError(f"Invalid Qibocal output {name}")
+        model.output_parameters = outputs
+        persisted, targets = self._build_persistence_plan(task, outputs)
+        if not self._update_calibration_parameters or not success:
+            self._mark_database_not_updated(model, outputs, targets)
+            return
+        repo = MongoQubitCalibrationRepository()
+        previous = self._get_previous_calibration_data(repo, execution_service, qid)
+        if task.get_name() == "QibocalBringUp":
+            persisted = {name: value for name, value in persisted.items() if name not in previous}
+        if persisted:
+            repo.update_calib_data(
+                username=self._username,
+                qid=qid,
+                chip_id=execution_service.chip_id,
+                project_id=execution_service.project_id,
+                output_parameters=persisted,
+            )
+        self._attach_previous_database_values(model, outputs, targets, previous)
 
     def save_mux_qid(
         self,

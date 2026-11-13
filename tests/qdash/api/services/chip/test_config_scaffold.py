@@ -515,7 +515,7 @@ def test_qibocal_preset_is_the_one_qubit_emulator_platform():
     assert QIBOCAL_PRESET.n_qubits == 1
     assert QIBOCAL_PRESET.mux_count == 0
     assert QIBOCAL_PRESET.requires_config_tree is False
-    assert QIBOCAL_PRESET.workflow_template_id == "qibocal_rabi_amplitude"
+    assert QIBOCAL_PRESET.workflow_template_id == "qibocal_emulator_calibration"
     topology_file = (
         ConfigLoader.LOCAL_CONFIG_DIR / "domain/topologies" / f"{QIBOCAL_PRESET.topology_id}.yaml"
     )

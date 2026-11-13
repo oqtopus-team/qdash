@@ -150,6 +150,13 @@ class SeedImportService:
             Results of the import operation
 
         """
+        from qdash.common.simulation_binding import check_hardware_export, chip_binding
+
+        check_hardware_export(
+            chip_binding(project_id, request.chip_id),
+            request.chip_id,
+            "hardware seed import; use QibocalBringUp",
+        )
         if request.source == SeedImportSource.QUBEX_PARAMS:
             return self._import_from_qubex(request, project_id, username)
         elif request.source == SeedImportSource.MANUAL:
@@ -507,6 +514,9 @@ class SeedImportService:
             Parameter unit
 
         """
+        from qdash.common.simulation_binding import check_parameters_for_chip, chip_binding
+
+        check_parameters_for_chip(chip_binding(project_id, chip_id), chip_id, [param_name])
         # Normalize qid: remove 'Q' prefix and leading zeros to match
         # chip_initializer format (e.g. "Q024" -> "24", "Q000" -> "0")
         normalized_qid = self._normalize_qid(qid)

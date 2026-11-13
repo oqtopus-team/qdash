@@ -8,6 +8,7 @@
 import type { ChipResponseActivityStatus } from './chipResponseActivityStatus';
 import type { ChipResponseCurrentCooldownId } from './chipResponseCurrentCooldownId';
 import type { ChipResponseInstalledAt } from './chipResponseInstalledAt';
+import type { ChipResponseSimulationBinding } from './chipResponseSimulationBinding';
 import type { ChipResponseTopologyId } from './chipResponseTopologyId';
 import type { NoteModel } from './noteModel';
 
@@ -36,4 +37,6 @@ export interface ChipResponse {
   activity_status?: ChipResponseActivityStatus;
   current_cooldown_id?: ChipResponseCurrentCooldownId;
   note?: NoteModel;
+  /** Present only on chips created from a simulation preset (for example qibocal). Such a chip runs only on its bound backend and its values are never exported to hardware configuration. Absent means simulation identity is unknown; Qibocal execution is refused. */
+  simulation_binding?: ChipResponseSimulationBinding;
 }

@@ -8,10 +8,11 @@ from typing import TYPE_CHECKING, Any, ClassVar
 import numpy as np
 import plotly.io as pio
 
+from qdash.common.qibocal_platform import CALIBRATION_FIELDS
 from qdash.datamodel.task import InputParameterSpec, OutputParameterSpec, RunParameterSpec
-from qdash.workflow.calibtasks.base import PostProcessResult, PreProcessResult, RunResult
+from qdash.workflow.calibtasks.base import PostProcessResult, RunResult
 from qdash.workflow.calibtasks.qibocal.base import QibocalTask
-from qdash.workflow.engine.backend.qibocal import QibocalRunResult, RabiAmplitudeRequest
+from qdash.workflow.engine.backend.qibocal import QibocalRequest, QibocalRunResult
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
@@ -34,8 +35,19 @@ class QibocalRabiAmplitude(QibocalTask):
 
     name: str = "QibocalRabiAmplitude"
     task_type: str = "qubit"
+    chi2_parameter: ClassVar[str] = "qibocal_rabi_chi2"
 
-    input_spec: ClassVar[dict[str, InputParameterSpec]] = {}
+    input_spec: ClassVar[dict[str, InputParameterSpec]] = {
+        "qibocal_qubit_frequency": InputParameterSpec.required_database(
+            unit="GHz", description="Native Qibolab drive frequency"
+        ),
+        "qibocal_pi_duration": InputParameterSpec.required_database(
+            unit="ns", description="Native RX and RX90 pulse duration"
+        ),
+        "qibocal_pi_amplitude": InputParameterSpec.required_database(
+            unit="a.u.", description="Native RX pulse amplitude; RX90 uses half"
+        ),
+    }
     run_spec: ClassVar[dict[str, RunParameterSpec]] = {
         "min_amp": RunParameterSpec(
             unit="a.u.",
@@ -75,6 +87,9 @@ class QibocalRabiAmplitude(QibocalTask):
         ),
     }
     output_spec: ClassVar[dict[str, OutputParameterSpec]] = {
+        "qibocal_pi_duration": OutputParameterSpec(
+            unit="ns", description="Duration paired with the fitted native RX amplitude"
+        ),
         "qibocal_pi_amplitude": OutputParameterSpec(
             unit="a.u.",
             description="Pi-pulse drive amplitude fitted by Qibocal on the Qibolab emulator",
@@ -88,7 +103,7 @@ class QibocalRabiAmplitude(QibocalTask):
     def _run_value(self, name: str) -> Any:
         return self.run_parameters[name].get_value()
 
-    def build_request(self, qid: str) -> RabiAmplitudeRequest:
+    def build_request(self, qid: str) -> QibocalRequest:
         """Validate the sweep and build the runner request."""
         min_amp = float(self._run_value("min_amp"))
         max_amp = float(self._run_value("max_amp"))
@@ -105,31 +120,49 @@ class QibocalRabiAmplitude(QibocalTask):
             )
         if max_amp <= min_amp:
             raise ValueError("max_amp must be greater than min_amp")
+        if max_amp > 1:
+            raise ValueError("max_amp must not exceed 1")
         if step_amp <= 0 or (max_amp - min_amp) / step_amp < 4:
             raise ValueError("step_amp must be positive and give at least 5 sweep points")
         if nshots <= 0:
             raise ValueError("nshots must be positive")
         if relaxation_time < 0:
             raise ValueError("relaxation_time must not be negative")
-        return RabiAmplitudeRequest(
+        return QibocalRequest(
             qubit=int(qid),
-            min_amp=min_amp,
-            max_amp=max_amp,
-            step_amp=step_amp,
-            nshots=nshots,
-            relaxation_time=relaxation_time,
+            protocol="rabi_amplitude",
+            parameters={
+                "min_amp": min_amp,
+                "max_amp": max_amp,
+                "step_amp": step_amp,
+                "nshots": nshots,
+                "relaxation_time": relaxation_time,
+            },
             seed=seed,
+            calibration={
+                field.name: field.validate(self.input_parameters[field.name].value)
+                for field in CALIBRATION_FIELDS
+            },
         )
-
-    def preprocess(self, backend: QibocalBackend, qid: str) -> PreProcessResult:
-        """No calibration inputs: the emulator platform carries its own parameters."""
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def run(self, backend: QibocalBackend, qid: str) -> RunResult:
         """Run Qibocal ``rabi_amplitude`` through the isolated runner."""
         request = self.build_request(qid)
         runner = backend.get_instance()
-        result = runner.run_rabi_amplitude(request, label=f"{self.name}_q{qid}")
+        self.output_provenance = {
+            "source": "qibolab-emulator",
+            "synthetic": True,
+            "chip_id": backend.config["chip_id"],
+            "project_id": backend.config.get("project_id"),
+            "simulation_binding": backend.binding().model_dump(mode="json"),
+            "calibration": request.calibration,
+            "protocol": request.protocol,
+        }
+        try:
+            result = runner.run_protocol(request, label=f"{self.name}_q{qid}")
+        finally:
+            self.output_provenance["run_dir"] = str(getattr(runner, "last_run_dir", ""))
+        self.output_provenance.update(result.provenance)
         return RunResult(raw_result=result)
 
     def extract_raw_data(self, run_result: RunResult) -> list[Any]:
@@ -139,19 +172,21 @@ class QibocalRabiAmplitude(QibocalTask):
         result: QibocalRunResult = run_result.raw_result
         data = result.result["data"]
         amplitude = np.asarray(data["amplitude"], dtype=float)
+        protocol = result.result["protocol"]
+        axis = "amplitude" if protocol == "rabi_amplitude" else "flips"
         target = f"Q{result.result['qubit']}"
         return [
             PreFitRawData(
                 target=target,
                 data=np.asarray(data["probability"], dtype=float),
-                axes={"amplitude": amplitude},
-                source_type="qibocal.rabi_amplitude.probability",
+                axes={axis: amplitude},
+                source_type=f"qibocal.{protocol}.probability",
             ),
             PreFitRawData(
                 target=target,
                 data=np.asarray(data["error"], dtype=float),
-                axes={"amplitude": amplitude},
-                source_type="qibocal.rabi_amplitude.probability_error",
+                axes={axis: amplitude},
+                source_type=f"qibocal.{protocol}.probability_error",
             ),
         ]
 
@@ -162,14 +197,32 @@ class QibocalRabiAmplitude(QibocalTask):
         if fit.get("status") != "ok" and not errors:
             errors.append("Qibocal fit failed")
         amplitude = fit.get("pi_amplitude")
-        request = result.result.get("request", {})
-        if not errors and amplitude is not None:
+        request = result.result.get("request", {}).get("parameters", {})
+        if not errors and amplitude is not None and result.result["protocol"] == "rabi_amplitude":
             low, high = float(request["min_amp"]), float(request["max_amp"])
             if not low <= float(amplitude) <= high:
                 errors.append(
                     f"Qibocal pi-pulse amplitude {amplitude:.6g} is outside the swept "
                     f"range [{low:g}, {high:g}]"
                 )
+        for name in ("pi_amplitude", "pi_amplitude_error", "pulse_length", "chi2", "chi2_error"):
+            value = fit.get(name)
+            if not isinstance(value, (int, float)) or not math.isfinite(value):
+                errors.append(f"Invalid fitted {name}")
+        if amplitude is not None and not 0 < float(amplitude) <= 1:
+            errors.append("Fitted amplitude is outside (0, 1]")
+        fitted = fit.get("fitted_parameters")
+        if (
+            not isinstance(fitted, list)
+            or not fitted
+            or any(
+                not isinstance(value, (int, float)) or not math.isfinite(value) for value in fitted
+            )
+        ):
+            errors.append("Qibocal fitted parameters are missing or not finite")
+        duration = fit.get("pulse_length")
+        if isinstance(duration, (int, float)) and duration <= 0:
+            errors.append("Fitted pulse duration must be positive")
         return errors
 
     def postprocess(
@@ -180,6 +233,7 @@ class QibocalRabiAmplitude(QibocalTask):
         fit = result.fit
         provenance = result.provenance
         self.output_provenance = {
+            **provenance,
             "source": provenance["source"],
             "synthetic": True,
             "backend": "qibocal",
@@ -204,10 +258,11 @@ class QibocalRabiAmplitude(QibocalTask):
                 validation_error="; ".join(errors),
             )
 
+        self.output_parameters["qibocal_pi_duration"].value = float(fit["pulse_length"])
         self.output_parameters["qibocal_pi_amplitude"].value = float(fit["pi_amplitude"])
         self.output_parameters["qibocal_pi_amplitude"].error = float(fit["pi_amplitude_error"])
-        self.output_parameters["qibocal_rabi_chi2"].value = float(fit["chi2"])
-        self.output_parameters["qibocal_rabi_chi2"].error = float(fit["chi2_error"] or 0.0)
+        self.output_parameters[self.chi2_parameter].value = float(fit["chi2"])
+        self.output_parameters[self.chi2_parameter].error = float(fit["chi2_error"] or 0.0)
         return PostProcessResult(
             output_parameters=self.attach_execution_id(execution_id),
             figures=figures,
@@ -221,7 +276,7 @@ class QibocalRabiAmplitude(QibocalTask):
             figure = pio.read_json(path)
             figure.update_layout(
                 title={
-                    "text": f"Qibocal rabi_amplitude : Q{qid} (Qibolab emulator, synthetic)",
+                    "text": f"Qibocal {result.result['protocol']} : Q{qid} (Qibolab emulator, synthetic)",
                     "x": 0.5,
                 },
             )

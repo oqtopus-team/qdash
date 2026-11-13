@@ -183,6 +183,7 @@ class TestGitHubPushConfigDefaults:
             GitHubPushConfig()
 
 
+@pytest.mark.usefixtures("init_db")
 class TestGitHubIntegrationPushFilesSync:
     """Tests for deferred local repo sync during grouped GitHub pushes."""
 
@@ -191,6 +192,8 @@ class TestGitHubIntegrationPushFilesSync:
 
         integration = GitHubIntegration.__new__(GitHubIntegration)
         integration.logger = MagicMock()
+        integration.project_id = "proj-1"
+        integration.chip_id = "chip-1"
         return integration
 
     def _make_config(self):
@@ -364,6 +367,8 @@ class TestSelectParamYamlFiles:
 
         integration = GitHubIntegration.__new__(GitHubIntegration)
         integration.logger = MagicMock()
+        integration.project_id = "proj-1"
+        integration.chip_id = "chip-1"
         return integration
 
     def test_selects_all_yaml_files_by_default(self, tmp_path: Path):

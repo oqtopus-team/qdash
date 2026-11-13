@@ -66,7 +66,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Optional Qibocal runner (build target `qibocal`, used by compose.qibocal.yaml)
 # -----------------------------------------------------------------------------
 # Qibocal and Qibolab pin `cma<4` while qubex needs `cma>=4`, so the runner gets its own
-# environment from its own lock under /app/tools/qibocal-runner. QDash starts it as a
+# environment from its own lock under /app/src/qdash/workflow/qibocal_runner. QDash starts it as a
 # subprocess and never imports it. The default target below does not build these stages.
 FROM python:3.11-slim-bookworm AS qibocal-runner-builder
 
@@ -76,11 +76,11 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=0
 
-WORKDIR /app/tools/qibocal-runner
-COPY tools/qibocal-runner/pyproject.toml tools/qibocal-runner/uv.lock ./
+WORKDIR /app/src/qdash/workflow/qibocal_runner
+COPY src/qdash/workflow/qibocal_runner/pyproject.toml src/qdash/workflow/qibocal_runner/uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --python /usr/local/bin/python3.11
-COPY tools/qibocal-runner/run_rabi_amplitude.py ./
+COPY src/qdash/workflow/qibocal_runner/run_protocol.py ./
 # The platform files the runner reads are copied from upstream Qibocal under Apache 2.0.
 COPY config/domain/qibocal/LICENSE config/domain/qibocal/UPSTREAM.md ./licenses/qibocal-platform/
 
@@ -88,7 +88,8 @@ FROM runtime AS qibocal
 
 # The installed distributions keep their LICENSE and NOTICE files in their .dist-info
 # directories inside .venv; copy the environment whole so those files stay in the image.
-COPY --from=qibocal-runner-builder /app/tools/qibocal-runner /app/tools/qibocal-runner
+COPY --from=qibocal-runner-builder /app/src/qdash/workflow/qibocal_runner /app/src/qdash/workflow/qibocal_runner
+COPY src/qdash/common/qibocal_platform.py /app/src/qdash/common/qibocal_platform.py
 
 # Default target: the worker without the Qibocal runner.
 FROM runtime AS default

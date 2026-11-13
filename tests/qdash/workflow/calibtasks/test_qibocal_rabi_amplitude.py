@@ -21,7 +21,7 @@ from qdash.workflow.engine.task.backend_saver import BackendSaver
 from tests.qdash.workflow.qibocal_helpers import fake_backend, run_task_through_executor
 
 TASK = "QibocalRabiAmplitude"
-OUTPUTS = {"qibocal_pi_amplitude", "qibocal_rabi_chi2"}
+OUTPUTS = {"qibocal_pi_amplitude", "qibocal_pi_duration", "qibocal_rabi_chi2"}
 WRITEBACK_SETTINGS = list(
     itertools.product(
         [True, False],  # update_calibration_parameters
@@ -52,17 +52,22 @@ class TestRegistration:
     def test_outputs_cannot_be_confused_with_qubex_parameters(self) -> None:
         assert set(QibocalRabiAmplitude.output_spec) == OUTPUTS
         assert all(not spec.publish_targets for spec in QibocalRabiAmplitude.output_spec.values())
-        assert QibocalRabiAmplitude.measurement_only_reason == EMULATOR_MEASUREMENT_ONLY_REASON
+        assert QibocalRabiAmplitude.measurement_only_reason is None
 
 
 class TestRequest:
     def test_default_sweep_starts_above_zero(self) -> None:
-        request = QibocalRabiAmplitude().build_request("0")
+        from qdash.common.qibocal_platform import load_platform_template, template_values
 
-        assert request.min_amp == 0.01
-        assert request.max_amp == 0.5
-        assert request.step_amp == 0.01
-        assert request.nshots == 1024
+        task = QibocalRabiAmplitude()
+        for name, value in template_values(load_platform_template().parameters(), 0).items():
+            task.input_parameters[name].value = value
+        request = task.build_request("0")
+
+        assert request.parameters["min_amp"] == 0.01
+        assert request.parameters["max_amp"] == 0.5
+        assert request.parameters["step_amp"] == 0.01
+        assert request.parameters["nshots"] == 1024
         assert request.seed == 1234
         assert request.qubit == 0
 
@@ -91,6 +96,13 @@ class TestRequest:
 
 
 class TestMeasurementOnly:
+    @pytest.fixture(autouse=True)
+    def legacy_policy(self, monkeypatch):
+        # Previously recorded tasks retain their unconditional measurement-only policy.
+        monkeypatch.setattr(
+            QibocalRabiAmplitude, "measurement_only_reason", EMULATOR_MEASUREMENT_ONLY_REASON
+        )
+
     @pytest.mark.parametrize(("update", "force", "default_backend"), WRITEBACK_SETTINGS)
     def test_every_setting_records_history_without_write_back(
         self,
@@ -296,42 +308,3 @@ class TestFailures:
 
         assert isinstance(error, Exception)
         assert "exceeded 1 s" in (_final_history(history_repo).message or "")
-
-
-@pytest.mark.parametrize("default_backend", ["qubex", "qibocal"])
-def test_orchestrator_run_records_history_and_leaves_calibration_untouched(
-    init_db: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, default_backend: str
-) -> None:
-    """``run_task`` with every write-back request enabled still writes history only."""
-    from qdash.dbmodel.qubit import QubitDocument
-    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-    from tests.qdash.workflow.qibocal_helpers import (
-        copy_platforms,
-        run_task_through_orchestrator,
-        write_fake_runner,
-    )
-
-    monkeypatch.setenv("DEFAULT_BACKEND", default_backend)
-    orchestrator, outcome = run_task_through_orchestrator(
-        tmp_path,
-        monkeypatch,
-        {
-            "runner_python": sys.executable,
-            "runner_script": str(write_fake_runner(tmp_path)),
-            "platforms_dir": str(copy_platforms(tmp_path)),
-        },
-        call_parameters={"update_calibration_parameters": True},
-        task_parameters={TASK: {"update_calibration_parameters": True}},
-    )
-
-    assert not isinstance(outcome, Exception), outcome
-    assert outcome["qibocal_pi_amplitude"]["value"] == pytest.approx(0.127)
-    (document,) = TaskResultHistoryDocument.find({"name": TASK}).run()
-    assert document.status == "completed"
-    for parameter in document.output_parameters.values():
-        assert parameter["database_updated"] is False
-        assert parameter["measurement_only_reason"] == EMULATOR_MEASUREMENT_ONLY_REASON
-        assert parameter["provenance"]["source"] == "qibolab-emulator"
-    assert document.json_figure_path and document.raw_data_path
-    assert QubitDocument.find({}).count() == 0
-    assert not set(orchestrator.task_context.calib_data.qubit.get("0", {})) & OUTPUTS

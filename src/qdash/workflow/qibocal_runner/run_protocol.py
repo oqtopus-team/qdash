@@ -1,4 +1,4 @@
-"""Run Qibocal's ``rabi_amplitude`` protocol on a Qibolab emulator platform for QDash.
+"""Run allowlisted official Qibocal protocols on a Qibolab emulator for QDash.
 
 This script runs inside the isolated environment defined by ``pyproject.toml`` and
 ``uv.lock`` in this directory. QDash never imports Qibocal or Qibolab; it starts this
@@ -6,7 +6,7 @@ script as a subprocess and reads the files it writes.
 
 Usage::
 
-    python -I run_rabi_amplitude.py REQUEST_JSON
+    python -I run_protocol.py REQUEST_JSON
 
 The request is a JSON object written by QDash (see ``QibocalBackend``). The script writes
 ``result.json`` into the request's ``output_dir`` and exits with:
@@ -37,7 +37,10 @@ from pathlib import Path
 from typing import Any
 
 RESULT_FILE = "result.json"
-PROTOCOL = "rabi_amplitude"
+PROTOCOL_PARAMETERS = {
+    "rabi_amplitude": {"min_amp", "max_amp", "step_amp", "nshots", "relaxation_time"},
+    "flipping": {"nflips_max", "nflips_step", "delta_amplitude", "nshots", "relaxation_time"},
+}
 EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_REJECTED = 3
@@ -79,7 +82,7 @@ def _versions() -> dict[str, str | None]:
     for name in DISTRIBUTIONS:
         try:
             versions[name] = importlib.metadata.version(name)
-        except importlib.metadata.PackageNotFoundError:
+        except importlib.metadata.PackageNotFoundError:  # noqa: PERF203 - report optional metadata
             versions[name] = None
     versions["python"] = host_platform.python_version()
     return versions
@@ -99,35 +102,48 @@ def _validate_request(request: dict[str, Any]) -> dict[str, Any]:
         "platforms_dir",
         "output_dir",
         "qubit",
-        "min_amp",
-        "max_amp",
-        "step_amp",
-        "nshots",
-        "relaxation_time",
         "seed",
+        "protocol",
+        "parameters",
+        "calibration",
+        "targets",
     )
     missing = [key for key in required if key not in request]
     if missing:
         raise RequestError(f"Request is missing {', '.join(missing)}")
-    min_amp = float(request["min_amp"])
-    max_amp = float(request["max_amp"])
-    step_amp = float(request["step_amp"])
-    if not all(math.isfinite(v) for v in (min_amp, max_amp, step_amp)):
-        raise RequestError("Amplitude sweep values must be finite")
-    # At zero amplitude the binomial error is zero, which makes the weighted fit undefined.
-    if min_amp <= 0:
-        raise RequestError("min_amp must be greater than 0")
-    if max_amp <= min_amp:
-        raise RequestError("max_amp must be greater than min_amp")
-    if step_amp <= 0 or (max_amp - min_amp) / step_amp < 4:
-        raise RequestError("step_amp must be positive and give at least 5 sweep points")
-    if int(request["nshots"]) <= 0:
-        raise RequestError("nshots must be positive")
-    if float(request["relaxation_time"]) < 0:
-        raise RequestError("relaxation_time must not be negative")
-    pulse_length = request.get("pulse_length")
-    if pulse_length is not None and float(pulse_length) <= 0:
-        raise RequestError("pulse_length must be positive when given")
+    if request.get("protocol") not in PROTOCOL_PARAMETERS:
+        raise RequestError("Protocol is not allowed")
+    if request.get("targets") != [request["qubit"]]:
+        raise RequestError("Exactly one matching target is required")
+    if not isinstance(request.get("calibration"), dict):
+        raise RequestError("Calibration values are required")
+    parameters = request["parameters"]
+    if (
+        not isinstance(parameters, dict)
+        or set(parameters) != PROTOCOL_PARAMETERS[request["protocol"]]
+    ):
+        raise RequestError("Protocol parameters must match the allowlist")
+    if not all(
+        isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+        for value in parameters.values()
+    ):
+        raise RequestError("Protocol parameters must be finite numbers")
+    if parameters["nshots"] <= 0 or parameters["relaxation_time"] < 0:
+        raise RequestError("Invalid shots or relaxation time")
+    if request["protocol"] == "rabi_amplitude":
+        if not 0 < parameters["min_amp"] < parameters["max_amp"] <= 1:
+            raise RequestError("Rabi amplitudes must satisfy 0 < min < max <= 1")
+        if (
+            parameters["step_amp"] <= 0
+            or (parameters["max_amp"] - parameters["min_amp"]) / parameters["step_amp"] < 4
+        ):
+            raise RequestError("Rabi requires at least five points")
+    else:
+        if (
+            parameters["nflips_step"] <= 0
+            or parameters["nflips_max"] / parameters["nflips_step"] < 6
+        ):
+            raise RequestError("Flipping requires at least six points")
     return request
 
 
@@ -183,7 +199,11 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
 
     from qibocal import Executor
     from qibocal.calibration import create_calibration_platform
+    from qibocal.protocols.flipping import flipping
     from qibocal.protocols.rabi.amplitude import rabi_amplitude
+
+    protocol_name = request["protocol"]
+    protocol = {"rabi_amplitude": rabi_amplitude, "flipping": flipping}[protocol_name]
 
     platform = create_calibration_platform(platform_name)
     controllers = _check_emulator(platform)
@@ -195,18 +215,25 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
             f"its qubits are {sorted(platform.qubits)}"
         )
 
+    # Load the dependency-free shared mapping explicitly: -I excludes the project path.
+    import importlib.util
+
+    mapping_path = Path(__file__).resolve().parents[2] / "common" / "qibocal_platform.py"
+    spec = importlib.util.spec_from_file_location("qdash_qibocal_mapping", mapping_path)
+    mapping = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mapping
+    spec.loader.exec_module(mapping)
+    assignments = mapping.native_assignments(qubit, request["calibration"])
+    platform.update({entry["path"]: entry["value"] for entry in assignments})
+    applied = platform.parameters.model_dump(mode="json")
+    mismatches = mapping.readback_mismatches(applied, assignments)
+    if mismatches:
+        raise RequestError("Calibration readback mismatch: " + "; ".join(mismatches))
+
     rx = platform.natives.single_qubit[qubit].RX[0][1]
     rx_before = {"amplitude": float(rx.amplitude), "duration": float(rx.duration)}
 
-    protocol_kwargs: dict[str, Any] = {
-        "min_amp": float(request["min_amp"]),
-        "max_amp": float(request["max_amp"]),
-        "step_amp": float(request["step_amp"]),
-        "nshots": int(request["nshots"]),
-        "relaxation_time": float(request["relaxation_time"]),
-    }
-    if request.get("pulse_length") is not None:
-        protocol_kwargs["pulse_length"] = float(request["pulse_length"])
+    protocol_kwargs = dict(request["parameters"])
 
     qibocal_dir = output_dir / "qibocal"
     with Executor.open(
@@ -214,7 +241,7 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
     ) as executor:
         if executor.update is not False:
             raise RuntimeError("Qibocal executor must run with update=False")
-        completed = executor.rabi_amplitude(update=False, **protocol_kwargs)
+        completed = getattr(executor, protocol_name)(update=False, **protocol_kwargs)
         data = completed.data
         results = completed.results
         rx_after = platform.natives.single_qubit[qubit].RX[0][1]
@@ -223,7 +250,9 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
             "duration": float(rx_after.duration),
         }
 
-    figures, fit_report = rabi_amplitude.report(data=data, fit=results, target=qubit)
+    figures, fit_report = protocol.report(
+        data=data, fit=results if qubit in results.fitted_parameters else None, target=qubit
+    )
     figure_paths = []
     for index, figure in enumerate(figures):
         path = output_dir / f"figure_{index}.json"
@@ -233,7 +262,7 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
     qubit_data = data[qubit]
     amplitude, amplitude_error = _float_pair(results.amplitude.get(qubit))
     chi2, chi2_error = _float_pair(results.chi2.get(qubit))
-    length, _ = _float_pair(results.length.get(qubit))
+    length = float(rx_before["duration"])
     fitted = results.fitted_parameters.get(qubit)
     fitted_parameters = [float(v) for v in fitted] if fitted is not None else None
 
@@ -243,7 +272,7 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
     else:
         if not (_finite(amplitude) and _finite(amplitude_error)):
             fit_errors.append("Qibocal pi-pulse amplitude or its error is not finite")
-        if chi2 is None or not _finite(chi2):
+        if chi2 is None or not _finite(chi2) or not _finite(chi2_error):
             fit_errors.append("Qibocal reduced chi-squared is missing or not finite")
         if fitted_parameters is None or not all(_finite(v) for v in fitted_parameters):
             fit_errors.append("Qibocal fitted parameters are missing or not finite")
@@ -251,7 +280,7 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
     platform_hash_after = _hash_tree(platform_dir)
     return {
         "status": "ok",
-        "protocol": PROTOCOL,
+        "protocol": protocol_name,
         "qubit": qubit,
         "request": request,
         "fit": {
@@ -265,7 +294,10 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
             "fitted_parameters": fitted_parameters,
         },
         "data": {
-            "amplitude": np.asarray(qubit_data.amp, dtype=float).tolist(),
+            "amplitude": np.asarray(
+                qubit_data.amp if protocol_name == "rabi_amplitude" else qubit_data.flips,
+                dtype=float,
+            ).tolist(),
             "probability": np.asarray(qubit_data.prob, dtype=float).tolist(),
             "error": np.asarray(qubit_data.error, dtype=float).tolist(),
         },
@@ -273,6 +305,8 @@ def run(request: dict[str, Any]) -> dict[str, Any]:
         "fit_report_html": fit_report,
         "provenance": {
             "source": "qibolab-emulator",
+            "applied_parameters": applied,
+            "calibration": request["calibration"],
             "synthetic": True,
             "controllers": controllers,
             "platform": platform_name,
@@ -320,7 +354,7 @@ def _exit_with_parent(poll_seconds: float = 1.0) -> None:
 def main(argv: list[str]) -> int:
     _exit_with_parent()
     if len(argv) != 2:
-        print("usage: run_rabi_amplitude.py REQUEST_JSON", file=sys.stderr)
+        print("usage: run_protocol.py REQUEST_JSON", file=sys.stderr)
         return EXIT_INVALID
     request_path = Path(argv[1])
     try:

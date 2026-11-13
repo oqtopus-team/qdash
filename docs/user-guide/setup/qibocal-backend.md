@@ -2,10 +2,10 @@
 
 The Qibocal backend runs Qibocal's Rabi amplitude measurement on one emulated qubit, so you can
 try QDash runs, task history, figures, and raw data with an upstream calibration library and no
-hardware. Its results are synthetic and measurement-only: QDash stores them in task history, and
-no setting makes them the current calibration values.
+hardware. Validated synthetic results become current calibration values only on the simulation
+chip created from this deployment’s preset. They are never exported to hardware configuration.
 
-The deployment has one task, **QibocalRabiAmplitude**, on one qubit, `0`. The emulator has no
+The deployment runs **QibocalBringUp**, **QibocalRabiAmplitude**, and **QibocalFlipping** on qubit `0`. The emulator has no
 other qubits, MUXes, or couplings, and QDash does not present it as a larger device. Use the
 [Fake backend](./fake-backend.md) to try multi-qubit workflows without hardware.
 
@@ -50,26 +50,32 @@ The Qibocal deployment needs no backend configuration and no Qubex configuration
 ## Create the Emulator Chip
 
 Create the chip after signing in as a project editor. [Run Your First Calibration](../first-calibration.md)
-does this from **Home**; the guide then opens the **Qibocal Emulator Rabi Amplitude** template.
+does this from **Home**; the guide then opens the **Qibocal Emulator Calibration** template.
 To add a chip directly:
 
 1. Open **Chip** and select **Create Chip**.
 2. Enter a **Chip ID**. The dialog shows **Qibocal emulator qubit** with the **Qibocal emulator
    backend**, the one-qubit topology, and **1 qubit**; there is nothing to choose.
 3. Select **Create Chip**.
-4. Select **Open template** in the confirmation to open the **Qibocal Emulator Rabi Amplitude**
+4. Select **Open template** in the confirmation to open the **Qibocal Emulator Calibration**
    template in **New Flow** with the new chip selected.
 
-QDash writes no configuration files for this chip; the emulator reads its own platform.
+QDash records the chip’s simulation identity when it creates the chip. Existing chips without
+that identity cannot run these tasks; create a new chip from the preset. Changing the emulator
+model also requires a new chip. QDash writes no hardware configuration files.
 
 ## Run the Measurement
 
 Run the template as a workflow: save it in **New Flow** and select **Execute**, as in
-[Run a Workflow](../running-calibrations.md#run-a-workflow). It runs **QibocalRabiAmplitude** on qubit `0`.
+[Run a Workflow](../running-calibrations.md#run-a-workflow). It runs **QibocalBringUp → QibocalRabiAmplitude → QibocalFlipping** on qubit `0`.
+BringUp fills only missing initial values. Later tasks read the current calibration values,
+including the preceding task’s accepted results. Running the template again preserves existing
+values during BringUp.
 
 To run the task alone, follow [Run One Task](../running-calibrations.md#run-one-task) with the
-task **QibocalRabiAmplitude**, the emulator chip, and qubit `0`. **Update calibration values**
-has no effect for this task.
+task **QibocalRabiAmplitude**, the initialized emulator chip, and qubit `0`. Disable
+**Update calibration values** to keep the current values unchanged; the next task then reads
+the older values. Run BringUp with updates enabled before measuring a new chip.
 
 | Run parameter | Default | Meaning |
 | --- | --- | --- |
@@ -87,9 +93,9 @@ parameters takes a few seconds; a finer sweep takes longer, up to the runner tim
 
 The result appears in **Execution** and in task history like any other task result:
 
-- **qibocal_pi_amplitude**, the fitted pi-pulse amplitude, and **qibocal_rabi_chi2**, the reduced
-  chi-squared of the fit, each marked as not applied to the calibration values, with the reason
-  and the run's provenance: emulator, platform, seed, and library versions.
+- **qibocal_pi_amplitude** and **qibocal_pi_duration**, the calibrated pulse pair, plus the fit
+  diagnostic. History records whether values were applied and the emulator, platform, seed,
+  input values, and library versions.
 - Qibocal's own figure, titled as synthetic emulator data.
 - Two raw-data files: the excited-state probability and its error against amplitude.
 

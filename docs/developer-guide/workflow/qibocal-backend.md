@@ -1,37 +1,41 @@
 # Qibocal Emulator Backend
 
-The `qibocal` backend runs upstream Qibocal protocols on a Qibolab emulator and records the
-results in QDash as measurement-only, synthetic data. Qibocal owns acquisition, fit, and figure;
-QDash owns scheduling, execution history, artifacts, and the rule that these results never become
-accepted calibration state. The backend currently provides one task, `QibocalRabiAmplitude`,
-which runs Qibocal's one-qubit `rabi_amplitude` protocol.
+The `qibocal` backend projects QDash database calibration values onto a Qibolab emulator before
+running official Qibocal protocols. QDash owns accepted values on simulation-bound chips;
+Qibocal owns acquisition, fit, and figures. Native platform files define channels, envelopes,
+instruments, and the Hamiltonian, and supply initial calibration values only.
+
+`QibocalBringUp` seeds missing values without replacing existing calibration. Each subsequent
+`QibocalRabiAmplitude` or `QibocalFlipping` resolves inputs from the current database, with snapshot
+and explicit overrides taking precedence through the existing task executor. Missing required
+inputs fail before the runner starts. There is no second native calibration source of truth.
 
 ## Process Boundary
 
 QDash never imports Qibocal or Qibolab. Qibocal 0.2.6 requires `cma<4` and qubex requires
 `cma>=4`, so the two cannot share an environment. The runner has its own project and lock in
-`tools/qibocal-runner/` (Python 3.11, `qibocal==0.2.6`, `qibolab[emulator]==0.2.16`,
+`src/qdash/workflow/qibocal_runner/` (Python 3.11, `qibocal==0.2.6`, `qibolab[emulator]==0.2.16`,
 `qibo==0.3.3`), and `QibocalBackend` starts it as a subprocess.
 
 ```mermaid
 sequenceDiagram
     participant Task as QibocalRabiAmplitude
     participant Backend as QibocalBackend
-    participant Runner as run_rabi_amplitude.py
+    participant Runner as run_protocol.py
     participant Qibocal as Qibocal Executor
 
-    Task->>Backend: run_rabi_amplitude(request)
+    Task->>Backend: run_protocol(request)
     Backend->>Backend: create run directory, copy platform, write request.json
-    Backend->>Runner: python -I run_rabi_amplitude.py request.json
-    Runner->>Runner: load platform, require EmulatorController
-    Runner->>Qibocal: Executor.open(update=False), rabi_amplitude(update=False)
+    Backend->>Runner: python -I run_protocol.py request.json
+    Runner->>Runner: load platform, require EmulatorController, apply and verify DB inputs
+    Runner->>Qibocal: Executor.open(update=False), allowed protocol(update=False)
     Qibocal-->>Runner: data, fit, report figure
     Runner-->>Backend: result.json, figure_0.json, qibocal/ output
     Backend->>Backend: verify result and unchanged platform
-    Backend-->>Task: QibocalRunResult
+    Backend-->>Task: QibocalRunResult with applied input readback
 ```
 
-`QibocalBackend.run_rabi_amplitude()` in `src/qdash/workflow/engine/backend/qibocal.py` owns
+`QibocalBackend.run_protocol()` in `src/qdash/workflow/engine/backend/qibocal.py` owns
 the subprocess:
 
 - Each run gets its own directory, `<execution calib dir>/qibocal/<task>_q<qid>_<random>/`,
@@ -58,19 +62,32 @@ the subprocess:
 | --- | --- |
 | Emulator only | The runner rejects the instantiated platform before acquisition unless every instrument is exactly `qibolab` `EmulatorController`; `DummyInstrument` and hardware controllers fail. The backend rejects a result whose reported controllers are not all emulators. |
 | Qibocal never updates the platform | The runner calls `Executor.open(..., update=False)` and the protocol with `update=False`, and never reads Qibocal's `new_platform` output. The backend rejects a result without `executor_update: false` and matching platform hashes. |
-| Results are measurement-only | `QibocalTask.measurement_only_reason` makes `CalibOrchestrator._should_update_calibration_parameters()` return `False` and `BackendSaver` skip the calibration database, backend parameter files, and calibration notes for every combination of `update_calibration_parameters`, `force_update_params`, and `DEFAULT_BACKEND`. |
-| History says why | Every output is stored with `database_updated: false`, `measurement_only_reason`, and `provenance` (source `qibolab-emulator`, controllers, platform hashes, seed, distribution versions, runner lock hash, run directory). |
-| No other write path | `GitHubPolicy.from_deployment()` disables GitHub pull and push for every backend other than `qubex`, and `AgentSessionService.list_action_candidates()` rejects outputs that carry `measurement_only_reason`, so an agent session cannot commit them. |
+| Adoption stays on a bound simulation chip | `BackendSaver` verifies the run binding, chip, and project, and writes only the QDash database after validation. `update_calibration_parameters=False` leaves the database unchanged. |
+| Mapping is checked before acquisition | `common/qibocal_platform.py` defines seed, apply, and readback paths. The runner uses `Platform.update`, checks the loaded values, and returns them for another comparison in QDash. |
+| Model identity is fixed at creation | The preset stores backend, platform, preset, and a structural fingerprint. Calibration defaults are excluded from the fingerprint; envelopes, model, channels, and instrument definitions are included. Existing chips without a binding are not migrated. |
+| Synthetic values stay out of hardware | Manual hardware edits, seed imports, props/note export, GitHub publication, and agent hardware apply reject bound chips. Agent candidates reject synthetic and legacy measurement-only outputs. |
+| Failed tasks retain origin | Task notes retain provenance and the runner artifact directory even when validation yields no outputs. Legacy `measurement_only_reason` remains an unconditional adoption prohibition. |
 
-Output names start with `qibocal_` (`qibocal_pi_amplitude`, `qibocal_rabi_chi2`) and declare no
+Output names start with `qibocal_` (`qibocal_qubit_frequency`, `qibocal_pi_duration`, `qibocal_pi_amplitude`) and declare no
 publish targets, so they never collide with qubex parameters such as `control_amplitude`. The
 general measurement-only flow is described in
 [Calibration Data Lifecycle](./calibration-data-lifecycle.md).
 
+The existing `fake` backend retains its current qubex-compatible persistence behavior. This
+binding policy does not migrate existing fake chips or hardware chips.
+
 ## Rabi Amplitude Task
 
-`QibocalRabiAmplitude` in `src/qdash/workflow/calibtasks/qibocal/rabi_amplitude.py` has no
-calibration inputs; the emulator platform carries its own qubit parameters.
+`QibocalRabiAmplitude` in `src/qdash/workflow/calibtasks/qibocal/rabi_amplitude.py` requires `qibocal_qubit_frequency` (GHz, projected to Hz), `qibocal_pi_duration` (ns), and
+`qibocal_pi_amplitude` (a.u.) from QDash. The sweep replaces the amplitude during acquisition;
+the loaded duration and frequency set its pulse context. Successful outputs include both fitted
+amplitude and pulse duration. RX90 uses half the RX amplitude with the same duration and envelope.
+These pulse meanings differ from qubex, so the names remain separate.
+
+`QibocalFlipping` consumes the saved amplitude and duration using the official `flipping`
+protocol. Defaults are 20 flip pairs (exclusive maximum), step 1, and amplitude detuning 0.02.
+It shares the shots, relaxation time, and seed defaults below. Neither protocol reads
+`new_platform` or asks Qibocal to adopt its fit.
 
 | Run parameter | Default | Rule |
 | --- | --- | --- |
@@ -105,13 +122,13 @@ recorded hash.
 
 ## Deployment
 
-The runner environment exists only where it is installed: `tools/qibocal-runner/.venv` on a host,
+The runner environment exists only where it is installed: `src/qdash/workflow/qibocal_runner/.venv` on a host,
 or the `qibocal` target of `src/qdash/workflow/Dockerfile` in a container. Without it,
 `QibocalBackend.connect()` fails with "Qibocal backend is not installed".
 
 | File | Role |
 | --- | --- |
-| `src/qdash/workflow/Dockerfile` | Stage `qibocal-runner-builder` runs `uv sync --frozen` on the runner's own lock into `/app/tools/qibocal-runner/.venv` and copies the runner script and the platform `LICENSE` and `UPSTREAM.md`; target `qibocal` adds that directory to the worker. The last stage, `default`, has no runner, so a build without a target never builds the runner stages. |
+| `src/qdash/workflow/Dockerfile` | Stage `qibocal-runner-builder` runs `uv sync --frozen` on the runner's own lock into `/app/src/qdash/workflow/qibocal_runner/.venv` and copies the runner script and the platform `LICENSE` and `UPSTREAM.md`; target `qibocal` adds that directory to the worker. The last stage, `default`, has no runner, so a build without a target never builds the runner stages. |
 | `compose.qibocal.yaml` | Overlay that builds `user-flow-worker` with `target: qibocal` and `init: true`, so PID 1 reaps a runner whose flow process was killed. No other service changes. |
 | `Taskfile.yaml` | `deploy-local-qibocal` and `deploy-local-qibocal-down` set `ENV=dev-qibocal`, `DEFAULT_BACKEND=qibocal`, and `COMPOSE_FILE=compose.yaml:compose.qibocal.yaml` |
 
@@ -132,8 +149,8 @@ The emulator platform has one qubit, `0`, so a qibocal deployment never presents
   and the first calibration guide (`resolveChipSetupMode()` in
   `ui/src/components/features/chip/chipSetupMode.ts`) treat it like the fake preset and open its
   `workflow_template_id`.
-- The flow template `qibocal_rabi_amplitude` (`src/qdash/workflow/templates/qibocal_emulator.py`,
-  backend `qibocal` in `templates.json`) runs `CustomOneQubit` on `QubitTargets(["0"])`.
+- The flow template `qibocal_emulator_calibration` (`src/qdash/workflow/templates/qibocal_emulator.py`,
+  backend `qibocal` in `templates.json`) runs BringUp → Rabi → Flipping with `CustomOneQubit` on `QubitTargets(["0"])`.
 - `requires_wiring: false` in `config/app/backend.yaml` (`backend_requires_wiring()` in
   `src/qdash/common/config/backend.py`) tells `CustomOneQubit` and the other one-qubit steps to
   run explicit qubit targets with `_execute_direct_one_qubit()` instead of the wiring-based
@@ -147,14 +164,14 @@ The emulator platform has one qubit, `0`, so a qibocal deployment never presents
 Create the runner environment from its lock and run the end-to-end tests:
 
 ```bash
-cd tools/qibocal-runner
+cd src/qdash/workflow/qibocal_runner
 uv sync --frozen
-cd ../..
+cd ../../../..
 QDASH_QIBOCAL_INTEGRATION=1 uv run pytest -m qibocal_emulator
 ```
 
 The tests run the task through `TaskExecutor` and `CalibOrchestrator.run_task()` with in-memory
-or mongomock storage, check the measurement-only history, figure, and raw data, rerun with the
+or mongomock storage, check database adoption, history, figure, and raw data, rerun with the
 same seed for an identical amplitude, and confirm that a `DummyInstrument` platform is rejected
 before acquisition. On macOS, wrapping the command in `sandbox-exec` with a profile that denies
 `network-outbound` confirms that a run needs no network once the environment exists.
@@ -162,11 +179,12 @@ before acquisition. On macOS, wrapping the command in `sandbox-exec` with a prof
 To run the runner alone, write a request and pass it as the only argument:
 
 ```bash
-tools/qibocal-runner/.venv/bin/python -I tools/qibocal-runner/run_rabi_amplitude.py request.json
+src/qdash/workflow/qibocal_runner/.venv/bin/python -I src/qdash/workflow/qibocal_runner/run_protocol.py request.json
 ```
 
-The request needs `platform`, `platforms_dir`, `output_dir`, `qubit`, `min_amp`, `max_amp`,
-`step_amp`, `nshots`, `relaxation_time`, and `seed`. Use a copy of the platform directory as
+The request includes `protocol` (`rabi_amplitude` or `flipping`), allowlisted `parameters`,
+`calibration`, matching single-qubit `targets`, `platform`, `platforms_dir`, `output_dir`, `qubit`,
+and `seed`. Shots and relaxation time belong in `parameters`. Use a copy of the platform directory as
 `platforms_dir`, as `QibocalBackend` does.
 
 ## Licenses
@@ -176,12 +194,12 @@ The runner environment installs Qibocal, Qibolab, and Qibo (Apache 2.0), QuTiP (
 dynamiqs (Apache 2.0 with a `NOTICE` for code derived from QuTiP), and JAX (Apache 2.0) from the
 lock; each distribution keeps its license and notice files in its installed metadata. The
 `qibocal` worker target copies the environment whole, so the image keeps those files, and adds the
-platform `LICENSE` and `UPSTREAM.md` under `/app/tools/qibocal-runner/licenses/qibocal-platform/`.
+platform `LICENSE` and `UPSTREAM.md` under `/app/src/qdash/workflow/qibocal_runner/licenses/qibocal-platform/`.
 
 ## Extend and Test
 
 To add another Qibocal protocol, add a `QibocalTask` subclass under
-`src/qdash/workflow/calibtasks/qibocal/`, a runner script or entry point that calls the upstream
+`src/qdash/workflow/calibtasks/qibocal/`, an allowlisted runner protocol that calls the upstream
 protocol through `Executor` with `update=False`, a backend method that reuses
 `_run_subprocess()`, and the task name in the `qibocal` section of `config/app/backend.yaml`.
 Run `task generate-task-catalog` afterwards.
@@ -190,7 +208,7 @@ Run `task generate-task-catalog` afterwards.
 | --- | --- |
 | Subprocess, isolation, timeout, cancellation, result checks, platform hash | `tests/qdash/workflow/engine/backend/test_qibocal_backend.py` |
 | Task request validation, outputs, failures, every write-back setting, orchestrator run | `tests/qdash/workflow/calibtasks/test_qibocal_rabi_amplitude.py` |
-| Real Qibocal and Qibolab emulator | `tests/qdash/workflow/calibtasks/test_qibocal_emulator_integration.py` (`qibocal_emulator` marker) |
+| Real Qibocal and Qibolab emulator | `tests/qdash/workflow/calibtasks/test_qibocal_database.py` (`qibocal_emulator` marker) |
 | GitHub policy, agent candidates | `tests/qdash/workflow/service/test_single_task_flow.py`, `tests/qdash/api/services/test_agent_session_service.py` |
 | Parent `SIGKILL` and the runner watchdog | `test_runner_exits_when_its_parent_is_killed` in `test_qibocal_backend.py` |
 | Chip preset and topology | `tests/qdash/api/services/chip/test_config_scaffold.py`, `tests/qdash/api/routers/test_chip.py` |

@@ -2,7 +2,7 @@
 
 QDash does not import Qibocal or Qibolab. Their pinned dependencies conflict with qubex
 (``cma<4`` against ``cma>=4``), so they live in their own environment under
-``tools/qibocal-runner`` and run as a subprocess. This module owns that boundary:
+``src/qdash/workflow/qibocal_runner`` and run as a subprocess. This module owns that boundary:
 
 * settings come from ``config/app/qibocal.yaml``, separate from the Qibolab platform files;
 * every run gets its own artifact directory and its own copy of the platform, so the
@@ -12,8 +12,7 @@ QDash does not import Qibocal or Qibolab. Their pinned dependencies conflict wit
 * the runner result is accepted only when it reports an emulator-only platform, an
   executor with ``update=False``, and an unchanged platform.
 
-The backend is limited to emulators. Its results are synthetic and are never written to
-accepted calibration state; see ``QibocalTask``.
+The backend is limited to emulators. Results can be adopted only on a matching bound chip.
 """
 
 from __future__ import annotations
@@ -30,10 +29,15 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from qdash.common.config.loader import ConfigLoader
+from qdash.common.qibocal_platform import PlatformTemplate, native_assignments, readback_mismatches
+from qdash.common.simulation_binding import require_qibocal_binding
 from qdash.workflow.engine.backend.base import BaseBackend
+
+if TYPE_CHECKING:
+    from qdash.datamodel.simulation import SimulationBindingModel
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +89,7 @@ class QibocalRunnerSettings:
 
         # Runner paths are relative to the directory that holds the config directory: the
         # repository root on a host, /app in the workflow image (/app/config is mounted there
-        # and the runner is installed under /app/tools/qibocal-runner).
+        # and the runner is installed under /app/src/qdash/workflow/qibocal_runner).
         app_root = ConfigLoader.get_config_dir().parent
 
         def repo_path(value: Any) -> Path:
@@ -129,17 +133,14 @@ class QibocalRunnerSettings:
 
 
 @dataclass(frozen=True)
-class RabiAmplitudeRequest:
-    """Parameters of one Qibocal ``rabi_amplitude`` run."""
+class QibocalRequest:
+    """An allowlisted protocol with final resolved calibration inputs."""
 
     qubit: int
-    min_amp: float
-    max_amp: float
-    step_amp: float
-    nshots: int
-    relaxation_time: float
+    protocol: str
+    parameters: dict[str, Any]
+    calibration: dict[str, float]
     seed: int
-    pulse_length: float | None = None
 
 
 @dataclass(frozen=True)
@@ -219,7 +220,7 @@ class QibocalBackend(BaseBackend):
             raise QibocalRunnerError(
                 "Qibocal backend is not installed: missing "
                 + ", ".join(missing)
-                + ". Run `uv sync --frozen` in tools/qibocal-runner."
+                + ". Run `uv sync --frozen` in src/qdash/workflow/qibocal_runner."
             )
         self._settings = settings
 
@@ -234,6 +235,14 @@ class QibocalBackend(BaseBackend):
         self.connect()
         return self
 
+    def binding(self) -> SimulationBindingModel:
+        settings = self.settings
+        return require_qibocal_binding(
+            self.config.get("project_id"),
+            self.config["chip_id"],
+            PlatformTemplate(settings.platforms_dir, settings.platform),
+        )
+
     def artifact_root(self) -> Path:
         """Directory below which each run gets its own folder."""
         calib_dir = self._config.get("calib_data_path")
@@ -244,16 +253,19 @@ class QibocalBackend(BaseBackend):
             calib_dir = str(Path(str(note_path)).parent.parent)
         return Path(str(calib_dir)) / "qibocal"
 
-    def run_rabi_amplitude(self, request: RabiAmplitudeRequest, label: str) -> QibocalRunResult:
-        """Run Qibocal ``rabi_amplitude`` and return the accepted result.
+    def run_protocol(self, request: QibocalRequest, label: str) -> QibocalRunResult:
+        """Run an allowlisted Qibocal protocol and return its verified result.
 
         Raises ``QibocalPlatformRejectedError`` when the platform is not an emulator,
         ``QibocalRunnerTimeoutError`` on timeout, and ``QibocalRunnerError`` for every
         other failure, including a changed platform.
         """
         settings = self.settings
+        binding = self.binding()
+        assignments = native_assignments(request.qubit, request.calibration)
         run_dir = self.artifact_root() / f"{label}_{uuid.uuid4().hex[:12]}"
         run_dir.mkdir(parents=True, exist_ok=False)
+        self.last_run_dir = run_dir
 
         source_hash = hash_tree(settings.platform_dir)
         platforms_copy = run_dir / "platforms"
@@ -264,6 +276,7 @@ class QibocalBackend(BaseBackend):
         )
         request_payload = {
             **asdict(request),
+            "targets": [request.qubit],
             "platform": settings.platform,
             "platforms_dir": str(platforms_copy),
             "output_dir": str(run_dir),
@@ -306,6 +319,16 @@ class QibocalBackend(BaseBackend):
             )
 
         self._check_result(result, source_hash)
+        problems = readback_mismatches(
+            result["provenance"].get("applied_parameters", {}), assignments
+        )
+        if problems:
+            raise QibocalRunnerError("Calibration readback mismatch: " + "; ".join(problems))
+        # Recheck the model before allowing a result to be adopted.
+        self.binding()
+        result["provenance"]["simulation_binding"] = binding.model_dump(mode="json")
+        result["provenance"]["chip_id"] = self.config["chip_id"]
+        result["provenance"]["project_id"] = self.config.get("project_id")
         # Identify the exact runner build: the lock pins every distribution version.
         lock = settings.script.parent / "uv.lock"
         result["provenance"]["runner_script_sha256"] = hashlib.sha256(

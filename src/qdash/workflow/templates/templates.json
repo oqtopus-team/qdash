@@ -135,9 +135,9 @@
     "function_name": "fake_calibration"
   },
   {
-    "id": "qibocal_rabi_amplitude",
-    "name": "Qibocal Emulator Rabi Amplitude",
-    "description": "Qibocal's rabi_amplitude protocol on the one-qubit upstream Qibolab emulator platform (qubit 0). Results are synthetic and measurement-only: history, figure, raw data and provenance are stored, and no setting updates calibration parameters.",
+    "id": "qibocal_emulator_calibration",
+    "name": "Qibocal Emulator Calibration",
+    "description": "BringUp seeds missing calibration values, then official Qibocal Rabi and Flipping calibrate the bound emulator chip. Validated values are saved only to that simulation chip; each task reads current QDash database values.",
     "category": "testing",
     "backend": "qibocal",
     "filename": "qibocal_emulator.py",

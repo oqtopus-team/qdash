@@ -3,7 +3,7 @@
 Runs Qibocal's ``rabi_amplitude`` protocol on the upstream Qibolab ``qubit`` emulator
 platform through the qibocal backend. Acquisition, fit, and figure are Qibocal's own; QDash
 stores the history, figure, raw data, and provenance. Results are synthetic and
-measurement-only: no setting writes them to accepted calibration state.
+adopted only into the matching simulation chip's QDash calibration database.
 
 The emulator platform has exactly one qubit, ``0``, and the Create Chip dialog of a qibocal
 deployment creates a one-qubit chip for it. Any other qubit ID fails before acquisition; the
@@ -42,7 +42,9 @@ from qdash.workflow.service.targets import QubitTargets
 
 # Tasks the template runs when none are given; each is listed for the qibocal backend in
 # config/app/backend.yaml.
-QIBOCAL_TASKS: list[TaskCall] = [TaskCall(name="QibocalRabiAmplitude")]
+QIBOCAL_TASKS: list[TaskCall] = [
+    TaskCall(name=name) for name in ("QibocalBringUp", "QibocalRabiAmplitude", "QibocalFlipping")
+]
 
 # The only qubit of the upstream Qibolab `qubit` emulator platform. Keep it a literal list so
 # the execution dialog can show the default targets.

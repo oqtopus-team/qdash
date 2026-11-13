@@ -516,6 +516,11 @@ class TestChipRouter:
         assert data["topology_id"] == "qibocal-emulator-1"
         assert data["config"]["status"] == "skipped"
         assert data["config"]["preset"] == "qibocal"
+        assert data["simulation_binding"]["backend"] == "qibocal"
+        assert data["simulation_binding"]["template_fingerprint"].startswith("sha256:")
+        stored = ChipDocument.find_one({"chip_id": "QIBOCAL"}).run()
+        assert stored is not None and stored.simulation_binding is not None
+        assert stored.simulation_binding.model_dump(mode="json") == data["simulation_binding"]
         assert not (config_tree / "QIBOCAL").exists()
         qids = [
             doc.qid
@@ -784,3 +789,25 @@ class TestChipRouter:
         )
 
         assert response.status_code == 403
+
+
+def test_request_cannot_reclassify_an_existing_chip(
+    test_client, test_project, auth_headers, monkeypatch
+):
+    monkeypatch.setenv("DEFAULT_BACKEND", "qibocal")
+    request = {
+        "chip_id": "UNKNOWN",
+        "size": 1,
+        "topology_id": "qibocal-emulator-1",
+        "config": {"create": False},
+        "simulation_binding": {"backend": "qibocal", "platform": "qubit"},
+    }
+    response = test_client.post("/chips", headers=auth_headers, json=request)
+    assert response.status_code == 200
+    assert response.json()["simulation_binding"] is None
+    request["config"] = {"preset": "qibocal"}
+    response = test_client.post("/chips", headers=auth_headers, json=request)
+    assert response.status_code == 400
+    stored = ChipDocument.find_one({"chip_id": "UNKNOWN"}).run()
+    assert stored is not None
+    assert stored.simulation_binding is None

@@ -240,6 +240,9 @@ class QubexBackend(BaseBackend):
             task_manager_id is kept as a parameter for backward compatibility but not used.
             Only the master note (task_id="master") is updated.
         """
+        from qdash.common.simulation_binding import check_hardware_export, chip_binding
+
+        check_hardware_export(chip_binding(project_id, chip_id), chip_id, "Qubex calibration note")
         raw_note = self.get_note()
         calib_note = json.loads(raw_note)
 
