@@ -172,7 +172,7 @@ def test_dynamic_or_invalid_coupling_defaults_remain_unknown(expression):
 
 PAIR_RUN = "CalibService(u, c).run({targets}, steps={steps})"
 PAIRS = "CouplingTargets(p)"
-SCHEDULED = "[SetCRSchedule(schedule=s), TwoQubitCalibration()]"
+AUTOMATIC = "[GenerateCRSchedule(), TwoQubitCalibration()]"
 
 
 def _modes(body: str, prefix: str = "") -> list[TargetMode]:
@@ -183,63 +183,62 @@ def _modes(body: str, prefix: str = "") -> list[TargetMode]:
 @pytest.mark.parametrize(
     ("body", "modes"),
     [
-        (PAIR_RUN.format(targets=PAIRS, steps=SCHEDULED), ["coupling_pairs"]),
+        (PAIR_RUN.format(targets=PAIRS, steps=AUTOMATIC), ["coupling_pairs"]),
         (
-            f"t = {PAIRS}\nsteps = {SCHEDULED}\nsteps.append(Custom())\n"
+            f"t = {PAIRS}\nsteps = {AUTOMATIC}\nsteps.append(ConfigureAll())\n"
             "with CalibService(u, c) as cal:\n    cal.run(t, steps)",
             ["coupling_pairs"],
         ),
-        # Without SetCRSchedule the 2Q steps would schedule other pairs.
-        (PAIR_RUN.format(targets=PAIRS, steps="[TwoQubitCalibration()]"), ["mux_ids", "qids"]),
+        # Automatic steps schedule only the directed target pairs.
+        (PAIR_RUN.format(targets=PAIRS, steps="[TwoQubitCalibration()]"), ["coupling_pairs"]),
         # Building a schedule does not count unless the executed pipeline uses it.
         (
-            f"unused = {SCHEDULED}\n"
+            f"unused = {AUTOMATIC}\n"
             + PAIR_RUN.format(targets=PAIRS, steps="[TwoQubitCalibration()]"),
+            ["coupling_pairs"],
+        ),
+        (
+            "GenerateCRSchedule()\n"
+            + PAIR_RUN.format(targets=PAIRS, steps="[TwoQubitCalibration()]"),
+            ["coupling_pairs"],
+        ),
+        (
+            "steps = [GenerateCRSchedule()]\n" + PAIR_RUN.format(targets=PAIRS, steps="steps"),
             ["mux_ids", "qids"],
         ),
         (
-            "SetCRSchedule(schedule=s)\n"
-            + PAIR_RUN.format(targets=PAIRS, steps="[TwoQubitCalibration()]"),
+            "MuxTargets([0])\n" + PAIR_RUN.format(targets=PAIRS, steps=AUTOMATIC),
+            ["mux_ids", "qids"],
+        ),
+        (PAIR_RUN.format(targets="QubitTargets(q)", steps=AUTOMATIC), ["mux_ids", "qids"]),
+        # Opaque or mutated step lists are rejected.
+        (
+            f"steps = {AUTOMATIC}\nsteps.pop(0)\n" + PAIR_RUN.format(targets=PAIRS, steps="steps"),
             ["mux_ids", "qids"],
         ),
         (
-            "steps = [SetCRSchedule(schedule=s), GenerateCRSchedule()]\n"
+            f"steps = {AUTOMATIC}\nsteps.append(make())\nsteps.append(x)\n"
             + PAIR_RUN.format(targets=PAIRS, steps="steps"),
             ["mux_ids", "qids"],
         ),
         (
-            "MuxTargets([0])\n" + PAIR_RUN.format(targets=PAIRS, steps=SCHEDULED),
-            ["mux_ids", "qids"],
-        ),
-        (PAIR_RUN.format(targets="QubitTargets(q)", steps=SCHEDULED), ["mux_ids", "qids"]),
-        # Steps that may lose SetCRSchedule or are not visible are rejected.
-        (
-            f"steps = {SCHEDULED}\nsteps.pop(0)\n" + PAIR_RUN.format(targets=PAIRS, steps="steps"),
-            ["mux_ids", "qids"],
-        ),
-        (
-            f"steps = {SCHEDULED}\nsteps.append(make())\nsteps.append(x)\n"
-            + PAIR_RUN.format(targets=PAIRS, steps="steps"),
-            ["mux_ids", "qids"],
-        ),
-        (
-            f"steps = {SCHEDULED}\nedit(steps)\n" + PAIR_RUN.format(targets=PAIRS, steps="steps"),
+            f"steps = {AUTOMATIC}\nedit(steps)\n" + PAIR_RUN.format(targets=PAIRS, steps="steps"),
             ["mux_ids", "qids"],
         ),
         (
             "if s:\n    steps = "
-            + SCHEDULED
-            + "\nelse:\n    steps = [TwoQubitCalibration()]\n"
+            + AUTOMATIC
+            + "\nelse:\n    steps = [OpaqueStep()]\n"
             + PAIR_RUN.format(targets=PAIRS, steps="steps"),
             ["mux_ids", "qids"],
         ),
         (PAIR_RUN.format(targets=PAIRS, steps="build_steps()"), ["mux_ids", "qids"]),
-        (PAIR_RUN.format(targets="p", steps=SCHEDULED), ["mux_ids", "qids"]),
+        (PAIR_RUN.format(targets="p", steps=AUTOMATIC), ["mux_ids", "qids"]),
         (
-            "for g in s:\n    " + PAIR_RUN.format(targets=PAIRS, steps=SCHEDULED),
+            "for g in s:\n    " + PAIR_RUN.format(targets=PAIRS, steps=AUTOMATIC),
             ["mux_ids", "qids"],
         ),
-        (f"targets = {PAIRS}\nsteps = {SCHEDULED}", ["mux_ids", "qids"]),
+        (f"targets = {PAIRS}\nsteps = {AUTOMATIC}", ["mux_ids", "qids"]),
         ("QubitTargets(q)", ["mux_ids", "qids"]),
     ],
 )
@@ -249,8 +248,8 @@ def test_supported_target_modes(body, modes):
 
 
 def test_target_modes_ignore_unused_module_helpers():
-    scheduled = PAIR_RUN.format(targets=PAIRS, steps=SCHEDULED)
-    unscheduled = PAIR_RUN.format(targets=PAIRS, steps="[TwoQubitCalibration()]")
+    scheduled = PAIR_RUN.format(targets=PAIRS, steps=AUTOMATIC)
+    unscheduled = PAIR_RUN.format(targets=PAIRS, steps="[OpaqueStep()]")
     helper = "def helper(u, c, p, s):\n    {}\n\n\n"
     # An unused scheduled helper does not enable pairs for the real entrypoint.
     assert _modes(unscheduled, helper.format(scheduled)) == ["mux_ids", "qids"]
@@ -265,7 +264,7 @@ def test_target_modes_ignore_unused_module_helpers():
 
 def test_target_modes_follow_the_named_entrypoint():
     source = (
-        f"def other(u, c, p, s):\n    {PAIR_RUN.format(targets=PAIRS, steps=SCHEDULED)}\n\n"
+        f"def other(u, c, p, s):\n    {PAIR_RUN.format(targets=PAIRS, steps=AUTOMATIC)}\n\n"
         "def run(u, c):\n    CalibService(u, c).run(QubitTargets(['0']), steps=[])\n"
     )
     assert supported_target_modes(source, "other") == ["coupling_pairs"]
@@ -273,8 +272,25 @@ def test_target_modes_follow_the_named_entrypoint():
     assert supported_target_modes(source, "missing") == ["mux_ids", "qids"]
 
 
-def test_scheduled_two_qubit_template_accepts_pairs():
-    source = (TEMPLATES / "two_qubit_scheduled.py").read_text()
-    assert supported_target_modes(source, "two_qubit_scheduled") == ["coupling_pairs"]
+def test_automatic_two_qubit_template_accepts_pairs():
+    source = (TEMPLATES / "two_qubit_pairs.py").read_text()
+    assert supported_target_modes(source, "two_qubit_pairs") == ["coupling_pairs"]
     two_qubit = (TEMPLATES / "two_qubit.py").read_text()
     assert supported_target_modes(two_qubit, "two_qubit") == ["mux_ids", "qids"]
+
+
+@pytest.mark.parametrize(
+    "steps", ["[]", "[GenerateCRSchedule()]", "[OpaqueStep()]", "[ConfigureAll()]"]
+)
+def test_unused_pair_step_does_not_enable_pair_overrides(steps):
+    assert _modes(
+        "unused = TwoQubitCalibration()\n" + PAIR_RUN.format(targets=PAIRS, steps=steps)
+    ) == ["mux_ids", "qids"]
+
+
+def test_each_run_requires_a_pair_step():
+    assert _modes(
+        PAIR_RUN.format(targets=PAIRS, steps=AUTOMATIC)
+        + "\n"
+        + PAIR_RUN.format(targets=PAIRS, steps="[]")
+    ) == ["mux_ids", "qids"]

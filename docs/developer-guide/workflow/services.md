@@ -197,13 +197,13 @@ exactly one non-empty mode: `mux_ids` with optional `exclude_qids`, `qids`, or `
 `GetFlowResponse.target_modes` lists the modes a saved source accepts, computed by
 `supported_target_modes()` from the entrypoint's syntax tree without executing the source. It is
 `["coupling_pairs"]` only when every `CalibService` `.run()` call in the entrypoint receives
-`CouplingTargets(...)` and a step list that always contains `SetCRSchedule`; otherwise it is
-`["mux_ids", "qids"]`. The step list must be a list literal or a name assigned only list literals
-with `SetCRSchedule` and changed only by `append`, `extend`, `insert`, or `+=` with step calls.
-Pipeline construction the check cannot prove keeps `["mux_ids", "qids"]`: no `.run()` call, a run
-inside a loop, comprehension, or lambda, targets or services from parameters, nested functions,
-any reference to a function or class defined in the module, other `*Targets` or
-`GenerateCRSchedule` calls in the entrypoint, and services or targets built at module level.
+`CouplingTargets(...)` and a list of built-in steps, with an automatic two-qubit step in each
+run; otherwise it is `["mux_ids", "qids"]`. The step list must be a literal or a name
+assigned only literal lists, changed only by `append`, `extend`, `insert`, or `+=` with built-in
+step calls. Named steps must also resolve to built-in constructors. `GenerateCRSchedule` is
+supported. Opaque steps, runs inside loops, comprehensions or lambdas, targets or services from
+parameters, nested functions, references to module-local helpers, other target classes, and
+services or targets built at module level do not enable pair overrides.
 Unused module functions do not affect the result, and calls into other modules are not followed.
 `target_defaults` can then report literal `CouplingTargets` pairs as `coupling_pairs`. The execute
 dialog offers only the listed modes and ignores defaults of a mode it does not offer. `execute_flow()` rejects a mode outside `target_modes` with
@@ -217,19 +217,18 @@ sets the other mode's argument to `None`, so templates that validate targets bef
 `CalibService` accept the selection. Otherwise the saved parameters stay unchanged. Workflows that
 pass literal targets directly to `CalibService.run()` keep their source and function signature
 unchanged. The API never derives other arguments, such as a `schedule`, from the override. The
-`two_qubit_scheduled` template therefore declares `coupling_pairs` beside an optional `schedule`:
-`coupling_pairs` takes precedence, a call with neither fails before calibrating, and a direct call
-with `coupling_pairs` and no override runs each pair in its own group. Deploy the API and workflow
-workers together to enable this behavior.
+`two_qubit_pairs` template declares `coupling_pairs`, requires a non-empty selection, and groups
+those directed pairs automatically. The `two_qubit_manual_rounds` template instead declares
+literal rounds and targets in its source and accepts no target override. Deploy the API and
+workflow workers together to enable this behavior.
 
 `CalibService.run()` applies the override through `override_pipeline()` in
 `service/flow_targets.py`. A MUX or qubit override replaces the initial `MuxTargets` or
 `QubitTargets`; a pair override replaces the initial `CouplingTargets`. Other target types, such as
-`AllMuxTargets`, fail with an error instead of running unchanged. A pair override also replaces the
-`schedule` of every `SetCRSchedule` step with groups that `CRScheduler.schedule_pairs()` builds from
-the selected pairs, so the saved schedule can neither add nor reverse pairs. Pipelines with
-`GenerateCRSchedule`, which rebuilds pairs from qubits, or without `SetCRSchedule` fail with an
-error. Every service in the current flow uses the
+`AllMuxTargets`, fail with an error instead of running unchanged. A pair override requires built-in steps and at least one `CustomTwoQubit` or
+`TwoQubitCalibration`; unknown step types fail before execution. Automatic two-qubit steps and
+`GenerateCRSchedule` call `CRScheduler.schedule_pairs()` for `CouplingTargets`, keeping exactly
+the selected directions whose qubits remain candidates. Every service in the current flow uses the
 selection; later pipeline filters and isolated workers retain their derived subsets. Separate
 nested Prefect flows do not inherit this context, and explicit task-level IDs are not rewritten.
 Omitting the override preserves code behavior. The complete workflow still reserves its chip.
@@ -258,7 +257,7 @@ and no runs; a partial plan is never returned. `flow_service/plan_preview.py` tu
 plan into steps: manual steps carry their exact rounds and the issues of
 `api/services/manual_round_checks.py`, automatic steps carry only a description, because their
 groups depend on run-time candidates and calibration data. Candidates are checked only while they
-still equal the run's literal targets, that is before any filter or `SetCRSchedule` step;
+still equal the run's literal targets, that is before any filter step;
 `OneQubitCheck` always uses the targets. Known-invalid manual literals make the plan `invalid`
 even when the rest is unresolved, and the dialog then disables **Execute**.
 

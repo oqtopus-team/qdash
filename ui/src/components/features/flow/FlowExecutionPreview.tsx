@@ -24,14 +24,12 @@ const ROUND_STEP_MS = 1200;
 const SCHEDULE_LABEL: Record<ExecutionPlanStep["schedule"], string | null> = {
   manual: "Manual rounds · user-defined",
   automatic: "Automatic · formed at run time",
-  fixed: "SetCRSchedule · unchecked",
   none: null,
 };
 
 const SCHEDULE_BADGE: Record<ExecutionPlanStep["schedule"], string> = {
   manual: "badge-primary",
   automatic: "badge-ghost",
-  fixed: "badge-warning",
   none: "badge-ghost",
 };
 

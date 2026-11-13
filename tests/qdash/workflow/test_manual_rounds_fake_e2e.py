@@ -28,7 +28,7 @@ from tests.qdash.workflow.test_fake_chip_preset import (  # noqa: F401 - pytest 
     fake_deployment,
     project,
 )
-from tests.qdash.workflow.test_two_qubit_scheduled_fake_e2e import (  # noqa: F401 - fixture
+from tests.qdash.workflow.test_two_qubit_pairs_fake_e2e import (  # noqa: F401 - fixture
     _run_dispatched_flow,
     coordinator,
 )
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
     from fastapi.testclient import TestClient
 
-    from tests.qdash.workflow.test_two_qubit_scheduled_fake_e2e import _RecordingCoordinator
+    from tests.qdash.workflow.test_two_qubit_pairs_fake_e2e import _RecordingCoordinator
 
 FLOW_NAME = "manual_rounds"
 

@@ -15,7 +15,7 @@ synchronize pulses or tasks between the targets of a round: a round is the same 
 | Execution mode | Who forms the rounds or groups | Where to read more |
 | --- | --- | --- |
 | `parallel_by_round` (one-qubit default) | The scheduler, from the chip wiring, when the run starts | [Choose an Execution Mode](./creating-workflows.md#choose-an-execution-mode) |
-| `automatic` (two-qubit default) | The CR scheduler, or an earlier `GenerateCRSchedule` or `SetCRSchedule` step | [Schedule Two-Qubit Calibration](./creating-workflows.md#schedule-two-qubit-calibration) |
+| `automatic` (two-qubit default) | The CR scheduler, or an earlier `GenerateCRSchedule` step | [Schedule Two-Qubit Calibration](./creating-workflows.md#schedule-two-qubit-calibration) |
 | `manual` | You, in the `rounds` of the step | This page |
 
 ## Write One-Qubit Rounds
@@ -100,11 +100,13 @@ that:
 - a pair with a standalone qubit runs alone in its round;
 - a directed pair appears in only one round of a step.
 
-A manual two-qubit step ignores a CR schedule from an earlier `GenerateCRSchedule` or
-`SetCRSchedule` step. `max_parallel_ops` caps only automatic groups, so a manual step that sets
-it is rejected; split a round yourself to run fewer pairs at once. `SetCRSchedule` still runs its
-hand-written groups without any of these checks; prefer a manual step when you want the groups
-checked before the run.
+Start with **2Q Manual Rounds** in **New Flow**. Edit `ROUNDS` and `TARGET_PAIRS` together,
+keeping every pair in the same order in both, then save and review **Execution preview**.
+The example pairs must exist on your chip. **Execute** offers no target override for this template.
+
+A manual two-qubit step ignores a CR schedule from an earlier `GenerateCRSchedule` step.
+`max_parallel_ops` caps only automatic groups, so a manual step that sets it is rejected;
+split a round yourself to run fewer pairs at once.
 
 A step without `execution_mode="manual"` that sets `rounds`, a manual step without `rounds`, and
 an unknown `execution_mode` all fail when the workflow builds its steps. The same `execution_mode`

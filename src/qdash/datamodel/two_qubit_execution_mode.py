@@ -1,10 +1,11 @@
 """Execution modes of two-qubit calibration steps.
 
 ``automatic`` (the default)
-    The step runs the CR schedule of an earlier ``GenerateCRSchedule`` or
-    ``SetCRSchedule`` step, or generates one from the candidate qubits. The
-    scheduler colors the pairs into conflict-free groups and ``max_parallel_ops``
-    caps the pairs of one group.
+    The step runs the CR schedule of an earlier ``GenerateCRSchedule`` step, or
+    groups the pairs itself: exactly the directed pairs of ``CouplingTargets``
+    whose qubits are still candidates, or pairs the scheduler picks among the
+    candidate qubits for other targets. The scheduler colors the pairs into
+    conflict-free groups and ``max_parallel_ops`` caps the pairs of one group.
 
 ``manual``
     The step's ``rounds`` list the directed ``(control, target)`` pairs of each

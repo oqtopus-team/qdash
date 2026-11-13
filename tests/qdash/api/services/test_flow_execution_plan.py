@@ -161,7 +161,7 @@ cal.run(MuxTargets([0, 1]), steps=[
     OneQubitCheck(),
     FilterByStatus(),
     CustomOneQubit(step_name="ramsey", tasks=[TaskCall(name="CheckRamsey")], execution_mode="parallel_by_mux"),
-    SetCRSchedule([[("0", "1")], [("4", "5")]]),
+    GenerateCRSchedule(max_parallel_ops=3),
     TwoQubitCalibration(max_parallel_ops=4),
 ])
 """
@@ -173,9 +173,11 @@ cal.run(MuxTargets([0, 1]), steps=[
     assert "at run time" in check.summary
     assert status.schedule == "none"
     assert ramsey.execution_mode == "parallel_by_mux" and ramsey.rounds == []
-    assert schedule.schedule == "fixed" and "not checked" in schedule.summary
-    assert [r.targets for r in schedule.rounds] == [["0-1"], ["4-5"]]
-    assert full.schedule == "automatic" and "at most 4 pairs" in full.summary
+    assert schedule.schedule == "none" and "at most 3 pairs" in schedule.summary
+    assert schedule.rounds == []
+    assert full.schedule == "automatic" and "earlier GenerateCRSchedule" in full.summary
+    assert "at most 4 pairs" not in full.summary
+    assert "not regrouped" in full.summary
     assert plan.target_override_allowed
 
 
@@ -705,3 +707,43 @@ async def test_service_preview_uses_the_topology_of_the_chip_it_read(
     assert plan.status == "invalid"
     [step] = plan.runs[0].steps
     assert any("share MUX 9" in issue.message for issue in step.issues)
+
+
+@pytest.mark.parametrize(
+    "target", ['CouplingTargets([("0", "1")])', 'QubitTargets(["0", "1"])', "MuxTargets([0])"]
+)
+def test_automatic_preview_distinguishes_pair_selection(target):
+    plan = _plan(
+        _source(
+            f"cal = CalibService(username, chip_id)\ncal.run({target}, [TwoQubitCalibration(max_parallel_ops=2)])"
+        )
+    )
+    assert plan.status == "resolved"
+    [step] = plan.runs[0].steps
+    assert step.rounds == []
+    assert "at most 2 pairs" in step.summary
+    if target.startswith("CouplingTargets"):
+        assert "no pair is added or reversed" in step.summary
+    else:
+        assert "picks the pairs among the candidate qubits" in step.summary
+
+
+def test_bundled_manual_template_previews_and_disallows_overrides():
+    import qdash.workflow as workflow
+
+    code = (Path(workflow.__file__).parent / "templates" / "two_qubit_manual_rounds.py").read_text()
+    plan = build_execution_plan(
+        flow_name="manual",
+        chip_id="chip-1",
+        updated_at=UPDATED,
+        code=code,
+        function_name="two_qubit_manual_rounds",
+        parameters={},
+        chip_model=lambda: MODEL,
+    )
+    assert plan.status == "resolved", plan.reason
+    assert not plan.target_override_allowed
+    assert supported_target_modes(code, "two_qubit_manual_rounds") == []
+    [step] = plan.runs[0].steps
+    assert step.schedule == "manual"
+    assert [r.targets for r in step.rounds] == [["0-1", "4-5"], ["8-9"]]

@@ -6,9 +6,14 @@ This module defines steps for 2-qubit calibration:
 - TwoQubitCalibration: Full 2Q calibration
 
 ``CustomTwoQubit`` and ``TwoQubitCalibration`` take an ``execution_mode``:
-``automatic`` (default) runs an earlier CR schedule or generates one, and
-``manual`` runs the step's ``rounds`` of directed pairs exactly as written
-(see :mod:`qdash.datamodel.two_qubit_execution_mode`).
+``automatic`` (default) groups pairs with the CR scheduler, and ``manual``
+runs the step's ``rounds`` of directed pairs exactly as written (see
+:mod:`qdash.datamodel.two_qubit_execution_mode`).
+
+Automatic pairs come from the pipeline targets. With ``CouplingTargets`` the
+scheduler groups exactly the listed directed pairs whose qubits are still
+candidates; it never adds, reverses or replaces a pair. With qubit or MUX
+targets it generates pairs from the candidate qubits.
 """
 
 from __future__ import annotations
@@ -33,6 +38,7 @@ from qdash.workflow.service.results import (
     normalize_metric_value,
 )
 from qdash.workflow.service.steps.base import CalibrationStep, TransformStep
+from qdash.workflow.service.targets import CouplingTargets
 from qdash.workflow.service.tasks import FULL_2Q_TASKS
 
 if TYPE_CHECKING:
@@ -40,6 +46,8 @@ if TYPE_CHECKING:
     from qdash.workflow.service._internal.session import CalibSession
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
+
+PairGroups = list[list[tuple[str, str]]]
 
 
 def _run_coupling_groups(
@@ -86,6 +94,98 @@ def _cr_scheduler(session: CalibSession) -> CRScheduler:
         project_id=session.project_id,
         mux_mapping=session.mux_mapping,
     )
+
+
+def _candidate_pairs(
+    name: str, pairs: list[tuple[str, str]], candidates: list[str]
+) -> list[tuple[str, str]]:
+    """``pairs`` in order, without those whose qubits an earlier step filtered out."""
+    current = set(candidates)
+    kept = [(control, target) for control, target in pairs if {control, target} <= current]
+    if len(kept) != len(pairs):
+        dropped = [f"{c}-{t}" for c, t in pairs if (c, t) not in kept]
+        get_run_logger().info(f"[{name}] Skipping pairs without candidate qubits: {dropped}")
+    return kept
+
+
+def _generate_groups(
+    name: str,
+    session: CalibSession,
+    targets: Target,
+    candidates: list[str],
+    max_parallel_ops: int,
+    inverse: bool = False,
+) -> PairGroups:
+    """Group the pairs of an automatic step with the CR scheduler.
+
+    ``CouplingTargets`` pairs are grouped as listed: ``schedule_pairs`` checks
+    that each is a directed chip coupling and never adds, drops or reverses
+    one. Other targets let the scheduler choose pairs among ``candidates``.
+    """
+    logger = get_run_logger()
+    if isinstance(targets, CouplingTargets):
+        if inverse:
+            raise ValueError(
+                f"[{name}] inverse does not apply to CouplingTargets: "
+                "each (control, target) pair already states its direction"
+            )
+        pairs = _candidate_pairs(name, list(targets.pairs), candidates)
+        if not pairs:
+            logger.warning(f"[{name}] No target pair has both qubits among the candidates")
+            return []
+        return (
+            _cr_scheduler(session)
+            .schedule_pairs(pairs, max_parallel_ops=max_parallel_ops)
+            .parallel_groups
+        )
+    if len(candidates) < 2:
+        logger.warning(f"[{name}] Not enough candidates ({len(candidates)}) for 2Q")
+        return []
+    schedule = _cr_scheduler(session).generate(
+        candidate_qubits=candidates, max_parallel_ops=max_parallel_ops, inverse=inverse
+    )
+    return schedule.parallel_groups
+
+
+def _automatic_groups(
+    step: Any, session: CalibSession, targets: Target, ctx: StepContext
+) -> PairGroups:
+    """Groups of an automatic two-qubit step for the current candidates.
+
+    A schedule from an earlier ``GenerateCRSchedule`` is reused without
+    regrouping; only pairs with a qubit that a later filter removed are left
+    out, and groups left empty are dropped. Otherwise the step generates its
+    own groups (see :func:`_generate_groups`).
+    """
+    cached: PairGroups | None = ctx.metadata.get("cr_schedule")
+    if cached is None:
+        return _generate_groups(
+            step.name, session, targets, ctx.candidate_qids, _max_parallel_ops(step)
+        )
+    get_run_logger().info(f"[{step.name}] Using the CR schedule of GenerateCRSchedule")
+    groups = [_candidate_pairs(step.name, list(group), ctx.candidate_qids) for group in cached]
+    return [group for group in groups if group]
+
+
+def _run_automatic(
+    step: Any,
+    session: CalibSession,
+    targets: Target,
+    ctx: StepContext,
+    plan: StepCalls,
+) -> dict[str, Any] | None:
+    """Run the automatic groups; None when there is no pair to run."""
+    logger = get_run_logger()
+    parallel_groups = _automatic_groups(step, session, targets, ctx)
+    if not parallel_groups:
+        logger.warning(f"[{step.name}] No valid CR pairs found")
+        return None
+    coupling_groups = [[f"{c}-{t}" for c, t in group] for group in parallel_groups]
+    total_pairs = sum(len(g) for g in coupling_groups)
+    logger.info(
+        f"[{step.name}] Executing {total_pairs} coupling pairs in {len(coupling_groups)} groups"
+    )
+    return _run_coupling_groups(session, coupling_groups, plan)
 
 
 def _init_mode(step: Any) -> PairRounds | None:
@@ -231,40 +331,11 @@ class CustomTwoQubit(CalibrationStep):
             )
             return ctx
 
-        # Use pre-generated schedule if available, otherwise generate
-        if "cr_schedule" in ctx.metadata:
-            parallel_groups = ctx.metadata["cr_schedule"]
-            logger.info(f"[{self.name}] Using pre-generated CR schedule")
-        else:
-            candidate_qubits = ctx.candidate_qids
-            if len(candidate_qubits) < 2:
-                logger.warning(
-                    f"[{self.name}] Not enough candidates ({len(candidate_qubits)}) for 2Q"
-                )
-                ctx.metadata[self.step_name] = TwoQubitResult(step_id=self.resolved_step_id)
-                ctx.record_step_result(self.resolved_step_id, ctx.metadata[self.step_name])
-                return ctx
-
-            scheduler = _cr_scheduler(session)
-            schedule = scheduler.generate(
-                candidate_qubits=candidate_qubits,
-                max_parallel_ops=_max_parallel_ops(self),
-            )
-            parallel_groups = schedule.parallel_groups
-
-        if not parallel_groups:
-            logger.warning(f"[{self.name}] No valid CR pairs found")
+        all_raw_results = _run_automatic(self, session, targets, ctx, plan)
+        if all_raw_results is None:
             ctx.metadata[self.step_name] = TwoQubitResult(step_id=self.resolved_step_id)
             ctx.record_step_result(self.resolved_step_id, ctx.metadata[self.step_name])
             return ctx
-
-        coupling_groups = [[f"{c}-{t}" for c, t in group] for group in parallel_groups]
-        total_pairs = sum(len(g) for g in coupling_groups)
-        logger.info(
-            f"[{self.name}] Executing {total_pairs} coupling pairs in {len(coupling_groups)} groups"
-        )
-
-        all_raw_results = _run_coupling_groups(session, coupling_groups, plan)
 
         session.record_stage_result(self.name, all_raw_results)
 
@@ -275,7 +346,7 @@ class CustomTwoQubit(CalibrationStep):
 
         logger.info(
             f"[{self.name}] Completed. "
-            f"{len(result.successful_couplings())}/{total_pairs} successful"
+            f"{len(result.successful_couplings())}/{len(all_raw_results)} successful"
         )
         return ctx
 
@@ -289,91 +360,23 @@ class CustomTwoQubit(CalibrationStep):
 
 
 @dataclass
-class SetCRSchedule(TransformStep):
-    """Set pre-defined CR schedule for 2-qubit calibration.
-
-    Use this step when you have a pre-computed schedule (e.g., from external
-    scheduling logic or manual specification) instead of auto-generating it.
-
-    The schedule is a list of parallel groups, where each group contains
-    (control, target) qubit ID tuples that can be executed in parallel.
-
-    Requires: nothing
-    Provides: candidate_couplings, candidate_qids
-
-    Example:
-        # Manual schedule with 2 parallel groups
-        SetCRSchedule(
-            schedule=[
-                [("0", "1"), ("4", "5")],   # Group 1: run in parallel
-                [("2", "3"), ("8", "9")],   # Group 2: run after group 1
-            ]
-        )
-    """
-
-    schedule: list[list[tuple[str, str]]] = field(default_factory=list)
-
-    @property
-    def name(self) -> str:
-        return "set_cr_schedule"
-
-    @property
-    def requires(self) -> set[str]:
-        return set()
-
-    @property
-    def provides(self) -> set[str]:
-        return {"candidate_couplings", "candidate_qids"}
-
-    def execute(
-        self,
-        session: CalibSession,
-        targets: Target,
-        ctx: StepContext,
-    ) -> StepContext:
-        """Set the CR schedule from external input."""
-        logger = get_run_logger()
-
-        if not self.schedule:
-            logger.warning(f"[{self.name}] Empty schedule provided")
-            ctx.candidate_couplings = []
-            ctx.candidate_qids = []
-            return ctx
-
-        # Flatten to coupling IDs
-        all_couplings = [f"{c}-{t}" for group in self.schedule for c, t in group]
-        ctx.candidate_couplings = all_couplings
-
-        # Extract unique qubit IDs
-        qids = set()
-        for group in self.schedule:
-            for control, target in group:
-                qids.add(control)
-                qids.add(target)
-        ctx.candidate_qids = sorted(qids)
-
-        # Store schedule in metadata for TwoQubitCalibration
-        ctx.metadata["cr_schedule"] = self.schedule
-
-        logger.info(
-            f"[{self.name}] Set {len(all_couplings)} couplings in "
-            f"{len(self.schedule)} parallel groups"
-        )
-        return ctx
-
-
-@dataclass
 class GenerateCRSchedule(TransformStep):
     """Generate CR (Cross-Resonance) schedule for 2-qubit calibration.
 
-    Uses CRScheduler to generate parallel execution groups based on:
-    - MUX conflicts
-    - Frequency constraints
-    - Candidate qubit availability
+    Uses CRScheduler to group pairs into parallel execution groups based on
+    MUX conflicts and candidate qubit availability. Later automatic two-qubit
+    steps reuse the groups, leaving out pairs whose qubits a later filter
+    removed; they do not regroup them.
 
-    The `inverse` parameter controls the CR direction based on the checkerboard pattern:
-    - False (default): Forward direction (control has lower frequency by design)
-    - True: Reverse direction (control has higher frequency by design)
+    The pairs depend on the pipeline targets:
+
+    - ``CouplingTargets``: exactly the listed directed pairs whose qubits are
+      still candidates, in their written direction. ``inverse=True`` is
+      rejected because each pair already states its direction.
+    - Qubit or MUX targets: the scheduler picks the pairs among the candidate
+      qubits. ``inverse`` selects the CR direction from the checkerboard
+      pattern: False (default) uses the control with the lower design
+      frequency, True the control with the higher one.
 
     Requires: candidate_qids (at least 2 qubits)
     Provides: candidate_couplings (scheduled coupling pairs)
@@ -400,38 +403,34 @@ class GenerateCRSchedule(TransformStep):
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
-        """Generate CR schedule from candidate qubits."""
+        """Generate the CR schedule for the targets and current candidates."""
         logger = get_run_logger()
 
-        candidate_qubits = ctx.candidate_qids
-        if len(candidate_qubits) < 2:
-            logger.warning(f"[{self.name}] Not enough candidates ({len(candidate_qubits)}) for 2Q")
-            ctx.candidate_couplings = []
-            return ctx
-
-        scheduler = _cr_scheduler(session)
-        schedule = scheduler.generate(
-            candidate_qubits=candidate_qubits,
-            max_parallel_ops=self.max_parallel_ops,
+        parallel_groups = _generate_groups(
+            self.name,
+            session,
+            targets,
+            ctx.candidate_qids,
+            self.max_parallel_ops,
             inverse=self.inverse,
         )
-
-        if not schedule.parallel_groups:
+        ctx.metadata["cr_schedule"] = parallel_groups
+        if not parallel_groups:
             logger.warning(f"[{self.name}] No valid CR pairs found")
             ctx.candidate_couplings = []
             return ctx
 
         # Flatten to coupling IDs
-        all_couplings = [f"{c}-{t}" for group in schedule.parallel_groups for c, t in group]
+        all_couplings = [f"{c}-{t}" for group in parallel_groups for c, t in group]
         ctx.candidate_couplings = all_couplings
 
-        # Store schedule in metadata for TwoQubitCalibration
-        ctx.metadata["cr_schedule"] = schedule.parallel_groups
-
-        direction = "reverse" if self.inverse else "forward"
+        if isinstance(targets, CouplingTargets):
+            direction = "as listed"
+        else:
+            direction = "reverse" if self.inverse else "forward"
         logger.info(
             f"[{self.name}] Generated {len(all_couplings)} couplings in "
-            f"{len(schedule.parallel_groups)} groups (direction: {direction})"
+            f"{len(parallel_groups)} groups (direction: {direction})"
         )
         return ctx
 
@@ -441,8 +440,10 @@ class TwoQubitCalibration(CalibrationStep):
     """2-qubit coupling calibration step.
 
     Executes FULL_2Q_TASKS on scheduled coupling pairs.
-    Uses schedule from GenerateCRSchedule if available in ctx.metadata["cr_schedule"],
-    otherwise generates schedule internally.
+    Uses the groups of an earlier GenerateCRSchedule if available in
+    ctx.metadata["cr_schedule"], otherwise groups the pairs itself: the
+    directed pairs of ``CouplingTargets`` as listed, or pairs the scheduler
+    picks among the candidate qubits for other targets.
 
     With ``execution_mode="manual"`` it runs ``rounds`` of directed pairs exactly
     as written instead, and ``max_parallel_ops`` is rejected.
@@ -501,38 +502,11 @@ class TwoQubitCalibration(CalibrationStep):
             )
             return ctx
 
-        candidate_qubits = ctx.candidate_qids
-        if len(candidate_qubits) < 2:
-            logger.warning(f"[{self.name}] Not enough candidates ({len(candidate_qubits)}) for 2Q")
+        all_raw_results = _run_automatic(self, session, targets, ctx, plan)
+        if all_raw_results is None:
             ctx.two_qubit = TwoQubitResult(step_id=self.resolved_step_id)
             ctx.record_step_result(self.resolved_step_id, ctx.two_qubit)
             return ctx
-
-        # Use pre-generated schedule if available, otherwise generate
-        if "cr_schedule" in ctx.metadata:
-            parallel_groups = ctx.metadata["cr_schedule"]
-            logger.info(f"[{self.name}] Using pre-generated CR schedule")
-        else:
-            scheduler = _cr_scheduler(session)
-            schedule = scheduler.generate(
-                candidate_qubits=candidate_qubits,
-                max_parallel_ops=_max_parallel_ops(self),
-            )
-            parallel_groups = schedule.parallel_groups
-
-        if not parallel_groups:
-            logger.warning(f"[{self.name}] No valid CR pairs found")
-            ctx.two_qubit = TwoQubitResult(step_id=self.resolved_step_id)
-            ctx.record_step_result(self.resolved_step_id, ctx.two_qubit)
-            return ctx
-
-        coupling_groups = [[f"{c}-{t}" for c, t in group] for group in parallel_groups]
-        total_pairs = sum(len(g) for g in coupling_groups)
-        logger.info(
-            f"[{self.name}] Executing {total_pairs} coupling pairs in {len(coupling_groups)} groups"
-        )
-
-        all_raw_results = _run_coupling_groups(session, coupling_groups, plan)
 
         session.record_stage_result(self.name, all_raw_results)
 
@@ -543,7 +517,7 @@ class TwoQubitCalibration(CalibrationStep):
 
         logger.info(
             f"[{self.name}] Completed. "
-            f"{len(result.successful_couplings())}/{total_pairs} successful"
+            f"{len(result.successful_couplings())}/{len(all_raw_results)} successful"
         )
         return ctx
 

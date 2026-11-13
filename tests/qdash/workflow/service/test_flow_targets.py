@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from qdash.common.mux_mapping import MuxMapping
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
+from qdash.workflow import TaskCall
 from qdash.workflow.service._internal.session import CalibSession
 from qdash.workflow.service._internal.settings import SessionSettings
 from qdash.workflow.service.flow_targets import (
@@ -17,8 +17,9 @@ from qdash.workflow.service.flow_targets import (
     read_target_override,
 )
 from qdash.workflow.service.steps import (
+    CustomOneQubit,
+    CustomTwoQubit,
     GenerateCRSchedule,
-    SetCRSchedule,
     TwoQubitCalibration,
 )
 from qdash.workflow.service.targets import AllMuxTargets, CouplingTargets, MuxTargets, QubitTargets
@@ -114,75 +115,65 @@ def test_qubit_override_rejects_coupling_targets():
         override_target(CouplingTargets([("0", "1")]), FlowTargetOverride(qids=["1"]))
 
 
-def test_coupling_override_replaces_pairs_and_source_schedule():
-    """The selected pairs and their generated groups replace the source schedule."""
-    source = SetCRSchedule(schedule=[[("0", "1"), ("4", "5")], [("2", "3")]])
+def test_coupling_override_replaces_only_the_targets():
+    """The selected pairs replace the targets; the steps are passed on unchanged."""
+    generate = GenerateCRSchedule(max_parallel_ops=4)
     calibration = TwoQubitCalibration()
-    scheduled: list[list[tuple[str, str]]] = []
-
-    def schedule(pairs):
-        scheduled.append(pairs)
-        return [[("63", "85"), ("64", "42")], [("85", "63")]]
 
     target, steps = override_pipeline(
         CouplingTargets([("0", "1"), ("4", "5"), ("2", "3")]),
-        [source, calibration],
+        [generate, calibration],
         SELECTED,
-        schedule,
     )
 
-    assert scheduled == [[("63", "85"), ("85", "63"), ("64", "42")]]
     assert target == CouplingTargets([("63", "85"), ("85", "63"), ("64", "42")])
-    assert steps[0] == SetCRSchedule(schedule=[[("63", "85"), ("64", "42")], [("85", "63")]])
+    assert steps[0] is generate
     assert steps[1] is calibration
-    assert source.schedule == [[("0", "1"), ("4", "5")], [("2", "3")]]
 
 
 def test_missing_override_preserves_targets_and_steps():
     target = CouplingTargets([("0", "1")])
-    steps = [SetCRSchedule(schedule=[[("0", "1")]]), TwoQubitCalibration()]
+    steps = [TwoQubitCalibration()]
 
-    def unexpected(pairs):
-        raise AssertionError("no override must not schedule")
-
-    new_target, new_steps = override_pipeline(target, steps, None, unexpected)
+    new_target, new_steps = override_pipeline(target, steps, None)
 
     assert new_target is target
-    assert new_steps == steps
     assert all(new is old for new, old in zip(new_steps, steps, strict=True))
+
+
+class _CustomPairStep(CustomTwoQubit):
+    """A subclass may run pairs other than the targets."""
 
 
 @pytest.mark.parametrize(
     ("steps", "message"),
     [
-        ([TwoQubitCalibration()], "SetCRSchedule"),
-        (
-            [SetCRSchedule(schedule=[[("0", "1")]]), GenerateCRSchedule(), TwoQubitCalibration()],
-            "GenerateCRSchedule",
-        ),
+        ([GenerateCRSchedule()], "CustomTwoQubit or TwoQubitCalibration"),
+        ([CustomOneQubit()], "CustomTwoQubit or TwoQubitCalibration"),
+        ([_CustomPairStep(tasks=[TaskCall(name="CheckCrossResonance")])], "_CustomPairStep"),
+        ([TwoQubitCalibration(), MagicMock()], "built-in steps only"),
     ],
 )
-def test_coupling_override_rejects_pipelines_that_would_change_pairs(steps, message):
-    def unexpected(pairs):
-        raise AssertionError("invalid pipelines must fail before scheduling")
-
+def test_coupling_override_rejects_pipelines_that_could_change_pairs(steps, message):
     with pytest.raises(ValueError, match=message):
-        override_pipeline(CouplingTargets([("0", "1")]), steps, SELECTED, unexpected)
+        override_pipeline(CouplingTargets([("0", "1")]), steps, SELECTED)
 
 
-def test_scheduler_errors_stop_the_run_before_the_pipeline(monkeypatch):
+def test_coupling_override_rejects_manual_steps():
+    manual = TwoQubitCalibration(execution_mode="manual", rounds=[[("0", "1")]])
+
+    with pytest.raises(ValueError, match="two_qubit_calibration"):
+        override_pipeline(CouplingTargets([("0", "1")]), [manual], SELECTED)
+
+
+def test_invalid_overrides_stop_the_run_before_a_session_exists(monkeypatch):
     from qdash.workflow.service._internal import runs
 
     context = SimpleNamespace(
         flow_run=SimpleNamespace(context={TARGET_CONTEXT_KEY: SELECTED.model_dump()})
     )
-    run_pipeline = MagicMock(return_value={})
-    monkeypatch.setattr(CalibSession, "run_pipeline", run_pipeline)
-
-    def reject(settings, pairs, *, mux_mapping=None):
-        raise ValueError("Coupling pairs not found on chip chip: ['63-85']")
-
-    monkeypatch.setattr(runs, "schedule_selected_pairs", reject)
+    created = MagicMock()
+    monkeypatch.setattr(runs, "CalibSession", created)
     settings = SessionSettings(
         username="user", chip_id="chip", project_id="project", backend_name="fake"
     )
@@ -195,83 +186,31 @@ def test_scheduler_errors_stop_the_run_before_the_pipeline(monkeypatch):
                 )
             },
         ),
-        pytest.raises(ValueError, match="not found"),
+        pytest.raises(ValueError, match="CouplingTargets"),
     ):
-        runs.run_calibration(
-            settings, CouplingTargets([("0", "1")]), [SetCRSchedule(schedule=[[("0", "1")]])]
-        )
+        runs.run_calibration(settings, QubitTargets(["0", "1"]), [TwoQubitCalibration()])
 
-    run_pipeline.assert_not_called()
+    created.assert_not_called()
 
 
-def test_selected_pairs_use_the_chip_scheduler(monkeypatch):
-    from qdash.workflow.service._internal import runs
-
-    calls = {}
-
-    class FakeScheduler:
-        def __init__(self, username, chip_id, *, wiring_config_path, project_id, mux_mapping):
-            calls["init"] = (username, chip_id, project_id, mux_mapping)
-
-        def schedule_pairs(self, pairs):
-            calls["pairs"] = pairs
-            return SimpleNamespace(parallel_groups=[[("63", "85")]])
-
-    monkeypatch.setattr("qdash.workflow.engine.CRScheduler", FakeScheduler)
-    settings = SessionSettings(
-        username="user", chip_id="chip", project_id="project", backend_name="fake"
-    )
-    pinned = MuxMapping.legacy()
-
-    assert runs.schedule_selected_pairs(settings, [("63", "85")], mux_mapping=pinned) == [
-        [("63", "85")]
-    ]
-    assert calls == {"init": ("user", "chip", "project", pinned), "pairs": [("63", "85")]}
-
-
-def test_selected_pairs_are_grouped_with_the_running_session_mapping(monkeypatch):
-    """The override schedule uses the MUX mapping the running session pinned, once."""
+def test_selected_pairs_reach_the_pipeline_as_targets(monkeypatch):
     from qdash.workflow.service._internal import runs
 
     context = SimpleNamespace(
         flow_run=SimpleNamespace(context={TARGET_CONTEXT_KEY: SELECTED.model_dump()})
     )
-    pinned = MuxMapping.from_groups({21: ["85", "84", "86", "87"]}, topology_id="synthetic-pin")
-    resolutions = []
-
-    def resolve(project_id, chip_id):
-        resolutions.append((project_id, chip_id))
-        return pinned if len(resolutions) == 1 else MuxMapping.legacy()
-
-    monkeypatch.setattr(
-        "qdash.workflow.service._internal.session.resolve_chip_mux_mapping", resolve
-    )
-    scheduled = {}
-
-    def schedule(settings, pairs, *, mux_mapping=None):
-        scheduled["mapping"] = mux_mapping
-        return [[tuple(pair)] for pair in pairs]
-
-    sessions = []
-
-    def run_pipeline(self, targets, steps):
-        sessions.append(self)
-        return {}
-
-    monkeypatch.setattr(runs, "schedule_selected_pairs", schedule)
+    run_pipeline = MagicMock(return_value={})
     monkeypatch.setattr(CalibSession, "run_pipeline", run_pipeline)
     settings = SessionSettings(
         username="user", chip_id="chip", project_id="project", backend_name="fake"
     )
+    steps = [TwoQubitCalibration()]
     with patch.dict(
         sys.modules,
         {"prefect.context": SimpleNamespace(FlowRunContext=SimpleNamespace(get=lambda: context))},
     ):
-        runs.run_calibration(
-            settings, CouplingTargets([("0", "1")]), [SetCRSchedule(schedule=[[("0", "1")]])]
-        )
+        runs.run_calibration(settings, CouplingTargets([("0", "1")]), steps)
 
-    [session] = sessions
-    assert scheduled["mapping"] is pinned
-    assert session.mux_mapping is pinned
-    assert resolutions == [("project", "chip")]
+    run_pipeline.assert_called_once_with(
+        CouplingTargets([("63", "85"), ("85", "63"), ("64", "42")]), steps
+    )

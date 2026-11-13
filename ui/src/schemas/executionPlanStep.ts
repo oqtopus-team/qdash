@@ -25,7 +25,7 @@ export interface ExecutionPlanStep {
   /** What one target of the step is */
   scope: ExecutionPlanStepScope;
   execution_mode?: ExecutionPlanStepExecutionMode;
-  /** manual: the exact rounds of the source, checked before execution. automatic: groups are formed by the scheduler at run time. fixed: a SetCRSchedule schedule used as written without checks. none: the step does not schedule targets. */
+  /** manual: the exact rounds of the source, checked before execution. automatic: groups are formed by the scheduler at run time. none: the step does not schedule targets. */
   schedule: ExecutionPlanStepSchedule;
   rounds?: ExecutionPlanRound[];
   /** Task names in call order; null when not stated literally */

@@ -20,7 +20,13 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONTRACT = Path(__file__).with_name("task_call_flow_contract.py")
 # Every built-in template with a ``tasks: list[TaskCall] | None`` flow parameter.
-TEMPLATES = ["fake_backend", "simple", "two_qubit", "two_qubit_scheduled"]
+TEMPLATES = [
+    "fake_backend",
+    "simple",
+    "two_qubit",
+    "two_qubit_manual_rounds",
+    "two_qubit_pairs",
+]
 
 
 @pytest.fixture(scope="module")

@@ -154,12 +154,11 @@ class ExecutionPlanStep(BaseModel):
         ..., description="What one target of the step is"
     )
     execution_mode: str | None = None
-    schedule: Literal["manual", "automatic", "fixed", "none"] = Field(
+    schedule: Literal["manual", "automatic", "none"] = Field(
         ...,
         description=(
             "manual: the exact rounds of the source, checked before execution. "
             "automatic: groups are formed by the scheduler at run time. "
-            "fixed: a SetCRSchedule schedule used as written without checks. "
             "none: the step does not schedule targets."
         ),
     )

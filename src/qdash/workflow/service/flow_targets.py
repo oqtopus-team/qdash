@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
 from qdash.workflow.service.targets import CouplingTargets, MuxTargets, QubitTargets, Target
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Sequence
 
     from qdash.workflow.service.steps.base import Step
-
-PairSchedule = list[list[tuple[str, str]]]
 
 
 def read_target_override() -> FlowTargetOverride | None:
@@ -55,21 +52,19 @@ def override_pipeline(
     target: Target,
     steps: Sequence[Step],
     override: FlowTargetOverride | None,
-    schedule_pairs: Callable[[list[tuple[str, str]]], PairSchedule],
 ) -> tuple[Target, list[Step]]:
-    """Apply an override to the pipeline targets and, for pairs, to its CR schedule.
+    """Apply an override to the pipeline targets; the steps are never rewritten.
 
     A pipeline with a ``manual`` step rejects every override: its rounds name
     their own targets and are never regrouped.
 
-    A coupling override replaces every ``SetCRSchedule`` with a schedule that
-    ``schedule_pairs`` builds from the selected pairs, so a source schedule can
-    neither add pairs nor reverse them. Pipelines without ``SetCRSchedule``, or
-    with ``GenerateCRSchedule`` (which rebuilds pairs from qubits), are rejected
-    because they would calibrate pairs other than the selection.
+    A coupling override replaces the initial ``CouplingTargets``. Automatic
+    two-qubit steps and ``GenerateCRSchedule`` then group exactly the selected
+    directed pairs, so the pipeline must consist of built-in steps only (a
+    custom step could calibrate other pairs) and run at least one two-qubit
+    step.
     """
     from qdash.common.manual_rounds import MANUAL_TARGET_OVERRIDE_REASON
-    from qdash.workflow.service.steps import GenerateCRSchedule, SetCRSchedule
 
     if override is not None:
         manual = [
@@ -81,16 +76,33 @@ def override_pipeline(
             # Never replace written rounds with other targets or generated groups.
             raise ValueError(f"{MANUAL_TARGET_OVERRIDE_REASON} Manual steps: {', '.join(manual)}")
     new_target = override_target(target, override)
-    if override is None or override.coupling_pairs is None:
-        return new_target, list(steps)
-    if any(isinstance(step, GenerateCRSchedule) for step in steps):
-        raise ValueError("Coupling pair overrides cannot run with GenerateCRSchedule")
-    if not any(isinstance(step, SetCRSchedule) for step in steps):
-        raise ValueError("Coupling pair overrides require a SetCRSchedule step")
-    schedule = schedule_pairs(override.pairs())
-    return new_target, [
-        replace(step, schedule=[list(group) for group in schedule])
-        if isinstance(step, SetCRSchedule)
-        else step
-        for step in steps
-    ]
+    if override is not None and override.coupling_pairs is not None:
+        _check_pair_pipeline(steps)
+    return new_target, list(steps)
+
+
+def _check_pair_pipeline(steps: Sequence[Step]) -> None:
+    """Reject pipelines that could run pairs other than the selected ones."""
+    from qdash.workflow.service import steps as builtin
+
+    pair_steps = {builtin.CustomTwoQubit, builtin.TwoQubitCalibration}
+    known = {
+        *pair_steps,
+        builtin.GenerateCRSchedule,
+        builtin.BringUp,
+        builtin.ConfigureAll,
+        builtin.CustomOneQubit,
+        builtin.OneQubitCheck,
+        builtin.OneQubitFineTune,
+        builtin.FilterByMetric,
+        builtin.FilterByStatus,
+    }
+    custom = sorted({type(step).__name__ for step in steps if type(step) not in known})
+    if custom:
+        raise ValueError(
+            f"Coupling pair overrides require built-in steps only; got {', '.join(custom)}"
+        )
+    if not any(type(step) in pair_steps for step in steps):
+        raise ValueError(
+            "Coupling pair overrides require a CustomTwoQubit or TwoQubitCalibration step"
+        )

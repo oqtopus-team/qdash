@@ -261,8 +261,8 @@ _PAIR_ROUNDS_DESCRIPTION = (
     "every pair must be current candidates. Rounds are never regrouped, reversed or split."
 )
 _TWO_QUBIT_MODE_DESCRIPTION = (
-    "automatic (default): run an earlier GenerateCRSchedule/SetCRSchedule schedule or generate "
-    "one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written."
+    "automatic (default): run an earlier GenerateCRSchedule schedule or generate one from the "
+    "candidate qubits. manual: run the pairs listed in `rounds` exactly as written."
 )
 _MAX_PARALLEL_OPS_DESCRIPTION = (
     "Pairs per automatically generated CR group. Rejected with execution_mode manual."
