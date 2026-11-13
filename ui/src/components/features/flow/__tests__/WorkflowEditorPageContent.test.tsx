@@ -29,8 +29,24 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("next/dynamic", () => ({
   default: () =>
-    function MockEditor() {
-      return <div data-testid="editor" />;
+    function MockEditor({
+      value,
+      onChange,
+      options,
+    }: {
+      value?: string;
+      onChange?: (value?: string) => void;
+      options?: { readOnly?: boolean };
+    }) {
+      return (
+        <textarea
+          data-testid="editor"
+          aria-label="Code"
+          value={value ?? ""}
+          readOnly={options?.readOnly}
+          onChange={(event) => onChange?.(event.target.value)}
+        />
+      );
     },
 }));
 
@@ -41,7 +57,21 @@ vi.mock("react-resizable-panels", () => ({
 }));
 
 vi.mock("@/components/features/flow/FlowExplorer", () => ({
-  FlowExplorer: () => null,
+  FlowExplorer: ({
+    currentName,
+    onOpen,
+  }: {
+    currentName: string;
+    onOpen: (name: string) => void;
+  }) => (
+    <div data-testid="explorer" data-current={currentName}>
+      {["first_calibration", "other_flow", "third_flow"].map((flowName) => (
+        <button key={flowName} type="button" onClick={() => onOpen(flowName)}>
+          Explorer {flowName}
+        </button>
+      ))}
+    </div>
+  ),
 }));
 vi.mock("@/components/features/flow/FlowSchedulePanel", () => ({
   FlowSchedulePanel: () => null,
@@ -84,21 +114,29 @@ vi.mock("@/client/execution/execution", () => ({
   useGetExecutionLockStatus: () => ({ data: undefined }),
 }));
 
+// Each workflow has its own source and chip, so a pane showing or saving the wrong one shows.
+const FLOW_CHIPS: Record<string, string> = {
+  first_calibration: "chip-a",
+  other_flow: "chip-b",
+  third_flow: "chip-c",
+};
+
 vi.mock("@/client/flow/flow", () => ({
-  getFlow: () =>
+  getFlow: (flowName: string) =>
     Promise.resolve({
       data: {
-        name: "first_calibration",
+        name: flowName,
         description: "",
-        code: "from prefect import flow\n",
-        flow_function_name: "first_calibration",
-        chip_id: "chip-a",
-        default_parameters: { username: "alice", chip_id: "chip-a" },
+        code: flowName === "first_calibration" ? "from prefect import flow\n" : `# ${flowName}\n`,
+        flow_function_name: flowName,
+        chip_id: FLOW_CHIPS[flowName] ?? "chip-a",
+        default_parameters: { username: "alice", chip_id: FLOW_CHIPS[flowName] ?? "chip-a" },
         default_run_parameters: {},
         tags: [],
         folder: "",
       },
     }),
+  getListFlowsQueryKey: () => ["/flows"],
   saveFlow: vi.fn(),
   deleteFlow: vi.fn(),
   executeFlow: mocks.executeFlow,
@@ -309,5 +347,165 @@ describe("WorkflowEditorPageContent execution help", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Execution help" })[1]);
 
     expect(screen.getByRole("dialog", { name: "Execution help" })).toBeInTheDocument();
+  });
+});
+
+describe("WorkflowEditorPageContent split editor", () => {
+  beforeEach(() => {
+    mocks.projectId = "project-1";
+    mocks.disabledReason = null;
+    vi.mocked(saveFlow).mockResolvedValue({ data: {} } as Awaited<ReturnType<typeof saveFlow>>);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    window.localStorage.clear();
+  });
+
+  const pane = (side: "Left" | "Right") => screen.getByRole("region", { name: new RegExp(side) });
+
+  async function openSplitWith(flowName: string) {
+    renderEditor();
+    await screen.findByTestId("editor");
+    fireEvent.click(screen.getByRole("button", { name: "Open split editor" }));
+    // The new right pane is active and waits for a workflow from the Explorer.
+    expect(pane("Right")).toHaveTextContent("Select a workflow in the Explorer");
+    expect(screen.getByText(/Opens in the/)).toHaveTextContent("Opens in the right pane");
+    fireEvent.click(screen.getByRole("button", { name: `Explorer ${flowName}` }));
+    await waitFor(() =>
+      expect(within(pane("Right")).getByLabelText("Code")).toHaveValue(`# ${flowName}\n`),
+    );
+  }
+
+  it("opens a different workflow in each pane and saves the right pane's workflow", async () => {
+    await openSplitWith("other_flow");
+
+    expect(within(pane("Left")).getByLabelText("Code")).toHaveValue("from prefect import flow\n");
+    expect(screen.getByRole("region", { name: "Left editor: first_calibration.py" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Right editor: other_flow.py" })).toBeVisible();
+    expect(screen.getByTestId("explorer")).toHaveAttribute("data-current", "other_flow");
+
+    fireEvent.click(screen.getByTitle("Click to edit"));
+    fireEvent.change(within(pane("Right")).getByLabelText("Code"), {
+      target: { value: "# other_flow edited\n" },
+    });
+    // Only the right pane's workflow is modified.
+    expect(within(pane("Right")).getByTitle("Unsaved changes")).toBeInTheDocument();
+    expect(within(pane("Left")).queryByTitle("Unsaved changes")).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+
+    expect(saveFlow).toHaveBeenCalledTimes(1);
+    expect(saveFlow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "other_flow",
+        code: "# other_flow edited\n",
+        chip_id: "chip-b",
+      }),
+    );
+    expect(within(pane("Left")).getByLabelText("Code")).toHaveValue("from prefect import flow\n");
+  });
+
+  it("saves and runs the workflow of the pane the user activated", async () => {
+    mocks.executeFlow.mockResolvedValue({
+      data: { execution_id: "20261113-001", flow_run_id: "run-1" },
+    });
+    await openSplitWith("other_flow");
+
+    // Activate the left pane: actions and the Explorer now follow its workflow.
+    fireEvent.click(within(pane("Left")).getByRole("button", { name: /first_calibration\.py/ }));
+    expect(
+      within(pane("Left")).getByRole("button", { name: /first_calibration\.py/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("explorer")).toHaveAttribute("data-current", "first_calibration");
+
+    fireEvent.click(screen.getByTitle("Click to edit"));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+    expect(saveFlow).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "first_calibration", chip_id: "chip-a" }),
+    );
+
+    // Focusing the right editor makes it active, and Execute runs that workflow.
+    fireEvent.focus(within(pane("Right")).getByLabelText("Code"));
+    await confirmExecute();
+    expect(mocks.executeFlow).toHaveBeenCalledTimes(1);
+    expect(mocks.executeFlow).toHaveBeenCalledWith(
+      "other_flow",
+      expect.objectContaining({
+        parameters: expect.objectContaining({ chip_id: "chip-b" }),
+      }),
+    );
+  });
+
+  it("asks before replacing or closing a right pane with unsaved changes", async () => {
+    await openSplitWith("other_flow");
+    fireEvent.click(screen.getByTitle("Click to edit"));
+    fireEvent.change(within(pane("Right")).getByLabelText("Code"), {
+      target: { value: "# draft\n" },
+    });
+
+    // Opening another workflow in the dirty pane waits for confirmation; Cancel keeps the draft.
+    fireEvent.click(screen.getByRole("button", { name: "Explorer third_flow" }));
+    const dialog = screen.getByRole("dialog", { name: "Discard unsaved changes?" });
+    expect(dialog).toHaveTextContent("other_flow.py");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(within(pane("Right")).getByLabelText("Code")).toHaveValue("# draft\n");
+
+    // Closing the split waits too.
+    fireEvent.click(screen.getByRole("button", { name: "Close split editor" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Discard unsaved changes?" })).getByRole("button", {
+        name: "Cancel",
+      }),
+    );
+    expect(within(pane("Right")).getByLabelText("Code")).toHaveValue("# draft\n");
+
+    // Confirming replaces the right pane's workflow; the left pane is untouched.
+    fireEvent.click(screen.getByRole("button", { name: "Explorer third_flow" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    await waitFor(() =>
+      expect(within(pane("Right")).getByLabelText("Code")).toHaveValue("# third_flow\n"),
+    );
+    expect(screen.getByRole("region", { name: "Right editor: third_flow.py" })).toBeVisible();
+    expect(within(pane("Left")).getByLabelText("Code")).toHaveValue("from prefect import flow\n");
+    expect(saveFlow).not.toHaveBeenCalled();
+  });
+
+  it("does not open one workflow in both panes", async () => {
+    await openSplitWith("other_flow");
+
+    // Picking the left pane's workflow while the right pane is active focuses the left pane.
+    fireEvent.click(screen.getByRole("button", { name: "Explorer first_calibration" }));
+
+    expect(screen.getByRole("region", { name: "Right editor: other_flow.py" })).toBeVisible();
+    expect(screen.getByTestId("explorer")).toHaveAttribute("data-current", "first_calibration");
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it("keeps the right pane's workflow when the left pane opens another", async () => {
+    await openSplitWith("other_flow");
+    fireEvent.click(within(pane("Left")).getByRole("button", { name: /first_calibration\.py/ }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Explorer third_flow" }));
+
+    expect(mocks.push).toHaveBeenCalledWith("/workflow/third_flow?split=other_flow");
+  });
+
+  it("asks before the single editor opens another workflow over unsaved changes", async () => {
+    renderEditor();
+    await screen.findByTestId("editor");
+    fireEvent.click(screen.getByTitle("Click to edit"));
+    fireEvent.change(screen.getByLabelText("Code"), { target: { value: "# changed\n" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Explorer other_flow" }));
+    expect(mocks.push).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+
+    expect(mocks.push).toHaveBeenCalledWith("/workflow/other_flow");
   });
 });

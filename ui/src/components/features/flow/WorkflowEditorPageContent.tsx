@@ -1,16 +1,12 @@
 "use client";
 
+import type { OnMount } from "@monaco-editor/react";
 import dynamic from "next/dynamic";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type {
-  ExecuteFlowRequest,
-  ExecuteFlowResponse,
-  ExecutionResponseDetail,
-  SaveFlowRequest,
-} from "@/schemas";
+import type { ExecuteFlowRequest, ExecuteFlowResponse, ExecutionResponseDetail } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
 import { useChatDock } from "@/contexts/ChatDockContext";
@@ -29,7 +25,6 @@ import {
 } from "@/components/ui/Command";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
-import { useListChips } from "@/client/chip/chip";
 import {
   getGetExecutionLockStatusQueryKey,
   useCancelExecution,
@@ -37,10 +32,9 @@ import {
   useGetExecutionLockStatus,
 } from "@/client/execution/execution";
 import {
-  getFlow,
-  saveFlow,
   deleteFlow,
   executeFlow,
+  getListFlowsQueryKey,
   useListFlows,
   listFlowSchedules,
 } from "@/client/flow/flow";
@@ -84,7 +78,9 @@ import { executionHref } from "@/components/features/first-calibration/journeyPr
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
 import { FlowExplorer } from "@/components/features/flow/FlowExplorer";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
+import { type FlowDocument, useFlowDocument } from "@/components/features/flow/useFlowDocument";
 import { WorkflowExecutionHelpDialog } from "@/components/features/flow/WorkflowExecutionHelpDialog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
@@ -131,35 +127,49 @@ const EDITOR_OPTIONS = {
 };
 
 type SidePanel = "explorer" | "properties";
+/** The left pane shows the page's workflow (the URL); the right pane, in split view, another. */
+type Pane = "primary" | "secondary";
+
+/** Workflows whose unsaved drafts an action would drop, and the action to run once confirmed. */
+interface DiscardPrompt {
+  names: string[];
+  action: () => void;
+}
+
+const PANE_LABEL: Record<Pane, string> = { primary: "Left", secondary: "Right" };
 
 export function WorkflowEditorPageContent() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   // `?space=<creator>`: the Workflow page opened this editor to browse that creator's tree.
-  const initialSpace = useSearchParams().get("space");
+  const initialSpace = searchParams.get("space");
+  // `?split=<name>`: the right pane's workflow, carried over when the left pane opens another.
+  const initialSplit = searchParams.get("split");
   const queryClient = useQueryClient();
   const toast = useToast();
-  const name = params.name as string;
+  const routeName = params.name as string;
   const { capture: captureJourneyContext } = useFirstCalibrationJourney();
 
-  const [description, setDescription] = useState("");
-  const [code, setCode] = useState("");
-  const [flowFunctionName, setFlowFunctionName] = useState("");
-  const [username, setUsername] = useState("");
-  const [chipId, setChipId] = useState("");
-  const [tags, setTags] = useState("");
-  const [folder, setFolder] = useState("");
-  const [defaultInterval, setDefaultInterval] = useState("");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Pane | null>(null);
+  const [executeTarget, setExecuteTarget] = useState<Pane | null>(null);
   const [lastExecutionId, setLastExecutionId] = useState<string | null>(null);
   const [lastFlowRunId, setLastFlowRunId] = useState<string | null>(null);
+  const [lastRun, setLastRun] = useState<{
+    flowName: string;
+    chipId: string;
+    username: string;
+  } | null>(null);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
   const [showExecutionHelp, setShowExecutionHelp] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
-  const [originalCode, setOriginalCode] = useState("");
-  const [isSplitView, setIsSplitView] = useState(false);
+  const [isSplitView, setIsSplitView] = useState(Boolean(initialSplit));
+  const [splitName, setSplitName] = useState<string | null>(
+    initialSplit && initialSplit !== routeName ? initialSplit : null,
+  );
+  const [activePane, setActivePane] = useState<Pane>("primary");
+  const [discardPrompt, setDiscardPrompt] = useState<DiscardPrompt | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [activeSidePanel, setActiveSidePanel] = useState<SidePanel>("explorer");
   const [sidebarSearch, setSidebarSearch] = useState("");
@@ -170,13 +180,42 @@ export function WorkflowEditorPageContent() {
   const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
   const reportedTerminalExecution = useRef<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const editorRef = useRef<any>(null);
+  const editorRefs = useRef<Record<Pane, any>>({ primary: null, secondary: null });
+
+  // Each pane edits and saves its own workflow.
+  const primary = useFlowDocument(routeName);
+  const secondary = useFlowDocument(isSplitView ? splitName : null);
+  const docs: Record<Pane, FlowDocument> = { primary, secondary };
+  // The pane that header actions, Properties, the status bar and the Explorer act on.
+  const currentPane: Pane = isSplitView && activePane === "secondary" ? "secondary" : "primary";
+  const active = docs[currentPane];
+  const ready = active.isReady;
+  const name = active.name ?? "";
+  const {
+    code,
+    setCode,
+    description,
+    setDescription,
+    flowFunctionName,
+    setFlowFunctionName,
+    username,
+    setUsername,
+    chipId,
+    setChipId,
+    tags,
+    setTags,
+    folder,
+    setFolder,
+    defaultInterval,
+    setDefaultInterval,
+    isDirty,
+  } = active;
+  const flow = active.flow;
+  // The run being confirmed belongs to the pane it was opened from.
+  const execDoc = executeTarget ? docs[executeTarget] : active;
 
   // Fetch current user
   const { data: userData } = useGetCurrentUser();
-
-  // Fetch chips
-  const { data: chipsData } = useListChips();
 
   // Fetch execution lock status (refresh every 5 seconds)
   const { data: lockStatus } = useGetExecutionLockStatus({
@@ -211,60 +250,51 @@ export function WorkflowEditorPageContent() {
   // Fetch all flows for sidebar
   const { data: flowsData } = useListFlows();
 
-  // Fetch schedules for this flow
+  // Fetch schedules for the active workflow
   const { data: schedulesData } = useQuery({
     queryKey: ["flow-schedules", name],
     queryFn: () => listFlowSchedules(name),
     refetchInterval: 10000,
+    enabled: Boolean(name),
   });
 
   const activeSchedules =
-    (schedulesData?.data &&
+    (ready &&
+      schedulesData?.data &&
       "schedules" in schedulesData.data &&
       schedulesData.data.schedules?.filter((s) => s.active)) ||
     [];
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["flow", name],
-    queryFn: () => getFlow(name),
-  });
-
   // The preview reads the saved source, which is what Execute runs.
   const executionPlan = useFlowExecutionPlan({
-    flowName: name,
-    chipId,
-    sourceVersion: data?.data?.updated_at,
-    enabled: showExecuteConfirm && Boolean(data?.data),
+    flowName: execDoc.name ?? "",
+    chipId: execDoc.chipId,
+    sourceVersion: execDoc.flow?.updated_at,
+    enabled: executeTarget !== null && execDoc.isReady,
   });
 
   const availability = useExecutionAvailability(
-    { flow_name: name, parameters: { chip_id: chipId } },
-    Boolean(data?.data && chipId),
+    { flow_name: execDoc.name ?? "", parameters: { chip_id: execDoc.chipId } },
+    Boolean(execDoc.isReady && execDoc.chipId),
   );
 
-  // Save and run answers are checked against the user and project they were submitted in; one
-  // that lands after a project switch is dropped instead of updating this page or the guide.
-  const saveMutation = useMutation({
-    mutationFn: ({ request }: { request: SaveFlowRequest; context: JourneyContext }) =>
-      saveFlow(request),
-    onSuccess: (_response, { context }) => {
-      if (!context.isCurrent()) return;
-      queryClient.invalidateQueries({ queryKey: ["flow", name] });
-      queryClient.invalidateQueries({ queryKey: ["flows"] });
-      queryClient.invalidateQueries({ queryKey: ["execution-availability"] });
-      setOriginalCode(code);
-      toast.success("Flow saved successfully!");
-    },
-  });
-
   const deleteMutation = useMutation({
-    mutationFn: () => deleteFlow(name),
-    onSuccess: () => {
-      toast.success("Flow deleted successfully!");
-      router.push("/workflow");
+    mutationFn: (flowName: string) => deleteFlow(flowName),
+    onSuccess: (_response, flowName) => {
+      toast.success(`${flowName} deleted successfully!`);
+      if (flowName === routeName) {
+        router.push("/workflow");
+        return;
+      }
+      // The right pane's workflow is gone; the left pane stays open.
+      queryClient.invalidateQueries({ queryKey: getListFlowsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["flows"] });
+      setSplitName((current) => (current === flowName ? null : current));
     },
   });
 
+  // Run answers are checked against the user and project they were submitted in; one that
+  // lands after a project switch is dropped instead of updating this page or the guide.
   const executeMutation = useMutation({
     mutationFn: ({
       name: flowName,
@@ -297,6 +327,11 @@ export function WorkflowEditorPageContent() {
       }
       setLastExecutionId(execId);
       setLastFlowRunId(response.data.flow_run_id || null);
+      setLastRun({
+        flowName: variables.name,
+        chipId: typeof runChipId === "string" ? runChipId : "",
+        username: String(variables.data.parameters?.username ?? ""),
+      });
       toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`);
       // The guide's run opens on its execution page, where the guide follows its progress.
       if (followedByJourney && execId && typeof runChipId === "string") {
@@ -314,15 +349,17 @@ export function WorkflowEditorPageContent() {
 
   // Errors shown on this page belong to the project they were made in.
   const { projectId } = useProject();
-  const resetSave = saveMutation.reset;
+  const resetPrimarySave = primary.resetSave;
+  const resetSecondarySave = secondary.resetSave;
   const resetExecute = executeMutation.reset;
   const previousProjectId = useRef(projectId);
   useEffect(() => {
     if (previousProjectId.current === projectId) return;
     previousProjectId.current = projectId;
-    resetSave();
+    resetPrimarySave();
+    resetSecondarySave();
     resetExecute();
-  }, [projectId, resetSave, resetExecute]);
+  }, [projectId, resetPrimarySave, resetSecondarySave, resetExecute]);
 
   const cancelMutation = useCancelExecution({
     mutation: {
@@ -335,8 +372,11 @@ export function WorkflowEditorPageContent() {
     },
   });
 
-  const executeDisabledReason =
-    saveMutation.isPending || deleteMutation.isPending
+  const executeDisabledReason = !execDoc.isReady
+    ? execDoc.name
+      ? "Loading this workflow…"
+      : "Open a workflow in this pane to run it."
+    : execDoc.isSaving || deleteMutation.isPending
       ? "Wait for the current operation to finish."
       : executeMutation.isPending
         ? "Starting this flow…"
@@ -348,147 +388,118 @@ export function WorkflowEditorPageContent() {
     latestExecution?.status !== "cancelling" &&
     !isExecutionTerminal(latestExecution?.status);
   const executeErrorMessage = getApiErrorMessage(executeMutation.error, "Unknown error");
-  useEffect(() => {
-    if (data?.data) {
-      const flow = data.data;
-      setDescription(flow.description);
-      setCode(flow.code);
-      setOriginalCode(flow.code);
-      setFlowFunctionName(flow.flow_function_name);
 
-      // Set username from flow or fallback to current user
-      const flowUsername = (flow.default_parameters?.username as string) || "";
-      setUsername(flowUsername || userData?.data?.username || "");
-
-      // Set chip_id from flow or fallback to latest chip
-      setChipId(flow.chip_id);
-
-      setTags(flow.tags?.join(", ") || "");
-      setFolder(flow.folder ?? "");
-      const runParams = flow.default_run_parameters as
-        | Record<string, { value?: string | number }>
-        | undefined;
-      setDefaultInterval(
-        runParams?.interval?.value != null ? String(runParams.interval.value) : "",
-      );
-    }
-  }, [data, userData, chipsData]);
-
-  // Set default username if not set by flow data
-  useEffect(() => {
-    if (userData?.data?.username && !username && !data?.data) {
-      setUsername(userData.data.username);
-    }
-  }, [userData, username, data]);
-
-  // Set default chip_id if not set by flow data
-  useEffect(() => {
-    if (chipsData?.data?.chips && chipsData.data.chips.length > 0 && !chipId && !data?.data) {
-      // Get the latest chip (sort by installed_at descending)
-      const sortedChips = [...chipsData.data.chips].sort((a, b) => {
-        const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
-        const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
-        return dateB - dateA;
-      });
-      setChipId(sortedChips[0].chip_id);
-    }
-  }, [chipsData, chipId, data]);
-
-  const isDirty = code !== originalCode;
-
-  // Tell the chat sidebar what is open here: the flow and the editor's current
-  // text, read when a turn is sent; a proposed edit lands in the editor unlocked.
+  // Tell the chat sidebar what is open here: the active pane's flow and its current text, read
+  // when a turn is sent; a proposed edit for that flow lands in the same pane, unlocked.
   const { registerPage } = useChatDock();
-  const pageState = useRef({ name, chipId, code, isDirty });
+  const pageState = useRef({ routeName, name, ready, chipId, code, isDirty, setCode });
   // Written after each commit, never during render; the provider below reads it when a turn is sent.
   useEffect(() => {
-    pageState.current = { name, chipId, code, isDirty };
+    pageState.current = { routeName, name, ready, chipId, code, isDirty, setCode };
   });
   useEffect(
     () =>
       registerPage({
         current: () => {
-          const { name, chipId, code, isDirty } = pageState.current;
+          const { routeName, name, ready, chipId, code, isDirty } = pageState.current;
           return {
-            path: `/workflow/${name}`,
-            title: `Workflow editor: ${name}`,
-            flow: { name, chipId: chipId || undefined, code, dirty: isDirty },
+            path: `/workflow/${routeName}`,
+            title: `Workflow editor: ${name || routeName}`,
+            flow: ready ? { name, chipId: chipId || undefined, code, dirty: isDirty } : undefined,
           };
         },
         applyCode: (next) => {
-          setCode(next);
+          if (!pageState.current.ready) return;
+          pageState.current.setCode(next);
           setIsEditorLocked(false);
         },
       }),
     [registerPage],
   );
 
-  const handleSave = useCallback(() => {
+  // Save the given pane's workflow; Save buttons and the palette use the active pane.
+  const savePane = (pane: Pane) => {
     if (isEditorLocked) return;
-    if (!username.trim()) {
-      toast.error("Please enter a username");
-      return;
-    }
+    docs[pane].save(captureJourneyContext());
+  };
+  const handleSave = () => savePane(currentPane);
 
-    const request: SaveFlowRequest = {
-      name,
-      description: description.trim(),
-      code,
-      flow_function_name: flowFunctionName.trim() || undefined,
-      chip_id: chipId.trim(),
-      tags: tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      folder: folder.trim(),
-      default_parameters: {
-        username: username.trim(),
-        chip_id: chipId.trim(),
-      },
-      default_run_parameters: defaultInterval.trim()
-        ? {
-            interval: {
-              value: defaultInterval.trim(),
-              value_type: "int",
-              unit: "ns",
-            },
-          }
-        : {},
-    };
-
-    saveMutation.mutate({ request, context: captureJourneyContext() });
-  }, [
-    isEditorLocked,
-    username,
-    name,
-    description,
-    code,
-    flowFunctionName,
-    chipId,
-    tags,
-    folder,
-    defaultInterval,
-    saveMutation,
-    captureJourneyContext,
-    toast,
-  ]);
-
-  // Keep a ref to handleSave for Monaco command (avoids stale closure)
-  const handleSaveRef = useRef(handleSave);
+  // Keep a ref to savePane for Monaco commands (avoids stale closure)
+  const savePaneRef = useRef(savePane);
   useEffect(() => {
-    handleSaveRef.current = handleSave;
-  }, [handleSave]);
+    savePaneRef.current = savePane;
+  });
 
-  // Warn before leaving with unsaved changes
+  // Warn before leaving with unsaved changes in either pane
+  const hasUnsavedChanges = primary.isDirty || secondary.isDirty;
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty) {
+      if (hasUnsavedChanges) {
         e.preventDefault();
       }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isDirty]);
+  }, [hasUnsavedChanges]);
+
+  /** Run `action`, first asking to discard any unsaved draft among `candidates`. */
+  const confirmDiscard = (candidates: FlowDocument[], action: () => void) => {
+    const names = candidates
+      .filter((doc) => doc.isDirty && doc.name)
+      .map((doc) => doc.name as string);
+    if (names.length === 0) {
+      action();
+      return;
+    }
+    setDiscardPrompt({ names, action });
+  };
+
+  const leaveEditor = () => confirmDiscard([primary, secondary], () => router.push("/workflow"));
+
+  // Open a workflow from the Explorer in the active pane.
+  const openFlow = (flowName: string) => {
+    const target = currentPane;
+    const other: Pane = target === "primary" ? "secondary" : "primary";
+    // A workflow already open in the other pane is focused there, never opened twice.
+    if (isSplitView && docs[other].name === flowName) {
+      setActivePane(other);
+      return;
+    }
+    if (docs[target].name === flowName) return;
+    if (target === "secondary") {
+      confirmDiscard([secondary], () => setSplitName(flowName));
+      return;
+    }
+    // The left pane is the page's workflow: opening another navigates, keeping the right pane's
+    // workflow open; the page reloads both, so either pane's draft is confirmed first.
+    confirmDiscard(isSplitView ? [primary, secondary] : [primary], () => {
+      const split = isSplitView && splitName ? `?split=${encodeURIComponent(splitName)}` : "";
+      router.push(`/workflow/${encodeURIComponent(flowName)}${split}`);
+    });
+  };
+
+  const toggleSplit = () => {
+    if (!isSplitView) {
+      // The new right pane waits for a workflow picked in the Explorer.
+      setIsSplitView(true);
+      setActivePane("secondary");
+      setActiveSidePanel("explorer");
+      setIsSidebarVisible(true);
+      return;
+    }
+    confirmDiscard([secondary], () => {
+      setIsSplitView(false);
+      setSplitName(null);
+      setActivePane("primary");
+    });
+  };
+
+  const openExecute = () => {
+    if (executeDisabledReason) return;
+    setExecuteTarget(currentPane);
+  };
+
+  const activeEditor = () => editorRefs.current[currentPane];
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -523,12 +534,23 @@ export function WorkflowEditorPageContent() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Sync fontSize and wordWrap to editor
+  // Sync fontSize and wordWrap to both editors
   useEffect(() => {
-    if (editorRef.current) {
-      editorRef.current.updateOptions({ fontSize, wordWrap });
+    for (const editor of Object.values(editorRefs.current)) {
+      editor?.updateOptions({ fontSize, wordWrap });
     }
   }, [fontSize, wordWrap]);
+
+  // The status bar follows the active pane's cursor.
+  const activePaneRef = useRef<Pane>(currentPane);
+  useEffect(() => {
+    activePaneRef.current = currentPane;
+    const position = editorRefs.current[currentPane]?.getPosition?.();
+    setCursorPosition(
+      position ? { line: position.lineNumber, column: position.column } : { line: 1, column: 1 },
+    );
+    setSelection({ lines: 0, chars: 0 });
+  }, [currentPane]);
 
   // Command palette actions
   const commands = [
@@ -537,8 +559,8 @@ export function WorkflowEditorPageContent() {
       label: "Save Flow",
       shortcut: "⌘S",
       icon: Save,
-      action: () => handleSaveRef.current(),
-      enabled: !isEditorLocked,
+      action: () => savePaneRef.current(currentPane),
+      enabled: !isEditorLocked && ready,
     },
     {
       id: "toggle-edit",
@@ -553,7 +575,7 @@ export function WorkflowEditorPageContent() {
       label: "Execute Flow",
       shortcut: "",
       icon: Play,
-      action: () => setShowExecuteConfirm(true),
+      action: openExecute,
       enabled: !executeDisabledReason,
     },
     {
@@ -562,14 +584,14 @@ export function WorkflowEditorPageContent() {
       shortcut: "",
       icon: Settings,
       action: () => setShowPropertiesModal(true),
-      enabled: true,
+      enabled: ready,
     },
     {
       id: "split-view",
       label: isSplitView ? "Close Split Editor" : "Open Split Editor",
       shortcut: "",
       icon: Columns2,
-      action: () => setIsSplitView(!isSplitView),
+      action: toggleSplit,
       enabled: true,
     },
     {
@@ -610,7 +632,7 @@ export function WorkflowEditorPageContent() {
       shortcut: "",
       icon: FileCode,
       action: () => {
-        const ed = editorRef.current;
+        const ed = activeEditor();
         if (ed) {
           const current = ed.getOption(72);
           ed.updateOptions({ minimap: { enabled: !current?.enabled } });
@@ -656,8 +678,8 @@ export function WorkflowEditorPageContent() {
       shortcut: "⌘G",
       icon: ChevronRight,
       action: () => {
-        editorRef.current?.focus();
-        editorRef.current?.getAction("editor.action.gotoLine")?.run();
+        activeEditor()?.focus();
+        activeEditor()?.getAction("editor.action.gotoLine")?.run();
       },
       enabled: true,
     },
@@ -667,8 +689,8 @@ export function WorkflowEditorPageContent() {
       shortcut: "⌘F",
       icon: Search,
       action: () => {
-        editorRef.current?.focus();
-        editorRef.current?.getAction("actions.find")?.run();
+        activeEditor()?.focus();
+        activeEditor()?.getAction("actions.find")?.run();
       },
       enabled: true,
     },
@@ -678,8 +700,8 @@ export function WorkflowEditorPageContent() {
       shortcut: "⇧⌥F",
       icon: FileCode,
       action: () => {
-        editorRef.current?.focus();
-        editorRef.current?.getAction("editor.action.formatDocument")?.run();
+        activeEditor()?.focus();
+        activeEditor()?.getAction("editor.action.formatDocument")?.run();
       },
       enabled: true,
     },
@@ -711,61 +733,93 @@ export function WorkflowEditorPageContent() {
     setIsSidebarVisible(true);
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleEditorMount = useCallback((editor: any, monaco: any) => {
-    editorRef.current = editor;
-    remeasureMonacoFontsWhenLoaded(monaco);
-    editor.onDidChangeCursorPosition((e: { position: { lineNumber: number; column: number } }) => {
-      setCursorPosition({
-        line: e.position.lineNumber,
-        column: e.position.column,
+  const mountEditor = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (pane: Pane, editor: any, monaco: any) => {
+      editorRefs.current[pane] = editor;
+      // A pane that opens another workflow remounts its editor; forget the disposed one.
+      editor.onDidDispose(() => {
+        if (editorRefs.current[pane] === editor) editorRefs.current[pane] = null;
       });
-    });
-    editor.onDidChangeCursorSelection(
-      (e: {
-        selection: {
-          startLineNumber: number;
-          endLineNumber: number;
-          startColumn: number;
-          endColumn: number;
-        };
-      }) => {
-        const sel = e.selection;
-        if (sel.startLineNumber === sel.endLineNumber && sel.startColumn === sel.endColumn) {
-          setSelection({ lines: 0, chars: 0 });
-        } else {
-          const model = editor.getModel();
-          if (model) {
-            const text = model.getValueInRange(sel);
-            const lines = sel.endLineNumber - sel.startLineNumber + 1;
-            setSelection({ lines, chars: text.length });
+      remeasureMonacoFontsWhenLoaded(monaco);
+      editor.onDidChangeCursorPosition(
+        (e: { position: { lineNumber: number; column: number } }) => {
+          if (activePaneRef.current !== pane) return;
+          setCursorPosition({
+            line: e.position.lineNumber,
+            column: e.position.column,
+          });
+        },
+      );
+      editor.onDidChangeCursorSelection(
+        (e: {
+          selection: {
+            startLineNumber: number;
+            endLineNumber: number;
+            startColumn: number;
+            endColumn: number;
+          };
+        }) => {
+          if (activePaneRef.current !== pane) return;
+          const sel = e.selection;
+          if (sel.startLineNumber === sel.endLineNumber && sel.startColumn === sel.endColumn) {
+            setSelection({ lines: 0, chars: 0 });
+          } else {
+            const model = editor.getModel();
+            if (model) {
+              const text = model.getValueInRange(sel);
+              const lines = sel.endLineNumber - sel.startLineNumber + 1;
+              setSelection({ lines, chars: text.length });
+            }
           }
-        }
-      },
-    );
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => handleSaveRef.current());
-    // Alt+Z → toggle word wrap
-    editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, () =>
-      setWordWrap((prev) => (prev === "on" ? "off" : "on")),
-    );
-  }, []);
+        },
+      );
+      // Cmd/Ctrl+S saves the workflow of the pane it was pressed in.
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () =>
+        savePaneRef.current(pane),
+      );
+      // Alt+Z → toggle word wrap
+      editor.addCommand(monaco.KeyMod.Alt | monaco.KeyCode.KeyZ, () =>
+        setWordWrap((prev) => (prev === "on" ? "off" : "on")),
+      );
+    },
+    [],
+  );
+  // Each pane's editor reports to its own pane.
+  const handlePrimaryMount = useCallback<OnMount>(
+    (editor, monaco) => mountEditor("primary", editor, monaco),
+    [mountEditor],
+  );
+  const handleSecondaryMount = useCallback<OnMount>(
+    (editor, monaco) => mountEditor("secondary", editor, monaco),
+    [mountEditor],
+  );
 
+  const deleteDoc = deleteTarget ? docs[deleteTarget] : null;
+  const showDeleteConfirm = deleteTarget !== null;
   const handleDelete = () => {
-    deleteMutation.mutate();
+    const pane = deleteTarget;
+    setDeleteTarget(null);
+    if (pane === "secondary") {
+      if (secondary.name) deleteMutation.mutate(secondary.name);
+      return;
+    }
+    // Deleting the left pane's workflow leaves the editor, so a right-pane draft is confirmed.
+    confirmDiscard(isSplitView ? [secondary] : [], () => deleteMutation.mutate(routeName));
   };
 
-  if (isLoading) {
+  if (primary.isLoading) {
     return <WorkflowEditorPageSkeleton />;
   }
 
-  if (error) {
+  if (primary.error) {
     return (
       <div className="container mx-auto p-6">
         <div className="alert alert-error">
           <AlertTriangle className="h-5 w-5" />
           <div>
             <div className="font-medium">Failed to load flow</div>
-            <div className="text-sm">{(error as Error)?.message}</div>
+            <div className="text-sm">{(primary.error as Error)?.message}</div>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -773,7 +827,7 @@ export function WorkflowEditorPageContent() {
             ← Back to Flows
           </button>
           <button
-            onClick={() => setShowDeleteConfirm(true)}
+            onClick={() => setDeleteTarget("primary")}
             className="btn btn-error"
             disabled={deleteMutation.isPending}
           >
@@ -791,20 +845,18 @@ export function WorkflowEditorPageContent() {
         {showDeleteConfirm && (
           <Dialog
             open
-            onOpenChange={(open) =>
-              !open && !deleteMutation.isPending && setShowDeleteConfirm(false)
-            }
+            onOpenChange={(open) => !open && !deleteMutation.isPending && setDeleteTarget(null)}
           >
             <DialogContent>
               <DialogTitle>Delete Flow</DialogTitle>
               <DialogDescription className="py-4">
-                Are you sure you want to delete <strong>{name}</strong>? The source file could not
-                be loaded, so this will remove the remaining flow metadata.
+                Are you sure you want to delete <strong>{routeName}</strong>? The source file could
+                not be loaded, so this will remove the remaining flow metadata.
               </DialogDescription>
               <div className="modal-action">
                 <button
                   type="button"
-                  onClick={() => setShowDeleteConfirm(false)}
+                  onClick={() => setDeleteTarget(null)}
                   className="btn btn-ghost"
                   disabled={deleteMutation.isPending}
                 >
@@ -812,10 +864,7 @@ export function WorkflowEditorPageContent() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowDeleteConfirm(false);
-                    handleDelete();
-                  }}
+                  onClick={handleDelete}
                   className="btn btn-error"
                   disabled={deleteMutation.isPending}
                 >
@@ -832,6 +881,103 @@ export function WorkflowEditorPageContent() {
       </div>
     );
   }
+
+  // One Monaco editor per pane, each bound to its own workflow's draft.
+  const renderEditor = (pane: Pane) => {
+    const doc = docs[pane];
+    return (
+      <Editor
+        // A new workflow in the pane gets a fresh editor, so undo never reaches another's text.
+        key={`${pane}:${doc.name}`}
+        height="100%"
+        language="python"
+        theme="vs-dark"
+        value={doc.code}
+        onChange={(value) => doc.setCode(value || "")}
+        onMount={pane === "primary" ? handlePrimaryMount : handleSecondaryMount}
+        options={{
+          ...EDITOR_OPTIONS,
+          fontSize,
+          wordWrap,
+          readOnly: isEditorLocked,
+          domReadOnly: isEditorLocked,
+        }}
+      />
+    );
+  };
+
+  const renderPaneBody = (pane: Pane) => {
+    const doc = docs[pane];
+    if (doc.isReady) return renderEditor(pane);
+    if (doc.error) {
+      return (
+        <div className="p-4">
+          <div className="alert alert-error">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            <span>
+              Failed to load {doc.name}: {(doc.error as Error)?.message || "Unknown error"}
+            </span>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="flex h-full items-center justify-center p-6 text-center text-sm text-base-content/60">
+        {doc.name ? (
+          <span className="flex items-center gap-2">
+            <span className="loading loading-spinner loading-sm" aria-hidden="true" />
+            Loading {doc.name}.py…
+          </span>
+        ) : (
+          <div>
+            <FolderOpen size={24} className="mx-auto mb-2 opacity-60" aria-hidden="true" />
+            <p>Select a workflow in the Explorer to open it in this pane.</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // A split pane: a header naming its workflow, then its editor. Clicking or focusing a pane
+  // makes it the one that Save, Execute, Properties and the Explorer act on.
+  const renderPane = (pane: Pane) => {
+    const doc = docs[pane];
+    const isActive = currentPane === pane;
+    const fileName = doc.name ? `${doc.name}.py` : "No workflow";
+    return (
+      <section
+        className="flex h-full min-w-0 flex-col"
+        aria-label={`${PANE_LABEL[pane]} editor: ${fileName}`}
+        onMouseDownCapture={() => setActivePane(pane)}
+        onFocusCapture={() => setActivePane(pane)}
+      >
+        <button
+          type="button"
+          onClick={() => setActivePane(pane)}
+          aria-pressed={isActive}
+          title={
+            isActive
+              ? `${PANE_LABEL[pane]} pane (active)`
+              : `Activate ${PANE_LABEL[pane].toLowerCase()} pane`
+          }
+          className={`relative flex h-8 shrink-0 items-center gap-2 border-b border-base-300 px-3 text-left text-xs ${
+            isActive ? "bg-base-300 text-base-content" : "bg-base-200 text-base-content/60"
+          }`}
+        >
+          {isActive && <span className="absolute inset-x-0 top-0 h-0.5 bg-primary" />}
+          <span className="text-info">py</span>
+          <span className="truncate font-medium">{fileName}</span>
+          {doc.isDirty && (
+            <span
+              className="h-2 w-2 shrink-0 rounded-full bg-base-content/60"
+              title="Unsaved changes"
+            />
+          )}
+        </button>
+        <div className="min-h-0 flex-1">{renderPaneBody(pane)}</div>
+      </section>
+    );
+  };
 
   return (
     <>
@@ -854,9 +1000,9 @@ export function WorkflowEditorPageContent() {
             </button>
             <button
               type="button"
-              onClick={() => router.push("/workflow")}
+              onClick={leaveEditor}
               className="btn btn-sm btn-ghost"
-              disabled={saveMutation.isPending || deleteMutation.isPending}
+              disabled={active.isSaving || deleteMutation.isPending}
               title="Back to workflows"
               aria-label="Back to workflows"
             >
@@ -864,7 +1010,12 @@ export function WorkflowEditorPageContent() {
             </button>
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-sm text-base-content/50">●</span>
-              <span className="text-sm font-medium text-base-content truncate">{name}.py</span>
+              <span className="text-sm font-medium text-base-content truncate">
+                {name ? `${name}.py` : "No workflow"}
+              </span>
+              {isSplitView && (
+                <span className="badge badge-sm badge-ghost">{PANE_LABEL[currentPane]} pane</span>
+              )}
               {activeSchedules.length > 0 && (
                 <span
                   className="badge badge-sm badge-info gap-1"
@@ -875,9 +1026,9 @@ export function WorkflowEditorPageContent() {
                 </span>
               )}
             </div>
-            {data?.data?.updated_at && (
+            {ready && flow?.updated_at && (
               <span className="text-xs text-base-content/50 hidden lg:inline">
-                Updated: {formatDateTime(data.data.updated_at)}
+                Updated: {formatDateTime(flow.updated_at)}
               </span>
             )}
           </div>
@@ -897,6 +1048,7 @@ export function WorkflowEditorPageContent() {
               type="button"
               onClick={() => setShowPropertiesModal(true)}
               className="btn btn-sm btn-ghost"
+              disabled={!ready}
               title="Properties"
               aria-label="Properties"
             >
@@ -911,7 +1063,7 @@ export function WorkflowEditorPageContent() {
               <span className="ml-1">{isEditorLocked ? "Edit" : "Editing"}</span>
             </button>
             <button
-              onClick={() => setShowExecuteConfirm(true)}
+              onClick={openExecute}
               className="btn btn-sm btn-success"
               data-coachmark="flow-execute"
               data-coachmark-ready={executeDisabledReason ? undefined : "true"}
@@ -942,9 +1094,9 @@ export function WorkflowEditorPageContent() {
               </button>
             )}
             <button
-              onClick={() => setShowDeleteConfirm(true)}
+              onClick={() => setDeleteTarget(currentPane)}
               className="btn btn-sm btn-error"
-              disabled={saveMutation.isPending || deleteMutation.isPending}
+              disabled={active.isSaving || deleteMutation.isPending || !ready}
             >
               <Trash2 size={16} />
               <span className="ml-1">Delete</span>
@@ -952,9 +1104,9 @@ export function WorkflowEditorPageContent() {
             <button
               onClick={handleSave}
               className={`btn btn-sm ${isEditorLocked ? "btn-outline" : "btn-success"}`}
-              disabled={saveMutation.isPending || deleteMutation.isPending || isEditorLocked}
+              disabled={active.isSaving || deleteMutation.isPending || isEditorLocked || !ready}
             >
-              {saveMutation.isPending ? (
+              {active.isSaving ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
                 <>
@@ -966,12 +1118,14 @@ export function WorkflowEditorPageContent() {
           </div>
         </div>
 
-        {saveMutation.isError && (
-          <div className="alert alert-error mx-4 mt-2">
-            <span>
-              Failed to save flow: {(saveMutation.error as Error)?.message || "Unknown error"}
-            </span>
-          </div>
+        {[primary, secondary].map((doc) =>
+          doc.saveError && doc.name ? (
+            <div key={doc.name} className="alert alert-error mx-4 mt-2">
+              <span>
+                Failed to save {doc.name}: {(doc.saveError as Error)?.message || "Unknown error"}
+              </span>
+            </div>
+          ) : null,
         )}
 
         {deleteMutation.isError && (
@@ -1090,6 +1244,17 @@ export function WorkflowEditorPageContent() {
                       />
                     </div>
                   </div>
+                  {isSplitView && (
+                    <p
+                      className="border-b border-base-300 px-3 py-1.5 text-xs text-base-content/60"
+                      role="status"
+                    >
+                      Opens in the{" "}
+                      <span className="font-medium text-base-content">
+                        {PANE_LABEL[currentPane].toLowerCase()} pane
+                      </span>
+                    </p>
+                  )}
                   <div className="min-h-0 flex-1 py-1">
                     <FlowExplorer
                       flows={flowsData?.data?.flows ?? []}
@@ -1098,17 +1263,15 @@ export function WorkflowEditorPageContent() {
                       isDirty={isDirty}
                       filter={sidebarSearch}
                       initialSpace={initialSpace}
-                      onOpen={(flowName) => {
-                        if (flowName !== name) {
-                          router.push(`/workflow/${encodeURIComponent(flowName)}`);
-                        }
-                      }}
+                      onOpen={openFlow}
                     />
                   </div>
                   <div className="border-t border-base-300 p-2">
                     <button
                       type="button"
-                      onClick={() => router.push("/workflow/new")}
+                      onClick={() =>
+                        confirmDiscard([primary, secondary], () => router.push("/workflow/new"))
+                      }
                       className="btn btn-primary btn-xs w-full gap-1"
                     >
                       <FilePlus2 size={13} />
@@ -1118,7 +1281,15 @@ export function WorkflowEditorPageContent() {
                 </>
               )}
 
-              {activeSidePanel === "properties" && (
+              {activeSidePanel === "properties" && !ready && (
+                <div className="flex-1 p-3 text-sm text-base-content/60">
+                  {name
+                    ? `Loading ${name}.py…`
+                    : "Open a workflow in this pane to see its properties."}
+                </div>
+              )}
+
+              {activeSidePanel === "properties" && ready && (
                 <div className="flex-1 overflow-y-auto p-3">
                   <div className="mb-3 rounded border border-base-300 bg-base-100 p-3">
                     <div className="flex items-center gap-2">
@@ -1263,22 +1434,24 @@ export function WorkflowEditorPageContent() {
           <div className="flex-1 flex flex-col min-w-0">
             {/* Tab Bar */}
             <div className="flex items-end bg-base-200 border-b border-base-300 h-9">
-              <div className="h-full px-4 text-sm font-medium flex items-center gap-2 border-r border-base-300 bg-base-300 text-base-content relative">
-                <span className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
-                <span className="text-info">py</span>
-                {name}.py
-                {isDirty && (
-                  <span
-                    className="w-2 h-2 rounded-full bg-base-content/60"
-                    title="Unsaved changes"
-                  />
-                )}
-              </div>
+              {!isSplitView && (
+                <div className="h-full px-4 text-sm font-medium flex items-center gap-2 border-r border-base-300 bg-base-300 text-base-content relative">
+                  <span className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
+                  <span className="text-info">py</span>
+                  {name}.py
+                  {isDirty && (
+                    <span
+                      className="w-2 h-2 rounded-full bg-base-content/60"
+                      title="Unsaved changes"
+                    />
+                  )}
+                </div>
+              )}
               {/* Split View Toggle */}
               <div className="ml-auto flex items-center px-2 h-full">
                 <button
                   type="button"
-                  onClick={() => setIsSplitView(!isSplitView)}
+                  onClick={toggleSplit}
                   className={`btn btn-xs btn-ghost ${isSplitView ? "text-primary" : "text-base-content/50"}`}
                   title={isSplitView ? "Close split editor" : "Open split editor"}
                   aria-label={isSplitView ? "Close split editor" : "Open split editor"}
@@ -1288,24 +1461,21 @@ export function WorkflowEditorPageContent() {
               </div>
             </div>
 
-            {/* Breadcrumbs */}
+            {/* Breadcrumbs: the active pane's workflow */}
             <div className="flex items-center gap-1 px-3 py-1 bg-base-300/50 border-b border-base-300 text-xs text-base-content/50">
-              <span
-                className="hover:text-base-content cursor-pointer"
-                onClick={() => router.push("/workflow")}
-              >
+              <span className="hover:text-base-content cursor-pointer" onClick={leaveEditor}>
                 workflows
               </span>
               <ChevronRight size={10} />
               <span
                 className="hover:text-base-content cursor-pointer"
-                onClick={() => setShowPropertiesModal(true)}
+                onClick={() => ready && setShowPropertiesModal(true)}
               >
-                {chipId || "chip"}
+                {(ready && chipId) || "chip"}
               </span>
               <ChevronRight size={10} />
-              <span className="text-base-content/80">{name}.py</span>
-              {flowFunctionName && (
+              <span className="text-base-content/80">{name ? `${name}.py` : "No workflow"}</span>
+              {ready && flowFunctionName && (
                 <>
                   <ChevronRight size={10} />
                   <span className="text-base-content/60">{flowFunctionName}()</span>
@@ -1319,57 +1489,16 @@ export function WorkflowEditorPageContent() {
                 orientation="horizontal"
                 style={{ flex: 1, minWidth: 0, overflow: "hidden" }}
               >
-                <Panel defaultSize="60%" minSize="20%" style={{ overflow: "hidden", minWidth: 0 }}>
-                  <Editor
-                    height="100%"
-                    language="python"
-                    theme="vs-dark"
-                    value={code}
-                    onChange={(value) => setCode(value || "")}
-                    onMount={handleEditorMount}
-                    options={{
-                      ...EDITOR_OPTIONS,
-                      fontSize,
-                      wordWrap,
-                      readOnly: isEditorLocked,
-                      domReadOnly: isEditorLocked,
-                    }}
-                  />
+                <Panel defaultSize="50%" minSize="20%" style={{ overflow: "hidden", minWidth: 0 }}>
+                  {renderPane("primary")}
                 </Panel>
                 <PanelResizeHandle className="w-1 bg-base-300 hover:bg-primary/50 transition-colors cursor-col-resize" />
-                <Panel defaultSize="40%" minSize="15%" style={{ overflow: "hidden", minWidth: 0 }}>
-                  <Editor
-                    height="100%"
-                    language="python"
-                    theme="vs-dark"
-                    value={code}
-                    onChange={(value) => setCode(value || "")}
-                    options={{
-                      ...EDITOR_OPTIONS,
-                      fontSize,
-                      wordWrap,
-                      readOnly: isEditorLocked,
-                      domReadOnly: isEditorLocked,
-                    }}
-                  />
+                <Panel defaultSize="50%" minSize="20%" style={{ overflow: "hidden", minWidth: 0 }}>
+                  {renderPane("secondary")}
                 </Panel>
               </PanelGroup>
             ) : (
-              <Editor
-                height="100%"
-                language="python"
-                theme="vs-dark"
-                value={code}
-                onChange={(value) => setCode(value || "")}
-                onMount={handleEditorMount}
-                options={{
-                  ...EDITOR_OPTIONS,
-                  fontSize,
-                  wordWrap,
-                  readOnly: isEditorLocked,
-                  domReadOnly: isEditorLocked,
-                }}
-              />
+              renderEditor("primary")
             )}
           </div>
         </div>
@@ -1394,13 +1523,14 @@ export function WorkflowEditorPageContent() {
               {lastExecutionId ? (
                 <div className="space-y-1">
                   <div className="text-base-content/40">
-                    <span className="text-info">[info]</span> Flow: {name}
+                    <span className="text-info">[info]</span> Flow: {lastRun?.flowName}
                   </div>
                   <div className="text-base-content/40">
                     <span className="text-info">[info]</span> Execution ID: {lastExecutionId}
                   </div>
                   <div className="text-base-content/40">
-                    <span className="text-info">[info]</span> Chip: {chipId} | User: {username}
+                    <span className="text-info">[info]</span> Chip: {lastRun?.chipId} | User:{" "}
+                    {lastRun?.username}
                   </div>
                   {latestExecution?.status === "failed" ? (
                     <div className="space-y-1 text-error">
@@ -1449,8 +1579,8 @@ export function WorkflowEditorPageContent() {
             <button
               type="button"
               onClick={() => {
-                editorRef.current?.focus();
-                editorRef.current?.getAction("editor.action.gotoLine")?.run();
+                activeEditor()?.focus();
+                activeEditor()?.getAction("editor.action.gotoLine")?.run();
               }}
               className="hover:bg-primary-content/20 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
               title="Go to Line (⌘G)"
@@ -1471,7 +1601,7 @@ export function WorkflowEditorPageContent() {
             )}
           </div>
           <div className="flex items-center gap-1">
-            <span className="px-1.5 py-0.5">{code.split("\n").length} lines</span>
+            <span className="px-1.5 py-0.5">{ready ? code.split("\n").length : 0} lines</span>
             <button
               type="button"
               onClick={() => setWordWrap((prev) => (prev === "on" ? "off" : "on"))}
@@ -1616,7 +1746,7 @@ export function WorkflowEditorPageContent() {
               Execute
             </span>
             <button
-              onClick={() => setShowExecuteConfirm(true)}
+              onClick={openExecute}
               className="btn btn-circle btn-success shadow-lg"
               data-coachmark="flow-execute"
               data-coachmark-ready={executeDisabledReason ? undefined : "true"}
@@ -1655,9 +1785,9 @@ export function WorkflowEditorPageContent() {
             <button
               onClick={handleSave}
               className={`btn btn-circle shadow-lg ${isEditorLocked ? "btn-outline bg-base-100" : "btn-success"}`}
-              disabled={saveMutation.isPending || deleteMutation.isPending || isEditorLocked}
+              disabled={active.isSaving || deleteMutation.isPending || isEditorLocked || !ready}
             >
-              {saveMutation.isPending ? (
+              {active.isSaving ? (
                 <span className="loading loading-spinner loading-sm"></span>
               ) : (
                 <Save size={20} />
@@ -1668,9 +1798,9 @@ export function WorkflowEditorPageContent() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">Delete</span>
             <button
-              onClick={() => setShowDeleteConfirm(true)}
+              onClick={() => setDeleteTarget(currentPane)}
               className="btn btn-circle btn-error shadow-lg"
-              disabled={saveMutation.isPending || deleteMutation.isPending}
+              disabled={active.isSaving || deleteMutation.isPending || !ready}
             >
               <Trash2 size={20} />
             </button>
@@ -1680,7 +1810,7 @@ export function WorkflowEditorPageContent() {
         <WorkflowExecutionHelpDialog open={showExecutionHelp} onOpenChange={setShowExecutionHelp} />
 
         {/* Properties Modal */}
-        {showPropertiesModal && (
+        {showPropertiesModal && ready && (
           <Dialog open onOpenChange={(open) => !open && setShowPropertiesModal(false)}>
             <DialogContent className="max-w-md max-h-[calc(100vh-8rem)]">
               <div className="flex justify-between items-center mb-4">
@@ -1839,7 +1969,7 @@ export function WorkflowEditorPageContent() {
                     id="flow-file-path"
                     type="text"
                     className="input input-bordered input-sm text-xs"
-                    value={data?.data?.file_path || ""}
+                    value={flow?.file_path || ""}
                     disabled
                   />
                 </div>
@@ -1862,20 +1992,18 @@ export function WorkflowEditorPageContent() {
         {showDeleteConfirm && (
           <Dialog
             open
-            onOpenChange={(open) =>
-              !open && !deleteMutation.isPending && setShowDeleteConfirm(false)
-            }
+            onOpenChange={(open) => !open && !deleteMutation.isPending && setDeleteTarget(null)}
           >
             <DialogContent>
               <DialogTitle>Delete Flow</DialogTitle>
               <DialogDescription className="py-4">
-                Are you sure you want to delete <strong>{name}</strong>? This action cannot be
-                undone.
+                Are you sure you want to delete <strong>{deleteDoc?.name}</strong>? This action
+                cannot be undone.
               </DialogDescription>
               <div className="modal-action">
                 <button
                   type="button"
-                  onClick={() => setShowDeleteConfirm(false)}
+                  onClick={() => setDeleteTarget(null)}
                   className="btn btn-ghost"
                   disabled={deleteMutation.isPending}
                 >
@@ -1883,10 +2011,7 @@ export function WorkflowEditorPageContent() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowDeleteConfirm(false);
-                    handleDelete();
-                  }}
+                  onClick={handleDelete}
                   className="btn btn-error"
                   disabled={deleteMutation.isPending}
                 >
@@ -1901,31 +2026,31 @@ export function WorkflowEditorPageContent() {
           </Dialog>
         )}
 
-        {/* Execute Confirmation Modal */}
-        {showExecuteConfirm && (
+        {/* Execute Confirmation Modal: runs the workflow of the pane it was opened from */}
+        {executeTarget && execDoc.name && (
           <FlowExecuteConfirmModal
-            flowName={name}
-            username={username}
-            chipId={chipId}
-            description={description}
-            tags={tags}
-            targetDefaults={data?.data?.target_defaults}
-            targetModes={data?.data?.target_modes}
+            flowName={execDoc.name}
+            username={execDoc.username}
+            chipId={execDoc.chipId}
+            description={execDoc.description}
+            tags={execDoc.tags}
+            targetDefaults={execDoc.flow?.target_defaults}
+            targetModes={execDoc.flow?.target_modes}
             plan={executionPlan}
-            hasUnsavedChanges={isDirty}
+            hasUnsavedChanges={execDoc.isDirty}
             disabledReason={executeDisabledReason}
             onConfirm={(targetOverride) => {
-              if (executeDisabledReason) return;
-              setShowExecuteConfirm(false);
+              if (executeDisabledReason || !execDoc.name) return;
+              setExecuteTarget(null);
               executeMutation.mutate({
-                name,
+                name: execDoc.name,
                 context: captureJourneyContext(),
                 data: {
                   target_override: targetOverride,
                   parameters: {
-                    username: username,
-                    chip_id: chipId,
-                    tags: tags
+                    username: execDoc.username,
+                    chip_id: execDoc.chipId,
+                    tags: execDoc.tags
                       .split(",")
                       .map((tag) => tag.trim())
                       .filter(Boolean),
@@ -1933,9 +2058,35 @@ export function WorkflowEditorPageContent() {
                 },
               });
             }}
-            onClose={() => setShowExecuteConfirm(false)}
+            onClose={() => setExecuteTarget(null)}
           />
         )}
+
+        {/* Unsaved draft confirmation before a pane's workflow is replaced or closed */}
+        <ConfirmDialog
+          open={discardPrompt !== null}
+          title="Discard unsaved changes?"
+          description={
+            <>
+              Unsaved changes to{" "}
+              {discardPrompt?.names.map((draft, index) => (
+                <span key={draft}>
+                  {index > 0 && " and "}
+                  <strong>{draft}.py</strong>
+                </span>
+              ))}{" "}
+              will be lost. Save first to keep them.
+            </>
+          }
+          confirmLabel="Discard changes"
+          destructive
+          onConfirm={() => {
+            const action = discardPrompt?.action;
+            setDiscardPrompt(null);
+            action?.();
+          }}
+          onOpenChange={(open) => !open && setDiscardPrompt(null)}
+        />
       </div>
     </>
   );
