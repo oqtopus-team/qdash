@@ -33,6 +33,31 @@ describe("TaskMessagePanel", () => {
     expect(container.innerHTML).toBe("");
   });
 
+  it("shows an action in the header and beside the empty fallback", () => {
+    const { rerender } = render(
+      <TaskMessagePanel
+        status="failed"
+        message="boom"
+        stackTrace="Traceback"
+        action={<button type="button">Investigate with AI</button>}
+      />,
+    );
+    expect(screen.getByText("Error Log").parentElement).toContainElement(
+      screen.getByRole("button", { name: "Investigate with AI" }),
+    );
+
+    rerender(
+      <TaskMessagePanel
+        status="failed"
+        message={null}
+        showEmptyFallback
+        action={<button type="button">Investigate with AI</button>}
+      />,
+    );
+    expect(screen.queryByText("No error message recorded.")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Investigate with AI" })).not.toBeNull();
+  });
+
   it("falls back to a placeholder for a failed task without a message", () => {
     render(<TaskMessagePanel status="failed" message={null} showEmptyFallback />);
 

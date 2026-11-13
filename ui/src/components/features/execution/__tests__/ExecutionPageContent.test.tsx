@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExecutionPageContent } from "@/components/features/execution/ExecutionPageContent";
 
 let loadingNextPage = false;
+const DEFAULT_DETAIL = { note: { flow_run_id: "flow-123" }, task: [] };
+let executionDetail: Record<string, unknown> = DEFAULT_DETAIL;
+const mockInvestigate = vi.fn();
 const mockCancelMutate = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
@@ -30,12 +33,21 @@ vi.mock("@/client/chip/chip", () => ({
 }));
 
 vi.mock("@/client/execution/execution", () => ({
-  useListExecutions: ({ skip, chip_id }: { skip: number; chip_id: string }) => ({
+  useListExecutions: ({
+    skip,
+    chip_id,
+    date,
+  }: {
+    skip: number;
+    chip_id: string;
+    date?: string;
+  }) => ({
     data: {
       data: {
-        total: 40,
-        executions:
-          skip > 0 || chip_id === "chip-2"
+        total: date ? 0 : 40,
+        executions: date
+          ? [] // the API returns nothing for a day with no runs
+          : skip > 0 || chip_id === "chip-2"
             ? [
                 {
                   execution_id: "exec-3",
@@ -67,12 +79,7 @@ vi.mock("@/client/execution/execution", () => ({
     isLoading: skip > 0 && loadingNextPage,
   }),
   useGetExecution: () => ({
-    data: {
-      data: {
-        note: { flow_run_id: "flow-123" },
-        task: [],
-      },
-    },
+    data: { data: executionDetail },
     isLoading: false,
     isError: false,
   }),
@@ -85,6 +92,10 @@ vi.mock("@/client/execution/execution", () => ({
   }),
   getListExecutionsQueryKey: () => ["/executions"],
   getGetExecutionQueryKey: (executionId: string) => [`/executions/${executionId}`],
+}));
+
+vi.mock("@/contexts/ChatDockContext", () => ({
+  useOptionalChatDock: () => ({ investigate: mockInvestigate }),
 }));
 
 vi.mock("@/hooks/useDateNavigation", () => ({
@@ -113,8 +124,25 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-vi.mock("@/components/features/execution/ExecutionDurationBreakdown", () => ({
-  ExecutionDurationBreakdown: () => <div>DurationBreakdown</div>,
+vi.mock("@/components/features/execution/ExecutionActivityChart", () => ({
+  DEFAULT_ACTIVITY_WINDOW: 30,
+  ExecutionActivityChart: ({
+    days,
+    selectedDate,
+    onDateSelect,
+  }: {
+    days: number;
+    selectedDate: string;
+    onDateSelect: (date: string) => void;
+  }) => (
+    <div>
+      <span>ActivityChart {days}d</span>
+      <span>selected:{selectedDate}</span>
+      <button type="button" onClick={() => onDateSelect("20260101")}>
+        pick-day
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("@/components/charts/TaskFigure", () => ({
@@ -166,6 +194,7 @@ describe("ExecutionPageContent cancel confirmation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     loadingNextPage = false;
+    executionDetail = DEFAULT_DETAIL;
     // Reset the mutate implementation so callback-driven tests don't leak into others.
     mockCancelMutate.mockReset();
   });
@@ -189,22 +218,19 @@ describe("ExecutionPageContent cancel confirmation", () => {
     expect(mockCancelMutate).not.toHaveBeenCalled();
   });
 
-  it("loads the duration breakdown only after it is expanded", () => {
+  it("shows the activity chart and lets it pick the day filter", () => {
     render(<ExecutionPageContent />);
 
-    expect(screen.queryByText("DurationBreakdown")).toBeNull();
+    expect(screen.getByText("ActivityChart 30d")).toBeTruthy();
+    expect(screen.getByText("selected:latest")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /Task duration breakdown/i }));
+    fireEvent.click(screen.getByRole("button", { name: "pick-day" }));
 
-    expect(screen.getByText("DurationBreakdown")).toBeTruthy();
+    expect(screen.getByText("selected:20260101")).toBeTruthy();
   });
 
-  it("summarizes the current executions and opens a non-modal details panel", () => {
+  it("opens a non-modal details panel", () => {
     render(<ExecutionPageContent />);
-
-    const summary = screen.getByRole("region", { name: "Execution status summary" });
-    expect(within(summary).getByText("Total")).toBeTruthy();
-    expect(within(summary).getByText("Running")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Running Execution"));
 
@@ -403,5 +429,119 @@ describe("ExecutionPageContent cancel confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel Execution" }));
 
     expect(mockToastError).toHaveBeenCalledWith("Failed to cancel execution");
+  });
+});
+
+describe("ExecutionPageContent failure investigation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+  });
+
+  afterEach(() => {
+    cleanup();
+    executionDetail = DEFAULT_DETAIL;
+  });
+
+  it("opens the investigation in the floating chat, not a second sidebar", () => {
+    const log = `Traceback (most recent call last):\n${"/app/qdash/workflow/calibtasks/qubex/".repeat(20)}base.py`;
+    executionDetail = { status: "failed", chip_id: "chip-1", message: log, task: [] };
+    render(<ExecutionPageContent />);
+
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    // The log sits in a scrolling block beside the action, not in a squeezed alert.
+    const body = within(panel).getByText((_, element) => element?.textContent === log);
+    expect(body.tagName).toBe("PRE");
+    expect(body.className).toContain("overflow-auto");
+    expect(within(panel).getByText("Error Log").parentElement).toContainElement(
+      within(panel).getByRole("button", { name: "Investigate with AI" }),
+    );
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Investigate with AI" }));
+
+    expect(mockInvestigate).toHaveBeenCalledWith(
+      { executionId: "exec-1", chipId: "chip-1" },
+      "mini",
+    );
+    // The details panel stays open underneath the floating window.
+    expect(panel.getAttribute("aria-hidden")).toBe("false");
+  });
+
+  it("still offers an investigation when the failure recorded no message", () => {
+    executionDetail = { status: "failed", chip_id: "chip-1", message: "", task: [] };
+    render(<ExecutionPageContent />);
+
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+    expect(within(panel).getByText("No error message recorded.")).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("button", { name: "Investigate with AI" }));
+
+    expect(mockInvestigate).toHaveBeenCalledWith(
+      { executionId: "exec-1", chipId: "chip-1" },
+      "mini",
+    );
+  });
+});
+
+describe("ExecutionPageContent status presentation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+  });
+
+  afterEach(() => {
+    cleanup();
+    executionDetail = DEFAULT_DETAIL;
+  });
+
+  it("labels list statuses with text and a static icon instead of a pulse", () => {
+    render(<ExecutionPageContent />);
+
+    const runningCard = screen.getByRole("button", {
+      name: "View Running Execution execution details",
+    });
+    const badge = within(runningCard).getByText("Running");
+    expect(badge.className).toContain("badge-info");
+    expect(badge.className).not.toContain("status-pulse");
+    expect(badge.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(document.querySelector(".status-pulse")).toBeNull();
+  });
+
+  it("renders task rows flat with text status cues and toggles their figures", () => {
+    executionDetail = {
+      ...DEFAULT_DETAIL,
+      status: "running",
+      task: [
+        { name: "CheckRabi", qid: "0", status: "running", figure_path: ["a.png"] },
+        { name: "CheckT1", qid: "1", status: "unexpected" },
+      ],
+    };
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+
+    const row = within(panel).getByText("0-CheckRabi").closest("h4")?.parentElement
+      ?.parentElement as HTMLElement;
+    const runningLabel = within(row).getByText("Running");
+    expect(runningLabel.className).toContain("text-info");
+    expect(runningLabel.className).not.toContain("status-pulse");
+    expect(runningLabel.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    // Unknown task statuses keep reading as failed.
+    const unknownRow = within(panel).getByText("1-CheckT1").closest("h4")?.parentElement
+      ?.parentElement as HTMLElement;
+    expect(within(unknownRow).getByText("Failed").className).toContain("text-error");
+    expect(panel.querySelector(".status-pulse")).toBeNull();
+
+    expect(row.className).not.toMatch(/shadow-(md|lg)/);
+    expect(row.className).toContain("border-l-info");
+    expect(within(panel).queryByText("TaskFigure")).toBeNull();
+
+    fireEvent.click(row);
+    expect(row.className).toContain("border-l-info");
+    expect(within(panel).getByText("TaskFigure")).toBeTruthy();
+
+    fireEvent.click(row);
+    expect(within(panel).queryByText("TaskFigure")).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ counter operations.
 import logging
 
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
+from qdash.dbmodel.project_execution_counter import ProjectExecutionCounterDocument
 from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ class MongoExecutionCounterRepository:
     """MongoDB implementation of ExecutionCounterRepository.
 
     This class provides atomic counter generation for execution IDs,
-    scoped by date, chip_id, and project_id. Username records the latest actor.
+    scoped by date and project_id across all chips. Username records the latest actor.
 
     Example
     -------
@@ -66,7 +67,7 @@ class MongoExecutionCounterRepository:
             msg = "project_id is required to generate an execution index"
             raise ValueError(msg)
 
-        result: int = ExecutionCounterDocument.get_next_index(
+        result: int = ProjectExecutionCounterDocument.get_next_index(
             date=date,
             username=username,
             user_id=self._user_id_for_username(username),
@@ -98,4 +99,7 @@ class MongoExecutionCounterRepository:
         counter_list = ExecutionCounterDocument.find(
             {"project_id": project_id, "chip_id": chip_id}
         ).run()
-        return [counter.date for counter in counter_list]
+        shared_counters = ProjectExecutionCounterDocument.find(
+            {"project_id": project_id, "chip_ids": chip_id}
+        ).run()
+        return sorted({counter.date for counter in [*counter_list, *shared_counters]})

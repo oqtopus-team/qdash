@@ -1,0 +1,47 @@
+# Development-only overlay for `task dev-local`. `task dev-services` and
+# `task dev-local-down` add it to compose.yaml; deployments never load it.
+#
+# The browser still enters through the caddy service on UI_PORT with the same
+# Caddyfile, but the API and the Next.js dev server run with hot reload outside
+# Compose: on the host, reached at host.docker.internal, or in the DevContainer,
+# reached by its service name, which compose.devcontainer.yaml sets as
+# QDASH_DEV_HOST. Prefect and the Pi Agent Runtime stay in Compose.
+#
+# It also publishes, on loopback only, the ports the host API uses to reach
+# MongoDB, Prefect, the deployment service and the Pi Agent Runtime.
+services:
+  caddy:
+    environment:
+      QDASH_API_UPSTREAM: ${QDASH_DEV_HOST:-host.docker.internal}:${API_PORT:-5715}
+      QDASH_UI_UPSTREAM: ${QDASH_DEV_HOST:-host.docker.internal}:${UI_DEV_PORT:-5713}
+    # Docker Engine on Linux defines host.docker.internal only with this entry.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Replace, not extend, the api and ui dependencies of compose.yaml, so
+    # starting caddy never builds or starts the production API and UI.
+    depends_on: !override
+      - prefect-server
+  mongo:
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+  prefect-server:
+    ports:
+      - "127.0.0.1:${PREFECT_PORT:-4200}:4200"
+  deployment-service:
+    ports:
+      - "127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}:8001"
+  agent-runtime:
+    environment:
+      # The runtime calls the development API back with the user's token.
+      QDASH_BASE_URL: http://${QDASH_DEV_HOST:-host.docker.internal}:${API_PORT:-5715}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # The browser never reaches the runtime: only the API does, with the
+    # runtime credential. This port serves the host API.
+    ports:
+      - "127.0.0.1:${AGENT_RUNTIME_PORT:-8002}:${AGENT_RUNTIME_PORT:-8002}"
+    depends_on: !override
+      agent-exec:
+        condition: service_started
+      agent-runtime-auth:
+        condition: service_completed_successfully

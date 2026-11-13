@@ -7,6 +7,7 @@
  */
 import type { TaskResultListItemElapsedTime } from './taskResultListItemElapsedTime';
 import type { TaskResultListItemEndAt } from './taskResultListItemEndAt';
+import type { TaskResultListItemInvocation } from './taskResultListItemInvocation';
 import type { TaskResultListItemSourceTaskId } from './taskResultListItemSourceTaskId';
 import type { TaskResultListItemStartAt } from './taskResultListItemStartAt';
 import type { TaskResultListItemUserId } from './taskResultListItemUserId';
@@ -26,8 +27,9 @@ export interface TaskResultListItem {
   message?: string;
   has_stack_trace?: boolean;
   source_task_id?: TaskResultListItemSourceTaskId;
+  /** Planned step and call this result executed; null for older results. */
+  invocation?: TaskResultListItemInvocation;
   start_at?: TaskResultListItemStartAt;
   end_at?: TaskResultListItemEndAt;
   elapsed_time?: TaskResultListItemElapsedTime;
-  ai_review_status?: string;
 }

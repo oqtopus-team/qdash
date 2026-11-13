@@ -33,6 +33,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -47,14 +48,22 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import QubitTargets
 
-TWO_QUBIT_TASKS: list[str] = [
-    "CheckCrossResonance",
-    "CreateZX90",
-    "CheckZX90",
-    "CheckBellState",
-    "CheckBellStateTomography",
-    "Check2QGateCoherenceLimit",
-    "ZX90InterleavedRandomizedBenchmarking",
+TWO_QUBIT_TASKS: list[TaskCall] = [
+    TaskCall(
+        name="CheckCrossResonance",
+        # Uncomment to tune the CR parameter search.
+        # run={
+        #     "adiabatic_safe_factor": 0.65,
+        #     "max_amplitude": 0.85,
+        #     "max_time_range": 8192,
+        # },
+    ),
+    TaskCall(name="CreateZX90"),
+    TaskCall(name="CheckZX90"),
+    TaskCall(name="CheckBellState"),
+    TaskCall(name="CheckBellStateTomography"),
+    TaskCall(name="Check2QGateCoherenceLimit"),
+    TaskCall(name="ZX90InterleavedRandomizedBenchmarking"),
 ]
 
 
@@ -67,7 +76,7 @@ def two_qubit(
     username: str,
     chip_id: str,
     qids: list[str] | None = None,
-    tasks: list[str] | None = None,
+    tasks: list[TaskCall] | None = None,
     inverse: bool = False,
     max_parallel_ops: int = 10,
     tags: list[str] | None = None,
@@ -128,7 +137,7 @@ def two_qubit(
             username="alice",
             chip_id="64Qv3",
             qids=["0", "1", "4", "5"],
-            tasks=["CheckCrossResonance", "CreateZX90", "CheckZX90"],
+            tasks=[TaskCall(name="CheckCrossResonance"), TaskCall(name="CreateZX90"), TaskCall(name="CheckZX90")],
         )
 
         # Limit parallel operations
@@ -159,6 +168,9 @@ def two_qubit(
     # Define Pipeline Steps
     # =========================================================================
 
+    # GenerateCRSchedule picks and groups the pairs at run time. To calibrate
+    # selected directed pairs, use the 2Q Automatic Pairs template; to write
+    # the rounds yourself, use the 2Q Manual Rounds template.
     steps: list[Step] = [
         # Generate CR schedule from candidate qubits with explicit direction
         GenerateCRSchedule(
@@ -189,17 +201,9 @@ def two_qubit(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
-            # Per-task overrides — uncomment to tune the CR parameter search.
-            # "CheckCrossResonance": {
-            #     "adiabatic_safe_factor": {"value": 0.65, "value_type": "float"},
-            #     "max_amplitude": {"value": 0.85, "value_type": "float"},
-            #     "max_time_range": {"value": 8192, "value_type": "int"},
-            # },
-        },
         default_run_parameters={
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

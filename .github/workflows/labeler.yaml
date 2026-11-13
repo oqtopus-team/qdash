@@ -1,44 +1,42 @@
 name: PR Labeler
 
 on:
-  pull_request:
+  # Commit subjects are handled only as data; this workflow does not check out or run
+  # pull request code.
+  # jactionlint ignore=dangerous-triggers
+  pull_request_target:
     types: [opened, synchronize]
     branches:
       - develop
 
-#Permissions are required for PRs by dependabot.
-permissions:
-  pull-requests: write
-  issues: write
-  contents: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
 
 jobs:
   labeler:
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      pull-requests: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Fetch all branches
-        run: git fetch --all
-
       - name: Extract commit messages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
         run: |
-          COMMITS=$(git log --format=%B origin/develop..HEAD)
-          echo "$COMMITS"
-          echo "$COMMITS" > commits.txt
-
-      - name: Debug - Print commits
-        run: cat commits.txt
+          gh api "repos/${REPO}/pulls/${PR_NUMBER}/commits" --paginate \
+            --jq '.[].commit.message | split("\n")[0]' > commits.txt
 
       - name: Set labels based on commit messages
         id: set-labels
         run: |
           labels=()
           while IFS= read -r commit; do
-            echo "Processing commit: $commit"
             if [[ $commit =~ ^feat ]]; then
               labels+=("feature")
             elif [[ $commit =~ ^fix ]]; then
@@ -66,28 +64,32 @@ jobs:
           echo "$unique_labels"
 
           # Set the output as a newline-separated string
-          echo "labels<<EOF" >> $GITHUB_OUTPUT
-          echo "$unique_labels" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "labels<<EOF"
+            echo "$unique_labels"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Add labels to PR
-        if: >-
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          github.actor != 'dependabot[bot]'
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          labels: ${{ steps.set-labels.outputs.labels }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          LABELS: ${{ steps.set-labels.outputs.labels }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          while IFS= read -r label; do
+            if [[ -n "${label}" ]]; then
+              gh pr edit "${PR_NUMBER}" --add-label "${label}"
+            fi
+          done <<< "${LABELS}"
 
       - name: Assign PR creator
-        if: >-
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          github.actor != 'dependabot[bot]'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             await github.rest.issues.addAssignees({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              assignees: [context.actor]
+              assignees: [context.payload.pull_request.user.login]
             })

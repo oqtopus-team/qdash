@@ -2,10 +2,12 @@
 
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from qdash.api.services.flow_service.deployment_client import DeploymentServiceClient
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.flow import FlowDocument
@@ -104,6 +106,7 @@ def sample_flow(test_project):
         created_at=datetime.now(),
         updated_at=datetime.now(),
         tags=["test"],
+        folder="daily/t1",
     )
     flow.insert()
     return flow
@@ -128,6 +131,7 @@ class TestFlowRouter:
         assert len(data["flows"]) == 1
         assert data["flows"][0]["name"] == "test_flow"
         assert data["flows"][0]["created_by"] == "test_user"
+        assert data["flows"][0]["folder"] == "daily/t1"
         assert data["flows"][0]["file_exists"] is False
 
     def test_list_flows_marks_existing_files(
@@ -215,6 +219,49 @@ class TestFlowRouter:
         assert response.status_code == 401
 
 
+class TestFlowMove:
+    """Tests for PATCH /flows/{name}/folder."""
+
+    def test_move_flow_updates_only_the_folder(
+        self, test_client, test_project, auth_headers, sample_flow
+    ):
+        response = test_client.patch(
+            "/flows/test_flow/folder", headers=auth_headers, json={"folder": "/weekly/"}
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["folder"] == "weekly"
+        stored = FlowDocument.find_one({"project_id": "test_project", "name": "test_flow"}).run()
+        assert stored is not None
+        assert stored.folder == "weekly"
+        assert stored.file_path == sample_flow.file_path
+        assert stored.deployment_id == sample_flow.deployment_id
+
+    def test_move_flow_to_the_root(self, test_client, test_project, auth_headers, sample_flow):
+        response = test_client.patch(
+            "/flows/test_flow/folder", headers=auth_headers, json={"folder": ""}
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["folder"] == ""
+
+    def test_move_flow_rejects_a_bad_folder(
+        self, test_client, test_project, auth_headers, sample_flow
+    ):
+        response = test_client.patch(
+            "/flows/test_flow/folder", headers=auth_headers, json={"folder": "../x"}
+        )
+
+        assert response.status_code == 400
+
+    def test_move_flow_not_found(self, test_client, test_project, auth_headers):
+        response = test_client.patch(
+            "/flows/missing/folder", headers=auth_headers, json={"folder": "a"}
+        )
+
+        assert response.status_code == 404
+
+
 class TestFlowExecution:
     """Tests for flow execution endpoint."""
 
@@ -226,19 +273,12 @@ class TestFlowExecution:
         project_id is passed for multi-tenancy support, allowing workflows to
         operate within the correct project context.
         """
-        # Arrange: Mock Prefect client
-        mock_flow_run = MagicMock()
-        mock_flow_run.id = "test-flow-run-id"
+        create_flow_run = AsyncMock(return_value="test-flow-run-id")
 
-        mock_client = MagicMock()
-        mock_client.create_flow_run_from_deployment = AsyncMock(return_value=mock_flow_run)
-
-        # Create async context manager mock
-        async_cm = MagicMock()
-        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
-        async_cm.__aexit__ = AsyncMock(return_value=None)
-
-        with patch("qdash.api.services.flow_service.get_client", return_value=async_cm):
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
             # Act
             response = test_client.post(
                 "/flows/test_flow/execute",
@@ -250,8 +290,7 @@ class TestFlowExecution:
         assert response.status_code == 200
 
         # Verify parameters passed to Prefect
-        call_args = mock_client.create_flow_run_from_deployment.call_args
-        parameters = call_args.kwargs.get("parameters", {})
+        parameters = create_flow_run.call_args.kwargs["parameters"]
 
         # project_id should be passed for multi-tenancy
         assert "project_id" in parameters
@@ -265,18 +304,12 @@ class TestFlowExecution:
         self, test_client, test_project, auth_headers, sample_flow
     ):
         """Test that execute_flow merges request parameters with default_parameters."""
-        # Arrange
-        mock_flow_run = MagicMock()
-        mock_flow_run.id = "test-flow-run-id"
+        create_flow_run = AsyncMock(return_value="test-flow-run-id")
 
-        mock_client = MagicMock()
-        mock_client.create_flow_run_from_deployment = AsyncMock(return_value=mock_flow_run)
-
-        async_cm = MagicMock()
-        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
-        async_cm.__aexit__ = AsyncMock(return_value=None)
-
-        with patch("qdash.api.services.flow_service.get_client", return_value=async_cm):
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
             # Act: Execute with custom parameters
             response = test_client.post(
                 "/flows/test_flow/execute",
@@ -287,8 +320,7 @@ class TestFlowExecution:
         # Assert
         assert response.status_code == 200
 
-        call_args = mock_client.create_flow_run_from_deployment.call_args
-        parameters = call_args.kwargs.get("parameters", {})
+        parameters = create_flow_run.call_args.kwargs["parameters"]
 
         # Default parameters should be present
         assert parameters.get("username") == "test_user"
@@ -346,17 +378,12 @@ class TestFlowExecution:
         self, test_client, test_project, editor_auth_headers, sample_flow
     ):
         """Test that project members can execute shared flows as themselves."""
-        mock_flow_run = MagicMock()
-        mock_flow_run.id = "test-flow-run-id"
+        create_flow_run = AsyncMock(return_value="test-flow-run-id")
 
-        mock_client = MagicMock()
-        mock_client.create_flow_run_from_deployment = AsyncMock(return_value=mock_flow_run)
-
-        async_cm = MagicMock()
-        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
-        async_cm.__aexit__ = AsyncMock(return_value=None)
-
-        with patch("qdash.api.services.flow_service.get_client", return_value=async_cm):
+        with patch(
+            "qdash.api.services.flow_service.prefect_gateway.PrefectGateway.create_flow_run",
+            new=create_flow_run,
+        ):
             response = test_client.post(
                 "/flows/test_flow/execute",
                 headers=editor_auth_headers,
@@ -365,8 +392,7 @@ class TestFlowExecution:
 
         assert response.status_code == 200
 
-        call_args = mock_client.create_flow_run_from_deployment.call_args
-        parameters = call_args.kwargs.get("parameters", {})
+        parameters = create_flow_run.call_args.kwargs["parameters"]
         assert parameters["username"] == "editor_user"
         assert parameters["project_id"] == "test_project"
 
@@ -374,21 +400,36 @@ class TestFlowExecution:
 class TestFlowTemplates:
     """Tests for flow template endpoints."""
 
+    def test_every_shipped_template_declares_a_backend(
+        self, test_client, test_project, auth_headers
+    ):
+        """Each entry in templates.json names the backend it runs on."""
+        response = test_client.get("/flows/templates", headers=auth_headers)
+
+        assert response.status_code == 200
+        templates = response.json()
+        assert templates
+        assert {template["backend"] for template in templates} == {"qubex", "fake"}
+
+    def test_list_templates_filters_by_backend(self, test_client, test_project, auth_headers):
+        """The backend query keeps fake templates out of a qubex deployment and vice versa."""
+        fake = test_client.get("/flows/templates", params={"backend": "fake"}, headers=auth_headers)
+        qubex = test_client.get(
+            "/flows/templates", params={"backend": "qubex"}, headers=auth_headers
+        )
+
+        assert fake.status_code == 200
+        assert [template["id"] for template in fake.json()] == ["fake_calibration"]
+        assert qubex.status_code == 200
+        qubex_ids = [template["id"] for template in qubex.json()]
+        assert "simple" in qubex_ids
+        assert "fake_calibration" not in qubex_ids
+
     def test_get_full_calibration_template_includes_configure_all(
         self, test_client, test_project, auth_headers
     ):
         """Test that the full calibration template starts with ConfigureAll."""
-        repo_root = Path(__file__).resolve().parents[4]
-        templates_dir = repo_root / "src/qdash/workflow/templates"
-
-        with (
-            patch("qdash.api.services.flow_service.TEMPLATES_DIR", templates_dir),
-            patch(
-                "qdash.api.services.flow_service.TEMPLATES_METADATA_FILE",
-                templates_dir / "templates.json",
-            ),
-        ):
-            response = test_client.get("/flows/templates/full_calibration", headers=auth_headers)
+        response = test_client.get("/flows/templates/full_calibration", headers=auth_headers)
 
         assert response.status_code == 200
         data = response.json()
@@ -400,23 +441,231 @@ class TestFlowTemplates:
         self, test_client, test_project, auth_headers
     ):
         """Test that the fast full calibration template is registered and loadable."""
-        repo_root = Path(__file__).resolve().parents[4]
-        templates_dir = repo_root / "src/qdash/workflow/templates"
-
-        with (
-            patch("qdash.api.services.flow_service.TEMPLATES_DIR", templates_dir),
-            patch(
-                "qdash.api.services.flow_service.TEMPLATES_METADATA_FILE",
-                templates_dir / "templates.json",
-            ),
-        ):
-            response = test_client.get(
-                "/flows/templates/fast_full_calibration", headers=auth_headers
-            )
+        response = test_client.get("/flows/templates/fast_full_calibration", headers=auth_headers)
 
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == "fast_full_calibration"
         assert "Shortened full calibration" in data["description"]
+        assert "Filter -> ConfigureAll -> 1Q fine-tune" in data["description"]
+        assert 'ConfigureAll(step_id="configure_all_before_fine_tune")' in data["code"]
         fine_tune_tasks_block = data["code"].split("FAST_1Q_FINE_TUNE_TASKS", 1)[1].split("]", 1)[0]
         assert "CheckT1Average" not in fine_tune_tasks_block
+
+
+class _RecordingDeploymentClient(DeploymentServiceClient):
+    """Deployment client stub that records registrations instead of calling the service."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls: list[dict[str, str | None]] = []
+
+    async def register(
+        self,
+        *,
+        file_path: str,
+        flow_function_name: str,
+        deployment_name: str,
+        old_deployment_id: str | None = None,
+    ) -> str:
+        """Record the registration."""
+        self.calls.append(
+            {
+                "file_path": file_path,
+                "flow_function_name": flow_function_name,
+                "deployment_name": deployment_name,
+                "old_deployment_id": old_deployment_id,
+            }
+        )
+        return f"deployment-{len(self.calls)}"
+
+
+@pytest.fixture
+def flow_service_on_tmp(tmp_path, monkeypatch):
+    """Route /flows saves to a real flow service on a temporary flow tree."""
+    from qdash.api.dependencies import get_flow_repository, get_flow_service
+    from qdash.api.main import app
+    from qdash.api.services.flow_service import service as flow_service_module
+    from qdash.api.services.flow_service.service import FlowService
+    from qdash.api.services.flow_service.source_store import FlowSourceStore
+
+    monkeypatch.setattr(flow_service_module, "format_with_ruff", lambda _path: None)
+    deployment = _RecordingDeploymentClient()
+    store = FlowSourceStore(tmp_path / "user_flows")
+    previous_overrides = app.dependency_overrides.copy()
+    app.dependency_overrides[get_flow_service] = lambda: FlowService(
+        flow_repository=get_flow_repository(),
+        source_store=store,
+        deployment_client=deployment,
+    )
+    try:
+        yield SimpleNamespace(deployment=deployment, store=store)
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
+
+
+FLOW_SOURCE = "from prefect import flow\n\n\n@flow\ndef first_calibration():\n    pass\n"
+
+
+class TestFlowCreateOnly:
+    """Tests for create-only saves used when a new flow is created."""
+
+    def _request(self, **overrides):
+        body = {
+            "name": "first_calibration",
+            "code": FLOW_SOURCE,
+            "chip_id": "chip-1",
+            "create_only": True,
+        }
+        body.update(overrides)
+        return body
+
+    def test_second_create_only_save_returns_409_and_keeps_the_flow(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        """Repeating a create-only save conflicts and leaves the first flow untouched."""
+        first = test_client.post("/flows", json=self._request(), headers=auth_headers)
+        assert first.status_code == 200
+        stored = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert stored is not None
+        file_path = Path(stored.file_path)
+
+        second = test_client.post(
+            "/flows",
+            json=self._request(code=FLOW_SOURCE + "# overwrite\n", chip_id="chip-2"),
+            headers=auth_headers,
+        )
+
+        assert second.status_code == 409
+        assert second.json() == {
+            "detail": "Flow 'first_calibration' already exists. Choose another name."
+        }
+        after = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert after is not None
+        assert after.chip_id == "chip-1"
+        assert after.deployment_id == stored.deployment_id
+        assert file_path.read_text(encoding="utf-8") == FLOW_SOURCE
+        assert len(flow_service_on_tmp.deployment.calls) == 1
+
+    def test_save_without_create_only_overwrites_as_before(
+        self, test_client, test_project, auth_headers, flow_service_on_tmp
+    ):
+        """The flow editor's save keeps overwriting an existing flow."""
+        assert (
+            test_client.post("/flows", json=self._request(), headers=auth_headers).status_code
+            == 200
+        )
+        legacy = self._request(code=FLOW_SOURCE + "# edited\n", chip_id="chip-2")
+        del legacy["create_only"]
+
+        response = test_client.post("/flows", json=legacy, headers=auth_headers)
+
+        assert response.status_code == 200
+        after = FlowDocument.find_by_project_and_name("test_project", "first_calibration")
+        assert after is not None
+        assert after.chip_id == "chip-2"
+        assert Path(after.file_path).read_text(encoding="utf-8").endswith("# edited\n")
+
+
+MANUAL_FLOW = """
+from qdash.workflow import TaskCall
+from qdash.workflow.service import CalibService
+from qdash.workflow.service.steps import CustomOneQubit
+from qdash.workflow.service.targets import QubitTargets
+
+
+def run_manual(username, chip_id):
+    cal = CalibService(username, chip_id)
+    return cal.run(
+        QubitTargets(["0", "8"]),
+        steps=[
+            CustomOneQubit(
+                execution_mode="manual",
+                rounds=[["0", "8"]],
+                tasks=[TaskCall(name="CheckRabi")],
+            )
+        ],
+    )
+"""
+
+
+@pytest.fixture
+def manual_flow(test_project, tmp_path):
+    """A saved flow with manual rounds, its source file and its chip."""
+    from qdash.dbmodel.chip import ChipDocument
+
+    path = tmp_path / "manual_flow.py"
+    path.write_text(MANUAL_FLOW, encoding="utf-8")
+    ChipDocument(
+        chip_id="test_chip",
+        username="test_user",
+        project_id="test_project",
+        size=64,
+        system_info=SystemInfoModel(),
+    ).insert()
+    flow = FlowDocument(
+        project_id="test_project",
+        name="manual_flow",
+        username="test_user",
+        chip_id="test_chip",
+        flow_function_name="run_manual",
+        file_path=str(path),
+        deployment_id="manual-deployment",
+    )
+    flow.insert()
+    return flow
+
+
+def _viewer_headers() -> dict[str, str]:
+    user = UserDocument(
+        username="viewer_user",
+        hashed_password="hashed",
+        access_token="viewer_token",
+        default_project_id="test_project",
+        system_info=SystemInfoModel(),
+    )
+    user.insert()
+    ProjectMembershipDocument(
+        project_id="test_project",
+        user_id=user.user_id,
+        username="viewer_user",
+        role=ProjectRole.VIEWER,
+        status="active",
+        invited_by_user_id=user.user_id,
+        invited_by="test_user",
+    ).insert()
+    return {"Authorization": "Bearer viewer_token", "X-Project-Id": "test_project"}
+
+
+class TestFlowExecutionPlan:
+    """GET /flows/{name}/execution-plan is a read-only, project-scoped preview."""
+
+    def test_a_viewer_reads_the_plan_without_changing_the_flow(self, test_client, manual_flow):
+        before = FlowDocument.find_by_project_and_name("test_project", "manual_flow")
+        response = test_client.get("/flows/manual_flow/execution-plan", headers=_viewer_headers())
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["chip_id"] == "test_chip"
+        assert body["runs"][0]["steps"][0]["rounds"] == [{"number": 1, "targets": ["0", "8"]}]
+        assert body["target_override_allowed"] is False
+        after = FlowDocument.find_by_project_and_name("test_project", "manual_flow")
+        assert after is not None and before is not None
+        assert after.updated_at == before.updated_at
+
+    def test_the_plan_requires_authentication(self, test_client, manual_flow):
+        assert test_client.get("/flows/manual_flow/execution-plan").status_code == 401
+
+    def test_other_projects_and_chips_are_not_visible(self, test_client, manual_flow, auth_headers):
+        other = test_client.get(
+            "/flows/manual_flow/execution-plan",
+            headers={**auth_headers, "X-Project-Id": "other_project"},
+        )
+        assert other.status_code in {403, 404}
+        chip = test_client.get(
+            "/flows/manual_flow/execution-plan",
+            headers=auth_headers,
+            params={"chip_id": "unknown_chip"},
+        )
+        assert chip.status_code == 404

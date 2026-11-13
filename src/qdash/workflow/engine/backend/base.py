@@ -15,6 +15,17 @@ class BaseBackend(ABC):
     """Connect to the backend."""
 
     @abstractmethod
+    def disconnect(self) -> None:
+        """Release resources held by the backend without opening a connection."""
+        ...
+
+    @property
+    @abstractmethod
+    def is_connected(self) -> bool:
+        """Return whether the backend currently owns a live backend instance."""
+        ...
+
+    @abstractmethod
     def version(self) -> str:
         """Return the version of the backend."""
         msg = "This method should be implemented by subclasses."

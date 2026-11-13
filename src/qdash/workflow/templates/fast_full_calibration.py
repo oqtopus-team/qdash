@@ -6,12 +6,13 @@ passes when the chip is already close to a calibrated state.
 
 Execution flow:
     1. ConfigureAll: Push the current full-chip configuration to the selected MUXes
-    2. OneQubitCheck: Fast pulse sanity check
+    2. OneQubitCheck: Fast pulse sanity check, then Ramsey
     3. FilterByStatus: Filter to only successful qubits
-    4. OneQubitFineTune: Pulse/readout/RB/X90 IRB tune without T1/T2 averages
-    5. FilterByMetric: Filter by X90 fidelity threshold
-    6. GenerateCRSchedule: Generate 2Q execution schedule
-    7. TwoQubitCalibration: 2Q coupling calibration
+    4. ConfigureAll: Push the current configuration again before fine-tuning
+    5. OneQubitFineTune: Pulse/readout/RB/X90 IRB tune without T1/T2 averages
+    6. FilterByMetric: Filter by X90 fidelity threshold
+    7. GenerateCRSchedule: Generate 2Q execution schedule
+    8. TwoQubitCalibration: 2Q coupling calibration
 
 Example:
     fast_full_calibration(
@@ -25,6 +26,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -42,35 +44,44 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import MuxTargets
 
-FAST_1Q_CHECK_TASKS: list[str] = [
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
+FAST_1Q_CHECK_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckRabi"),
+    TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
+    TaskCall(name="CheckHPIPulse"),
+    TaskCall(name="CheckRamsey"),
 ]
 
-FAST_1Q_FINE_TUNE_TASKS: list[str] = [
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "ReadoutClassification",
-    "RandomizedBenchmarking",
-    "X90InterleavedRandomizedBenchmarking",
+FAST_1Q_FINE_TUNE_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckRabi"),
+    TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
+    TaskCall(name="CheckHPIPulse"),
+    TaskCall(name="CreatePIPulse", run={"pi_duration": 32}),
+    TaskCall(name="CheckPIPulse"),
+    TaskCall(name="CreateDRAGHPIPulse", run={"drag_hpi_duration": 16}),
+    TaskCall(name="CheckDRAGHPIPulse"),
+    TaskCall(name="CreateDRAGPIPulse", run={"drag_pi_duration": 24}),
+    TaskCall(name="CheckDRAGPIPulse"),
+    TaskCall(name="ReadoutClassification"),
+    TaskCall(name="RandomizedBenchmarking"),
+    TaskCall(name="X90InterleavedRandomizedBenchmarking"),
 ]
 
 # Final step: calibrate and validate each scheduled coupling, then benchmark it.
-FAST_2Q_TASKS: list[str] = [
-    "CheckCrossResonance",
-    "CreateZX90",
-    "CheckZX90",
-    "CheckBellState",
-    "CheckBellStateTomography",
-    "ZX90InterleavedRandomizedBenchmarking",
+FAST_2Q_TASKS: list[TaskCall] = [
+    TaskCall(
+        name="CheckCrossResonance",
+        # Uncomment to tune the CR parameter search.
+        # run={
+        #     "adiabatic_safe_factor": 0.65,
+        #     "max_amplitude": 0.85,
+        #     "max_time_range": 8192,
+        # },
+    ),
+    TaskCall(name="CreateZX90"),
+    TaskCall(name="CheckZX90"),
+    TaskCall(name="CheckBellState"),
+    TaskCall(name="CheckBellStateTomography"),
+    TaskCall(name="ZX90InterleavedRandomizedBenchmarking"),
 ]
 
 
@@ -121,9 +132,11 @@ def fast_full_calibration(
 
     steps = [
         ConfigureAll(),
-        OneQubitCheck(mode="synchronized", tasks=FAST_1Q_CHECK_TASKS),
+        OneQubitCheck(execution_mode="parallel_by_round", tasks=FAST_1Q_CHECK_TASKS),
         FilterByStatus(),
-        OneQubitFineTune(mode="synchronized", tasks=FAST_1Q_FINE_TUNE_TASKS),
+        # Reconfigure the selected MUXes; FilterByStatus's candidates carry over.
+        ConfigureAll(step_id="configure_all_before_fine_tune"),
+        OneQubitFineTune(execution_mode="parallel_by_round", tasks=FAST_1Q_FINE_TUNE_TASKS),
         FilterByMetric(metric="x90_fidelity", threshold=fidelity_threshold),
         GenerateCRSchedule(max_parallel_ops=max_parallel_ops, inverse=inverse),
         TwoQubitCalibration(tasks=FAST_2Q_TASKS),
@@ -135,29 +148,9 @@ def fast_full_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
-            "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreatePIPulse": {
-                "pi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreateDRAGHPIPulse": {
-                "drag_hpi_duration": {"value": 16, "value_type": "int"},
-            },
-            "CreateDRAGPIPulse": {
-                "drag_pi_duration": {"value": 24, "value_type": "int"},
-            },
-            # Per-task overrides — uncomment to tune the CR parameter search.
-            # "CheckCrossResonance": {
-            #     "adiabatic_safe_factor": {"value": 0.65, "value_type": "float"},
-            #     "max_amplitude": {"value": 0.85, "value_type": "float"},
-            #     "max_time_range": {"value": 8192, "value_type": "int"},
-            # },
-        },
         default_run_parameters={
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

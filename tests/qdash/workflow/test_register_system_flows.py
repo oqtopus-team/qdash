@@ -12,6 +12,11 @@ def test_system_flow_registration_includes_legacy_and_agent_deployments() -> Non
         "flow_function_name": "single_task_executor",
         "deployment_name": "system-single-task",
     }
+    assert by_name["system-calibration-pipeline"] == {
+        "file_path": "/app/qdash/workflow/service/pipeline_flow.py",
+        "flow_function_name": "calibration_pipeline",
+        "deployment_name": "system-calibration-pipeline",
+    }
     assert by_name["system-candidate-apply"] == {
         "file_path": "/app/qdash/workflow/service/agent_candidate_apply_flow.py",
         "flow_function_name": "agent_candidate_apply",

@@ -1,36 +1,56 @@
 name: Publish @oqtopus-team/qdash-client
 
+# The TypeScript packages workflow owns PR/develop builds so packages share one client
+# version and cannot race a separate client publication for the same commit.
 on:
-  pull_request:
-    branches: [develop]
-    paths:
-      - "clients/typescript/**"
-      - "docs/oas/openapi.json"
-      - "Taskfile.yaml"
-      - ".github/workflows/publish-qdash-typescript-client.yml"
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      publish:
+        description: Publish the built client before dependent pi packages
+        type: boolean
+        default: false
+    secrets:
+      NPM_TOKEN:
+        required: false
+    outputs:
+      version:
+        description: Exact version of the client tarball from this run
+        value: ${{ jobs.build.outputs.version }}
 
 permissions:
   contents: read
 
+concurrency:
+  group: qdash-typescript-client-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      channel: ${{ steps.version.outputs.channel }}
     name: Build TypeScript client
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          # Tags are needed to derive the beta version from the latest release.
+          fetch-depth: 0
 
       - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: "1.4.0"
+          no-cache: true
 
       - name: Install dependencies
-        working-directory: clients/typescript
         run: bun install --frozen-lockfile
 
       - name: Verify generated client
@@ -43,10 +63,12 @@ jobs:
         working-directory: clients/typescript
         run: bun run check
 
-      - name: Set release version
-        if: startsWith(github.ref, 'refs/tags/v')
-        working-directory: clients/typescript
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+      - name: Test release versioning
+        run: node --test .github/scripts/client-release.test.mjs
+
+      - name: Set package version
+        id: version
+        run: node .github/scripts/client-release.mjs
 
       - name: Build package
         working-directory: clients/typescript
@@ -55,38 +77,45 @@ jobs:
           npm pack --pack-destination dist --ignore-scripts
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: qdash-typescript-client-dist
+          overwrite: true
           path: clients/typescript/dist/oqtopus-team-qdash-client-*.tgz
           if-no-files-found: error
 
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: inputs.publish || startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
       id-token: write
     steps:
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Update npm
-        run: npm install --global npm@latest
-
       - name: Download package artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: qdash-typescript-client-dist
           path: dist
 
       - name: Publish package
-        run: npm publish ./dist/oqtopus-team-qdash-client-*.tgz --access public --provenance
+        # Keep token publishing until npm Trusted Publishing is configured.
+        # jactionlint ignore=use-trusted-publishing
+        run: |
+          case "$CLIENT_CHANNEL" in
+            latest|beta|pi) ;;
+            *) echo "This build is validation-only" >&2; exit 1 ;;
+          esac
+          npm publish ./dist/oqtopus-team-qdash-client-*.tgz --access public --provenance --tag "$CLIENT_CHANNEL"
         env:
+          CLIENT_CHANNEL: ${{ needs.build.outputs.channel }}
           # Used only to bootstrap the package before npm Trusted Publishing can be configured.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

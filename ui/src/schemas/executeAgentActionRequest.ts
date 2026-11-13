@@ -5,16 +5,14 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecuteAgentActionRequestSourceExecutionId } from './executeAgentActionRequestSourceExecutionId';
 
 /**
  * Dispatch one authorized run-task action as a staged measurement.
  */
 export interface ExecuteAgentActionRequest {
-  /**
-     * @minLength 1
-     * @maxLength 200
-     */
-  source_execution_id: string;
+  /** Execution the action was decided from, kept for provenance. The run reads the current calibration state, as a Task Workbench run does. */
+  source_execution_id?: ExecuteAgentActionRequestSourceExecutionId;
   update_params?: boolean;
   reconfigure?: boolean;
 }

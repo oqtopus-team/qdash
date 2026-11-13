@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import { themeChange } from "theme-change";
-import { AVAILABLE_THEMES, type ThemeName } from "@/constants/themes";
+import { AVAILABLE_THEMES, DARK_THEMES, type ThemeName } from "@/constants/themes";
 
 type Theme = ThemeName;
 
@@ -63,4 +63,10 @@ export function useTheme() {
     throw new Error("useTheme must be used within a ThemeProvider");
   }
   return context;
+}
+
+/** True when the active theme has dark surfaces; "light" outside a ThemeProvider. */
+export function useIsDarkTheme(): boolean {
+  const context = useContext(ThemeContext);
+  return DARK_THEMES.includes(context?.theme ?? "light");
 }

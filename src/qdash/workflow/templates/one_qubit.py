@@ -11,11 +11,12 @@ Example:
     )
 """
 
+import math  # noqa: F401  # used by commented range overrides below
 from typing import Any
 
-import numpy as np  # noqa: F401  # used by commented per-task overrides below
 from prefect import flow
 
+from qdash.workflow import TaskCall, sweep  # noqa: F401  # used by commented range overrides below
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -29,72 +30,6 @@ from qdash.workflow.service.steps import (
     Step,
 )
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
-
-# Task lists are explicit so this template can be reviewed and edited on its own.
-# Tests keep these stages aligned with coarse_one and fine_one.
-# Step 1: coarse calibration through Ramsey, calibrating and checking all four pulse types.
-ONE_QUBIT_CHECK_TASKS: list[str] = [
-    "Configure",  # Apply the starting configuration before the readout search.
-    "CheckCoarseReadoutParams",
-    "Configure",  # Apply the updated readout settings before pulse calibration.
-    "CheckRabi",  # Update control amplitude from the measured Rabi frequency.
-    "CheckRabi",  # Measure again at the updated amplitude for HPI creation.
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "CheckT1",
-    "CheckT2Echo",
-    "CheckRamsey",
-]
-
-# Step 3: fine calibration after the successful-qubit filter.
-ONE_QUBIT_FINE_TUNE_TASKS: list[str] = [
-    "Configure",
-    # Round 1: calibrate HPI -> PI -> DRAG HPI -> DRAG PI, then tune amplitude/frequency.
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "CheckOptimalReadoutAmplitude",
-    "CheckOptimalReadoutFrequency",
-    "Configure",  # Apply round 1's readout frequency before recalibrating pulses.
-    # Round 2: recalibrate all four pulse types at the updated settings, then repeat the pair.
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "CheckOptimalReadoutAmplitude",
-    "CheckOptimalReadoutFrequency",
-    "Configure",  # Apply the final readout frequency before final pulse calibration.
-    # Calibrate all pulses at the final readout settings before classification and RB.
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "ReadoutClassification",
-    "RandomizedBenchmarking",
-    "X90InterleavedRandomizedBenchmarking",
-]
 
 
 @flow(
@@ -139,18 +74,112 @@ def one_qubit(
     else:
         raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
-    steps: list[Step]
-    if check_only:
-        # Run only the coarse stage shown above.
-        steps = [
-            OneQubitCheck(mode="synchronized", tasks=ONE_QUBIT_CHECK_TASKS),
+    # Pulse durations (ns) shared by every pulse calibration in both stages.
+    hpi_duration = 32
+    pi_duration = 32
+    drag_hpi_duration = 16
+    drag_pi_duration = 24
+
+    # Task lists are explicit so this template can be reviewed and edited on its own.
+    # Tests keep these stages aligned with coarse_one and fine_one.
+    # Step 1: coarse calibration through Ramsey, calibrating and checking all four pulse types.
+    # To choose rounds yourself, edit a step to execution_mode="manual" with
+    # rounds=[["0", "8"], ["1", "9"]]: rounds run in order, the qubits of a round in
+    # parallel, and the chip checks run before any qubit. The rounds must name
+    # exactly the step's current qubits, so a manual OneQubitFineTune fails when
+    # FilterByStatus drops a qubit it lists. See docs/user-guide/manual-execution-rounds.md.
+    steps: list[Step] = [
+        OneQubitCheck(
+            execution_mode="parallel_by_round",
+            tasks=[
+                # Apply the starting configuration before the readout search.
+                TaskCall(name="Configure", call_id="configure_initial"),
+                TaskCall(name="CheckCoarseReadoutParams"),
+                # Apply the updated readout settings before pulse calibration.
+                TaskCall(name="Configure", call_id="configure_readout"),
+                # Update control amplitude from the measured Rabi frequency.
+                TaskCall(name="CheckRabi", call_id="rabi_amplitude_update"),
+                # Measure again at the updated amplitude for HPI creation.
+                TaskCall(name="CheckRabi", call_id="rabi_at_updated_amplitude"),
+                TaskCall(name="CreateHPIPulse", run={"hpi_duration": hpi_duration}),
+                TaskCall(name="CheckHPIPulse"),
+                TaskCall(name="CreatePIPulse", run={"pi_duration": pi_duration}),
+                TaskCall(name="CheckPIPulse"),
+                TaskCall(name="CreateDRAGHPIPulse", run={"drag_hpi_duration": drag_hpi_duration}),
+                TaskCall(name="CheckDRAGHPIPulse"),
+                TaskCall(name="CreateDRAGPIPulse", run={"drag_pi_duration": drag_pi_duration}),
+                TaskCall(name="CheckDRAGPIPulse"),
+                TaskCall(
+                    name="CheckT1",
+                    # Uncomment to make the sweep range explicit (100 ns to 500 us).
+                    # run={"time_range": sweep.logspace(math.log10(100), math.log10(500_000), 51)},
+                ),
+                TaskCall(
+                    name="CheckT2Echo",
+                    # Uncomment to make the sweep range explicit (300 ns to 100 us).
+                    # run={"time_range": sweep.logspace(math.log10(300), math.log10(100_000), 51)},
+                ),
+                TaskCall(name="CheckRamsey"),
+            ],
+        ),
+    ]
+    if not check_only:
+        # Step 3: fine calibration after the successful-qubit filter.
+        # Configure applies the latest readout settings before each pulse calibration round.
+        fine_tasks: list[TaskCall] = [TaskCall(name="Configure", call_id="configure_round1")]
+        for round_name, next_round in (("round1", "round2"), ("round2", "final"), ("final", None)):
+            # Calibrate and check HPI -> PI -> DRAG HPI -> DRAG PI at the current settings.
+            fine_tasks += [
+                TaskCall(name="CheckRabi", call_id=f"rabi_{round_name}"),
+                TaskCall(
+                    name="CreateHPIPulse",
+                    call_id=f"hpi_create_{round_name}",
+                    run={"hpi_duration": hpi_duration},
+                ),
+                TaskCall(name="CheckHPIPulse", call_id=f"hpi_check_{round_name}"),
+                TaskCall(
+                    name="CreatePIPulse",
+                    call_id=f"pi_create_{round_name}",
+                    run={"pi_duration": pi_duration},
+                ),
+                TaskCall(name="CheckPIPulse", call_id=f"pi_check_{round_name}"),
+                TaskCall(
+                    name="CreateDRAGHPIPulse",
+                    call_id=f"drag_hpi_create_{round_name}",
+                    run={"drag_hpi_duration": drag_hpi_duration},
+                ),
+                TaskCall(name="CheckDRAGHPIPulse", call_id=f"drag_hpi_check_{round_name}"),
+                TaskCall(
+                    name="CreateDRAGPIPulse",
+                    call_id=f"drag_pi_create_{round_name}",
+                    run={"drag_pi_duration": drag_pi_duration},
+                ),
+                TaskCall(name="CheckDRAGPIPulse", call_id=f"drag_pi_check_{round_name}"),
+            ]
+            if next_round is not None:
+                # Tune readout amplitude, then frequency, and apply them before the next round.
+                fine_tasks += [
+                    TaskCall(
+                        name="CheckOptimalReadoutAmplitude",
+                        call_id=f"readout_amplitude_{round_name}",
+                    ),
+                    TaskCall(
+                        name="CheckOptimalReadoutFrequency",
+                        call_id=f"readout_frequency_{round_name}",
+                    ),
+                    TaskCall(name="Configure", call_id=f"configure_{next_round}"),
+                ]
+        # Classify readout and benchmark only after the final pulse calibration.
+        fine_tasks += [
+            TaskCall(name="ReadoutClassification"),
+            TaskCall(name="RandomizedBenchmarking"),
+            TaskCall(name="X90InterleavedRandomizedBenchmarking"),
         ]
-    else:
-        # Run coarse -> filter successful qubits -> fine, with one Execution per calibration stage.
-        steps = [
-            OneQubitCheck(mode="synchronized", tasks=ONE_QUBIT_CHECK_TASKS),
+
+        # Run coarse -> filter successful qubits -> fine, with one Execution per stage.
+        steps += [
             FilterByStatus(),  # Only proceed with successful qubits
-            OneQubitFineTune(mode="synchronized", tasks=ONE_QUBIT_FINE_TUNE_TASKS),
+            OneQubitFineTune(execution_mode="parallel_by_round", tasks=fine_tasks),
         ]
 
     cal = CalibService(
@@ -159,36 +188,9 @@ def one_qubit(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
-            "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreatePIPulse": {
-                "pi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreateDRAGHPIPulse": {
-                "drag_hpi_duration": {"value": 16, "value_type": "int"},
-            },
-            "CreateDRAGPIPulse": {
-                "drag_pi_duration": {"value": 24, "value_type": "int"},
-            },
-            # Per-task overrides — uncomment to extend coherence sweep ranges.
-            # "CheckT1": {
-            #     "time_range": {
-            #         "value": (np.log10(100), np.log10(1000 * 1000), 51),  # 100 ns 〜 1 ms
-            #         "value_type": "np.logspace",
-            #     },
-            # },
-            # "CheckT2Echo": {
-            #     "time_range": {
-            #         "value": (np.log10(300), np.log10(500 * 1000), 51),  # 300 ns 〜 500 μs
-            #         "value_type": "np.logspace",
-            #     },
-            # },
-        },
         default_run_parameters={
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

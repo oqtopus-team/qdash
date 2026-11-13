@@ -19,11 +19,12 @@ Example:
     )
 """
 
+import math  # noqa: F401  # used by commented range overrides below
 from typing import Any
 
-import numpy as np  # noqa: F401  # used by commented per-task overrides below
 from prefect import flow
 
+from qdash.workflow import TaskCall, sweep  # noqa: F401  # used by commented range overrides below
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -41,46 +42,64 @@ from qdash.workflow.service.steps import (
 )
 from qdash.workflow.service.targets import MuxTargets
 
-FULL_1Q_CHECK_TASKS: list[str] = [
-    "CheckRabi",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    # "CheckOptimalReadoutFrequency",
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CheckT1",
-    "CheckT2Echo",
-    "CheckRamsey",
+FULL_1Q_CHECK_TASKS: list[TaskCall] = [
+    # Update control amplitude, then measure again at the updated amplitude.
+    TaskCall(name="CheckRabi", call_id="rabi_amplitude_update"),
+    TaskCall(name="CheckRabi", call_id="rabi_at_updated_amplitude"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_first", run={"hpi_duration": 32}),
+    TaskCall(name="CheckHPIPulse", call_id="hpi_check_first"),
+    # TaskCall(name="CheckOptimalReadoutFrequency"),
+    # Second pass at the settings the first pass produced.
+    TaskCall(name="CheckRabi", call_id="rabi_second_pass"),
+    TaskCall(name="CreateHPIPulse", call_id="hpi_create_second", run={"hpi_duration": 32}),
+    TaskCall(name="CheckHPIPulse", call_id="hpi_check_second"),
+    TaskCall(
+        name="CheckT1",
+        # Uncomment to make the sweep range explicit (100 ns to 500 us).
+        # run={"time_range": sweep.logspace(math.log10(100), math.log10(500_000), 51)},
+    ),
+    TaskCall(
+        name="CheckT2Echo",
+        # Uncomment to make the sweep range explicit (300 ns to 100 us).
+        # run={"time_range": sweep.logspace(math.log10(300), math.log10(100_000), 51)},
+    ),
+    TaskCall(name="CheckRamsey"),
 ]
 
-FULL_1Q_FINE_TUNE_TASKS: list[str] = [
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "ReadoutClassification",
-    "CheckT1Average",
-    "CheckT2EchoAverage",
-    "Check1QGateCoherenceLimit",
-    "RandomizedBenchmarking",
-    "X90InterleavedRandomizedBenchmarking",
+FULL_1Q_FINE_TUNE_TASKS: list[TaskCall] = [
+    TaskCall(name="CheckRabi"),
+    TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
+    TaskCall(name="CheckHPIPulse"),
+    TaskCall(name="CreatePIPulse", run={"pi_duration": 32}),
+    TaskCall(name="CheckPIPulse"),
+    TaskCall(name="CreateDRAGHPIPulse", run={"drag_hpi_duration": 16}),
+    TaskCall(name="CheckDRAGHPIPulse"),
+    TaskCall(name="CreateDRAGPIPulse", run={"drag_pi_duration": 24}),
+    TaskCall(name="CheckDRAGPIPulse"),
+    TaskCall(name="ReadoutClassification"),
+    TaskCall(name="CheckT1Average"),
+    TaskCall(name="CheckT2EchoAverage"),
+    TaskCall(name="Check1QGateCoherenceLimit"),
+    TaskCall(name="RandomizedBenchmarking"),
+    TaskCall(name="X90InterleavedRandomizedBenchmarking"),
 ]
 
-FULL_2Q_TASKS: list[str] = [
-    "CheckCrossResonance",
-    "CreateZX90",
-    "CheckZX90",
-    "CheckBellState",
-    "CheckBellStateTomography",
-    "Check2QGateCoherenceLimit",
-    "ZX90InterleavedRandomizedBenchmarking",
+FULL_2Q_TASKS: list[TaskCall] = [
+    TaskCall(
+        name="CheckCrossResonance",
+        # Uncomment to tune the CR parameter search.
+        # run={
+        #     "adiabatic_safe_factor": 0.65,
+        #     "max_amplitude": 0.85,
+        #     "max_time_range": 8192,
+        # },
+    ),
+    TaskCall(name="CreateZX90"),
+    TaskCall(name="CheckZX90"),
+    TaskCall(name="CheckBellState"),
+    TaskCall(name="CheckBellStateTomography"),
+    TaskCall(name="Check2QGateCoherenceLimit"),
+    TaskCall(name="ZX90InterleavedRandomizedBenchmarking"),
 ]
 
 
@@ -146,10 +165,10 @@ def full_calibration(
         # Stage 0: Push current configuration to all selected MUXes
         ConfigureAll(),
         # Stage 1: Basic 1Q characterization
-        OneQubitCheck(mode="synchronized", tasks=FULL_1Q_CHECK_TASKS),
+        OneQubitCheck(execution_mode="parallel_by_round", tasks=FULL_1Q_CHECK_TASKS),
         FilterByStatus(),  # Only proceed with successful qubits
         # Stage 2: Advanced 1Q calibration (DRAG, RB, IRB)
-        OneQubitFineTune(mode="synchronized", tasks=FULL_1Q_FINE_TUNE_TASKS),
+        OneQubitFineTune(execution_mode="parallel_by_round", tasks=FULL_1Q_FINE_TUNE_TASKS),
         # Stage 3: Filter by X90 fidelity
         FilterByMetric(metric="x90_fidelity", threshold=fidelity_threshold),
         # Stage 4: Generate 2Q schedule with explicit direction
@@ -168,42 +187,9 @@ def full_calibration(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
-            "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreatePIPulse": {
-                "pi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreateDRAGHPIPulse": {
-                "drag_hpi_duration": {"value": 16, "value_type": "int"},
-            },
-            "CreateDRAGPIPulse": {
-                "drag_pi_duration": {"value": 24, "value_type": "int"},
-            },
-            # Per-task overrides — uncomment to tune the CR parameter search.
-            # "CheckCrossResonance": {
-            #     "adiabatic_safe_factor": {"value": 0.65, "value_type": "float"},
-            #     "max_amplitude": {"value": 0.85, "value_type": "float"},
-            #     "max_time_range": {"value": 8192, "value_type": "int"},
-            # },
-            # Per-task overrides — uncomment to extend coherence sweep ranges.
-            # "CheckT1": {
-            #     "time_range": {
-            #         "value": (np.log10(100), np.log10(1000 * 1000), 51),  # 100 ns 〜 1 ms
-            #         "value_type": "np.logspace",
-            #     },
-            # },
-            # "CheckT2Echo": {
-            #     "time_range": {
-            #         "value": (np.log10(300), np.log10(500 * 1000), 51),  # 300 ns 〜 500 μs
-            #         "value_type": "np.logspace",
-            #     },
-            # },
-        },
         default_run_parameters={
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

@@ -5,11 +5,15 @@ from pymongo.errors import DuplicateKeyError
 
 from qdash.dbmodel.forum import ForumCounterDocument, ForumPostDocument
 from qdash.dbmodel.migration import (
+    RENAME_AGENT_CANDIDATE_SET_COMMITS_MIGRATION_ID,
     RENAME_CHECK_CHEVRON_MIGRATION_ID,
+    RENAME_CHECK_EF_CHEVRON_MIGRATION_ID,
     MigrationError,
     migrate_backfill_forum_thread_numbers,
     migrate_forum_status,
+    migrate_rename_agent_candidate_set_commits,
     migrate_rename_check_chevron,
+    migrate_rename_check_ef_chevron,
     run_pending_database_migrations,
 )
 
@@ -53,6 +57,96 @@ def test_rename_check_chevron_migration_uses_ledger_and_preserves_task_catalog(i
     repeated = run_pending_database_migrations(init_db, dry_run=False)
 
     assert repeated[RENAME_CHECK_CHEVRON_MIGRATION_ID]["already_completed"] is True
+
+
+def test_rename_check_ef_chevron_migration_uses_ledger_and_preserves_task_catalog(init_db):
+    history_fields = {
+        "task_result_history": "name",
+        "parameter_versions": "task_name",
+        "provenance_activities": "task_name",
+        "issue_knowledge": "task_name",
+        "agent_candidate_commits": "task_name",
+        "agent_actions": "task_name",
+    }
+    for collection_name, field_name in history_fields.items():
+        init_db[collection_name].insert_one({field_name: "CheckEFChevron"})
+    init_db["note_event"].insert_one({"extra": {"task_name": "CheckEFChevron"}})
+    init_db["task"].insert_one({"name": "CheckEFChevron"})
+
+    dry_run = migrate_rename_check_ef_chevron(init_db)
+
+    assert dry_run["matched"] == len(history_fields) + 1
+    assert dry_run["updated"] == 0
+    assert init_db["task_result_history"].find_one()["name"] == "CheckEFChevron"
+    assert init_db["migration_ledger"].count_documents({}) == 0
+
+    executed = run_pending_database_migrations(init_db, dry_run=False)
+
+    result = executed[RENAME_CHECK_EF_CHEVRON_MIGRATION_ID]
+    assert result["already_completed"] is False
+    assert result["stats"]["matched"] == len(history_fields) + 1
+    assert result["stats"]["updated"] == len(history_fields) + 1
+    for collection_name, field_name in history_fields.items():
+        assert init_db[collection_name].find_one()[field_name] == "CheckAdaptiveEFChevron"
+    assert init_db["note_event"].find_one()["extra"]["task_name"] == ("CheckAdaptiveEFChevron")
+    assert init_db["task"].find_one()["name"] == "CheckEFChevron"
+    ledger = init_db["migration_ledger"].find_one(
+        {"migration_id": RENAME_CHECK_EF_CHEVRON_MIGRATION_ID}
+    )
+    assert ledger["status"] == "completed"
+
+    repeated = run_pending_database_migrations(init_db, dry_run=False)
+
+    assert repeated[RENAME_CHECK_EF_CHEVRON_MIGRATION_ID]["already_completed"] is True
+
+
+def test_rename_agent_candidate_set_commits_moves_the_collection(init_db):
+    init_db["agent_campaign_commits"].insert_many(
+        [{"_id": "c1", "commit_id": "c1"}, {"_id": "c2", "commit_id": "c2"}]
+    )
+
+    dry_run = migrate_rename_agent_candidate_set_commits(init_db)
+
+    assert dry_run == {"matched": 2, "moved": 0, "renamed": False}
+    assert init_db["agent_candidate_set_commits"].count_documents({}) == 0
+
+    executed = run_pending_database_migrations(init_db, dry_run=False)
+
+    result = executed[RENAME_AGENT_CANDIDATE_SET_COMMITS_MIGRATION_ID]
+    assert result["stats"] == {"matched": 2, "moved": 2, "renamed": True}
+    assert "agent_campaign_commits" not in init_db.list_collection_names()
+    assert init_db["agent_candidate_set_commits"].count_documents({}) == 2
+    assert run_pending_database_migrations(init_db, dry_run=False)[
+        RENAME_AGENT_CANDIDATE_SET_COMMITS_MIGRATION_ID
+    ]["already_completed"]
+
+
+def test_rename_agent_candidate_set_commits_merges_into_an_existing_collection(init_db):
+    def commit(commit_id: str) -> dict[str, str]:
+        return {
+            "_id": commit_id,
+            "commit_id": commit_id,
+            "project_id": "p",
+            "session_id": "s",
+            "idempotency_key": f"key-{commit_id}",
+        }
+
+    init_db["agent_campaign_commits"].insert_many([commit("c1"), commit("c2")])
+    init_db["agent_candidate_set_commits"].insert_one(commit("c2"))
+
+    stats = migrate_rename_agent_candidate_set_commits(init_db, dry_run=False)
+
+    assert stats == {"matched": 2, "moved": 1, "renamed": False}
+    assert "agent_campaign_commits" not in init_db.list_collection_names()
+    assert sorted(d["_id"] for d in init_db["agent_candidate_set_commits"].find()) == ["c1", "c2"]
+
+
+def test_rename_agent_candidate_set_commits_without_the_old_collection_is_a_no_op(init_db):
+    assert migrate_rename_agent_candidate_set_commits(init_db, dry_run=False) == {
+        "matched": 0,
+        "moved": 0,
+        "renamed": False,
+    }
 
 
 def _forum_post(post_id) -> ForumPostDocument:

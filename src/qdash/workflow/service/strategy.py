@@ -1,16 +1,24 @@
-"""Calibration strategy classes for CalibService.
+"""Calibration strategy classes for one-qubit calibration steps.
 
-Strategy pattern implementation for different calibration execution modes.
+Each one-qubit execution mode maps to one strategy here. The mode names and the
+difference between rounds and MUX parallelism are defined in
+:mod:`qdash.datamodel.one_qubit_execution_mode`. Every strategy keeps
+the scheduler's hardware stage constraints; the strategies differ only in how
+targets wait for each other, and every target runs the step's full call list.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
+from qdash.datamodel.one_qubit_execution_mode import (
+    OneQubitExecutionMode,
+    validate_one_qubit_execution_mode,
+)
 from qdash.workflow.engine import OneQubitScheduler
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.service._internal.scheduling_tasks import (
@@ -22,7 +30,8 @@ from qdash.workflow.service._internal.scheduling_tasks import (
 )
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.datamodel.task_call import StepCalls
+    from qdash.workflow.service._internal.session import CalibSession
 
 
 # =============================================================================
@@ -32,15 +41,26 @@ if TYPE_CHECKING:
 
 @dataclass
 class OneQubitConfig:
-    """Configuration for 1-qubit calibration."""
+    """Configuration for 1-qubit calibration.
+
+    ``plan`` holds the step's normalized calls, its step_id and failure policy.
+    The strategy decides only where and when targets run; every target runs the
+    plan's calls in order.
+    """
 
     mux_ids: list[int]
     exclude_qids: list[str]
-    tasks: list[str]
-    flow_name: str | None
-    project_id: str | None
+    plan: StepCalls
     qids: list[str] | None = None  # Explicit qubit IDs (overrides mux_ids if set)
     simultaneous_spectroscopy_schedule_mode: str = "local_index"
+    # Standalone (non-multiplexed) qubits to calibrate besides the MUX members.
+    # They run after the MUX stages, one at a time.
+    standalone_qids: list[str] = field(default_factory=list)
+
+    @property
+    def tasks(self) -> list[str]:
+        """Task names in call order, with repeats."""
+        return self.plan.task_names()
 
 
 # =============================================================================
@@ -54,13 +74,13 @@ class OneQubitStrategy(ABC):
     @abstractmethod
     def execute(
         self,
-        cal_service: CalibService,
+        session: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute the 1-qubit calibration strategy.
 
         Args:
-            cal_service: CalibService instance with username, chip_id, etc.
+            session: CalibSession instance with username, chip_id, etc.
             config: Configuration for the calibration
 
         Returns:
@@ -93,11 +113,14 @@ class OneQubitStrategy(ABC):
 # =============================================================================
 
 
-class OneQubitScheduledStrategy(OneQubitStrategy):
-    """Box-based scheduled 1-qubit calibration.
+class OneQubitParallelByMuxStrategy(OneQubitStrategy):
+    """``parallel_by_mux``: MUXes in parallel, the qubits of each MUX in turn.
 
     Groups qubits by Box type (A/B/MIXED) and executes MUX groups in parallel
-    with qubits within each group running sequentially.
+    with qubits within each group running sequentially. MUXes do not wait for
+    each other between qubits: with MUX0 = {Q0, Q1} and MUX1 = {Q4, Q5}, Q1 may
+    start as soon as Q0 finishes while Q4 is still running (illustrative; the
+    scheduler decides grouping and order).
 
     Execution pattern:
         Box_A:
@@ -108,16 +131,20 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalibService,
+        session: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
-        """Execute Box-based scheduled calibration."""
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
+        """Run the MUX groups of each stage in parallel, stages one after another."""
+        wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id,
+            wiring_config_path=wiring_config_path,
+            mux_mapping=session.mux_mapping,
         )
         schedule = scheduler.generate_from_mux(
-            mux_ids=config.mux_ids, exclude_qids=config.exclude_qids
+            mux_ids=config.mux_ids,
+            exclude_qids=config.exclude_qids,
+            standalone_qids=config.standalone_qids,
         )
 
         all_results = {}
@@ -160,77 +187,75 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
         all_qids = list(dict.fromkeys(all_qids))
 
         # Workers borrow the Execution owned by the pipeline step.
-        session_config = {
-            "username": cal_service.username,
-            "chip_id": cal_service.chip_id,
-            "backend_name": cal_service.backend_name,
-            "project_id": config.project_id,
-            "muxes": None,
-            "execution_id": cal_service.execution_id,
-            "default_run_parameters": cal_service.default_run_parameters,
-            "task_run_parameters": cal_service.task_run_parameters,
-            "tags": cal_service.tags,
-            "flow_name": cal_service.flow_name,
-            "note": cal_service.note,
-        }
+        worker = session.worker_spec()
 
         # Execute stages grouped by box type (sequentially between box types)
         for box_type, sequential_groups in box_sequential_groups.items():
             stage_name = f"Box_{box_type}"
             stage_results = {}
 
-            for seq_idx, parallel_groups in enumerate(sequential_groups):
+            for parallel_groups in sequential_groups:
                 mux_results = run_mux_calibrations_parallel(
                     mux_groups=parallel_groups,
-                    tasks=config.tasks,
-                    session_config=session_config,
+                    plan=config.plan,
+                    worker=worker,
                 )
                 stage_results.update(mux_results)
 
             all_results[stage_name] = stage_results
 
         # Record all box results within the current step Execution
-        cal_service.record_stage_result("1q_scheduled", all_results)
+        session.record_stage_result("1q_parallel_by_mux", all_results)
 
         return all_results
 
 
-class OneQubitSynchronizedStrategy(OneQubitStrategy):
-    """Synchronized step-based 1-qubit calibration.
+class OneQubitParallelByRoundStrategy(OneQubitStrategy):
+    """``parallel_by_round``: rounds of qubits from different MUXes.
 
-    All MUXes execute the same step simultaneously before moving to the next.
-    Uses checkerboard pattern for frequency isolation.
+    The scheduler selects rounds (``OneQubitRoundScheduleResult.rounds``).
+    A round is a set of qubits from different MUXes; each qubit of the round
+    runs the step's full call list, and the next round starts only after every
+    qubit of the round has finished. A round is not a per-task barrier and does
+    not synchronize pulse timing. The order within a MUX follows the
+    checkerboard ordering strategy.
+
+    With MUX0 = {Q0, Q1} and MUX1 = {Q4, Q5}, Q0 and Q4 both finish before Q1
+    and Q5 start (illustrative; the scheduler decides the rounds).
 
     Execution pattern:
-        Step 1: [Q0, Q8, Q16, ...] all in parallel (different MUXes, same position)
-        Step 2: [Q1, Q9, Q17, ...] all in parallel
+        Round 1: [Q0, Q8, Q16, ...] all in parallel (different MUXes, same position)
+        Round 2: [Q1, Q9, Q17, ...] all in parallel
         ...
     """
 
     def execute(
         self,
-        cal_service: CalibService,
+        session: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
-        """Execute synchronized step-based calibration."""
+        """Execute the rounds one after another, the qubits of a round in parallel."""
         logger = get_run_logger()
 
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
+        wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id,
+            wiring_config_path=wiring_config_path,
+            mux_mapping=session.mux_mapping,
         )
-        schedule = scheduler.generate_synchronized_from_mux(
+        schedule = scheduler.generate_rounds_from_mux(
             mux_ids=config.mux_ids,
             exclude_qids=config.exclude_qids,
             use_checkerboard=True,
+            standalone_qids=config.standalone_qids,
         )
 
-        logger.info(f"Synchronized schedule: {schedule.total_steps} steps")
+        logger.info(f"parallel_by_round schedule: {schedule.total_rounds} rounds")
 
-        # Collect ALL qids across all steps for a single execution
+        # Collect ALL qids across all rounds for a single execution
         all_qids: list[str] = []
-        for step in schedule.steps:
-            filtered_qids = self._filter_qids(step.parallel_qids, config.qids)
+        for round_ in schedule.rounds:
+            filtered_qids = self._filter_qids(round_.parallel_qids, config.qids)
             all_qids.extend(filtered_qids)
 
         # Deduplicate while preserving order
@@ -240,40 +265,28 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             return {}
 
         # Workers borrow the Execution owned by the pipeline step.
-        session_config = {
-            "username": cal_service.username,
-            "chip_id": cal_service.chip_id,
-            "backend_name": cal_service.backend_name,
-            "project_id": config.project_id,
-            "muxes": None,
-            "execution_id": cal_service.execution_id,
-            "default_run_parameters": cal_service.default_run_parameters,
-            "task_run_parameters": cal_service.task_run_parameters,
-            "tags": cal_service.tags,
-            "flow_name": cal_service.flow_name,
-            "note": cal_service.note,
-        }
+        worker = session.worker_spec()
 
         all_results: dict[str, Any] = {}
 
-        for step in schedule.steps:
-            filtered_qids = self._filter_qids(step.parallel_qids, config.qids)
+        for round_ in schedule.rounds:
+            filtered_qids = self._filter_qids(round_.parallel_qids, config.qids)
             if not filtered_qids:
                 continue
 
-            step_results = run_qubit_calibrations_parallel(
+            round_results = run_qubit_calibrations_parallel(
                 qids=filtered_qids,
-                tasks=config.tasks,
-                session_config=session_config,
+                plan=config.plan,
+                worker=worker,
             )
             # Group results by box type for organized output
-            box_key = f"Box_{step.box_type}"
+            box_key = f"Box_{round_.box_type}"
             if box_key not in all_results:
                 all_results[box_key] = {}
-            all_results[box_key].update(step_results)
+            all_results[box_key].update(round_results)
 
-        # Record all scheduling rounds within the current step Execution
-        cal_service.record_stage_result("1q_synchronized", all_results)
+        # Record all rounds within the current step Execution
+        session.record_stage_result("1q_parallel_by_round", all_results)
 
         return all_results
 
@@ -283,49 +296,44 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalibService,
+        session: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute local-index spectroscopy steps as hardware-aware batches."""
         from qdash.workflow.service.one_qubit_stage_runner import OneQubitStageRunner
 
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
+        wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id,
+            wiring_config_path=wiring_config_path,
+            mux_mapping=session.mux_mapping,
         )
         schedule = scheduler.generate_simultaneous_spectroscopy_batches_from_mux(
             mux_ids=config.mux_ids,
             exclude_qids=config.exclude_qids,
             mode=config.simultaneous_spectroscopy_schedule_mode,
+            standalone_qids=config.standalone_qids,
         )
 
-        runner = OneQubitStageRunner(cal_service, project_id=config.project_id)
+        runner = OneQubitStageRunner(session)
         all_qids = runner.collect_simultaneous_qids(schedule, config.qids)
         if not all_qids:
             return {}
 
+        # Reject what the batch path cannot run before any batch measures.
+        runner.preflight_batch(config.plan)
         all_results = runner.execute_simultaneous_spectroscopy_schedule(
             schedule,
-            tasks=config.tasks,
+            plan=config.plan,
             allowed_qids=config.qids,
         )
 
-        # Match the per-qubit status supplied by the other strategies so a
-        # successful batch remains eligible for the pipeline's status filter.
-        for step_results in all_results.values():
-            for qubit_results in step_results.values():
-                qubit_results["status"] = (
-                    "success"
-                    if all(task_name in qubit_results for task_name in config.tasks)
-                    else "failed"
-                )
-
-        cal_service.record_stage_result("experimental_simultaneous_spectroscopy", all_results)
+        session.record_stage_result("experimental_simultaneous_spectroscopy", all_results)
         return all_results
 
 
-class OneQubitSerialStrategy(OneQubitStrategy):
-    """Fully serial 1-qubit calibration.
+class OneQubitSequentialStrategy(OneQubitStrategy):
+    """``sequential``: one MUX at a time and one qubit at a time within a MUX.
 
     Executes all MUXes one by one, completely sequentially.
     Useful for debugging or when hardware constraints require no parallelism.
@@ -336,16 +344,20 @@ class OneQubitSerialStrategy(OneQubitStrategy):
 
     def execute(
         self,
-        cal_service: CalibService,
+        session: CalibSession,
         config: OneQubitConfig,
     ) -> dict[str, Any]:
-        """Execute fully serial calibration."""
-        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
+        """Run the MUX groups one after another in the parent session."""
+        wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id,
+            wiring_config_path=wiring_config_path,
+            mux_mapping=session.mux_mapping,
         )
         schedule = scheduler.generate_from_mux(
-            mux_ids=config.mux_ids, exclude_qids=config.exclude_qids
+            mux_ids=config.mux_ids,
+            exclude_qids=config.exclude_qids,
+            standalone_qids=config.standalone_qids,
         )
 
         # Collect all qids from all stages
@@ -362,16 +374,14 @@ class OneQubitSerialStrategy(OneQubitStrategy):
         if not all_qids:
             return {}
 
-        # Execute MUX groups one by one (completely serial)
+        # Execute MUX groups one by one in the parent session
         all_results = {}
         for mux_group in all_mux_groups:
-            # Execute single MUX group (no parallelism)
-            result = _calibrate_mux_qubits(qids=mux_group, tasks=config.tasks)
-            all_results.update(result)
+            all_results.update(_calibrate_mux_qubits(qids=mux_group, plan=config.plan))
 
-        cal_service.record_stage_result("1q_serial", all_results)
+        session.record_stage_result("1q_sequential", all_results)
 
-        return {"serial": all_results}
+        return {"sequential": all_results}
 
 
 # =============================================================================
@@ -379,27 +389,25 @@ class OneQubitSerialStrategy(OneQubitStrategy):
 # =============================================================================
 
 
-ONE_QUBIT_STRATEGIES: dict[str, type[OneQubitStrategy]] = {
-    "synchronized": OneQubitSynchronizedStrategy,
-    "scheduled": OneQubitScheduledStrategy,
+ONE_QUBIT_STRATEGIES: dict[OneQubitExecutionMode, type[OneQubitStrategy]] = {
+    "parallel_by_round": OneQubitParallelByRoundStrategy,
+    "parallel_by_mux": OneQubitParallelByMuxStrategy,
     "simultaneous_spectroscopy": OneQubitSimultaneousSpectroscopyStrategy,
-    "serial": OneQubitSerialStrategy,
+    "sequential": OneQubitSequentialStrategy,
 }
 
 
-def get_one_qubit_strategy(mode: str) -> OneQubitStrategy:
-    """Get a 1-qubit calibration strategy by mode name.
+def get_one_qubit_strategy(execution_mode: str) -> OneQubitStrategy:
+    """Get the 1-qubit calibration strategy of an execution mode.
 
     Args:
-        mode: Strategy mode ("synchronized" or "scheduled")
+        execution_mode: ``parallel_by_round``, ``parallel_by_mux``, ``sequential``
+            or ``simultaneous_spectroscopy``.
 
     Returns:
         Strategy instance
 
     Raises:
-        ValueError: If mode is not recognized
+        ValueError: If execution_mode is not one of these values
     """
-    if mode not in ONE_QUBIT_STRATEGIES:
-        valid_modes = ", ".join(ONE_QUBIT_STRATEGIES.keys())
-        raise ValueError(f"Unknown mode '{mode}'. Valid modes: {valid_modes}")
-    return ONE_QUBIT_STRATEGIES[mode]()
+    return ONE_QUBIT_STRATEGIES[validate_one_qubit_execution_mode(execution_mode)]()

@@ -5,33 +5,25 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ExpectedResultResponse } from './expectedResultResponse';
-import type { FailureModeResponse } from './failureModeResponse';
-import type { KnowledgeCaseResponse } from './knowledgeCaseResponse';
-import type { KnowledgeImageResponse } from './knowledgeImageResponse';
-import type { OutputParameterInfoResponse } from './outputParameterInfoResponse';
+import type { KnowledgeExampleResponse } from './knowledgeExampleResponse';
+import type { KnowledgeFigureResponse } from './knowledgeFigureResponse';
+import type { TaskKnowledgeResponseNextActions } from './taskKnowledgeResponseNextActions';
+import type { TaskReferenceResponse } from './taskReferenceResponse';
 
 /**
- * Response model for task knowledge (LLM-oriented domain knowledge).
+ * Task knowledge: the background, its figures, labeled examples, and the rendered prompt.
  */
 export interface TaskKnowledgeResponse {
   name: string;
+  /** calibtasks package, e.g. one_qubit_coarse */
   category?: string;
-  summary: string;
-  what_it_measures: string;
-  physical_principle: string;
-  expected_result: ExpectedResultResponse;
-  evaluation_criteria: string;
-  check_questions?: string[];
-  failure_modes: FailureModeResponse[];
-  tips: string[];
-  output_parameters_info?: OutputParameterInfoResponse[];
-  analysis_guide?: string[];
-  prerequisites?: string[];
-  images?: KnowledgeImageResponse[];
-  review_markdown?: string;
-  review_images?: KnowledgeImageResponse[];
-  cases?: KnowledgeCaseResponse[];
+  background?: string;
+  figures?: KnowledgeFigureResponse[];
+  examples?: KnowledgeExampleResponse[];
+  /** The background as Markdown, headed by the experiment name */
   prompt_text: string;
-  review_prompt_text?: string;
+  /** Autonomous-plan step per evaluation status code, from task.md's frontmatter. A status without an entry stops the plan for human review. */
+  next_actions?: TaskKnowledgeResponseNextActions;
+  /** The background and question-template parts for the evaluation model */
+  reference?: TaskReferenceResponse;
 }

@@ -12,5 +12,7 @@ import type { MuxDetailResponseDetail } from './muxDetailResponseDetail';
  */
 export interface MuxDetailResponse {
   mux_id: number;
+  /** Member qubit IDs in local slot order, from the chip topology */
+  qids?: string[];
   detail: MuxDetailResponseDetail;
 }

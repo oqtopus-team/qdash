@@ -55,7 +55,8 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
         # Control qubit parameters
         "control_qubit_frequency": InputParameterSpec.database_or_default(
             default=0,
-            parameter_name="qubit_frequency",
+            parameter_name="control_frequency",
+            fallback_parameter_names=("qubit_frequency",),
             qid_role="control",
             unit="GHz",
         ),
@@ -94,6 +95,7 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
         "control_readout_frequency": InputParameterSpec.database_or_default(
             default=0,
             parameter_name="readout_frequency",
+            fallback_parameter_names=("resonator_frequency",),
             qid_role="control",
             unit="GHz",
         ),
@@ -106,7 +108,8 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
         # Target qubit parameters
         "target_qubit_frequency": InputParameterSpec.database_or_default(
             default=0,
-            parameter_name="qubit_frequency",
+            parameter_name="control_frequency",
+            fallback_parameter_names=("qubit_frequency",),
             qid_role="target",
             unit="GHz",
         ),
@@ -129,6 +132,7 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
         "target_readout_frequency": InputParameterSpec.database_or_default(
             default=0,
             parameter_name="readout_frequency",
+            fallback_parameter_names=("resonator_frequency",),
             qid_role="target",
             unit="GHz",
         ),

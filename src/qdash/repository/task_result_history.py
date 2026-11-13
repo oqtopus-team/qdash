@@ -71,22 +71,6 @@ class MongoTaskResultHistoryRepository:
             task=task,
             execution_model=execution_model,
         )
-        self._attach_ai_review_note(task, execution_model)
-
-    def _attach_ai_review_note(
-        self, task: BaseTaskResultModel, execution_model: ExecutionModel
-    ) -> None:
-        """Attach an AI review note after persistence when configured.
-
-        This is intentionally best-effort: failing note generation must not
-        change the calibration task outcome or block history persistence.
-        """
-        try:
-            from qdash.workflow.engine.task.ai_review import enqueue_ai_review_note
-
-            enqueue_ai_review_note(task, execution_model)
-        except Exception as e:
-            logger.warning(f"Failed to attach AI review note for task {task.name}: {e}")
 
     def set_source_task_id(
         self,

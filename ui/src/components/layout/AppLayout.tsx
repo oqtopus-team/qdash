@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { FolderLock, Settings, ShieldCheck } from "lucide-react";
 
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
-import { AnalysisSidebar } from "./AnalysisSidebar";
+import { ChatSidebar } from "./ChatSidebar";
 import { MiniChatWindow } from "./MiniChatWindow";
 
+import { FirstCalibrationBanner } from "@/components/features/first-calibration/FirstCalibrationBanner";
+import { FirstCalibrationCoachmarks } from "@/components/features/first-calibration/FirstCalibrationCoachmarks";
 import { SidebarProvider } from "@/contexts/SidebarContext";
-import { AnalysisChatProvider } from "@/contexts/AnalysisChatContext";
+import { ChatDockProvider } from "@/contexts/ChatDockContext";
+import { CopilotChatSessionProvider } from "@/contexts/CopilotChatSessionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 
@@ -33,7 +36,7 @@ function ProjectAccessState() {
         <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-base-200 text-base-content/70">
           <FolderLock size={28} aria-hidden="true" />
         </div>
-        <h1 className="text-2xl font-semibold text-base-content">No project access</h1>
+        <h1 className="text-xl font-medium text-base-content">No project access</h1>
         <p className="mt-3 text-sm leading-6 text-base-content/70">
           You are not a member of any project yet. Ask a project owner or administrator to invite
           you before viewing measurement results, chips, workflows, or project discussions.
@@ -82,21 +85,31 @@ export function AppLayout({ children }: AppLayoutProps) {
   // Authenticated pages - render with sidebar and navbar
   return (
     <SidebarProvider>
-      <AnalysisChatProvider>
-        <div className="flex w-full h-screen overflow-hidden">
-          <Sidebar />
-          <div className="flex-1 flex flex-col h-screen w-0 min-w-0 transition-[flex] duration-300 ease-in-out">
-            <Navbar />
-            <main className="flex-1 overflow-y-auto bg-base-100">
-              <div key={pathname} className="page-transition">
-                {showProjectAccessState ? <ProjectAccessState /> : children}
-              </div>
-            </main>
+      <CopilotChatSessionProvider>
+        <ChatDockProvider>
+          <div className="flex w-full h-screen overflow-hidden">
+            <Sidebar />
+            <div className="flex-1 flex flex-col h-screen w-0 min-w-0 transition-[flex] duration-300 ease-in-out">
+              <Navbar />
+              {!showProjectAccessState && <FirstCalibrationBanner />}
+              <main className="flex-1 overflow-y-auto bg-base-100">
+                {/* Full height of the area under the navbar and the guide banner, so editor
+                    pages can fill it with h-full; taller pages overflow and scroll in main. */}
+                <div key={pathname} className="page-transition h-full">
+                  {showProjectAccessState ? <ProjectAccessState /> : children}
+                </div>
+              </main>
+            </div>
+            <ChatSidebar />
           </div>
-          <AnalysisSidebar />
-        </div>
-        {!showProjectAccessState && <MiniChatWindow />}
-      </AnalysisChatProvider>
+          {!showProjectAccessState && <MiniChatWindow />}
+          {!showProjectAccessState && (
+            <Suspense fallback={null}>
+              <FirstCalibrationCoachmarks />
+            </Suspense>
+          )}
+        </ChatDockProvider>
+      </CopilotChatSessionProvider>
     </SidebarProvider>
   );
 }

@@ -18,6 +18,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -26,49 +27,6 @@ from qdash.workflow.service.calib_service import (
 )
 from qdash.workflow.service.steps import OneQubitFineTune
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
-
-FINE_ONE_TASKS: list[str] = [
-    "Configure",
-    # Round 1: calibrate HPI -> PI -> DRAG HPI -> DRAG PI, then tune amplitude/frequency.
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "CheckOptimalReadoutAmplitude",
-    "CheckOptimalReadoutFrequency",
-    "Configure",  # Apply round 1's readout frequency before recalibrating pulses.
-    # Round 2: recalibrate all four pulse types at the updated settings, then repeat the pair.
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "CheckOptimalReadoutAmplitude",
-    "CheckOptimalReadoutFrequency",
-    "Configure",  # Apply the final readout frequency before final pulse calibration.
-    # Calibrate all pulses at the final readout settings before classification and RB.
-    "CheckRabi",
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "ReadoutClassification",
-    "RandomizedBenchmarking",
-    "X90InterleavedRandomizedBenchmarking",
-]
 
 
 @flow(
@@ -109,7 +67,62 @@ def fine_one(
     else:
         raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
-    steps = [OneQubitFineTune(mode="synchronized", tasks=FINE_ONE_TASKS)]
+    # Pulse durations (ns) shared by every round of pulse calibration.
+    hpi_duration = 32
+    pi_duration = 32
+    drag_hpi_duration = 16
+    drag_pi_duration = 24
+
+    # Configure applies the latest readout settings before each pulse calibration round.
+    fine_tasks: list[TaskCall] = [TaskCall(name="Configure", call_id="configure_round1")]
+    for round_name, next_round in (("round1", "round2"), ("round2", "final"), ("final", None)):
+        # Calibrate and check HPI -> PI -> DRAG HPI -> DRAG PI at the current settings.
+        fine_tasks += [
+            TaskCall(name="CheckRabi", call_id=f"rabi_{round_name}"),
+            TaskCall(
+                name="CreateHPIPulse",
+                call_id=f"hpi_create_{round_name}",
+                run={"hpi_duration": hpi_duration},
+            ),
+            TaskCall(name="CheckHPIPulse", call_id=f"hpi_check_{round_name}"),
+            TaskCall(
+                name="CreatePIPulse",
+                call_id=f"pi_create_{round_name}",
+                run={"pi_duration": pi_duration},
+            ),
+            TaskCall(name="CheckPIPulse", call_id=f"pi_check_{round_name}"),
+            TaskCall(
+                name="CreateDRAGHPIPulse",
+                call_id=f"drag_hpi_create_{round_name}",
+                run={"drag_hpi_duration": drag_hpi_duration},
+            ),
+            TaskCall(name="CheckDRAGHPIPulse", call_id=f"drag_hpi_check_{round_name}"),
+            TaskCall(
+                name="CreateDRAGPIPulse",
+                call_id=f"drag_pi_create_{round_name}",
+                run={"drag_pi_duration": drag_pi_duration},
+            ),
+            TaskCall(name="CheckDRAGPIPulse", call_id=f"drag_pi_check_{round_name}"),
+        ]
+        if next_round is not None:
+            # Tune readout amplitude, then frequency, and apply them before the next round.
+            fine_tasks += [
+                TaskCall(
+                    name="CheckOptimalReadoutAmplitude", call_id=f"readout_amplitude_{round_name}"
+                ),
+                TaskCall(
+                    name="CheckOptimalReadoutFrequency", call_id=f"readout_frequency_{round_name}"
+                ),
+                TaskCall(name="Configure", call_id=f"configure_{next_round}"),
+            ]
+    # Classify readout and benchmark only after the final pulse calibration.
+    fine_tasks += [
+        TaskCall(name="ReadoutClassification"),
+        TaskCall(name="RandomizedBenchmarking"),
+        TaskCall(name="X90InterleavedRandomizedBenchmarking"),
+    ]
+
+    steps = [OneQubitFineTune(execution_mode="parallel_by_round", tasks=fine_tasks)]
 
     cal = CalibService(
         username,
@@ -117,23 +130,9 @@ def fine_one(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
-            "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreatePIPulse": {
-                "pi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreateDRAGHPIPulse": {
-                "drag_hpi_duration": {"value": 16, "value_type": "int"},
-            },
-            "CreateDRAGPIPulse": {
-                "drag_pi_duration": {"value": 24, "value_type": "int"},
-            },
-        },
         default_run_parameters={
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

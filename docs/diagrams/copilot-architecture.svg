@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 560" role="img" aria-label="Both Copilot chats post to the API's chat stream. The API loads sessions and task context from MongoDB and forwards the turn to the Agent runtime, which calls the chat and evaluation models and calls back into the API as the user for pi-qdash tools and the Python sandbox.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-dash { stroke-dasharray: 5 4; }
+    .qd-ui { fill: rgba(46, 160, 67, 0.12); stroke: #2ea043; stroke-width: 1.5; }
+    .qd-api { fill: rgba(219, 109, 40, 0.12); stroke: #db6d28; stroke-width: 1.5; }
+    .qd-wf { fill: rgba(130, 80, 223, 0.12); stroke: #8250df; stroke-width: 1.5; }
+    .qd-data { fill: rgba(9, 105, 218, 0.10); stroke: #0969da; stroke-width: 1.5; }
+    .qd-ext { fill: none; stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  </style>
+  <defs>
+    <marker id="qd-copilot-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+  </defs>
+
+  <g class="qd-root">
+    <!-- Row 1: the two chat entry points -->
+    <rect x="225" y="20" width="170" height="56" rx="8" class="qd-ui"/>
+    <text x="310" y="44" class="qd-title">Chat page</text>
+    <text x="310" y="62" class="qd-sub">/copilot</text>
+
+    <rect x="645" y="20" width="170" height="56" rx="8" class="qd-ui"/>
+    <text x="730" y="44" class="qd-title">Task result chat</text>
+    <text x="730" y="62" class="qd-sub">Ask AI · sidebar</text>
+
+    <!-- Row 2: MongoDB, API -->
+    <path d="M25,158 v40 a85,8 0 0,0 170,0 v-40" class="qd-data"/>
+    <ellipse cx="110" cy="158" rx="85" ry="8" class="qd-data"/>
+    <text x="110" y="181" class="qd-title">MongoDB</text>
+    <text x="110" y="197" class="qd-sub">chat sessions · results</text>
+
+    <rect x="435" y="150" width="170" height="56" rx="8" class="qd-api"/>
+    <text x="520" y="174" class="qd-title">API</text>
+    <text x="520" y="192" class="qd-sub">copilot router</text>
+
+    <!-- Row 3: runtime state, Agent runtime, config -->
+    <path d="M25,298 v40 a85,8 0 0,0 170,0 v-40" class="qd-data"/>
+    <ellipse cx="110" cy="298" rx="85" ry="8" class="qd-data"/>
+    <text x="110" y="321" class="qd-title">Runtime state</text>
+    <text x="110" y="337" class="qd-sub">agent-runtime-state</text>
+
+    <rect x="435" y="290" width="170" height="56" rx="8" class="qd-wf"/>
+    <text x="520" y="314" class="qd-title">Agent runtime</text>
+    <text x="520" y="332" class="qd-sub">pi · pi-qdash · pi-qcaleval</text>
+
+    <path d="M845,296 h100 l8,-6 h58 a4,4 0 0,1 4,4 v52 h-170 z" class="qd-data"/>
+    <text x="930" y="324" class="qd-title">config/copilot</text>
+    <text x="930" y="340" class="qd-sub">chat · evaluation.yaml</text>
+
+    <!-- Row 4: model endpoints -->
+    <rect x="225" y="430" width="170" height="56" rx="8" class="qd-ext"/>
+    <text x="310" y="454" class="qd-title">Chat model</text>
+    <text x="310" y="472" class="qd-sub">OpenAI-compatible API</text>
+
+    <rect x="645" y="430" width="170" height="56" rx="8" class="qd-ext"/>
+    <text x="730" y="454" class="qd-title">Evaluation model</text>
+    <text x="730" y="472" class="qd-sub">vLLM · Ising</text>
+
+    <!-- Edges -->
+    <line x1="330" y1="76" x2="470" y2="148" class="qd-edge" marker-end="url(#qd-copilot-arrow)"/>
+    <text x="388" y="122" class="qd-label" text-anchor="end">POST /chat/stream (SSE)</text>
+
+    <line x1="710" y1="76" x2="570" y2="148" class="qd-edge" marker-end="url(#qd-copilot-arrow)"/>
+    <text x="652" y="122" class="qd-label">same route + task</text>
+
+    <line x1="435" y1="178" x2="197" y2="178" class="qd-edge" marker-start="url(#qd-copilot-arrow)" marker-end="url(#qd-copilot-arrow)"/>
+    <text x="316" y="170" class="qd-label" text-anchor="middle">sessions · task context</text>
+
+    <line x1="490" y1="206" x2="490" y2="288" class="qd-edge" marker-end="url(#qd-copilot-arrow)"/>
+    <text x="480" y="244" class="qd-label" text-anchor="end">POST /chat</text>
+    <text x="480" y="260" class="qd-label" text-anchor="end">NDJSON events back</text>
+
+    <line x1="550" y1="290" x2="550" y2="208" class="qd-edge" marker-end="url(#qd-copilot-arrow)"/>
+    <text x="560" y="244" class="qd-label">tools · Python sandbox</text>
+    <text x="560" y="260" class="qd-label">as the signed-in user</text>
+
+    <line x1="435" y1="318" x2="197" y2="318" class="qd-edge" marker-end="url(#qd-copilot-arrow)"/>
+    <text x="316" y="310" class="qd-label" text-anchor="middle">durable sessions</text>
+
+    <line x1="845" y1="318" x2="607" y2="318" class="qd-edge" marker-end="url(#qd-copilot-arrow)"/>
+    <text x="726" y="310" class="qd-label" text-anchor="middle">models.json at startup</text>
+
+    <line x1="480" y1="346" x2="345" y2="428" class="qd-edge" marker-end="url(#qd-copilot-arrow)"/>
+    <text x="398" y="392" class="qd-label" text-anchor="end">planner turns</text>
+
+    <line x1="560" y1="346" x2="695" y2="428" class="qd-edge" marker-end="url(#qd-copilot-arrow)"/>
+    <text x="642" y="392" class="qd-label">qcal_evaluate</text>
+
+    <!-- Legend -->
+    <g transform="translate(25,520)">
+      <rect x="0" y="0" width="22" height="14" rx="3" class="qd-ui"/>
+      <text x="30" y="11" class="qd-label">UI</text>
+      <rect x="80" y="0" width="22" height="14" rx="3" class="qd-api"/>
+      <text x="110" y="11" class="qd-label">API</text>
+      <rect x="165" y="0" width="22" height="14" rx="3" class="qd-wf"/>
+      <text x="195" y="11" class="qd-label">Agent runtime</text>
+      <rect x="305" y="0" width="22" height="14" rx="3" class="qd-data"/>
+      <text x="335" y="11" class="qd-label">Data or config</text>
+      <rect x="450" y="0" width="22" height="14" rx="3" class="qd-ext"/>
+      <text x="480" y="11" class="qd-label">External model</text>
+    </g>
+  </g>
+</svg>

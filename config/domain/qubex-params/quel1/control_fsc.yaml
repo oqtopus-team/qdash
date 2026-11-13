@@ -1,0 +1,5 @@
+meta:
+  description: Control FSC
+  default: 39990
+  scope: qubit
+data: {}

@@ -35,7 +35,6 @@ import {
   DeleteUserDialog,
 } from "@/components/features/admin/AdminConfirmDialogs";
 import { AdminProjectsPanel } from "@/components/features/admin/AdminProjectsPanel";
-import { SystemUpdateCard } from "@/components/features/admin/SystemUpdateCard";
 import { AdminUsersPanel } from "@/components/features/admin/AdminUsersPanel";
 import { CreateUserModal } from "@/components/features/admin/CreateUserModal";
 import { EditUserModal } from "@/components/features/admin/EditUserModal";
@@ -44,9 +43,11 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { AdminPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDate } from "@/lib/utils/datetime";
 
+/** Admin page with tabs for managing users, projects, and system settings. */
 export function AdminPageContent() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -176,6 +177,7 @@ export function AdminPageContent() {
     setSelectedUsernames([]);
   };
 
+  /** Updates the selected user and rethrows failures so the edit modal can display them. */
   const handleUpdateUser = async (updates: {
     organization?: string;
     disabled?: boolean;
@@ -193,6 +195,7 @@ export function AdminPageContent() {
       setSelectedUser(null);
     } catch (err) {
       console.error("Failed to update user:", err);
+      throw err;
     }
   };
 
@@ -382,7 +385,7 @@ export function AdminPageContent() {
 
   return (
     <PageContainer>
-      <PageHeader title="Admin" description="Manage access, projects, and this deployment" />
+      <PageHeader title="Admin" description="Users, projects and deployment settings" />
 
       {bulkFeedback && (
         <div
@@ -482,12 +485,7 @@ export function AdminPageContent() {
       )}
 
       {/* System Tab */}
-      {activeTab === "system" && (
-        <div className="space-y-6">
-          <SystemUpdateCard />
-          <SettingsCard />
-        </div>
-      )}
+      {activeTab === "system" && <SettingsCard />}
 
       {/* Edit Modal */}
       {isEditModalOpen && selectedUser && (
@@ -1036,12 +1034,17 @@ function MembersModal({
                       {members.map((member: MemberItem) => (
                         <tr key={member.username}>
                           <td>
-                            <div className="font-mono text-sm">{member.username}</div>
-                            {member.display_name && (
-                              <div className="text-xs text-base-content/60">
-                                {member.display_name}
+                            <div className="flex items-center gap-2">
+                              <UserAvatar username={member.username} size={24} />
+                              <div className="min-w-0">
+                                <div className="font-mono text-sm">{member.username}</div>
+                                {member.display_name && (
+                                  <div className="text-xs text-base-content/60">
+                                    {member.display_name}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </td>
                           <td>
                             <span className={`badge badge-sm ${getRoleBadgeClass(member.role)}`}>
@@ -1145,6 +1148,7 @@ function MembersModal({
                               checked={selectedCandidateUsernames.includes(userItem.username)}
                               onChange={() => handleToggleCandidate(userItem.username)}
                             />
+                            <UserAvatar username={userItem.username} size={24} />
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="font-mono text-sm">{userItem.username}</span>
@@ -1318,13 +1322,13 @@ function AssignUsersToProjectModal({
                 <div className="stats stats-vertical sm:stats-horizontal w-full bg-base-200">
                   <div className="stat py-2 px-3">
                     <div className="stat-title text-xs">Will add</div>
-                    <div className="stat-value text-primary text-2xl">
+                    <div className="stat-value">
                       {selectedProjectMembersLoading ? "-" : assignableUsers.length}
                     </div>
                   </div>
                   <div className="stat py-2 px-3">
                     <div className="stat-title text-xs">Already member</div>
-                    <div className="stat-value text-2xl">
+                    <div className="stat-value">
                       {selectedProjectMembersLoading ? "-" : alreadyAssignedUsers.length}
                     </div>
                   </div>

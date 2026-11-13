@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 30 1100 362" role="img" aria-label="develop branches off main. Feature, bugfix, and hotfix branches branch off develop and return through squash-merged pull requests. Each push to develop updates the release pull request to main, and a vX.Y.Z tag on main creates the GitHub Release.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-dev-lane { font-size: 13px; font-weight: 600; }
+    .qd-t-main { fill: #cf222e; }
+    .qd-t-dev { fill: #0969da; }
+    .qd-t-feat { fill: #2ea043; }
+    .qd-t-hot { fill: #db6d28; }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-dash { stroke-dasharray: 5 4; }
+    .qd-bg { fill: var(--vp-c-bg, #ffffff); }
+    .qd-main { stroke: #cf222e; fill: #cf222e; }
+    .qd-dev { stroke: #0969da; fill: #0969da; }
+    .qd-feat { stroke: #2ea043; fill: #2ea043; }
+    .qd-hot { stroke: #db6d28; fill: #db6d28; }
+    .qd-line { stroke-width: 3; fill: none; }
+    .qd-tag { fill: rgba(207, 34, 46, 0.10); stroke: #cf222e; stroke-width: 1.5; }
+    .qd-ext { fill: none; stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  </style>
+  <defs>
+    <marker id="qd-dev-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+  </defs>
+
+  <g class="qd-root">
+    <!-- Lane names -->
+    <text x="20" y="114" class="qd-dev-lane qd-t-main">main</text>
+    <text x="20" y="194" class="qd-dev-lane qd-t-dev">develop</text>
+    <text x="20" y="284" class="qd-dev-lane qd-t-feat">feature/xxx</text>
+    <text x="20" y="354" class="qd-dev-lane qd-t-hot">hotfix/xxx</text>
+
+    <!-- Branch lines -->
+    <line x1="120" y1="110" x2="880" y2="110" class="qd-line qd-main"/>
+    <path d="M160,110 C160,160 190,190 240,190 H880" class="qd-line qd-dev"/>
+    <path d="M240,190 C240,250 260,280 300,280 H420 C450,280 480,250 480,190" class="qd-line qd-feat"/>
+    <path d="M480,190 C480,320 510,350 550,350 H640 C670,350 700,320 700,190" class="qd-line qd-hot"/>
+    <path d="M700,190 C770,190 780,110 840,110" class="qd-line qd-dev"/>
+
+    <!-- Commits -->
+    <circle cx="160" cy="110" r="8" class="qd-main"/>
+    <circle cx="840" cy="110" r="8" class="qd-main"/>
+    <circle cx="240" cy="190" r="8" class="qd-dev"/>
+    <circle cx="480" cy="190" r="8" class="qd-dev"/>
+    <circle cx="700" cy="190" r="8" class="qd-dev"/>
+    <circle cx="330" cy="280" r="7" class="qd-feat"/>
+    <circle cx="390" cy="280" r="7" class="qd-feat"/>
+    <circle cx="595" cy="350" r="7" class="qd-hot"/>
+
+    <!-- Merge annotations -->
+    <text x="360" y="304" class="qd-label" text-anchor="middle">squash-merged PR to develop</text>
+    <text x="595" y="376" class="qd-label" text-anchor="middle">squash-merged PR to develop</text>
+    <text x="752" y="140" class="qd-label" text-anchor="end">release PR</text>
+    <text x="752" y="155" class="qd-label" text-anchor="end">(auto-updated)</text>
+
+    <!-- Tag and release -->
+    <rect x="800" y="58" width="80" height="24" rx="12" class="qd-tag"/>
+    <text x="840" y="75" class="qd-sub" style="font-weight: 600">vX.Y.Z</text>
+    <line x1="840" y1="82" x2="840" y2="100" class="qd-edge"/>
+
+    <rect x="920" y="42" width="160" height="56" rx="8" class="qd-ext"/>
+    <text x="1000" y="66" class="qd-title">GitHub Release</text>
+    <text x="1000" y="84" class="qd-sub">created on tag push</text>
+    <line x1="880" y1="70" x2="918" y2="70" class="qd-edge" marker-end="url(#qd-dev-arrow)"/>
+
+    <!-- Release PR automation note -->
+    <rect x="920" y="160" width="160" height="56" rx="8" class="qd-ext"/>
+    <text x="1000" y="184" class="qd-title">git-pr-release</text>
+    <text x="1000" y="202" class="qd-sub">runs on push to develop</text>
+    <line x1="918" y1="186" x2="784" y2="156" class="qd-edge qd-dash" marker-end="url(#qd-dev-arrow)"/>
+  </g>
+</svg>

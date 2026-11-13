@@ -1,60 +1,62 @@
 # Calibration Data and Provenance
 
-QDash provides complementary views for current chip state, metric history, raw task results, and
-parameter lineage.
+Use QDash's data views to move from a chip-wide health check to one measurement and the values it
+produced.
 
-## Select the Right View
+## Choose a View
 
-| Question | Page |
+| Question | Open |
 | --- | --- |
-| Is the chip broadly healthy? | Dashboard |
-| How does one metric compare across targets? | Metrics |
-| What is the latest result for a task on each target? | Chip |
-| How did parameters change over time? | Analysis or Provenance |
-| What exactly happened in one run? | Execution or Task Results |
+| Is the chip broadly healthy? | **Dashboard** |
+| How does one metric compare across targets? | **Metrics** |
+| What is the latest result for a task on each target? | **Chip** |
+| How did parameters change over time? | **Analysis** |
+| Which result produced a value, and what depends on it? | **Lineage** on the result or metric |
+| What happened in one run? | **Execution** or **Task Results** |
 
-All views use the active project and selected chip. Time range, cool-down, target direction, and
-latest/best/average selection can change which record is shown; include those filters when sharing
-an observation with another user.
+The active project, chip, time range, cool-down, target direction, and value selection determine
+what these pages show. Include that scope when sharing an observation.
 
-## Dashboard and Metrics
+## Scan Current State
 
-**Dashboard** presents all configured metrics with coverage, heatmaps, distributions, and scoped
-notes. **Metrics** focuses on a selected metric and provides qubit or coupling history, parameter
-details, notes, issues, report export, and data export where available.
+Follow [Dashboard](./dashboard.md#select-the-data-scope) to choose a chip, time range, and value
+selection, then review coverage and distributions. Use **Metrics** to compare one parameter
+across targets, checking direction for couplings. The
+[Color range](./dashboard.md#scan-chip-health) control is shared by both pages.
 
-For directional coupling data, verify the displayed direction before comparing values. For time
-ranges, distinguish the latest value from best or average aggregation.
+## Inspect Measurements
 
-## Chip and Task Artifacts
+Open **Chip** and select a task to see its latest results on the topology. Select a qubit or
+coupling to open its history and artifacts. Use **Task Results** to search across executions by
+chip, task, target, or status.
 
-**Chip** organizes calibration task results on the device topology. Select a task, then a qubit or
-coupling to open its details and history. Multi-select actions can request AI review or download
-figures for the displayed results.
+Figures and raw data are available only when the selected task produced them.
 
-Task-result pages expose the stored parameters and artifacts for one measurement. Figure JSON and
-NetCDF raw data are downloadable when that task produced them.
+## Follow Parameter History
 
-## Analysis
+Open **Analysis** to compare selected parameters over time. If a chart is empty, broaden the time
+range and confirm the chip, target, and parameter selections.
 
-**Analysis** plots selected chip parameters over time. Use it to compare trends and identify a
-time window for deeper inspection. The available parameters come from the configured metric and
-calibration data; an empty chart can mean the selected chip, target, parameter, or time range has
-no matching records.
+Open **Lineage** on a task result, on an entry in a metric's history, or on a row of an
+execution's **Parameter changes** to see which task produced the value, the current values that
+task read, and the values derived from it. Manual edits and seed imports appear as the producer of
+the values they wrote. After changing a value, re-run the tasks that produced the values derived
+from it. **Full graph** shows every value the selected one derives from.
 
-## Provenance
+## Modify Current Parameters
 
-**Data Provenance** tracks calibration parameter history and lineage using W3C PROV-DM concepts.
-Use it to answer which task result produced a value, which inputs contributed to it, and which
-downstream parameters may depend on it. The page can also derive recalibration recommendations
-from affected lineage and pass a task list to the workflow editor.
+Use **Calibration DB** to review current values, modify YAML candidates, or remove an invalid
+current value:
 
-Provenance is project-scoped. Values created before project-scoped calibration was introduced are
-available only after the corresponding migration has resolved their project, chip, and artifact
-context. See [Calibration Data Sharing](./calibration-data-sharing.md) for the current layout.
+1. Open **Calibration DB** and select **Modify parameters**.
+2. Compare the YAML candidate values with the current database.
+3. To change a value, select the parameters to import and edit them if needed.
+4. Review the proposed changes, then confirm the import.
+5. To remove a current value, select **Edit import value**, then select **Delete** and confirm the
+   deletion.
 
-## Import Initial Parameters
+The modification view shows only parameters the deployment permits. Frequency values produced by
+calibration experiments can be excluded from seed import even when a YAML file contains them.
+Treat the comparison as a review, not as an unconditional overwrite.
 
-**Import** compares Qubex YAML values with QDash calibration state before importing initial
-parameters. Review the comparison rather than treating the file as an unconditional overwrite.
-Imported values become part of the calibration history and provenance context.
+How this works: [Calibration Data Lifecycle](../developer-guide/workflow/calibration-data-lifecycle.md).

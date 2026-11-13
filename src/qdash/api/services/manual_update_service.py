@@ -21,6 +21,7 @@ from fastapi import HTTPException
 
 from qdash.api.schemas.calibration import (
     CalibrationGitHubSync,
+    CalibrationParameterDeleteResponse,
     ManualEditItem,
     ManualEditsResponse,
     ManualParameterUpdateRequest,
@@ -50,19 +51,12 @@ from qdash.repository.qubit import MongoQubitCalibrationRepository
 
 logger = logging.getLogger(__name__)
 
-_MANUALLY_CORRECTABLE_TASKS = {
-    "CheckQubitSpectroscopy",
-    "CheckResonatorSpectroscopy",
-}
-
-_FAILED_TASK_CORRECTABLE_PARAMETERS = {
-    "CheckQubitSpectroscopy": {
-        "coarse_qubit_frequency",
-        "anharmonicity",
-        "f01_repr_db",
-        "f01_quality_level",
-        "coarse_control_amplitude",
-    },
+# Operational parameters an operator may correct from each spectroscopy result.
+# Measured values (``resonator_frequency``, ``coarse_qubit_frequency``) and
+# diagnostics stay as recorded; see docs/developer-guide/workflow/frequency-parameter-policy.md.
+_MANUALLY_CORRECTABLE_PARAMETERS: dict[str, frozenset[str]] = {
+    "CheckResonatorSpectroscopy": frozenset({"readout_frequency", "readout_amplitude"}),
+    "CheckQubitSpectroscopy": frozenset({"control_frequency", "coarse_control_amplitude"}),
 }
 
 
@@ -163,19 +157,18 @@ class ManualUpdateService:
                     execution_id=execution_id,
                 )
 
-            if source_doc is not None:
-                for source_version in self._param_version_repo.get_by_task(
-                    project_id=project_id, task_id=source_doc.task_id
-                ):
-                    self._relation_repo.create_relation(
-                        relation_type=ProvenanceRelationType.USED,
-                        source_type="activity",
-                        source_id=activity.activity_id,
-                        target_type="entity",
-                        target_id=source_version.entity_id,
-                        project_id=project_id,
-                        execution_id=execution_id,
-                    )
+            for source_version in self._param_version_repo.get_by_task(
+                project_id=project_id, task_id=source_doc.task_id
+            ):
+                self._relation_repo.create_relation(
+                    relation_type=ProvenanceRelationType.USED,
+                    source_type="activity",
+                    source_id=activity.activity_id,
+                    target_type="entity",
+                    target_id=source_version.entity_id,
+                    project_id=project_id,
+                    execution_id=execution_id,
+                )
 
             # Record in TaskResultHistory so metrics page picks up the new values.
             task_type = "coupling" if is_coupling else "qubit"
@@ -208,7 +201,7 @@ class ManualUpdateService:
                 execution_id=execution_id,
                 tags=["manual-edit"],
                 chip_id=request.chip_id,
-                source_task_id=source_doc.task_id if source_doc is not None else None,
+                source_task_id=source_doc.task_id,
             )
             task_result.insert()
 
@@ -251,6 +244,48 @@ class ManualUpdateService:
             execution_id=execution_id,
             provenance_activity_id=activity.activity_id,
             github_sync=CalibrationGitHubService().sync(task_result),
+        )
+
+    def delete_parameter(
+        self,
+        *,
+        chip_id: str,
+        qid: str,
+        parameter_name: str,
+        project_id: str,
+        username: str,
+    ) -> CalibrationParameterDeleteResponse:
+        """Delete one current calibration value while retaining historical snapshots."""
+        repository = self._coupling_repo if "-" in qid else self._qubit_repo
+        try:
+            repository.delete_calib_parameter(
+                username=username,
+                qid=qid,
+                chip_id=chip_id,
+                parameter_name=parameter_name,
+                project_id=project_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        ParameterVersionDocument.invalidate_current(
+            project_id=project_id,
+            parameter_name=parameter_name,
+            qid=qid,
+        )
+
+        logger.info(
+            "Deleted calibration parameter: project=%s, chip=%s, qid=%s, parameter=%s, user=%s",
+            project_id,
+            chip_id,
+            qid,
+            parameter_name,
+            username,
+        )
+        return CalibrationParameterDeleteResponse(
+            chip_id=chip_id,
+            qid=qid,
+            parameter_name=parameter_name,
         )
 
     def retry_github_sync(self, task_id: str, project_id: str) -> CalibrationGitHubSync:
@@ -340,17 +375,19 @@ class ManualUpdateService:
         self,
         request: ManualParameterUpdateRequest,
         project_id: str,
-    ) -> TaskResultHistoryDocument | None:
-        """Validate a correction against the source spectroscopy result."""
-        if request.source_task_id is None:
-            return None
+    ) -> TaskResultHistoryDocument:
+        """Validate a correction against the source spectroscopy result.
 
+        Only the operational parameters mapped for the source task may be written.
+        Measured frequencies are owned by experiments and are never corrected by hand.
+        """
         source_doc = TaskResultHistoryDocument.find_one(
             {"project_id": project_id, "task_id": request.source_task_id}
         ).run()
         if source_doc is None:
             raise HTTPException(status_code=404, detail="Source task result not found")
-        if source_doc.name not in _MANUALLY_CORRECTABLE_TASKS:
+        allowed_names = _MANUALLY_CORRECTABLE_PARAMETERS.get(source_doc.name)
+        if allowed_names is None:
             raise HTTPException(
                 status_code=400,
                 detail=f"Manual correction is not supported for {source_doc.name}",
@@ -361,24 +398,24 @@ class ManualUpdateService:
                 detail="Source task result does not match the requested chip and qid",
             )
 
-        allowed_names = set(source_doc.output_parameter_names)
-        if source_doc.status == "failed":
-            allowed_names.update(_FAILED_TASK_CORRECTABLE_PARAMETERS.get(source_doc.name, set()))
         unknown_names = sorted(set(request.parameters) - allowed_names)
         if unknown_names:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unknown source output parameter(s): {', '.join(unknown_names)}",
+                detail=(
+                    f"Parameter(s) not correctable from {source_doc.name}: "
+                    f"{', '.join(unknown_names)}. Allowed: {', '.join(sorted(allowed_names))}"
+                ),
             )
         return source_doc
 
     @staticmethod
     def _save_correction_figure(
-        source_doc: TaskResultHistoryDocument | None,
+        source_doc: TaskResultHistoryDocument,
         request: ManualParameterUpdateRequest,
     ) -> tuple[list[str], list[str]]:
         """Persist a marker-overlay figure for later review of a manual correction."""
-        if source_doc is None or request.correction_point is None:
+        if request.correction_point is None:
             return [], []
         if not source_doc.json_figure_path:
             raise HTTPException(

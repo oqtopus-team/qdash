@@ -19,7 +19,7 @@ tasks:
   generate:
     dotenv: [.env]
     cmds:
-      - uv run scripts/generate_task_catalog.py
+      - uv run --all-packages scripts/generate_task_catalog.py
       - |
         OPENAPI_TMP="$(mktemp)"
         ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
@@ -33,7 +33,7 @@ tasks:
   generate-task-catalog:
     desc: Generate task metadata catalog from workflow classes
     cmds:
-      - uv run scripts/generate_task_catalog.py
+      - uv run --all-packages scripts/generate_task_catalog.py
 
   generate-python-schema:
     desc: Generate Python Pydantic schema models from OpenAPI
@@ -64,11 +64,6 @@ tasks:
           --output {{.PY_SCHEMA_OUTPUT}}
       - uv run ruff format {{.PY_SCHEMA_OUTPUT}}
 
-  knowledge:
-    desc: Generate task knowledge JSON from markdown files
-    cmds:
-      - uv run scripts/generate_task_knowledge.py
-
   knowledge-pull:
     desc: Pull task-knowledge.json from the knowledge repository (KNOWLEDGE_REPO_URL)
     dotenv: [.env]
@@ -79,25 +74,32 @@ tasks:
           echo "KNOWLEDGE_REPO_URL not set, skipping pull"
           exit 0
         fi
-        # Build auth URL if credentials available
-        AUTH_URL="$KNOWLEDGE_REPO_URL"
-        if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_TOKEN" ]; then
-          AUTH_URL=$(echo "$KNOWLEDGE_REPO_URL" | sed "s|https://|https://${GITHUB_USER}:${GITHUB_TOKEN}@|")
-        fi
+        # Credentials go through a one-shot credential helper, never into the
+        # remote URL: a URL with a token embedded is written to .git/config and
+        # stays there in plain text.
+        git_auth() {
+          if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_TOKEN" ]; then
+            git -c credential.helper= \
+              -c "credential.helper=!f() { echo username=$GITHUB_USER; echo password=$GITHUB_TOKEN; }; f" "$@"
+          else
+            git "$@"
+          fi
+        }
         # Clone or pull
         if [ -d "$KNOWLEDGE_DIR/.git" ]; then
           echo "Pulling latest from $KNOWLEDGE_REPO_URL..."
-          git -C "$KNOWLEDGE_DIR" remote set-url origin "$AUTH_URL"
-          git -C "$KNOWLEDGE_DIR" fetch origin && git -C "$KNOWLEDGE_DIR" reset --hard origin/main || {
+          # Also scrubs a token that an earlier version of this task embedded.
+          git -C "$KNOWLEDGE_DIR" remote set-url origin "$KNOWLEDGE_REPO_URL"
+          git_auth -C "$KNOWLEDGE_DIR" fetch origin && git -C "$KNOWLEDGE_DIR" reset --hard origin/main || {
             echo "Pull failed, re-cloning..."
             rm -rf "$KNOWLEDGE_DIR"
-            git clone --depth 1 "$AUTH_URL" "$KNOWLEDGE_DIR"
+            git_auth clone --depth 1 "$KNOWLEDGE_REPO_URL" "$KNOWLEDGE_DIR"
           }
         else
           echo "Cloning $KNOWLEDGE_REPO_URL..."
           rm -rf "$KNOWLEDGE_DIR"
           mkdir -p config
-          git clone --depth 1 "$AUTH_URL" "$KNOWLEDGE_DIR"
+          git_auth clone --depth 1 "$KNOWLEDGE_REPO_URL" "$KNOWLEDGE_DIR"
         fi
         # Verify JSON exists in the cloned repo
         if [ -f "$KNOWLEDGE_DIR/task-knowledge.json" ]; then
@@ -134,9 +136,11 @@ tasks:
   # =============================================================================
 
   dev-services:
-    desc: Start only the services needed by host-side API/UI development
+    desc: Start Caddy and the services behind the development API and UI
     cmds:
-      - docker compose up -d mongo postgres prefect-server deployment-service user-flow-worker
+      # compose.dev-local.yaml points Caddy on UI_PORT at the API and UI of
+      # dev-api-local and dev-ui-local and publishes the loopback ports they use.
+      - docker compose -f compose.yaml -f compose.dev-local.yaml up -d mongo postgres prefect-server deployment-service user-flow-worker agent-runtime caddy
 
   dev-local-down:
     desc: Stop host API/UI processes and Docker Compose services started for development
@@ -190,12 +194,14 @@ tasks:
         stop_command "uvicorn src.qdash.api.main:app" "API"
         stop_command "bun run dev" "UI"
         stop_port "${API_PORT:-5715}" "API"
-        stop_port "${UI_PORT:-5714}" "UI"
-      - docker compose down
+        # Not UI_PORT: Caddy's published port belongs to Docker.
+        stop_port "${UI_DEV_PORT:-5713}" "UI"
+      - docker compose -f compose.yaml -f compose.dev-local.yaml down
 
   dev-local-setup:
-    desc: Install dependencies needed by host-side API/UI development
+    desc: Install dependencies and tools needed by local development
     cmds:
+      - .devcontainer/install-lychee.sh
       - uv sync --locked --all-groups --all-packages
       - mkdir -p "${CONFIG_PATH:-./config/qubex-config}"
       - bun install --cwd ui --frozen-lockfile
@@ -206,32 +212,50 @@ tasks:
       - uv sync --all-groups --all-packages --no-cache --upgrade
 
   dev-api-local:
-    desc: Start the API on the host against Docker services
+    desc: Start the API with hot reload behind the development Caddy
     dotenv: [.env]
     silent: true
     cmds:
+      # Caddy reaches this listener at QDASH_DEV_HOST (see compose.dev-local.yaml):
+      # host loopback through Docker Desktop or OrbStack on macOS, the Docker host
+      # gateway on Linux, and custom_net in the DevContainer. QDASH_DEV_BIND overrides.
       - |
         /bin/sh -c '
         mkdir -p .tmp
         echo "$$" > .tmp/dev-api-local.pid
-        MONGO_HOST="${MONGO_HOST:-localhost}" PREFECT_API_URL="http://127.0.0.1:${PREFECT_PORT:-4200}/api" DEPLOYMENT_SERVICE_URL="http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}" exec uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
+        if [ "${QDASH_DEV_HOST:-}" = devcontainer ]; then
+          bind="${QDASH_DEV_BIND:-0.0.0.0}"
+          export MONGO_HOST=mongo PREFECT_API_URL=http://prefect-server:4200/api DEPLOYMENT_SERVICE_URL=http://deployment-service:8001 PI_AGENT_RUNTIME_URL="http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}"
+        else
+          if [ "$(uname -s)" = Darwin ]; then bind="${QDASH_DEV_BIND:-127.0.0.1}"; else bind="${QDASH_DEV_BIND:-0.0.0.0}"; fi
+          export MONGO_HOST="${MONGO_HOST:-localhost}" PREFECT_API_URL="http://127.0.0.1:${PREFECT_PORT:-4200}/api" DEPLOYMENT_SERVICE_URL="http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}" PI_AGENT_RUNTIME_URL="http://127.0.0.1:${AGENT_RUNTIME_PORT:-8002}"
+        fi
+        if [ -z "${AGENT_RUNTIME_TOKEN:-}" ]; then
+          AGENT_RUNTIME_TOKEN="$(docker compose -f compose.yaml -f compose.dev-local.yaml exec -T agent-runtime cat /run/agent-runtime-auth/token 2>/dev/null)" \
+            || echo "Pi Agent Runtime is not running: Copilot chat fails until task dev-services starts it" >&2
+          export AGENT_RUNTIME_TOKEN
+        fi
+        exec uv run uvicorn src.qdash.api.main:app --reload --host "$bind" --port "${API_PORT:-5715}" --forwarded-allow-ips "*"
         '
 
   dev-ui-local:
-    desc: Start the UI on the host against the local API
+    desc: Start the Next.js dev server behind the development Caddy
     dir: ui
     dotenv: [../.env]
     silent: true
     cmds:
+      # Browsers use Caddy on UI_PORT; Next.js listens on UI_DEV_PORT. The bind
+      # follows dev-api-local.
       - |
         /bin/sh -c '
         mkdir -p ../.tmp
         echo "$$" > ../.tmp/dev-ui-local.pid
-        PORT="${UI_PORT:-5714}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" exec bun run dev
+        if [ "${QDASH_DEV_HOST:-}" = devcontainer ] || [ "$(uname -s)" != Darwin ]; then bind="${QDASH_DEV_BIND:-0.0.0.0}"; else bind="${QDASH_DEV_BIND:-127.0.0.1}"; fi
+        PORT="${UI_DEV_PORT:-5713}" exec bun run dev --hostname "$bind"
         '
 
   dev-local:
-    desc: Start lightweight local development services, API, and UI
+    desc: Start Caddy, Docker services, and the API and UI with hot reload
     cmds:
       - task: dev-services
       - task --parallel dev-api-local dev-ui-local
@@ -259,6 +283,11 @@ tasks:
     desc: Run Python client tests
     cmds:
       - uv run pytest clients/python/tests/ -v
+
+  build-client-ts:
+    desc: Build the local TypeScript client for pi packages and the runtime
+    cmds:
+      - bun run build:client
 
   test-client-ts:
     desc: Run TypeScript client checks
@@ -319,6 +348,45 @@ tasks:
     cmds:
       - bun run docs:build
 
+  check-docs-mermaid:
+    desc: Build docs and render every Mermaid diagram in headless Chromium
+    deps: [build-docs]
+    dir: docs
+    cmds:
+      - bunx playwright install --only-shell chromium
+      - bun run docs:check-mermaid
+
+  check-docs-links:
+    desc: Build docs and check external links, local links, and anchors
+    deps: [build-docs]
+    cmds:
+      - |
+        LYCHEE_ROOT_DIR="$(mktemp -d)"
+        trap 'rm -rf "${LYCHEE_ROOT_DIR}"' EXIT
+        mkdir "${LYCHEE_ROOT_DIR}/source" "${LYCHEE_ROOT_DIR}/site"
+        ln -s "$(pwd)/docs/index.md" "${LYCHEE_ROOT_DIR}/source/index.md"
+        for asset in docs/public/*; do
+          ln -s "$(pwd)/${asset}" "${LYCHEE_ROOT_DIR}/source/$(basename "${asset}")"
+        done
+        for section in developer-guide user-guide reference; do
+          ln -s "$(pwd)/docs/${section}" "${LYCHEE_ROOT_DIR}/source/${section}"
+        done
+        git ls-files --cached --others --exclude-standard docs |
+          while IFS= read -r file; do
+            case "${file}" in
+              *.md)
+                if [ -f "${file}" ]; then
+                  printf '%s\n' "${file}"
+                fi
+                ;;
+            esac
+          done > "${LYCHEE_ROOT_DIR}/inputs"
+        lychee --config lychee.toml --root-dir "${LYCHEE_ROOT_DIR}/source" \
+          --files-from "${LYCHEE_ROOT_DIR}/inputs"
+        ln -s "$(pwd)/docs/.vitepress/dist" "${LYCHEE_ROOT_DIR}/site/qdash"
+        lychee --config lychee.toml --offline --scheme file --include-fragments=full \
+          --root-dir "${LYCHEE_ROOT_DIR}/site" -- 'docs/.vitepress/dist/**/*.html'
+
   # =============================================================================
   # Linting & Formatting (local development - auto-fix)
   # =============================================================================
@@ -356,23 +424,32 @@ tasks:
     cmds:
       - trufflehog git file://. --fail --exclude-paths=.trufflehog-exclude-paths.txt
 
+  check-betterleaks-version:
+    desc: Verify betterleaks matches BETTERLEAKS_VERSION in .devcontainer/Dockerfile
+    cmds:
+      - bash scripts/check_betterleaks_version.sh
+
   scan-leaks:
     desc: Run Betterleaks scan over git history (full repository)
     cmds:
+      - task: check-betterleaks-version
       - |
-        if command -v betterleaks >/dev/null 2>&1; then
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0=safe.directory \
-            GIT_CONFIG_VALUE_0="$PWD" \
-            betterleaks git . --verbose
-        else
-          echo "betterleaks not installed; skipping leak scan"
-        fi
+        GIT_CONFIG_COUNT=1 \
+          GIT_CONFIG_KEY_0=safe.directory \
+          GIT_CONFIG_VALUE_0="$PWD" \
+          betterleaks git "$(git rev-parse --absolute-git-dir)" --config .betterleaks.toml --verbose
 
   scan-leaks-staged:
     desc: Run Betterleaks on staged files only (same as pre-commit)
     cmds:
       - bash scripts/scan_staged_leaks.sh --verbose
+
+  scan-leaks-local:
+    desc: Scan tracked working files and commits not in LEAKS_BASE (default origin/develop)
+    env:
+      LEAKS_BASE: '{{.LEAKS_BASE | default "origin/develop"}}'
+    cmds:
+      - bash scripts/scan_local_leaks.sh
 
   # =============================================================================
   # Local Check (run before push)
@@ -381,12 +458,17 @@ tasks:
   check:
     desc: Run all checks locally (lint, typecheck, test, UI, audit)
     cmds:
+      # Fail fast on the wrong scanner before the slower checks run.
+      - task: check-betterleaks-version
       - task: lint
       - task: ci-lint
       - task: ci-typecheck
       - task: ci-test
       - task: ci-ui
-      - task: scan-leaks
+      - task: test-client-ts
+      - task: ci-pi-packages
+      - task: ci-agent-runtime
+      - task: scan-leaks-local
 
   check-all:
     desc: Run the full local check suite
@@ -407,7 +489,7 @@ tasks:
   ci-lint:
     desc: Check Python linting (no auto-fix)
     cmds:
-      - uv run scripts/generate_task_catalog.py --check
+      - uv run --all-packages scripts/generate_task_catalog.py --check
       - uv run ruff check .
       - uv run ruff format --check .
 
@@ -445,6 +527,24 @@ tasks:
       - bun run knip
       # Bun <1.4 cannot read the current lockfile format, even when other UI commands succeed.
       - bunx bun@1.4.0 audit
+
+  ci-pi-packages:
+    desc: Typecheck and test the independently published pi packages
+    deps: [build-client-ts]
+    cmds:
+      - bun run --filter '@oqtopus-team/pi-qdash' check
+      - bun run --filter '@oqtopus-team/pi-qdash' test
+      - bun run --filter '@oqtopus-team/pi-qcaleval' check
+      - bun run --filter '@oqtopus-team/pi-qcaleval' test
+      - node --test .github/scripts/pi-package-release.test.mjs .github/scripts/client-release.test.mjs
+
+  ci-agent-runtime:
+    desc: Run all agent-runtime CI checks
+    deps: [build-client-ts]
+    dir: agent-runtime
+    cmds:
+      - bun test
+      - bunx tsc --noEmit
 
   ci-ui-build:
     desc: Build UI for production
@@ -492,7 +592,6 @@ tasks:
   deploy-local:
     cmds:
       - task: knowledge-pull
-      - task: updater-start
       - docker compose up -d --build
     desc: Deploy the application with Docker Compose in dev mode
 
@@ -502,7 +601,6 @@ tasks:
       ENV: dev-fake
     cmds:
       - task: knowledge-pull
-      - task: updater-start
       - docker compose up -d --build
     desc: Deploy the application locally with the fake QUBEX-compatible backend
 
@@ -512,40 +610,17 @@ tasks:
     desc: Stop the local fake Docker Compose stack
 
   dev-ui:
-    dir: ui
     cmds:
-      - bun run dev
-    desc: Start the UI development server
+      - task: dev-ui-local
+    desc: Start the Next.js dev server behind the development Caddy (alias of dev-ui-local)
 
   deploy:
+    dotenv: [.env]
     cmds:
       - task: knowledge-pull
-      - task: updater-start
-      - docker compose --profile tunnel up -d --build
+      - |
+        COMPOSE_PROFILES="${COMPOSE_PROFILES:+${COMPOSE_PROFILES},}tunnel" \
+          docker compose up -d --build
       - sleep 3
       - docker compose restart api
     desc: Deploy the application with Docker Compose
-
-  updater:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater run
-    desc: Run the host-side QDash updater in the foreground
-
-  updater-start:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater start
-    desc: Start the host-side QDash updater in the background
-
-  updater-stop:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater stop
-    desc: Stop the background QDash updater
-
-  updater-status:
-    dotenv: [.env]
-    cmds:
-      - uv run --isolated --locked --no-dev qdash-updater status
-    desc: Show whether the host-side QDash updater is running

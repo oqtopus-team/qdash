@@ -1,281 +1,68 @@
-"""CalibService - High-level API for calibration workflows.
+"""CalibService - the workflow author's entry point for calibration runs.
 
-This module provides a clean, service-oriented API for calibration tasks.
-It wraps low-level session management and provides a step-based pipeline
-approach for building calibration workflows.
+A workflow describes *what* to calibrate: a validated execution context, run
+metadata, shared run defaults, and ``run(targets, steps)`` with ``TaskCall``
+entries. QDash owns *how* it runs: execution IDs, hardware reservation, worker
+sessions, snapshot restoration, GitHub synchronization and closing every
+Execution on success, failure or cancellation. None of that is configured
+through ``CalibService``.
 
 Example:
-    Step-based calibration flow:
-
     ```python
     from prefect import flow
-    from qdash.workflow.service import CalibService
+    from qdash.workflow import CalibService, TaskCall
+    from qdash.workflow.service.calib_service import (
+        on_flow_cancellation,
+        on_flow_crashed,
+        on_flow_failure,
+    )
+    from qdash.workflow.service.steps import CustomOneQubit
     from qdash.workflow.service.targets import MuxTargets
-    from qdash.workflow.service.steps import OneQubitCheck, FilterByStatus, OneQubitFineTune
 
-    @flow
+
+    @flow(
+        on_cancellation=[on_flow_cancellation],
+        on_failure=[on_flow_failure],
+        on_crashed=[on_flow_crashed],
+    )
     def calibration_flow(username, chip_id, flow_name=None, project_id=None):
-        cal = CalibService(username, chip_id, flow_name=flow_name, project_id=project_id)
-        targets = MuxTargets([0, 1, 2, 3])
-        return cal.run(targets, steps=[
-            OneQubitCheck(),
-            FilterByStatus(),
-            OneQubitFineTune(),
-        ])
+        cal = CalibService(username, chip_id, project_id=project_id, flow_name=flow_name)
+        return cal.run(
+            MuxTargets([0, 1, 2, 3]),
+            steps=[CustomOneQubit(tasks=[TaskCall(name="CheckRabi")])],
+        )
     ```
 """
 
 from __future__ import annotations
 
-import contextlib
-import json
+import copy
 import logging
-import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+from qdash.workflow.engine.task_parameters import normalize_default_run_parameters
+from qdash.workflow.service._internal.lifecycle import (
+    on_flow_cancellation,
+    on_flow_cancellation_keep_lock,
+    on_flow_crashed,
+    on_flow_crashed_keep_lock,
+    on_flow_failure,
+    on_flow_failure_keep_lock,
+)
+from qdash.workflow.service.context import CalibContext, resolve_calib_context
+from qdash.workflow.service.execution_id import generate_execution_id
 
-    from qdash.repository.protocols import (
-        ExecutionCounterRepository,
-        ExecutionLockRepository,
-        UserRepository,
-    )
-    from qdash.workflow.engine.backend.base import BaseBackend
-    from qdash.workflow.engine.execution.service import ExecutionService
-    from qdash.workflow.engine.task.context import TaskContext
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from qdash.workflow.service.steps import Step
     from qdash.workflow.service.targets import Target
 
-from prefect import get_run_logger
-
-from qdash.common.config.backend import get_default_backend
-from qdash.common.execution_resources import (
-    ExecutionResourceScope,
-    merge_resource_scopes,
-    resolve_execution_resource_scope,
-    scope_contains,
-)
-from qdash.common.utils.datetime import now
-from qdash.workflow.engine import CalibConfig, CalibOrchestrator
-from qdash.workflow.engine.params_updater import get_params_updater
-from qdash.workflow.service.execution_id import generate_execution_id
-from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
-
 logger = logging.getLogger(__name__)
-
-
-_CANCELLATION_EXC_NAMES = frozenset({"CancelledRun", "CancelledError"})
-_EXTERNAL_TERMINATION_EXC_NAMES = frozenset({"TerminationSignal", "ExternalSignal"})
-
-
-def _iter_exception_chain(exc: BaseException) -> Iterator[BaseException]:
-    """Yield the exception, its ``__cause__`` chain, and any group members.
-
-    ``__context__`` is deliberately not followed: a genuine failure raised while
-    a cancellation is being handled would otherwise be reported as a cancellation.
-    """
-    seen: set[int] = set()
-    pending: list[BaseException] = [exc]
-    while pending:
-        current = pending.pop()
-        if id(current) in seen:
-            continue
-        seen.add(id(current))
-        yield current
-        if current.__cause__ is not None:
-            pending.append(current.__cause__)
-        pending.extend(getattr(current, "exceptions", ()) or ())
-
-
-def _matches_exception_name(exc: BaseException, names: frozenset[str]) -> bool:
-    """Check the exception chain against a set of class names.
-
-    Matching by name avoids a hard import dependency on prefect in non-workflow
-    contexts.
-    """
-    return any(
-        cls.__name__ in names
-        for member in _iter_exception_chain(exc)
-        for cls in type(member).__mro__
-    )
-
-
-def _is_cancellation(exc: BaseException) -> bool:
-    """Check if an exception represents a cancelled run result.
-
-    Prefect builds ``prefect.exceptions.CancelledRun`` when the result of an
-    already cancelled run is retrieved. It is not what a running flow receives
-    when the run is cancelled, see :func:`_is_external_termination`.
-    """
-    return _matches_exception_name(exc, _CANCELLATION_EXC_NAMES)
-
-
-def _is_external_termination(exc: BaseException) -> bool:
-    """Check if the flow process was interrupted by a signal.
-
-    Prefect installs a SIGTERM handler that raises ``TerminationSignal`` inside
-    user code, and it raises the same exception for a runner-driven cancel and
-    for a plain SIGTERM. The flow process cannot tell those apart, but the flow
-    run's terminal state can, so callers should leave the execution open and let
-    ``on_flow_cancellation`` / ``on_flow_crashed`` close it.
-    """
-    return _matches_exception_name(exc, _EXTERNAL_TERMINATION_EXC_NAMES)
-
-
-def _run_terminal_hook(
-    hook_name: str,
-    flow_run: Any,
-    status: str,
-    message: str,
-    *,
-    release_lock: bool = True,
-) -> None:
-    """Close executions belonging to a finished flow run.
-
-    Args:
-        hook_name: Name of the calling hook, used as the finalizer's log context.
-        flow_run: The Prefect flow run whose parameters identify the project
-            and whose id identifies the executions to close.
-        status: Terminal status to set on any executions left open.
-        message: Message to record on the closed executions.
-        release_lock: Whether the finalizer should also release the project's
-            execution lock. Must be ``False`` for flows built with
-            ``use_lock=False``, since they never acquired the lock and must
-            not clear one held by an unrelated running calibration.
-
-    """
-    _logger = logging.getLogger(__name__)
-    try:
-        params = flow_run.parameters or {}
-        project_id = params.get("project_id")
-        flow_run_id = str(flow_run.id)
-
-        if not project_id:
-            _logger.warning("%s: no project_id in parameters, skipping", hook_name)
-            return
-
-        from qdash.dbmodel.initialize import initialize
-
-        initialize()
-
-        from qdash.repository.execution_finalizer import finalize_executions_by_flow_run_id
-
-        finalize_executions_by_flow_run_id(
-            project_id=project_id,
-            flow_run_id=flow_run_id,
-            status=status,
-            message=message,
-            context=hook_name,
-            logger=_logger,
-            release_lock=release_lock,
-        )
-    except Exception:
-        _logger.error("%s failed", hook_name, exc_info=True)
-
-
-def on_flow_cancellation(flow: Any, flow_run: Any, state: Any) -> None:
-    """Prefect on_cancellation hook for flow runs.
-
-    Called by Prefect after the flow process is killed (SIGTERM).
-    This runs in a *separate* process, so it cannot access in-memory state.
-    Instead, it reads the flow_run parameters and updates MongoDB directly.
-
-    Usage::
-
-        @flow(
-            on_cancellation=[on_flow_cancellation],
-            on_failure=[on_flow_failure],
-            on_crashed=[on_flow_crashed],
-        )
-        def my_flow(username, chip_id, ...):
-            ...
-
-    """
-    _run_terminal_hook("on_flow_cancellation", flow_run, "cancelled", "Execution was cancelled")
-
-
-def on_flow_failure(flow: Any, flow_run: Any, state: Any) -> None:
-    """Prefect on_failure hook. Closes executions left open by an exception."""
-    _run_terminal_hook(
-        "on_flow_failure",
-        flow_run,
-        "failed",
-        _terminal_state_message(state, "Flow run failed before the execution was closed"),
-    )
-
-
-def on_flow_crashed(flow: Any, flow_run: Any, state: Any) -> None:
-    """Prefect on_crashed hook. Closes executions left open by an infrastructure crash."""
-    _run_terminal_hook(
-        "on_flow_crashed", flow_run, "failed", "Flow run crashed before the execution was closed"
-    )
-
-
-def _terminal_state_message(state: Any, fallback: str) -> str:
-    """Return Prefect's terminal reason without exposing an unbounded payload."""
-    message = getattr(state, "message", None)
-    if not isinstance(message, str) or not message.strip():
-        return fallback
-    return message.strip()[:2000]
-
-
-def on_flow_cancellation_keep_lock(flow: Any, flow_run: Any, state: Any) -> None:
-    """Prefect on_cancellation hook for flows that do not acquire the project execution lock.
-
-    Behaves like ``on_flow_cancellation`` but never releases the project
-    execution lock, for use by flows built with ``use_lock=False`` that
-    never acquired it in the first place.
-    """
-    _run_terminal_hook(
-        "on_flow_cancellation_keep_lock",
-        flow_run,
-        "cancelled",
-        "Execution was cancelled",
-        release_lock=False,
-    )
-
-
-def on_flow_failure_keep_lock(flow: Any, flow_run: Any, state: Any) -> None:
-    """Prefect on_failure hook for flows that do not acquire the project execution lock.
-
-    Behaves like ``on_flow_failure`` but never releases the project
-    execution lock, for use by flows built with ``use_lock=False`` that
-    never acquired it in the first place.
-    """
-    _run_terminal_hook(
-        "on_flow_failure_keep_lock",
-        flow_run,
-        "failed",
-        _terminal_state_message(state, "Flow run failed before the execution was closed"),
-        release_lock=False,
-    )
-
-
-def on_flow_crashed_keep_lock(flow: Any, flow_run: Any, state: Any) -> None:
-    """Prefect on_crashed hook for flows that do not acquire the project execution lock.
-
-    Behaves like ``on_flow_crashed`` but never releases the project
-    execution lock, for use by flows built with ``use_lock=False`` that
-    never acquired it in the first place.
-    """
-    _run_terminal_hook(
-        "on_flow_crashed_keep_lock",
-        flow_run,
-        "failed",
-        "Flow run crashed before the execution was closed",
-        release_lock=False,
-    )
-
 
 __all__ = [
     "CalibService",
-    # Re-exported for backward compatibility (used by strategy.py, two_qubit.py)
-    "finish_calibration",
     "generate_execution_id",
-    "get_session",
-    "init_calibration",
     "on_flow_cancellation",
     "on_flow_cancellation_keep_lock",
     "on_flow_crashed",
@@ -284,33 +71,118 @@ __all__ = [
     "on_flow_failure_keep_lock",
 ]
 
+_TASKCALL_HINT = (
+    "set run, input and update_calibration_parameters on each TaskCall instead "
+    "(share values through local variables, and default_run_parameters for run "
+    "values every task shares)"
+)
+_MANAGED_HINT = "QDash manages it for every run; remove the argument"
+
+_GITHUB_HINT = (
+    "GitHub pull and push follow github.enabled and github.branch in "
+    "config/app/workflow.yaml (qubex backend only); "
+    "TaskCall(..., update_calibration_parameters=False) controls calibration writes, "
+    "not synchronization"
+)
+
+# Removed constructor options and how to migrate each one.
+LEGACY_OPTION_MIGRATIONS: dict[str, str] = {
+    "qids": "pass targets to run(): cal.run(QubitTargets(qids), steps=[...])",
+    "muxes": "pass targets to run(): cal.run(MuxTargets(mux_ids), steps=[...])",
+    "name": "use flow_name=... for the display name",
+    "task_parameters": _TASKCALL_HINT,
+    "task_run_parameters": _TASKCALL_HINT,
+    "_task_defaults": _TASKCALL_HINT,
+    "execution_id": f"execution IDs are allocated per step Execution; {_MANAGED_HINT}",
+    "use_lock": f"every run reserves the hardware it plans to use; {_MANAGED_HINT}",
+    "skip_execution": f"every calibration step owns one Execution; {_MANAGED_HINT}",
+    "resource_scope": f"the reservation is planned from targets and steps; {_MANAGED_HINT}",
+    "enable_github": _GITHUB_HINT,
+    "enable_github_pull": _GITHUB_HINT,
+    "github_push_config": _GITHUB_HINT,
+    "backend_name": "the backend is part of the execution context: "
+    "CalibService.from_context(resolve_calib_context(username, chip_id, "
+    "project_id=project_id, backend=backend_name))",
+    "configuration_mode": "put a ConfigureAll step with "
+    'TaskCall(name="ConfigureAll", run={"configuration_mode": ...}) first; the layout applies '
+    "from that step on, so earlier steps keep QUBEX_CONFIGURATION_MODE",
+    "source_execution_id": "snapshot re-execution is the single-task executor's job "
+    "(Re-execute in the task detail page); a flow that declares a source_execution_id "
+    "parameter still restores from it",
+    "source_task_id": "snapshot re-execution is the single-task executor's job",
+    "snapshot_exempt_tasks": "snapshot re-execution is the single-task executor's job",
+    "force_update_params": "force updates are a single-task re-execution option "
+    "(update_params); TaskCall(..., update_calibration_parameters=False) controls saving",
+    "persist_output_parameters": "use TaskCall(..., update_calibration_parameters=False) "
+    "for measurement-only calls",
+    "user_repo": "resolve the context with resolve_calib_context(...) and pass it to "
+    "CalibService.from_context(...)",
+    "lock_repo": _MANAGED_HINT,
+    "counter_repo": _MANAGED_HINT,
+    "enable_github_push": _MANAGED_HINT,
+}
+
+# Order of the removed positional parameters after username and chip_id.
+_POSITIONAL_LEGACY = (
+    "qids",
+    "execution_id",
+    "backend_name",
+    "name",
+    "flow_name",
+    "tags",
+    "use_lock",
+    "note",
+)
+
+
+def _reject_legacy_arguments(args: tuple[Any, ...], options: dict[str, Any]) -> None:
+    """Raise one actionable error for every removed constructor argument."""
+    if not args and not options:
+        return
+    problems: list[str] = []
+    for index, _ in enumerate(args):
+        name = _POSITIONAL_LEGACY[index] if index < len(_POSITIONAL_LEGACY) else None
+        hint = LEGACY_OPTION_MIGRATIONS.get(name or "", "pass it as a keyword argument")
+        label = f"positional argument {index + 3}" + (f" ({name})" if name else "")
+        problems.append(f"{label}: {hint}")
+    for name in options:
+        hint = LEGACY_OPTION_MIGRATIONS.get(
+            name, "CalibService accepts flow_name, tags, note and default_run_parameters"
+        )
+        problems.append(f"{name}: {hint}")
+    raise TypeError(
+        "CalibService no longer accepts these arguments:\n  - "
+        + "\n  - ".join(problems)
+        + "\nSee docs/developer-guide/workflow/services.md for the migration."
+    )
+
 
 class CalibService:
-    """High-level API for calibration workflows.
+    """Run calibration steps for one validated context.
 
-    Provides a clean, intuitive interface for common calibration patterns
-    with automatic session management and error handling.
+    ``CalibService(username, chip_id, project_id=..., flow_name=...)`` is the
+    entry for Prefect flows: QDash injects these parameters when it starts the
+    flow, and the constructor checks them with :func:`resolve_calib_context` on
+    the configured default backend. For direct Python use, or to choose another
+    backend, resolve the context yourself and call :meth:`from_context`.
 
-    Attributes:
-        username: Username for the calibration session
-        chip_id: Target chip ID
-        flow_name: Flow name for tracking
-        project_id: Project ID for multi-tenancy
+    The service has no hardware state of its own. Each :meth:`run` reserves the
+    hardware its targets and steps need, runs every calibration step in its own
+    Execution, and closes each Execution on success, failure or cancellation, so
+    there is nothing to finish afterwards and the same service can run again.
 
     Example:
-        Simple API usage:
-
         ```python
-        cal = CalibService("alice", "64Qv3")
-        results = cal.run(qids=["0", "1"], tasks=["CheckRabi", "CreateHPIPulse"])
-        ```
-
-        Advanced low-level access:
-
-        ```python
-        cal = CalibService("alice", "64Qv3", qids=["0", "1"])
-        result = cal.execute_task("CheckFreq", "0")
-        cal.finish_calibration()
+        cal = CalibService(username, chip_id, project_id=project_id, flow_name=flow_name)
+        results = cal.run(
+            QubitTargets(["0", "1"]),
+            steps=[
+                CustomOneQubit(
+                    step_name="rabi_and_hpi",
+                    tasks=[TaskCall(name="CheckRabi"), TaskCall(name="CreateHPIPulse")],
+                )
+            ],
+        )
         ```
     """
 
@@ -318,1282 +190,137 @@ class CalibService:
         self,
         username: str,
         chip_id: str,
-        qids: list[str] | None = None,
-        execution_id: str | None = None,
-        backend_name: str | None = None,
-        name: str | None = None,
+        *legacy_args: Any,
+        project_id: str | None = None,
         flow_name: str | None = None,
         tags: list[str] | None = None,
-        use_lock: bool = True,
         note: dict[str, Any] | None = None,
-        enable_github_pull: bool | None = None,
-        enable_github: bool = True,
-        github_push_config: GitHubPushConfig | None = None,
-        muxes: list[int] | None = None,
-        project_id: str | None = None,
-        skip_execution: bool = False,
         default_run_parameters: dict[str, Any] | None = None,
-        task_run_parameters: dict[str, dict[str, Any]] | None = None,
-        source_execution_id: str | None = None,
-        parameter_overrides: dict[str, dict[str, Any]] | None = None,
-        source_task_id: str | None = None,
-        snapshot_exempt_tasks: set[str] | None = None,
-        force_update_params: bool = False,
-        persist_output_parameters: bool = True,
-        *,
-        user_repo: UserRepository | None = None,
-        lock_repo: ExecutionLockRepository | None = None,
-        counter_repo: ExecutionCounterRepository | None = None,
-        resource_scope: ExecutionResourceScope | None = None,
+        **legacy_options: Any,
     ) -> None:
-        """Initialize the calibration service.
-
-        Supports two usage patterns:
-
-        1. High-level API (lazy initialization):
-           ```python
-           cal = CalibService("alice", "64Qv3")
-           cal.run(qids=["0", "1"], tasks=["CheckRabi"])
-           ```
-
-        2. Low-level API (immediate initialization):
-           ```python
-           cal = CalibService("alice", "64Qv3", qids=["0", "1"])
-           cal.execute_task("CheckRabi", "0")
-           cal.finish_calibration()
-           ```
+        """Resolve the context of a Prefect flow run and record run metadata.
 
         Args:
-            username: Username for the session
-            chip_id: Target chip ID
-            qids: List of qubit IDs to calibrate. If None, session is lazily initialized.
-            execution_id: Unique execution identifier (e.g., "20240101-001").
-                If None, auto-generates using current date and counter.
-            backend_name: Backend type, either 'qubex' or 'fake' (default: from backend.yaml)
-            name: Human-readable name for the execution (deprecated, use flow_name)
-            flow_name: Flow name for display in execution list (auto-injected by API)
-            tags: List of tags for categorization
-            use_lock: Whether to use ExecutionLock to prevent concurrent calibrations (default: True)
-            note: Additional notes to store with execution (default: {})
-            enable_github_pull: Whether to pull latest config from GitHub before starting
-            enable_github: Enable GitHub integration (default: True). Sets both pull and push.
-            github_push_config: Configuration for GitHub push operations
-            muxes: List of MUX IDs for system-level tasks (default: None)
-            project_id: Project ID for multi-tenancy support. If None, auto-resolved
-                from username's default_project_id.
-            skip_execution: Internal option for isolated workers borrowing an existing
-                Execution. Pipelines automatically create one Execution per calibration
-                step, including when older templates pass this option. Default: False.
-            default_run_parameters: Shared fallback run parameters applied to all tasks.
-            task_run_parameters: Explicit task settings keyed by task name. Alongside
-                run parameters, ``update_calibration_parameters`` can be set to ``False``
-                to keep a task's output as measurement history without applying it to
-                the current calibration parameters.
-            user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
-            lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
-            counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
+            username: User the run is attributed to (injected by QDash).
+            chip_id: Chip to calibrate.
+            project_id: Project of the run (injected by QDash). Defaults to the
+                user's default project.
+            flow_name: Display name of the run; each step's Execution is named
+                ``<flow_name>_<step name>`` (injected by QDash).
+            tags: Tags recorded on every Execution of the run.
+            note: Extra JSON-serializable data recorded in every Execution's note.
+            default_run_parameters: Run values every task shares, in the same
+                plain, sweep or wrapped form as ``TaskCall.run``. When omitted,
+                the saved flow's defaults apply.
 
         Raises:
-            RuntimeError: If use_lock=True and another calibration is already running
-
+            TypeError: A removed argument was passed; the message says how to
+                migrate each one.
+            CalibContextError: The user, project or permission is not valid.
         """
-        self.username = username
-        self.chip_id = chip_id
-        self.qids = qids
-        self.muxes = muxes
-        self.backend_name = backend_name or get_default_backend()
-        self.use_lock = use_lock
-        self.skip_execution = skip_execution
-        self.default_run_parameters = default_run_parameters or {}
-        self.task_run_parameters = task_run_parameters or {}
-        self._lock_acquired = False
-        self._lock_execution_id: str | None = None
-        self._reserved_scope = resource_scope
+        _reject_legacy_arguments(legacy_args, legacy_options)
+        context = resolve_calib_context(username, chip_id, project_id=project_id)
+        self._setup(context, flow_name, tags, note, default_run_parameters)
 
-        # Resolve source_execution_id from Prefect runtime context if not provided
-        if source_execution_id is None:
-            source_execution_id = self._read_source_execution_id_from_context()
-        self.source_execution_id = source_execution_id
-        self._parameter_overrides = parameter_overrides
-        self._source_task_id = source_task_id
-        self._snapshot_exempt_tasks = snapshot_exempt_tasks or set()
-        self._force_update_params = force_update_params
-        self._persist_output_parameters = persist_output_parameters
-
-        # Store injected repositories for later use
-        self._user_repo = user_repo
-        self._lock_repo = lock_repo
-        self._counter_repo = counter_repo
-
-        # Store flow_name (priority: flow_name > name)
-        self.flow_name = flow_name or name
-
-        # GitHub configuration
-        self.enable_github = enable_github
-        # enable_github_pull: explicit value > enable_github default
-        self._enable_github_pull = (
-            enable_github_pull if enable_github_pull is not None else enable_github
-        )
-
-        # Auto-resolve project_id from username if not provided
-        # This works because only owners can run calibrations (1 user = 1 project policy)
-        if project_id is None:
-            if self._user_repo is None:
-                from qdash.repository import MongoUserRepository
-
-                self._user_repo = MongoUserRepository()
-
-            default_project_id = self._user_repo.get_default_project_id(username)
-            if default_project_id:
-                project_id = default_project_id
-                logger.info(f"Auto-resolved project_id={project_id} from user={username}")
-            else:
-                raise ValueError(
-                    f"Could not resolve project_id for user={username}. "
-                    f"default_project_id is not set. "
-                    f"Either provide project_id explicitly or ensure user has default_project_id set."
-                )
-        self.project_id = project_id
-
-        # Auto-load default_run_parameters from flow document if not explicitly provided
-        if not self.default_run_parameters and self.flow_name:
-            self._load_default_run_parameters()
-        logger.debug(
-            "CalibService.__init__ flow_name=%s default_run_parameters=%s task_run_parameters=%s",
-            self.flow_name,
-            self.default_run_parameters,
-            self.task_run_parameters,
-        )
-
-        # Session state
-        self._initialized = False
-        self._pipeline_active = False
-        self.execution_id: str | None = execution_id
-        self._orchestrator: CalibOrchestrator | None = None
-        self.github_integration: GitHubIntegration | None = None
-        self.github_push_config: GitHubPushConfig | None = github_push_config
-        self.tags: list[str] | None = tags
-        self.note: dict[str, Any] | None = note
-
-        # If qids provided, initialize immediately (low-level API mode)
-        if qids is not None:
-            self._initialize(qids, tags, note)
-
-    @staticmethod
-    def _read_source_execution_id_from_context() -> str | None:
-        """Try to read source_execution_id from Prefect flow run parameters."""
-        try:
-            from prefect.context import get_run_context
-
-            ctx = get_run_context()
-            flow_run = getattr(ctx, "flow_run", None)
-            if flow_run and flow_run.parameters:
-                value = flow_run.parameters.get("source_execution_id")
-                return str(value) if value is not None else None
-        except Exception:
-            logger.debug("No Prefect run context available for source_execution_id")
-        return None
-
-    @staticmethod
-    def _read_flow_run_id_from_context() -> str | None:
-        """Try to read the Prefect flow run id from the run context."""
-        try:
-            from prefect.context import get_run_context
-
-            ctx = get_run_context()
-            flow_run = getattr(ctx, "flow_run", None)
-            if flow_run:
-                return str(flow_run.id)
-        except Exception:
-            logger.debug("No Prefect run context available for flow_run_id")
-        return None
-
-    def _load_default_run_parameters(self) -> None:
-        """Load default_run_parameters from the flow document in MongoDB."""
-        try:
-            from qdash.repository.flow import MongoFlowRepository
-
-            flow_repo = MongoFlowRepository()
-            flow_name = self.flow_name or ""
-            flow = flow_repo.find_by_project_and_name(self.project_id, flow_name)
-            if flow and flow.default_run_parameters:
-                self.default_run_parameters = flow.default_run_parameters
-                logger.debug(
-                    "Loaded default_run_parameters from flow '%s': %s",
-                    self.flow_name,
-                    flow.default_run_parameters,
-                )
-        except Exception:
-            logger.warning(
-                f"Failed to load default_run_parameters for flow '{self.flow_name}'",
-                exc_info=True,
-            )
-
-    def _ensure_execution_id(self) -> None:
-        """Adopt the API reservation or mint a history ID, retaining the lock owner."""
-        flow_run_id = self._read_flow_run_id_from_context()
-        claimed_execution_id: str | None = None
-        supplied_execution_id = self.execution_id is not None
-        if self.execution_id is None:
-            # Lock-owning wrappers must adopt the API's execution ID as well:
-            # minting another ID would collide with their own pre-acquired lock.
-            # Isolated workers (skip_execution=True, use_lock=False) must never
-            # claim the parent execution or take over its lifecycle.
-            if flow_run_id is not None and (not self.skip_execution or self.use_lock):
-                from qdash.repository import MongoExecutionRepository
-
-                claimed_execution_id = MongoExecutionRepository().claim_scheduled_execution(
-                    project_id=self.project_id, flow_run_id=flow_run_id
-                )
-                if claimed_execution_id is not None:
-                    # The API has already created a visible parent row. Own its
-                    # start/terminal states even if this wrapper normally skips
-                    # creating an Execution and delegates measurements to children.
-                    self.skip_execution = False
-                    logger.info(
-                        "Adopted pre-created execution_id=%s for flow_run_id=%s",
-                        claimed_execution_id,
-                        flow_run_id,
-                    )
-
-            self.execution_id = claimed_execution_id or generate_execution_id(
-                self.username,
-                self.chip_id,
-                project_id=self.project_id,
-                counter_repo=self._counter_repo,
-            )
-
-        if self._lock_execution_id is None:
-            self._lock_execution_id = (
-                f"flow:{flow_run_id}"
-                if self._pipeline_active
-                and flow_run_id
-                and claimed_execution_id is None
-                and not supplied_execution_id
-                else self.execution_id
-            )
-
-    def _acquire_resource_scope(self, scope: ExecutionResourceScope) -> None:
-        """Atomically reserve the whole plan, never dropping already held resources."""
-        if not self.use_lock:
-            return
-        self._ensure_execution_id()
-        if self._lock_repo is None:
-            from qdash.repository import MongoExecutionLockRepository
-
-            self._lock_repo = MongoExecutionLockRepository()
-        if self._reserved_scope is not None:
-            scope = merge_resource_scopes(self._reserved_scope, scope)
-        if not self._lock_repo.try_lock(
-            project_id=self.project_id,
-            execution_id=self._lock_execution_id,
-            chip_id=scope.chip_id,
-            resources=scope.resources,
-            exclusive=scope.exclusive,
-        ):
-            raise RuntimeError("Calibration is already running. Cannot start a new session.")
-        self._reserved_scope = scope
-        self._lock_acquired = True
-
-    def _validate_resource_scope(self, parameters: dict[str, Any]) -> None:
-        """Reject operations beyond the plan, including operations in borrowed workers."""
-        if self._reserved_scope is None:
-            return
-        if parameters.get("qids") == []:
-            return
-        requested = resolve_execution_resource_scope(self.chip_id, parameters)
-        if not scope_contains(self._reserved_scope, requested):
-            raise RuntimeError("Requested hardware is outside the workflow's reserved resources")
-
-    def _initialize(
-        self,
-        qids: list[str],
+    @classmethod
+    def from_context(
+        cls,
+        context: CalibContext,
+        *,
+        flow_name: str | None = None,
         tags: list[str] | None = None,
         note: dict[str, Any] | None = None,
-    ) -> None:
-        """Initialize session with given qids (internal method).
+        default_run_parameters: dict[str, Any] | None = None,
+    ) -> CalibService:
+        """Create a service for a context from :func:`resolve_calib_context`.
 
-        Args:
-            qids: List of qubit IDs to calibrate
-            tags: List of tags for categorization
-            note: Additional notes to store with execution
-
+        Example:
+            ```python
+            context = resolve_calib_context("alice", "64Qv3")
+            CalibService.from_context(context, flow_name="nightly").run(targets, steps)
+            ```
         """
-        if self._initialized:
-            return
+        if not isinstance(context, CalibContext):
+            raise TypeError("context must come from resolve_calib_context(...)")
+        service = cls.__new__(cls)
+        service._setup(context, flow_name, tags, note, default_run_parameters)
+        return service
 
-        self.qids = qids
-
-        flow_run_id = self._read_flow_run_id_from_context()
-
-        self._ensure_execution_id()
-        self._validate_resource_scope({"qids": qids})
-        assert self.execution_id is not None
-        if self.muxes is not None:
-            self._validate_resource_scope({"mux_ids": self.muxes})
-
-        # Initialize GitHub integration
-        self.github_integration = GitHubIntegration(
-            username=self.username,
-            chip_id=self.chip_id,
-            execution_id=self.execution_id,
-            project_id=self.project_id,
+    def _setup(
+        self,
+        context: CalibContext,
+        flow_name: str | None,
+        tags: list[str] | None,
+        note: dict[str, Any] | None,
+        default_run_parameters: dict[str, Any] | None,
+    ) -> None:
+        self._context = context
+        self._flow_name = flow_name
+        self._tags = list(tags) if tags is not None else None
+        self._note = copy.deepcopy(note) if note is not None else None
+        self._default_run_parameters = (
+            normalize_default_run_parameters(default_run_parameters)
+            if default_run_parameters
+            else None
         )
-
-        # Setup github_push_config if not provided
-        if self.github_push_config is None and self.enable_github:
-            from qdash.workflow.service.github import ConfigFileType
-
-            self.github_push_config = GitHubPushConfig(
-                enabled=self.enable_github,
-                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
-            )
-        elif self.github_push_config is None:
-            self.github_push_config = GitHubPushConfig()
-
-        # A pipeline reserves its complete plan before any step starts. Later
-        # step execution IDs never change the reservation owner or narrow scope.
-        if self.use_lock and not self._lock_acquired:
-            lock_parameters: dict[str, Any] = (
-                {"mux_ids": self.muxes} if self.muxes is not None else {"qids": qids}
-            )
-            self._acquire_resource_scope(
-                resolve_execution_resource_scope(self.chip_id, lock_parameters)
-            )
-
-        # Wrap all initialization in try/except to ensure lock is released on failure
-        try:
-            if flow_run_id:
-                note = {**(note or {}), "flow_run_id": flow_run_id}
-            if self._reserved_scope is not None:
-                note = {
-                    **(note or {}),
-                    "hardware_reservation": {
-                        "chip_id": self._reserved_scope.chip_id,
-                        "resources": list(self._reserved_scope.resources),
-                        "exclusive": self._reserved_scope.exclusive,
-                    },
-                }
-            self.note = note
-
-            # Create CalibConfig
-            logger.debug(
-                "CalibConfig default_run_parameters=%s task_run_parameters=%s",
-                self.default_run_parameters,
-                self.task_run_parameters,
-            )
-            config = CalibConfig(
-                username=self.username,
-                chip_id=self.chip_id,
-                qids=qids,
-                execution_id=self.execution_id,
-                backend_name=self.backend_name,
-                flow_name=self.flow_name,
-                tags=tags,
-                note=note,
-                muxes=self.muxes,
-                project_id=self.project_id,
-                enable_github_pull=self._enable_github_pull,
-                skip_execution=self.skip_execution,
-                default_run_parameters=self.default_run_parameters,
-                task_run_parameters=self.task_run_parameters,
-                force_update_params=self._force_update_params,
-                persist_output_parameters=self._persist_output_parameters,
-            )
-
-            # Create a parameter loader for snapshot re-execution or standalone
-            # user overrides. Quick runs have no source snapshot, but still need
-            # input overrides to be re-applied after task preprocessing.
-            snapshot_loader = None
-            if self._source_task_id or self.source_execution_id or self._parameter_overrides:
-                from qdash.workflow.engine.task.snapshot_loader import (
-                    SnapshotParameterLoader,
-                )
-
-                snapshot_loader = SnapshotParameterLoader(
-                    source_execution_id=self.source_execution_id,
-                    project_id=self.project_id,
-                    source_task_id=self._source_task_id,
-                    parameter_overrides=self._parameter_overrides,
-                    snapshot_exempt_tasks=self._snapshot_exempt_tasks,
-                )
-                logger.info(
-                    "Created SnapshotParameterLoader for source_task_id=%s, source_execution_id=%s",
-                    self._source_task_id,
-                    self.source_execution_id,
-                )
-
-            # Create and initialize CalibOrchestrator
-            self._orchestrator = CalibOrchestrator(
-                config=config,
-                github_integration=self.github_integration,
-                snapshot_loader=snapshot_loader,
-            )
-            self._orchestrator._source_task_id = self._source_task_id
-            self._orchestrator.initialize()
-
-            self._initialized = True
-        except Exception:
-            # Release lock if initialization fails
-            if self._lock_acquired and self._lock_repo is not None:
-                self._lock_repo.unlock(
-                    project_id=self.project_id,
-                    execution_id=self._lock_execution_id,
-                )
-                self._lock_acquired = False
-                self._lock_execution_id = None
-            raise
 
     @property
-    def execution_service(self) -> ExecutionService | None:
-        """Get the ExecutionService from CalibOrchestrator."""
-        if self._orchestrator is None:
-            return None
-        # Access private attribute to avoid RuntimeError from property
-        return self._orchestrator._execution_service
-
-    @execution_service.setter
-    def execution_service(self, value: ExecutionService | None) -> None:
-        """Set execution_service (for backward compatibility with reload)."""
-        if self._orchestrator is not None:
-            self._orchestrator._execution_service = value
+    def context(self) -> CalibContext:
+        """The validated user, chip and project of every run."""
+        return self._context
 
     @property
-    def task_context(self) -> TaskContext | None:
-        """Get the TaskContext from CalibOrchestrator."""
-        if self._orchestrator is None:
-            return None
-        # Access private attribute to avoid RuntimeError from property
-        return self._orchestrator._task_context
+    def username(self) -> str:
+        return self._context.username
 
     @property
-    def backend(self) -> BaseBackend | None:
-        """Get the Backend from CalibOrchestrator."""
-        if self._orchestrator is None:
-            return None
-        # Access private attribute to avoid RuntimeError from property
-        return self._orchestrator._backend
+    def chip_id(self) -> str:
+        return self._context.chip_id
 
-    def execute_task(
-        self,
-        task_name: str,
-        qid: str,
-        task_details: dict[str, Any] | None = None,
-        upstream_id: str | None = None,
-    ) -> dict[str, Any]:
-        """Execute a calibration task with integrated save processing.
+    @property
+    def project_id(self) -> str:
+        return self._context.project_id
+
+    @property
+    def backend_name(self) -> str:
+        return self._context.backend_name
+
+    @property
+    def flow_name(self) -> str | None:
+        return self._flow_name
+
+    @property
+    def tags(self) -> list[str] | None:
+        return list(self._tags) if self._tags is not None else None
+
+    @property
+    def note(self) -> dict[str, Any] | None:
+        return copy.deepcopy(self._note) if self._note is not None else None
+
+    @property
+    def default_run_parameters(self) -> dict[str, Any]:
+        """Explicit shared run defaults; the saved flow's apply when this is empty."""
+        return dict(self._default_run_parameters or {})
+
+    def run(self, targets: Target, steps: Sequence[Step]) -> dict[str, Any]:
+        """Run the steps on the targets, one Execution per calibration step.
+
+        Targets selected in the QDash UI for this run replace ``targets``.
 
         Args:
-            task_name: Name of the task to execute (e.g., 'CheckFreq')
-            qid: Qubit ID to calibrate
-            task_details: Optional task-specific configuration parameters. Set
-                ``task_details[task_name]["update_calibration_parameters"]`` to ``False``
-                to retain a successful measurement without updating current calibration values.
-            upstream_id: Optional explicit upstream task_id for dependency tracking
+            targets: ``MuxTargets``, ``QubitTargets`` or another target.
+            steps: Calibration and transform steps, run in order.
 
         Returns:
-            Dictionary containing the task's output parameters and task_id
-
-        Example:
-            ```python
-            result = session.execute_task("CheckFreq", "0")
-            print(f"Frequency: {result.get('qubit_frequency')}")
-
-            # With explicit upstream_id for group execution
-            result1 = session.execute_task("CheckRabi", "33")
-            result2 = session.execute_task("CheckRabi", "32", upstream_id=result1["task_id"])
-            ```
+            Results dictionary with typed results of each step.
         """
-        if self.use_lock and not self._lock_acquired:
-            raise RuntimeError("No hardware reservation is held for this execution")
-        parameters: dict[str, Any] = {"qid": qid}
-        if task_name == "ConfigureAll":
-            parameters = {
-                "mux_ids": (task_details or {})
-                .get(task_name, {})
-                .get("run_parameters", {})
-                .get("mux_ids", {})
-                .get("value")
-            }
-        self._validate_resource_scope(parameters)
-        assert self._orchestrator is not None, "Session not initialized"
-        result: dict[str, Any] = self._orchestrator.run_task(
-            task_name, qid, task_details, upstream_id
+        from qdash.workflow.service._internal.runs import run_calibration, workflow_settings
+
+        settings = workflow_settings(
+            self._context,
+            flow_name=self._flow_name,
+            tags=self._tags,
+            note=self._note,
+            default_run_parameters=self._default_run_parameters,
         )
-        return result
-
-    def execute_task_batch(
-        self,
-        task_name: str,
-        qids: list[str],
-        task_details: dict[str, Any] | None = None,
-        upstream_id: str | None = None,
-    ) -> dict[str, dict[str, Any]]:
-        """Execute one calibration task with a single batch_run over qids."""
-        if self.use_lock and not self._lock_acquired:
-            raise RuntimeError("No hardware reservation is held for this execution")
-        self._validate_resource_scope({"qids": qids})
-        assert self._orchestrator is not None, "Session not initialized"
-        return self._orchestrator.run_task_batch(task_name, qids, task_details, upstream_id)
-
-    def get_parameter(self, qid: str, param_name: str) -> Any:
-        """Get a calibration parameter value for a qubit.
-
-        Args:
-            qid: Qubit ID
-            param_name: Parameter name (e.g., 'qubit_frequency')
-
-        Returns:
-            Parameter value, or None if not found
-
-        Example:
-            ```python
-            freq = session.get_parameter("0", "qubit_frequency")
-            ```
-
-        """
-        assert self.execution_service is not None, "ExecutionService not initialized"
-        return self.execution_service.calib_data.qubit.get(qid, {}).get(param_name)
-
-    def set_parameter(self, qid: str, param_name: str, value: Any) -> None:
-        """Set a calibration parameter value for a qubit.
-
-        Args:
-            qid: Qubit ID
-            param_name: Parameter name
-            value: Parameter value
-
-        Example:
-            ```python
-            session.set_parameter("0", "qubit_frequency", 5.0)
-            ```
-
-        """
-        assert self.execution_service is not None, "ExecutionService not initialized"
-        if qid not in self.execution_service.calib_data.qubit:
-            self.execution_service.calib_data.qubit[qid] = {}
-        self.execution_service.calib_data.qubit[qid][param_name] = value
-
-    def record_stage_result(self, stage_name: str, result: dict[str, Any]) -> None:
-        """Record the result of a calibration stage for tracking and history.
-
-        This method stores stage-specific results in the execution note, which is
-        persisted to MongoDB and visible in the execution history. Useful for:
-        - Recording dynamically determined values during execution
-        - Tracking intermediate decisions and metrics
-        - Multi-stage calibration workflows with clear stage boundaries
-
-        Args:
-            stage_name: Name of the stage (e.g., "stage1_frequency_scan", "stage2_optimization")
-            result: Dictionary containing stage results (any JSON-serializable data)
-                Common fields: status, metrics, decisions, qubits, timestamps, etc.
-
-        Example:
-            ```python
-            # Stage 1: Frequency characterization
-            stage1_results = {}
-            for qid in qids:
-                freq_result = session.execute_task("CheckFreq", qid)
-                stage1_results[qid] = {
-                    "frequency": freq_result.get("qubit_frequency"),
-                    "quality": "high" if freq_result.get("contrast", 0) > 0.8 else "low"
-                }
-
-            # Record stage 1 results with decision logic
-            session.record_stage_result("stage1_frequency_scan", {
-                "status": "completed",
-                "qubits": stage1_results,
-                "decision": "proceed_to_rabi" if all(r["quality"] == "high" for r in stage1_results.values()) else "retry_frequency"
-            })
-
-            # Stage 2: Use stage 1 results to determine next actions
-            stage1_data = session.get_stage_result("stage1_frequency_scan")
-            if stage1_data["decision"] == "proceed_to_rabi":
-                for qid in qids:
-                    session.execute_task("CheckRabi", qid)
-            ```
-
-        """
-        assert self.execution_service is not None, "ExecutionService not initialized"
-        logger = get_run_logger()
-
-        # Record stage result using the structured ExecutionNote API
-        timestamp = now()
-        self.execution_service.note.record_stage(stage_name, result, timestamp)
-
-        # Persist to database immediately
-        self.execution_service.save()
-        logger.info(f"Recorded stage result for '{stage_name}'")
-
-    def get_stage_result(self, stage_name: str) -> dict[str, Any] | None:
-        """Get the recorded result of a previous calibration stage.
-
-        Args:
-            stage_name: Name of the stage to retrieve
-
-        Returns:
-            Stage result dictionary, or None if stage not found
-
-        Example:
-            ```python
-            # Retrieve stage 1 results to determine stage 2 logic
-            stage1_data = session.get_stage_result("stage1_frequency_scan")
-            if stage1_data and stage1_data["decision"] == "proceed_to_rabi":
-                # Execute stage 2 tasks
-                pass
-            ```
-
-        """
-        assert self.execution_service is not None, "ExecutionService not initialized"
-        stage_result = self.execution_service.note.get_stage(stage_name)
-
-        if stage_result:
-            return dict(stage_result.result)
-        return None
-
-    def _finalize_stale_running_tasks(
-        self,
-        logger: Any,
-        message: str = "Task was still running when execution completed",
-    ) -> None:
-        """Finalize any tasks still in RUNNING status for this execution.
-
-        During Dask parallel execution, tasks may remain in RUNNING status if:
-        - The MongoDB write for final status fails
-        - Prefect task timeout prevents the finally block from completing
-        - A Dask worker process crashes
-        - There is latency between Dask future resolution and MongoDB write completion
-
-        This method retries several times with progressive backoff delays to handle
-        the latency case, then marks any remaining running tasks as FAILED before
-        the execution status is updated, ensuring data consistency.
-
-        Args:
-            logger: Logger instance for output
-            message: Failure message to set on stale tasks
-
-        """
-        if self.execution_service is None or self.execution_id is None:
-            return
-
-        project_id = self.execution_service.project_id
-        if project_id is None:
-            return
-
-        try:
-            from qdash.repository import MongoTaskResultHistoryRepository
-
-            repo = MongoTaskResultHistoryRepository()
-
-            # Progressive backoff delays (in seconds) to handle MongoDB write latency
-            # from Dask workers. Starts short to minimize latency in the common case,
-            # then increases to handle slower edge cases.
-            retry_delays = [0.5, 1, 2, 3, 5]
-
-            for attempt, delay in enumerate(retry_delays):
-                count = repo.finalize_running_tasks(
-                    project_id=project_id,
-                    execution_id=self.execution_id,
-                    message=message,
-                )
-                if count > 0:
-                    logger.warning(
-                        f"[attempt {attempt + 1}/{len(retry_delays)}] "
-                        f"Finalized {count} stale task(s) still in RUNNING status "
-                        f"for execution {self.execution_id}"
-                    )
-                    if attempt < len(retry_delays) - 1:
-                        # Wait before re-checking in case more tasks
-                        # are still being written by Dask workers
-                        time.sleep(delay)
-                else:
-                    if attempt == 0:
-                        logger.info(
-                            f"All tasks in terminal state for execution {self.execution_id}"
-                        )
-                    break
-        except Exception as e:
-            logger.warning(f"Failed to finalize stale running tasks: {e}")
-
-    def _finalize_tasks_on_cancel(
-        self,
-        logger: Any,
-        message: str = "Execution was cancelled",
-    ) -> None:
-        """Mark non-terminal tasks as cancelled for this execution.
-
-        Unlike _finalize_stale_running_tasks which only targets RUNNING tasks,
-        this method also marks SCHEDULED and PENDING tasks as cancelled.
-
-        Args:
-            logger: Logger instance for output
-            message: Cancellation message to set on tasks
-
-        """
-        if self.execution_service is None or self.execution_id is None:
-            return
-
-        project_id = self.execution_service.project_id
-        if project_id is None:
-            return
-
-        try:
-            from qdash.repository import MongoTaskResultHistoryRepository
-
-            repo = MongoTaskResultHistoryRepository()
-
-            retry_delays = [0.5, 1, 2, 3, 5]
-
-            for attempt, delay in enumerate(retry_delays):
-                count = repo.finalize_tasks_on_cancel(
-                    project_id=project_id,
-                    execution_id=self.execution_id,
-                    message=message,
-                )
-                if count > 0:
-                    logger.warning(
-                        f"[attempt {attempt + 1}/{len(retry_delays)}] "
-                        f"Cancelled {count} non-terminal task(s) "
-                        f"for execution {self.execution_id}"
-                    )
-                    if attempt < len(retry_delays) - 1:
-                        time.sleep(delay)
-                else:
-                    if attempt == 0:
-                        logger.info(
-                            f"All tasks in terminal state for execution {self.execution_id}"
-                        )
-                    break
-        except Exception as e:
-            logger.warning(f"Failed to finalize tasks on cancel: {e}")
-
-    def _sync_backend_params_before_push(self, logger: Any) -> None:
-        """Sync recent calibration results into backend YAML params prior to GitHub push."""
-        assert self.execution_service is not None, "ExecutionService not initialized"
-        assert self.github_push_config is not None, "GitHubPushConfig not initialized"
-        self._merge_task_result_calib_data_before_push(logger)
-        updater_instance = get_params_updater(self.backend, self.chip_id)
-        if updater_instance is None:
-            return
-
-        from qdash.workflow.engine.params_updater import resolve_param_yaml_file_names
-
-        push_candidate_files: set[str] = set()
-        for qid, params in self.execution_service.calib_data.qubit.items():
-            if "-" in qid or not params:
-                continue
-            push_candidate_files.update(resolve_param_yaml_file_names(params))
-            try:
-                push_candidate_files.update(updater_instance.update(qid, params))
-            except Exception as exc:
-                logger.warning(f"Failed to sync params for qid={qid}: {exc}")
-
-        configured_param_files = self.github_push_config.params_file_names
-        if configured_param_files is not None:
-            self.github_push_config.params_file_names = [
-                file_name
-                for file_name in configured_param_files
-                if file_name in push_candidate_files
-            ]
-            skipped_files = sorted(set(configured_param_files) - push_candidate_files)
-            if skipped_files:
-                logger.info(
-                    "Skipping params files not touched by this calibration: %s",
-                    ", ".join(skipped_files),
-                )
-
-    def _merge_task_result_calib_data_before_push(self, logger: Any) -> None:
-        """Reload completed task outputs into parent calib_data before GitHub push.
-
-        Parallel strategies run isolated child sessions. Those sessions persist
-        TaskResultHistoryDocument rows, but their in-memory calib_data does not
-        flow back to the parent process. Rebuild the parent in-memory calib_data
-        from completed task results before deciding which params YAML files changed.
-        """
-        assert self.execution_service is not None, "ExecutionService not initialized"
-        execution_id = getattr(self, "execution_id", None)
-        if not execution_id:
-            return
-
-        try:
-            from bunnet import SortDirection
-
-            from qdash.datamodel.task import CalibDataModel, ParameterModel, TaskTypes
-            from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-            docs = (
-                TaskResultHistoryDocument.find(
-                    {
-                        "project_id": self.project_id,
-                        "execution_id": execution_id,
-                        "status": "completed",
-                    }
-                )
-                .sort([("end_at", SortDirection.ASCENDING)])
-                .run()
-            )
-
-            calib_data = CalibDataModel()
-            for doc in docs:
-                if not doc.qid or not doc.output_parameters:
-                    continue
-
-                for name, value in doc.output_parameters.items():
-                    try:
-                        parameter = (
-                            value
-                            if isinstance(value, ParameterModel)
-                            else ParameterModel.model_validate(value)
-                        )
-                    except Exception:
-                        logger.debug(
-                            "Skipping invalid output parameter %s from task_id=%s",
-                            name,
-                            doc.task_id,
-                            exc_info=True,
-                        )
-                        continue
-
-                    if doc.task_type == TaskTypes.COUPLING or "-" in doc.qid:
-                        calib_data.put_coupling_data(doc.qid, name, parameter)
-                    else:
-                        calib_data.put_qubit_data(doc.qid, name, parameter)
-
-            if calib_data.qubit or calib_data.coupling:
-                self.execution_service.merge_calib_data(calib_data)
-                logger.info(
-                    "Merged task result calib_data before GitHub push: %d qubit(s), %d coupling(s)",
-                    len(calib_data.qubit),
-                    len(calib_data.coupling),
-                )
-        except Exception as exc:
-            logger.warning(f"Failed to merge task result calib_data before push: {exc}")
-
-    def finish_calibration(
-        self,
-        update_chip_history: bool = True,
-        push_to_github: bool | None = None,
-        export_note_to_file: bool = False,
-    ) -> dict[str, Any] | None:
-        """Complete the calibration session and save final state.
-
-        This method performs cleanup and finalization:
-        - Marks the execution as complete
-        - Updates ChipDocument and ChipHistoryDocument (if requested)
-        - Exports calibration note to file (if requested)
-        - Pushes results to GitHub (if configured)
-        - Releases the execution lock (if it was acquired)
-
-        Args:
-            update_chip_history: Whether to update ChipHistoryDocument (default: True)
-            push_to_github: Override github_push_config.enabled if specified
-            export_note_to_file: Whether to export calibration note to local file (default: False)
-                Useful for debugging or archival purposes. The note is always available
-                in MongoDB regardless of this setting.
-
-        Returns:
-            Push results dictionary if push was performed, else None
-
-        Example:
-            ```python
-            # Basic usage
-            session.finish_calibration()
-
-            # With explicit push override
-            push_results = session.finish_calibration(push_to_github=True)
-            print(f"Pushed files: {push_results}")
-
-            # Export note to file for debugging
-            session.finish_calibration(export_note_to_file=True)
-            ```
-
-        """
-        logger = get_run_logger()
-        push_results = None
-
-        try:
-            # Skip finalization if this session doesn't own the execution.
-            # This covers two cases:
-            # 1. Wrapper mode (no ExecutionService was created)
-            # 2. Isolated Dask worker sessions (skip_execution=True) that
-            #    may have borrowed the parent's ExecutionService via
-            #    _run_prefect_task — they must NOT complete/modify it.
-            if self.execution_service is None or self.skip_execution:
-                logger.info("Skipping finalization (no owned Execution)")
-                return None
-
-            assert self.task_context is not None, "TaskContext not initialized"
-            assert self.github_push_config is not None, "GitHubPushConfig not initialized"
-
-            # Finalize any tasks still in RUNNING status before completing execution.
-            self._finalize_stale_running_tasks(logger)
-
-            # Reload and complete execution
-            self.execution_service = self.execution_service.reload().complete()
-
-            if update_chip_history:
-                self._update_chip_history(logger)
-
-            if export_note_to_file:
-                self._export_calibration_note(logger)
-
-            push_results = self._push_to_github_if_configured(logger, push_to_github)
-
-        finally:
-            self._release_lock_if_acquired()
-
-        return push_results
-
-    def _update_chip_history(self, logger: Any) -> None:
-        """Update chip history for the specific chip being calibrated."""
-        try:
-            from qdash.repository import (
-                MongoChipHistoryRepository,
-                MongoChipRepository,
-            )
-
-            chip_repo = MongoChipRepository()
-            chip = chip_repo.find_by_id(project_id=self.project_id, chip_id=self.chip_id)
-            if chip is not None:
-                history_repo = MongoChipHistoryRepository()
-                history_repo.create_history(
-                    username=self.username,
-                    chip_id=self.chip_id,
-                    project_id=self.project_id,
-                )
-            else:
-                logger.warning(
-                    f"Chip '{self.chip_id}' not found in project '{self.project_id}', "
-                    "skipping history update"
-                )
-        except Exception as e:
-            logger.warning(f"Failed to update chip history: {e}")
-
-    def _export_calibration_note(self, logger: Any) -> None:
-        """Export calibration note to a local JSON file."""
-        assert self.task_context is not None
-        assert self.execution_service is not None
-        try:
-            from qdash.repository import MongoCalibrationNoteRepository
-
-            repo = MongoCalibrationNoteRepository()
-            latest_note = repo.find_one(
-                username=self.username,
-                task_id=self.task_context.id,
-                execution_id=self.execution_id,
-                chip_id=self.chip_id,
-            )
-
-            if latest_note:
-                note_path = Path(
-                    f"{self.execution_service.calib_data_path}/calib_note/{self.task_context.id}.json"
-                )
-                note_path.parent.mkdir(parents=True, exist_ok=True)
-                note_path.write_text(json.dumps(latest_note.note, indent=2, ensure_ascii=False))
-                logger.info(f"Exported calibration note to {note_path}")
-            else:
-                logger.warning(f"No calibration note found for task_id={self.task_context.id}")
-        except Exception as e:
-            logger.error(f"Failed to export calibration note: {e}")
-
-    def _push_to_github_if_configured(
-        self, logger: Any, push_to_github: bool | None
-    ) -> dict[str, Any] | None:
-        """Push results to GitHub if configured."""
-        assert self.github_push_config is not None
-        assert self.execution_service is not None
-
-        should_push = (
-            push_to_github if push_to_github is not None else self.github_push_config.enabled
-        )
-        if not should_push:
-            return None
-
-        self._sync_backend_params_before_push(logger)
-        if GitHubIntegration.check_credentials() and self.github_integration is not None:
-            try:
-                push_results = self.github_integration.push_files(self.github_push_config)
-                if push_results:
-                    self.execution_service.note.github_push_results = push_results
-                    self.execution_service.save()
-                    logger.info(f"GitHub push completed: {push_results}")
-                return push_results
-            except Exception as e:
-                logger.error(f"Failed to push to GitHub: {e}")
-                return {"error": str(e)}
-        else:
-            logger.warning("GitHub credentials not configured, skipping push")
-            return None
-
-    def _release_lock_if_acquired(self) -> None:
-        """Release the execution lock if it was acquired by this session."""
-        if getattr(self, "_pipeline_active", False):
-            return
-        if self.use_lock and self._lock_acquired and self._lock_repo is not None:
-            self._lock_repo.unlock(
-                project_id=self.project_id,
-                execution_id=self._lock_execution_id,
-            )
-            self._lock_acquired = False
-            self._lock_execution_id = None
-
-    def fail_calibration(self, error_message: str = "") -> None:
-        """Mark the calibration as failed and cleanup.
-
-        This should be called in exception handlers to properly mark
-        the execution as failed and release resources.
-
-        Args:
-            error_message: Description of the failure
-
-        Example:
-            ```python
-            try:
-                cal.execute_task("CheckFreq", "0")
-            except Exception as e:
-                cal.fail_calibration(str(e))
-                raise
-            ```
-
-        """
-        run_logger = get_run_logger()
-        try:
-            # Skip if this session doesn't own the execution
-            if self.skip_execution:
-                return
-
-            # Finalize any tasks still in RUNNING status before failing execution
-            if self.execution_service:
-                self._finalize_stale_running_tasks(
-                    run_logger,
-                    message="Task was still running when execution failed",
-                )
-            # Reload and mark as failed
-            if self.execution_service:
-                self.execution_service = self.execution_service.reload().fail(error_message)
-        finally:
-            self._release_lock_if_acquired()
-            self._initialized = False
-
-    def cancel_calibration(self) -> None:
-        """Mark the calibration as cancelled and cleanup.
-
-        This should be called when a Prefect CancelledRun exception is caught
-        to properly distinguish cancellation from failure.
-        """
-        run_logger = get_run_logger()
-        try:
-            if self.skip_execution:
-                return
-
-            # Mark non-terminal tasks as cancelled
-            if self.execution_service:
-                self._finalize_tasks_on_cancel(run_logger)
-
-            # Reload and mark execution as cancelled
-            if self.execution_service:
-                self.execution_service = self.execution_service.reload().cancel()
-        finally:
-            self._release_lock_if_acquired()
-            self._initialized = False
-
-    def abandon_calibration(self) -> None:
-        """Release resources without recording a terminal status.
-
-        Called when the flow process is interrupted by a signal. Whether the run
-        was cancelled or killed is only known from the flow run's terminal state,
-        so the execution is left open for ``on_flow_cancellation`` /
-        ``on_flow_crashed``, or the API reconciliation, to close.
-        """
-        self._release_lock_if_acquired()
-        self._initialized = False
-
-    # =========================================================================
-    # High-level API Methods
-    # =========================================================================
-
-    def run(
-        self,
-        targets: Target,
-        steps: Sequence[Step],
-    ) -> dict[str, Any]:
-        """Run calibration pipeline with targets and steps.
-
-        Args:
-            targets: Target specification (MuxTargets, QubitTargets, etc.)
-            steps: List of Step objects defining the calibration pipeline
-
-        Returns:
-            Results dictionary. Structure depends on the steps executed.
-
-        Example:
-            ```python
-            from qdash.workflow.service import CalibService
-            from qdash.workflow.service.targets import MuxTargets
-            from qdash.workflow.service.steps import (
-                OneQubitCheck,
-                OneQubitFineTune,
-                FilterByFidelity,
-                TwoQubitCalibration,
-            )
-
-            cal = CalibService("alice", "64Qv3")
-            targets = MuxTargets([0, 1, 2, 3])
-
-            results = cal.run(targets, steps=[
-                OneQubitCheck(),
-                OneQubitFineTune(),
-                FilterByFidelity(threshold=0.9),
-                TwoQubitCalibration(),
-            ])
-            ```
-        """
-        return self._run_pipeline(targets, steps)
-
-    def _run_pipeline(
-        self,
-        targets: Target,
-        steps: Sequence[Step],
-    ) -> dict[str, Any]:
-        """Execute a calibration pipeline with steps.
-
-        Args:
-            targets: Target specification
-            steps: List of steps to execute
-
-        Returns:
-            Dictionary with typed results from each step
-        """
-        from qdash.workflow.service.session_context import (
-            clear_current_session,
-            set_current_session,
-        )
-        from qdash.workflow.service.steps import Pipeline, StepContext
-        from qdash.workflow.service.steps.base import TransformStep
-
-        logger = get_run_logger()
-
-        # Set this CalibService as the current session for task execution
-        set_current_session(self)
-        self._pipeline_active = True
-        active_step = False
-        completed_steps = 0
-        pipeline_flow_name = self.flow_name
-        pipeline_note = self.note
-
-        try:
-            qids = targets.to_qids(self.chip_id)
-            # Validate pipeline dependencies
-            pipeline = Pipeline(steps)
-            from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
-
-            planned_scope = plan_pipeline_resources(self.chip_id, targets, steps, self.muxes)
-            self._acquire_resource_scope(planned_scope)
-            logger.info(f"Starting calibration pipeline with {len(pipeline)} steps")
-
-            # Initialize context
-            ctx = StepContext()
-            ctx.candidate_qids = qids
-
-            # Execute steps sequentially
-            for i, step in enumerate(pipeline):
-                logger.info(f"Step {i + 1}/{len(pipeline)}: {step.name}")
-                try:
-                    # Transform-only steps do not create an Execution. Hardware
-                    # steps share one session across all workers and strategies.
-                    if not isinstance(step, TransformStep):
-                        self._validate_resource_scope({"qids": ctx.candidate_qids})
-                        if completed_steps:
-                            self._initialized = False
-                            self._orchestrator = None
-                            self.execution_id = None
-                        self.flow_name = (
-                            f"{pipeline_flow_name}_{step.name}" if pipeline_flow_name else step.name
-                        )
-                        self.note = {
-                            **(pipeline_note or {}),
-                            "step_name": step.name,
-                            "step_index": i + 1,
-                            "pipeline_name": pipeline_flow_name,
-                        }
-                        active_step = True
-                        # Compatibility with saved templates that still pass
-                        # skip_execution=True for the old wrapper session.
-                        was_skipped = self.skip_execution
-                        self.skip_execution = False
-                        if not self._initialized:
-                            self._initialize(ctx.candidate_qids, self.tags, self.note)
-                        elif was_skipped and self.execution_service is not None:
-                            assert self._orchestrator is not None
-                            self._orchestrator.config.skip_execution = False
-                            self.execution_service.save().start()
-                    ctx = step.execute(self, targets, ctx)
-                    if active_step:
-                        self.finish_calibration()
-                        active_step = False
-                        completed_steps += 1
-                except Exception as e:
-                    logger.error(f"Step {step.name} failed: {e}")
-                    raise
-
-            logger.info("Pipeline completed successfully")
-
-        except BaseException as exc:
-            with contextlib.suppress(Exception):
-                logger.error(
-                    "Pipeline aborted by %s (cause=%s, context=%s, group=%s)",
-                    type(exc).__name__,
-                    type(exc.__cause__).__name__ if exc.__cause__ else None,
-                    type(exc.__context__).__name__ if exc.__context__ else None,
-                    [type(sub).__name__ for sub in getattr(exc, "exceptions", [])] or None,
-                )
-                if active_step:
-                    if _is_cancellation(exc):
-                        logger.info("Execution was cancelled")
-                        self.cancel_calibration()
-                    elif _is_external_termination(exc):
-                        logger.info(
-                            "Pipeline interrupted by a termination signal; "
-                            "leaving the execution for the flow run hooks to close"
-                        )
-                        self.abandon_calibration()
-                    else:
-                        self.fail_calibration()
-            raise
-        finally:
-            self.flow_name = pipeline_flow_name
-            self.note = pipeline_note
-            self._pipeline_active = False
-            try:
-                self._release_lock_if_acquired()
-            finally:
-                clear_current_session()
-
-        # Build results from typed context fields
-        results: dict[str, Any] = {
-            "candidate_qids": ctx.candidate_qids,
-            "candidate_couplings": ctx.candidate_couplings,
-        }
-        if ctx.one_qubit_check is not None:
-            results["one_qubit_check"] = ctx.one_qubit_check
-        if ctx.one_qubit_fine_tune is not None:
-            results["one_qubit_fine_tune"] = ctx.one_qubit_fine_tune
-        if ctx.two_qubit is not None:
-            results["two_qubit"] = ctx.two_qubit
-        if ctx.filters:
-            results["filters"] = ctx.filters
-        if ctx.metadata:
-            results["metadata"] = ctx.metadata
-
-        return results
-
-
-# =============================================================================
-# Internal Session Management (re-exported for backward compatibility)
-# =============================================================================
-
-from qdash.workflow.service._internal.session_helpers import (
-    finish_calibration,
-    get_session,
-    init_calibration,
-)
+        return run_calibration(settings, targets, steps)

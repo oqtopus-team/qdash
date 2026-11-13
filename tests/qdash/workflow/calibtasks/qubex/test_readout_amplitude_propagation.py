@@ -6,7 +6,7 @@ from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import CheckQub
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_adaptive_chevron import (
     CheckAdaptiveChevron,
 )
-from qdash.workflow.service.tasks import BRINGUP_TASKS
+from qdash.workflow.service.tasks import BRINGUP_TASKS as DEFAULT_BRINGUP_CALLS
 
 
 def test_bringup_tasks_prefer_loaded_readout_amplitude() -> None:
@@ -48,6 +48,7 @@ def test_cw_tasks_do_not_declare_readout_amplitude_as_run_parameter() -> None:
 
 def test_bringup_uses_adaptive_chevron_after_coarse_calibration() -> None:
     """Verify bring-up orders adaptive chevron after CW calibration tasks."""
+    BRINGUP_TASKS = [call.name for call in DEFAULT_BRINGUP_CALLS]
     assert "CheckAdaptiveChevron" in BRINGUP_TASKS
     assert "CheckChevron" not in BRINGUP_TASKS
     assert "CheckCoarseChevron" not in BRINGUP_TASKS

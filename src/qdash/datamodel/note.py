@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 class NoteModel(BaseModel):
@@ -35,47 +35,4 @@ class NoteCommentModel(BaseModel):
     updated_by: str = Field(default="", description="Username of the last editor")
     updated_at: datetime | None = Field(
         default=None, description="Timestamp of the last edit; None until edited"
-    )
-
-
-class AiReviewModel(BaseModel):
-    """Persistent state for an AI review run on a task result."""
-
-    model_config = ConfigDict(protected_namespaces=())
-
-    status: str = Field(
-        default="",
-        description="AI review status: requested, running, completed, or failed",
-    )
-    requested_at: datetime | None = Field(
-        default=None,
-        description="Timestamp when AI review was requested",
-    )
-    requested_by: str = Field(
-        default="",
-        description="Username that requested AI review",
-    )
-    review_run_id: str = Field(
-        default="",
-        description="AI review run identifier shared by task results in the same run",
-    )
-    trigger_type: str = Field(
-        default="manual_chip_bulk",
-        description="How this AI review run was triggered, such as manual_chip_bulk or execution",
-    )
-    model_provider: str = Field(
-        default="",
-        description="Provider for the selected AI review model",
-    )
-    model_name: str = Field(
-        default="",
-        description="Name of the selected AI review model",
-    )
-    completed_at: datetime | None = Field(
-        default=None,
-        description="Timestamp when AI review completed or failed",
-    )
-    error: str = Field(
-        default="",
-        description="Failure detail if AI review failed",
     )

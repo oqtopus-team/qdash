@@ -1,3 +1,5 @@
+import pytest
+
 from qdash.config import Settings, resolve_api_cors_origins
 
 
@@ -30,6 +32,24 @@ def test_resolve_api_cors_origins_falls_back_to_client_url() -> None:
     )
 
     assert resolve_api_cors_origins(settings) == ["https://app.example.com"]
+
+
+@pytest.mark.parametrize(
+    ("client_url", "ui_port", "expected"),
+    [
+        ("https://qdash.example.com", 5714, "https://qdash.example.com"),
+        ("https://qdash.example.com/", 5714, "https://qdash.example.com"),
+        ("http://localhost:5714", 5714, "http://localhost:5714"),
+        ("", 5714, "http://localhost:5714"),
+        ("", 3000, "http://localhost:3000"),
+    ],
+)
+def test_public_url_uses_client_url_or_local_ui_port(
+    client_url: str, ui_port: int, expected: str
+) -> None:
+    settings = Settings.model_construct(client_url=client_url, ui_port=ui_port)
+
+    assert settings.public_url == expected
 
 
 def test_resolve_api_cors_origins_uses_localhost_defaults_in_local_env() -> None:

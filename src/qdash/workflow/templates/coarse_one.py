@@ -14,6 +14,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -22,25 +23,6 @@ from qdash.workflow.service.calib_service import (
 )
 from qdash.workflow.service.steps import OneQubitCheck
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
-
-COARSE_ONE_TASKS: list[str] = [
-    "Configure",  # Apply the starting configuration before the readout search.
-    "CheckCoarseReadoutParams",
-    "Configure",  # Apply the updated readout settings before pulse calibration.
-    "CheckRabi",  # Update control amplitude from the measured Rabi frequency.
-    "CheckRabi",  # Measure again at the updated amplitude for HPI creation.
-    "CreateHPIPulse",
-    "CheckHPIPulse",
-    "CreatePIPulse",
-    "CheckPIPulse",
-    "CreateDRAGHPIPulse",
-    "CheckDRAGHPIPulse",
-    "CreateDRAGPIPulse",
-    "CheckDRAGPIPulse",
-    "CheckT1",
-    "CheckT2Echo",
-    "CheckRamsey",
-]
 
 
 @flow(
@@ -81,7 +63,33 @@ def coarse_one(
     else:
         raise ValueError("mux_ids or qids is required; select targets before running this flow")
 
-    steps = [OneQubitCheck(mode="synchronized", tasks=COARSE_ONE_TASKS)]
+    steps = [
+        OneQubitCheck(
+            execution_mode="parallel_by_round",
+            tasks=[
+                # Apply the starting configuration before the readout search.
+                TaskCall(name="Configure", call_id="configure_initial"),
+                TaskCall(name="CheckCoarseReadoutParams"),
+                # Apply the updated readout settings before pulse calibration.
+                TaskCall(name="Configure", call_id="configure_readout"),
+                # Update control amplitude from the measured Rabi frequency.
+                TaskCall(name="CheckRabi", call_id="rabi_amplitude_update"),
+                # Measure again at the updated amplitude for HPI creation.
+                TaskCall(name="CheckRabi", call_id="rabi_at_updated_amplitude"),
+                TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
+                TaskCall(name="CheckHPIPulse"),
+                TaskCall(name="CreatePIPulse", run={"pi_duration": 32}),
+                TaskCall(name="CheckPIPulse"),
+                TaskCall(name="CreateDRAGHPIPulse", run={"drag_hpi_duration": 16}),
+                TaskCall(name="CheckDRAGHPIPulse"),
+                TaskCall(name="CreateDRAGPIPulse", run={"drag_pi_duration": 24}),
+                TaskCall(name="CheckDRAGPIPulse"),
+                TaskCall(name="CheckT1"),
+                TaskCall(name="CheckT2Echo"),
+                TaskCall(name="CheckRamsey"),
+            ],
+        )
+    ]
 
     cal = CalibService(
         username,
@@ -89,23 +97,9 @@ def coarse_one(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
-            "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreatePIPulse": {
-                "pi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreateDRAGHPIPulse": {
-                "drag_hpi_duration": {"value": 16, "value_type": "int"},
-            },
-            "CreateDRAGPIPulse": {
-                "drag_pi_duration": {"value": 24, "value_type": "int"},
-            },
-        },
         default_run_parameters={
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

@@ -85,6 +85,24 @@ class InMemoryQubitCalibrationRepository:
 
         return qubit
 
+    def delete_calib_parameter(
+        self,
+        *,
+        username: str,
+        qid: str,
+        chip_id: str,
+        parameter_name: str,
+        project_id: str | None,
+    ) -> QubitModel:
+        """Delete one current calibration parameter."""
+        qubit = self._qubits.get(self._make_key(username, qid, chip_id))
+        if qubit is None:
+            raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
+        if parameter_name not in qubit.data:
+            raise ValueError(f"Parameter {parameter_name} not found for qubit {qid}")
+        del qubit.data[parameter_name]
+        return qubit
+
     def find_one(
         self,
         *,

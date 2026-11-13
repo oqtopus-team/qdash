@@ -25,6 +25,8 @@ class TaskProtocol(Protocol):
     backend: str
     input_parameters: dict[str, Any]
     input_parameters_from_snapshot: bool
+    input_overrides: dict[str, Any]
+    run_overrides: dict[str, Any]
     run_parameters: dict[str, Any]
 
     def get_name(self) -> str:

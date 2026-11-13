@@ -1,0 +1,5 @@
+# Build context of exec/Dockerfile (compose.yaml builds it from agent-runtime/).
+node_modules
+extensions
+test
+.pi-agent

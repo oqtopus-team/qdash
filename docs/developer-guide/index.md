@@ -1,21 +1,35 @@
 # Developer Guide
 
-This guide is for people changing QDash code.
+Use this guide to understand, change, test, and contribute to QDash. Procedures for operating the
+product are in the [User Guide](../user-guide/index.md).
 
-Read this short section first. Use the detailed development pages only when you need deeper
-design context or examples.
+## Make Your First Change
 
-## Start Here
+1. Read [Architecture](./architecture.md) to see the UI, API, and workflow boundaries.
+2. Follow [Development Setup](./setup.md) to start a local environment.
+3. Use [Codebase](./codebase.md) to find the owning package and generated files.
+4. Choose commands from [Command Reference](./commands.md).
+5. Run the checks selected by [Testing](./testing.md).
+6. Follow [Development Flow](./development-flow.md) when preparing the pull request.
 
-- [Setup](../development/setup.md): clone the repository and get a working local stack.
-- [Codebase](./codebase.md): understand where API, UI, workflow, and shared code live.
-- [Commands](./commands.md): use the common `task` commands.
-- [Testing](./testing.md): choose focused checks before opening a PR.
+## Choose a Component
 
-## Deep Dives
+| Area | Owns | Start here |
+| --- | --- | --- |
+| API | Authentication, project access, persistence, and HTTP contracts | [API Design Guidelines](./api/design.md) |
+| UI | Routes, interaction, server state, and presentation | [UI Architecture](./ui/architecture.md) |
+| Workflow | Calibration execution, scheduling, parameters, and Prefect integration | [Workflow Engine Architecture](./workflow/engine-architecture.md) |
+| Copilot | Chat, evaluation, agent execution, and the workspace | [Copilot Architecture](./copilot/architecture.md) |
+| Cross-component design | Data flow, schedulers, topology, notes, and provenance | [Architecture](./architecture.md) |
 
-- API: [design](../development/api/design.md), [testing](../development/api/testing.md)
-- UI: [architecture](../development/ui/architecture.md), [guidelines](../development/ui/guidelines.md), [testing](../development/ui/testing.md)
-- Workflow: [architecture](../development/workflow/engine-architecture.md), [calibration data lifecycle](../development/workflow/calibration-data-lifecycle.md), [testing](../development/workflow/testing.md)
-- Copilot: [architecture](../development/copilot/architecture.md), [sandbox](../development/copilot/sandbox.md), [streaming](../development/copilot/streaming.md)
-- Repository practices: [development flow](../development/development-flow.md), [docs guidelines](../development/docs-guidelines.md)
+Use the component groups in the sidebar to open implementation rules and focused test guides. Use
+[Reference](../reference/index.md) when you need an exact schema, index, generated API, or client
+contract.
+
+## Apply Repository-Wide Conventions
+
+The conventions for [datetime handling](./conventions/datetime.md),
+[logging](./conventions/logging.md), and
+[credential scanning](./conventions/credential-scan.md) apply across component boundaries.
+
+Use [Documentation Guidelines](./docs-guidelines.md) for any page under `docs/`.

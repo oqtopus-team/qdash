@@ -1,0 +1,5 @@
+meta:
+  description: Readout VATT
+  default: 2048
+  scope: mux
+data: {}

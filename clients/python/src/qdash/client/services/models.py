@@ -918,6 +918,10 @@ class FlowTemplate(BaseModel):
     """
     Template category
     """
+    backend: Annotated[str, Field(title="Backend")]
+    """
+    Backend the template's tasks run on, e.g. qubex or fake
+    """
     filename: Annotated[str, Field(title="Filename")]
     """
     Python filename
@@ -948,6 +952,10 @@ class FlowTemplateWithCode(BaseModel):
     category: Annotated[str, Field(title="Category")]
     """
     Template category
+    """
+    backend: Annotated[str, Field(title="Backend")]
+    """
+    Backend the template's tasks run on, e.g. qubex or fake
     """
     filename: Annotated[str, Field(title="Filename")]
     """
@@ -1803,6 +1811,37 @@ class ListCopilotChatSessionsResponse(BaseModel):
     """
 
     sessions: Annotated[list[CopilotChatSessionSummary], Field(title="Sessions")]
+
+
+class ExecutionActivityDay(BaseModel):
+    """
+    Executions started on one calendar day, counted by status.
+    """
+
+    date: Annotated[str, Field(title="Date")]
+    """
+    Calendar day in the requested time zone, YYYY-MM-DD
+    """
+    completed: Annotated[int | None, Field(title="Completed")] = 0
+    failed: Annotated[int | None, Field(title="Failed")] = 0
+    running: Annotated[int | None, Field(title="Running")] = 0
+    scheduled: Annotated[int | None, Field(title="Scheduled")] = 0
+    cancelled: Annotated[int | None, Field(title="Cancelled")] = 0
+    other: Annotated[int | None, Field(title="Other")] = 0
+    total: Annotated[int | None, Field(title="Total")] = 0
+
+
+class ExecutionActivityResponse(BaseModel):
+    """
+    Daily execution counts for a chip over a trailing window of days.
+    """
+
+    chip_id: Annotated[str, Field(title="Chip Id")]
+    days: Annotated[int, Field(title="Days")]
+    timezone: Annotated[str, Field(title="Timezone")]
+    since: Annotated[str, Field(title="Since")]
+    until: Annotated[str, Field(title="Until")]
+    buckets: Annotated[list[ExecutionActivityDay], Field(title="Buckets")]
 
 
 class ListExecutionsResponse(BaseModel):
@@ -4427,6 +4466,8 @@ class AgentSessionPolicy(BaseModel):
     quality_gates: dict[str, dict[str, float | None]] = Field(default_factory=dict)
     allow_reconfigure: bool = False
     max_actions: int
+    autonomy: str = "confirm_each"
+    max_rounds_per_target: int = 3
 
 
 class AgentSessionResponse(BaseModel):
@@ -4553,8 +4594,8 @@ class AgentCandidateCommitResponse(BaseModel):
     backend_applied_at: AwareDatetime | None = None
 
 
-class AgentCampaignCommitResponse(BaseModel):
-    """Client representation of an audited final campaign candidate-set commit."""
+class AgentCandidateSetCommitResponse(BaseModel):
+    """Client representation of an audited final candidate-set commit."""
 
     commit_id: str
     session_id: str
@@ -4571,3 +4612,79 @@ class AgentCampaignCommitResponse(BaseModel):
     state_version_after: int
     created_at: AwareDatetime
     committed_at: AwareDatetime | None = None
+
+
+class TaskNextAction(BaseModel):
+    """One autonomous-plan step from a task's knowledge, keyed by evaluation status."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    action: str
+    task: str | None = None
+    overrides: dict[str, float] = Field(default_factory=dict)
+    suggested_range_parameter: str | None = None
+    note: str = ""
+
+
+class EvaluationRunSummary(BaseModel):
+    """Client representation of a calibration evaluation run."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    run_id: str
+    status: str
+    total: int = 0
+    completed_count: int = 0
+    failed_count: int = 0
+    pending_count: int = 0
+
+
+class CreateEvaluationRunResponse(BaseModel):
+    """What a requested evaluation run queued and skipped."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    run: EvaluationRunSummary
+    task_ids: list[str] = Field(default_factory=list)
+    skipped: dict[str, str] = Field(default_factory=dict)
+
+
+class EvaluationOutput(BaseModel):
+    """The evaluation model's parsed answers."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    model: str | None = None
+    diagnosis: dict[str, Any] | None = None
+
+
+class EvaluationItem(BaseModel):
+    """Client representation of one task result's evaluation."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    evaluation_id: str
+    run_id: str
+    task_id: str
+    task_name: str = ""
+    qid: str = ""
+    status: str
+    error: str | None = None
+    output: EvaluationOutput | None = None
+
+
+class EvaluationRunDetailResponse(BaseModel):
+    """An evaluation run with its evaluations."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    run: EvaluationRunSummary
+    evaluations: list[EvaluationItem] = Field(default_factory=list)
+
+
+class ListEvaluationsResponse(BaseModel):
+    """Evaluations of one task result."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    evaluations: list[EvaluationItem] = Field(default_factory=list)

@@ -6,43 +6,47 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
+from qdash.workflow.service._internal.call_runner import (
+    batch_preflight_problems,
+    run_batch_calls,
+)
 from qdash.workflow.service._internal.scheduling_tasks import (
     run_mux_calibrations_parallel,
     run_qubit_batch_calibration_isolated,
 )
-from qdash.workflow.service.calib_service import get_session
+from qdash.workflow.service.session_context import get_session
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.datamodel.task_call import StepCalls
+    from qdash.workflow.service._internal.session import CalibSession
+    from qdash.workflow.service._internal.settings import WorkerSpec
+
+
+def batch_capable_tasks(backend_name: str) -> dict[str, bool]:
+    """Task name -> whether the task implements ``batch_run`` on this backend."""
+    from qdash.workflow.calibtasks.base import BaseTask
+    from qdash.workflow.calibtasks.fake.base import FakeTask
+    from qdash.workflow.calibtasks.qubex.base import QubexTask
+
+    # These implementations declare the interface but cannot execute a batch.
+    # Compare methods so inherited stubs are rejected regardless of class names.
+    unsupported = {BaseTask.batch_run, QubexTask.batch_run, FakeTask.batch_run}
+    return {
+        name: task_class.batch_run not in unsupported
+        for name, task_class in BaseTask.registry.get(backend_name, {}).items()
+    }
 
 
 class OneQubitStageRunner:
     """Run one-qubit schedules without owning the execution lifecycle."""
 
-    def __init__(self, cal_service: CalibService, *, project_id: str | None = None) -> None:
-        self.cal_service = cal_service
-        self.project_id = project_id or cal_service.project_id
+    def __init__(self, session: CalibSession) -> None:
+        self.session = session
 
-    def build_session_config(self, *, execution_id: str, flow_name: str | None) -> dict[str, Any]:
-        """Build isolated-worker session config for the current parent execution."""
-        return {
-            "username": self.cal_service.username,
-            "chip_id": self.cal_service.chip_id,
-            "backend_name": self.cal_service.backend_name,
-            "project_id": self.project_id,
-            "muxes": None,
-            "execution_id": execution_id,
-            "default_run_parameters": self.cal_service.default_run_parameters,
-            "task_run_parameters": self.cal_service.task_run_parameters,
-            "tags": self.cal_service.tags,
-            "flow_name": flow_name,
-            "note": self.cal_service.note,
-        }
-
-    def collect_scheduled_qids(
+    def collect_mux_group_qids(
         self, schedule: Any, allowed_qids: list[str] | None = None
     ) -> list[str]:
-        """Collect qids from a scheduled MUX plan."""
+        """Collect qids from the MUX groups of a ``OneQubitScheduleResult``."""
         qids: list[str] = []
         for stage_info in schedule.stages:
             for group in stage_info.parallel_groups:
@@ -58,15 +62,30 @@ class OneQubitStageRunner:
             qids.extend(self._filter_qids(step.parallel_qids, allowed_qids))
         return list(dict.fromkeys(qids))
 
-    def execute_scheduled_mux_schedule(
+    def preflight_batch(self, plan: StepCalls) -> None:
+        """Raise before any hardware work when the batch path cannot run ``plan``."""
+        problems = batch_preflight_problems(
+            plan,
+            self.session.task_parameters,
+            batch_capable_tasks(self.session.backend_name),
+        )
+        if problems:
+            raise ValueError(
+                "simultaneous_spectroscopy cannot run this step: " + "; ".join(problems)
+            )
+
+    def execute_parallel_by_mux_schedule(
         self,
         schedule: Any,
         *,
-        tasks: list[str],
-        session_config: dict[str, Any],
+        plan: StepCalls,
+        worker: WorkerSpec,
         allowed_qids: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Run a scheduled MUX plan under the current parent execution."""
+        """Run a ``parallel_by_mux`` schedule under the current parent execution.
+
+        The MUX groups of a stage run in parallel; stages run one after another.
+        """
         stages_by_box: dict[str, list[Any]] = {}
         for stage_info in schedule.stages:
             stages_by_box.setdefault(stage_info.box_type, []).append(stage_info)
@@ -83,8 +102,8 @@ class OneQubitStageRunner:
                     continue
                 mux_results = run_mux_calibrations_parallel(
                     mux_groups=parallel_groups,
-                    tasks=tasks,
-                    session_config=session_config,
+                    plan=plan,
+                    worker=worker,
                 )
                 stage_results.update(mux_results)
             if stage_results:
@@ -95,11 +114,15 @@ class OneQubitStageRunner:
         self,
         schedule: Any,
         *,
-        tasks: list[str],
+        plan: StepCalls,
         allowed_qids: list[str] | None = None,
-        session_config: dict[str, Any] | None = None,
+        worker: WorkerSpec | None = None,
     ) -> dict[str, Any]:
-        """Run simultaneous spectroscopy batches under the current execution."""
+        """Run simultaneous spectroscopy batches under the current execution.
+
+        Every call runs once per schedule step over that step's qubits, so each
+        call is a barrier for its batch; schedule steps run one after another.
+        """
         logger = get_run_logger()
         all_results: dict[str, Any] = {}
         for step in schedule.steps:
@@ -111,21 +134,16 @@ class OneQubitStageRunner:
                 step.step_index,
                 len(step_qids),
             )
-            if session_config is not None:
+            if worker is not None:
                 all_results[f"step_{step.step_index}"] = run_qubit_batch_calibration_isolated(
                     qids=step_qids,
-                    tasks=tasks,
-                    session_config=session_config,
+                    plan=plan,
+                    worker=worker,
                 )
                 continue
-
-            session = get_session()
-            step_results: dict[str, dict[str, Any]] = {qid: {} for qid in step_qids}
-            for task_name in tasks:
-                task_results = session.execute_task_batch(task_name, step_qids)
-                for qid, task_result in task_results.items():
-                    step_results.setdefault(qid, {})[task_name] = task_result
-            all_results[f"step_{step.step_index}"] = step_results
+            all_results[f"step_{step.step_index}"] = run_batch_calls(
+                get_session(), step_qids, plan, logger
+            )
         return all_results
 
     @staticmethod

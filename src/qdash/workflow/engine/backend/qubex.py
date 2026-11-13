@@ -4,6 +4,12 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from qdash.common.mux_mapping import (
+    MuxMapping,
+    check_qubex_mux_mapping,
+    resolve_chip_mux_mapping,
+    resolve_topology_mux_mapping,
+)
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.datamodel.task import TaskTypes
 from qdash.workflow.engine.backend.base import BaseBackend
@@ -42,6 +48,7 @@ class QubexBackend(BaseBackend):
         config: dict[str, Any],
         *,
         calibration_note_repo: "CalibrationNoteRepository | None" = None,
+        mux_mapping: MuxMapping | None = None,
     ) -> None:
         """Initialize the Qubex backend with a configuration dictionary.
 
@@ -52,6 +59,16 @@ class QubexBackend(BaseBackend):
         calibration_note_repo : CalibrationNoteRepository, optional
             Repository for calibration notes. If None, uses the default
             MongoDB implementation.
+        mux_mapping : MuxMapping, optional
+            The chip's MUX membership as QDash schedules it. If None, it is
+            resolved from ``config`` before the first hardware access; see
+            :meth:`ensure_mux_mapping_compatible`.
+
+        Raises
+        ------
+        MuxMappingError
+            If ``mux_mapping`` places a qubit in a MUX or slot that Qubex
+            does not drive.
 
         """
         from qubex import Experiment
@@ -59,6 +76,9 @@ class QubexBackend(BaseBackend):
         self._config = config
         self._exp: Experiment | None = None
         self._calibration_note_repo = calibration_note_repo
+        self._mux_mapping = mux_mapping
+        if mux_mapping is not None:
+            check_qubex_mux_mapping(mux_mapping)
 
     @property
     def calibration_note_repo(self) -> "CalibrationNoteRepository":
@@ -80,9 +100,52 @@ class QubexBackend(BaseBackend):
 
         return str(get_version())
 
+    def ensure_mux_mapping_compatible(self) -> MuxMapping:
+        """Return the chip's MUX mapping after checking that Qubex can drive it.
+
+        Qubex derives MUX membership and control slots from qubit indices
+        (MUX ``i // 4``, slot ``i % 4``) and ignores QDash topologies. Every
+        code path that builds or connects a Qubex ``Experiment`` calls this
+        first, so an incompatible ``muxes`` layout fails before any hardware
+        access. The mapping comes from, in order: the ``mux_mapping`` given
+        at construction, a non-empty ``config["topology_id"]``, or the chip document for
+        ``config["project_id"]`` and ``config["chip_id"]``. Without any of
+        these the legacy layout, which is Qubex's own, is assumed.
+
+        Raises
+        ------
+        MuxMappingError
+            If the mapping cannot be resolved, or Qubex would drive different
+            MUXes or slots than QDash schedules.
+
+        """
+        if self._mux_mapping is None:
+            self._mux_mapping = self._resolve_mux_mapping()
+        check_qubex_mux_mapping(self._mux_mapping)
+        return self._mux_mapping
+
+    def _resolve_mux_mapping(self) -> MuxMapping:
+        # Only a non-empty topology ID overrides the chip; ``None`` or ``""``
+        # means "not given", never "use the legacy layout".
+        topology_id = self._config.get("topology_id")
+        if topology_id:
+            return resolve_topology_mux_mapping(topology_id)
+        project_id = self._config.get("project_id")
+        chip_id = self._config.get("chip_id")
+        if project_id and chip_id:
+            return resolve_chip_mux_mapping(project_id, chip_id)
+        logger.warning(
+            "QubexBackend has no project_id or topology_id for chip %r; assuming the "
+            "legacy MUX layout (qid // 4, slot qid %% 4)",
+            chip_id,
+        )
+        return MuxMapping.legacy()
+
     def connect(self) -> None:
         if self._exp is None:
             from qubex import Experiment
+
+            self.ensure_mux_mapping_compatible()
 
             if self._config.get("task_type") == TaskTypes.QUBIT:
                 qubits = [
@@ -120,6 +183,17 @@ class QubexBackend(BaseBackend):
                 ),
             )
             self._exp.connect()
+
+    def disconnect(self) -> None:
+        """Release the Experiment's hardware connections if it was created."""
+        if self._exp is not None:
+            self._exp.disconnect()
+            self._exp = None
+
+    @property
+    def is_connected(self) -> bool:
+        """Return whether an Experiment has been created and connected."""
+        return self._exp is not None
 
     def get_instance(self) -> Experiment | None:
         if self._exp is None:
@@ -233,19 +307,30 @@ class QubexBackend(BaseBackend):
         calib_note = json.loads(raw_note)
 
         # Filter to only the calibrated qubit/coupling to avoid TOCTOU.
-        # Each param_type dict is keyed by qubit label (e.g. "Q16", "Q016") or
-        # coupling label (e.g. "Q16-Q22").  We keep only the entry that
-        # matches the qid that was just calibrated.
+        # Each param_type dict is keyed by qubit label (e.g. "Q16", "Q016"),
+        # transition label (e.g. "Q16-ef"), or coupling label (e.g. "Q16-Q22").
+        # We keep only entries that belong to the qid that was just calibrated.
         # Note: qid is numeric (e.g. "16") but keys use label format (e.g. "Q16").
         if qid is not None:
             from qdash.common.domain.qubit import qid_to_label_from_chip
 
             label = qid_to_label_from_chip(qid, project_id=project_id, chip_id=chip_id)
 
+            transition_labels = {
+                f"{label}-ef",
+                f"{label}-fh",
+            }
             filtered: dict[str, Any] = {}
             for param_type, qubits in calib_note.items():
-                if isinstance(qubits, dict) and label in qubits:
-                    filtered[param_type] = {label: qubits[label]}
+                if not isinstance(qubits, dict):
+                    continue
+                matching = {
+                    key: value
+                    for key, value in qubits.items()
+                    if key == label or key in transition_labels
+                }
+                if matching:
+                    filtered[param_type] = matching
             calib_note = filtered
 
         repo = self.calibration_note_repo

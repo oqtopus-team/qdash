@@ -3,44 +3,42 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import {
   AlertCircle,
   ArrowUpRight,
   ChevronDown,
-  ExternalLink,
   MessageSquareText,
   RefreshCw,
   Search,
   SlidersHorizontal,
-  X,
   XCircle,
 } from "lucide-react";
 import Select from "react-select";
 import type { SingleValue } from "react-select";
 
 import { useListExecutions } from "@/client/execution/execution";
-import { useGetTaskResult } from "@/client/task/task";
 import { useGetTaskFileSettings, useListTaskInfo } from "@/client/task-file/task-file";
 import { useListTaskResults } from "@/client/task-result/task-result";
-import { TaskFigure } from "@/components/charts/TaskFigure";
-import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
-import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
 import { formatDateTime } from "@/lib/utils/datetime";
-import { getTaskParameterUiGroup } from "@/lib/utils/task-parameters";
 import type {
   ExecutionResponseSummary,
   ListTaskResultsParams,
   TaskInfo,
   TaskResultListItem,
 } from "@/schemas";
+import { QubitTile } from "@/components/ui/QubitTile";
+import {
+  TaskResultPreviewSidebar,
+  compactId,
+  statusBadgeClass,
+} from "@/components/features/task-results/TaskResultPreviewSidebar";
 
 const PAGE_SIZE = 50;
 const STATUS_TABS = ["all", "failed", "running", "completed", "cancelled"] as const;
@@ -78,22 +76,8 @@ function readFilters(searchParams: SearchParamReader): FilterState {
   };
 }
 
-function statusBadgeClass(status: string): string {
-  if (status === "completed" || status === "success") return "badge-success";
-  if (status === "failed") return "badge-error";
-  if (status === "running") return "badge-info";
-  if (status === "scheduled" || status === "pending") return "badge-warning";
-  if (status === "cancelled") return "badge-neutral";
-  return "badge-ghost";
-}
-
 function isFailureStatus(status: string): boolean {
   return status === "failed";
-}
-
-function compactId(value: string): string {
-  if (!value) return "-";
-  return value.length > 16 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
 }
 
 function executionOptionLabel(execution: ExecutionResponseSummary): string {
@@ -147,60 +131,70 @@ function TaskResultRow({
       role="button"
       tabIndex={0}
       aria-label={`Preview ${item.task_name || "unnamed"} task result for ${item.qid || "unknown target"}`}
-      className={`cursor-pointer align-top hover ${isSelected ? "bg-primary/10" : ""}`}
+      aria-current={isSelected ? "true" : undefined}
+      className={`cursor-pointer align-top focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${isSelected ? "bg-primary/10" : ""}`}
       onClick={onSelect}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           onSelect();
         }
       }}
     >
-      <td>
+      <td className="whitespace-nowrap">
         <span className={`badge badge-sm ${statusBadgeClass(item.status)}`}>{item.status}</span>
       </td>
-      <td className="min-w-52">
+      <td className="min-w-40 max-w-64">
         <Link
           href={`/task-results/${item.task_id}`}
-          className="inline-flex max-w-full items-center gap-1 font-semibold text-primary hover:underline"
+          className="inline-flex max-w-full items-center gap-1 font-medium text-primary hover:underline"
           onClick={(event) => event.stopPropagation()}
         >
           <span className="truncate">{item.task_name || "Unnamed"}</span>
-          <ArrowUpRight className="h-3 w-3 shrink-0" />
+          <ArrowUpRight className="h-3 w-3 shrink-0" aria-hidden="true" />
         </Link>
-        <div className="mt-1 font-mono text-xs text-base-content/45">{compactId(item.task_id)}</div>
+        <div className="mt-0.5 font-mono text-xs text-base-content/60">
+          {compactId(item.task_id)}
+        </div>
       </td>
-      <td>
-        <div className="font-mono text-xs">{item.qid || "-"}</div>
-        <div className="mt-1 text-xs text-base-content/50">{item.chip_id || "-"}</div>
+      <td className="whitespace-nowrap">
+        {item.qid ? (
+          <QubitTile qid={item.qid} />
+        ) : (
+          <span className="text-xs text-base-content/60">-</span>
+        )}
+        <div className="mt-0.5 font-mono text-xs text-base-content/60">{item.chip_id || "-"}</div>
       </td>
-      <td className="min-w-44">
+      <td className="whitespace-nowrap">
         <Link
           href={`/execution/${encodeURIComponent(item.chip_id)}/${encodeURIComponent(item.execution_id)}`}
           className="font-mono text-xs text-primary hover:underline"
+          onClick={(event) => event.stopPropagation()}
         >
           {compactId(item.execution_id)}
         </Link>
-        <div className="mt-1 text-xs text-base-content/50">{item.username || "-"}</div>
+        <div className="mt-0.5 text-xs text-base-content/60">{item.username || "-"}</div>
       </td>
-      <td className="min-w-36 text-xs">
-        <div>{formatDateTime(item.start_at)}</div>
-        <div className="mt-1 text-base-content/50">{item.elapsed_time || "-"}</div>
+      <td className="whitespace-nowrap">
+        <div className="font-mono text-xs">{formatDateTime(item.start_at)}</div>
+        <div className="mt-0.5 font-mono text-xs text-base-content/60">
+          {item.elapsed_time || "-"}
+        </div>
       </td>
-      <td className="min-w-80">
+      <td className="min-w-64">
         {message ? (
           <div className="flex gap-2">
             {isFailure ? (
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-error" />
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-error" aria-hidden="true" />
             ) : (
-              <MessageSquareText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-base-content/35" />
+              <MessageSquareText
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-base-content/40"
+                aria-hidden="true"
+              />
             )}
-            <div>
-              <div
-                className={`line-clamp-2 text-xs ${isFailure ? "text-error/80" : "text-base-content/60"}`}
-              >
-                {message}
-              </div>
+            <div className="min-w-0">
+              <div className="line-clamp-2 text-xs text-base-content/70 break-words">{message}</div>
               {item.has_stack_trace && (
                 <span className="badge badge-xs badge-outline mt-1">Stack trace</span>
               )}
@@ -221,10 +215,12 @@ function ExecutionFilter({
   chipId,
   selectedExecutionId,
   onExecutionSelect,
+  inputId,
 }: {
   chipId: string;
   selectedExecutionId: string;
   onExecutionSelect: (executionId: string) => void;
+  inputId?: string;
 }) {
   const { data: executionData, isLoading } = useListExecutions(
     { chip_id: chipId || "__none__", skip: 0, limit: 100 },
@@ -266,300 +262,58 @@ function ExecutionFilter({
       options={options}
       value={options.find((option) => option.value === selectedExecutionId) ?? null}
       onChange={handleChange}
-      placeholder="Select an execution"
+      placeholder={chipId ? "Select an execution" : "Select a chip first"}
       className="text-base-content"
       styles={styles}
+      inputId={inputId}
       isDisabled={!chipId}
       isClearable
     />
   );
 }
 
-function compactParameterValue(value: unknown): string {
-  if (value === null || value === undefined) return "-";
-  if (typeof value === "object" && "value" in (value as Record<string, unknown>)) {
-    const record = value as Record<string, unknown>;
-    const unit = typeof record.unit === "string" ? record.unit : "";
-    return `${String(record.value ?? "-")}${unit ? ` ${unit}` : ""}`;
-  }
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
-}
-
-function ParameterPreview({
-  title,
-  parameters,
-  parameterDefinitions,
-  maxItems = 6,
-}: {
-  title: string;
-  parameters: Record<string, unknown> | undefined;
-  parameterDefinitions?: Record<string, unknown>;
-  maxItems?: number;
-}) {
-  const allEntries = Object.entries(parameters ?? {});
-  const regularEntries: [string, unknown][] = [];
-  const parameterGroups = new Map<string, { collapsed: boolean; entries: [string, unknown][] }>();
-  for (const entry of allEntries) {
-    const group = getTaskParameterUiGroup(parameterDefinitions?.[entry[0]] ?? entry[1]);
-    if (!group) {
-      regularEntries.push(entry);
-      continue;
-    }
-    const existing = parameterGroups.get(group.name);
-    if (existing) {
-      existing.entries.push(entry);
-    } else {
-      parameterGroups.set(group.name, { collapsed: group.collapsed, entries: [entry] });
-    }
-  }
-  const entries = regularEntries.slice(0, maxItems);
-  if (allEntries.length === 0) return null;
-
-  const renderEntries = (items: [string, unknown][]) => (
-    <dl className="divide-y divide-base-200">
-      {items.map(([key, value]) => {
-        const formattedValue = compactParameterValue(value);
-        return (
-          <div
-            key={key}
-            className="grid grid-cols-[minmax(120px,0.8fr)_1fr] gap-3 px-3 py-2 text-xs"
-          >
-            <dt className="truncate font-mono text-base-content/55" title={key}>
-              {key}
-            </dt>
-            <dd className="truncate font-mono text-base-content/80" title={formattedValue}>
-              {formattedValue}
-            </dd>
-          </div>
-        );
-      })}
-    </dl>
-  );
-
-  return (
-    <div className="rounded-lg border border-base-300">
-      <div className="border-b border-base-300 px-3 py-2 text-xs font-semibold text-base-content/70">
-        {title}
-      </div>
-      {renderEntries(entries)}
-      {regularEntries.length > maxItems && (
-        <div className="border-t border-base-300 px-3 py-2 text-xs text-base-content/45">
-          +{regularEntries.length - maxItems} more on full page
-        </div>
-      )}
-      {[...parameterGroups.entries()].map(([groupName, group]) => (
-        <details
-          key={groupName}
-          className="collapse collapse-arrow rounded-none border-t border-base-300 bg-base-100"
-          open={!group.collapsed}
-        >
-          <summary className="collapse-title min-h-0 px-3 py-2 text-xs font-semibold">
-            <span className="flex items-center gap-2">
-              {groupName}
-              <span className="badge badge-xs badge-ghost">{group.entries.length}</span>
-            </span>
-          </summary>
-          <div className="collapse-content px-0 pb-0">{renderEntries(group.entries)}</div>
-        </details>
-      ))}
-    </div>
-  );
-}
-
 /**
- * Slide-over preview of the selected row on the Task Results list page.
- *
- * Fetches the full result for `taskId` and shows its figures, metadata, message, and a
- * trimmed set of parameters. Pass `taskId` as null to keep it closed.
+ * Labelled filter field with an optional inline clear button
  */
-function TaskResultPreviewSidebar({
-  taskId,
-  onClose,
-  tasks,
+function FilterField({
+  id,
+  label,
+  clearLabel,
+  onClear,
+  children,
 }: {
-  taskId: string | null;
-  onClose: () => void;
-  tasks: TaskInfo[];
+  id: string;
+  label: string;
+  clearLabel: string;
+  onClear?: () => void;
+  children: ReactNode;
 }) {
-  const {
-    data: response,
-    isLoading,
-    isError,
-  } = useGetTaskResult(taskId ?? "", {
-    query: {
-      enabled: !!taskId,
-      refetchInterval: (query) => {
-        const status = query.state.data?.data.status;
-        return status === "running" || status === "scheduled" || status === "pending"
-          ? 2000
-          : false;
-      },
-      refetchIntervalInBackground: true,
-    },
-  });
-  const taskResult = response?.data;
-  const taskDefinition = tasks.find((task) => task.name === taskResult?.task_name);
-  const isOpen = !!taskId;
-  const figures = taskResult && Array.isArray(taskResult.figure_path) ? taskResult.figure_path : [];
-  const jsonFigures =
-    taskResult && Array.isArray(taskResult.json_figure_path) ? taskResult.json_figure_path : [];
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [isOpen, onClose]);
-
   return (
-    <div
-      role="complementary"
-      aria-label="Task result preview"
-      aria-hidden={!isOpen}
-      inert={!isOpen}
-      className={`fixed right-0 top-0 z-50 h-full w-full overflow-y-auto border-l border-base-300 bg-base-100 p-4 shadow-xl transition-transform duration-300 sm:w-3/4 sm:p-6 lg:w-2/5 ${
-        isOpen ? "translate-x-0" : "translate-x-full"
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onClose}
-        className="btn btn-ghost btn-sm btn-circle absolute right-3 top-3 sm:right-4 sm:top-4"
-        aria-label="Close task result preview"
-      >
-        <X className="h-4 w-4" />
-      </button>
-
-      {taskId && (
-        <div className="pr-8">
-          <div className="mb-5">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              {taskResult?.status && (
-                <span className={`badge badge-sm ${statusBadgeClass(taskResult.status)}`}>
-                  {taskResult.status}
-                </span>
-              )}
-              {taskResult?.qid && (
-                <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
-              )}
-            </div>
-            <h2 className="text-xl font-bold">{taskResult?.task_name || "Task Result"}</h2>
-            {taskResult && (
-              <ExecutionTaskProgress status={taskResult.status} note={taskResult.note} />
-            )}
-            <p className="mt-1 font-mono text-xs text-base-content/50">{taskId}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link href={`/task-results/${taskId}`} className="btn btn-primary btn-sm gap-1">
-                <ExternalLink className="h-3.5 w-3.5" />
-                Open full page
-              </Link>
-              {taskResult?.chip_id && taskResult?.execution_id && (
-                <Link
-                  href={`/execution/${encodeURIComponent(taskResult.chip_id)}/${encodeURIComponent(
-                    taskResult.execution_id,
-                  )}`}
-                  className="btn btn-ghost btn-sm gap-1"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Execution
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <span className="loading loading-spinner loading-lg" />
-            </div>
-          ) : isError || !taskResult ? (
-            <div className="alert alert-error">
-              <XCircle className="h-5 w-5" />
-              <span>Failed to load task result.</span>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {(figures.length > 0 || jsonFigures.length > 0) && (
-                <div>
-                  <h3 className="mb-2 text-sm font-semibold">Figures</h3>
-                  <div className="flex h-56 items-center gap-3 overflow-x-auto rounded-lg bg-base-200/60 p-3">
-                    {figures.length > 0 ? (
-                      figures.map((figure, index) => (
-                        <TaskFigure
-                          key={`${figure}-${index}`}
-                          path={figure}
-                          jsonFigurePath={jsonFigures[index]}
-                          qid={taskResult.qid}
-                          className="h-full w-auto shrink-0 rounded object-contain"
-                        />
-                      ))
-                    ) : (
-                      <TaskFigure
-                        jsonFigurePath={jsonFigures[0]}
-                        qid={taskResult.qid}
-                        className="h-full w-auto shrink-0 rounded object-contain"
-                      />
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="rounded-lg bg-base-200/60 p-3">
-                <h3 className="mb-2 text-sm font-semibold">Metadata</h3>
-                <dl className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <dt className="text-base-content/50">Chip</dt>
-                    <dd className="font-mono">{taskResult.chip_id || "-"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-base-content/50">QID</dt>
-                    <dd className="font-mono">{taskResult.qid || "-"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-base-content/50">Execution</dt>
-                    <dd className="font-mono" title={taskResult.execution_id}>
-                      {compactId(taskResult.execution_id)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-base-content/50">User</dt>
-                    <dd>{taskResult.username || taskResult.user_id || "-"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-base-content/50">Started</dt>
-                    <dd>{formatDateTime(taskResult.start_at)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-base-content/50">Elapsed</dt>
-                    <dd>{taskResult.elapsed_time || "-"}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              <TaskMessagePanel
-                status={taskResult.status}
-                message={taskResult.message}
-                stackTrace={taskResult.stack_trace}
-                showEmptyFallback
-              />
-
-              <ParameterPreview
-                title="Output Parameters"
-                parameters={taskResult.output_parameters as Record<string, unknown> | undefined}
-              />
-              <ParameterPreview
-                title="Input Parameters"
-                parameters={taskResult.input_parameters as Record<string, unknown> | undefined}
-                parameterDefinitions={taskDefinition?.input_parameters}
-                maxItems={4}
-              />
-            </div>
-          )}
-        </div>
-      )}
+    <div className="min-w-0">
+      <label htmlFor={id} className="mb-1 block text-xs font-medium text-base-content/60">
+        {label}
+      </label>
+      <div className="flex items-center gap-1">
+        <div className="min-w-0 flex-1">{children}</div>
+        {onClear && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm btn-square"
+            onClick={onClear}
+            aria-label={clearLabel}
+            title={clearLabel}
+          >
+            <XCircle className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+      </div>
     </div>
+  );
+}
+
+function filtersEqual(a: FilterState, b: FilterState): boolean {
+  return (Object.keys(a) as Array<keyof FilterState>).every(
+    (key) => a[key].trim() === b[key].trim(),
   );
 }
 
@@ -639,125 +393,88 @@ export function TaskResultsPageContent() {
 
   const hasFilters =
     filters.status !== "all" ||
-    filters.chipId ||
-    filters.taskName ||
-    filters.qid ||
-    filters.executionId ||
-    filters.username ||
-    filters.message;
+    !!filters.chipId ||
+    !!filters.taskName ||
+    !!filters.qid ||
+    !!filters.executionId ||
+    !!filters.username ||
+    !!filters.message;
+  const hasPendingChanges = !filtersEqual(draftFilters, filters);
+
+  const rangeLabel =
+    data && data.items.length > 0
+      ? `Showing ${skip + 1}-${Math.min(skip + data.items.length, data.total)} of ${data.total}`
+      : data
+        ? `${data.total} results`
+        : null;
 
   return (
     <PageContainer maxWidth>
-      <PageHeader
-        title="Task Results"
-        description="Review task outcomes across executions and focus on failed results."
-        actions={
-          <span className="badge badge-neutral gap-1">
-            <strong>{data?.total ?? 0}</strong> results
-          </span>
-        }
-      />
+      <PageHeader title="Task Results" description="Outcomes of every task across executions" />
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="tabs tabs-boxed">
-          {STATUS_TABS.map((status) => (
-            <button
-              key={status}
-              type="button"
-              className={`tab tab-sm ${filters.status === status ? "tab-active" : ""}`}
-              onClick={() => navigateWithFilters({ ...filters, status })}
-            >
-              {status === "all" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
-              {status !== "all" && data?.status_counts?.[status] != null && (
-                <span className="ml-1 text-xs opacity-70">{data.status_counts[status]}</span>
-              )}
-            </button>
-          ))}
-        </div>
-        {isFetching && (
-          <span className="inline-flex items-center gap-1 text-xs text-base-content/50">
-            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            Refreshing
-          </span>
-        )}
-      </div>
-
-      <form onSubmit={handleSubmit}>
-        <PageFiltersBar className="mb-4 sm:mb-6">
-          <PageFiltersBar.Group className="flex-1">
-            <PageFiltersBar.Item label="Chip" className="sm:w-72">
-              <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <ChipSelector
-                    selectedChip={draftFilters.chipId}
-                    onChipSelect={(chipId) =>
-                      setDraftFilters((current) => ({ ...current, chipId, executionId: "" }))
-                    }
-                  />
-                </div>
-                {draftFilters.chipId && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm btn-square"
-                    onClick={() =>
-                      setDraftFilters((current) => ({ ...current, chipId: "", executionId: "" }))
-                    }
-                    title="Clear chip filter"
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Execution" className="sm:w-72">
-              <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <ExecutionFilter
-                    chipId={draftFilters.chipId}
-                    selectedExecutionId={draftFilters.executionId}
-                    onExecutionSelect={(executionId) =>
-                      setDraftFilters((current) => ({ ...current, executionId }))
-                    }
-                  />
-                </div>
-                {draftFilters.executionId && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm btn-square"
-                    onClick={() => setDraftFilters((current) => ({ ...current, executionId: "" }))}
-                    title="Clear execution filter"
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </PageFiltersBar.Item>
-            <PageFiltersBar.Item label="Task" className="sm:w-72">
-              <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <TaskSelector
-                    tasks={tasks}
-                    selectedTask={draftFilters.taskName}
-                    onTaskSelect={(taskName) =>
-                      setDraftFilters((current) => ({ ...current, taskName }))
-                    }
-                    disabled={tasks.length === 0}
-                  />
-                </div>
-                {draftFilters.taskName && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm btn-square"
-                    onClick={() => setDraftFilters((current) => ({ ...current, taskName: "" }))}
-                    title="Clear task filter"
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </PageFiltersBar.Item>
-          </PageFiltersBar.Group>
-          <PageFiltersBar.Group position="end">
+      <form onSubmit={handleSubmit} aria-label="Task result filters" className="mb-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,18rem))_1fr] xl:items-end">
+          <FilterField
+            id="task-result-filter-chip"
+            label="Chip"
+            clearLabel="Clear chip filter"
+            onClear={
+              draftFilters.chipId
+                ? () => setDraftFilters((current) => ({ ...current, chipId: "", executionId: "" }))
+                : undefined
+            }
+          >
+            <ChipSelector
+              inputId="task-result-filter-chip"
+              selectedChip={draftFilters.chipId}
+              onChipSelect={(chipId) =>
+                setDraftFilters((current) => ({ ...current, chipId, executionId: "" }))
+              }
+            />
+          </FilterField>
+          <FilterField
+            id="task-result-filter-execution"
+            label="Execution"
+            clearLabel="Clear execution filter"
+            onClear={
+              draftFilters.executionId
+                ? () => setDraftFilters((current) => ({ ...current, executionId: "" }))
+                : undefined
+            }
+          >
+            <ExecutionFilter
+              inputId="task-result-filter-execution"
+              chipId={draftFilters.chipId}
+              selectedExecutionId={draftFilters.executionId}
+              onExecutionSelect={(executionId) =>
+                setDraftFilters((current) => ({ ...current, executionId }))
+              }
+            />
+          </FilterField>
+          <FilterField
+            id="task-result-filter-task"
+            label="Task"
+            clearLabel="Clear task filter"
+            onClear={
+              draftFilters.taskName
+                ? () => setDraftFilters((current) => ({ ...current, taskName: "" }))
+                : undefined
+            }
+          >
+            <TaskSelector
+              inputId="task-result-filter-task"
+              tasks={tasks}
+              selectedTask={draftFilters.taskName}
+              onTaskSelect={(taskName) => setDraftFilters((current) => ({ ...current, taskName }))}
+              disabled={tasks.length === 0}
+            />
+          </FilterField>
+          <div className="flex min-h-[38px] flex-wrap items-center gap-2 sm:col-span-2 xl:col-span-1 xl:justify-end">
+            {hasPendingChanges && (
+              <span className="text-xs text-base-content/60" role="status">
+                Unapplied changes
+              </span>
+            )}
             <button
               type="button"
               className={`btn btn-sm gap-1 ${showMoreFilters ? "btn-neutral" : "btn-ghost"}`}
@@ -765,30 +482,31 @@ export function TaskResultsPageContent() {
               aria-controls="task-result-more-filters"
               onClick={() => setShowMoreFilters((value) => !value)}
             >
-              <SlidersHorizontal className="h-4 w-4" />
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
               More filters
               {(filters.qid || filters.message || filters.username) && (
                 <span className="badge badge-xs badge-primary">Active</span>
               )}
               <ChevronDown
                 className={`h-3.5 w-3.5 transition-transform ${showMoreFilters ? "rotate-180" : ""}`}
+                aria-hidden="true"
               />
             </button>
             <button type="submit" className="btn btn-primary btn-sm">
               Apply
             </button>
-            {hasFilters && (
+            {(hasFilters || hasPendingChanges) && (
               <button type="button" className="btn btn-ghost btn-sm gap-1" onClick={clearFilters}>
-                <XCircle className="h-4 w-4" />
+                <XCircle className="h-4 w-4" aria-hidden="true" />
                 Clear
               </button>
             )}
-          </PageFiltersBar.Group>
-        </PageFiltersBar>
+          </div>
+        </div>
         {showMoreFilters && (
           <div
             id="task-result-more-filters"
-            className="mb-6 grid gap-3 rounded-box border border-base-300 bg-base-200/40 p-4 sm:grid-cols-[minmax(8rem,12rem)_minmax(16rem,1fr)]"
+            className="mt-3 grid gap-3 rounded-box border border-base-300 bg-base-200/40 p-4 sm:grid-cols-[minmax(8rem,12rem)_minmax(16rem,1fr)]"
           >
             <label className="form-control">
               <span className="mb-1 text-xs font-medium text-base-content/60">QID</span>
@@ -806,7 +524,7 @@ export function TaskResultsPageContent() {
                 Message contains
               </span>
               <span className="input input-bordered flex h-[38px] min-h-[38px] items-center gap-2 bg-base-100">
-                <Search className="h-3.5 w-3.5 text-base-content/40" />
+                <Search className="h-3.5 w-3.5 text-base-content/40" aria-hidden="true" />
                 <input
                   className="grow"
                   value={draftFilters.message}
@@ -821,9 +539,43 @@ export function TaskResultsPageContent() {
         )}
       </form>
 
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div
+          className="tabs tabs-boxed w-fit max-w-full overflow-x-auto"
+          role="group"
+          aria-label="Status"
+        >
+          {STATUS_TABS.map((status) => (
+            <button
+              key={status}
+              type="button"
+              aria-pressed={filters.status === status}
+              className={`tab tab-sm ${filters.status === status ? "tab-active" : ""}`}
+              onClick={() => navigateWithFilters({ ...filters, status })}
+            >
+              {status === "all" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
+              {status !== "all" && data?.status_counts?.[status] != null && (
+                <span className="ml-1 font-mono text-xs opacity-70">
+                  {data.status_counts[status]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 text-xs text-base-content/60" aria-live="polite">
+          {isFetching && !isLoading && (
+            <span className="inline-flex items-center gap-1">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              Refreshing
+            </span>
+          )}
+          {rangeLabel && !isError && <span className="font-mono">{rangeLabel}</span>}
+        </div>
+      </div>
+
       {isError ? (
         <div className="alert alert-error">
-          <XCircle className="h-5 w-5" />
+          <XCircle className="h-5 w-5" aria-hidden="true" />
           <span>Failed to load task results.</span>
         </div>
       ) : isLoading ? (
@@ -831,16 +583,27 @@ export function TaskResultsPageContent() {
           <span className="loading loading-spinner loading-lg" />
         </div>
       ) : !data || data.items.length === 0 ? (
-        <EmptyState
-          title="No task results found"
-          description="Try changing the status or clearing one of the filters."
-          emoji="magnifying-glass"
-        />
+        hasFilters ? (
+          <EmptyState
+            title="No task results match these filters"
+            description="Change the status or filters, or clear them to see every result"
+            emoji="magnifying-glass"
+            action={
+              <button type="button" className="btn btn-sm gap-1" onClick={clearFilters}>
+                <XCircle className="h-4 w-4" aria-hidden="true" />
+                Clear filters
+              </button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title="No task results yet"
+            description="Results appear here after an execution runs a task"
+            emoji="empty"
+          />
+        )
       ) : (
         <>
-          <div className="mb-3 text-xs text-base-content/50">
-            Showing {skip + 1}-{Math.min(skip + data.items.length, data.total)} of {data.total}
-          </div>
           <div className="overflow-x-auto rounded-lg border border-base-300 bg-base-100">
             <table className="table table-sm">
               <thead>
@@ -869,6 +632,7 @@ export function TaskResultsPageContent() {
           {totalPages > 1 && (
             <div className="mt-6 flex items-center justify-center gap-3">
               <button
+                type="button"
                 className="btn btn-sm btn-ghost"
                 disabled={skip === 0}
                 onClick={() => navigateWithFilters(filters, Math.max(0, skip - PAGE_SIZE))}
@@ -879,6 +643,7 @@ export function TaskResultsPageContent() {
                 Page {currentPage} of {totalPages}
               </span>
               <button
+                type="button"
                 className="btn btn-sm btn-ghost"
                 disabled={currentPage >= totalPages}
                 onClick={() => navigateWithFilters(filters, skip + PAGE_SIZE)}
@@ -889,11 +654,7 @@ export function TaskResultsPageContent() {
           )}
         </>
       )}
-      <TaskResultPreviewSidebar
-        taskId={selectedTaskId}
-        onClose={() => setSelectedTaskId(null)}
-        tasks={tasks}
-      />
+      <TaskResultPreviewSidebar taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} />
     </PageContainer>
   );
 }

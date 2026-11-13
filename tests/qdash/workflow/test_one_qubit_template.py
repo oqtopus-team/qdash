@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.task_call_helpers import call_ids, effective_settings, names, settings
 
 one_qubit_module = importlib.import_module("qdash.workflow.templates.one_qubit")
 
@@ -55,18 +56,51 @@ def test_one_qubit_template_requires_explicit_targets(monkeypatch) -> None:
 
 def test_one_qubit_template_passes_template_task_lists(monkeypatch) -> None:
     from qdash.workflow.service.steps import FilterByStatus
-    from qdash.workflow.templates.coarse_one import COARSE_ONE_TASKS
-    from qdash.workflow.templates.fine_one import FINE_ONE_TASKS
 
-    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+    coarse_one_module = importlib.import_module("qdash.workflow.templates.coarse_one")
+    fine_one_module = importlib.import_module("qdash.workflow.templates.fine_one")
+    for module in (one_qubit_module, coarse_one_module, fine_one_module):
+        monkeypatch.setattr(module, "CalibService", FakeCalibService)
 
     result = one_qubit_module.one_qubit(username="alice", chip_id="64Q", mux_ids=[0])
+    coarse_step = coarse_one_module.coarse_one(username="alice", chip_id="64Q", mux_ids=[0])[
+        "steps"
+    ][0]
+    fine_step = fine_one_module.fine_one(username="alice", chip_id="64Q", mux_ids=[0])["steps"][0]
 
     steps = result["steps"]
     assert len(steps) == 3
-    assert steps[0].tasks == COARSE_ONE_TASKS
+    # The stages match coarse_one and fine_one call for call, settings included.
+    assert effective_settings(steps[0].tasks) == effective_settings(coarse_step.tasks)
     assert isinstance(steps[1], FilterByStatus)
-    assert steps[2].tasks == FINE_ONE_TASKS
+    assert effective_settings(steps[2].tasks) == effective_settings(fine_step.tasks)
+    assert "task_parameters" not in result["kwargs"]
+
+
+PULSE_DURATIONS = {
+    "CreateHPIPulse": {"hpi_duration": 32},
+    "CreatePIPulse": {"pi_duration": 32},
+    "CreateDRAGHPIPulse": {"drag_hpi_duration": 16},
+    "CreateDRAGPIPulse": {"drag_pi_duration": 24},
+}
+
+
+@pytest.mark.parametrize("check_only", [False, True])
+def test_one_qubit_template_sets_durations_on_every_pulse_call(monkeypatch, check_only) -> None:
+    monkeypatch.setattr(one_qubit_module, "CalibService", FakeCalibService)
+
+    result = one_qubit_module.one_qubit(
+        username="alice", chip_id="64Q", mux_ids=[0], check_only=check_only
+    )
+
+    pulse_calls = 0
+    for step in result["steps"]:
+        for call in getattr(step, "tasks", None) or ():
+            expected = settings(run=PULSE_DURATIONS.get(call.name, {}))
+            assert call.effective_settings({}) == expected, call.resolved_call_id
+            pulse_calls += call.name in PULSE_DURATIONS
+    # Four pulse types in the coarse stage, plus three rounds of them in the fine stage.
+    assert pulse_calls == (4 if check_only else 16)
 
 
 @pytest.mark.parametrize("check_only", [False, True])
@@ -78,7 +112,7 @@ def test_one_qubit_template_check_calibrates_and_checks_all_pulses(monkeypatch, 
     )
 
     assert len(result["steps"]) == (1 if check_only else 3)
-    assert result["steps"][0].tasks == [
+    assert names(result["steps"][0].tasks) == [
         "Configure",
         "CheckCoarseReadoutParams",
         "Configure",
@@ -128,9 +162,11 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     assert len(result["steps"]) == 1
     step = result["steps"][0]
     assert isinstance(step, OneQubitFineTune)
-    assert step.mode == "synchronized"
-    tasks = step.tasks
-    assert tasks is not None
+    assert step.execution_mode == "parallel_by_round"
+    assert step.tasks is not None
+    tasks = names(step.tasks)
+    # Every repeated pulse calibration is its own call, named after its round.
+    assert len(set(call_ids(step.calls()))) == len(step.tasks)
     assert tasks[0] == "Configure"
     optimization_indices = [
         i for i, name in enumerate(tasks) if name.startswith("CheckOptimalReadout")
@@ -177,7 +213,8 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     ]
     full = one_qubit_module.one_qubit(username="alice", chip_id="64Q", qids=["8"])
     assert result["kwargs"]["default_run_parameters"] == full["kwargs"]["default_run_parameters"]
-    assert result["kwargs"]["task_run_parameters"] == full["kwargs"]["task_run_parameters"]
+    assert "task_parameters" not in result["kwargs"]
+    assert effective_settings(step.tasks) == effective_settings(full["steps"][2].tasks)
     assert result["kwargs"]["flow_name"] == "fine-check"
     assert result["kwargs"]["project_id"] == "project-1"
     assert result["kwargs"]["tags"] == ["fine"]
@@ -189,3 +226,39 @@ def test_fine_one_requires_explicit_targets(monkeypatch) -> None:
     monkeypatch.setattr(fine_one_module, "CalibService", FakeCalibService)
     with pytest.raises(ValueError, match="mux_ids or qids is required"):
         fine_one_module.fine_one(username="alice", chip_id="64Q")
+
+
+def test_fine_one_names_every_call_after_its_round(monkeypatch) -> None:
+    fine_one_module = importlib.import_module("qdash.workflow.templates.fine_one")
+    monkeypatch.setattr(fine_one_module, "CalibService", FakeCalibService)
+
+    result = fine_one_module.fine_one(username="alice", chip_id="64Q", qids=["0"])
+
+    def pulse_round(round_name: str) -> list[str]:
+        return [
+            f"rabi_{round_name}",
+            f"hpi_create_{round_name}",
+            f"hpi_check_{round_name}",
+            f"pi_create_{round_name}",
+            f"pi_check_{round_name}",
+            f"drag_hpi_create_{round_name}",
+            f"drag_hpi_check_{round_name}",
+            f"drag_pi_create_{round_name}",
+            f"drag_pi_check_{round_name}",
+        ]
+
+    assert call_ids(result["steps"][0].calls()) == [
+        "configure_round1",
+        *pulse_round("round1"),
+        "readout_amplitude_round1",
+        "readout_frequency_round1",
+        "configure_round2",
+        *pulse_round("round2"),
+        "readout_amplitude_round2",
+        "readout_frequency_round2",
+        "configure_final",
+        *pulse_round("final"),
+        "ReadoutClassification",
+        "RandomizedBenchmarking",
+        "X90InterleavedRandomizedBenchmarking",
+    ]

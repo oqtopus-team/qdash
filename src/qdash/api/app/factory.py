@@ -1,10 +1,12 @@
 """FastAPI application factory for QDash API."""
 
+from copy import deepcopy
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
+from fastapi.utils import deep_dict_update
 
 from qdash.api.app.metadata import API_METADATA, OPENAPI_EXTRA
 from qdash.api.app.router_registry import register_routers
@@ -34,11 +36,14 @@ def _add_binary_formats(value: Any) -> None:
 
 
 def _configure_openapi_schema(app: FastAPI) -> None:
-    """Normalize generator-sensitive OpenAPI 3.1 schema details."""
+    """Add API security metadata and normalize OpenAPI 3.1 schema details."""
     generate_openapi = app.openapi
 
     def openapi() -> dict[str, Any]:
+        if app.openapi_schema is not None:
+            return app.openapi_schema
         schema = generate_openapi()
+        deep_dict_update(schema, deepcopy(OPENAPI_EXTRA))
         _add_binary_formats(schema)
         return schema
 
@@ -54,7 +59,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
         root_path="/api",
         swagger_ui_parameters={"defaultModelsExpandDepth": -1},
-        openapi_extra=OPENAPI_EXTRA,
     )
 
     app_settings = settings or get_settings()

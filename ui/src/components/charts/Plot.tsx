@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
 import type {
@@ -12,6 +12,8 @@ import type {
   PlotSelectionEvent,
 } from "plotly.js";
 import Plotly from "plotly.js-dist-min";
+import { useIsDarkTheme } from "@/contexts/ThemeContext";
+import { chartTheme, themedLayout } from "@/lib/chartTheme";
 
 interface PlotFigure {
   data: Plotly.Data[];
@@ -49,7 +51,7 @@ const typedPlotly = Plotly as unknown as {
 
 export default function Plot({
   data,
-  layout,
+  layout: layoutProp,
   config,
   style,
   className,
@@ -63,8 +65,14 @@ export default function Plot({
   onUnhover,
   onRelayout,
 }: PlotProps) {
+  const [renderError, setRenderError] = useState<Error | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitializedRef = useRef(false);
+  const isDark = useIsDarkTheme();
+  const layout = useMemo<Partial<Layout>>(
+    () => themedLayout(layoutProp, chartTheme(isDark)),
+    [layoutProp, isDark],
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -72,37 +80,44 @@ export default function Plot({
 
     let cancelled = false;
 
-    void typedPlotly.react(container, data, layout, config).then((graphDiv) => {
-      if (cancelled) return;
+    void typedPlotly
+      .react(container, data, layout, config)
+      .then((graphDiv) => {
+        if (cancelled) return;
 
-      const figure: PlotFigure = {
-        data,
-        layout: layout ?? {},
-        frames: [],
-      };
+        const figure: PlotFigure = {
+          data,
+          layout: layout ?? {},
+          frames: [],
+        };
 
-      if (!isInitializedRef.current) {
-        isInitializedRef.current = true;
-        onInitialized?.(figure, graphDiv);
-      } else {
-        onUpdate?.(figure, graphDiv);
-      }
+        if (!isInitializedRef.current) {
+          isInitializedRef.current = true;
+          onInitialized?.(figure, graphDiv);
+        } else {
+          onUpdate?.(figure, graphDiv);
+        }
 
-      const emitter = graphDiv as HTMLElement & {
-        on?: (event: string, handler: (...args: unknown[]) => void) => void;
-        removeAllListeners?: (event?: string) => void;
-      };
-      emitter.removeAllListeners?.("plotly_selected");
-      emitter.removeAllListeners?.("plotly_click");
-      emitter.removeAllListeners?.("plotly_hover");
-      emitter.removeAllListeners?.("plotly_unhover");
-      emitter.removeAllListeners?.("plotly_relayout");
-      if (onSelected) emitter.on?.("plotly_selected", onSelected as (...args: unknown[]) => void);
-      if (onClick) emitter.on?.("plotly_click", onClick as (...args: unknown[]) => void);
-      if (onHover) emitter.on?.("plotly_hover", onHover as (...args: unknown[]) => void);
-      if (onUnhover) emitter.on?.("plotly_unhover", onUnhover as (...args: unknown[]) => void);
-      if (onRelayout) emitter.on?.("plotly_relayout", onRelayout as (...args: unknown[]) => void);
-    });
+        const emitter = graphDiv as HTMLElement & {
+          on?: (event: string, handler: (...args: unknown[]) => void) => void;
+          removeAllListeners?: (event?: string) => void;
+        };
+        emitter.removeAllListeners?.("plotly_selected");
+        emitter.removeAllListeners?.("plotly_click");
+        emitter.removeAllListeners?.("plotly_hover");
+        emitter.removeAllListeners?.("plotly_unhover");
+        emitter.removeAllListeners?.("plotly_relayout");
+        if (onSelected) emitter.on?.("plotly_selected", onSelected as (...args: unknown[]) => void);
+        if (onClick) emitter.on?.("plotly_click", onClick as (...args: unknown[]) => void);
+        if (onHover) emitter.on?.("plotly_hover", onHover as (...args: unknown[]) => void);
+        if (onUnhover) emitter.on?.("plotly_unhover", onUnhover as (...args: unknown[]) => void);
+        if (onRelayout) emitter.on?.("plotly_relayout", onRelayout as (...args: unknown[]) => void);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setRenderError(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -151,6 +166,9 @@ export default function Plot({
       typedPlotly.purge(container);
     };
   }, [data, layout, onPurge]);
+
+  // Surface asynchronous Plotly failures to the enclosing React error boundary.
+  if (renderError) throw renderError;
 
   return <div ref={containerRef} style={style} className={className} />;
 }

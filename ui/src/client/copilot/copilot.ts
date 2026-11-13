@@ -25,14 +25,20 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  AnalysisResponse,
-  AnalyzeRequest,
   CopilotChatSessionResponse,
+  CopilotPreferences,
+  CopilotPreferencesUpdate,
+  CopilotSystemPrompt,
   CreateCopilotChatSessionRequest,
   DeleteCopilotChatSession200,
   GetCopilotConfig200,
+  GetCopilotSourceFileParams,
   HTTPValidationError,
   ListCopilotChatSessionsResponse,
+  ListSourceRootsResponse,
+  SearchCopilotSourceParams,
+  SearchSourceResponse,
+  SourceFileResponse,
   UpdateCopilotChatSessionRequest
 } from '../../schemas';
 
@@ -63,10 +69,8 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
  *
  * Retrieves the Copilot configuration from YAML, including:
  * - enabled: Whether Copilot is enabled
- * - evaluation_metrics: Which metrics to use for multi-metric evaluation
- * - scoring: Thresholds for good/excellent ratings per metric
- * - system_prompt: The AI assistant's system prompt
- * - initial_message: The initial greeting message
+ * - chat_models: The planner models the UI offers
+ * - evaluation_models: The calibration evaluation model
  *
  * Returns
  * -------
@@ -164,84 +168,6 @@ export function useGetCopilotConfig<TData = Awaited<ReturnType<typeof getCopilot
 
 
 /**
- * Analyze a calibration task result using LLM.
- *
- * Constructs a rich context from task knowledge, qubit parameters,
- * and experimental data, then sends it to the configured LLM for analysis.
- *
- * Parameters
- * ----------
- * request : AnalyzeRequest
- *     The analysis request containing task info, IDs, and user message.
- *
- * Returns
- * -------
- * AnalysisResponse
- *     Structured analysis from the LLM.
- * @summary Analyze calibration result with AI
- */
-export const analyzeCopilot = (
-    analyzeRequest: AnalyzeRequest,
- options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
-) => {
-
-
-      return customInstance<AnalysisResponse>(
-      {url: `/copilot/analyze`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: analyzeRequest, signal
-    },
-      options);
-    }
-
-
-
-
-export const getAnalyzeCopilotMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeCopilot>>, TError,{data: AnalyzeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof analyzeCopilot>>, TError,{data: AnalyzeRequest}, TContext> => {
-
-const mutationKey = ['analyzeCopilot'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeCopilot>>, {data: AnalyzeRequest}> = (props) => {
-          const {data} = props ?? {};
-
-          return  analyzeCopilot(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AnalyzeCopilotMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeCopilot>>>
-    export type AnalyzeCopilotMutationBody = AnalyzeRequest
-    export type AnalyzeCopilotMutationError = HTTPValidationError
-
-    /**
- * @summary Analyze calibration result with AI
- */
-export const useAnalyzeCopilot = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeCopilot>>, TError,{data: AnalyzeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof analyzeCopilot>>,
-        TError,
-        {data: AnalyzeRequest},
-        TContext
-      > => {
-      return useMutation(getAnalyzeCopilotMutationOptions(options), queryClient);
-    }
-    /**
  * Return all persisted chat sessions owned by the current user.
  * @summary List the current user's chat sessions
  */
@@ -621,3 +547,529 @@ export const useDeleteCopilotChatSession = <TError = HTTPValidationError,
       > => {
       return useMutation(getDeleteCopilotChatSessionMutationOptions(options), queryClient);
     }
+    /**
+ * QDash and allowlisted dependency source served read-only, with known revisions.
+ * @summary List the source trees the Copilot can read
+ */
+export const listCopilotSourceRoots = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ListSourceRootsResponse>(
+      {url: `/copilot/source/roots`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListCopilotSourceRootsQueryKey = () => {
+    return [
+    `/copilot/source/roots`
+    ] as const;
+    }
+
+
+export const getListCopilotSourceRootsQueryOptions = <TData = Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCopilotSourceRootsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCopilotSourceRoots>>> = ({ signal }) => listCopilotSourceRoots(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListCopilotSourceRootsQueryResult = NonNullable<Awaited<ReturnType<typeof listCopilotSourceRoots>>>
+export type ListCopilotSourceRootsQueryError = unknown
+
+
+export function useListCopilotSourceRoots<TData = Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCopilotSourceRoots>>,
+          TError,
+          Awaited<ReturnType<typeof listCopilotSourceRoots>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCopilotSourceRoots<TData = Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCopilotSourceRoots>>,
+          TError,
+          Awaited<ReturnType<typeof listCopilotSourceRoots>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListCopilotSourceRoots<TData = Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List the source trees the Copilot can read
+ */
+
+export function useListCopilotSourceRoots<TData = Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotSourceRoots>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListCopilotSourceRootsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Literal search in file contents or file paths; read-only and size-limited.
+ * @summary Search the source the Copilot can read
+ */
+export const searchCopilotSource = (
+    params: SearchCopilotSourceParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<SearchSourceResponse>(
+      {url: `/copilot/source/search`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getSearchCopilotSourceQueryKey = (params?: SearchCopilotSourceParams,) => {
+    return [
+    `/copilot/source/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchCopilotSourceQueryOptions = <TData = Awaited<ReturnType<typeof searchCopilotSource>>, TError = HTTPValidationError>(params: SearchCopilotSourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchCopilotSourceQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchCopilotSource>>> = ({ signal }) => searchCopilotSource(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchCopilotSourceQueryResult = NonNullable<Awaited<ReturnType<typeof searchCopilotSource>>>
+export type SearchCopilotSourceQueryError = HTTPValidationError
+
+
+export function useSearchCopilotSource<TData = Awaited<ReturnType<typeof searchCopilotSource>>, TError = HTTPValidationError>(
+ params: SearchCopilotSourceParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchCopilotSource>>,
+          TError,
+          Awaited<ReturnType<typeof searchCopilotSource>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchCopilotSource<TData = Awaited<ReturnType<typeof searchCopilotSource>>, TError = HTTPValidationError>(
+ params: SearchCopilotSourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchCopilotSource>>,
+          TError,
+          Awaited<ReturnType<typeof searchCopilotSource>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchCopilotSource<TData = Awaited<ReturnType<typeof searchCopilotSource>>, TError = HTTPValidationError>(
+ params: SearchCopilotSourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Search the source the Copilot can read
+ */
+
+export function useSearchCopilotSource<TData = Awaited<ReturnType<typeof searchCopilotSource>>, TError = HTTPValidationError>(
+ params: SearchCopilotSourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchCopilotSource>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchCopilotSourceQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Read up to 400 numbered lines; without ``root`` the path is matched as a traceback prints it.
+ * @summary Read a line range of a source file
+ */
+export const getCopilotSourceFile = (
+    params: GetCopilotSourceFileParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<SourceFileResponse>(
+      {url: `/copilot/source/file`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetCopilotSourceFileQueryKey = (params?: GetCopilotSourceFileParams,) => {
+    return [
+    `/copilot/source/file`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCopilotSourceFileQueryOptions = <TData = Awaited<ReturnType<typeof getCopilotSourceFile>>, TError = HTTPValidationError>(params: GetCopilotSourceFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCopilotSourceFileQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCopilotSourceFile>>> = ({ signal }) => getCopilotSourceFile(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCopilotSourceFileQueryResult = NonNullable<Awaited<ReturnType<typeof getCopilotSourceFile>>>
+export type GetCopilotSourceFileQueryError = HTTPValidationError
+
+
+export function useGetCopilotSourceFile<TData = Awaited<ReturnType<typeof getCopilotSourceFile>>, TError = HTTPValidationError>(
+ params: GetCopilotSourceFileParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotSourceFile>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotSourceFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotSourceFile<TData = Awaited<ReturnType<typeof getCopilotSourceFile>>, TError = HTTPValidationError>(
+ params: GetCopilotSourceFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotSourceFile>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotSourceFile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotSourceFile<TData = Awaited<ReturnType<typeof getCopilotSourceFile>>, TError = HTTPValidationError>(
+ params: GetCopilotSourceFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Read a line range of a source file
+ */
+
+export function useGetCopilotSourceFile<TData = Awaited<ReturnType<typeof getCopilotSourceFile>>, TError = HTTPValidationError>(
+ params: GetCopilotSourceFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSourceFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCopilotSourceFileQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * The instructions this user added to their chats.
+ * @summary Get the current user's Copilot preferences
+ */
+export const getCopilotPreferences = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CopilotPreferences>(
+      {url: `/copilot/preferences`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetCopilotPreferencesQueryKey = () => {
+    return [
+    `/copilot/preferences`
+    ] as const;
+    }
+
+
+export const getGetCopilotPreferencesQueryOptions = <TData = Awaited<ReturnType<typeof getCopilotPreferences>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCopilotPreferencesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCopilotPreferences>>> = ({ signal }) => getCopilotPreferences(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCopilotPreferencesQueryResult = NonNullable<Awaited<ReturnType<typeof getCopilotPreferences>>>
+export type GetCopilotPreferencesQueryError = unknown
+
+
+export function useGetCopilotPreferences<TData = Awaited<ReturnType<typeof getCopilotPreferences>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotPreferences>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotPreferences>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotPreferences<TData = Awaited<ReturnType<typeof getCopilotPreferences>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotPreferences>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotPreferences>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotPreferences<TData = Awaited<ReturnType<typeof getCopilotPreferences>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the current user's Copilot preferences
+ */
+
+export function useGetCopilotPreferences<TData = Awaited<ReturnType<typeof getCopilotPreferences>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotPreferences>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCopilotPreferencesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Replace this user's chat instructions; an empty text clears them.
+ * @summary Update the current user's Copilot preferences
+ */
+export const updateCopilotPreferences = (
+    copilotPreferencesUpdate: CopilotPreferencesUpdate,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CopilotPreferences>(
+      {url: `/copilot/preferences`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: copilotPreferencesUpdate, signal
+    },
+      options);
+    }
+
+
+
+
+export const getUpdateCopilotPreferencesMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCopilotPreferences>>, TError,{data: CopilotPreferencesUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCopilotPreferences>>, TError,{data: CopilotPreferencesUpdate}, TContext> => {
+
+const mutationKey = ['updateCopilotPreferences'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCopilotPreferences>>, {data: CopilotPreferencesUpdate}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateCopilotPreferences(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCopilotPreferencesMutationResult = NonNullable<Awaited<ReturnType<typeof updateCopilotPreferences>>>
+    export type UpdateCopilotPreferencesMutationBody = CopilotPreferencesUpdate
+    export type UpdateCopilotPreferencesMutationError = HTTPValidationError
+
+    /**
+ * @summary Update the current user's Copilot preferences
+ */
+export const useUpdateCopilotPreferences = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCopilotPreferences>>, TError,{data: CopilotPreferencesUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateCopilotPreferences>>,
+        TError,
+        {data: CopilotPreferencesUpdate},
+        TContext
+      > => {
+      return useMutation(getUpdateCopilotPreferencesMutationOptions(options), queryClient);
+    }
+    /**
+ * QDash's chat system prompt and this user's instructions as appended to it (read-only).
+ * @summary Show what QDash tells the chat model
+ */
+export const getCopilotSystemPrompt = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CopilotSystemPrompt>(
+      {url: `/copilot/system-prompt`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetCopilotSystemPromptQueryKey = () => {
+    return [
+    `/copilot/system-prompt`
+    ] as const;
+    }
+
+
+export const getGetCopilotSystemPromptQueryOptions = <TData = Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCopilotSystemPromptQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCopilotSystemPrompt>>> = ({ signal }) => getCopilotSystemPrompt(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCopilotSystemPromptQueryResult = NonNullable<Awaited<ReturnType<typeof getCopilotSystemPrompt>>>
+export type GetCopilotSystemPromptQueryError = unknown
+
+
+export function useGetCopilotSystemPrompt<TData = Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotSystemPrompt>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotSystemPrompt>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotSystemPrompt<TData = Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCopilotSystemPrompt>>,
+          TError,
+          Awaited<ReturnType<typeof getCopilotSystemPrompt>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCopilotSystemPrompt<TData = Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Show what QDash tells the chat model
+ */
+
+export function useGetCopilotSystemPrompt<TData = Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotSystemPrompt>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCopilotSystemPromptQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}

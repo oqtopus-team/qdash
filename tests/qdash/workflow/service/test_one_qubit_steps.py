@@ -3,48 +3,39 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from qdash.common.mux_mapping import MuxMapping
+from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.steps.one_qubit import CustomOneQubit
 
 if TYPE_CHECKING:
-    from qdash.workflow.service.calib_service import CalibService
+    from qdash.workflow.service._internal.session import CalibSession
 
 
 def test_custom_one_qubit_direct_targets_reuse_step_execution(monkeypatch) -> None:
     from unittest.mock import MagicMock
 
-    init = MagicMock(side_effect=AssertionError("must reuse the step Execution"))
-    finish = MagicMock(side_effect=AssertionError("pipeline owns completion"))
     run = MagicMock(return_value={"1": {"status": "success"}})
-    monkeypatch.setattr("qdash.workflow.service.calib_service.init_calibration", init)
-    monkeypatch.setattr("qdash.workflow.service.calib_service.finish_calibration", finish)
+    spec = object()
     monkeypatch.setattr(
         "qdash.workflow.service._internal.scheduling_tasks.run_qubit_calibrations_parallel",
         run,
     )
-    service = SimpleNamespace(
-        username="alice",
+    session = SimpleNamespace(
+        mux_mapping=MuxMapping.legacy(),
         chip_id="64Qv3",
-        backend_name="qubex",
-        project_id="project-1",
-        execution_id="exec-step",
-        default_run_parameters={},
-        task_run_parameters={},
-        tags=[],
-        flow_name="simple_tasks",
-        note={},
+        worker_spec=MagicMock(return_value=spec),
         record_stage_result=MagicMock(),
+        finish_calibration=MagicMock(side_effect=AssertionError("pipeline owns completion")),
     )
-    step = CustomOneQubit(step_name="simple_tasks", tasks=["CheckRabi"])
-    result = step._execute_direct(cast("CalibService", service), ["1"])
+    step = CustomOneQubit(step_name="simple_tasks", tasks=[TaskCall(name="CheckRabi")])
+    result = step._execute_direct(cast("CalibSession", session), ["1"])
 
     assert result == {"direct": {"1": {"status": "success"}}}
-    config = run.call_args.kwargs["session_config"]
-    assert config["execution_id"] == "exec-step"
-    assert config["tags"] == []
-    assert config["flow_name"] == "simple_tasks"
-    service.record_stage_result.assert_called_once_with("simple_tasks", result)
-    init.assert_not_called()
-    finish.assert_not_called()
+    # Workers receive the step session's spec and borrow its Execution.
+    assert run.call_args.kwargs["worker"] is spec
+    assert run.call_args.kwargs["plan"].step_id == "simple_tasks"
+    session.record_stage_result.assert_called_once_with("simple_tasks", result)
+    session.finish_calibration.assert_not_called()
 
 
 def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> None:
@@ -54,7 +45,7 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
     calls = []
 
     class FakeStrategy:
-        def execute(self, service, config):
+        def execute(self, session, config):
             calls.append(config)
             return {"scheduled": {"1": {"status": "success"}, "4": {"status": "success"}}}
 
@@ -63,26 +54,33 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
         lambda mode: FakeStrategy(),
     )
 
-    service = SimpleNamespace(
+    session = SimpleNamespace(
+        mux_mapping=MuxMapping.legacy(),
         username="alice",
         chip_id="64Qv3",
         backend_name="qubex",
         project_id="project-1",
         default_run_parameters={},
-        task_run_parameters={},
+        task_parameters={},
         tags=[],
         flow_name="simple_calibration",
         note={},
     )
-    step = CustomOneQubit(step_name="simple_tasks", tasks=["CheckRabi"], mode="scheduled")
+    step = CustomOneQubit(
+        step_name="simple_tasks",
+        tasks=[TaskCall(name="Configure", on_failure="stop"), TaskCall(name="CheckRabi")],
+        execution_mode="parallel_by_mux",
+        continue_on_failure=True,
+    )
 
-    step.execute(cast("CalibService", service), QubitTargets(["1", "4"]), StepContext())
+    step.execute(cast("CalibSession", session), QubitTargets(["1", "4"]), StepContext())
 
     assert len(calls) == 1
     assert calls[0].mux_ids == [0, 1]
     assert calls[0].qids == ["1", "4"]
-    assert calls[0].tasks == ["CheckRabi"]
-    assert calls[0].flow_name == "simple_calibration_simple_tasks"
+    assert calls[0].tasks == ["Configure", "CheckRabi"]
+    assert calls[0].plan.continue_on_failure is True
+    assert [call.on_failure for call in calls[0].plan.calls] == ["stop", None]
 
 
 def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> None:
@@ -93,7 +91,7 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
     calls = []
 
     class FakeStrategy:
-        def execute(self, service, config):
+        def execute(self, session, config):
             calls.append(config)
             return {"scheduled": {"2": {"status": "success"}, "5": {"status": "success"}}}
 
@@ -102,26 +100,26 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
         lambda mode: FakeStrategy(),
     )
 
-    service = SimpleNamespace(
+    session = SimpleNamespace(
+        mux_mapping=MuxMapping.legacy(),
         username="alice",
         chip_id="64Qv3",
         backend_name="qubex",
         project_id="project-1",
         default_run_parameters={},
-        task_run_parameters={},
+        task_parameters={},
         tags=[],
         flow_name="one_qubit",
         note={},
     )
-    step = OneQubitCheck(mode="synchronized", tasks=["CheckRabi"])
+    step = OneQubitCheck(execution_mode="parallel_by_round", tasks=[TaskCall(name="CheckRabi")])
 
-    step.execute(cast("CalibService", service), QubitTargets(["2", "5"]), StepContext())
+    step.execute(cast("CalibSession", session), QubitTargets(["2", "5"]), StepContext())
 
     assert len(calls) == 1
     assert calls[0].mux_ids == [0, 1]
     assert calls[0].qids == ["2", "5"]
     assert calls[0].tasks == ["CheckRabi"]
-    assert calls[0].flow_name == "one_qubit_one_qubit_check"
 
 
 @pytest.mark.parametrize("successful_qids", [[], ["1"]])
@@ -138,14 +136,14 @@ def test_fine_tune_respects_coarse_status_filter(monkeypatch, successful_qids) -
             qid, QubitCalibData(status="success" if qid in successful_qids else "failed")
         )
     ctx = StepContext(candidate_qids=["0", "1"], one_qubit_check=coarse_result)
-    service = cast("CalibService", SimpleNamespace(chip_id="64Q"))
+    session = cast("CalibSession", SimpleNamespace(chip_id="64Q"))
     targets = QubitTargets(["0", "1"])
-    ctx = FilterByStatus().execute(service, targets, ctx)
+    ctx = FilterByStatus().execute(session, targets, ctx)
     execute = MagicMock(return_value={})
     step = OneQubitFineTune()
     monkeypatch.setattr(step, "_execute_with_qids", execute)
 
-    step.execute(service, targets, ctx)
+    step.execute(session, targets, ctx)
 
     if successful_qids:
         assert execute.call_args.args[1] == successful_qids

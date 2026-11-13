@@ -2,98 +2,10 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import numpy as np
+import pytest
 
 from qdash.workflow.engine.backend.fake import FakeBackend
 from qdash.workflow.engine.backend.fake_qubex.simulation import FakeExperiment
-
-
-def test_fake_ramsey_fit_exposes_qubex_compatible_fields() -> None:
-    exp = FakeExperiment()
-
-    result = exp.ramsey_experiment(
-        targets=["Q00"],
-        time_range=np.arange(0.0, 1000.0, 100.0),
-        detuning=0.001,
-        plot=False,
-    )
-
-    fit = result.data["Q00"].fit()
-
-    assert fit["f"] == 0.001
-    assert fit["f_err"] == 0.0
-    assert fit["tau_err"] == 0.0
-
-
-def test_fake_default_t1_and_t2_echo_lifetimes_have_small_variation() -> None:
-    exp = FakeExperiment()
-
-    t1_result = exp.t1_experiment(
-        targets=["Q00", "Q01"],
-        time_range=np.geomspace(100.0, 10_000.0, 5),
-        plot=False,
-    )
-    t2_result = exp.t2_experiment(
-        targets=["Q00", "Q01"],
-        time_range=np.geomspace(300.0, 10_000.0, 5),
-        plot=False,
-    )
-
-    assert t1_result.data["Q00"].t1 != t2_result.data["Q00"].t2
-    assert t1_result.data["Q00"].t1 != t1_result.data["Q01"].t1
-    assert t2_result.data["Q00"].t2 != t2_result.data["Q01"].t2
-
-
-def test_fake_default_coherence_lifetimes_and_time_scale_vary_between_runs(
-    monkeypatch,
-) -> None:
-    values = iter(
-        [
-            0.0,
-            0.0,
-            -0.020,
-            0.030,
-            0.0,
-            0.020,
-            0.0,
-            0.0,
-            -0.015,
-            0.0,
-            0.025,
-            0.015,
-        ]
-    )
-    monkeypatch.setattr(
-        "qdash.workflow.engine.backend.fake_qubex.simulation.random.uniform",
-        lambda *_: next(values),
-    )
-    exp = FakeExperiment()
-
-    first_t1 = exp.t1_experiment(
-        targets=["Q00"],
-        time_range=np.geomspace(100.0, 10_000.0, 5),
-        plot=False,
-    )
-    second_t1 = exp.t1_experiment(
-        targets=["Q00"],
-        time_range=np.geomspace(100.0, 10_000.0, 5),
-        plot=False,
-    )
-    first_t2 = exp.t2_experiment(
-        targets=["Q00"],
-        time_range=np.geomspace(300.0, 10_000.0, 5),
-        plot=False,
-    )
-    second_t2 = exp.t2_experiment(
-        targets=["Q00"],
-        time_range=np.geomspace(300.0, 10_000.0, 5),
-        plot=False,
-    )
-
-    assert first_t1.data["Q00"].t1 != second_t1.data["Q00"].t1
-    assert not np.array_equal(first_t1.data["Q00"].sweep_range, second_t1.data["Q00"].sweep_range)
-    assert first_t2.data["Q00"].t2 != second_t2.data["Q00"].t2
-    assert not np.array_equal(first_t2.data["Q00"].sweep_range, second_t2.data["Q00"].sweep_range)
 
 
 def test_fake_explicit_lifetimes_are_preserved() -> None:
@@ -130,7 +42,7 @@ def test_fake_zx90_accepts_explicit_cr_parameters_and_x180(monkeypatch) -> None:
     assert exp._resolve_zx90_x180("Q00", {"Q00": x180}) is x180
 
 
-def test_fake_backend_passes_readout_duration_to_experiment(monkeypatch) -> None:
+def test_fake_backend_passes_session_configuration_to_experiment(monkeypatch) -> None:
     experiment = MagicMock()
     factory = MagicMock(return_value=experiment)
     monkeypatch.setattr(
@@ -143,10 +55,32 @@ def test_fake_backend_passes_readout_duration_to_experiment(monkeypatch) -> None
             "qids": ["0"],
             "chip_id": "chip-1",
             "readout_duration": 2048.0,
+            "configuration_mode": "ge-ef-fh",
         }
     )
 
     backend.connect()
 
     assert factory.call_args.kwargs["readout_duration"] == 2048.0
+    assert factory.call_args.kwargs["configuration_mode"] == "ge-ef-fh"
     experiment.connect.assert_called_once_with()
+
+
+def test_fake_default_control_amplitude_drives_a_pi_rotation_in_pi_duration() -> None:
+    exp = FakeExperiment()
+
+    rate = exp.calc_rabi_rate("Q00")
+
+    assert rate == pytest.approx(1.0 / (2.0 * exp.pi_duration))
+    assert exp.control_params.get_control_amplitude("Q00") == exp.CONTROL_AMPLITUDE_SCALE
+
+
+def test_default_device_parameters_follow_the_physical_qubit() -> None:
+    """A session on a subset of qubits simulates each qubit as the full device does."""
+    full = FakeExperiment()
+    subset = FakeExperiment(qubits=[2, 3])
+
+    for label in ("Q02", "Q03"):
+        assert subset.get_target(label).frequency == full.get_target(label).frequency
+        assert subset.get_target(f"R{label}").frequency == full.get_target(f"R{label}").frequency
+        assert subset.get_qubit(label).anharmonicity == full.get_qubit(label).anharmonicity

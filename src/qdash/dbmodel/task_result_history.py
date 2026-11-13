@@ -7,7 +7,7 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 
 from qdash.common.utils.datetime import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel
-from qdash.datamodel.note import AiReviewModel, NoteModel
+from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import (
     BaseTaskResultModel,
@@ -16,6 +16,7 @@ from qdash.datamodel.task import (
     validate_task_result_input_parameters,
     validate_task_result_output_parameters,
 )
+from qdash.datamodel.task_invocation import TaskInvocation
 from qdash.dbmodel.user import UserDocument
 
 
@@ -67,14 +68,6 @@ class TaskResultHistoryDocument(Document):
         default_factory=NoteModel,
         description="Free-form user note attached to this task result (dashboard)",
     )
-    ai_review_note: NoteModel = Field(
-        default_factory=NoteModel,
-        description="AI-generated review note attached to this task result",
-    )
-    ai_review: AiReviewModel = Field(
-        default_factory=AiReviewModel,
-        description="Persistent AI review request state for this task result",
-    )
     figure_path: list[str] = Field(..., description="The path to the figure")
     json_figure_path: list[str] = Field([], description="The path to the JSON figure")
     raw_data_path: list[str] = Field([], description="The path to the raw data")
@@ -84,6 +77,10 @@ class TaskResultHistoryDocument(Document):
     task_type: str = Field(..., description="The task type")
     system_info: SystemInfoModel = Field(..., description="The system information")
     qid: str = Field("", description="The qubit ID")
+    invocation: TaskInvocation | None = Field(
+        default=None,
+        description="Planned step and call this result executed; absent on older results.",
+    )
 
     execution_id: str = Field(..., description="The execution ID")
     tags: list[str] = Field(..., description="The tags")
@@ -221,15 +218,6 @@ class TaskResultHistoryDocument(Document):
                 # docs whose user_note.updated_at is an actual date (i.e. set).
                 partialFilterExpression={"user_note.updated_at": {"$type": "date"}},
             ),
-            IndexModel(
-                [
-                    ("project_id", ASCENDING),
-                    ("chip_id", ASCENDING),
-                    ("ai_review_note.updated_at", DESCENDING),
-                ],
-                name="project_chip_ai_review_note_idx",
-                partialFilterExpression={"ai_review_note.updated_at": {"$type": "date"}},
-            ),
             # Cool-down filter: list task results that ran in a specific
             # cool-down. Sparse so empty (legacy) rows are not indexed.
             IndexModel(
@@ -293,6 +281,7 @@ class TaskResultHistoryDocument(Document):
             task_type=task.task_type,
             system_info=task.system_info.model_dump(),
             qid=getattr(task, "qid", ""),
+            invocation=task.invocation,
             execution_id=execution_model.execution_id,
             tags=execution_model.tags,
             chip_id=execution_model.chip_id,
@@ -336,6 +325,7 @@ class TaskResultHistoryDocument(Document):
         doc.task_type = task.task_type
         doc.system_info = task.system_info
         doc.qid = getattr(task, "qid", "")
+        doc.invocation = task.invocation
         doc.execution_id = execution_model.execution_id
         doc.tags = execution_model.tags
         doc.chip_id = execution_model.chip_id

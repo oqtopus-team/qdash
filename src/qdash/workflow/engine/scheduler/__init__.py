@@ -22,18 +22,21 @@ OneQubitScheduler (1-Qubit)
     Schedules 1-qubit calibration tasks with Box-aware grouping.
 
     Features:
-    - Box classification (BOX_A, BOX_B, BOX_MIXED)
-    - Synchronized execution mode
+    - Box classification (BOX_A, BOX_B, BOX_MIXED, BOX_STANDALONE)
+    - Rounds for the parallel_by_round execution mode
     - Pluggable ordering strategies
 
 OneQubitScheduleResult
     Result of 1-qubit scheduling with stage information.
 
+OneQubitRoundScheduleResult
+    Rounds of the parallel_by_round execution mode (OneQubitRound entries).
+
 Conflict Types
 --------------
 1. **MUX Conflict**: Two qubits share the same MUX (multiplexer)
 2. **Qubit Conflict**: Same qubit appears in multiple CR pairs
-3. **Box Conflict**: Tasks from different boxes cannot be synchronized
+3. **Box Conflict**: Qubits of different box types are placed in separate stages
 
 Scheduling Example
 ------------------
@@ -56,6 +59,8 @@ BOX_B : str
     Identifier for Box B hardware group.
 BOX_MIXED : str
     Identifier for mixed Box A/B configuration.
+BOX_STANDALONE : str
+    Identifier for qubits outside every MUX (run one at a time).
 """
 
 from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler, CRScheduleResult
@@ -64,8 +69,11 @@ from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
     BOX_B,
     BOX_MIXED,
+    BOX_STANDALONE,
     MuxBatchScheduleResult,
     MuxBatchStepInfo,
+    OneQubitRound,
+    OneQubitRoundScheduleResult,
     OneQubitScheduleResult,
     OneQubitStageInfo,
 )
@@ -74,11 +82,14 @@ __all__ = [
     "BOX_A",
     "BOX_B",
     "BOX_MIXED",
+    "BOX_STANDALONE",
     "CRScheduleResult",
     # CR Scheduler (2-qubit)
     "CRScheduler",
     "MuxBatchScheduleResult",
     "MuxBatchStepInfo",
+    "OneQubitRound",
+    "OneQubitRoundScheduleResult",
     "OneQubitScheduleResult",
     # 1-Qubit Scheduler
     "OneQubitScheduler",

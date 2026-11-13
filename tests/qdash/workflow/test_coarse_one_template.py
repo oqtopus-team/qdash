@@ -9,6 +9,7 @@ import pytest
 
 from qdash.workflow.service.steps import OneQubitCheck
 from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
 
 coarse_one_module = importlib.import_module("qdash.workflow.templates.coarse_one")
 
@@ -33,8 +34,8 @@ def test_coarse_one_configures_before_readout_search_and_calibrates_all_pulses()
     assert len(result["steps"]) == 1
     step = result["steps"][0]
     assert isinstance(step, OneQubitCheck)
-    assert step.mode == "synchronized"
-    assert step.tasks == [
+    assert step.execution_mode == "parallel_by_round"
+    assert names(step.tasks) == [
         "Configure",
         "CheckCoarseReadoutParams",
         "Configure",
@@ -91,22 +92,24 @@ def test_coarse_one_forwards_execution_context_and_preserves_task_scan_defaults(
         "project_id": "project-1",
         "flow_name": "coarse-check",
         "tags": ["coarse"],
-        "task_run_parameters": {
-            "CreateHPIPulse": {
-                "hpi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreatePIPulse": {
-                "pi_duration": {"value": 32, "value_type": "int"},
-            },
-            "CreateDRAGHPIPulse": {
-                "drag_hpi_duration": {"value": 16, "value_type": "int"},
-            },
-            "CreateDRAGPIPulse": {
-                "drag_pi_duration": {"value": 24, "value_type": "int"},
-            },
-        },
         "default_run_parameters": {
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 150 * 1024,
         },
+    }
+
+
+def test_coarse_one_sets_pulse_durations_on_each_pulse_call() -> None:
+    result = coarse_one_module.coarse_one(username="alice", chip_id="64Q", qids=["0"])
+
+    durations = {
+        call_id: call_settings["run"]
+        for call_id, call_settings in effective_settings(result["steps"][0].tasks)
+        if call_settings["run"]
+    }
+    assert durations == {
+        "CreateHPIPulse": settings(run={"hpi_duration": 32})["run"],
+        "CreatePIPulse": settings(run={"pi_duration": 32})["run"],
+        "CreateDRAGHPIPulse": settings(run={"drag_hpi_duration": 16})["run"],
+        "CreateDRAGPIPulse": settings(run={"drag_pi_duration": 24})["run"],
     }

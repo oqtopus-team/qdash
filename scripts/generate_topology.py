@@ -91,7 +91,11 @@ def generate_square_lattice_mux(
         "grid_size": grid_size,
         "num_qubits": num_qubits,
         "direction_convention": "checkerboard_cr",
-        "mux": {"enabled": True, "size": mux_size},
+        # MUX N owns qubits N*k..N*k+k-1 in local slot order (k = mux_size**2).
+        "muxes": {
+            mux_id: list(range(mux_id * qubits_per_mux, (mux_id + 1) * qubits_per_mux))
+            for mux_id in range(num_qubits // qubits_per_mux)
+        },
         "qubits": qubits,
         "couplings": couplings,
         "visualization": {
@@ -144,7 +148,7 @@ def generate_square_lattice(num_qubits: int) -> dict[str, Any]:
         "grid_size": grid_size,
         "num_qubits": num_qubits,
         "direction_convention": "checkerboard_cr",
-        "mux": {"enabled": False},
+        "muxes": {},  # no MUX: every qubit is standalone
         "qubits": qubits,
         "couplings": couplings,
         "visualization": {
@@ -176,7 +180,7 @@ def generate_linear(num_qubits: int) -> dict[str, Any]:
         "description": "Linear qubit chain topology",
         "grid_size": num_qubits,
         "num_qubits": num_qubits,
-        "mux": {"enabled": False},
+        "muxes": {},  # no MUX: every qubit is standalone
         "qubits": qubits,
         "couplings": couplings,
         "visualization": {
@@ -242,7 +246,7 @@ def generate_heavy_hex(num_qubits: int) -> dict[str, Any]:
         "description": "Heavy hexagonal topology (IBM-style)",
         "grid_size": grid_size,
         "num_qubits": num_qubits,
-        "mux": {"enabled": False},
+        "muxes": {},  # no MUX: every qubit is standalone
         "qubits": qubits,
         "couplings": couplings,
         "visualization": {

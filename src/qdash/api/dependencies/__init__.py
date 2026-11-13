@@ -4,9 +4,11 @@ This module provides FastAPI dependency functions for injecting
 repositories and services into route handlers.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from qdash.api.schemas.task_file import TaskInfo
+    from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
     from qdash.api.services.flow_schedule_service import FlowScheduleService
     from qdash.api.services.flow_service import FlowService
 
@@ -20,18 +22,19 @@ from qdash.api.services.admin_service import AdminService
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
-from qdash.api.services.chip import ChipService
+from qdash.api.services.chip import ChipConfigScaffolder, ChipService
 from qdash.api.services.config_service import ConfigService
 from qdash.api.services.cooldown_service import CooldownService
 from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEventService
 from qdash.api.services.copilot_chat_session_service import CopilotChatSessionService
+from qdash.api.services.copilot_investigation_service import CopilotInvestigationService
 from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.device_topology_service import DeviceTopologyService
+from qdash.api.services.evaluation_service import EvaluationService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
 from qdash.api.services.forum_service import ForumService
-from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
-from qdash.api.services.issue_service import IssueService
+from qdash.api.services.knowledge_draft_service import KnowledgeDraftStore
 from qdash.api.services.manual_update_service import ManualUpdateService
 from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.note_service import NoteService
@@ -41,11 +44,11 @@ from qdash.api.services.provenance_service import ProvenanceService
 from qdash.api.services.reanalysis_service import ReanalysisService
 from qdash.api.services.seed_import_service import SeedImportService
 from qdash.api.services.slack_notification_service import SlackNotificationService
-from qdash.api.services.system_update_service import SystemUpdateService
+from qdash.api.services.source_access_service import SourceAccessService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
-from qdash.config import get_settings
+from qdash.api.services.user_avatar_service import UserAvatarService
 from qdash.copilot.runtime import CopilotRuntime
 from qdash.repository import (
     MongoChipRepository,
@@ -72,6 +75,7 @@ from qdash.repository.provenance import (
 from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.repository.tag import MongoTagRepository
 from qdash.repository.task_definition import MongoTaskDefinitionRepository
+from qdash.repository.user_avatar import MongoUserAvatarRepository
 
 
 @cached_dependency_provider
@@ -117,6 +121,15 @@ def get_task_result_repository() -> MongoTaskResultHistoryRepository:
 
     """
     return MongoTaskResultHistoryRepository()
+
+
+def get_chip_config_scaffolder() -> ChipConfigScaffolder:
+    """Get the writer of new chips' Qubex configuration directories.
+
+    Not cached: the configuration tree is resolved per request, so a mount
+    that appears after startup is picked up.
+    """
+    return ChipConfigScaffolder()
 
 
 @cached_dependency_provider
@@ -255,6 +268,25 @@ def get_task_result_service() -> TaskResultService:
 
 
 @cached_dependency_provider
+def get_evaluation_service() -> EvaluationService:
+    """Get the calibration evaluation service instance.
+
+    Cached so background runs stay referenced by one service for the
+    lifetime of the worker.
+    """
+    return EvaluationService(
+        chip_repository=get_chip_repository(),
+        task_result_repository=get_task_result_repository(),
+    )
+
+
+@cached_dependency_provider
+def get_knowledge_draft_store() -> KnowledgeDraftStore:
+    """Get the store of uploaded task-knowledge drafts."""
+    return KnowledgeDraftStore()
+
+
+@cached_dependency_provider
 def get_tag_repository() -> MongoTagRepository:
     """Get the tag repository instance."""
     return MongoTagRepository()
@@ -336,12 +368,6 @@ def get_provenance_service() -> ProvenanceService:
 
 
 @cached_dependency_provider
-def get_issue_service() -> IssueService:
-    """Get the issue service instance."""
-    return IssueService(notification_service=get_notification_service())
-
-
-@cached_dependency_provider
 def get_forum_service() -> ForumService:
     """Get the forum service instance."""
     return ForumService(
@@ -357,27 +383,31 @@ def get_slack_notification_service() -> SlackNotificationService:
 
 
 @cached_dependency_provider
-def get_issue_knowledge_service() -> IssueKnowledgeService:
-    """Get the issue knowledge service instance."""
-    return IssueKnowledgeService()
-
-
-@cached_dependency_provider
 def get_copilot_runtime() -> CopilotRuntime:
     """Get the copilot runtime instance."""
     return CopilotRuntime()
 
 
 @cached_dependency_provider
-def get_admin_service() -> AdminService:
-    """Get the admin service instance."""
-    return AdminService()
+def get_source_access_service() -> SourceAccessService:
+    """Get the read-only source access service for Copilot investigations."""
+    return SourceAccessService()
 
 
 @cached_dependency_provider
-def get_system_update_service() -> SystemUpdateService:
-    """Get the administrator-facing system update proxy."""
-    return SystemUpdateService(get_settings())
+def get_copilot_investigation_service() -> CopilotInvestigationService:
+    """Get the service that opens a chat investigating a failed execution."""
+    return CopilotInvestigationService(
+        execution_service=get_execution_service(),
+        task_service=get_task_service(),
+        source_service=get_source_access_service(),
+    )
+
+
+@cached_dependency_provider
+def get_admin_service() -> AdminService:
+    """Get the admin service instance."""
+    return AdminService()
 
 
 @cached_dependency_provider
@@ -461,6 +491,12 @@ def get_user_repository() -> MongoUserRepository:
 
 
 @cached_dependency_provider
+def get_user_avatar_service() -> UserAvatarService:
+    """Get the user avatar settings service instance."""
+    return UserAvatarService(store=MongoUserAvatarRepository())
+
+
+@cached_dependency_provider
 def get_auth_service() -> AuthService:
     """Get the auth service instance."""
     return AuthService(
@@ -516,6 +552,40 @@ def get_flow_repository() -> MongoFlowRepository:
 
 
 @cached_dependency_provider
+def get_calibration_pipeline_service() -> "CalibrationPipelineService":
+    """Get the calibration pipeline service instance."""
+    from fastapi import HTTPException
+
+    from qdash.api.services.calibration_pipeline_service import CalibrationPipelineService
+
+    def task_catalog(backend: str) -> "dict[str, TaskInfo]":
+        try:
+            tasks = get_task_file_service().list_task_info(backend).tasks
+        except HTTPException as exc:
+            # The preflight must not pass a spec it could not check.
+            raise LookupError(str(exc.detail)) from exc
+        return {task.name: task for task in tasks}
+
+    def qubit_data(project_id: str, chip_id: str, qid: str) -> dict[str, Any]:
+        return get_qubit_calibration_repository().get_calibration_data(
+            project_id=project_id, chip_id=chip_id, qid=qid
+        )
+
+    def source_run_parameters(project_id: str, task_id: str) -> dict[str, Any] | None:
+        results = get_task_result_repository().find(
+            {"project_id": project_id, "task_id": task_id}, limit=1
+        )
+        return dict(results[0].run_parameters) if results else None
+
+    return CalibrationPipelineService(
+        task_definition_repository=get_task_definition_repository(),
+        task_catalog=task_catalog,
+        qubit_data=qubit_data,
+        source_run_parameters=source_run_parameters,
+    )
+
+
+@cached_dependency_provider
 def get_flow_service() -> "FlowService":
     """Get the flow service instance."""
     from qdash.api.services.flow_service import FlowService
@@ -523,6 +593,7 @@ def get_flow_service() -> "FlowService":
     return FlowService(
         flow_repository=get_flow_repository(),
         execution_lock_repository=get_execution_lock_repository(),
+        chip_repository=get_chip_repository(),
     )
 
 

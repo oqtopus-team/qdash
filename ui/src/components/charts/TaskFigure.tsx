@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { ZoomIn } from "lucide-react";
+import { useEffect, useState } from "react";
+import { RotateCw, ZoomIn } from "lucide-react";
 
+import { FigureStrip } from "@/components/charts/FigureStrip";
 import { useGetTaskResult } from "@/client/task/task";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { FigureLightbox } from "./FigureLightbox";
@@ -14,10 +15,76 @@ interface TaskFigureProps {
   qid: string;
   className?: string;
   hideExpandButton?: boolean;
+  /**
+   * Scale the figure down to fit its box (both width and height), centred.
+   * Without it the figure keeps its height and overflows sideways, which suits
+   * the horizontally scrolling strips most pages put figures in.
+   */
+  fit?: boolean;
 }
 
 function figureUrl(path: string): string {
   return `/api/executions/figure?path=${encodeURIComponent(path)}`;
+}
+
+/** Delays before each automatic reload of a figure that failed to load, in milliseconds. */
+export const FIGURE_RETRY_DELAYS_MS: readonly number[] = [1000, 3000];
+
+interface FigureLoadState {
+  src: string;
+  /** Loads after the first; each one asks the browser for the image again. */
+  attempt: number;
+  /** Waiting to reload after a failed load. */
+  waiting: boolean;
+  failed: boolean;
+}
+
+function freshLoadState(src: string): FigureLoadState {
+  return { src, attempt: 0, waiting: false, failed: false };
+}
+
+/**
+ * Loads a figure URL and recovers from transient failures. A figure can fail to load while the
+ * API restarts or a request is dropped; the browser keeps that failure, so the URL is requested
+ * again a few times with a retry marker before the figure reports an error. A new figure path
+ * always starts from a fresh load, so a failure never carries over to another figure.
+ */
+function useRetryingFigureSrc(src: string) {
+  const [state, setState] = useState<FigureLoadState>(() => freshLoadState(src));
+  const current = state.src === src ? state : freshLoadState(src);
+  if (state.src !== src) setState(current);
+
+  useEffect(() => {
+    if (!current.waiting) return;
+    const delay = FIGURE_RETRY_DELAYS_MS[current.attempt] ?? 0;
+    const timer = window.setTimeout(() => {
+      setState((previous) =>
+        previous.src === src && previous.waiting
+          ? { ...previous, attempt: previous.attempt + 1, waiting: false }
+          : previous,
+      );
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [current.waiting, current.attempt, src]);
+
+  const onError = () =>
+    setState((previous) => {
+      if (previous.src !== src || previous.waiting) return previous;
+      return previous.attempt < FIGURE_RETRY_DELAYS_MS.length
+        ? { ...previous, waiting: true }
+        : { ...previous, failed: true };
+    });
+  const retry = () =>
+    setState((previous) => ({
+      src,
+      attempt: previous.src === src ? previous.attempt + 1 : 0,
+      waiting: false,
+      failed: false,
+    }));
+
+  const requestSrc =
+    current.attempt === 0 ? src : `${src}${src.includes("?") ? "&" : "?"}retry=${current.attempt}`;
+  return { requestSrc, waiting: current.waiting, failed: current.failed, onError, retry };
 }
 
 function ExpandableImage({
@@ -26,28 +93,63 @@ function ExpandableImage({
   className,
   jsonFigurePath,
   hideExpandButton,
+  fit = false,
 }: {
   src: string;
   alt: string;
   className: string;
   jsonFigurePath?: string;
   hideExpandButton?: boolean;
+  fit?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasError, setHasError] = useState(false);
+  const { requestSrc, waiting, failed, onError, retry } = useRetryingFigureSrc(src);
 
-  if (hasError) {
+  if (failed) {
     return (
-      <div className="flex items-center justify-center h-full text-base-content/40 text-xs">
-        Failed to load image
+      <div
+        role="alert"
+        className="flex h-full flex-col items-center justify-center gap-1 text-xs text-base-content/60"
+      >
+        <span>Failed to load image</span>
+        <button
+          type="button"
+          className="btn btn-xs btn-ghost gap-1"
+          onClick={(event) => {
+            event.stopPropagation();
+            retry();
+          }}
+        >
+          <RotateCw className="h-3 w-3" aria-hidden="true" />
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (waiting) {
+    return (
+      <div className="flex h-full items-center justify-center" aria-busy="true">
+        <span className="loading loading-spinner loading-sm" aria-label="Loading figure" />
       </div>
     );
   }
 
   return (
-    <div className="relative group inline-flex h-full min-w-0 min-h-0 shrink-0">
+    <div
+      className={
+        fit
+          ? "relative group flex h-full w-full min-w-0 min-h-0 items-center justify-center"
+          : "relative group inline-flex h-full min-w-0 min-h-0 shrink-0"
+      }
+    >
       {/* eslint-disable-next-line @next/next/no-img-element -- dynamic API image with native sizing */}
-      <img src={src} alt={alt} className={className} onError={() => setHasError(true)} />
+      <img
+        src={requestSrc}
+        alt={alt}
+        className={fit ? `h-full w-full object-contain ${className}` : className}
+        onError={onError}
+      />
       {!hideExpandButton && (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -68,7 +170,7 @@ function ExpandableImage({
       )}
       {isOpen && (
         <FigureLightbox
-          src={src}
+          src={requestSrc}
           alt={alt}
           jsonFigurePath={jsonFigurePath}
           onClose={() => setIsOpen(false)}
@@ -85,6 +187,7 @@ export function TaskFigure({
   qid,
   className = "",
   hideExpandButton,
+  fit = false,
 }: TaskFigureProps) {
   // Use generated API client hook when taskId is provided
   const {
@@ -144,12 +247,13 @@ export function TaskFigure({
         className={className}
         jsonFigurePath={normalizedJsonPaths[0]}
         hideExpandButton={hideExpandButton}
+        fit={fit}
       />
     );
   }
 
   return (
-    <div className="flex h-full w-full items-center gap-2 overflow-x-auto">
+    <FigureStrip className="h-full w-full gap-2">
       {normalizedPaths.map((p, i) => (
         <ExpandableImage
           key={p}
@@ -160,6 +264,6 @@ export function TaskFigure({
           hideExpandButton={hideExpandButton}
         />
       ))}
-    </div>
+    </FigureStrip>
   );
 }

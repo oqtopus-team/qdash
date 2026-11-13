@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 266" role="img" aria-label="Timestamps are created in UTC, stored in MongoDB without tzinfo, made timezone-aware again on read, sent as ISO 8601 UTC strings, and converted to the UI timezone only for display. Elapsed time is stored as seconds and sent as an H:MM:SS string that the UI shows as-is.">
+  <style>
+    .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
+    .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .qd-sub { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; text-anchor: middle; }
+    .qd-label { fill: var(--vp-c-text-2, #59636e); font-size: 11.5px; }
+    .qd-col { fill: var(--vp-c-text-2, #59636e); font-size: 12px; font-weight: 600; text-anchor: middle; }
+    .qd-row { fill: var(--vp-c-text-1, #1f2328); font-size: 12px; font-weight: 600; }
+    .qd-edge { stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.4; fill: none; }
+    .qd-head { fill: var(--vp-c-text-2, #59636e); }
+    .qd-rule { stroke: var(--vp-c-divider, #d1d9e0); stroke-width: 1; }
+    .qd-ui { fill: rgba(46, 160, 67, 0.12); stroke: #2ea043; stroke-width: 1.5; }
+    .qd-api { fill: rgba(219, 109, 40, 0.12); stroke: #db6d28; stroke-width: 1.5; }
+    .qd-data { fill: rgba(9, 105, 218, 0.10); stroke: #0969da; stroke-width: 1.5; }
+    .qd-json { fill: rgba(110, 118, 129, 0.08); stroke: var(--vp-c-text-2, #59636e); stroke-width: 1.5; }
+  </style>
+  <defs>
+    <marker id="qd-dt-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="qd-head"/>
+    </marker>
+  </defs>
+
+  <g class="qd-root">
+    <!-- Column headers -->
+    <text x="110" y="24" class="qd-col">Backend · write</text>
+    <text x="350" y="24" class="qd-col">MongoDB</text>
+    <text x="590" y="24" class="qd-col">Backend · read</text>
+    <text x="830" y="24" class="qd-col">API JSON</text>
+    <text x="1070" y="24" class="qd-col">UI</text>
+    <line x1="20" y1="36" x2="1160" y2="36" class="qd-rule"/>
+
+    <!-- Row 1: timestamps -->
+    <text x="20" y="62" class="qd-row">Timestamp</text>
+
+    <rect x="20" y="74" width="180" height="56" rx="8" class="qd-api"/>
+    <text x="110" y="98" class="qd-title">now()</text>
+    <text x="110" y="116" class="qd-sub">aware datetime, UTC</text>
+
+    <path d="M260,82 v40 a90,8 0 0,0 180,0 v-40" class="qd-data"/>
+    <ellipse cx="350" cy="82" rx="90" ry="8" class="qd-data"/>
+    <text x="350" y="105" class="qd-title">BSON Date</text>
+    <text x="350" y="121" class="qd-sub">UTC, tzinfo dropped</text>
+
+    <rect x="500" y="74" width="180" height="56" rx="8" class="qd-api"/>
+    <text x="590" y="98" class="qd-title">ensure_timezone()</text>
+    <text x="590" y="116" class="qd-sub">naive → aware UTC</text>
+
+    <rect x="740" y="74" width="180" height="56" rx="8" class="qd-json"/>
+    <text x="830" y="98" class="qd-title">"…T01:30:45Z"</text>
+    <text x="830" y="116" class="qd-sub">ISO 8601, UTC</text>
+
+    <rect x="980" y="74" width="180" height="56" rx="8" class="qd-ui"/>
+    <text x="1070" y="98" class="qd-title">2025-12-21 10:30:45</text>
+    <text x="1070" y="116" class="qd-sub">formatDateTime() · JST</text>
+
+    <line x1="200" y1="102" x2="258" y2="102" class="qd-edge" marker-end="url(#qd-dt-arrow)"/>
+    <text x="230" y="94" class="qd-label" text-anchor="middle">insert</text>
+    <line x1="440" y1="102" x2="498" y2="102" class="qd-edge" marker-end="url(#qd-dt-arrow)"/>
+    <text x="470" y="94" class="qd-label" text-anchor="middle">load</text>
+    <line x1="680" y1="102" x2="738" y2="102" class="qd-edge" marker-end="url(#qd-dt-arrow)"/>
+    <text x="710" y="94" class="qd-label" text-anchor="middle">serialize</text>
+    <line x1="920" y1="102" x2="978" y2="102" class="qd-edge" marker-end="url(#qd-dt-arrow)"/>
+    <text x="950" y="94" class="qd-label" text-anchor="middle">format</text>
+
+    <!-- Row 2: elapsed time -->
+    <text x="20" y="180" class="qd-row">Elapsed time</text>
+
+    <rect x="20" y="192" width="180" height="56" rx="8" class="qd-api"/>
+    <text x="110" y="216" class="qd-title">timedelta</text>
+    <text x="110" y="234" class="qd-sub">task run duration</text>
+
+    <path d="M260,200 v40 a90,8 0 0,0 180,0 v-40" class="qd-data"/>
+    <ellipse cx="350" cy="200" rx="90" ry="8" class="qd-data"/>
+    <text x="350" y="223" class="qd-title">float</text>
+    <text x="350" y="239" class="qd-sub">seconds</text>
+
+    <rect x="500" y="192" width="180" height="56" rx="8" class="qd-api"/>
+    <text x="590" y="216" class="qd-title">parse_elapsed_time()</text>
+    <text x="590" y="234" class="qd-sub">float → timedelta</text>
+
+    <rect x="740" y="192" width="180" height="56" rx="8" class="qd-json"/>
+    <text x="830" y="216" class="qd-title">"1:23:45"</text>
+    <text x="830" y="234" class="qd-sub">format_elapsed_time()</text>
+
+    <rect x="980" y="192" width="180" height="56" rx="8" class="qd-ui"/>
+    <text x="1070" y="216" class="qd-title">1:23:45</text>
+    <text x="1070" y="234" class="qd-sub">shown as-is</text>
+
+    <line x1="200" y1="220" x2="258" y2="220" class="qd-edge" marker-end="url(#qd-dt-arrow)"/>
+    <text x="230" y="212" class="qd-label" text-anchor="middle">store</text>
+    <line x1="440" y1="220" x2="498" y2="220" class="qd-edge" marker-end="url(#qd-dt-arrow)"/>
+    <text x="470" y="212" class="qd-label" text-anchor="middle">load</text>
+    <line x1="680" y1="220" x2="738" y2="220" class="qd-edge" marker-end="url(#qd-dt-arrow)"/>
+    <text x="710" y="212" class="qd-label" text-anchor="middle">serialize</text>
+    <line x1="920" y1="220" x2="978" y2="220" class="qd-edge" marker-end="url(#qd-dt-arrow)"/>
+    <text x="950" y="212" class="qd-label" text-anchor="middle">render</text>
+  </g>
+</svg>

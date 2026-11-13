@@ -10,7 +10,7 @@ interface RegionZoomToggleProps {
 export function RegionZoomToggle({ enabled, onToggle }: RegionZoomToggleProps) {
   return (
     <label
-      className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all duration-200 cursor-pointer select-none ${
+      className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-colors duration-200 cursor-pointer select-none ${
         enabled
           ? "bg-primary/10 border-primary"
           : "bg-base-200/50 border-base-300 hover:border-primary/50"
@@ -21,15 +21,30 @@ export function RegionZoomToggle({ enabled, onToggle }: RegionZoomToggleProps) {
       >
         <ZoomIn size={20} aria-hidden="true" />
       </div>
+      {/* Both states stay mounted so the card keeps the width of the wider one */}
       <div className="flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-sm">Region Zoom</span>
-          {enabled && <span className="badge badge-primary badge-xs">Active</span>}
+          <span
+            className={`badge badge-primary badge-xs ${enabled ? "" : "invisible"}`}
+            aria-hidden={enabled ? undefined : true}
+          >
+            Active
+          </span>
         </div>
-        <p className="text-xs text-base-content/60">
-          {enabled
-            ? "Click any region on the grid to zoom in"
-            : "Enable to zoom into specific regions"}
+        <p className="grid text-xs text-base-content/60">
+          <span
+            className={`col-start-1 row-start-1 ${enabled ? "invisible" : ""}`}
+            aria-hidden={enabled ? true : undefined}
+          >
+            Enable to zoom into specific regions
+          </span>
+          <span
+            className={`col-start-1 row-start-1 ${enabled ? "" : "invisible"}`}
+            aria-hidden={enabled ? undefined : true}
+          >
+            Click any region on the grid to zoom in
+          </span>
         </p>
       </div>
       <input

@@ -16,6 +16,17 @@ else:
     QubexBackend = Any
 
 
+def test_qubit_spectroscopy_publishes_coarse_frequency_as_operational_seed() -> None:
+    publish_targets = CheckQubitSpectroscopy.output_spec["coarse_qubit_frequency"].publish_targets
+
+    assert publish_targets == ("coarse_qubit_frequency", "control_frequency")
+
+
+def test_qubit_spectroscopy_does_not_declare_qubit_anharmonicity_output() -> None:
+    """Keep spectroscopy-derived anharmonicity out of calibration state."""
+    assert {"qubit_anharmonicity", "anharmonicity"}.isdisjoint(CheckQubitSpectroscopy.output_spec)
+
+
 def test_check_qubit_spectroscopy_outputs_uplifted_coarse_control_amplitude_and_marks_it(
     monkeypatch,
 ) -> None:
@@ -29,8 +40,8 @@ def test_check_qubit_spectroscopy_outputs_uplifted_coarse_control_amplitude_and_
             repr_db=-20.0,
             quality_level=4,
         ),
-        f12=None,
-        anharmonicity=None,
+        f12=SimpleNamespace(frequency=4.021),
+        anharmonicity=-0.3,
     )
 
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
@@ -48,6 +59,7 @@ def test_check_qubit_spectroscopy_outputs_uplifted_coarse_control_amplitude_and_
     )
 
     assert result.output_parameters["coarse_qubit_frequency"].value == 4.321
+    assert {"qubit_anharmonicity", "anharmonicity"}.isdisjoint(result.output_parameters)
     assert result.output_parameters["f01_repr_db"].value == -20.0
     assert result.output_parameters["coarse_control_amplitude"].value == pytest.approx(
         10 ** (-10 / 20)

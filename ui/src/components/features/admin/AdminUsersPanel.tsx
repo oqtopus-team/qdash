@@ -2,6 +2,8 @@
 
 import type { UserListItem } from "@/schemas";
 
+import { UserAvatar } from "@/components/ui/UserAvatar";
+
 type UserRoleFilter = "all" | "admin" | "user";
 type UserProjectFilter = "all" | "with" | "without";
 
@@ -88,7 +90,7 @@ export function AdminUsersPanel({
       <div className="card-body gap-5 p-5 sm:p-6">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
           <div>
-            <h2 className="card-title text-lg">User management</h2>
+            <h2 className="card-title">User management</h2>
             <p className="mt-1 text-sm text-base-content/60">
               Create accounts, manage access, and assign projects.
             </p>
@@ -203,8 +205,9 @@ export function AdminUsersPanel({
                       disabled={!isUserSelectable(userItem, currentUsername)}
                       onChange={() => onToggleUserSelection(userItem.username)}
                     />
-                    <div>
-                      <h3 className="font-mono font-medium">{userItem.username}</h3>
+                    <UserAvatar username={userItem.username} size={28} />
+                    <div className="min-w-0">
+                      <h3 className="font-mono font-medium break-all">{userItem.username}</h3>
                       <p className="text-sm text-base-content/60">{userItem.display_name || "-"}</p>
                       <p className="text-xs text-base-content/50">
                         {userItem.organization || "No organization"}
@@ -290,7 +293,12 @@ export function AdminUsersPanel({
                       onChange={() => onToggleUserSelection(userItem.username)}
                     />
                   </td>
-                  <td className="font-mono">{userItem.username}</td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <UserAvatar username={userItem.username} size={24} />
+                      <span className="font-mono">{userItem.username}</span>
+                    </div>
+                  </td>
                   <td>{userItem.display_name || "-"}</td>
                   <td>{userItem.organization || "-"}</td>
                   <td>

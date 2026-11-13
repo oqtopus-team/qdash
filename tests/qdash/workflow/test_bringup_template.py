@@ -5,6 +5,9 @@ from typing import Any
 
 import pytest
 
+from qdash.workflow.calibtasks.qubex import CheckAdaptiveChevron
+from tests.qdash.workflow.task_call_helpers import effective_settings, names, settings
+
 bringup_module = importlib.import_module("qdash.workflow.templates.bringup")
 
 
@@ -20,7 +23,7 @@ class FakeCalibService:
         return {"targets": targets, "steps": steps}
 
 
-def test_bringup_starts_with_configure_all(monkeypatch) -> None:
+def test_bringup_starts_with_measurements(monkeypatch) -> None:
     monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
 
     result = bringup_module.bringup(
@@ -29,32 +32,34 @@ def test_bringup_starts_with_configure_all(monkeypatch) -> None:
         mux_ids=[0],
     )
 
-    assert [step.name for step in result["steps"]] == ["configure_all", "bringup"]
+    assert [step.name for step in result["steps"]] == ["bringup"]
 
 
 def test_bringup_step_accepts_resonator_assignment_order() -> None:
+    from qdash.datamodel.task_call import TaskCall
     from qdash.workflow.service.steps import BringUp
 
-    service = type(
-        "Service",
-        (),
-        {
-            "default_run_parameters": {"interval": {"value": 1, "value_type": "int"}},
-            "task_run_parameters": {},
-        },
-    )()
-    step = BringUp(mode="scheduled", resonator_assignment_order=[0, 3, 1, 2])
+    step = BringUp(execution_mode="parallel_by_mux", resonator_assignment_order=[0, 3, 1, 2])
 
-    step._apply_resonator_assignment_order(service)
-
-    assert service.default_run_parameters == {
-        "interval": {"value": 1, "value_type": "int"},
-    }
-    assert service.task_run_parameters == {
-        "CheckResonatorSpectroscopy": {
-            "resonator_assignment_order": {"value": [0, 3, 1, 2], "value_type": "list"}
-        },
-    }
+    resonator = [call for call in step.calls() if call.name == "CheckResonatorSpectroscopy"]
+    assert resonator
+    assert all(
+        call.settings()["run"]["resonator_assignment_order"] == {"value": [0, 3, 1, 2]}
+        for call in resonator
+    )
+    assert all(
+        "resonator_assignment_order" not in (call.run or {})
+        for call in step.calls()
+        if call.name != "CheckResonatorSpectroscopy"
+    )
+    # A call's own order takes precedence over the step's.
+    own = BringUp(
+        tasks=[
+            TaskCall(name="CheckResonatorSpectroscopy", run={"resonator_assignment_order": [1]})
+        ],
+        resonator_assignment_order=[0, 3, 1, 2],
+    )
+    assert own.calls()[0].settings()["run"]["resonator_assignment_order"] == {"value": [1]}
 
 
 def test_bringup_template_passes_template_task_list(monkeypatch) -> None:
@@ -62,31 +67,30 @@ def test_bringup_template_passes_template_task_list(monkeypatch) -> None:
 
     result = bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
 
-    assert result["steps"][1].tasks == bringup_module.BRINGUP_TASKS
+    assert names(result["steps"][0].tasks) == names(bringup_module.BRINGUP_TASKS)
 
 
 def test_bringup_template_preserves_task_specific_acquisition_settings(monkeypatch) -> None:
     monkeypatch.setattr(bringup_module, "CalibService", FakeCalibService)
 
-    bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
+    result = bringup_module.bringup(username="alice", chip_id="16Q-test", mux_ids=[0])
 
     assert FakeCalibService.last_kwargs is not None
-    assert FakeCalibService.last_kwargs["task_run_parameters"] == {
-        "CheckResonatorSpectroscopy": {
-            "shots": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 0, "value_type": "int"},
-        },
-        "CheckQubitSpectroscopy": {
-            "shots": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 1024, "value_type": "int"},
-        },
-        "CheckControlAmplitude": {
-            "shots": {"value": 8192, "value_type": "int"},
-        },
-        "CheckAdaptiveChevron": {
-            "shots": {"value": 256, "value_type": "int"},
-        },
+    assert "task_parameters" not in FakeCalibService.last_kwargs
+    assert FakeCalibService.last_kwargs["default_run_parameters"] == {
+        "readout_duration": 1024,
+        "interval": 150 * 1024,
     }
+    # Call settings take precedence over the shared interval default.
+    assert effective_settings(result["steps"][0].tasks) == [
+        ("CheckResonatorSpectroscopy", settings(run={"shots": 1024, "interval": 0})),
+        ("CheckQubitSpectroscopy", settings(run={"shots": 1024, "interval": 1024})),
+        ("CheckControlAmplitude", settings(run={"shots": 8192})),
+        ("CheckAdaptiveChevron", settings(run={"shots": 256})),
+    ]
+    adaptive = result["steps"][0].tasks[-1]
+    assert adaptive.run is not None
+    assert adaptive.run["shots"]["value"] == CheckAdaptiveChevron.run_spec["shots"].default
 
 
 def test_bringup_template_requires_explicit_mux_ids(monkeypatch) -> None:

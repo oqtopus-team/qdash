@@ -254,7 +254,7 @@ if __name__ == "__main__":
         fig.write_image(file="qubit_frequency.png")
 
     if "qubit_anharmonicity" in info_type:
-        values = props["anharmonicity"]
+        values = props["qubit_anharmonicity"]
         fig = graph.create_lattice_figure(
             title="Qubit anharmonicity (MHz)",
             values=list(values.values()),

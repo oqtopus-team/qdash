@@ -1,0 +1,5 @@
+meta:
+  description: Control VATT
+  default: 3072
+  scope: qubit
+data: {}

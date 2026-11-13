@@ -9,6 +9,7 @@ from typing import Any
 
 from bunnet import SortDirection
 
+from qdash.datamodel.task_invocation import TaskInvocation
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 logger = logging.getLogger(__name__)
@@ -18,12 +19,25 @@ DEFAULT_SNAPSHOT_LIMIT = 10_000
 """Maximum number of task result documents to load from a single execution."""
 
 
+class SnapshotAmbiguityError(ValueError):
+    """The source execution has several results the requested call could mean."""
+
+
+_Record = tuple[TaskInvocation | None, dict[str, Any], dict[str, Any]]
+
+
 class SnapshotParameterLoader:
     """Loads parameters from a previous execution's task results.
 
     Loads the exact source task when ``source_task_id`` is available. Full
-    workflow re-execution may instead load all records for a source execution
-    and index them by (task_name, qid).
+    workflow re-execution instead loads all records of a source execution and
+    matches each new run by task name, qid, and planned call: a call restores the
+    record of the same ``step_id`` and ``call_id``, so the coarse and the fine
+    ``CheckRamsey`` of one step each get their own inputs back.
+
+    Records written before task calls existed carry no call identity. One such
+    record for a (task, qid) is used as before; several are ambiguous, and the
+    loader raises :class:`SnapshotAmbiguityError` instead of picking one.
 
     Parameters
     ----------
@@ -33,9 +47,6 @@ class SnapshotParameterLoader:
         The project identifier.
     source_task_id : str | None
         Exact task result ID to load for single-task re-execution.
-    parameter_overrides : dict[str, dict[str, Any]] | None
-        Optional user overrides. Shape: ``{"run": {...}, "input": {...}}``.
-        Values are merged on top of snapshot parameters.
     limit : int
         Maximum number of task result documents to load. Defaults to
         ``DEFAULT_SNAPSHOT_LIMIT`` (10 000).
@@ -47,17 +58,15 @@ class SnapshotParameterLoader:
         source_execution_id: str | None,
         project_id: str,
         source_task_id: str | None = None,
-        parameter_overrides: dict[str, dict[str, Any]] | None = None,
         snapshot_exempt_tasks: set[str] | None = None,
         limit: int = DEFAULT_SNAPSHOT_LIMIT,
     ) -> None:
         self._source_execution_id = source_execution_id
         self._project_id = project_id
         self._source_task_id = source_task_id
-        self._parameter_overrides = parameter_overrides
         self._snapshot_exempt_tasks = snapshot_exempt_tasks or set()
         self._limit = limit
-        self._cache: dict[tuple[str, str], tuple[dict[str, Any], dict[str, Any]]] | None = None
+        self._cache: dict[tuple[str, str], list[_Record]] | None = None
 
     @property
     def has_snapshot_source(self) -> bool:
@@ -67,6 +76,10 @@ class SnapshotParameterLoader:
     def requires_snapshot(self, task_name: str) -> bool:
         """Whether a task must be resolved from the configured snapshot source."""
         return self.has_snapshot_source and task_name not in self._snapshot_exempt_tasks
+
+    @staticmethod
+    def _record(doc: TaskResultHistoryDocument) -> _Record:
+        return (doc.invocation, doc.input_parameters or {}, doc.run_parameters or {})
 
     def _load(self) -> None:
         """Lazily load all task results for the source execution."""
@@ -86,10 +99,7 @@ class SnapshotParameterLoader:
                     }
                 ).run()
                 if doc is not None:
-                    self._cache[(doc.name, doc.qid)] = (
-                        doc.input_parameters or {},
-                        doc.run_parameters or {},
-                    )
+                    self._cache[(doc.name, doc.qid)] = [self._record(doc)]
                 return
 
             assert self._source_execution_id is not None
@@ -106,15 +116,11 @@ class SnapshotParameterLoader:
             )
 
             for doc in docs:
-                key = (doc.name, doc.qid)
-                self._cache[key] = (
-                    doc.input_parameters or {},
-                    doc.run_parameters or {},
-                )
+                self._cache.setdefault((doc.name, doc.qid), []).append(self._record(doc))
 
             logger.info(
                 "Loaded %d task snapshots from execution %s",
-                len(self._cache),
+                sum(len(records) for records in self._cache.values()),
                 self._source_execution_id,
             )
         except Exception:
@@ -126,9 +132,12 @@ class SnapshotParameterLoader:
             self._cache = {}
 
     def get_snapshot(
-        self, task_name: str, qid: str
+        self,
+        task_name: str,
+        qid: str,
+        invocation: TaskInvocation | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]] | None:
-        """Get snapshot input/run parameters for a task+qid.
+        """Get snapshot input/run parameters for a task+qid, and its planned call.
 
         Parameters
         ----------
@@ -136,45 +145,59 @@ class SnapshotParameterLoader:
             The task name.
         qid : str
             The qubit ID.
+        invocation : TaskInvocation | None
+            The planned call being run. Selects the source record of the same
+            ``step_id`` and ``call_id`` when the source has call identities.
 
         Returns
         -------
         tuple[dict[str, Any], dict[str, Any]] | None
             Tuple of (input_parameters, run_parameters), or None if not found.
 
+        Raises
+        ------
+        SnapshotAmbiguityError
+            When several source records match and none identifies the call.
+
         """
         if task_name in self._snapshot_exempt_tasks:
             return None
         self._load()
         assert self._cache is not None
-        result = self._cache.get((task_name, qid))
-        if result is None:
+        records = self._cache.get((task_name, qid), [])
+        if not records:
             return None
-        if not self._parameter_overrides:
-            return result
-        snap_input, snap_run = result
-        merged_input = self._merge_overrides(snap_input, self._parameter_overrides.get("input", {}))
-        merged_run = self._merge_overrides(snap_run, self._parameter_overrides.get("run", {}))
-        return merged_input, merged_run
+        if self._source_task_id is not None:
+            # Single-task re-execution restores exactly the requested task result.
+            _, inputs, run = records[0]
+            return inputs, run
 
-    @staticmethod
-    def _merge_overrides(
-        snapshot_dict: dict[str, Any], overrides: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Merge user overrides on top of snapshot parameters.
+        identified = [record for record in records if record[0] is not None]
+        if invocation is not None and identified:
+            matches = [
+                record
+                for record in identified
+                if record[0] is not None
+                and record[0].call_id == invocation.call_id
+                and record[0].step_id == invocation.step_id
+            ]
+            if not matches:
+                return None
+            # The same call ran once per target in an execution; a later record
+            # of it can only be the same call recorded again.
+            _, inputs, run = matches[-1]
+            return inputs, run
 
-        For each key in *overrides*, if the snapshot entry is a dict with a
-        ``"value"`` key the override replaces only the ``"value"`` field
-        (preserving ``unit``, ``value_type``, ``description``, etc.).
-        Otherwise the entry is replaced entirely.
-        """
-        if not overrides:
-            return snapshot_dict
-        merged = {**snapshot_dict}
-        for key, new_value in overrides.items():
-            existing = merged.get(key)
-            if isinstance(existing, dict) and "value" in existing:
-                merged[key] = {**existing, "value": new_value}
-            else:
-                merged[key] = new_value
-        return merged
+        if len(records) == 1:
+            _, inputs, run = records[0]
+            return inputs, run
+        raise SnapshotAmbiguityError(
+            f"Source execution {self._source_execution_id} ran task {task_name!r} on qid "
+            f"{qid!r} {len(records)} times"
+            + (
+                " without call identities"
+                if not identified
+                else ", and this run has no call identity to choose one by"
+            )
+            + "; re-run a single task result by task_id instead"
+        )

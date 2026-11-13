@@ -8,8 +8,9 @@ import {
 
 import { withCodeBlockCopyButton } from "./codeBlockCopyButton";
 
-const supportedLanguages: NonNullable<CodeBlockOptions["supportedLanguages"]> = {
-  text: codeBlockOptions.supportedLanguages.text,
+export const supportedLanguages: NonNullable<CodeBlockOptions["supportedLanguages"]> = {
+  text: { ...codeBlockOptions.supportedLanguages.text, name: "Auto", aliases: ["text"] },
+  txt: { name: "Plain Text", aliases: ["txt", "plain", "plaintext"] },
   python: codeBlockOptions.supportedLanguages.python,
   shellscript: {
     ...codeBlockOptions.supportedLanguages.shellscript,

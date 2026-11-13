@@ -14,13 +14,20 @@ if TYPE_CHECKING:
     from qdash.client.services.client import QDashClient
     from qdash.client.services.models import (
         AgentActionResponse,
-        AgentCampaignCommitResponse,
         AgentCandidateCommitResponse,
         AgentCandidateResponse,
+        AgentCandidateSetCommitResponse,
         AgentSessionResponse,
     )
 
-_CAMPAIGN_COMPLETE = "$complete"
+PLAN_COMPLETE = "$complete"
+"""Planner target: the plan is done."""
+PLAN_DEFAULT = "$default"
+"""Planner target: follow the node's own ``on_pass`` / ``on_rollback`` / next-node rule."""
+PLAN_ESCALATE = "$escalate"
+"""Planner target: stop for a person; the decision's reason says why."""
+_PLAN_COMPLETE = PLAN_COMPLETE
+_PLANNER_SENTINELS = frozenset({PLAN_COMPLETE, PLAN_DEFAULT, PLAN_ESCALATE})
 
 
 class AgentSkillTransition(StrEnum):
@@ -49,37 +56,48 @@ class AgentStepOutcome:
 
 @dataclass(frozen=True)
 class AgentPlannerObservation:
-    """Bounded campaign state presented to a user-operated next-action planner."""
+    """Bounded plan state presented to a user-operated next-action planner."""
 
     session_id: str
     qid: str
-    source_execution_id: str
+    source_execution_id: str | None
     last_node_id: str
     last_outcome: AgentStepOutcome
     node_path: tuple[str, ...]
     carried_overrides: dict[str, float]
     available_node_ids: tuple[str, ...]
     remaining_node_executions: int
+    node_tasks: dict[str, str] = field(default_factory=dict)
+    """node id -> task name, so a planner can find the node that runs a task."""
+    node_visits: dict[str, int] = field(default_factory=dict)
+    """node id -> how many times it has run so far, including the last node."""
 
 
 @dataclass(frozen=True)
 class AgentPlannerDecision:
-    """Audited planner selection of one pre-authorized node or `$complete`."""
+    """Audited planner selection of one pre-authorized node or a sentinel.
+
+    ``target_node_id`` is a node of the plan, ``$complete``, ``$default``
+    (follow the plan's own transition), or ``$escalate`` (stop for a person).
+    ``parameter_overrides`` apply to the chosen node's next run only; the
+    session policy still bounds them when the action is submitted.
+    """
 
     target_node_id: str
     reason: str = ""
+    parameter_overrides: dict[str, float] = field(default_factory=dict)
 
 
-class AgentCampaignPlanner(Protocol):
-    """Select the next node without expanding the pre-authorized campaign graph."""
+class AgentPlanner(Protocol):
+    """Select the next node without expanding the pre-authorized plan graph."""
 
     def choose_next(self, observation: AgentPlannerObservation) -> AgentPlannerDecision:
         """Return one available node or `$complete`."""
 
 
 @dataclass(frozen=True)
-class AgentCampaignNode:
-    """One policy-bounded node in an autonomous single-qubit campaign."""
+class AgentPlanNode:
+    """One policy-bounded node in a bounded single-qubit plan."""
 
     task_name: str
     candidate_parameter: str
@@ -95,39 +113,39 @@ class AgentCampaignNode:
 
     def __post_init__(self) -> None:
         if not self.task_name:
-            raise ValueError("campaign task_name must not be empty")
+            raise ValueError("plan task_name must not be empty")
         if not self.candidate_parameter:
-            raise ValueError("campaign candidate_parameter must not be empty")
+            raise ValueError("plan candidate_parameter must not be empty")
         if self.apply_backend and not self.commit_candidate:
-            raise ValueError("campaign apply_backend requires commit_candidate=true")
+            raise ValueError("plan apply_backend requires commit_candidate=true")
         if self.push_to_github and not self.apply_backend:
-            raise ValueError("campaign push_to_github requires apply_backend=true")
+            raise ValueError("plan push_to_github requires apply_backend=true")
         for field_name, value in (
             ("node_id", self.node_id),
             ("on_pass", self.on_pass),
             ("on_rollback", self.on_rollback),
         ):
             if value is not None and not value:
-                raise ValueError(f"campaign {field_name} must not be empty")
+                raise ValueError(f"plan {field_name} must not be empty")
         if any(not math.isfinite(value) for value in self.parameter_overrides.values()):
-            raise ValueError("campaign parameter overrides must be finite")
+            raise ValueError("plan parameter overrides must be finite")
 
 
 @dataclass(frozen=True)
-class AgentCampaignOutcome:
-    """Terminal campaign result with every attempted Skill transition."""
+class AgentPlanOutcome:
+    """Terminal plan result with every attempted Skill transition."""
 
     transition: AgentSkillTransition
     reason: str
     session_id: str
     qid: str
-    source_execution_id: str
+    source_execution_id: str | None
     completed_nodes: int
     attempts: int
     outcomes: tuple[AgentStepOutcome, ...]
     carried_overrides: dict[str, float] = field(default_factory=dict)
     node_path: tuple[str, ...] = ()
-    campaign_commit: AgentCampaignCommitResponse | None = None
+    candidate_set_commit: AgentCandidateSetCommitResponse | None = None
     planner_decisions: tuple[AgentPlannerDecision, ...] = ()
 
 
@@ -186,7 +204,7 @@ class AgentCalibrationRunner:
         session_id: str,
         task_name: str,
         qid: str,
-        source_execution_id: str,
+        source_execution_id: str | None = None,
         candidate_parameter: str,
         parameter_overrides: dict[str, float] | None = None,
         diagnosis: str = "",
@@ -506,8 +524,8 @@ class AgentCalibrationRunner:
         )
 
 
-class AgentCampaignRunner:
-    """Advance a declarative single-qubit campaign through typed transitions."""
+class AgentPlanRunner:
+    """Advance a declarative single-qubit plan through typed transitions."""
 
     def __init__(
         self,
@@ -529,12 +547,13 @@ class AgentCampaignRunner:
         )
 
     @staticmethod
-    def _validate_graph(nodes: list[AgentCampaignNode]) -> tuple[list[str], str | None]:
+    def _validate_graph(nodes: list[AgentPlanNode]) -> tuple[list[str], str | None]:
         node_ids = [node.node_id or f"node-{index}" for index, node in enumerate(nodes)]
-        if _CAMPAIGN_COMPLETE in node_ids:
-            return node_ids, f"Campaign node ID '{_CAMPAIGN_COMPLETE}' is reserved"
+        reserved = sorted(_PLANNER_SENTINELS.intersection(node_ids))
+        if reserved:
+            return node_ids, f"Plan node ID '{reserved[0]}' is reserved"
         if len(set(node_ids)) != len(node_ids):
-            return node_ids, "Campaign node IDs must be unique"
+            return node_ids, "Plan node IDs must be unique"
 
         known_ids = set(node_ids)
         for index, node in enumerate(nodes):
@@ -544,7 +563,7 @@ class AgentCampaignRunner:
             ):
                 if (
                     target is not None
-                    and not (transition == "on_pass" and target == _CAMPAIGN_COMPLETE)
+                    and not (transition == "on_pass" and target == _PLAN_COMPLETE)
                     and target not in known_ids
                 ):
                     return (
@@ -557,7 +576,7 @@ class AgentCampaignRunner:
     def _policy_error(
         session: AgentSessionResponse,
         qid: str,
-        nodes: list[AgentCampaignNode],
+        nodes: list[AgentPlanNode],
         required_actions: int,
     ) -> str | None:
         policy = session.policy
@@ -568,7 +587,7 @@ class AgentCampaignRunner:
         remaining_actions = policy.max_actions - session.action_count
         if required_actions > remaining_actions:
             return (
-                f"Campaign requires {required_actions} actions but the session has "
+                f"Plan requires {required_actions} actions but the session has "
                 f"{remaining_actions} remaining"
             )
 
@@ -594,22 +613,28 @@ class AgentCampaignRunner:
                     return f"Node {index} override '{name}' is above the session maximum"
         return None
 
-    def run_campaign(
+    def run_plan(
         self,
         *,
         session_id: str,
         qid: str,
-        source_execution_id: str,
-        nodes: list[AgentCampaignNode],
+        source_execution_id: str | None = None,
+        nodes: list[AgentPlanNode],
         max_pre_dispatch_retries: int = 1,
         max_node_executions: int | None = None,
         commit_on_success: bool = False,
-        planner: AgentCampaignPlanner | None = None,
+        planner: AgentPlanner | None = None,
+        max_node_visits: int | None = None,
         idempotency_prefix: str | None = None,
-    ) -> AgentCampaignOutcome:
-        """Run a bounded decision graph while preserving a fixed source snapshot."""
+    ) -> AgentPlanOutcome:
+        """Run a bounded decision graph while preserving a fixed source snapshot.
+
+        ``max_node_visits`` bounds how often any one node runs, whichever rule
+        (planner, ``$default``, ``on_pass``, ``on_rollback``) led back to it; a visit
+        past the limit ends the plan as ``human_escalation`` before dispatch.
+        """
         if not nodes:
-            raise ValueError("campaign requires at least one node")
+            raise ValueError("plan requires at least one node")
         if max_pre_dispatch_retries < 0:
             raise ValueError("max_pre_dispatch_retries must be non-negative")
         execution_limit = len(nodes) if max_node_executions is None else max_node_executions
@@ -619,16 +644,25 @@ class AgentCampaignRunner:
             not idempotency_prefix or len(idempotency_prefix) > 96
         ):
             raise ValueError("idempotency_prefix must contain 1 to 96 characters")
-        if commit_on_success and any(
+        if max_node_visits is not None and max_node_visits <= 0:
+            raise ValueError("max_node_visits must be positive")
+        per_node_writes = any(
             node.commit_candidate or node.apply_backend or node.push_to_github for node in nodes
-        ):
+        )
+        if commit_on_success and per_node_writes:
             raise ValueError(
                 "commit_on_success cannot be combined with per-node commit or backend apply"
+            )
+        if planner is not None and per_node_writes:
+            # A planner may escalate after a node; a per-node commit would already be written.
+            raise ValueError(
+                "a planner-controlled plan cannot use per-node commit or backend apply; "
+                "use commit_on_success"
             )
 
         node_ids, graph_error = self._validate_graph(nodes)
         if graph_error is not None:
-            return AgentCampaignOutcome(
+            return AgentPlanOutcome(
                 transition=AgentSkillTransition.HUMAN_ESCALATION,
                 reason=graph_error,
                 session_id=session_id,
@@ -644,7 +678,7 @@ class AgentCampaignRunner:
             session = self._client.get_agent_session(session_id)
         except QDashApiError as exc:
             step = _api_error_outcome(exc, session_id=session_id)
-            return AgentCampaignOutcome(
+            return AgentPlanOutcome(
                 transition=step.transition,
                 reason=step.reason,
                 session_id=session_id,
@@ -657,7 +691,7 @@ class AgentCampaignRunner:
 
         policy_error = self._policy_error(session, qid, nodes, execution_limit)
         if policy_error is not None:
-            return AgentCampaignOutcome(
+            return AgentPlanOutcome(
                 transition=AgentSkillTransition.HUMAN_ESCALATION,
                 reason=policy_error,
                 session_id=session_id,
@@ -668,7 +702,7 @@ class AgentCampaignRunner:
                 outcomes=(),
             )
 
-        prefix = idempotency_prefix or f"campaign-{uuid4()}"
+        prefix = idempotency_prefix or f"plan-{uuid4()}"
         carried: dict[str, float] = {}
         outcomes: list[AgentStepOutcome] = []
         completed_nodes = 0
@@ -677,11 +711,18 @@ class AgentCampaignRunner:
         current_index = 0
         final_candidates: dict[str, AgentCandidateResponse] = {}
         planner_decisions: list[AgentPlannerDecision] = []
+        # Overrides a planner attached to its decision; consumed by the next node run.
+        planner_overrides: dict[str, float] = {}
 
         def choose_planner_target(
             node_id: str,
             outcome: AgentStepOutcome,
         ) -> tuple[str | None, str | None]:
+            """The planner's target node, or None to follow the plan; an error stops the plan.
+
+            ``$default`` is recorded and returns None so the node's own transition
+            applies. ``$escalate`` returns the decision's reason as the error.
+            """
             if planner is None:
                 return None, None
             observation = AgentPlannerObservation(
@@ -694,27 +735,41 @@ class AgentCampaignRunner:
                 carried_overrides=dict(carried),
                 available_node_ids=tuple(node_ids),
                 remaining_node_executions=execution_limit - len(node_path),
+                node_tasks={node_ids[i]: nodes[i].task_name for i in range(len(nodes))},
+                node_visits={node_ids[i]: visit_counts.get(i, 0) for i in range(len(nodes))},
             )
             try:
                 decision = planner.choose_next(observation)
             except Exception as exc:
-                return None, f"Campaign planner failed: {exc}"
+                return None, f"Planner failed: {exc}"
             target = decision.target_node_id
             if not target:
-                return None, "Campaign planner returned an empty target"
-            if target == _CAMPAIGN_COMPLETE:
+                return None, "Planner returned an empty target"
+            if target == PLAN_ESCALATE:
+                planner_decisions.append(decision)
+                return None, f"Planner requested human review: {decision.reason}"
+            if decision.parameter_overrides and target in _PLANNER_SENTINELS:
+                return None, f"Planner attached overrides to '{target}'"
+            if any(not math.isfinite(value) for value in decision.parameter_overrides.values()):
+                return None, "Planner overrides must be finite"
+            if target == PLAN_COMPLETE:
                 if outcome.transition != AgentSkillTransition.PASS:
-                    return None, "Campaign planner cannot complete after a rollback"
+                    return None, "Planner cannot complete after a rollback"
+            elif target == PLAN_DEFAULT:
+                planner_decisions.append(decision)
+                return None, None
             elif target not in node_indexes:
-                return None, f"Campaign planner selected unknown node '{target}'"
+                return None, f"Planner selected unknown node '{target}'"
             planner_decisions.append(decision)
+            planner_overrides.clear()
+            planner_overrides.update(decision.parameter_overrides)
             return target, None
 
         while True:
             if len(node_path) >= execution_limit:
-                return AgentCampaignOutcome(
+                return AgentPlanOutcome(
                     transition=AgentSkillTransition.HUMAN_ESCALATION,
-                    reason=f"Campaign reached the {execution_limit} node execution limit",
+                    reason=f"Plan reached the {execution_limit} node execution limit",
                     session_id=session_id,
                     qid=qid,
                     source_execution_id=source_execution_id,
@@ -729,9 +784,27 @@ class AgentCampaignRunner:
             node = nodes[current_index]
             node_id = node_ids[current_index]
             visit = visit_counts.get(current_index, 0)
+            if max_node_visits is not None and visit >= max_node_visits:
+                return AgentPlanOutcome(
+                    transition=AgentSkillTransition.HUMAN_ESCALATION,
+                    reason=(
+                        f"Plan node {node_id} ({node.task_name}) already ran {visit} times "
+                        f"(limit {max_node_visits})"
+                    ),
+                    session_id=session_id,
+                    qid=qid,
+                    source_execution_id=source_execution_id,
+                    completed_nodes=completed_nodes,
+                    attempts=len(outcomes),
+                    outcomes=tuple(outcomes),
+                    carried_overrides=dict(carried),
+                    node_path=tuple(node_path),
+                    planner_decisions=tuple(planner_decisions),
+                )
             visit_counts[current_index] = visit + 1
             node_path.append(node_id)
-            overrides = {**carried, **node.parameter_overrides}
+            overrides = {**carried, **node.parameter_overrides, **planner_overrides}
+            planner_overrides.clear()
             retries = 0
             key_base = f"{prefix}-node-{current_index}"
             if visit:
@@ -767,11 +840,10 @@ class AgentCampaignRunner:
                 break
 
             if outcome.transition not in {AgentSkillTransition.PASS, AgentSkillTransition.ROLLBACK}:
-                return AgentCampaignOutcome(
+                return AgentPlanOutcome(
                     transition=outcome.transition,
                     reason=(
-                        f"Campaign stopped at node {current_index} "
-                        f"({node.task_name}): {outcome.reason}"
+                        f"Plan stopped at node {current_index} ({node.task_name}): {outcome.reason}"
                     ),
                     session_id=session_id,
                     qid=qid,
@@ -787,7 +859,7 @@ class AgentCampaignRunner:
             if outcome.transition == AgentSkillTransition.ROLLBACK:
                 planner_target, planner_error = choose_planner_target(node_id, outcome)
                 if planner_error is not None:
-                    return AgentCampaignOutcome(
+                    return AgentPlanOutcome(
                         transition=AgentSkillTransition.HUMAN_ESCALATION,
                         reason=planner_error,
                         session_id=session_id,
@@ -804,10 +876,10 @@ class AgentCampaignRunner:
                     current_index = node_indexes[planner_target]
                     continue
                 if node.on_rollback is None:
-                    return AgentCampaignOutcome(
+                    return AgentPlanOutcome(
                         transition=outcome.transition,
                         reason=(
-                            f"Campaign stopped at node {current_index} "
+                            f"Plan stopped at node {current_index} "
                             f"({node.task_name}): {outcome.reason}"
                         ),
                         session_id=session_id,
@@ -824,11 +896,9 @@ class AgentCampaignRunner:
                 continue
 
             if outcome.candidate is None:
-                return AgentCampaignOutcome(
+                return AgentPlanOutcome(
                     transition=AgentSkillTransition.HUMAN_ESCALATION,
-                    reason=(
-                        f"Campaign node {current_index} passed without an authoritative candidate"
-                    ),
+                    reason=(f"Plan node {current_index} passed without an authoritative candidate"),
                     session_id=session_id,
                     qid=qid,
                     source_execution_id=source_execution_id,
@@ -845,7 +915,7 @@ class AgentCampaignRunner:
 
             planner_target, planner_error = choose_planner_target(node_id, outcome)
             if planner_error is not None:
-                return AgentCampaignOutcome(
+                return AgentPlanOutcome(
                     transition=AgentSkillTransition.HUMAN_ESCALATION,
                     reason=planner_error,
                     session_id=session_id,
@@ -858,13 +928,13 @@ class AgentCampaignRunner:
                     node_path=tuple(node_path),
                     planner_decisions=tuple(planner_decisions),
                 )
-            if planner_target == _CAMPAIGN_COMPLETE:
+            if planner_target == _PLAN_COMPLETE:
                 break
             if planner_target is not None:
                 current_index = node_indexes[planner_target]
                 continue
             if node.on_pass is not None:
-                if node.on_pass == _CAMPAIGN_COMPLETE:
+                if node.on_pass == _PLAN_COMPLETE:
                     break
                 current_index = node_indexes[node.on_pass]
                 continue
@@ -873,11 +943,11 @@ class AgentCampaignRunner:
                 continue
             break
 
-        campaign_commit = None
+        candidate_set_commit = None
         if commit_on_success:
             try:
                 latest_session = self._client.get_agent_session(session_id)
-                campaign_commit = self._client.commit_agent_campaign_candidates(
+                candidate_set_commit = self._client.commit_agent_candidate_set(
                     session_id,
                     [
                         {
@@ -887,13 +957,13 @@ class AgentCampaignRunner:
                         }
                         for candidate in final_candidates.values()
                     ],
-                    idempotency_key=f"{prefix}-campaign-commit",
+                    idempotency_key=f"{prefix}-candidate-set-commit",
                     expected_state_version=latest_session.state_version,
                 )
             except QDashApiError as exc:
-                return AgentCampaignOutcome(
+                return AgentPlanOutcome(
                     transition=AgentSkillTransition.HUMAN_ESCALATION,
-                    reason=f"Campaign passed but final candidate commit failed: {exc}",
+                    reason=f"Plan passed but final candidate commit failed: {exc}",
                     session_id=session_id,
                     qid=qid,
                     source_execution_id=source_execution_id,
@@ -905,9 +975,9 @@ class AgentCampaignRunner:
                     planner_decisions=tuple(planner_decisions),
                 )
 
-        return AgentCampaignOutcome(
+        return AgentPlanOutcome(
             transition=AgentSkillTransition.PASS,
-            reason=f"Campaign completed {completed_nodes} nodes",
+            reason=f"Plan completed {completed_nodes} nodes",
             session_id=session_id,
             qid=qid,
             source_execution_id=source_execution_id,
@@ -916,6 +986,6 @@ class AgentCampaignRunner:
             outcomes=tuple(outcomes),
             carried_overrides=dict(carried),
             node_path=tuple(node_path),
-            campaign_commit=campaign_commit,
+            candidate_set_commit=candidate_set_commit,
             planner_decisions=tuple(planner_decisions),
         )

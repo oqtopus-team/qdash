@@ -2,94 +2,104 @@
 
 import Image from "next/image";
 
-import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
+import { useCustomAvatarSpec } from "@/lib/avatar/avatarSpecs";
+import { glyphAvatarDataUri, resolveAvatarSpec } from "@/lib/avatar/glyphAvatar";
 
-type AvatarPreset = {
-  key: string;
-  label: string;
-};
-
-export const AVATAR_PRESETS: AvatarPreset[] = [
-  { key: "fox", label: "Fox" },
-  { key: "cat", label: "Cat" },
-  { key: "dog", label: "Dog" },
-  { key: "rabbit", label: "Rabbit" },
-  { key: "bear", label: "Bear" },
-  { key: "panda", label: "Panda" },
-  { key: "koala", label: "Koala" },
-  { key: "tiger", label: "Tiger" },
-  { key: "lion", label: "Lion" },
-  { key: "unicorn", label: "Unicorn" },
-  { key: "owl", label: "Owl" },
-  { key: "octopus", label: "Octopus" },
-  { key: "butterfly", label: "Butterfly" },
-  { key: "dolphin", label: "Dolphin" },
-  { key: "whale", label: "Whale" },
-  { key: "penguin", label: "Penguin" },
-  { key: "sun", label: "Sun" },
-  { key: "moon", label: "Moon" },
-  { key: "star", label: "Star" },
-  { key: "rainbow", label: "Rainbow" },
-  { key: "cloud", label: "Cloud" },
-  { key: "snowflake", label: "Snowflake" },
-  { key: "cherry", label: "Cherry" },
-  { key: "tulip", label: "Tulip" },
-  { key: "sunflower", label: "Sunflower" },
-  { key: "mushroom", label: "Mushroom" },
-  { key: "crystal", label: "Crystal" },
-  { key: "planet", label: "Planet" },
-];
-
-const AVATAR_PRESET_KEYS = new Set(AVATAR_PRESETS.map((preset) => preset.key));
-
-function resolveAvatarKey(username: string, avatarKey?: string | null) {
-  if (avatarKey && AVATAR_PRESET_KEYS.has(avatarKey)) return avatarKey;
-  return getAvatarEmoji(username);
-}
-
-export function UserAvatar({
-  username,
-  avatarKey,
+/**
+ * A glyph avatar rendered locally from a spec, shown as a `data:` URI image.
+ *
+ * No request is made for the image; the markup comes from the bundled glyph-avatar package and
+ * `<img>` never runs script inside it.
+ */
+export function GlyphAvatarImage({
+  spec,
+  alt,
   size = 28,
   className = "",
+  title,
 }: {
-  username: string;
-  avatarKey?: string | null;
+  spec: string;
+  alt: string;
   size?: number;
   className?: string;
+  title?: string;
 }) {
   return (
-    <span
-      className={`inline-flex shrink-0 items-center justify-center ${className}`}
-      title={username}
-    >
-      <FluentEmoji
-        name={resolveAvatarKey(username, avatarKey)}
-        size={size}
-        alt={username || "User avatar"}
-      />
+    <span className={`avatar shrink-0 ${className}`} title={title}>
+      <span className="rounded-full" style={{ width: size, height: size }}>
+        <Image src={glyphAvatarDataUri(spec)} alt={alt} width={size} height={size} unoptimized />
+      </span>
     </span>
+  );
+}
+
+/**
+ * A user's glyph avatar.
+ *
+ * It renders at once from the username, so loading, network, and API failures still show the
+ * user's automatic avatar. A custom avatar chosen on this instance replaces it when its spec
+ * arrives from the batched lookup.
+ */
+export function UserAvatar({
+  username,
+  size = 28,
+  className = "",
+  showTitle = true,
+}: {
+  username: string;
+  size?: number;
+  className?: string;
+  /** False where a tooltip or visible label already names the user. */
+  showTitle?: boolean;
+}) {
+  const customSpec = useCustomAvatarSpec(username);
+
+  if (!username) {
+    return (
+      <span className={`avatar avatar-placeholder shrink-0 ${className}`}>
+        <span
+          className="rounded-full bg-base-300 text-base-content/70"
+          style={{ width: size, height: size, fontSize: Math.max(10, Math.round(size * 0.42)) }}
+          role="img"
+          aria-label="User avatar"
+        >
+          <span aria-hidden="true">?</span>
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <GlyphAvatarImage
+      spec={resolveAvatarSpec(username, customSpec)}
+      alt={username}
+      size={size}
+      className={className}
+      title={showTitle ? username : undefined}
+    />
   );
 }
 
 export function QdashBotAvatar({
   size = 28,
   className = "",
+  unframed = false,
 }: {
   size?: number;
   className?: string;
+  unframed?: boolean;
 }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-base-100 ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center ${unframed ? "" : "rounded-full bg-base-100"} ${className}`}
       title="QDash"
     >
       <Image
-        src="/oqtopus_logo.png"
+        src={unframed ? "/oqtopus_logo.svg" : "/oqtopus_logo.png"}
         alt="OQTOPUS"
         width={size}
         height={size}
-        className="rounded-full"
+        className={unframed ? "" : "rounded-full"}
       />
     </span>
   );

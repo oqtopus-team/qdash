@@ -74,9 +74,7 @@ export function CooldownWiringSection({
   return (
     <div className="text-xs">
       <div className="flex items-center justify-between mb-1 min-h-[1.25rem]">
-        <span className="text-base-content/60 font-semibold uppercase tracking-wide">
-          Wiring info
-        </span>
+        <span className="text-base-content/60 font-medium">Wiring info</span>
         <SaveStatus state={auto.state} savedAt={auto.savedAt} />
       </div>
 
@@ -89,7 +87,7 @@ export function CooldownWiringSection({
           onChange={(blocks, markdown) => auto.schedule({ blocks, markdown })}
         />
       </div>
-      <div className="text-[11px] text-base-content/50 mt-1">
+      <div className="text-xs text-base-content/50 mt-1">
         Type <kbd className="kbd kbd-xs">/</kbd> for blocks (table, image, heading, list, toggle,
         code, …). Paste images with <kbd className="kbd kbd-xs">⌘/Ctrl+V</kbd>. Changes save
         automatically.

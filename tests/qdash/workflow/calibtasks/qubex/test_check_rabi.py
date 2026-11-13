@@ -27,6 +27,10 @@ def test_check_rabi_uses_r2_threshold_0_6() -> None:
         processor.validate_r2({"0": 0.59}, "0", task.r2_threshold)
 
 
+def test_check_rabi_reports_angle_in_radians() -> None:
+    assert CheckRabi.output_spec["rabi_angle"].unit == "rad"
+
+
 def test_check_rabi_run_uses_data_fit_r2_for_validation(monkeypatch: pytest.MonkeyPatch) -> None:
     task = CheckRabi()
     task.input_parameters["qubit_frequency"] = InputParameterModel(value=5.0, unit="GHz")
@@ -44,7 +48,7 @@ def test_check_rabi_run_uses_data_fit_r2_for_validation(monkeypatch: pytest.Monk
                 frequency=0.02,
                 phase=0.1,
                 offset=0.2,
-                angle=180.0,
+                angle=math.pi,
                 noise=0.01,
                 distance=0.9,
                 r2=np.float32(0.95),
@@ -86,7 +90,7 @@ def test_check_rabi_run_does_not_store_rejected_rabi_params(
                 frequency=0.02,
                 phase=0.1,
                 offset=0.2,
-                angle=180.0,
+                angle=math.pi,
                 noise=0.01,
                 distance=0.9,
                 r2=0.59,
@@ -149,7 +153,7 @@ def test_check_rabi_postprocess_marks_non_finite_frequency_failed_after_artifact
                 frequency=math.nan,
                 phase=0.0,
                 offset=0.0,
-                angle=180.0,
+                angle=math.pi,
                 noise=0.0,
                 distance=1.0,
                 r2=0.95,

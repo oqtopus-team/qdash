@@ -26,6 +26,8 @@ export interface FlowSummary {
   updated_at: string;
   /** Tags */
   tags: string[];
+  /** Folder path inside the creator's space, e.g. "daily/t1" (empty = root) */
+  folder?: string;
   /** Whether the flow source file exists */
   file_exists?: boolean;
 }

@@ -13,7 +13,7 @@ export function EnvironmentBadge({ className }: { className?: string }) {
 
   return (
     <div
-      className={`badge badge-primary font-bold ${className ?? "badge-md"}`}
+      className={`badge badge-primary font-medium ${className ?? "badge-md"}`}
       title={`Environment: ${env}`}
     >
       {env}

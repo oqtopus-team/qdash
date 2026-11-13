@@ -27,12 +27,15 @@ class Settings(BaseSettings):
     prefect_port: int = 4200
     api_port: int = 5715
     ui_port: int = 5714
-    # Optional Unix socket for the host-side updater service.
-    updater_socket: str = ""
     # Logging
     log_level: str = "INFO"
     # Timezone
     timezone: str = "Asia/Tokyo"
+
+    @property
+    def public_url(self) -> str:
+        """Return the browser-facing QDash URL: CLIENT_URL, else the local UI port."""
+        return self.client_url.rstrip("/") or f"http://localhost:{self.ui_port}"
 
     @field_validator("slack_forum_notification", mode="before")
     @classmethod

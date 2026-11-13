@@ -5,6 +5,8 @@ from typing import Any
 
 import pytest
 
+from tests.qdash.workflow.task_call_helpers import names
+
 check_waveform_module = importlib.import_module("qdash.workflow.templates.check_waveform")
 
 
@@ -31,8 +33,8 @@ def test_check_waveform_template_runs_check_waveform_step(monkeypatch) -> None:
 
     step = result["steps"][0]
     assert step.name == "check_waveform"
-    assert step.tasks == ["CheckWaveform"]
-    assert step.mode == "scheduled"
+    assert names(step.tasks) == ["CheckWaveform"]
+    assert step.execution_mode == "parallel_by_mux"
 
 
 def test_check_waveform_template_sets_default_interval(monkeypatch) -> None:
@@ -46,8 +48,8 @@ def test_check_waveform_template_sets_default_interval(monkeypatch) -> None:
 
     assert FakeCalibService.last_kwargs is not None
     assert FakeCalibService.last_kwargs["default_run_parameters"] == {
-        "readout_duration": {"value": 1024, "value_type": "int"},
-        "interval": {"value": 150 * 1024, "value_type": "int"},
+        "readout_duration": 1024,
+        "interval": 150 * 1024,
     }
 
 

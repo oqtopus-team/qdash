@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 
 from qdash.common.config.path_resolver import resolve_config_base_path
+from qdash.common.mux_mapping import MuxMapping, MuxMappingError, resolve_chip_mux_mapping
 from qdash.common.wiring_resources import mux_module_resources
 
 
@@ -24,20 +25,44 @@ class ExecutionResourceScope:
 def resolve_execution_resource_scope(
     chip_id: str,
     parameters: dict[str, Any],
+    *,
+    project_id: str | None = None,
+    mux_mapping: MuxMapping | None = None,
 ) -> ExecutionResourceScope:
     """Resolve flow parameters into a conservative hardware resource scope.
 
     Explicit MUX targets and qubit/coupling targets are mapped to their wiring
-    modules and channels. Unresolved targets or wiring claim the whole chip.
+    modules and channels through the chip's MUX mapping (``mux_mapping``, or
+    the chip topology resolved in ``project_id``; without either the legacy
+    ``qid // 4`` convention applies). Unresolved targets, mapping or wiring
+    claim the whole chip. So does any standalone qubit (one the topology lists
+    in no MUX): ``wiring.yaml`` maps only MUXes to hardware, so the modules a
+    standalone qubit shares with other targets are unknown.
     """
     normalized_chip_id = chip_id.strip()
-    mux_ids = _target_mux_ids(parameters)
-    if not normalized_chip_id or mux_ids is None:
+    if not normalized_chip_id:
+        return ExecutionResourceScope(chip_id=normalized_chip_id, exclusive=True)
+    if mux_mapping is None:
+        try:
+            mux_mapping = (
+                resolve_chip_mux_mapping(project_id, normalized_chip_id)
+                if project_id
+                else MuxMapping.legacy()
+            )
+        except MuxMappingError:
+            return ExecutionResourceScope(chip_id=normalized_chip_id, exclusive=True)
+    mux_ids = _target_mux_ids(parameters, mux_mapping)
+    if mux_ids is None:
         return ExecutionResourceScope(chip_id=normalized_chip_id, exclusive=True)
 
     resources = {f"mux:{mux_id}" for mux_id in mux_ids}
-    wiring = _load_wiring(normalized_chip_id)
+    entries = _load_wiring_entries(normalized_chip_id)
+    wiring = _wiring_resources(entries)
     if any(mux_id not in wiring for mux_id in mux_ids):
+        return ExecutionResourceScope(chip_id=normalized_chip_id, exclusive=True)
+    # A member slot without a control port means the mapping and the wiring
+    # disagree about the hardware; claim everything rather than guess.
+    if mux_mapping.wiring_errors(entry for entry in entries if entry.get("mux") in mux_ids):
         return ExecutionResourceScope(chip_id=normalized_chip_id, exclusive=True)
     for mux_id in mux_ids:
         resources.update(wiring[mux_id])
@@ -83,13 +108,15 @@ def resolve_workflow_resource_scope(chip_id: str) -> ExecutionResourceScope:
     return ExecutionResourceScope(chip_id.strip(), exclusive=True)
 
 
-def _target_mux_ids(parameters: dict[str, Any]) -> set[int] | None:
+def _target_mux_ids(parameters: dict[str, Any], mapping: MuxMapping) -> set[int] | None:
     mux_ids = parameters.get("mux_ids")
     if isinstance(mux_ids, list) and mux_ids:
         try:
-            return {int(mux_id) for mux_id in mux_ids}
+            requested = {int(mux_id) for mux_id in mux_ids}
         except (TypeError, ValueError):
             return None
+        # A MUX the topology does not define has no known members to protect.
+        return requested if all(mapping.has_mux(mux_id) for mux_id in requested) else None
 
     targets: list[Any] | None = None
     qids = parameters.get("qids")
@@ -107,49 +134,58 @@ def _target_mux_ids(parameters: dict[str, Any]) -> set[int] | None:
             match = re.search(r"(\d+)$", part.strip())
             if match is None:
                 return None
-            resolved.add(int(match.group(1)) // 4)
+            mux_id = mapping.find_mux(int(match.group(1)))
+            if mux_id is None:
+                # Standalone or unknown qubit: its hardware is not mapped.
+                return None
+            resolved.add(mux_id)
     return resolved or None
 
 
-def _load_wiring(chip_id: str) -> dict[int, tuple[str, ...]]:
+def _load_wiring_entries(chip_id: str) -> list[dict[str, Any]]:
+    """MUX rows of the chip's ``wiring.yaml``; ``[]`` when unreadable or malformed."""
     path = resolve_config_base_path() / chip_id / "config" / "wiring.yaml"
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
-        return {}
+        return []
     if not isinstance(raw, dict):
-        return {}
+        return []
     # Match the schedulers' chip-keyed and group-keyed wiring formats.
     groups = [raw[chip_id]] if chip_id in raw else list(raw.values())
     if any(not isinstance(group, list) for group in groups):
-        return {}
+        return []
+    entries = [entry for group in groups for entry in group]
+    if any(not isinstance(entry, dict) for entry in entries):
+        return []
+    return entries
+
+
+def _wiring_resources(entries: list[dict[str, Any]]) -> dict[int, tuple[str, ...]]:
     result: dict[int, tuple[str, ...]] = {}
-    for group in groups:
-        for entry in group:
-            if not isinstance(entry, dict):
-                return {}
-            mux_id = entry.get("mux")
-            if type(mux_id) is not int or mux_id < 0 or mux_id in result:
-                return {}
-            ctrl = entry.get("ctrl")
-            read_out = entry.get("read_out")
-            if (
-                not isinstance(ctrl, list)
-                or not ctrl
-                or any(not isinstance(channel, str) or not channel.strip() for channel in ctrl)
-                or not isinstance(read_out, str)
-                or not read_out.strip()
-            ):
-                return {}
-            resources = mux_module_resources(entry)
-            for key in ("ctrl", "read_out", "read_in", "pump"):
-                value = entry.get(key)
-                values = value if isinstance(value, list) else [value]
-                for channel in values:
-                    if channel in (None, ""):
-                        continue
-                    if not isinstance(channel, str):
-                        return {}
-                    resources.add(f"channel:{channel}")
-            result[mux_id] = tuple(sorted(resources))
+    for entry in entries:
+        mux_id = entry.get("mux")
+        if type(mux_id) is not int or mux_id < 0 or mux_id in result:
+            return {}
+        ctrl = entry.get("ctrl")
+        read_out = entry.get("read_out")
+        if (
+            not isinstance(ctrl, list)
+            or not ctrl
+            or any(not isinstance(channel, str) or not channel.strip() for channel in ctrl)
+            or not isinstance(read_out, str)
+            or not read_out.strip()
+        ):
+            return {}
+        resources = mux_module_resources(entry)
+        for key in ("ctrl", "read_out", "read_in", "pump"):
+            value = entry.get(key)
+            values = value if isinstance(value, list) else [value]
+            for channel in values:
+                if channel in (None, ""):
+                    continue
+                if not isinstance(channel, str):
+                    return {}
+                resources.add(f"channel:{channel}")
+        result[mux_id] = tuple(sorted(resources))
     return result

@@ -13,6 +13,7 @@ import type { ForumPostCreateParentId } from './forumPostCreateParentId';
 import type { ForumPostCreateStatus } from './forumPostCreateStatus';
 import type { ForumPostCreateTargetId } from './forumPostCreateTargetId';
 import type { ForumPostCreateTargetType } from './forumPostCreateTargetType';
+import type { ForumPostCreateTaskId } from './forumPostCreateTaskId';
 import type { ForumPostCreateTitle } from './forumPostCreateTitle';
 
 /**
@@ -38,10 +39,7 @@ export interface ForumPostCreate {
   content_blocks?: ForumPostCreateContentBlocksItem[];
   /** Parent forum post ID for replies. None for root threads. */
   parent_id?: ForumPostCreateParentId;
-  /**
-     * Operator label for root threads
-     * @maxItems 1
-     */
+  /** Operator labels for root threads */
   labels?: string[];
   /** Assigned project member username */
   assignee_username?: ForumPostCreateAssigneeUsername;
@@ -55,4 +53,6 @@ export interface ForumPostCreate {
   target_id?: ForumPostCreateTargetId;
   /** Linked cool-down ID */
   cooldown_id?: ForumPostCreateCooldownId;
+  /** Task result this thread is about. Chip and target are filled from it when not given. */
+  task_id?: ForumPostCreateTaskId;
 }

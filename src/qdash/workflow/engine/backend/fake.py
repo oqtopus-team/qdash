@@ -50,8 +50,24 @@ class FakeBackend(BaseBackend):
             classifier_dir=self._config.get("classifier_dir", "."),
             readout_duration=self._config.get("readout_duration"),
             calib_note_path=self._config.get("note_path", str(qubex_paths.default_calib_note_path)),
+            **(
+                {"configuration_mode": self._config["configuration_mode"]}
+                if "configuration_mode" in self._config
+                else {}
+            ),
         )
         self._exp.connect()
+
+    def disconnect(self) -> None:
+        """Release the fake Experiment if it was created."""
+        if self._exp is not None:
+            self._exp.disconnect()
+            self._exp = None
+
+    @property
+    def is_connected(self) -> bool:
+        """Return whether a fake Experiment has been created and connected."""
+        return self._exp is not None
 
     def get_instance(self) -> Any:
         if self._exp is None:

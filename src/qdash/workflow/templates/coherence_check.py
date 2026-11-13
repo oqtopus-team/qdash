@@ -1,17 +1,21 @@
 """Qubit coherence check template.
 
 This template applies the current hardware configuration, records a coarse
-Chevron measurement without updating calibration parameters, then runs Rabi, T1,
-T2Echo, and Ramsey checks for explicitly selected MUXes or qubits.
+Chevron measurement without updating calibration parameters, and runs Rabi,
+T1, T2Echo, and Ramsey for explicitly selected MUXes or qubits. The same step
+then applies the configuration again, re-measures Rabi, and runs Ramsey on a
+five times longer time scale with a smaller detuning.
 
 Example:
     coherence_check(username="alice", chip_id="64Qv3", mux_ids=[0, 1])
 """
 
+import math
 from typing import Any
 
 from prefect import flow
 
+from qdash.workflow import TaskCall, sweep
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
     on_flow_cancellation,
@@ -20,15 +24,6 @@ from qdash.workflow.service.calib_service import (
 )
 from qdash.workflow.service.steps import CustomOneQubit
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
-
-COHERENCE_CHECK_TASKS: list[str] = [
-    "Configure",
-    "CheckChevron",
-    "CheckRabi",
-    "CheckT1",
-    "CheckT2Echo",
-    "CheckRamsey",
-]
 
 
 @flow(
@@ -72,9 +67,53 @@ def coherence_check(
     steps = [
         CustomOneQubit(
             step_name="coherence_check",
-            tasks=COHERENCE_CHECK_TASKS,
-            mode="synchronized",
-        )
+            tasks=[
+                TaskCall(name="Configure", call_id="configure_initial"),
+                TaskCall(
+                    name="CheckChevron",
+                    run={
+                        # Keep the measurement grid explicit so users can inspect and
+                        # tune the coherence-check acquisition condition here.
+                        "detuning_range": sweep.linspace(-0.05, 0.05, 41),
+                        "time_range": sweep.linspace(0, 250, 26),
+                        "shots": 256,
+                    },
+                    update_calibration_parameters=False,
+                ),
+                TaskCall(name="CheckRabi", call_id="rabi_initial"),
+                TaskCall(
+                    name="CheckT1",
+                    run={"time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51)},
+                ),
+                TaskCall(
+                    name="CheckT2Echo",
+                    run={"time_range": sweep.logspace(math.log10(300), math.log10(500_000), 51)},
+                ),
+                TaskCall(
+                    name="CheckRamsey",
+                    call_id="ramsey_short",
+                    run={
+                        "time_range": sweep.arange(0, 10_001, 100),
+                        "detuning": 0.001,
+                    },
+                ),
+                # Configure and CheckRabi run again on fresh hardware state before the
+                # long Ramsey. A target that fails an earlier call stops here; other
+                # targets continue without waiting for every target's short pass.
+                TaskCall(name="Configure", call_id="configure_long_ramsey"),
+                TaskCall(name="CheckRabi", call_id="rabi_long_ramsey"),
+                TaskCall(
+                    name="CheckRamsey",
+                    call_id="ramsey_long",
+                    run={
+                        # Keep 101 points while extending the time scale by 5x.
+                        "time_range": sweep.arange(0, 50_001, 500),
+                        "detuning": 0.0002,
+                    },
+                ),
+            ],
+            execution_mode="parallel_by_round",
+        ),
     ]
 
     cal = CalibService(
@@ -83,24 +122,9 @@ def coherence_check(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
-        task_run_parameters={
-            "CheckChevron": {
-                # Keep the full search window while using a coarser grid for
-                # routine coherence monitoring (806 points instead of 2601).
-                "detuning_range": {
-                    "value": (-0.05, 0.05, 31),
-                    "value_type": "np.linspace",
-                },
-                "time_range": {
-                    "value": (0, 401, 16),
-                    "value_type": "range",
-                },
-                "update_calibration_parameters": False,
-            },
-        },
         default_run_parameters={
-            "readout_duration": {"value": 1024, "value_type": "int"},
-            "interval": {"value": 150 * 1024, "value_type": "int"},
+            "readout_duration": 1024,
+            "interval": 256 * 1024,
         },
     )
     return cal.run(targets, steps=steps)

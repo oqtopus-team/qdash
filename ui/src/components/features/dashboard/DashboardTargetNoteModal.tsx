@@ -28,10 +28,12 @@ import {
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor, type MentionCandidate } from "@/components/ui/MarkdownEditor";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
+import { useForumLabels } from "@/hooks/useForumLabels";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { GetChipNotesSummaryParams, NoteCommentModel, SystemRole } from "@/schemas";
 
 import { formatForumPostTitle, getForumLabel } from "../forum/categories";
+import { ForumLabelBadge } from "../forum/ForumLabelBadge";
 
 export interface TargetNoteEntry {
   targetId: string;
@@ -160,6 +162,7 @@ export function DashboardTargetNoteModal({
   const relatedForumPosts =
     forumPostsResponse?.data.posts.filter((post) => matchesForumTarget(post, chipId, targetId)) ??
     [];
+  const { labels: forumLabels } = useForumLabels();
 
   const [entryDraft, setEntryDraft] = useState("");
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
@@ -295,7 +298,7 @@ export function DashboardTargetNoteModal({
           <div className="rounded-md bg-base-200/60 border border-base-300 p-3 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <span className="text-sm font-semibold">Linked forum discussions</span>
+                <span className="text-sm font-medium">Linked forum discussions</span>
                 <p className="mt-0.5 text-xs leading-snug text-base-content/55">
                   Use for separate issues, images, MTG discussion, and resolved follow-up.
                 </p>
@@ -322,17 +325,13 @@ export function DashboardTargetNoteModal({
                         </span>
                         {(post.labels ?? []).length > 0 && (
                           <span className="mt-1 flex flex-wrap gap-1">
-                            {(post.labels ?? []).map((label) => {
-                              const labelDef = getForumLabel(label);
-                              return (
-                                <span
-                                  key={label}
-                                  className={`badge badge-xs ${labelDef.badgeClass}`}
-                                >
-                                  {labelDef.label}
-                                </span>
-                              );
-                            })}
+                            {(post.labels ?? []).map((label) => (
+                              <ForumLabelBadge
+                                key={label}
+                                size="xs"
+                                label={getForumLabel(label, forumLabels)}
+                              />
+                            ))}
                           </span>
                         )}
                       </span>
@@ -354,7 +353,7 @@ export function DashboardTargetNoteModal({
           <section className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold">Note entries</h3>
+                <h3 className="text-sm font-medium">Note entries</h3>
                 <p className="mt-0.5 text-xs text-base-content/55">
                   Each entry keeps its original author and latest editor.
                 </p>
@@ -428,7 +427,7 @@ export function DashboardTargetNoteModal({
                             disabled={mutationPending}
                             mentionCandidates={mentionCandidates}
                           />
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-base-content/50">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/50">
                             <span className={isEditingEntryTooLong ? "text-error" : undefined}>
                               {editingEntryDraft.length} / 5000
                             </span>
@@ -478,7 +477,7 @@ export function DashboardTargetNoteModal({
 
           <section className="rounded-md border border-base-300 bg-base-100 p-3 space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-semibold">Post entry</span>
+              <span className="text-sm font-medium">Post entry</span>
               <span
                 className={isEntryTooLong ? "text-xs text-error" : "text-xs text-base-content/50"}
               >
