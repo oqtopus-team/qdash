@@ -22,6 +22,8 @@ logs/
 calib_data/
 mongo_data/
 postgres_data/
+# Data directories of .env.example.qibocal.
+qibocal_data/
 # Qubex config checkout: mounted at runtime, never copied into an image, and
 # containers write files there that the building user may not be able to read.
 config/qubex-config/

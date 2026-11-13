@@ -11,32 +11,39 @@ other qubits, MUXes, or couplings, and QDash does not present it as a larger dev
 
 ## Start a Qibocal Deployment
 
-Start from the environment file of [Setup](../setup.md#create-the-environment-file), then start
-QDash with the Qibocal overlay. The overlay adds the Qibocal runner to the workflow worker image
-only; it makes that image about 1.35 GB larger, and Fake and Qubex deployments never build it.
+Create `.env` from the Qibocal example, set the administrator password as
+[Setup](../setup.md#configure-shared-deployment-settings) describes, and start QDash:
 
 ```bash
-cp .env.example .env
+cp .env.example.qibocal .env
 task deploy-local-qibocal
 ```
 
-`task deploy-local-qibocal` starts the Compose project `dev-qibocal` with `DEFAULT_BACKEND=qibocal`.
-Without Go Task, set the same values and pass both Compose files:
+`cp` replaces an existing `.env`. Stop a deployment that runs from this checkout before replacing
+its `.env`, because Compose reads the project name from `.env`. The example sets these values; the
+other values match `.env.example`:
 
-```bash
-ENV=dev-qibocal DEFAULT_BACKEND=qibocal \
-  docker compose -f compose.yaml -f compose.qibocal.yaml up -d --build
-```
+| Variable | Value in `.env.example.qibocal` |
+| --- | --- |
+| `ENV` | `dev-qibocal`, the Docker Compose project name |
+| `DEFAULT_BACKEND` | `qibocal` |
+| `COMPOSE_FILE` | `compose.yaml:compose.qibocal.yaml`, so every `docker compose` command includes the Qibocal overlay |
+| `UI_PORT` | `5794`; the Fake and Qubex examples use `5714` |
+| `POSTGRES_DATA_PATH` / `MONGO_DATA_PATH` / `CALIB_DATA_PATH` | `./qibocal_data/postgres`, `./qibocal_data/mongo`, and `./qibocal_data/calib`, instead of the directories of the other examples |
 
-The values from the shell take precedence over `.env`. To keep a Qibocal deployment apart from
-another one on the same host, also give it its own `UI_PORT` and data directories, as
-[Run Several Deployments on One Host](../setup.md#run-several-deployments-on-one-host) describes.
+The overlay `compose.qibocal.yaml` adds the Qibocal runner to the workflow worker image only; it
+makes that image about 1.35 GB larger, and Fake and Qubex deployments never build it. Because
+`.env` sets `COMPOSE_FILE`, `docker compose up -d --build` and the commands in
+[Operations](../operations.md) work unchanged; open QDash at <http://localhost:5794/login>.
+Stop it with `task deploy-local-qibocal-down` or `docker compose down`.
 
-Stop it with `task deploy-local-qibocal-down`, or with the same `ENV` and both Compose files:
-
-```bash
-ENV=dev-qibocal docker compose -f compose.yaml -f compose.qibocal.yaml down
-```
+`ENV` and the data directories keep the containers, named volumes, databases, and calibration
+data of a Qibocal deployment apart from those of a Fake or Qubex deployment, including when one
+checkout switches between the examples. Both deployments still use what Compose mounts from the
+checkout: the source directories and `./config`, which holds the Qibocal runner settings and
+platform. A checkout holds one `.env`, so run a Qibocal deployment beside another one from a
+separate checkout, as [Run Several Deployments on One Host](../setup.md#run-several-deployments-on-one-host)
+describes; its `UI_PORT` already differs from the default `5714`.
 
 The Qibocal deployment needs no backend configuration and no Qubex configuration tree.
 

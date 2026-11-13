@@ -65,6 +65,15 @@ Prepare the configuration root at `CONFIG_PATH` before startup. Place existing c
 and parameter files there as described in [Qubex backend](./setup/qubex-backend.md). You can
 create a new chip's configuration after signing in.
 
+For the Qibocal emulator, copy the Qibocal example:
+
+```bash
+cp .env.example.qibocal .env
+```
+
+It adds the Qibocal Compose overlay and uses `UI_PORT=5794` and its own data directories, as
+[Qibocal emulator backend](./setup/qibocal-backend.md#start-a-qibocal-deployment) describes.
+
 ## Configure Shared Deployment Settings
 
 Set a unique initial administrator password in `.env` before starting QDash. The
