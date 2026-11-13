@@ -113,3 +113,51 @@ export function getNavigationSections({ canEdit, isAdmin }: NavigationOptions): 
     },
   ];
 }
+
+/**
+ * Destinations shown as tabs in the mobile tab bar, in display order. Each tab
+ * is active on its own route and on every route nested under one of its bases;
+ * `/executions/{id}` resolves to an execution page, so it belongs to Execution.
+ * Every other destination stays in the header menu.
+ */
+const MOBILE_TAB_BASES: ReadonlyArray<{ href: string; bases: readonly string[] }> = [
+  { href: "/dashboard", bases: ["/dashboard"] },
+  { href: "/workflow", bases: ["/workflow"] },
+  { href: "/execution", bases: ["/execution", "/executions"] },
+  { href: "/chat", bases: ["/chat"] },
+];
+
+export type MobileTab = {
+  item: NavItem;
+  bases: readonly string[];
+};
+
+/** True when `pathname` is `base` itself or a route nested under it. */
+export function isPathWithin(pathname: string, base: string): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+/**
+ * Resolves the mobile tabs from the shared sections, so a tab carries the same
+ * label, icon, and visibility as its sidebar row; a hidden row hides its tab.
+ */
+export function getMobileTabs(sections: NavSection[]): MobileTab[] {
+  const items = new Map(sections.flatMap((section) => section.items).map((i) => [i.href, i]));
+  return MOBILE_TAB_BASES.flatMap(({ href, bases }) => {
+    const item = items.get(href);
+    return item && item.visible !== false ? [{ item, bases }] : [];
+  });
+}
+
+export function isMobileTabActive(tab: MobileTab, pathname: string): boolean {
+  return tab.bases.some((base) => isPathWithin(pathname, base));
+}
+
+/** The sections without the destinations the mobile tab bar already shows. */
+export function withoutMobileTabs(sections: NavSection[]): NavSection[] {
+  const tabHrefs = new Set(MOBILE_TAB_BASES.map((tab) => tab.href));
+  return sections.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => !tabHrefs.has(item.href)),
+  }));
+}

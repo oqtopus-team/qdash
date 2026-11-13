@@ -606,7 +606,7 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
         </div>
 
         {/* Mobile FAB */}
-        <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">
+        <div className="fab fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-30 sm:hidden">
           <div tabIndex={0} role="button" className="btn btn-circle btn-primary shadow-lg">
             <Plus size={20} />
           </div>
