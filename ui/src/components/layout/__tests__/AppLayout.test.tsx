@@ -83,7 +83,7 @@ describe("AppLayout navigation chrome", () => {
 
     const rail = container.querySelector('aside[aria-label="Primary navigation"]');
     const main = container.querySelector("main") as HTMLElement;
-    const tabBar = container.querySelector('nav.dock[aria-label="Primary navigation"]');
+    const tabBar = container.querySelector('nav#mobile-tab-bar[aria-label="Primary navigation"]');
 
     expect(rail?.className).toContain("hidden");
     expect(rail?.className).toContain("lg:flex");
@@ -118,7 +118,7 @@ describe("AppLayout navigation chrome", () => {
   it("opens the header menu, lists the other destinations, and restores focus on Escape", async () => {
     const { container } = renderLayout();
 
-    const tabBar = container.querySelector('nav.dock[aria-label="Primary navigation"]');
+    const tabBar = container.querySelector('nav#mobile-tab-bar[aria-label="Primary navigation"]');
     // The header trigger is the only menu opener; the tab bar holds route links only.
     expect(within(tabBar as HTMLElement).queryByRole("button")).toBeNull();
 

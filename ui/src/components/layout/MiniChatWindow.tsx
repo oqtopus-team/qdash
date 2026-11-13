@@ -127,6 +127,8 @@ export function MiniChatWindow() {
 
   const [viewport, setViewport] = useState({
     width: WINDOW_WIDTH + 2 * MARGIN,
+    top: 0,
+    left: 0,
     bottom: WINDOW_HEIGHT + 2 * MARGIN,
   });
   useEffect(() => {
@@ -138,6 +140,8 @@ export function MiniChatWindow() {
         : window.innerHeight;
       setViewport({
         width: window.visualViewport?.width ?? window.innerWidth,
+        top: window.visualViewport?.offsetTop ?? 0,
+        left: window.visualViewport?.offsetLeft ?? 0,
         bottom:
           dockRect && dockRect.height > 0 ? Math.min(dockRect.top, visibleBottom) : visibleBottom,
       });
@@ -147,25 +151,27 @@ export function MiniChatWindow() {
     if (dock) observer.observe(dock);
     window.addEventListener("resize", updateViewport);
     window.visualViewport?.addEventListener("resize", updateViewport);
+    window.visualViewport?.addEventListener("scroll", updateViewport);
     return () => {
       observer.disconnect();
       window.removeEventListener("resize", updateViewport);
       window.visualViewport?.removeEventListener("resize", updateViewport);
+      window.visualViewport?.removeEventListener("scroll", updateViewport);
     };
   }, []);
 
-  // Measure the dock's top edge so its safe-area padding is included.
+  // Measure the tab bar's outer top edge so its inset gap and safe-area padding count.
   const size = useMemo(
     () => ({
       width: Math.max(1, Math.min(WINDOW_WIDTH, viewport.width - 2 * MARGIN)),
-      height: Math.max(1, Math.min(WINDOW_HEIGHT, viewport.bottom - 2 * MARGIN)),
+      height: Math.max(1, Math.min(WINDOW_HEIGHT, viewport.bottom - viewport.top - 2 * MARGIN)),
     }),
     [viewport],
   );
   const defaultPos = useMemo(
     () => ({
-      x: Math.max(0, viewport.width - size.width - MARGIN),
-      y: Math.max(0, viewport.bottom - size.height - MARGIN),
+      x: viewport.left + Math.max(0, viewport.width - size.width - MARGIN),
+      y: Math.max(viewport.top, viewport.bottom - size.height - MARGIN),
     }),
     [viewport, size],
   );
@@ -176,9 +182,13 @@ export function MiniChatWindow() {
   useEffect(() => {
     if (miniChat.isOpen) {
       resetPosition();
-      setMinimized(false);
     }
   }, [miniChat.isOpen, resetPosition]);
+
+  // Only opening the window resets the user's minimized choice.
+  useEffect(() => {
+    if (miniChat.isOpen) setMinimized(false);
+  }, [miniChat.isOpen]);
 
   if (!miniChat.isOpen) return null;
 

@@ -52,18 +52,38 @@ describe("MobileTabBar", () => {
 
     // Other destinations live in the header menu, so the bar holds only route links.
     expect(within(getTabBar()).queryByRole("button")).toBeNull();
-    expect(getTabBar().children).toHaveLength(4);
+    expect(getTabBar().querySelector(".dock")?.children).toHaveLength(4);
   });
 
-  it("uses the DaisyUI dock below lg and stays in the layout flow", () => {
+  it("insets a rounded DaisyUI dock inside an in-flow nav below lg", () => {
     render(<MobileTabBar />);
 
-    const className = getTabBar().className;
+    const nav = getTabBar();
+    const dock = nav.firstElementChild as HTMLElement;
 
-    expect(className).toContain("dock");
-    expect(className).toContain("lg:hidden");
-    expect(className).toContain("relative");
-    expect(className).toContain("shrink-0");
+    // MiniChatWindow measures this element, so it must own the gap and safe-area reserve.
+    expect(nav.id).toBe("mobile-tab-bar");
+    expect(nav.className).toContain("lg:hidden");
+    expect(nav.className).toContain("shrink-0");
+    expect(nav.className).toContain("px-3");
+    expect(nav.className).toContain("pb-[calc(0.75rem+env(safe-area-inset-bottom))]");
+    expect(nav.children).toHaveLength(1);
+
+    // The dock surface stays in flow instead of DaisyUI's fixed default.
+    expect(dock.className).toContain("dock");
+    expect(dock.className).toContain("relative");
+    expect(dock.className).toContain("rounded-2xl");
+  });
+
+  it("gives every tab a 44px minimum width, a focus outline, and no dock underline", () => {
+    render(<MobileTabBar />);
+
+    for (const link of within(getTabBar()).getAllByRole("link")) {
+      expect(link.className).toContain("min-w-11");
+      expect(link.className).toContain("focus-visible:outline-2");
+      expect(link.className).toContain("after:hidden");
+      expect(link.className).not.toContain("dock-active");
+    }
   });
 
   it.each([
@@ -83,7 +103,15 @@ describe("MobileTabBar", () => {
       .filter((link) => link.getAttribute("aria-current") === "page");
 
     expect(current.map((link) => link.textContent)).toEqual([label]);
-    expect(current[0].className).toContain("text-primary");
+
+    // Only the current tab's icon sits in the tinted primary circle.
+    const tinted = within(getTabBar())
+      .getAllByTestId("mobile-tab-icon")
+      .filter((icon) => icon.className.includes("bg-primary/15"));
+    expect(tinted).toHaveLength(1);
+    expect(tinted[0].className).toContain("rounded-full");
+    expect(tinted[0].className).toContain("text-primary");
+    expect(current[0].contains(tinted[0])).toBe(true);
   });
 
   it("marks no tab current on a menu destination", () => {
@@ -92,6 +120,9 @@ describe("MobileTabBar", () => {
 
     for (const link of within(getTabBar()).getAllByRole("link")) {
       expect(link.hasAttribute("aria-current")).toBe(false);
+    }
+    for (const icon of within(getTabBar()).getAllByTestId("mobile-tab-icon")) {
+      expect(icon.className).not.toContain("bg-primary");
     }
   });
 
