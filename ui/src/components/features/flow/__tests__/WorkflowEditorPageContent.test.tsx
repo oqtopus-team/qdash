@@ -10,7 +10,7 @@ import {
   storedJourney,
 } from "@/components/features/first-calibration/__tests__/journeyTestUtils";
 import { WorkflowEditorPageContent } from "@/components/features/flow/WorkflowEditorPageContent";
-import { saveFlow } from "@/client/flow/flow";
+import { deleteFlow, saveFlow } from "@/client/flow/flow";
 
 const mocks = vi.hoisted(() => ({
   executeFlow: vi.fn(),
@@ -19,6 +19,11 @@ const mocks = vi.hoisted(() => ({
   projectId: "project-1",
   push: vi.fn(),
   disabledReason: null as string | null,
+  // Saved source per workflow, when a test changes it from the default.
+  flowCode: {} as Record<string, string>,
+  // Workflows whose source fails to load.
+  failingFlows: new Set<string>(),
+  getFlow: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -121,21 +126,28 @@ const FLOW_CHIPS: Record<string, string> = {
   third_flow: "chip-c",
 };
 
+mocks.getFlow.mockImplementation((flowName: string) =>
+  mocks.failingFlows.has(flowName)
+    ? Promise.reject(new Error("source file missing"))
+    : Promise.resolve({
+        data: {
+          name: flowName,
+          description: "",
+          code:
+            mocks.flowCode[flowName] ??
+            (flowName === "first_calibration" ? "from prefect import flow\n" : `# ${flowName}\n`),
+          flow_function_name: flowName,
+          chip_id: FLOW_CHIPS[flowName] ?? "chip-a",
+          default_parameters: { username: "alice", chip_id: FLOW_CHIPS[flowName] ?? "chip-a" },
+          default_run_parameters: {},
+          tags: [],
+          folder: "",
+        },
+      }),
+);
+
 vi.mock("@/client/flow/flow", () => ({
-  getFlow: (flowName: string) =>
-    Promise.resolve({
-      data: {
-        name: flowName,
-        description: "",
-        code: flowName === "first_calibration" ? "from prefect import flow\n" : `# ${flowName}\n`,
-        flow_function_name: flowName,
-        chip_id: FLOW_CHIPS[flowName] ?? "chip-a",
-        default_parameters: { username: "alice", chip_id: FLOW_CHIPS[flowName] ?? "chip-a" },
-        default_run_parameters: {},
-        tags: [],
-        folder: "",
-      },
-    }),
+  getFlow: (flowName: string) => mocks.getFlow(flowName),
   getListFlowsQueryKey: () => ["/flows"],
   saveFlow: vi.fn(),
   deleteFlow: vi.fn(),
@@ -154,7 +166,7 @@ function renderEditor() {
     </QueryClientProvider>
   );
   const view = render(page());
-  return { rerender: () => view.rerender(page()) };
+  return { client, rerender: () => view.rerender(page()) };
 }
 
 async function confirmExecute() {
@@ -354,6 +366,8 @@ describe("WorkflowEditorPageContent split editor", () => {
   beforeEach(() => {
     mocks.projectId = "project-1";
     mocks.disabledReason = null;
+    // A save answers only in the project it was submitted in.
+    window.localStorage.setItem(PROJECT_STORAGE_KEY, "project-1");
     vi.mocked(saveFlow).mockResolvedValue({ data: {} } as Awaited<ReturnType<typeof saveFlow>>);
   });
 
@@ -361,6 +375,8 @@ describe("WorkflowEditorPageContent split editor", () => {
     cleanup();
     vi.clearAllMocks();
     window.localStorage.clear();
+    mocks.flowCode = {};
+    mocks.failingFlows.clear();
   });
 
   const pane = (side: "Left" | "Right") => screen.getByRole("region", { name: new RegExp(side) });
@@ -507,5 +523,96 @@ describe("WorkflowEditorPageContent split editor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
 
     expect(mocks.push).toHaveBeenCalledWith("/workflow/other_flow");
+  });
+
+  it("keeps edits made while a save is pending and refreshes both workflow lists", async () => {
+    const pending = deferred<Awaited<ReturnType<typeof saveFlow>>>();
+    vi.mocked(saveFlow).mockReturnValue(pending.promise as ReturnType<typeof saveFlow>);
+    const { client } = renderEditor();
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    await screen.findByTestId("editor");
+    fireEvent.click(screen.getByTitle("Click to edit"));
+    fireEvent.change(screen.getByLabelText("Code"), { target: { value: "# v1\n" } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+    expect(saveFlow).toHaveBeenCalledWith(expect.objectContaining({ code: "# v1\n" }));
+
+    // The user keeps typing while the save is in flight.
+    fireEvent.change(screen.getByLabelText("Code"), { target: { value: "# v2\n" } });
+    mocks.flowCode.first_calibration = "# v1\n";
+    const loads = mocks.getFlow.mock.calls.length;
+    await act(async () => {
+      pending.resolve({ data: {} } as Awaited<ReturnType<typeof saveFlow>>);
+      await pending.promise;
+    });
+
+    // The save refetches the workflow, which answers with the submitted source.
+    await waitFor(() => expect(mocks.getFlow.mock.calls.length).toBeGreaterThan(loads));
+    await waitFor(() =>
+      expect(client.getQueryState(["flow", "first_calibration"])?.fetchStatus).toBe("idle"),
+    );
+    expect(screen.getByLabelText("Code")).toHaveValue("# v2\n");
+    expect(screen.getByTitle("Unsaved changes")).toBeInTheDocument();
+    // The submitted source is the new baseline: returning to it leaves nothing unsaved.
+    fireEvent.change(screen.getByLabelText("Code"), { target: { value: "# v1\n" } });
+    expect(screen.queryByTitle("Unsaved changes")).not.toBeInTheDocument();
+
+    // The Workflow page's list and the editor's Explorer list are both refreshed.
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["flows"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["/flows"] });
+  });
+
+  it("asks before deleting a workflow that failed to load over a right-pane draft", async () => {
+    vi.mocked(deleteFlow).mockResolvedValue({} as Awaited<ReturnType<typeof deleteFlow>>);
+    const { client } = renderEditor();
+    await screen.findByTestId("editor");
+    fireEvent.click(screen.getByRole("button", { name: "Open split editor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Explorer other_flow" }));
+    await waitFor(() =>
+      expect(within(pane("Right")).getByLabelText("Code")).toHaveValue("# other_flow\n"),
+    );
+    fireEvent.click(screen.getByTitle("Click to edit"));
+    fireEvent.change(within(pane("Right")).getByLabelText("Code"), {
+      target: { value: "# draft\n" },
+    });
+
+    // The left pane's source can no longer be loaded.
+    mocks.failingFlows.add("first_calibration");
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: ["flow", "first_calibration"] });
+    });
+    expect(await screen.findByText("Failed to load flow")).toBeInTheDocument();
+
+    const deleteMetadata = async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete Flow Metadata" }));
+      fireEvent.click(
+        within(screen.getByRole("dialog", { name: "Delete Flow" })).getByRole("button", {
+          name: "Delete",
+        }),
+      );
+      return screen.findByRole("dialog", { name: "Discard unsaved changes?" });
+    };
+
+    // Cancel keeps the metadata and the right pane's draft.
+    const dialog = await deleteMetadata();
+    expect(dialog).toHaveTextContent("other_flow.py");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Discard unsaved changes?" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(deleteFlow).not.toHaveBeenCalled();
+
+    // Confirming discards the draft and deletes the left pane's workflow.
+    const again = await deleteMetadata();
+    await act(async () => {
+      fireEvent.click(within(again).getByRole("button", { name: "Discard changes" }));
+    });
+    expect(deleteFlow).toHaveBeenCalledTimes(1);
+    expect(deleteFlow).toHaveBeenCalledWith("first_calibration");
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/workflow"));
   });
 });

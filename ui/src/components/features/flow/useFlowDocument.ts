@@ -7,7 +7,7 @@ import type { GetFlowResponse, SaveFlowRequest } from "@/schemas";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
-import { getFlow, saveFlow } from "@/client/flow/flow";
+import { getFlow, getListFlowsQueryKey, saveFlow } from "@/client/flow/flow";
 import type { JourneyContext } from "@/components/features/first-calibration/useFirstCalibrationJourney";
 import { useToast } from "@/components/ui/Toast";
 
@@ -62,6 +62,9 @@ export function useFlowDocument(name: string | null): FlowDocument {
   const [loadedName, setLoadedName] = useState<string | null>(null);
   // Read by a save that answers later, to tell whether the pane still shows the saved workflow.
   const loadedNameRef = useRef<string | null>(null);
+  // Counts each time a workflow is opened, so a save that answers after the pane reopened its
+  // workflow does not move the new draft's baseline.
+  const openCountRef = useRef(0);
   const [description, setDescription] = useState("");
   const [code, setCode] = useState("");
   const [originalCode, setOriginalCode] = useState("");
@@ -85,10 +88,19 @@ export function useFlowDocument(name: string | null): FlowDocument {
     currentUsername.current = userData?.data?.username;
   });
 
-  // Load the saved workflow into the draft only when it is opened or saved again, never
-  // because another query refreshed, so a draft is not reset behind the user's back.
+  // Load the saved workflow into the draft only when it is opened. A refetch of the open
+  // workflow, such as the one after a save, never replaces the draft, so edits made while a save
+  // was pending survive. When the query drops its data (a project switch resets it), the next
+  // answer opens the workflow again.
   useEffect(() => {
-    if (!name || !flow) return;
+    if (!name || !flow) {
+      if (loadedNameRef.current !== null) {
+        loadedNameRef.current = null;
+        setLoadedName(null);
+      }
+      return;
+    }
+    if (loadedNameRef.current === name) return;
     setDescription(flow.description);
     setCode(flow.code);
     setOriginalCode(flow.code);
@@ -105,6 +117,7 @@ export function useFlowDocument(name: string | null): FlowDocument {
       | Record<string, { value?: string | number }>
       | undefined;
     setDefaultInterval(runParams?.interval?.value != null ? String(runParams.interval.value) : "");
+    openCountRef.current += 1;
     loadedNameRef.current = name;
     setLoadedName(name);
   }, [name, flow]);
@@ -132,17 +145,26 @@ export function useFlowDocument(name: string | null): FlowDocument {
   const isReady = Boolean(name && flow && loadedName === name);
 
   // A save answers for the user and project it was submitted in; one that lands after a
-  // project switch is dropped. The saved source becomes the baseline only for the workflow
-  // that was saved, in case the pane moved to another workflow meanwhile.
+  // project switch is dropped. The submitted source becomes the baseline only while the pane
+  // still holds the draft it was submitted from, so edits made after submitting stay unsaved.
   const saveMutation = useMutation({
-    mutationFn: ({ request }: { request: SaveFlowRequest; context: JourneyContext }) =>
-      saveFlow(request),
-    onSuccess: (_response, { request, context }) => {
+    mutationFn: ({
+      request,
+    }: {
+      request: SaveFlowRequest;
+      context: JourneyContext;
+      openCount: number;
+    }) => saveFlow(request),
+    onSuccess: (_response, { request, context, openCount }) => {
       if (!context.isCurrent()) return;
       queryClient.invalidateQueries({ queryKey: ["flow", request.name] });
+      // The Workflow page lists under ["flows"]; the editor's Explorer uses the generated key.
       queryClient.invalidateQueries({ queryKey: ["flows"] });
+      queryClient.invalidateQueries({ queryKey: getListFlowsQueryKey() });
       queryClient.invalidateQueries({ queryKey: ["execution-availability"] });
-      if (loadedNameRef.current === request.name) setOriginalCode(request.code);
+      if (loadedNameRef.current === request.name && openCountRef.current === openCount) {
+        setOriginalCode(request.code);
+      }
       toast.success(`${request.name} saved successfully!`);
     },
   });
@@ -180,7 +202,7 @@ export function useFlowDocument(name: string | null): FlowDocument {
             }
           : {},
       };
-      mutateSave({ request, context });
+      mutateSave({ request, context, openCount: openCountRef.current });
       return true;
     },
     [

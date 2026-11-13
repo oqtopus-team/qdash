@@ -808,6 +808,35 @@ export function WorkflowEditorPageContent() {
     confirmDiscard(isSplitView ? [secondary] : [], () => deleteMutation.mutate(routeName));
   };
 
+  // Unsaved draft confirmation before a pane's workflow is replaced, closed or deleted. Both the
+  // editor and the load-error view render it, since either can defer an action behind it.
+  const discardDialog = (
+    <ConfirmDialog
+      open={discardPrompt !== null}
+      title="Discard unsaved changes?"
+      description={
+        <>
+          Unsaved changes to{" "}
+          {discardPrompt?.names.map((draft, index) => (
+            <span key={draft}>
+              {index > 0 && " and "}
+              <strong>{draft}.py</strong>
+            </span>
+          ))}{" "}
+          will be lost. Save first to keep them.
+        </>
+      }
+      confirmLabel="Discard changes"
+      destructive
+      onConfirm={() => {
+        const action = discardPrompt?.action;
+        setDiscardPrompt(null);
+        action?.();
+      }}
+      onOpenChange={(open) => !open && setDiscardPrompt(null)}
+    />
+  );
+
   if (primary.isLoading) {
     return <WorkflowEditorPageSkeleton />;
   }
@@ -878,6 +907,7 @@ export function WorkflowEditorPageContent() {
             </DialogContent>
           </Dialog>
         )}
+        {discardDialog}
       </div>
     );
   }
@@ -2062,31 +2092,7 @@ export function WorkflowEditorPageContent() {
           />
         )}
 
-        {/* Unsaved draft confirmation before a pane's workflow is replaced or closed */}
-        <ConfirmDialog
-          open={discardPrompt !== null}
-          title="Discard unsaved changes?"
-          description={
-            <>
-              Unsaved changes to{" "}
-              {discardPrompt?.names.map((draft, index) => (
-                <span key={draft}>
-                  {index > 0 && " and "}
-                  <strong>{draft}.py</strong>
-                </span>
-              ))}{" "}
-              will be lost. Save first to keep them.
-            </>
-          }
-          confirmLabel="Discard changes"
-          destructive
-          onConfirm={() => {
-            const action = discardPrompt?.action;
-            setDiscardPrompt(null);
-            action?.();
-          }}
-          onOpenChange={(open) => !open && setDiscardPrompt(null)}
-        />
+        {discardDialog}
       </div>
     </>
   );
