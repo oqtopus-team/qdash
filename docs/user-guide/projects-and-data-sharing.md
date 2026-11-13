@@ -54,6 +54,8 @@ description, invite existing QDash users, change member roles, and remove member
 
 4. Remove the member when they no longer need project access.
 
+   ![Removing a project member from Settings](/images/guides/remove-project-member.gif)
+
 Deleting a project removes its project-scoped records and is not reversible through the UI.
 Review membership, chips, executions, and artifacts before confirming deletion.
 
