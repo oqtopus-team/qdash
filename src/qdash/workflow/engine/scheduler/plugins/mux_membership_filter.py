@@ -15,6 +15,8 @@ class MuxMembershipFilter(CRPairFilter):
 
     Removes pairs where either qubit is not found in the qid_to_mux mapping,
     which indicates the qubit is not part of the active MUX configuration.
+    Standalone qubits (``context.standalone_qids``) are kept: they belong to
+    no MUX by design, and the schedulers run their pairs one at a time.
 
     This filter is useful as a preparatory step before MUX-based scheduling,
     ensuring all remaining pairs can be properly assigned to MUX groups.
@@ -38,7 +40,12 @@ class MuxMembershipFilter(CRPairFilter):
         self._input = len(pairs)
 
         filtered = [
-            pair for pair in pairs if all(qid in context.qid_to_mux for qid in pair.split("-"))
+            pair
+            for pair in pairs
+            if all(
+                qid in context.qid_to_mux or qid in context.standalone_qids
+                for qid in pair.split("-")
+            )
         ]
 
         self._output = len(filtered)

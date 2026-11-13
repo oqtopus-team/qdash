@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from qdash.common.mux_mapping import MuxMapping, MuxMappingSnapshot
 from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service._internal.lifecycle import (
     is_cancellation as _is_cancellation,
@@ -271,6 +272,7 @@ def _worker(
             execution_id=execution_id,
             reservation=ReservationScope.of(reservation) if reservation is not None else None,
         ),
+        mux_mapping=MuxMapping.legacy(),
     )
     session._initialize(qids)
     return session
@@ -327,6 +329,29 @@ class ExternalSignal(BaseException):
 
 class TerminationSignal(ExternalSignal):
     """Stand-in for prefect.exceptions.TerminationSignal."""
+
+
+LEGACY_MAPPING = MuxMappingSnapshot.of(MuxMapping.legacy())
+"""What an owner of a chip without a topology hands its workers."""
+
+
+@pytest.fixture(autouse=True)
+def chips_without_topology(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Store every chip of these tests as a legacy chip (no ``topology_id``).
+
+    Only the chip document lookup is replaced: ``resolve_chip_mux_mapping``,
+    the Qubex layout check and the scope checks still run, so sessions resolve
+    the legacy mapping exactly as they do for such a chip in production. Tests
+    about unusable topologies live in the MUX mapping test modules.
+    """
+    lookups: list[tuple[Any, ...]] = []
+
+    def find_one(*args: Any, **kwargs: Any) -> Any:
+        lookups.append(args)
+        return SimpleNamespace(run=lambda: SimpleNamespace(topology_id=None))
+
+    monkeypatch.setattr("qdash.dbmodel.chip.ChipDocument.find_one", find_one)
+    return lookups
 
 
 @pytest.fixture(autouse=True)
@@ -633,7 +658,9 @@ class TestCalibSessionInitialization:
     def test_borrowed_session_only_releases_its_backend(self, mock_flow_session_deps):
         settings = _settings(github=GitHubPolicy.pull_and_push())
         spec = WorkerSpec(
-            settings=settings.for_worker(), lease=WorkerLease(execution_id="parent-execution")
+            settings=settings.for_worker(),
+            lease=WorkerLease(execution_id="parent-execution"),
+            mux_mapping=LEGACY_MAPPING,
         )
 
         with borrowed_session(spec, ["0"]) as session:
@@ -1550,6 +1577,7 @@ def _borrowing_worker(scope: Any, **overrides: Any) -> CalibSession:
     return CalibSession(
         _settings(username="alice", chip_id="chip-1", project_id="project-1", **overrides),
         lease=WorkerLease(execution_id="child", reservation=ReservationScope.of(scope)),
+        mux_mapping=MuxMapping.legacy(),
     )
 
 
@@ -1573,6 +1601,7 @@ def test_task_and_isolated_worker_reject_unreserved_hardware(
     spec = WorkerSpec(
         settings=_settings(username="alice", chip_id="chip-1", project_id="project-1"),
         lease=WorkerLease(execution_id="child", reservation=ReservationScope.of(scope)),
+        mux_mapping=LEGACY_MAPPING,
     )
     with pytest.raises(RuntimeError, match="outside the workflow"), borrowed_session(spec, ["4"]):
         pass
@@ -1855,7 +1884,9 @@ def test_workers_apply_the_inherited_snapshot_and_force_override(
         "qdash.workflow.engine.task.snapshot_loader.SnapshotParameterLoader", RecordingLoader
     )
     spec = WorkerSpec(
-        settings=_rerun_settings().for_worker(), lease=WorkerLease(execution_id="exec-step")
+        settings=_rerun_settings().for_worker(),
+        lease=WorkerLease(execution_id="exec-step"),
+        mux_mapping=LEGACY_MAPPING,
     )
 
     with borrowed_session(spec, ["0"]) as worker:

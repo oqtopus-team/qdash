@@ -17,6 +17,12 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import {
+  buildMuxCellMap,
+  clipMuxBoxes,
+  muxLabelAreaClass,
+  type MuxGroupBox,
+} from "@/lib/utils/mux-groups";
 import { pickColor } from "@/lib/utils/color-scale";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth, cellFontSize } from "@/lib/utils/grid-layout";
@@ -29,6 +35,8 @@ interface MetricValue {
   execution_id?: string | null;
   stddev?: number | null;
 }
+
+const NO_MUX_GROUPS: MuxGroupBox[] = [];
 
 interface QubitMetricsGridProps {
   metricData: { [key: string]: MetricValue } | null;
@@ -240,7 +248,14 @@ export function QubitMetricsGrid({
     showMuxBoundaries = false,
     qubits: topologyQubits,
     gridSize: topologyGridSize,
+    muxGroups = NO_MUX_GROUPS,
   } = useTopologyConfig(topologyId) ?? {};
+
+  // Cell -> MUX box, so boundaries follow the topology's actual MUX groups
+  const muxCellMap = useMemo(
+    () => buildMuxCellMap(muxGroups, topologyQubits),
+    [muxGroups, topologyQubits],
+  );
 
   // Calculate actual grid dimensions from topology qubit positions
   const { gridRows, gridCols } = useMemo(() => {
@@ -393,9 +408,7 @@ export function QubitMetricsGrid({
       const actualRow = displayGridStart.row + localRow;
       const actualCol = displayGridStart.col + localCol;
 
-      const muxRow = Math.floor(actualRow / muxSize);
-      const muxCol = Math.floor(actualCol / muxSize);
-      const isEvenMux = (muxRow + muxCol) % 2 === 0;
+      const muxBox = muxCellMap.get(`${actualRow},${actualCol}`);
 
       let qid: string | undefined;
       if (topologyQubits) {
@@ -418,8 +431,8 @@ export function QubitMetricsGrid({
       const value = metric?.value ?? null;
       const stddev = metric?.stddev ?? null;
       const muxBgClass =
-        hasMux && showMuxBoundaries
-          ? isEvenMux
+        hasMux && showMuxBoundaries && muxBox
+          ? muxBox.isEven
             ? "ring-2 ring-inset ring-primary/20"
             : "ring-2 ring-inset ring-secondary/20"
           : "";
@@ -432,7 +445,7 @@ export function QubitMetricsGrid({
     displayRows,
     displayCols,
     displayGridStart,
-    muxSize,
+    muxCellMap,
     topologyQubits,
     displayData,
     layoutParams,
@@ -502,36 +515,26 @@ export function QubitMetricsGrid({
                 gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
               }}
             >
-              {Array.from({
-                length: Math.pow(Math.ceil(displayCols / muxSize), 2),
-              }).map((_, idx) => {
-                const numMuxCols = Math.ceil(displayCols / muxSize);
-                const muxLocalRow = Math.floor(idx / numMuxCols);
-                const muxLocalCol = idx % numMuxCols;
-                const muxActualRow = Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-                const muxActualCol = Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-                const muxIndex =
-                  muxActualRow * Math.floor(effectiveGridSize / muxSize) + muxActualCol;
-                const startCol = muxLocalCol * muxSize + 1;
-                const startRow = muxLocalRow * muxSize + 1;
-                const spanCols = Math.min(muxSize, displayCols - muxLocalCol * muxSize);
-                const spanRows = Math.min(muxSize, displayRows - muxLocalRow * muxSize);
-                if (spanCols <= 0 || spanRows <= 0) return null;
-
+              {clipMuxBoxes(muxGroups, {
+                row: displayGridStart.row,
+                col: displayGridStart.col,
+                rows: displayRows,
+                cols: displayCols,
+              }).map((box) => {
                 return (
                   <div
-                    key={idx}
-                    className="flex items-center justify-center"
+                    key={box.muxId}
+                    className={muxLabelAreaClass(box)}
                     style={{
-                      gridColumn: `${startCol} / span ${spanCols}`,
-                      gridRow: `${startRow} / span ${spanRows}`,
+                      gridColumn: `${box.col + 1} / span ${box.cols}`,
+                      gridRow: `${box.row + 1} / span ${box.rows}`,
                     }}
                   >
                     <div
                       className="font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
                       style={{ fontSize: cellFontSize(displayCellSize, 0.13) }}
                     >
-                      MUX{muxIndex}
+                      MUX{box.muxId}
                     </div>
                   </div>
                 );
@@ -607,9 +610,8 @@ export function QubitMetricsGrid({
       handleCellClick,
       hasMux,
       showMuxBoundaries,
-      muxSize,
+      muxGroups,
       displayGridStart,
-      effectiveGridSize,
       zoomMode,
       regionSelectionEnabled,
       isSquareGrid,

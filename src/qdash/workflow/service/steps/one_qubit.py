@@ -92,11 +92,13 @@ def _execute_scheduled_one_qubit(
     if not qids:
         return {}
 
-    mux_ids = sorted({int(qid) // 4 for qid in qids})
+    # Standalone qubits are scheduled after the MUX stages, one at a time.
+    mux_ids, standalone_qids = session.mux_mapping.partition_qids(qids)
     config = OneQubitConfig(
         mux_ids=mux_ids,
         exclude_qids=[],
         qids=qids,
+        standalone_qids=standalone_qids,
         plan=plan,
     )
     strategy = get_one_qubit_strategy(execution_mode)
@@ -244,7 +246,9 @@ class CustomOneQubit(CalibrationStep):
         has_previous_selection = bool(ctx.filters) or ctx.get_latest_one_qubit_result() is not None
         if self._rounds is not None:
             candidates = (
-                ctx.candidate_qids if has_previous_selection else targets.to_qids(session.chip_id)
+                ctx.candidate_qids
+                if has_previous_selection
+                else targets.to_qids(session.chip_id, mux_mapping=session.mux_mapping)
             )
             raw_results = _execute_manual_one_qubit(self, session, candidates, plan)
         elif has_previous_selection:
@@ -262,7 +266,9 @@ class CustomOneQubit(CalibrationStep):
                 )
             else:
                 raw_results = self._execute_scheduled(
-                    session, targets.to_qids(session.chip_id), plan
+                    session,
+                    targets.to_qids(session.chip_id, mux_mapping=session.mux_mapping),
+                    plan,
                 )
 
         result = self._build_result(raw_results)
@@ -379,7 +385,10 @@ class OneQubitCheck(CalibrationStep):
         if self._rounds is not None:
             # OneQubitCheck always runs on the pipeline targets, as in other modes.
             raw_results = _execute_manual_one_qubit(
-                self, session, targets.to_qids(session.chip_id), plan
+                self,
+                session,
+                targets.to_qids(session.chip_id, mux_mapping=session.mux_mapping),
+                plan,
             )
         elif isinstance(targets, MuxTargets):
             raw_results = _execute_mux_one_qubit(
@@ -390,7 +399,7 @@ class OneQubitCheck(CalibrationStep):
                 execution_mode=_scheduled_mode(self),
             )
         else:
-            qids = targets.to_qids(session.chip_id)
+            qids = targets.to_qids(session.chip_id, mux_mapping=session.mux_mapping)
             raw_results = self._execute_scheduled(session, qids, plan)
 
         result = self._build_result(raw_results)
@@ -500,7 +509,7 @@ class OneQubitFineTune(CalibrationStep):
         qids = (
             ctx.candidate_qids
             if ctx.candidate_qids or has_previous_selection
-            else targets.to_qids(session.chip_id)
+            else targets.to_qids(session.chip_id, mux_mapping=session.mux_mapping)
         )
 
         logger.info(

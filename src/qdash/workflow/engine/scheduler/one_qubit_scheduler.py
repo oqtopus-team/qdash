@@ -15,6 +15,12 @@ Conflict Rules:
     - Qubits using different boxes can execute in parallel (different stages)
     - MUXes with mixed box dependencies conflict with both Box A and Box B
 
+Standalone Qubits:
+    Qubits that the chip topology lists in no MUX are standalone. The wiring
+    maps only MUXes to hardware, so the resources a standalone qubit shares
+    are unknown. They are scheduled conservatively: after every MUX stage, in
+    a ``STANDALONE`` stage (or one step each), one qubit at a time.
+
 Parallel Groups:
     Within each stage, qubits are grouped by MUX for parallel execution:
     - Qubits on different MUXes can run in parallel
@@ -52,11 +58,18 @@ from typing import TYPE_CHECKING, Any
 import yaml
 
 from qdash.common.manual_rounds import channel_box_type, channel_module_id
+from qdash.common.mux_mapping import (
+    MuxMapping,
+    MuxMappingError,
+    canonical_qid,
+    normalize_qid,
+)
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
     BOX_B,
     BOX_MIXED,
+    BOX_STANDALONE,
     MuxBatchScheduleResult,
     MuxBatchStepInfo,
     OneQubitRound,
@@ -103,6 +116,7 @@ class OneQubitScheduler:
         self,
         chip_id: str,
         wiring_config_path: str | Path | None = None,
+        mux_mapping: MuxMapping | None = None,
     ) -> None:
         """Initialize 1-qubit scheduler.
 
@@ -110,9 +124,12 @@ class OneQubitScheduler:
             chip_id: Chip ID (e.g., "64Qv3", "144Qv2")
             wiring_config_path: Path to wiring.yaml configuration file.
                 If None, uses the default QubexPaths wiring path.
+            mux_mapping: MUX membership resolved from the chip topology. If None,
+                the legacy convention applies (MUX N owns qubits 4N..4N+3).
         """
         self.chip_id = chip_id
         self.wiring_config_path = wiring_config_path
+        self.mux_mapping = mux_mapping if mux_mapping is not None else MuxMapping.legacy()
         self._wiring_config: list[dict[str, Any]] | None = None
         self._mux_box_map: dict[int, set[str]] | None = None
         self._qid_to_mux: dict[str, int] | None = None
@@ -210,24 +227,28 @@ class OneQubitScheduler:
         return mux_box_map
 
     def _build_qubit_to_mux_map(self, wiring_config: list[dict[str, Any]]) -> dict[str, int]:
-        """Build mapping from qubit ID to MUX ID.
+        """Build mapping from qubit ID to MUX ID for the wired MUXes.
 
-        Each MUX controls 4 qubits: MUX_N controls qubits [4N, 4N+1, 4N+2, 4N+3].
+        Membership comes from ``mux_mapping`` (the chip topology); wiring rows
+        are joined by MUX ID. Wired MUXes the topology does not define have no
+        qubits.
 
         Args:
             wiring_config: List of MUX configurations from wiring.yaml
 
         Returns:
             Mapping from qubit ID (string) to MUX ID (int)
+
+        Raises:
+            MuxMappingError: If a member slot has no control port in the wiring
         """
         if self._qid_to_mux is not None:
             return self._qid_to_mux
 
-        qid_to_mux = {}
-        for entry in wiring_config:
-            mux_id = entry["mux"]
-            for offset in range(4):
-                qid_to_mux[str(mux_id * 4 + offset)] = mux_id
+        self.mux_mapping.check_wiring(wiring_config)
+        qid_to_mux = self.mux_mapping.qid_to_mux(
+            entry["mux"] for entry in wiring_config if self.mux_mapping.has_mux(entry["mux"])
+        )
 
         self._qid_to_mux = qid_to_mux
         return qid_to_mux
@@ -371,7 +392,9 @@ class OneQubitScheduler:
 
         mux_groups: dict[int, list[str]] = {}
         for qid in qids:
-            mux_id = qid_to_mux.get(qid, int(qid) // 4)  # Default: 4 qubits per MUX
+            mux_id = qid_to_mux.get(qid)
+            if mux_id is None:
+                mux_id = self.mux_mapping.mux_of(qid)
             if mux_id not in mux_groups:
                 mux_groups[mux_id] = []
             mux_groups[mux_id].append(qid)
@@ -387,17 +410,74 @@ class OneQubitScheduler:
                 grid_size=grid_size,
                 mux_grid_size=mux_grid_size,
                 qid_to_mux=qid_to_mux,
+                mux_mapping=self.mux_mapping,
             )
 
             for mux_id, mux_qids in mux_groups.items():
                 mux_groups[mux_id] = ordering_strategy.order_qids_in_mux(mux_id, mux_qids, context)
         else:
-            # Default: sort by qubit ID
+            # Default: local slot order (qubit ID order for the legacy mapping)
             for mux_id, mux_qids in mux_groups.items():
-                mux_groups[mux_id] = sorted(mux_qids, key=int)
+                mux_groups[mux_id] = sorted(mux_qids, key=self.mux_mapping.slot_of)
 
         # Return groups sorted by MUX ID
         return [mux_groups[mux_id] for mux_id in sorted(mux_groups.keys())]
+
+    def _split_standalone(self, qids: list[str]) -> tuple[list[str], list[str]]:
+        """Split ``qids`` into multiplexed and standalone qubits.
+
+        Accepted aliases are normalized first (``"Q07"`` becomes ``"7"``, the
+        form the MUX mapping and the wiring use), and duplicates are dropped.
+        Order is kept for multiplexed qubits; standalone qubits come back in
+        ascending ID order. Qubits the chip topology does not define raise
+        ``MuxMappingError``.
+
+        Raises:
+            MuxMappingError: If a qubit is not defined by the chip topology
+        """
+        unknown = [qid for qid in qids if not self.mux_mapping.is_known(qid)]
+        if unknown:
+            raise MuxMappingError(
+                f"Qubits {unknown} are not defined by the chip topology"
+                + (f" {self.mux_mapping.topology_id}" if self.mux_mapping.topology_id else "")
+            )
+        qids = list(dict.fromkeys(normalize_qid(qid) for qid in qids))
+        muxed = [qid for qid in qids if self.mux_mapping.find_mux(qid) is not None]
+        standalone = sorted(
+            {qid for qid in qids if self.mux_mapping.find_mux(qid) is None}, key=int
+        )
+        return muxed, standalone
+
+    def _load_mux_resources(
+        self, muxed_qids: list[str]
+    ) -> tuple[list[dict[str, Any]], dict[int, set[str]], dict[str, int]]:
+        """Wiring, MUX box map and qubit -> MUX map, or empties without MUX qubits.
+
+        A run of only standalone qubits does not read the wiring: it maps no
+        hardware for them.
+        """
+        if not muxed_qids:
+            return [], {}, {}
+        wiring_config = self._load_wiring_config()
+        qid_to_mux = self._build_qubit_to_mux_map(wiring_config)
+        if not self.mux_mapping.unbounded:
+            # A targeted MUX of the topology without a wiring row has no hardware:
+            # fail instead of silently scheduling none of its qubits. Legacy chips
+            # keep their historical behavior of skipping MUXes outside the wiring.
+            unwired = sorted(
+                {self.mux_mapping.mux_of(qid) for qid in muxed_qids if qid not in qid_to_mux}
+            )
+            if unwired:
+                raise MuxMappingError(
+                    f"MUXes {unwired} of {self.mux_mapping._label()} have no row in the "
+                    f"wiring of chip {self.chip_id}; add them to wiring.yaml or leave them "
+                    "out of the targets"
+                )
+        return (
+            wiring_config,
+            self._build_mux_box_map(wiring_config),
+            qid_to_mux,
+        )
 
     def _get_qubit_box_type(
         self,
@@ -459,34 +539,44 @@ class OneQubitScheduler:
                 mixed_qids.append(qid)
         return box_a_qids, box_b_qids, mixed_qids
 
-    @staticmethod
     def _mux_ids_to_qids(
+        self,
         mux_ids: list[int],
         exclude_qids: list[str] | None = None,
+        standalone_qids: list[str] | None = None,
     ) -> list[str]:
         """Convert MUX IDs to qubit IDs, optionally excluding specified qubits.
 
-        Each MUX controls 4 qubits: MUX_N → qubits [4N, 4N+1, 4N+2, 4N+3].
+        Members come from ``mux_mapping`` in local slot order. A MUX the
+        mapping does not define is an error, never an arithmetic guess.
+        ``standalone_qids`` are appended after the MUX members.
 
         Args:
             mux_ids: List of MUX IDs to convert
             exclude_qids: Optional list of qubit IDs to exclude
+            standalone_qids: Standalone (non-multiplexed) qubits to add
 
         Returns:
             List of qubit ID strings
 
         Raises:
-            ValueError: If no MUX IDs provided or all qubits excluded
+            ValueError: If no MUX IDs or standalone qubits are provided, a MUX is
+                undefined, a ``standalone_qids`` entry is not standalone, or all
+                qubits are excluded
         """
-        if len(mux_ids) == 0:
+        standalone = [str(qid) for qid in standalone_qids or []]
+        if len(mux_ids) == 0 and not standalone:
             msg = "No MUX IDs provided"
             raise ValueError(msg)
-        qids = []
-        for mux_id in mux_ids:
-            for offset in range(4):
-                qids.append(str(mux_id * 4 + offset))
+        not_standalone = [qid for qid in standalone if not self.mux_mapping.is_standalone(qid)]
+        if not_standalone:
+            raise MuxMappingError(
+                f"Qubits {not_standalone} are not standalone qubits of the chip topology"
+            )
+        qids = self.mux_mapping.qids_for_muxes(mux_ids)
+        qids += [qid for qid in dict.fromkeys(standalone) if qid not in qids]
         if exclude_qids:
-            exclude_set = set(exclude_qids)
+            exclude_set = {canonical_qid(qid) for qid in exclude_qids}
             original_count = len(qids)
             qids = [qid for qid in qids if qid not in exclude_set]
             excluded_count = original_count - len(qids)
@@ -552,14 +642,15 @@ class OneQubitScheduler:
         if len(qids) == 0:
             msg = "No qubits provided"
             raise ValueError(msg)
+        muxed_qids, standalone_qids = self._split_standalone(qids)
 
         # Load configuration
-        wiring_config = self._load_wiring_config()
-        mux_box_map = self._build_mux_box_map(wiring_config)
-        qid_to_mux = self._build_qubit_to_mux_map(wiring_config)
+        wiring_config, mux_box_map, qid_to_mux = self._load_mux_resources(muxed_qids)
 
         # Classify qubits by box type
-        box_a_qids, box_b_qids, mixed_qids = self._classify_qubits(qids, qid_to_mux, mux_box_map)
+        box_a_qids, box_b_qids, mixed_qids = self._classify_qubits(
+            muxed_qids, qid_to_mux, mux_box_map
+        )
 
         logger.info(f"  Box A qubits: {box_a_qids}")
         logger.info(f"  Box B qubits: {box_b_qids}")
@@ -627,6 +718,19 @@ class OneQubitScheduler:
                         )
                     )
 
+        # Standalone qubits have no known hardware mapping: run them last, one
+        # at a time (a single sequential group).
+        if standalone_qids:
+            logger.info(f"  Standalone qubits: {standalone_qids}")
+            stages.append(
+                OneQubitStageInfo(
+                    box_type=BOX_STANDALONE,
+                    qids=standalone_qids,
+                    mux_ids=set(),
+                    parallel_groups=[list(standalone_qids)],
+                )
+            )
+
         logger.info(f"Generated {len(stages)} stages")
         for i, stage in enumerate(stages, 1):
             logger.info(
@@ -639,6 +743,7 @@ class OneQubitScheduler:
             "box_a_count": len(box_a_qids),
             "box_b_count": len(box_b_qids),
             "mixed_count": len(mixed_qids),
+            "standalone_count": len(standalone_qids),
             "num_stages": len(stages),
             "chip_id": self.chip_id,
         }
@@ -655,6 +760,7 @@ class OneQubitScheduler:
         mux_ids: list[int],
         exclude_qids: list[str] | None = None,
         ordering_strategy: MuxOrderingStrategy | None = None,
+        standalone_qids: list[str] | None = None,
     ) -> OneQubitScheduleResult:
         """Generate 1-qubit execution schedule from MUX IDs.
 
@@ -667,6 +773,7 @@ class OneQubitScheduler:
             ordering_strategy: Optional strategy for ordering qubits within each MUX.
                 Use CheckerboardOrderingStrategy for frequency-aware ordering.
                 If None, uses natural qubit ID order.
+            standalone_qids: Standalone (non-multiplexed) qubits to schedule too
 
         Returns:
             OneQubitScheduleResult containing stages and metadata
@@ -699,7 +806,7 @@ class OneQubitScheduler:
             )
             ```
         """
-        qids = self._mux_ids_to_qids(mux_ids, exclude_qids)
+        qids = self._mux_ids_to_qids(mux_ids, exclude_qids, standalone_qids)
         return self.generate(qids=qids, ordering_strategy=ordering_strategy)
 
     def get_mux_info(self) -> dict[int, dict[str, Any]]:
@@ -735,7 +842,7 @@ class OneQubitScheduler:
 
             result[mux_id] = {
                 "box_types": box_types,
-                "qids": sorted(mux_to_qids.get(mux_id, []), key=int),
+                "qids": sorted(mux_to_qids.get(mux_id, []), key=self.mux_mapping.slot_of),
                 "box_label": label,
             }
 
@@ -809,11 +916,10 @@ class OneQubitScheduler:
         if len(qids) == 0:
             msg = "No qubits provided"
             raise ValueError(msg)
+        muxed_qids, standalone_qids = self._split_standalone(qids)
 
         # Load configuration
-        wiring_config = self._load_wiring_config()
-        mux_box_map = self._build_mux_box_map(wiring_config)
-        qid_to_mux = self._build_qubit_to_mux_map(wiring_config)
+        wiring_config, mux_box_map, qid_to_mux = self._load_mux_resources(muxed_qids)
 
         # Determine grid size from chip_id
         grid_size = 12 if "144" in self.chip_id else 8
@@ -825,6 +931,7 @@ class OneQubitScheduler:
             grid_size=grid_size,
             mux_grid_size=mux_grid_size,
             qid_to_mux=qid_to_mux,
+            mux_mapping=self.mux_mapping,
         )
 
         # Select strategy
@@ -835,7 +942,9 @@ class OneQubitScheduler:
             strategy = DefaultOrderingStrategy()
 
         # Classify qubits by box type
-        box_a_qids, box_b_qids, mixed_qids = self._classify_qubits(qids, qid_to_mux, mux_box_map)
+        box_a_qids, box_b_qids, mixed_qids = self._classify_qubits(
+            muxed_qids, qid_to_mux, mux_box_map
+        )
 
         logger.info(f"  Box A qubits: {len(box_a_qids)}")
         logger.info(f"  Box B qubits: {len(box_b_qids)}")
@@ -916,6 +1025,17 @@ class OneQubitScheduler:
                         )
                         round_index += 1
 
+        # Standalone qubits have no known hardware mapping: one round each, last.
+        for qid in standalone_qids:
+            all_rounds.append(
+                OneQubitRound(
+                    round_index=round_index,
+                    box_type=BOX_STANDALONE,
+                    parallel_qids=[qid],
+                )
+            )
+            round_index += 1
+
         logger.info(f"Generated {len(all_rounds)} rounds")
         for round_ in all_rounds:
             logger.info(
@@ -929,6 +1049,7 @@ class OneQubitScheduler:
             "box_a_count": len(box_a_qids),
             "box_b_count": len(box_b_qids),
             "mixed_count": len(mixed_qids),
+            "standalone_count": len(standalone_qids),
             "num_rounds": len(all_rounds),
             "chip_id": self.chip_id,
             "use_checkerboard": use_checkerboard,
@@ -947,6 +1068,7 @@ class OneQubitScheduler:
         mux_ids: list[int],
         exclude_qids: list[str] | None = None,
         use_checkerboard: bool = True,
+        standalone_qids: list[str] | None = None,
     ) -> OneQubitRoundScheduleResult:
         """Generate the rounds of a ``parallel_by_round`` schedule from MUX IDs.
 
@@ -957,6 +1079,7 @@ class OneQubitScheduler:
             mux_ids: List of MUX IDs to schedule
             exclude_qids: Optional list of qubit IDs to exclude
             use_checkerboard: If True, uses CheckerboardOrderingStrategy
+            standalone_qids: Standalone (non-multiplexed) qubits to schedule too
 
         Returns:
             OneQubitRoundScheduleResult containing rounds and metadata
@@ -980,7 +1103,7 @@ class OneQubitScheduler:
                 print(f"Round {round_.round_index}: {round_.parallel_qids}")
             ```
         """
-        qids = self._mux_ids_to_qids(mux_ids, exclude_qids)
+        qids = self._mux_ids_to_qids(mux_ids, exclude_qids, standalone_qids)
         return self.generate_rounds(qids=qids, use_checkerboard=use_checkerboard)
 
     def generate_simultaneous_spectroscopy_batches(
@@ -992,8 +1115,11 @@ class OneQubitScheduler:
 
         Supported modes:
 
-        - ``local_index``: four local-index steps across selected MUXes.
-        - ``all``: one step containing all selected qids.
+        - ``local_index``: one step per local MUX slot across selected MUXes.
+        - ``all``: one step containing all selected multiplexed qids.
+
+        In both modes standalone qubits follow in steps of their own, one
+        qubit per step, because their hardware sharing is unknown.
 
         The returned ``parallel_batches`` contains one batch per step so the
         step can be submitted as one simultaneous spectroscopy call. Wiring
@@ -1021,13 +1147,17 @@ class OneQubitScheduler:
         if len(qids) == 0:
             msg = "No qubits provided"
             raise ValueError(msg)
+        muxed_qids, standalone_qids = self._split_standalone(qids)
 
-        wiring_config = self._load_wiring_config()
-        mux_box_map = self._build_mux_box_map(wiring_config)
-        qid_to_mux = self._build_qubit_to_mux_map(wiring_config)
-        box_a_qids, box_b_qids, mixed_qids = self._classify_qubits(qids, qid_to_mux, mux_box_map)
-        sorted_qids = sorted(qids, key=int)
-        if mode == "all":
+        _, mux_box_map, qid_to_mux = self._load_mux_resources(muxed_qids)
+        box_a_qids, box_b_qids, mixed_qids = self._classify_qubits(
+            muxed_qids, qid_to_mux, mux_box_map
+        )
+        sorted_qids = sorted(muxed_qids, key=int)
+        steps: list[MuxBatchStepInfo] = []
+        if not sorted_qids:
+            pass
+        elif mode == "all":
             steps = [
                 MuxBatchStepInfo(
                     step_index=0,
@@ -1036,13 +1166,12 @@ class OneQubitScheduler:
                 )
             ]
         else:
-            step_qids: list[list[str]] = [[] for _ in range(4)]
-
+            # One step per local slot: the same slot of every MUX runs together.
+            slot_qids: dict[int, list[str]] = {}
             for qid in sorted_qids:
-                local_index = int(qid) % 4
-                step_qids[local_index].append(qid)
+                slot_qids.setdefault(self.mux_mapping.slot_of(qid), []).append(qid)
+            step_qids = [slot_qids.get(slot, []) for slot in range(max(slot_qids) + 1)]
 
-            steps = []
             for step_index, step in enumerate(step_qids):
                 if not step:
                     continue
@@ -1054,11 +1183,22 @@ class OneQubitScheduler:
                     )
                 )
 
+        next_index = steps[-1].step_index + 1 if steps else 0
+        for offset, qid in enumerate(standalone_qids):
+            steps.append(
+                MuxBatchStepInfo(
+                    step_index=next_index + offset,
+                    box_type=BOX_STANDALONE,
+                    parallel_batches=[[qid]],
+                )
+            )
+
         metadata = {
             "total_qubits": len(qids),
             "box_a_count": len(box_a_qids),
             "box_b_count": len(box_b_qids),
             "mixed_count": len(mixed_qids),
+            "standalone_count": len(standalone_qids),
             "num_steps": len(steps),
             "num_batches": sum(len(step.parallel_batches) for step in steps),
             "chip_id": self.chip_id,
@@ -1078,7 +1218,8 @@ class OneQubitScheduler:
         mux_ids: list[int],
         exclude_qids: list[str] | None = None,
         mode: str = "local_index",
+        standalone_qids: list[str] | None = None,
     ) -> MuxBatchScheduleResult:
         """Generate simultaneous spectroscopy MUX-batch schedule from MUX IDs."""
-        qids = self._mux_ids_to_qids(mux_ids, exclude_qids)
+        qids = self._mux_ids_to_qids(mux_ids, exclude_qids, standalone_qids)
         return self.generate_simultaneous_spectroscopy_batches(qids=qids, mode=mode)

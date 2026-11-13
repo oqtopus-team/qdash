@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 
 from qdash.common.manual_rounds import ManualRoundsError
+from qdash.common.mux_mapping import MuxMapping
 from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec
 from qdash.datamodel.flow_targets import FlowTargetOverride
 from qdash.datamodel.task_call import TaskCall
@@ -66,7 +67,7 @@ def recorder(monkeypatch: pytest.MonkeyPatch) -> Recorder:
     record = Recorder()
     monkeypatch.setattr(scheduling_tasks, "run_qubit_calibrations_parallel", record.qubits)
     monkeypatch.setattr(scheduling_tasks, "run_coupling_calibrations_parallel", record.pairs)
-    monkeypatch.setattr(manual_module, "chip_wiring", lambda chip_id: WIRING)
+    monkeypatch.setattr(manual_module, "chip_wiring", lambda chip_id, mux_mapping=None: WIRING)
     monkeypatch.setattr(manual_module, "chip_coupling_ids", lambda project, chip: COUPLINGS)
     logger = SimpleNamespace(info=lambda *_: None, warning=lambda *_: None)
     for module in ("manual_rounds", "steps.one_qubit", "steps.two_qubit"):
@@ -85,6 +86,8 @@ def _session() -> CalibSession:
         plan_digest=None,
         stages=[],
         worker_spec=lambda: "worker",
+        # A chip without a topology: the session pins the legacy MUX layout.
+        mux_mapping=MuxMapping.legacy(),
     )
     session.record_stage_result = lambda name, result: session.stages.append(name)
     return cast("CalibSession", session)
@@ -161,12 +164,21 @@ def test_one_qubit_rounds_run_in_written_order(recorder: Recorder, build: Any) -
 def test_mux_targets_must_match_the_rounds_exactly(
     recorder: Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(MuxTargets, "to_qids", lambda self, chip: ["0", "1", "2", "3", "8", "9"])
+    session = _session()
+    mappings: list[Any] = []
+
+    def to_qids(self: MuxTargets, chip: str, *, mux_mapping: Any = None) -> list[str]:
+        mappings.append(mux_mapping)
+        return ["0", "1", "2", "3", "8", "9"]
+
+    monkeypatch.setattr(MuxTargets, "to_qids", to_qids)
     step = CustomOneQubit(tasks=RABI, execution_mode="manual", rounds=ONE_QUBIT_ROUNDS)
 
     with pytest.raises(ManualRoundsError, match="current qubits 2, 3 are in no round"):
-        step.execute(_session(), MuxTargets([0, 2]), StepContext())
+        step.execute(session, MuxTargets([0, 2]), StepContext())
     assert recorder.qubit_rounds == []
+    # The targets resolve with the session's pinned MUX mapping.
+    assert mappings == [session.mux_mapping]
 
 
 def test_filtered_out_qubits_fail_instead_of_being_dropped(recorder: Recorder) -> None:
@@ -235,10 +247,12 @@ def test_pair_qubits_outside_the_candidates_fail(recorder: Recorder) -> None:
 
 def test_automatic_steps_keep_the_default_group_cap(monkeypatch: pytest.MonkeyPatch) -> None:
     requested: list[int] = []
+    mappings: list[Any] = []
+    pinned = MuxMapping.legacy()
 
     class Scheduler:
         def __init__(self, *args: Any, **kwargs: Any) -> None:
-            pass
+            mappings.append(kwargs["mux_mapping"])
 
         def generate(self, candidate_qubits: list[str], max_parallel_ops: int) -> Any:
             requested.append(max_parallel_ops)
@@ -252,7 +266,10 @@ def test_automatic_steps_keep_the_default_group_cap(monkeypatch: pytest.MonkeyPa
     logger = SimpleNamespace(info=lambda *_: None, warning=lambda *_: None)
     monkeypatch.setattr("qdash.workflow.service.steps.two_qubit.get_run_logger", lambda: logger)
     session = cast(
-        "CalibSession", SimpleNamespace(chip_id="c", username="u", project_id="p", plan_digest=None)
+        "CalibSession",
+        SimpleNamespace(
+            chip_id="c", username="u", project_id="p", plan_digest=None, mux_mapping=pinned
+        ),
     )
     ctx = StepContext(candidate_qids=["0", "1"])
 
@@ -262,6 +279,8 @@ def test_automatic_steps_keep_the_default_group_cap(monkeypatch: pytest.MonkeyPa
     )
 
     assert requested == [10, 3]
+    # Both steps schedule on the session's pinned mapping.
+    assert mappings == [pinned, pinned]
 
 
 # ---------------------------------------------------------------------------
@@ -319,11 +338,13 @@ def test_manual_rounds_are_part_of_the_hardware_reservation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     requested: list[list[str]] = []
+    mappings: list[Any] = []
 
-    def scope(chip_id: str, parameters: dict[str, Any]) -> Any:
+    def scope(chip_id: str, parameters: dict[str, Any], *, mux_mapping: Any = None) -> Any:
         from qdash.common.execution_resources import ExecutionResourceScope
 
         requested.append(list(parameters.get("qids", [])))
+        mappings.append(mux_mapping)
         return ExecutionResourceScope(chip_id, tuple(f"q{q}" for q in parameters["qids"]))
 
     monkeypatch.setattr(
@@ -333,6 +354,9 @@ def test_manual_rounds_are_part_of_the_hardware_reservation(
         FilterByStatus(),
         CustomTwoQubit(tasks=CR, execution_mode="manual", rounds=PAIR_ROUNDS),
     ]
-    result = plan_pipeline_resources("chip", QubitTargets(["0"]), steps)
+    mapping = MuxMapping.legacy()
+    result = plan_pipeline_resources("chip", QubitTargets(["0"]), steps, mux_mapping=mapping)
     assert requested == [["0"], ["0", "1", "4", "5", "8", "9"]]
+    # The rounds reserve hardware with the run's pinned MUX mapping, as the targets do.
+    assert mappings == [mapping, mapping]
     assert not result.exclusive

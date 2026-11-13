@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from qdash.common.mux_mapping import MuxMapping
 from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.steps.one_qubit import CustomOneQubit
 
@@ -20,6 +21,7 @@ def test_custom_one_qubit_direct_targets_reuse_step_execution(monkeypatch) -> No
         run,
     )
     session = SimpleNamespace(
+        mux_mapping=MuxMapping.legacy(),
         chip_id="64Qv3",
         worker_spec=MagicMock(return_value=spec),
         record_stage_result=MagicMock(),
@@ -53,6 +55,7 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
     )
 
     session = SimpleNamespace(
+        mux_mapping=MuxMapping.legacy(),
         username="alice",
         chip_id="64Qv3",
         backend_name="qubex",
@@ -98,6 +101,7 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
     )
 
     session = SimpleNamespace(
+        mux_mapping=MuxMapping.legacy(),
         username="alice",
         chip_id="64Qv3",
         backend_name="qubex",

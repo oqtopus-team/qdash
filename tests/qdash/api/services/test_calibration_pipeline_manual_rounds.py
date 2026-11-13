@@ -188,3 +188,36 @@ def test_missing_wiring_is_a_warning_not_a_pass() -> None:
     )
     assert problems == []
     assert [(w.path, w.message) for w in warnings] == [("steps[0].rounds", "no wiring file")]
+
+
+def test_dry_run_resolves_mux_targets_and_rounds_with_the_topology_mapping() -> None:
+    """Sparse MUX IDs and member slots come from the topology, not from ``qid // 4``."""
+    from qdash.common.mux_mapping import MuxMapping
+
+    model = ChipRoundModel(
+        wiring=[
+            {"mux": 9, "ctrl": ["Q9A-0", "Q9A-1", "Q9A-2"], "read_out": "R9A-0"},
+            {"mux": 2, "ctrl": ["Q2A-0"], "read_out": "R2A-0"},
+        ],
+        coupling_ids=frozenset(),
+        mux_mapping=MuxMapping.from_groups(
+            {9: ["36", "41", "38"], 2: ["5"]}, known_qids=["36", "41", "38", "5", "20"]
+        ),
+    )
+    targets = {"mux_ids": [9, 2], "exclude_qids": ["38"]}
+    ok = _spec(_custom_1q(execution_mode="manual", rounds=[["36", "5"], ["41"]]), targets=targets)
+    assert _problems(ok, model) == []
+
+    shared = _spec(
+        _custom_1q(execution_mode="manual", rounds=[["36", "41"], ["5"]]), targets=targets
+    )
+    [(path, message)] = _problems(shared, model)
+    assert path == "steps[0].rounds" and "share MUX 9" in message
+
+
+def test_dry_run_rejects_rounds_against_an_unusable_topology() -> None:
+    model = ChipRoundModel(wiring=None, mapping_error="the MUX mapping of chip 'chip' is unusable")
+    spec = _spec(_custom_1q(execution_mode="manual", rounds=[["0", "8"], ["1", "9"]]))
+    assert _problems(spec, model) == [
+        ("steps[0].rounds", "the MUX mapping of chip 'chip' is unusable")
+    ]

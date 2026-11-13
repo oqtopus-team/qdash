@@ -22,7 +22,7 @@ OneQubitScheduler (1-Qubit)
     Schedules 1-qubit calibration tasks with Box-aware grouping.
 
     Features:
-    - Box classification (BOX_A, BOX_B, BOX_MIXED)
+    - Box classification (BOX_A, BOX_B, BOX_MIXED, BOX_STANDALONE)
     - Rounds for the parallel_by_round execution mode
     - Pluggable ordering strategies
 
@@ -59,6 +59,8 @@ BOX_B : str
     Identifier for Box B hardware group.
 BOX_MIXED : str
     Identifier for mixed Box A/B configuration.
+BOX_STANDALONE : str
+    Identifier for qubits outside every MUX (run one at a time).
 """
 
 from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler, CRScheduleResult
@@ -67,6 +69,7 @@ from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
     BOX_B,
     BOX_MIXED,
+    BOX_STANDALONE,
     MuxBatchScheduleResult,
     MuxBatchStepInfo,
     OneQubitRound,
@@ -79,6 +82,7 @@ __all__ = [
     "BOX_A",
     "BOX_B",
     "BOX_MIXED",
+    "BOX_STANDALONE",
     "CRScheduleResult",
     # CR Scheduler (2-qubit)
     "CRScheduler",

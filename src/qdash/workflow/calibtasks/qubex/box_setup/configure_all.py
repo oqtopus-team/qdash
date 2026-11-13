@@ -64,6 +64,10 @@ class ConfigureAll(QubexTask):
         if not isinstance(mode, str) or mode not in get_args(ConfigurationMode):
             raise ValueError(f"Unsupported configuration_mode: {mode!r}")
         configuration_mode = cast("ConfigurationMode", mode)
+        # This task builds its own Experiment, so it must run the backend's
+        # MUX layout check itself before touching the boxes, and must not hand
+        # Qubex a MUX that the chip topology does not define.
+        mux_ids = backend.ensure_mux_mapping_compatible().check_mux_ids(mux_ids)
 
         qubex_paths = get_qubex_paths()
         config_dir = backend.config.get("config_dir", str(qubex_paths.config_dir(chip_id)))

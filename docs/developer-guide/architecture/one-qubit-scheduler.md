@@ -22,9 +22,17 @@ A MUX with one recognized `A` channel and otherwise unrecognized channels is the
 `BOX_A:4` or `quel3-02-a01:4`, contain `:` and never match, so every MUX of such a chip is
 `MIXED`.
 
-Qubit-to-MUX mapping follows the hardware convention that MUX `N` owns qubits `4N` through
-`4N + 3`. Within a stage, different MUX groups may run in parallel, while qubits in the same MUX
-group run sequentially.
+Qubit-to-MUX mapping comes from the `mux_mapping` passed to the scheduler, which the workflow
+service resolves from the chip's topology template (see
+[MUX Membership in Topology Templates](./square-lattice-topology.md#mux-membership-in-topology-templates)).
+Without a mapping, MUX `N` owns qubits `4N` through `4N + 3`. A MUX or qubit outside an explicit
+mapping is an error. Within a stage, different MUX groups may run in parallel, while qubits in the
+same MUX group run sequentially.
+
+A standalone qubit, which the topology lists in no MUX, has no wiring row, so its hardware sharing
+is unknown. Every schedule form runs standalone qubits after the MUX stages, one at a time: one
+`STANDALONE` stage with a single sequential group, or one round (or spectroscopy step) per
+qubit. A selection of only standalone qubits does not read the wiring.
 
 MIXED MUXes get one additional constraint: MUXes whose `ctrl` channels share a Box B base ID,
 such as `R21B`, go to different sequential stages. This is the only resource check between MUXes;
@@ -46,7 +54,7 @@ flowchart LR
     mixedStages --> order
 ```
 
-The result executes A, B, and then every MIXED stage. MUX groups inside one stage are parallel;
+The result executes A, B, every MIXED stage, and then the `STANDALONE` stage. MUX groups inside one stage are parallel;
 the qubits inside each group remain sequential.
 
 ## Schedule Forms
@@ -59,8 +67,8 @@ The scheduler exposes three forms for different execution APIs.
 | `generate_rounds()` | `OneQubitRoundScheduleResult` | Every qubit of round N finishes before round N+1 starts |
 | `generate_simultaneous_spectroscopy_batches()` | `MuxBatchScheduleResult` | One spectroscopy call measures a whole selected batch |
 
-Each form has a corresponding `*_from_mux()` convenience method that expands MUX IDs and applies
-`exclude_qids` before scheduling.
+Each form has a corresponding `*_from_mux()` convenience method that expands MUX IDs, adds any
+`standalone_qids`, and applies `exclude_qids` before scheduling.
 
 ### MUX-group schedule
 
@@ -77,7 +85,7 @@ for stage in schedule.stages:
     run_mux_groups_in_parallel(stage.parallel_groups)
 ```
 
-Stages are ordered A, B, then MIXED. Multiple MIXED stages can appear when shared Box B modules
+Stages are ordered A, B, MIXED, then STANDALONE. Multiple MIXED stages can appear when shared Box B modules
 force sequential groups. `parallel_groups` is grouped by MUX and sorted by MUX ID.
 
 ### Round schedule
@@ -94,8 +102,10 @@ per entry. Checkerboard ordering is enabled by default; the exact ordering polic
 
 The spectroscopy API accepts `mode="local_index"` or `mode="all"`.
 
-- `local_index` creates up to four steps based on `int(qid) % 4`.
-- `all` creates one step containing all selected qubits.
+- `local_index` creates one step per local MUX slot.
+- `all` creates one step containing all selected multiplexed qubits.
+
+In both modes each standalone qubit gets a step of its own after the MUX steps.
 
 This API reports box classification for observability but does not split the batch on A/B resource
 conflicts. Its caller and backend operation must support the selected simultaneous measurement.
@@ -104,8 +114,10 @@ conflicts. Its caller and backend operation must support the selected simultaneo
 
 - An empty qubit or MUX selection raises `ValueError`; excluding every expanded qubit does too.
 - A missing wiring file raises `FileNotFoundError`.
-- In stage and round schedules, a qubit outside every MUX's `4N` to `4N + 3` range is logged
-  as a warning and omitted. Simultaneous-spectroscopy batches retain the requested qubits.
+- With a topology, a qubit the topology does not define, or a member of a MUX without a
+  `wiring.yaml` row, raises `MuxMappingError`. Without a topology, a qubit of a MUX the wiring
+  does not list is logged as a warning and omitted from stage and round schedules;
+  simultaneous-spectroscopy batches retain it.
 - Stage and MUX order are deterministic.
 - A result is an ordering under the A, B, and Box B `ctrl` rules above, not a check of the
   hardware. It does not acquire a hardware reservation or execute a backend call; reservations
@@ -158,19 +170,25 @@ messages, each naming the step, the 1-based round, and the targets:
 
 | Check | Function | When |
 | --- | --- | --- |
-| Shape: non-empty rounds of qubit ID strings, a qubit in one round only | `parse_qubit_rounds()` | Step construction and spec validation |
+| Shape: non-empty rounds of canonical qubit ID strings (no leading zeros), a qubit in one round only | `parse_qubit_rounds()` | Step construction and spec validation |
 | `rounds` only with `manual`, required with it | `qubit_rounds_for_mode()` | Step construction and spec validation |
-| Wired qubits, one qubit per MUX, one box stage per round, no shared Box B `ctrl` module among mixed MUXes | `qubit_round_issues()` | `Step.preflight()` before the pipeline reserves anything, again before the step's workers |
+| Qubits defined by the topology, wired MUX members, a standalone qubit alone in its round, one qubit per MUX, one box stage per round, no shared Box B `ctrl` module among mixed MUXes | `qubit_round_issues()` | `Step.preflight()` before the pipeline reserves anything, again before the step's workers |
 | Rounds name exactly the step's current qubits | `qubit_candidate_issues()` | Before the step's workers |
 
 The hardware rules are this scheduler's model, so an automatically generated round passes them,
-and they share `channel_box_type()` and `channel_module_id()` with `OneQubitScheduler`. A qubit
+and they share `channel_box_type()` and `channel_module_id()` with `OneQubitScheduler`. MUX
+membership comes from the same `MuxMapping`: the worker passes the session's pinned mapping, and
+the API resolves the chip's `topology_id` the same way (`ChipRoundModel.mux_mapping`). A topology
+that cannot be loaded becomes `ChipRoundModel.mapping_error`, which rejects every round, and a
+topology without MUXes needs no `wiring.yaml`. MUX targets of the dry run and the preview expand
+through `mux_target_qids()` in member-slot order. A qubit
 appears once per step because results are keyed by qubit. `CalibSession.run_pipeline()` calls
 `preflight()` on every step after `Pipeline` validation; `run_qubit_rounds()` in
 `workflow/service/manual_rounds.py` then runs each round through
 `run_qubit_calibrations_parallel()`, the `parallel_by_round` worker path, records stage
 `1q_manual` as `round_1`, `round_2`, ..., and never filters, reorders, or splits a round.
-`plan_pipeline_resources()` adds the round qubits to the reservation. The user procedure is
+`plan_pipeline_resources()` adds the round qubits to the reservation with the run's pinned mapping,
+so a standalone qubit in a round reserves the whole chip. The user procedure is
 [Write Manual Execution Rounds](../../user-guide/manual-execution-rounds.md).
 
 ### Migrate from the former names

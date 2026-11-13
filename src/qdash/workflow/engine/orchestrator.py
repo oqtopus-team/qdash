@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 
     from qdash.datamodel.task_invocation import TaskInvocation
     from qdash.workflow.engine.backend.base import BaseBackend
+    from qdash.workflow.engine.backend.qubex import QubexBackend
     from qdash.workflow.engine.config import CalibConfig
     from qdash.workflow.engine.task.snapshot_loader import SnapshotParameterLoader
     from qdash.workflow.service.github import GitHubIntegration
@@ -207,6 +208,7 @@ class CalibOrchestrator:
                 calib_dir=config.calib_data_path,
                 history_recorder=self._create_history_recorder(),
                 force_update_params=config.force_update_params,
+                mux_mapping=config.mux_mapping,
             )
 
             # Initialize Backend
@@ -299,10 +301,13 @@ class CalibOrchestrator:
         backend = create_backend(
             backend=config.backend_name,
             config=session_config,
+            mux_mapping=config.mux_mapping,
         )
 
         # Save calibration_note before connecting (loads parameter overrides)
         if backend.name == "qubex":
+            # Fail on an unsupported MUX layout before touching params files.
+            cast("QubexBackend", backend).ensure_mux_mapping_compatible()
             backend.save_note(
                 username=config.username,
                 chip_id=config.chip_id,
@@ -653,6 +658,7 @@ class CalibOrchestrator:
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
             update_calibration_parameters=update_calibration_parameters,
+            mux_mapping=config.mux_mapping,
         )
 
         # Copy relevant calibration data
@@ -701,6 +707,7 @@ class CalibOrchestrator:
             source_task_id=self._source_task_id,
             force_update_params=config.force_update_params,
             update_calibration_parameters=update_calibration_parameters,
+            mux_mapping=config.mux_mapping,
         )
 
         relevant_qids: list[str] = []

@@ -13,6 +13,12 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import {
+  buildMuxCellMap,
+  clipMuxBoxes,
+  muxLabelPosition,
+  type MuxGroupBox,
+} from "@/lib/utils/mux-groups";
 import { pickColor } from "@/lib/utils/color-scale";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridDimension, cellFontSize } from "@/lib/utils/grid-layout";
@@ -36,6 +42,8 @@ interface MetricValue {
   task_id?: string | null;
   execution_id?: string | null;
 }
+
+const NO_MUX_GROUPS: MuxGroupBox[] = [];
 
 interface CouplingMetricsGridProps {
   metricData: { [key: string]: MetricValue } | null;
@@ -86,7 +94,14 @@ export function CouplingMetricsGrid({
     qubits: topologyQubits,
     couplings: topologyCouplings,
     gridSize: topologyGridSize,
+    muxGroups = NO_MUX_GROUPS,
   } = useTopologyConfig(topologyId) ?? {};
+
+  // Cell -> MUX box, so boundaries follow the topology's actual MUX groups
+  const muxCellMap = useMemo(
+    () => buildMuxCellMap(muxGroups, topologyQubits),
+    [muxGroups, topologyQubits],
+  );
 
   // Calculate actual grid dimensions from topology qubit positions
   const { gridRows, gridCols } = useMemo(() => {
@@ -297,15 +312,13 @@ export function CouplingMetricsGrid({
             const x = displayCol * (displayCellSize + gap);
             const y = displayRow * (displayCellSize + gap);
 
-            // Calculate MUX index for this cell (using actual position, not display position)
-            const muxRow = Math.floor(pos.row / muxSize);
-            const muxCol = Math.floor(pos.col / muxSize);
-            const isEvenMux = (muxRow + muxCol) % 2 === 0;
+            // MUX group covering this cell (using actual position, not display position)
+            const muxBox = muxCellMap.get(`${pos.row},${pos.col}`);
 
             // MUX styling class
             const muxBgClass =
-              hasMux && showMuxBoundaries
-                ? isEvenMux
+              hasMux && showMuxBoundaries && muxBox
+                ? muxBox.isEven
                   ? "ring-2 ring-inset ring-primary/20"
                   : "ring-2 ring-inset ring-secondary/20"
                 : "";
@@ -332,41 +345,32 @@ export function CouplingMetricsGrid({
       {/* MUX labels - centered in each MUX group */}
       {hasMux && showMuxBoundaries && (
         <>
-          {Array.from({
-            length: Math.pow(Math.ceil(displayGridSize / muxSize), 2),
-          }).map((_, idx) => {
-            const numMuxCols = Math.ceil(displayGridSize / muxSize);
-            const muxLocalRow = Math.floor(idx / numMuxCols);
-            const muxLocalCol = idx % numMuxCols;
-
-            // Calculate actual MUX position considering zoom offset
-            const muxActualRow = Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-            const muxActualCol = Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-            const muxIndex = muxActualRow * Math.floor(effectiveGridSize / muxSize) + muxActualCol;
-
-            // Calculate center position of MUX group
-            const muxCenterX =
-              (muxLocalCol * muxSize + muxSize / 2) * (displayCellSize + gap) - gap / 2;
-            const muxCenterY =
-              (muxLocalRow * muxSize + muxSize / 2) * (displayCellSize + gap) - gap / 2;
+          {clipMuxBoxes(muxGroups, {
+            row: displayGridStart.row,
+            col: displayGridStart.col,
+            rows: displayGridSize,
+            cols: displayGridSize,
+          }).map((box) => {
+            // Centered over several cells; a single cell gets its label at an edge.
+            const position = muxLabelPosition(box, displayCellSize, gap);
 
             return (
               <div
-                key={`mux-label-${idx}`}
+                key={`mux-label-${box.muxId}`}
                 className={`absolute z-10 pointer-events-none ${
                   zoomMode === "full" ? "hidden md:flex" : "flex"
                 }`}
                 style={{
-                  top: muxCenterY,
-                  left: muxCenterX,
-                  transform: "translate(-50%, -50%)",
+                  top: position.top,
+                  left: position.left,
+                  transform: position.transform,
                 }}
               >
                 <div
                   className="font-medium text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
                   style={{ fontSize: cellFontSize(displayCellSize, 0.13) }}
                 >
-                  MUX{muxIndex}
+                  MUX{box.muxId}
                 </div>
               </div>
             );

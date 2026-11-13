@@ -43,7 +43,7 @@ flowchart TD
     candidates -->|Yes| filterCandidates[Keep pairs with two candidates]
     candidates -->|No| direction
     filterCandidates --> direction[Select CR direction]
-    direction --> muxFilter[Remove pairs missing MUX mappings]
+    direction --> muxFilter[Remove pairs with unwired MUX qubits]
     muxFilter --> split{Same MUX?}
     split -->|Yes| fast[Intra-MUX pairs]
     split -->|No| slow[Inter-MUX pairs]
@@ -71,8 +71,10 @@ schedule.
 directed `(control, target)` pairs without the candidate, direction, or MUX-membership filters.
 It never adds, drops, or reverses a pair, so a run calibrates exactly the selection. It raises
 `ValueError` when the list is empty or repeats a pair, when a pair's exact `control-target` ID is
-not a repository coupling, or when either qubit is missing from `wiring.yaml`. Valid pairs then go
-through the same intra/inter-MUX split, conflict coloring, and chunking as `generate()`.
+not a repository coupling, or when either qubit is neither a member of a wired topology MUX nor a
+standalone qubit. MUX membership comes from the chip topology, as in `generate()`, and a chip whose
+topology declares no MUX needs no `wiring.yaml`. Valid pairs then go through the same
+intra/inter-MUX split, conflict coloring, and chunking as `generate()`.
 `metadata["direction_method"]` and `filtering_stats["direction_method"]` are `explicit`.
 
 ## Manual Rounds
@@ -84,11 +86,14 @@ pairs without `CRScheduler`, without an earlier `cr_schedule`, and without chunk
 `max_parallel_ops` now defaults to `None`, meaning 10 for automatic steps, so a manual step that
 sets it is rejected instead of silently ignoring or applying it; a spec rejects it only when the
 field is explicitly set. `pair_round_issues()` in `common/manual_rounds.py` applies the
-`schedule_pairs()` membership checks (exact `control-target` coupling ID, wired qubits) and the
+`schedule_pairs()` membership checks (exact `control-target` coupling ID, qubits that are wired
+MUX members or standalone qubits of the chip topology, with membership from the same
+`MuxMapping`) and the
 conflict rules of `group_cr_pairs_by_conflict()` (shared MUX, MUXes in `mux_conflicts()`, which
 `build_mux_conflict_map()` now delegates to) to each written round; shared qubits and repeated
 pairs fail in `parse_pair_rounds()`. Unlike automatic grouping, manual rounds may mix intra- and
-inter-MUX pairs. `pair_candidate_issues()` requires both qubits of each pair among the current
+inter-MUX pairs. A pair with a standalone qubit must be alone in its round, as
+`schedule_pairs()` never groups it. `pair_candidate_issues()` requires both qubits of each pair among the current
 candidates. `SetCRSchedule` remains the unchecked path. The user procedure is
 [Write Two-Qubit Rounds](../../user-guide/manual-execution-rounds.md#write-two-qubit-rounds).
 
@@ -105,7 +110,15 @@ adds the edge:
 
 <Diagram name="cr-schedule-conflict-graph" caption="Example fixture with max_parallel_ops = 4: selected pairs on a schematic wiring, their conflict graph with the graph color of each pair, and the execution groups G1 to G4. Colors mark execution groups, not graph colors." />
 
-`build_qubit_to_mux_map()` assigns qubits `4N` to `4N + 3` to MUX `N` for every wiring entry.
+`build_qubit_to_mux_map()` takes MUX membership from the chip topology's MUX mapping and joins
+it to the wiring by MUX ID, so a wired MUX the topology does not define has no qubits. A chip
+without a topology keeps the legacy convention: qubits `4N` to `4N + 3` belong to MUX `N`.
+`CRScheduler` resolves that mapping from the chip's `topology_id` only when the caller passes no
+`mux_mapping`. Workflow callers (`CustomTwoQubit`, `GenerateCRSchedule`, `TwoQubitCalibration`
+and the coupling target override) pass the session's mapping, which the reservation and workers
+already use, so a topology edited during the run does not change MUX membership in the schedule.
+Coupling direction and `checkerboard_cr` geometry still load the current topology; this is not
+a snapshot of the full topology.
 `build_mux_conflict_map()` makes two MUXes conflict when their entries claim a common module
 through `mux_module_resources()` in `src/qdash/common/wiring_resources.py`. That function reads
 only `read_out` and `ctrl`; other wiring fields, such as read-in or pump channels, do not create
@@ -121,6 +134,11 @@ pump ports, or a collision between a control port and a readout port of the same
 The same function feeds hardware reservations between executions, which are separate from the
 grouping inside one execution; see
 [Hardware Reservations](../workflow/engine-architecture.md#hardware-reservations).
+
+A standalone qubit (one the topology lists in no MUX) has no wiring row, so the scheduler does
+not know which resources it shares. Its pairs are kept but always run alone in their group. A pair
+is intra-MUX only when both qubits are in the same declared MUX; two standalone qubits are not.
+`MuxMembershipFilter` keeps standalone pairs through `FilterContext.standalone_qids`.
 
 `split_fast_slow_pairs()` puts pairs whose two qubits share a MUX in the intra-MUX list and the
 rest in the inter-MUX list. Each list gets its own graph and coloring, and every intra-MUX group
@@ -170,9 +188,11 @@ The built-in filters are `CandidateQubitFilter`, `MuxMembershipFilter`,
 `MuxConflictScheduler` and `IntraThenInterMuxScheduler`.
 
 When no plugins are supplied, `generate_with_plugins()` uses only the directionality filter and an
-intra-then-inter MUX conflict scheduler capped at 10 operations per group. Unlike `generate()`, its
-default filter pipeline does not add candidate or explicit MUX-membership filters. Callers that
-need those policies must supply them.
+intra-then-inter MUX conflict scheduler capped at 10 operations per group. Its default filter
+pipeline does not add a candidate filter; callers that need one must supply it. Whatever the
+filters, `generate_with_plugins()` then drops any pair with a qubit that is neither a wired MUX
+member nor a standalone qubit of the topology, as `generate()` does, and reports the count as
+`mux_filtered_out` in `filtering_stats`.
 
 Custom filters must preserve the `control-target` string format. Custom schedulers must not place
 conflicting pairs together and should return enough metadata to identify their policy in stored

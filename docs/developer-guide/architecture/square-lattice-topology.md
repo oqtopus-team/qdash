@@ -73,7 +73,122 @@ MUX Structure (4 qubits per MUX):
 - **MUX grid**: 6×6 = 36 MUXes
 - **Each MUX**: Controls 4 qubits
 
+## MUX Membership in Topology Templates
+
+The chip's topology template under `config/domain/topologies/` is the single source of MUX
+membership. The chip pages, the schedulers, execution locks, and MUX result fan-out all read it
+through `src/qdash/common/mux_mapping.py`, so a MUX label in the UI is the MUX the scheduler
+targets. The top-level `muxes` key maps each MUX ID to its member qubits:
+
+```yaml
+qubits:
+  0: {row: 0, col: 0}
+  # ...
+couplings:
+  - [1, 0]
+  # ...
+muxes:
+  0: [0, 1, 2, 3]
+  1: [4, 5]
+visualization:
+  show_mux_boundaries: true
+  region_size: 4
+```
+
+- The key is the MUX ID: the `mux` key of the matching `wiring.yaml` row, which keeps the MUX's
+  hardware resources. The order in which MUXes are declared carries no meaning.
+- The array index of a member is its local slot: the hardware assignment to the `i`-th port in
+  that row's `ctrl` list. A slot is not a round: the ordering strategy maps it to a
+  `parallel_by_round` round, and `CheckerboardOrderingStrategy` runs slot 2 of an odd MUX in
+  round 0 (see [MUX Ordering Strategies](./one-qubit-ordering-strategies.md)). QDash never sorts a member
+  list. Slot 0 is the representative qubit that runs MUX-level tasks.
+- MUX IDs may be sparse, MUXes may have different sizes, and members need not be consecutive.
+- A qubit in `qubits` that no MUX lists is **standalone** (not multiplexed). `muxes: {}` declares a
+  chip whose qubits are all standalone, as the bundled `linear-16` and `heavy-hex-27` templates
+  do. A standalone qubit is a valid calibration target, not a one-qubit MUX; a qubit that is not
+  in `qubits` is unknown and rejected.
+- `muxes` is required, so an empty declaration cannot be confused with a forgotten one. Loading
+  also rejects a qubit in two MUXes or twice in one MUX, an empty member list, a member missing
+  from `qubits`, negative or non-integer IDs, and qubit positions outside `grid_size`. A schedule
+  fails when a member slot has no `ctrl` port in the wiring, or when a targeted MUX has no
+  `wiring.yaml` row; it never drops that MUX's qubits. Chips without a topology keep skipping
+  MUXes that the wiring does not list.
+- `visualization.show_mux_boundaries` only decides whether the UI and the metrics PDF draw MUX
+  outlines and labels. The UI draws each MUX around its members' positions; standalone qubits and
+  cells without qubits get no MUX label. A zoomed region labels a MUX only when it shows one of
+  its members, and a label over a single cell sits at the cell's bottom-left edge so it does not
+  cover the cell's value.
+
+The topology API (`GET /topology/{topology_id}`) returns the normalized `muxes`, the template
+format it came from as `muxes_source`, `standalone_qubits`, and `mux_slots` (qubit ID to
+hardware slot, excluding standalone qubits). The chip MUX API
+(`GET /chips/{chip_id}/muxes`) lists declared MUXes only.
+
+### Legacy Templates
+
+Templates written before `muxes` declare a `mux:` block instead. The loader normalizes it into
+`muxes`; a template that declares both `mux` and `muxes` is rejected as ambiguous.
+
+| Legacy declaration | Normalized membership (`muxes_source`) |
+| --- | --- |
+| `mux: {enabled: false}` | No MUX: every qubit is standalone (`legacy_disabled`) |
+| `mux: {enabled: true, groups: {0: {qids: [0, 1, 2, 3]}}}` | The listed groups (`legacy_groups`) |
+| `mux: {enabled: true, size: 2}` without `groups` | MUX `qid // 4` on slot `qid % 4`, for the qubits the template defines (`legacy_qid_div_4`) |
+
+Legacy slot gaps cannot be represented by canonical member arrays without changing slot
+assignments. For example, legacy qubits `[0, 2]` occupy slots `0, 2`, although the API's
+normalized `muxes` contains `{0: [0, 2]}`. Read `mux_slots` for the actual slots. Do not
+export that array as canonical YAML: it would assign qubit 2 to slot 1. Keep the legacy
+declaration until the hardware assignment can be migrated; API metadata is not template input.
+
+A chip without `topology_id` keeps the `qid // 4` convention for any qubit. A chip whose
+`topology_id` names a missing or invalid template does not fall back: scheduling fails, and the
+execution lock claims the whole chip. `scripts/generate_topology.py` writes `muxes`.
+
+### Scheduling Standalone Qubits
+
+`wiring.yaml` maps only MUXes to hardware, so QDash does not know which modules a standalone
+qubit shares. QDash schedules standalone qubits conservatively instead of inventing parallelism:
+
+- The 1-qubit schedules run standalone qubits after every MUX stage, one at a time (a
+  `STANDALONE` stage or one round per qubit). A run of only standalone qubits does not read the
+  wiring.
+- Manual rounds must list a standalone qubit, or a pair with one, alone in its round.
+- The CR scheduler keeps pairs with a standalone qubit and gives each such pair its own group.
+  A pair of two standalone qubits is never an intra-MUX pair.
+- The execution lock reserves the whole chip for any target that includes a standalone qubit.
+- MUX-level tasks, `BringUp`, and a `ConfigureAll` that derives its MUXes from qubit targets
+  refuse standalone qubits with an error. They never pick a MUX for a qubit that has none.
+- `MuxTargets` and `AllMuxTargets` select declared MUXes only. `AllQubitTargets` selects every
+  known qubit, multiplexed or standalone.
+
+### Qubex Backend Restriction
+
+Qubex ignores the topology: it places qubit index `i` in MUX `i // 4` on control slot `i % 4`
+and binds each `wiring.yaml` `ctrl` port to that qubit. The Qubex backend therefore accepts only
+a topology where every qubit is in a MUX and MUX `N` lists a prefix of `[4N, 4N+1, 4N+2, 4N+3]`
+in that order. The bundled templates with MUXes satisfy this. Other layouts, such as
+`0: [4, 5, 6, 7]`, `0: [1, 0, 2, 3]`, or any standalone qubit (including a legacy
+`mux: {enabled: false}` template), raise `MuxMappingError` naming each
+offending MUX or qubit before any Qubex `Experiment` is built or connected:
+
+- `CalibService` checks the chip's mapping before it takes a lock or creates an Execution.
+- `QubexBackend.ensure_mux_mapping_compatible()` runs before `connect()` builds the
+  `Experiment`, before the orchestrator writes calibration notes, and before `ConfigureAll`
+  builds its own `Experiment`. The backend uses the mapping passed to it (`CalibConfig.mux_mapping`,
+  `create_backend(..., mux_mapping=...)`), else `config["topology_id"]`, else the chip document
+  for `config["project_id"]` and `config["chip_id"]`. With none of these it assumes the legacy
+  layout and logs a warning.
+- `POST /calibration-pipelines/validate` reports the mismatch as a `backend_name` problem.
+
+The fake backend accepts any valid layout, including standalone and mixed targets. The check
+lives in `check_qubex_mux_mapping()` in `src/qdash/common/mux_mapping.py`.
+
 ## Qubit ID to Coordinate Conversion
+
+The CR scheduler's design-based direction inference (`qid_to_coords()` in
+`src/qdash/workflow/engine/scheduler/cr_utils.py`) uses this conversion when the topology does
+not declare `direction_convention: checkerboard_cr`. Topology templates list positions explicitly.
 
 ### Algorithm
 

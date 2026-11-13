@@ -51,6 +51,13 @@ from qdash.common.execution_resources import (
     resolve_execution_resource_scope,
     scope_contains,
 )
+from qdash.common.mux_mapping import (
+    MuxMapping,
+    MuxMappingError,
+    MuxMappingSnapshot,
+    check_qubex_mux_mapping,
+    resolve_chip_mux_mapping,
+)
 from qdash.common.utils.datetime import now
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
 from qdash.workflow.engine.params_updater import get_params_updater
@@ -137,12 +144,20 @@ class CalibSession:
         *,
         lease: WorkerLease | None = None,
         repositories: SessionRepositories | None = None,
+        mux_mapping: MuxMapping | None = None,
     ) -> None:
         """Create a session; ``lease`` makes it a worker borrowing its owner's Execution.
 
+        ``mux_mapping`` pins the MUX membership, as a worker receives it from
+        its owner; otherwise the chip topology is resolved once on first use.
+        A worker must receive it: it never resolves the chip topology itself.
+
         Raises:
-            ValueError: A per-task default names a task the backend does not register.
+            ValueError: A per-task default names a task the backend does not
+                register, or a worker has no MUX mapping from its owner.
         """
+        if lease is not None and mux_mapping is None:
+            raise ValueError("A worker session needs the MUX mapping its owner resolved")
         validate_task_names(settings.task_defaults, settings.backend_name)
         self.settings = settings
         self.role = SessionRole.WORKER if lease is not None else SessionRole.OWNER
@@ -167,6 +182,10 @@ class CalibSession:
         self._configuration_mode = settings.configuration_mode
         self._orchestrator: CalibOrchestrator | None = None
         self.github_integration: GitHubIntegration | None = None
+        self._mux_mapping: MuxMapping | None = mux_mapping
+        # A failed resolution is final for the session, so a later caller
+        # (such as worker_spec) cannot pick up a topology edited since.
+        self._mux_mapping_error: MuxMappingError | None = None
 
     # -- Settings views ------------------------------------------------------
 
@@ -220,11 +239,69 @@ class CalibSession:
     def github_push_config(self) -> GitHubPushConfig:
         return self.settings.github.push
 
+    @property
+    def mux_mapping(self) -> MuxMapping:
+        """MUX membership from the chip topology, resolved once per session.
+
+        An owner keeps it for every step of its run and hands it to its workers
+        (:meth:`worker_spec`), so the plan, the reservation, the workers and MUX
+        result fan-out all use one mapping even if the chip's topology changes.
+
+        A failed resolution is kept too: every later access raises the same
+        error instead of reading the chip topology again.
+
+        Raises:
+            MuxMappingError: If the chip's configured topology cannot be used.
+        """
+        if self._mux_mapping is None:
+            if self._mux_mapping_error is not None:
+                raise self._mux_mapping_error
+            try:
+                self._mux_mapping = resolve_chip_mux_mapping(self.project_id, self.chip_id)
+            except MuxMappingError as exc:
+                self._mux_mapping_error = exc
+                raise
+        return self._mux_mapping
+
+    def _qubex_mux_mapping(self) -> MuxMapping:
+        """:attr:`mux_mapping`, checked against the layout Qubex drives.
+
+        This is the same mapping the schedulers and execution locks use, so
+        the backend checks exactly the membership QDash schedules.
+
+        Raises:
+            MuxMappingError: If the mapping cannot be resolved, or Qubex would
+                drive different MUXes or slots than QDash schedules.
+        """
+        mapping = self.mux_mapping
+        check_qubex_mux_mapping(mapping)
+        return mapping
+
+    def _usable_mux_mapping(self) -> MuxMapping | None:
+        """:attr:`mux_mapping`, or ``None`` when the chip topology is unusable."""
+        try:
+            return self.mux_mapping
+        except MuxMappingError:
+            return None
+
+    def resource_scope(self, parameters: dict[str, Any]) -> ExecutionResourceScope:
+        """Hardware scope of ``parameters``; the whole chip if the MUX mapping is unusable."""
+        try:
+            mapping = self.mux_mapping
+        except MuxMappingError:
+            return ExecutionResourceScope(self.chip_id.strip(), exclusive=True)
+        return resolve_execution_resource_scope(self.chip_id, parameters, mux_mapping=mapping)
+
     def worker_spec(self) -> WorkerSpec:
         """What isolated workers of the current Execution inherit; the only such builder."""
         if self.execution_id is None:
             raise RuntimeError("Workers can only borrow an initialized Execution")
+        # A worker must inherit a mapping the owner successfully resolved.
+        # Propagate resolution errors rather than allowing a later worker to
+        # resolve a different topology after the chip configuration changes.
+        mapping = MuxMappingSnapshot.of(self.mux_mapping)
         return WorkerSpec(
+            mux_mapping=mapping,
             settings=self.settings.with_configuration_mode(self._configuration_mode).for_worker(),
             lease=WorkerLease(
                 execution_id=self.execution_id,
@@ -307,7 +384,7 @@ class CalibSession:
             return
         if parameters.get("qids") == []:
             return
-        requested = resolve_execution_resource_scope(self.chip_id, parameters)
+        requested = self.resource_scope(parameters)
         if not scope_contains(self._reserved_scope, requested):
             raise RuntimeError("Requested hardware is outside the workflow's reserved resources")
 
@@ -321,6 +398,13 @@ class CalibSession:
             return
 
         self.qids = qids
+        # Reject a MUX layout Qubex cannot drive before any lock, Execution
+        # or hardware session exists.
+        execution_mux_mapping = (
+            self._qubex_mux_mapping()
+            if self.backend_name == "qubex"
+            else self._usable_mux_mapping()
+        )
         flow_run_id = read_flow_run_id_from_context()
 
         self._ensure_execution_id()
@@ -337,9 +421,7 @@ class CalibSession:
         # A pipeline reserves its complete plan before any step starts. Later
         # step execution IDs never change the reservation owner or narrow scope.
         if not self.is_worker and not self._lock_acquired:
-            self._acquire_resource_scope(
-                resolve_execution_resource_scope(self.chip_id, {"qids": qids})
-            )
+            self._acquire_resource_scope(self.resource_scope({"qids": qids}))
 
         # Interruptions before the caller holds a session also release the claim.
         try:
@@ -370,6 +452,7 @@ class CalibSession:
                 default_run_parameters=self.default_run_parameters,
                 task_parameters=self.task_parameters,
                 force_update_params=settings.force_update_params,
+                mux_mapping=execution_mux_mapping,
             )
             if self._configuration_mode is not None:
                 config.configuration_mode = self._configuration_mode
@@ -504,10 +587,12 @@ class CalibSession:
         )[task_name]
         resource_parameters: dict[str, Any] = {"qid": qid}
         if task_name == "ConfigureAll":
-            resource_parameters = {
-                "mux_ids": effective_settings[RUN].get("mux_ids", {}).get("value")
-            }
+            mux_ids = effective_settings[RUN].get("mux_ids", {}).get("value")
+            self._reject_unknown_mux_ids(task_name, mux_ids)
+            resource_parameters = {"mux_ids": mux_ids}
+        self._reject_unknown_targets(task_name, [qid])
         self._validate_resource_scope(resource_parameters)
+        self._reject_mux_task_on_standalone(task_name, [qid])
         assert self._orchestrator is not None, "Session not initialized"
         result: dict[str, Any] = self._orchestrator.run_task(
             task_name,
@@ -538,7 +623,9 @@ class CalibSession:
             {task_name: self.task_parameters.get(task_name, {RUN: {}, INPUT: {}})},
             {task_name: settings},
         )[task_name]
+        self._reject_unknown_targets(task_name, qids)
         self._validate_resource_scope({"qids": qids})
+        self._reject_mux_task_on_standalone(task_name, qids)
         assert self._orchestrator is not None, "Session not initialized"
         return self._orchestrator.run_task_batch(
             task_name,
@@ -547,6 +634,63 @@ class CalibSession:
             upstream_id,
             invocation=_with_settings(invocation, effective_settings),
         )
+
+    def _reject_unknown_targets(self, task_name: str, targets: list[str]) -> None:
+        """Refuse qubit or coupling targets that a bounded chip topology does not define.
+
+        A whole-chip reservation covers any qubit ID, so membership is checked
+        here before any hardware work. System and global tasks address no qubit
+        and may pass a placeholder target. Legacy chips without a topology keep
+        the unbounded ``qid // 4`` convention and are not checked.
+        """
+        from qdash.workflow.calibtasks.base import BaseTask
+
+        task_class = BaseTask.registry.get(self.backend_name, {}).get(task_name)
+        if getattr(task_class, "task_type", None) in ("system", "global"):
+            return
+        mapping = self.mux_mapping
+        if mapping.unbounded:
+            return
+        unknown = [
+            str(target)
+            for target in targets
+            if not all(mapping.is_known(part.strip()) for part in str(target).split("-"))
+        ]
+        if unknown:
+            raise MuxMappingError(
+                f"{task_name} targets {unknown} are not defined in the chip topology"
+            )
+
+    def _reject_unknown_mux_ids(self, task_name: str, mux_ids: Any) -> None:
+        """Refuse a MUX selection outside the chip topology before it reaches hardware.
+
+        ``None`` or an empty list keeps the task's own default selection, which
+        reserves the whole chip. Any other value must list MUX IDs of the
+        session's mapping; a whole-chip reservation alone does not stop an
+        undefined MUX from being configured.
+        """
+        if mux_ids is None or mux_ids == []:
+            return
+        if not isinstance(mux_ids, list):
+            raise MuxMappingError(f"{task_name} mux_ids must be a list, got {mux_ids!r}")
+        self.mux_mapping.check_mux_ids(mux_ids)
+
+    def _reject_mux_task_on_standalone(self, task_name: str, qids: list[str]) -> None:
+        """Refuse a MUX-level task on qubits that the chip topology lists in no MUX.
+
+        A MUX task drives and fans out to a whole MUX; a standalone qubit has
+        none, and QDash must not pick an arbitrary one for it.
+        """
+        from qdash.workflow.calibtasks.active_protocols import is_mux_task
+
+        if not is_mux_task(task_name, self.backend_name):
+            return
+        standalone = [qid for qid in qids if self.mux_mapping.is_standalone(qid)]
+        if standalone:
+            raise MuxMappingError(
+                f"{task_name} is a MUX-level task and cannot run on standalone qubits "
+                f"{standalone}; they are in no MUX of the chip topology"
+            )
 
     def get_parameter(self, qid: str, param_name: str) -> Any:
         """Get a calibration parameter value for a qubit.
@@ -1273,7 +1417,12 @@ class CalibSession:
         pipeline_flow_name = base_settings.flow_name
 
         try:
-            qids = targets.to_qids(self.chip_id)
+            # An unusable configured topology stops here: no hardware from a guess.
+            mux_mapping = self.mux_mapping
+            if self.backend_name == "qubex":
+                # Reject a layout Qubex cannot drive before reserving hardware.
+                check_qubex_mux_mapping(mux_mapping)
+            qids = targets.to_qids(self.chip_id, mux_mapping=mux_mapping)
             # Validate pipeline dependencies, step ids and filter references
             pipeline = Pipeline(steps)
             # Manual rounds are checked against the chip before anything is
@@ -1283,7 +1432,9 @@ class CalibSession:
             calibration_plan = self.calibration_plan(list(pipeline))
             self.plan_digest = calibration_plan["digest"]
             pipeline_note = {**(base_settings.note or {}), "calibration_plan": calibration_plan}
-            self._acquire_resource_scope(plan_pipeline_resources(self.chip_id, targets, steps))
+            self._acquire_resource_scope(
+                plan_pipeline_resources(self.chip_id, targets, steps, mux_mapping=mux_mapping)
+            )
             run_logger.info(f"Starting calibration pipeline with {len(pipeline)} steps")
 
             ctx = StepContext()
@@ -1415,12 +1566,16 @@ class CalibSession:
 def borrowed_session(spec: WorkerSpec, qids: list[str]) -> Iterator[CalibSession]:
     """Run as an isolated worker of ``spec``'s owner for ``qids``.
 
-    The worker inherits every measurement setting of its owner and borrows the
-    owner's Execution and reservation. Leaving the block only releases the
+    The worker inherits every measurement setting and the MUX mapping of its
+    owner and borrows the owner's Execution and reservation. Leaving the block only releases the
     worker's backend: the owner records the terminal status, updates chip
     history, pushes to GitHub and releases the reservation.
     """
-    session = CalibSession(spec.settings, lease=spec.lease)
+    session = CalibSession(
+        spec.settings,
+        lease=spec.lease,
+        mux_mapping=spec.mux_mapping.to_mapping(),
+    )
     session._initialize(qids)
     try:
         yield session

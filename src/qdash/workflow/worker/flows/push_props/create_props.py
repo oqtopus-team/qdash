@@ -197,6 +197,7 @@ def create_chip_properties(
             "qids": "",
             "note_path": "",
             "chip_id": chip_id,
+            "project_id": project_id,
         },
     )
     props, _ = get_chip_properties(

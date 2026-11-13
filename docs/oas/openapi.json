@@ -16264,7 +16264,7 @@
           "topology"
         ],
         "summary": "Get topology by ID",
-        "description": "Get a specific topology definition.\n\nArgs:\n----\n    topology_id: Topology identifier (e.g., \"square-lattice-mux-64\")\n\nReturns:\n-------\n    dict: Complete topology definition with qubits and couplings",
+        "description": "Get a specific topology definition.\n\nArgs:\n----\n    topology_id: Topology identifier (e.g., \"square-lattice-mux-64\")\n\nReturns:\n-------\n    dict: Complete topology definition with qubits, couplings and the\n    normalized ``muxes`` (MUX ID to member qubits in local slot order).\n    Qubits that no MUX lists are standalone. Legacy ``mux`` templates are\n    normalized too, and ``muxes_source`` says which format the template\n    used, so every client renders the same membership the schedulers use.\n    ``mux_slots`` maps each multiplexed qubit to its hardware slot; legacy\n    slot gaps are preserved and can differ from normalized array indices.",
         "operationId": "getTopologyById",
         "security": [
           {
@@ -26504,6 +26504,14 @@
           "mux_id": {
             "type": "integer",
             "title": "Mux Id"
+          },
+          "qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Qids",
+            "description": "Member qubit IDs in local slot order, from the chip topology"
           },
           "detail": {
             "additionalProperties": {

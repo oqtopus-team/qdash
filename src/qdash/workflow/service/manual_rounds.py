@@ -2,8 +2,8 @@
 
 ``execution_mode="manual"`` steps hand their rounds here. Before any worker
 starts, the rounds are checked with :mod:`qdash.common.manual_rounds` against
-the chip's wiring, its directed coupling IDs and the step's current qubits;
-the API preview runs the same checks. Then every round runs its targets in
+the session's pinned MUX mapping, the chip's wiring, its directed coupling IDs
+and the step's current qubits; the API preview runs the same checks. Then every round runs its targets in
 parallel and the next round starts after every target of the round finished.
 No round is colored, reordered, chunked or reversed, and no earlier CR schedule
 or target override replaces it.
@@ -20,6 +20,7 @@ from qdash.common.manual_rounds import (
     PairRounds,
     QubitRounds,
     load_wiring_entries,
+    needs_wiring,
     pair_candidate_issues,
     pair_round_issues,
     qubit_candidate_issues,
@@ -30,14 +31,20 @@ from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from qdash.common.mux_mapping import MuxMapping
     from qdash.datamodel.task_call import StepCalls
     from qdash.workflow.service._internal.session import CalibSession
 
 MANUAL_STAGE_RESULT = "1q_manual"
 
 
-def chip_wiring(chip_id: str) -> list[dict[str, Any]]:
-    """The MUX entries of the chip's wiring.yaml, as the schedulers read it."""
+def chip_wiring(chip_id: str, mux_mapping: MuxMapping | None = None) -> list[dict[str, Any]]:
+    """The MUX entries of the chip's wiring.yaml, as the schedulers read it.
+
+    A topology without any MUX needs no wiring: its qubits are all standalone.
+    """
+    if not needs_wiring(mux_mapping):
+        return []
     return load_wiring_entries(get_qubex_paths().wiring_yaml(chip_id), chip_id)
 
 
@@ -57,8 +64,14 @@ def check_qubit_rounds(
     step: str,
     candidates: Sequence[str] | None = None,
 ) -> None:
-    """Raise :class:`ManualRoundsError` for rounds the model or the candidates reject."""
-    issues = qubit_round_issues(rounds, chip_wiring(session.chip_id))
+    """Raise :class:`ManualRoundsError` for rounds the model or the candidates reject.
+
+    Membership comes from the session's pinned MUX mapping, the same mapping
+    its workers, resource reservations and MUX fan-out use. An unusable chip
+    topology raises ``MuxMappingError`` before any target runs.
+    """
+    mapping = session.mux_mapping
+    issues = qubit_round_issues(rounds, chip_wiring(session.chip_id, mapping), mapping)
     if candidates is not None:
         issues.extend(qubit_candidate_issues(rounds, candidates))
     if issues:
@@ -72,11 +85,16 @@ def check_pair_rounds(
     step: str,
     candidates: Sequence[str] | None = None,
 ) -> None:
-    """Raise :class:`ManualRoundsError` for pairs the model or the candidates reject."""
+    """Raise :class:`ManualRoundsError` for pairs the model or the candidates reject.
+
+    Uses the session's pinned MUX mapping, as :func:`check_qubit_rounds` does.
+    """
+    mapping = session.mux_mapping
     issues = pair_round_issues(
         rounds,
-        chip_wiring(session.chip_id),
+        chip_wiring(session.chip_id, mapping),
         chip_coupling_ids(session.project_id, session.chip_id),
+        mapping,
     )
     if candidates is not None:
         issues.extend(pair_candidate_issues(rounds, candidates))

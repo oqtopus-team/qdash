@@ -4503,7 +4503,13 @@ const listTopologies = (
  *
  * Returns:
  * -------
- *     dict: Complete topology definition with qubits and couplings
+ *     dict: Complete topology definition with qubits, couplings and the
+ *     normalized ``muxes`` (MUX ID to member qubits in local slot order).
+ *     Qubits that no MUX lists are standalone. Legacy ``mux`` templates are
+ *     normalized too, and ``muxes_source`` says which format the template
+ *     used, so every client renders the same membership the schedulers use.
+ *     ``mux_slots`` maps each multiplexed qubit to its hardware slot; legacy
+ *     slot gaps are preserved and can differ from normalized array indices.
  * @summary Get topology by ID
  */
 const getTopologyById = (

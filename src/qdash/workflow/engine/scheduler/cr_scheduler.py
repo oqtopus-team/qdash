@@ -46,6 +46,7 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
+from qdash.common.mux_mapping import MuxMapping, resolve_topology_mux_mapping
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.engine.scheduler.cr_utils import (
     build_mux_conflict_map,
@@ -159,6 +160,7 @@ class CRScheduler:
         *,
         project_id: str | None = None,
         chip_repo: ChipRepository | None = None,
+        mux_mapping: MuxMapping | None = None,
     ) -> None:
         """Initialize CR scheduler.
 
@@ -169,6 +171,8 @@ class CRScheduler:
                 If None, uses the default QubexPaths wiring path.
             chip_repo: Repository for chip data access.
                 If None, uses MongoChipRepository.
+            mux_mapping: MUX membership resolved from the chip topology. If None,
+                it is resolved from the chip's ``topology_id``.
 
         """
         self.username = username
@@ -179,6 +183,7 @@ class CRScheduler:
         self._chip: ChipModel | None = None
         self._wiring_config: list[dict[str, Any]] | None = None
         self._topology: TopologyDefinition | None = None
+        self._mux_mapping = mux_mapping
         # Cached individual document data (scalable approach for 256+ qubits)
         self._qubit_models: dict[str, Any] | None = None
         self._coupling_ids: list[str] | None = None
@@ -244,6 +249,19 @@ class CRScheduler:
                     )
         return self._topology
 
+    def _resolve_mux_mapping(self) -> MuxMapping:
+        """MUX membership from the chip topology; legacy only without a topology_id.
+
+        A configured topology that cannot be loaded raises rather than letting
+        the schedule use a guessed MUX layout.
+        """
+        if self._mux_mapping is None:
+            topology_id = self._load_chip_data().topology_id
+            self._mux_mapping = resolve_topology_mux_mapping(
+                topology_id if isinstance(topology_id, str) else None
+            )
+        return self._mux_mapping
+
     def _get_topology_direction_set(self, inverse: bool = False) -> set[str] | None:
         """Get set of valid coupling directions from topology.
 
@@ -280,6 +298,17 @@ class CRScheduler:
 
         return self._wiring_config
 
+    def _load_mux_wiring(self) -> list[dict[str, Any]]:
+        """Wiring rows for the chip's MUXes; none when the topology has no MUX.
+
+        ``wiring.yaml`` maps only MUXes to hardware, so a chip whose topology
+        declares no MUX needs no wiring to schedule its standalone qubits.
+        """
+        mapping = self._resolve_mux_mapping()
+        if not mapping.unbounded and not mapping.mux_ids:
+            return []
+        return self._load_wiring_config()
+
     def _get_two_qubit_pair_list(self) -> list[str]:
         """Extract all two-qubit coupling IDs from CouplingDocument collection."""
         coupling_ids = self._load_coupling_ids()
@@ -303,6 +332,9 @@ class CRScheduler:
         Args:
             filters: List of CRPairFilter instances to apply in order.
                 If None, uses default filters (frequency directionality only).
+                After the filters, pairs with a qubit that is neither a wired
+                MUX member nor a standalone qubit of the topology are always
+                dropped, as ``MuxMembershipFilter`` would.
             scheduler: CRSchedulingStrategy instance for scheduling.
                 If None, uses default (IntraThenInterMuxScheduler with MuxConflictScheduler).
 
@@ -360,9 +392,9 @@ class CRScheduler:
         qubit_frequency = extract_qubit_frequency(qubit_models)
 
         # Load MUX configuration
-        wiring_config = self._load_wiring_config()
+        wiring_config = self._load_mux_wiring()
         mux_conflict_map = build_mux_conflict_map(wiring_config)
-        qid_to_mux = build_qubit_to_mux_map(wiring_config)
+        qid_to_mux = build_qubit_to_mux_map(wiring_config, self._resolve_mux_mapping())
 
         # Determine grid size
         grid_size = 12 if "144Q" in self.chip_id else 8
@@ -378,6 +410,7 @@ class CRScheduler:
             qid_to_mux=qid_to_mux,
             qubit_models=qubit_models,
             topology_directions=topology_directions,
+            standalone_qids=frozenset(self._resolve_mux_mapping().standalone_qids),
         )
 
         # Use default filters if not provided
@@ -401,6 +434,24 @@ class CRScheduler:
             filter_stats.append(stats)
             logger.info(
                 f"  Filter {i} ({stats['filter_name']}): {stats['input_pairs']} → {stats['output_pairs']}"
+            )
+
+        # Whatever the filters, a pair runs only when both qubits are wired MUX
+        # members or standalone qubits of the topology. Without this, a qubit the
+        # topology does not define would have no MUX and be scheduled as a slow pair.
+        pairs_before_mux_filter = len(filtered_pairs)
+        filtered_pairs = [
+            pair
+            for pair in filtered_pairs
+            if all(
+                qid in qid_to_mux or qid in filter_context.standalone_qids
+                for qid in pair.split("-")
+            )
+        ]
+        if pairs_before_mux_filter != len(filtered_pairs):
+            logger.warning(
+                f"Filtered out {pairs_before_mux_filter - len(filtered_pairs)} pairs "
+                f"with qubits missing from MUX configuration"
             )
 
         if len(filtered_pairs) == 0:
@@ -452,6 +503,7 @@ class CRScheduler:
         filtering_stats = {
             "all_coupling_pairs": len(all_pairs),
             "final_filtered_pairs": len(filtered_pairs),
+            "mux_filtered_out": pairs_before_mux_filter - len(filtered_pairs),
             "filter_pipeline": filter_stats,
         }
 
@@ -474,8 +526,9 @@ class CRScheduler:
 
         Unlike :meth:`generate`, no pair is added, dropped or reversed: every
         ``(control, target)`` pair must be a chip coupling with that exact ID and
-        both qubits must be wired. Pairs sharing a qubit or conflicting MUXes run
-        in different groups.
+        both qubits must be wired MUX members or standalone qubits of the chip
+        topology. Pairs sharing a qubit or conflicting MUXes run in different
+        groups; a pair with a standalone qubit never shares a group.
 
         Raises:
             ValueError: If ``pairs`` is empty, duplicated, or names an unknown
@@ -492,10 +545,18 @@ class CRScheduler:
         if unknown:
             raise ValueError(f"Coupling pairs not found on chip {self.chip_id}: {unknown}")
 
-        wiring_config = self._load_wiring_config()
+        mapping = self._resolve_mux_mapping()
+        wiring_config = self._load_mux_wiring()
         mux_conflict_map = build_mux_conflict_map(wiring_config)
-        qid_to_mux = build_qubit_to_mux_map(wiring_config)
-        unwired = [pair for pair in cr_pairs if any(q not in qid_to_mux for q in pair.split("-"))]
+        qid_to_mux = build_qubit_to_mux_map(wiring_config, mapping)
+        # Standalone qubits are valid targets without wiring; their pairs are
+        # slow and never share a group with another pair.
+        standalone = set(mapping.standalone_qids)
+        unwired = [
+            pair
+            for pair in cr_pairs
+            if any(q not in qid_to_mux and q not in standalone for q in pair.split("-"))
+        ]
         if unwired:
             raise ValueError(f"Coupling pairs with qubits missing from the wiring: {unwired}")
 
@@ -681,13 +742,19 @@ class CRScheduler:
             raise ValueError(msg)
 
         # Load MUX configuration
-        wiring_config = self._load_wiring_config()
+        wiring_config = self._load_mux_wiring()
         mux_conflict_map = build_mux_conflict_map(wiring_config)
-        qid_to_mux = build_qubit_to_mux_map(wiring_config)
+        qid_to_mux = build_qubit_to_mux_map(wiring_config, self._resolve_mux_mapping())
 
-        # Filter out CR pairs that have qubits without MUX mappings
+        # Filter out CR pairs with qubits of unwired MUXes. Standalone qubits
+        # stay: they are valid targets whose pairs are scheduled one at a time.
+        standalone = set(self._resolve_mux_mapping().standalone_qids)
         pairs_before_mux_filter = len(cr_pairs)
-        cr_pairs = [pair for pair in cr_pairs if all(qid in qid_to_mux for qid in pair.split("-"))]
+        cr_pairs = [
+            pair
+            for pair in cr_pairs
+            if all(qid in qid_to_mux or qid in standalone for qid in pair.split("-"))
+        ]
         if pairs_before_mux_filter != len(cr_pairs):
             logger.warning(
                 f"Filtered out {pairs_before_mux_filter - len(cr_pairs)} pairs "
@@ -699,7 +766,8 @@ class CRScheduler:
             logger.error(msg)
             raise ValueError(msg)
 
-        # Group pairs: fast (intra-MUX) first, then slow (inter-MUX)
+        # Group pairs: fast (intra-MUX) first, then slow (inter-MUX). Pairs with
+        # a standalone qubit are slow and never share a group with another pair.
         fast, slow = split_fast_slow_pairs(cr_pairs, qid_to_mux)
         grouped = group_cr_pairs_by_conflict(
             fast, qid_to_mux, mux_conflict_map, max_parallel_ops, coloring_strategy

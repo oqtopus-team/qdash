@@ -28,9 +28,9 @@ CheckRabi, CreateHPIPulse, CreatePIPulse, CheckT1, CheckT2Echo, and CheckRamsey 
 
 The template targets MUXes, as the hardware templates do. The literal `MUX_IDS` list at the top of
 the source selects MUX 0 to 15, all 64 qubits, and the execution dialog shows it as the default
-targets. QDash finds the four qubits of each MUX in the chip's wiring, and the same box-aware
-scheduler that runs a hardware chip runs them: MUX groups in the same hardware stage run in parallel, and
-the qubits of one MUX run one after another. Hardware stages run sequentially.
+targets. QDash takes the four qubits of each MUX from the chip's topology, and the same box-aware
+scheduler that runs a hardware chip runs them: MUX groups in the same hardware stage run in
+parallel, and the qubits of one MUX run one after another. Hardware stages run sequentially.
 
 To calibrate fewer qubits or tasks, change the source or the run:
 

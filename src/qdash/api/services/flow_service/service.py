@@ -50,6 +50,7 @@ from qdash.api.services.flow_service.validation import (
 )
 from qdash.api.services.manual_round_checks import load_chip_round_model
 from qdash.common.manual_rounds import MANUAL_TARGET_OVERRIDE_REASON
+from qdash.common.mux_mapping import resolve_topology_mux_mapping
 from qdash.config import get_settings
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
 
@@ -450,8 +451,11 @@ class FlowService:
         if not chip:
             raise HTTPException(status_code=400, detail="Select a chip to preview the execution")
         repository = self._chips()
-        if repository.find_by_id(project_id, chip) is None:
+        found = repository.find_by_id(project_id, chip)
+        if found is None:
             raise HTTPException(status_code=404, detail=f"Chip '{chip}' not found in this project")
+        # The chip's topology, resolved as the worker session resolves it.
+        topology_id = getattr(found, "topology_id", None)
         # The parameters a run from the execution dialog receives.
         parameters: dict[str, Any] = {
             **flow.default_parameters,
@@ -467,7 +471,14 @@ class FlowService:
             code=self._sources.read(file_path),
             function_name=flow.flow_function_name,
             parameters=parameters,
-            chip_model=lambda: load_chip_round_model(project_id, chip, repository.get_coupling_ids),
+            chip_model=lambda: load_chip_round_model(
+                project_id,
+                chip,
+                repository.get_coupling_ids,
+                lambda: resolve_topology_mux_mapping(
+                    topology_id if isinstance(topology_id, str) else None
+                ),
+            ),
         )
 
     def _chips(self) -> ChipRepository:

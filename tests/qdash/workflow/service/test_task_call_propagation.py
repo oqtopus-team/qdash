@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 
 import qdash.workflow.calibtasks.qubex  # noqa: F401 - registers the qubex tasks
+from qdash.common.mux_mapping import MuxMapping, MuxMappingSnapshot
 from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service._internal import scheduling_tasks
 from qdash.workflow.service.results import OneQubitResult
@@ -45,6 +46,7 @@ class RecordingSession:
     """A worker session that records calls and fails where it is told to."""
 
     backend_name = "qubex"
+    mux_mapping = MuxMapping.legacy()
 
     def __init__(self, log: list[tuple[str, str, str, str]], fail: set[tuple[str, str]]) -> None:
         self.log = log
@@ -95,6 +97,7 @@ def _worker_spec() -> Any:
             username="alice", chip_id="64Q", project_id="project-1", backend_name="qubex"
         ).for_worker(),
         lease=WorkerLease(execution_id="exec-1"),
+        mux_mapping=MuxMappingSnapshot.of(MuxMapping.legacy()),
     )
 
 
@@ -109,6 +112,7 @@ def _session() -> CalibSession:
             project_id="project-1",
             task_parameters={},
             plan_digest="digest-1",
+            mux_mapping=MuxMapping.legacy(),
             worker_spec=_worker_spec,
             record_stage_result=lambda *args: None,
         ),

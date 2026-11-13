@@ -150,6 +150,7 @@ def worker_spec_contract() -> dict[str, Any]:
     from prefect import flow
     from prefect.utilities.hashing import hash_objects
 
+    from qdash.common.mux_mapping import MuxMapping, MuxMappingSnapshot
     from qdash.datamodel.task_call import TaskCall as Call
     from qdash.datamodel.task_call import normalize_calls
     from qdash.workflow.service._internal.settings import (
@@ -174,6 +175,15 @@ def worker_spec_contract() -> dict[str, Any]:
         lease=WorkerLease(
             execution_id="exec-1",
             reservation=ReservationScope(chip_id="64Q", resources=("mux:0",)),
+        ),
+        # A synthetic explicit mapping with a standalone qubit, so the pinned
+        # membership is part of what must cross the boundaries unchanged.
+        mux_mapping=MuxMappingSnapshot.of(
+            MuxMapping.from_groups(
+                {0: ["0", "1", "2", "3"], 2: ["8", "10"]},
+                topology_id="synthetic",
+                known_qids=["0", "1", "2", "3", "8", "10", "20"],
+            )
         ),
     )
     plan = StepCalls(step_id="step", calls=normalize_calls([Call(name="CheckRabi")]))

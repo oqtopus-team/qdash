@@ -21,7 +21,8 @@ synchronize pulses or tasks between the targets of a round: a round is the same 
 ## Write One-Qubit Rounds
 
 `CustomOneQubit`, `OneQubitCheck`, and `OneQubitFineTune` accept `execution_mode="manual"` with
-`rounds`, a list of rounds that each list qubit IDs as strings:
+`rounds`, a list of rounds that each list qubit IDs as strings without leading zeros, such as
+`"7"`:
 
 ```python
 from prefect import flow
@@ -57,11 +58,15 @@ adds a qubit. In the example, `QubitTargets(["0", "8", "1", "9"])` matches the r
 `MuxTargets([0, 2])` would also select qubits 2, 3, 10, and 11 and fail. `OneQubitCheck` always
 compares its rounds with the run's targets, as it does in the other modes.
 
-QDash checks one-qubit rounds against the chip wiring with the rules the automatic round schedule
-follows:
+QDash checks one-qubit rounds against the chip's topology and wiring with the rules the automatic
+round schedule follows. The MUX of each qubit comes from the chip's topology template, as for
+every other run; a chip without a topology keeps MUX `N` = qubits `4N` to `4N + 3`.
 
 - a qubit appears in only one round of a step, because its result would otherwise be overwritten;
-- every qubit has a MUX entry in the chip wiring;
+- every qubit is defined by the chip's topology, and a qubit in a MUX has a MUX entry in the chip
+  wiring;
+- a standalone qubit, which the topology lists in no MUX, runs alone in its round, because QDash
+  does not know which hardware it shares;
 - the qubits of one round use different MUXes;
 - a round does not mix Box A, Box B, and mixed MUXes, which the scheduler runs in separate stages;
 - mixed MUXes of one round do not share a Box B control module.
@@ -88,9 +93,11 @@ that:
 
 - every pair is a coupling of the chip in exactly the written direction; `("5", "4")` is a
   different pair from `("4", "5")`, and QDash never reverses it;
-- both qubits of every pair are among the step's current qubits;
+- both qubits of every pair are among the step's current qubits and are defined by the chip's
+  topology;
 - the pairs of one round share no qubit, no MUX, and no MUX whose readout or control module is
   shared in the chip wiring;
+- a pair with a standalone qubit runs alone in its round;
 - a directed pair appears in only one round of a step.
 
 A manual two-qubit step ignores a CR schedule from an earlier `GenerateCRSchedule` or
@@ -135,9 +142,9 @@ between them can change the source that executes.
 A round tells QDash which targets may run in parallel, not that they measure at the same moment.
 Each parallel executor has 16 worker slots; resource availability and deployment settings can
 reduce actual concurrency. Targets beyond those slots wait for earlier targets to finish, still
-before the next round. The checks use the chip wiring and coupling
-list that QDash models; they do not prove that your hardware can drive every target of a round
-together. On wiring written as `<box ID>:<port>`, such as QuEL-3, every MUX is a mixed MUX and
+before the next round. The checks use the chip's topology, wiring, and coupling list that QDash
+models; when the topology of the chip cannot be loaded, the preview and the run reject every
+round. The checks do not prove that your hardware can drive every target of a round together. On wiring written as `<box ID>:<port>`, such as QuEL-3, every MUX is a mixed MUX and
 QDash can only check shared MUXes and, for pairs, shared modules; see
 [Check Parallel Execution on QuEL-3](./setup/qubex-backend.md#check-parallel-execution-on-quel-3).
 

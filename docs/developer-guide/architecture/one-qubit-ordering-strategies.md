@@ -14,13 +14,14 @@ shared-module grouping remain the responsibility of `OneQubitScheduler`.
   round starts.
 
 Both operations receive `OrderingContext`, which contains the chip ID, qubit-grid size, MUX-grid
-size, and qubit-to-MUX map. Strategies return qubit IDs only; they do not inspect wiring resources,
+size, qubit-to-MUX map, and the topology's `mux_mapping`. `OrderingContext.slot_members()` returns
+a MUX's qubits by local slot; without a mapping, slot `i` of MUX `N` is qubit `4N + i`. Strategies return qubit IDs only; they do not inspect wiring resources,
 start Prefect tasks, or execute hardware operations.
 
 ## Built-in Strategies
 
-`DefaultOrderingStrategy` uses numeric qubit order within each MUX. Its rounds take the same
-local offset from every selected MUX:
+`DefaultOrderingStrategy` uses local slot order within each MUX. Its rounds take the same local
+slot from every selected MUX; with the legacy mapping:
 
 ```text
 round 0: 4N
@@ -29,9 +30,9 @@ round 2: 4N + 2
 round 3: 4N + 3
 ```
 
-`CheckerboardOrderingStrategy` alternates local offsets by MUX parity:
+`CheckerboardOrderingStrategy` alternates local slots by MUX ID parity:
 
-| MUX parity | Offset order |
+| MUX parity | Slot order |
 | --- | --- |
 | Even | `0, 1, 2, 3` |
 | Odd | `2, 3, 0, 1` |
@@ -45,8 +46,13 @@ round 2: 2, 4, 10, 12
 round 3: 3, 5, 11, 13
 ```
 
+A slot's round is its position in the parity order, even when the MUX lacks some slots. For
+example, an odd MUX with only slots 0 and 1 leaves rounds 0 and 1 empty and runs its slots in
+rounds 2 and 3, together with slots 0 and 1 of the other odd MUXes. Slots beyond 3 in a larger
+MUX follow in slot order after round 3. Rounds that no MUX fills are not emitted.
+
 This interleaving avoids selecting the same physical row position from every neighboring MUX at
-once. It is a scheduling policy based on the fixed four-qubits-per-MUX layout, not a replacement
+once. It is a scheduling policy based on the 2×2 slot layout of each MUX, not a replacement
 for measured-frequency validation.
 
 ## How the Scheduler Uses a Strategy

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from qdash.common.mux_mapping import MuxMapping
 from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler
 from qdash.workflow.engine.scheduler.cr_utils import (
     build_mux_conflict_map,
@@ -57,6 +58,8 @@ def test_docs_groups_match_schedule_pairs(demo: ModuleType, tmp_path: Path) -> N
         username="docs",
         chip_id="docs_chip",
         wiring_config_path=str(tmp_path / "unused.yaml"),
+        # The docs fixture is a chip without a topology: the legacy MUX layout.
+        mux_mapping=MuxMapping.legacy(),
     )
     scheduler._coupling_ids = _ids(demo.PAIRS)
     scheduler._wiring_config = _wiring(demo)
@@ -76,6 +79,8 @@ def test_docs_cap_2_splits_color_1(demo: ModuleType, tmp_path: Path) -> None:
         username="docs",
         chip_id="docs_chip",
         wiring_config_path=str(tmp_path / "unused.yaml"),
+        # The docs fixture is a chip without a topology: the legacy MUX layout.
+        mux_mapping=MuxMapping.legacy(),
     )
     scheduler._coupling_ids = _ids(demo.PAIRS)
     scheduler._wiring_config = _wiring(demo)

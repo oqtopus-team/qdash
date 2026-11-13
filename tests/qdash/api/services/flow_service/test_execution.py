@@ -393,7 +393,7 @@ class TestExecutionCoordinatorDispatchRun:
         with patch(
             "qdash.api.services.flow_service.execution.resolve_execution_resource_scope",
             return_value=scope,
-        ):
+        ) as resolve_scope:
             await _coordinator(lock=lock, executions=MagicMock(), prefect=prefect).dispatch_run(
                 project_id="proj-1",
                 username="user-1",
@@ -403,6 +403,8 @@ class TestExecutionCoordinatorDispatchRun:
                 parameters={"qid": "Q00"},
             )
 
+        # The project is needed to resolve the chip topology's MUX mapping.
+        resolve_scope.assert_called_once_with("chip-1", {"qid": "Q00"}, project_id="proj-1")
         lock.try_lock.assert_called_once_with(
             project_id="proj-1",
             execution_id="20240101-001",

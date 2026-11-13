@@ -101,6 +101,7 @@ from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
     BOX_B,
     BOX_MIXED,
+    BOX_STANDALONE,
     MuxBatchScheduleResult,
     MuxBatchStepInfo,
     OneQubitRound,
@@ -125,6 +126,7 @@ __all__ = [
     "BOX_A",
     "BOX_B",
     "BOX_MIXED",
+    "BOX_STANDALONE",
     "CRScheduleResult",
     # Scheduler
     "CRScheduler",

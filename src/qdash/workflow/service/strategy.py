@@ -10,7 +10,7 @@ targets wait for each other, and every target runs the step's full call list.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
@@ -53,6 +53,9 @@ class OneQubitConfig:
     plan: StepCalls
     qids: list[str] | None = None  # Explicit qubit IDs (overrides mux_ids if set)
     simultaneous_spectroscopy_schedule_mode: str = "local_index"
+    # Standalone (non-multiplexed) qubits to calibrate besides the MUX members.
+    # They run after the MUX stages, one at a time.
+    standalone_qids: list[str] = field(default_factory=list)
 
     @property
     def tasks(self) -> list[str]:
@@ -134,10 +137,14 @@ class OneQubitParallelByMuxStrategy(OneQubitStrategy):
         """Run the MUX groups of each stage in parallel, stages one after another."""
         wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=session.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id,
+            wiring_config_path=wiring_config_path,
+            mux_mapping=session.mux_mapping,
         )
         schedule = scheduler.generate_from_mux(
-            mux_ids=config.mux_ids, exclude_qids=config.exclude_qids
+            mux_ids=config.mux_ids,
+            exclude_qids=config.exclude_qids,
+            standalone_qids=config.standalone_qids,
         )
 
         all_results = {}
@@ -232,12 +239,15 @@ class OneQubitParallelByRoundStrategy(OneQubitStrategy):
 
         wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=session.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id,
+            wiring_config_path=wiring_config_path,
+            mux_mapping=session.mux_mapping,
         )
         schedule = scheduler.generate_rounds_from_mux(
             mux_ids=config.mux_ids,
             exclude_qids=config.exclude_qids,
             use_checkerboard=True,
+            standalone_qids=config.standalone_qids,
         )
 
         logger.info(f"parallel_by_round schedule: {schedule.total_rounds} rounds")
@@ -294,12 +304,15 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
 
         wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=session.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id,
+            wiring_config_path=wiring_config_path,
+            mux_mapping=session.mux_mapping,
         )
         schedule = scheduler.generate_simultaneous_spectroscopy_batches_from_mux(
             mux_ids=config.mux_ids,
             exclude_qids=config.exclude_qids,
             mode=config.simultaneous_spectroscopy_schedule_mode,
+            standalone_qids=config.standalone_qids,
         )
 
         runner = OneQubitStageRunner(session)
@@ -337,10 +350,14 @@ class OneQubitSequentialStrategy(OneQubitStrategy):
         """Run the MUX groups one after another in the parent session."""
         wiring_config_path = self._get_wiring_config_path(session.chip_id)
         scheduler = OneQubitScheduler(
-            chip_id=session.chip_id, wiring_config_path=wiring_config_path
+            chip_id=session.chip_id,
+            wiring_config_path=wiring_config_path,
+            mux_mapping=session.mux_mapping,
         )
         schedule = scheduler.generate_from_mux(
-            mux_ids=config.mux_ids, exclude_qids=config.exclude_qids
+            mux_ids=config.mux_ids,
+            exclude_qids=config.exclude_qids,
+            standalone_qids=config.standalone_qids,
         )
 
         # Collect all qids from all stages

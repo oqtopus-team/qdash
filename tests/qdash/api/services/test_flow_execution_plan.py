@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import pytest
 from fastapi import HTTPException
@@ -19,15 +20,13 @@ from qdash.api.services.flow_service.service import FlowService
 from qdash.api.services.flow_service.source_store import FlowSourceStore
 from qdash.api.services.flow_service.target_defaults import supported_target_modes
 from qdash.api.services.manual_round_checks import ChipRoundModel
+from qdash.common.mux_mapping import MuxMapping
 from tests.qdash.api.services.test_flow_service import (
     _FakeFlowRepository,
     _make_flow,
     _StubCoordinator,
     _StubDeploymentClient,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 UPDATED = datetime(2026, 11, 1, tzinfo=timezone.utc)
 WIRING = [
@@ -126,6 +125,32 @@ def test_the_manual_example_resolves_to_its_exact_rounds() -> None:
 def test_known_parameters_select_the_branch_that_runs() -> None:
     [run] = _plan(MANUAL, {"use_pairs": False}).runs
     assert [step.name for step in run.steps] == ["rabi"]
+
+
+def test_the_bundled_fast_template_previews_both_configure_all_steps() -> None:
+    # The fast template reconfigures before fine-tuning; each ConfigureAll keeps its own name.
+    import qdash.workflow as workflow
+
+    code = (Path(workflow.__file__).parent / "templates" / "fast_full_calibration.py").read_text()
+    response = build_execution_plan(
+        flow_name="fast_full_calibration",
+        chip_id="chip-1",
+        updated_at=UPDATED,
+        code=code,
+        function_name="fast_full_calibration",
+        parameters={"mux_ids": [0, 1]},
+        chip_model=lambda: MODEL,
+    )
+    assert response.status == "resolved" and response.reason is None
+    [run] = response.runs
+    names = [step.name for step in run.steps]
+    assert names[:5] == [
+        "configure_all",
+        "one_qubit_check",
+        "filter_by_status",
+        "configure_all_before_fine_tune",
+        "one_qubit_fine_tune",
+    ]
 
 
 def test_automatic_steps_are_described_not_computed() -> None:
@@ -490,10 +515,13 @@ class _ChipRepository:
     def __init__(self, chips: set[str]) -> None:
         self.chips = chips
         self.calls: list[str] = []
+        self.topology_id: str | None = None
 
     def find_by_id(self, project_id: str, chip_id: str) -> Any:
         self.calls.append(f"find:{project_id}:{chip_id}")
-        return SimpleNamespace(chip_id=chip_id) if chip_id in self.chips else None
+        if chip_id not in self.chips:
+            return None
+        return SimpleNamespace(chip_id=chip_id, topology_id=self.topology_id)
 
     def get_coupling_ids(self, project_id: str, chip_id: str) -> list[str]:
         self.calls.append(f"couplings:{project_id}:{chip_id}")
@@ -562,3 +590,118 @@ async def test_execute_rejects_target_overrides_for_manual_flows(tmp_path: Path)
     assert error.value.status_code == 400
     assert "Target overrides are not accepted" in str(error.value.detail)
     assert cast("Any", service)._coordinator.run_calls == []
+
+
+# ---------------------------------------------------------------------------
+# Topology MUX mapping
+# ---------------------------------------------------------------------------
+
+# Synthetic topology: sparse MUX IDs, MUX 9 owns 41 (``qid // 4`` would say MUX 10)
+# and qubit 20 is standalone.
+SPARSE_MODEL = ChipRoundModel(
+    wiring=[
+        {"mux": 9, "ctrl": ["Q9A-0", "Q9A-1", "Q9A-2"], "read_out": "R9A-0"},
+        {"mux": 2, "ctrl": ["Q2A-0"], "read_out": "R2A-0"},
+    ],
+    coupling_ids=frozenset({"36-41"}),
+    mux_mapping=MuxMapping.from_groups(
+        {9: ["36", "41", "38"], 2: ["5"]}, known_qids=["36", "41", "38", "5", "20"]
+    ),
+)
+
+
+def _sparse_source(rounds: str) -> str:
+    return _source(
+        f"""
+cal = CalibService(username, chip_id)
+cal.run(MuxTargets([9, 2], exclude_qids=["38"]), steps=[
+    CustomOneQubit(tasks=[TaskCall(name="CheckRabi")], execution_mode="manual", rounds={rounds}),
+])
+"""
+    )
+
+
+def test_preview_resolves_mux_targets_and_rounds_with_the_topology_mapping() -> None:
+    plan = _plan(_sparse_source('[["36", "5"], ["41"]]'), model=SPARSE_MODEL)
+    assert plan.status == "resolved"
+    [step] = plan.runs[0].steps
+    assert step.issues == [] and step.unchecked == []
+    assert [r.targets for r in step.rounds] == [["36", "5"], ["41"]]
+
+    shared = _plan(_sparse_source('[["36", "41"], ["5"]]'), model=SPARSE_MODEL)
+    assert shared.status == "invalid"
+    [step] = shared.runs[0].steps
+    assert any("share MUX 9" in issue.message for issue in step.issues)
+
+
+def test_preview_rejects_rounds_against_an_unusable_topology() -> None:
+    model = ChipRoundModel(
+        wiring=None, mapping_error="the MUX mapping of chip 'chip-1' is unusable"
+    )
+    plan = _plan(_sparse_source('[["36"]]'), model=model)
+    assert plan.status == "invalid"
+    [step] = plan.runs[0].steps
+    assert [issue.message for issue in step.issues] == [
+        "the MUX mapping of chip 'chip-1' is unusable"
+    ]
+
+
+def test_round_model_of_a_topology_without_muxes_reads_no_wiring(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from qdash.api.services import manual_round_checks
+
+    mapping = MuxMapping.from_groups({}, known_qids=["0", "1"])
+    monkeypatch.setattr(manual_round_checks, "resolve_chip_mux_mapping", lambda p, c: mapping)
+
+    def no_config() -> Any:
+        raise AssertionError("a topology without MUXes must not read wiring.yaml")
+
+    monkeypatch.setattr(manual_round_checks, "resolve_config_base_path", no_config)
+    model = manual_round_checks.load_chip_round_model("project", "chip-1", None)
+    assert model.wiring == [] and model.mux_mapping is mapping and model.mapping_error is None
+
+
+def test_round_model_keeps_an_unusable_topology_as_an_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from qdash.api.services import manual_round_checks
+    from qdash.common.mux_mapping import MuxMappingError
+
+    def broken(project_id: str, chip_id: str) -> MuxMapping:
+        raise MuxMappingError("Topology 'gone' not found")
+
+    monkeypatch.setattr(manual_round_checks, "resolve_chip_mux_mapping", broken)
+    monkeypatch.setattr(manual_round_checks, "resolve_config_base_path", lambda: tmp_path)
+    model = manual_round_checks.load_chip_round_model("project", "chip-1", None)
+    assert model.mux_mapping is None
+    assert model.mapping_error is not None and "Topology 'gone' not found" in model.mapping_error
+
+
+@pytest.mark.asyncio
+async def test_service_preview_uses_the_topology_of_the_chip_it_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from qdash.api.services.flow_service import service as service_module
+
+    wiring = SPARSE_MODEL.wiring
+    monkeypatch.setattr(
+        "qdash.api.services.manual_round_checks.load_wiring_entries", lambda path, chip: wiring
+    )
+    requested: list[str | None] = []
+
+    def resolve(topology_id: str | None) -> MuxMapping:
+        requested.append(topology_id)
+        assert SPARSE_MODEL.mux_mapping is not None
+        return SPARSE_MODEL.mux_mapping
+
+    monkeypatch.setattr(service_module, "resolve_topology_mux_mapping", resolve)
+    service, _, chips = _service(tmp_path, _sparse_source('[["36", "41"], ["5"]]'), {"chip-1"})
+    chips.topology_id = "synthetic-sparse"
+
+    plan = await service.get_execution_plan("my_flow", "alice", "project-1", None)
+
+    assert requested == ["synthetic-sparse"]
+    assert plan.status == "invalid"
+    [step] = plan.runs[0].steps
+    assert any("share MUX 9" in issue.message for issue in step.issues)

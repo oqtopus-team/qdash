@@ -94,10 +94,10 @@ def _target_qids(
         return list(targets.qids)
     if targets.coupling_pairs is not None:
         return list(dict.fromkeys(qid for pair in targets.coupling_pairs for qid in pair))
-    wiring = model().wiring
-    if wiring is None or targets.mux_ids is None:
+    loaded = model()
+    if loaded.wiring is None or loaded.mapping_error is not None or targets.mux_ids is None:
         return None
-    return mux_target_qids(targets.mux_ids, targets.exclude_qids, wiring)
+    return mux_target_qids(targets.mux_ids, targets.exclude_qids, loaded.wiring, loaded.mux_mapping)
 
 
 def _parse_rounds(step: StaticStep) -> tuple[QubitRounds | PairRounds | None, list[RoundIssue]]:

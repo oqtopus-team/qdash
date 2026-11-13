@@ -15,6 +15,14 @@ worker reject the same rounds with the same messages:
 - :func:`qubit_candidate_issues` and :func:`pair_candidate_issues` check the
   rounds against the qubits a step may run on.
 
+MUX membership comes from the chip topology's :class:`~qdash.common.mux_mapping.MuxMapping`
+(the same mapping the schedulers, execution locks and MUX fan-out use); the
+wiring is joined to it by MUX ID. Without a mapping the legacy convention
+(MUX ``N`` owns qubits ``4N`` to ``4N + 3``) applies, as for chips without a
+topology. A standalone qubit (a qubit of the topology in no MUX) has no known
+hardware resources, so it must run alone in its round, as the automatic
+schedulers run it.
+
 The resource model is the schedulers' model, not a hardware certificate: a
 round that passes may still contend for resources the wiring file does not
 describe.
@@ -29,6 +37,7 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
+from qdash.common.mux_mapping import MuxMapping, canonical_qid
 from qdash.common.wiring_resources import mux_module_resources
 
 if TYPE_CHECKING:
@@ -38,7 +47,7 @@ if TYPE_CHECKING:
 QubitRounds = tuple[tuple[str, ...], ...]
 PairRounds = tuple[tuple[tuple[str, str], ...], ...]
 
-_QID = re.compile(r"^\d+$")
+_QID = re.compile(r"^(?:0|[1-9]\d*)$")
 _CHANNEL = re.compile(r"^([A-Za-z0-9]+)(?:-\d+)?$")
 
 BOX_A = "A"
@@ -104,7 +113,10 @@ def _qid_issue(value: object) -> str | None:
     if not isinstance(value, str):
         return f"qubit ID {value!r} must be a string such as '0'"
     if not _QID.match(value):
-        return f"qubit ID {value!r} must be a non-negative integer string"
+        return (
+            f"qubit ID {value!r} must be a non-negative integer string without leading "
+            "zeros, such as '7'"
+        )
     return None
 
 
@@ -371,11 +383,46 @@ def box_b_ctrl_modules(entry: Mapping[str, Any]) -> set[str]:
     }
 
 
-def qubit_mux_map(entries: Iterable[Mapping[str, Any]]) -> dict[str, int]:
-    """MUX ``N`` owns qubits ``4N`` to ``4N + 3``."""
-    return {
-        str(entry["mux"] * 4 + offset): entry["mux"] for entry in entries for offset in range(4)
-    }
+def _mapping(mux_mapping: MuxMapping | None) -> MuxMapping:
+    return mux_mapping if mux_mapping is not None else MuxMapping.legacy()
+
+
+def needs_wiring(mux_mapping: MuxMapping | None) -> bool:
+    """Whether checks against ``mux_mapping`` need ``wiring.yaml``.
+
+    The wiring maps only MUXes to hardware, so a topology without any MUX
+    (every qubit standalone) is checked without it, as the CR scheduler does.
+    """
+    mapping = _mapping(mux_mapping)
+    return mapping.unbounded or bool(mapping.mux_ids)
+
+
+def qubit_mux_map(
+    entries: Iterable[Mapping[str, Any]], mux_mapping: MuxMapping | None = None
+) -> dict[str, int]:
+    """Qubit -> MUX for the wired MUXes the mapping defines.
+
+    Members come from ``mux_mapping`` (legacy: MUX ``N`` owns ``4N`` to
+    ``4N + 3``). A wired MUX the mapping does not define has no qubits.
+    """
+    mapping = _mapping(mux_mapping)
+    return mapping.qid_to_mux(entry["mux"] for entry in entries if mapping.has_mux(entry["mux"]))
+
+
+def _wiring_issues(
+    mapping: MuxMapping, wiring: Sequence[Mapping[str, Any]], touched: Collection[int]
+) -> list[RoundIssue]:
+    """Slots of the rounds' MUXes that have no control port in the wiring."""
+    rows = [entry for entry in wiring if entry.get("mux") in touched]
+    return [RoundIssue(error) for error in mapping.wiring_errors(rows)]
+
+
+def _membership_issue(mapping: MuxMapping, qid: str) -> str | None:
+    """Why ``qid`` cannot run on the chip at all, or ``None``."""
+    if not mapping.is_known(qid):
+        where = f"topology {mapping.topology_id}" if mapping.topology_id else "the chip topology"
+        return f"qubit {qid} is not defined by {where}"
+    return None
 
 
 def mux_conflicts(entries: Iterable[Mapping[str, Any]]) -> dict[int, set[int]]:
@@ -393,25 +440,51 @@ def mux_conflicts(entries: Iterable[Mapping[str, Any]]) -> dict[int, set[int]]:
 
 
 def qubit_round_issues(
-    rounds: QubitRounds, wiring: Sequence[Mapping[str, Any]]
+    rounds: QubitRounds,
+    wiring: Sequence[Mapping[str, Any]],
+    mux_mapping: MuxMapping | None = None,
 ) -> list[RoundIssue]:
     """Problems of one-qubit rounds under the one-qubit scheduler's model.
 
-    The model is that of ``parallel_by_round``: each qubit must be wired, the
-    qubits of a round use different MUXes, a round stays within one box stage
-    (A, B or MIXED), and MIXED MUXes of a round do not share a Box B ``ctrl``
-    module.
+    The model is that of ``parallel_by_round``: each qubit must be defined by
+    the chip topology and, when it is in a MUX, wired; the qubits of a round
+    use different MUXes, a round stays within one box stage (A, B or MIXED),
+    and MIXED MUXes of a round do not share a Box B ``ctrl`` module. A
+    standalone qubit runs alone in its round.
     """
+    mapping = _mapping(mux_mapping)
     by_mux = {entry["mux"]: entry for entry in wiring}
-    qid_to_mux = qubit_mux_map(wiring)
+    qid_to_mux = qubit_mux_map(wiring, mapping)
     issues: list[RoundIssue] = []
+    touched: set[int] = set()
     for number, round_ in enumerate(rounds, start=1):
-        unwired = [qid for qid in round_ if qid not in qid_to_mux]
-        for qid in unwired:
-            issues.append(
-                RoundIssue(f"qubit {qid} has no MUX entry in the chip's wiring", number, (qid,))
-            )
-        wired = [qid for qid in round_ if qid in qid_to_mux]
+        wired: list[str] = []
+        for qid in round_:
+            problem = _membership_issue(mapping, qid)
+            if problem is not None:
+                issues.append(RoundIssue(problem, number, (qid,)))
+            elif mapping.is_standalone(qid):
+                if len(round_) > 1:
+                    issues.append(
+                        RoundIssue(
+                            f"qubit {qid} is standalone (in no MUX), so the hardware it shares "
+                            "is unknown; it must run alone in its round",
+                            number,
+                            (qid,),
+                        )
+                    )
+            elif qid not in qid_to_mux:
+                issues.append(
+                    RoundIssue(
+                        f"qubit {qid} has no MUX entry in the chip's wiring "
+                        f"(MUX {mapping.mux_of(qid)})",
+                        number,
+                        (qid,),
+                    )
+                )
+            else:
+                wired.append(qid)
+                touched.add(qid_to_mux[qid])
         seen_mux: dict[int, str] = {}
         for qid in wired:
             mux = qid_to_mux[qid]
@@ -456,24 +529,30 @@ def qubit_round_issues(
                     )
                 else:
                     module_owner[module_id] = qid
-    return issues
+    return _wiring_issues(mapping, wiring, touched) + issues
 
 
 def pair_round_issues(
     rounds: PairRounds,
     wiring: Sequence[Mapping[str, Any]],
     coupling_ids: Collection[str],
+    mux_mapping: MuxMapping | None = None,
 ) -> list[RoundIssue]:
     """Problems of two-qubit rounds under the CR scheduler's model.
 
     Every pair must be a chip coupling with exactly that ``control-target`` ID
-    (a pair is never reversed) and both qubits must be wired. Pairs of a round
-    may not use the same MUX or MUXes that share a readout or control module.
+    (a pair is never reversed), and both qubits must be defined by the chip
+    topology and, when in a MUX, wired. Pairs of a round may not use the same
+    MUX or MUXes that share a readout or control module. A pair with a
+    standalone qubit runs alone in its round, as the CR scheduler never groups
+    it with another pair.
     """
-    qid_to_mux = qubit_mux_map(wiring)
+    mapping = _mapping(mux_mapping)
+    qid_to_mux = qubit_mux_map(wiring, mapping)
     conflicts = mux_conflicts(wiring)
     known = set(coupling_ids)
     issues: list[RoundIssue] = []
+    touched: set[int] = set()
     for number, round_ in enumerate(rounds, start=1):
         usable: list[tuple[str, tuple[int, int]]] = []
         for control, target in round_:
@@ -488,7 +567,18 @@ def pair_round_issues(
                     RoundIssue(f"{label} is not a coupling of the chip{hint}", number, (label,))
                 )
                 continue
-            unwired = [qid for qid in (control, target) if qid not in qid_to_mux]
+            undefined = [
+                problem
+                for qid in (control, target)
+                if (problem := _membership_issue(mapping, qid)) is not None
+            ]
+            if undefined:
+                issues.append(RoundIssue(f"{label}: {'; '.join(undefined)}", number, (label,)))
+                continue
+            standalone = [qid for qid in (control, target) if mapping.is_standalone(qid)]
+            unwired = [
+                qid for qid in (control, target) if qid not in qid_to_mux and qid not in standalone
+            ]
             if unwired:
                 issues.append(
                     RoundIssue(
@@ -498,6 +588,19 @@ def pair_round_issues(
                     )
                 )
                 continue
+            if standalone:
+                if len(round_) > 1:
+                    issues.append(
+                        RoundIssue(
+                            f"{label} uses standalone qubit {', '.join(standalone)} (in no MUX), "
+                            "so the hardware it shares is unknown; it must run alone in its round",
+                            number,
+                            (label,),
+                        )
+                    )
+                touched.update(qid_to_mux[qid] for qid in (control, target) if qid in qid_to_mux)
+                continue
+            touched.update((qid_to_mux[control], qid_to_mux[target]))
             usable.append((label, (qid_to_mux[control], qid_to_mux[target])))
         for (left, left_muxes), (right, right_muxes) in itertools.combinations(usable, 2):
             shared = sorted(set(left_muxes) & set(right_muxes))
@@ -521,7 +624,7 @@ def pair_round_issues(
                         (left, right),
                     )
                 )
-    return issues
+    return _wiring_issues(mapping, wiring, touched) + issues
 
 
 # ---------------------------------------------------------------------------
@@ -586,14 +689,26 @@ def pair_candidate_issues(rounds: PairRounds, candidates: Sequence[str]) -> list
 
 
 def mux_target_qids(
-    mux_ids: Iterable[int], exclude_qids: Iterable[str], wiring: Sequence[Mapping[str, Any]]
+    mux_ids: Iterable[int],
+    exclude_qids: Iterable[str],
+    wiring: Sequence[Mapping[str, Any]],
+    mux_mapping: MuxMapping | None = None,
 ) -> list[str]:
-    """Qubits of ``MuxTargets`` as the scheduler resolves them: wired and not excluded."""
-    wired = qubit_mux_map(wiring)
-    excluded = set(exclude_qids)
+    """Qubits of ``MuxTargets`` as the scheduler resolves them, in MUX-then-slot order.
+
+    Members come from ``mux_mapping``; exclusions match by qubit number. A
+    chip without a topology skips MUXes the wiring does not list, as the
+    scheduler does. With a topology, an unwired MUX keeps its members (the
+    worker refuses it, and the round checks report the missing wiring). MUX
+    IDs the mapping does not define are left to the target checks.
+    """
+    mapping = _mapping(mux_mapping)
+    wired = {entry["mux"] for entry in wiring}
+    excluded = {canonical_qid(qid) for qid in exclude_qids}
     return [
         qid
-        for mux in mux_ids
-        for qid in (str(mux * 4 + offset) for offset in range(4))
-        if qid in wired and qid not in excluded
+        for mux in dict.fromkeys(mux_ids)
+        if mapping.has_mux(mux) and (not mapping.unbounded or mux in wired)
+        for qid in mapping.qids_of(mux)
+        if qid not in excluded
     ]

@@ -32,6 +32,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
+from qdash.common.mux_mapping import MuxMapping
+
 logger = logging.getLogger(__name__)
 
 
@@ -44,12 +46,27 @@ class OrderingContext:
         grid_size: Grid dimension (8 for 64-qubit, 12 for 144-qubit)
         mux_grid_size: MUX grid dimension (4 for 64-qubit, 6 for 144-qubit)
         qid_to_mux: Mapping from qubit ID to MUX ID
+        mux_mapping: MUX membership with local slots from the chip topology.
+            If None, the legacy convention applies (MUX N = qubits 4N..4N+3).
     """
 
     chip_id: str
     grid_size: int
     mux_grid_size: int
     qid_to_mux: dict[str, int] = field(default_factory=dict)
+    mux_mapping: MuxMapping | None = None
+
+    def slot_members(self, mux_id: int) -> dict[int, str]:
+        """Local slot -> qubit ID for ``mux_id``."""
+        mapping = self.mux_mapping if self.mux_mapping is not None else MuxMapping.legacy()
+        return mapping.slots_of(mux_id)
+
+
+def _ordered_slots(slots: dict[int, str], preferred: list[int]) -> list[int]:
+    """``preferred`` slots first, then any further slots of a larger MUX."""
+    return [slot for slot in preferred if slot in slots] + sorted(
+        slot for slot in slots if slot not in preferred
+    )
 
 
 class MuxOrderingStrategy(ABC):
@@ -70,7 +87,7 @@ class MuxOrderingStrategy(ABC):
 
         Args:
             mux_id: MUX identifier
-            qids: List of qubit IDs in this MUX (subset of [4N, 4N+1, 4N+2, 4N+3])
+            qids: List of qubit IDs in this MUX (subset of its members)
             context: Context object containing chip configuration
 
         Returns:
@@ -118,10 +135,10 @@ class MuxOrderingStrategy(ABC):
 
 
 class DefaultOrderingStrategy(MuxOrderingStrategy):
-    """Default ordering strategy - qubits in natural order [0, 1, 2, 3].
+    """Default ordering strategy - qubits in local slot order [0, 1, 2, 3].
 
-    This is the simplest strategy that maintains the natural qubit ID order
-    within each MUX.
+    This is the simplest strategy that keeps the MUX's slot order. With the
+    legacy mapping this is the natural qubit ID order.
 
     Example:
         ```python
@@ -137,8 +154,9 @@ class DefaultOrderingStrategy(MuxOrderingStrategy):
         qids: list[str],
         context: OrderingContext,
     ) -> list[str]:
-        """Return qubits in natural order."""
-        return sorted(qids, key=int)
+        """Return qubits in local slot order."""
+        slot_of = {qid: slot for slot, qid in context.slot_members(mux_id).items()}
+        return sorted(qids, key=lambda qid: (slot_of.get(qid, len(slot_of)), int(qid)))
 
     def get_metadata(self) -> dict[str, Any]:
         """Return strategy metadata."""
@@ -153,10 +171,10 @@ class DefaultOrderingStrategy(MuxOrderingStrategy):
         qids: list[str],
         context: OrderingContext,
     ) -> list[list[str]]:
-        """Generate rounds in natural order: round N holds offset N of every MUX.
+        """Generate rounds in local slot order: round N holds slot N of every MUX.
 
         Example:
-            For MUXes [0, 1]: [0, 4], [1, 5], [2, 6], [3, 7]
+            For MUXes [0, 1] on the legacy layout: [0, 4], [1, 5], [2, 6], [3, 7]
 
         Args:
             mux_ids: List of MUX IDs to include
@@ -164,20 +182,17 @@ class DefaultOrderingStrategy(MuxOrderingStrategy):
             context: Context object
 
         Returns:
-            Up to 4 non-empty rounds with natural ordering
+            One non-empty round per occupied local slot (up to 4 for 2x2 MUXes)
         """
         qid_set = set(qids)
-        rounds: list[list[str]] = [[] for _ in range(4)]
+        rounds: dict[int, list[str]] = {}
 
         for mux_id in sorted(mux_ids):
-            base_qid = mux_id * 4
-
-            for offset in range(4):
-                target_qid = str(base_qid + offset)
+            for slot, target_qid in sorted(context.slot_members(mux_id).items()):
                 if target_qid in qid_set:
-                    rounds[offset].append(target_qid)
+                    rounds.setdefault(slot, []).append(target_qid)
 
-        return [round_ for round_ in rounds if round_]
+        return [rounds[slot] for slot in sorted(rounds)]
 
     def __repr__(self) -> str:
         """String representation."""
@@ -191,13 +206,13 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
     execute in parallel, adjacent qubits (which have similar frequencies)
     are never calibrated simultaneously.
 
-    MUX internal layout (2x2):
-        4N   4N+1
-        4N+2 4N+3
+    MUX internal layout (2x2, by local slot):
+        slot0 slot1
+        slot2 slot3
 
-    Ordering pattern:
-        - Even MUX (mux_id % 2 == 0): [0, 1, 2, 3] offset order
-        - Odd MUX (mux_id % 2 == 1): [2, 3, 0, 1] offset order
+    Ordering pattern (slots come from the chip topology's MUX mapping):
+        - Even MUX (mux_id % 2 == 0): [0, 1, 2, 3] slot order
+        - Odd MUX (mux_id % 2 == 1): [2, 3, 0, 1] slot order
 
     This creates a chip-wide checkerboard pattern where each round
     calibrates qubits that are spatially and frequency-separated.
@@ -230,22 +245,14 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
         context: OrderingContext,
     ) -> list[str]:
         """Order qubits for checkerboard pattern."""
-        # Determine which offset order to use
+        # Determine which slot order to use
         offset_order = self.EVEN_MUX_ORDER if mux_id % 2 == 0 else self.ODD_MUX_ORDER
 
-        # Base qubit ID for this MUX
-        base_qid = mux_id * 4
-
-        # Build mapping from offset to qid
+        slots = context.slot_members(mux_id)
         qid_set = set(qids)
-        ordered = []
-
-        for offset in offset_order:
-            target_qid = str(base_qid + offset)
-            if target_qid in qid_set:
-                ordered.append(target_qid)
-
-        return ordered
+        return [
+            slots[slot] for slot in _ordered_slots(slots, offset_order) if slots[slot] in qid_set
+        ]
 
     def get_metadata(self) -> dict[str, Any]:
         """Return strategy metadata."""
@@ -289,19 +296,22 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
             - Round 3: [3, 5, 11, 13]
         """
         qid_set = set(qids)
-        rounds: list[list[str]] = [[] for _ in range(4)]
+        rounds: dict[int, list[str]] = {}
 
         for mux_id in sorted(mux_ids):
-            base_qid = mux_id * 4
+            slots = context.slot_members(mux_id)
 
-            # Determine offset order for this MUX
+            # Determine slot order for this MUX
             offset_order = self.EVEN_MUX_ORDER if mux_id % 2 == 0 else self.ODD_MUX_ORDER
 
-            # Add qubits to corresponding rounds
-            for round_idx, offset in enumerate(offset_order):
-                target_qid = str(base_qid + offset)
+            # The round is the slot's position in the parity order, so a MUX that lacks a
+            # slot leaves that round empty instead of shifting its later slots forward.
+            # Slots beyond the 2x2 order of a larger MUX follow in slot order.
+            for slot in _ordered_slots(slots, offset_order):
+                target_qid = slots[slot]
                 if target_qid in qid_set:
-                    rounds[round_idx].append(target_qid)
+                    round_idx = offset_order.index(slot) if slot in offset_order else slot
+                    rounds.setdefault(round_idx, []).append(target_qid)
 
-        # Filter out empty rounds
-        return [round_ for round_ in rounds if round_]
+        # Empty rounds are never created
+        return [rounds[round_idx] for round_idx in sorted(rounds)]
