@@ -6,12 +6,13 @@ passes when the chip is already close to a calibrated state.
 
 Execution flow:
     1. ConfigureAll: Push the current full-chip configuration to the selected MUXes
-    2. OneQubitCheck: Fast pulse sanity check
+    2. OneQubitCheck: Fast pulse sanity check, then Ramsey
     3. FilterByStatus: Filter to only successful qubits
-    4. OneQubitFineTune: Pulse/readout/RB/X90 IRB tune without T1/T2 averages
-    5. FilterByMetric: Filter by X90 fidelity threshold
-    6. GenerateCRSchedule: Generate 2Q execution schedule
-    7. TwoQubitCalibration: 2Q coupling calibration
+    4. ConfigureAll: Push the current configuration again before fine-tuning
+    5. OneQubitFineTune: Pulse/readout/RB/X90 IRB tune without T1/T2 averages
+    6. FilterByMetric: Filter by X90 fidelity threshold
+    7. GenerateCRSchedule: Generate 2Q execution schedule
+    8. TwoQubitCalibration: 2Q coupling calibration
 
 Example:
     fast_full_calibration(
@@ -47,6 +48,7 @@ FAST_1Q_CHECK_TASKS: list[TaskCall] = [
     TaskCall(name="CheckRabi"),
     TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
     TaskCall(name="CheckHPIPulse"),
+    TaskCall(name="CheckRamsey"),
 ]
 
 FAST_1Q_FINE_TUNE_TASKS: list[TaskCall] = [
@@ -132,6 +134,8 @@ def fast_full_calibration(
         ConfigureAll(),
         OneQubitCheck(execution_mode="parallel_by_round", tasks=FAST_1Q_CHECK_TASKS),
         FilterByStatus(),
+        # Reconfigure the selected MUXes; FilterByStatus's candidates carry over.
+        ConfigureAll(step_id="configure_all_before_fine_tune"),
         OneQubitFineTune(execution_mode="parallel_by_round", tasks=FAST_1Q_FINE_TUNE_TASKS),
         FilterByMetric(metric="x90_fidelity", threshold=fidelity_threshold),
         GenerateCRSchedule(max_parallel_ops=max_parallel_ops, inverse=inverse),
