@@ -11517,6 +11517,108 @@
         }
       }
     },
+    "/flows/{name}/execution-plan": {
+      "get": {
+        "tags": [
+          "flow"
+        ],
+        "summary": "Preview a flow's execution plan",
+        "description": "Read the saved source's steps and check manual rounds, without executing anything.\n\nThe source is parsed, never imported or run. Manual rounds are checked against\nthe chip's wiring and directed couplings with the checks the worker repeats\nbefore any target measures. Automatic groups are described, not computed.",
+        "operationId": "getFlowExecutionPlan",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Chip to check against; defaults to the flow's chip",
+              "title": "Chip Id"
+            },
+            "description": "Chip to check against; defaults to the flow's chip"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowExecutionPlanResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No chip is selected or saved for the flow",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The flow, its source or the chip is not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/{name}/execute": {
       "post": {
         "tags": [
@@ -22411,6 +22513,196 @@
         "title": "ExecutionLockStatusResponse",
         "description": "Response model for the fetch_execution_lock_status endpoint."
       },
+      "ExecutionPlanIssue": {
+        "properties": {
+          "round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round",
+            "description": "1-based round; null for the whole step"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Targets",
+            "description": "Qubit IDs or control-target pairs involved"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ExecutionPlanIssue",
+        "description": "One problem that stops a step's manual rounds from running."
+      },
+      "ExecutionPlanRound": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number",
+            "description": "1-based position; rounds run in this order"
+          },
+          "targets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Targets",
+            "description": "Qubit IDs, or control-target pairs such as 0-1, in source order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "targets"
+        ],
+        "title": "ExecutionPlanRound",
+        "description": "One manual round exactly as the source writes it."
+      },
+      "ExecutionPlanRun": {
+        "properties": {
+          "targets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FlowTargetOverride"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Literal targets of the call; null when computed at run time"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionPlanStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "steps"
+        ],
+        "title": "ExecutionPlanRun",
+        "description": "One CalibService.run call of the entrypoint."
+      },
+      "ExecutionPlanStep": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index",
+            "description": "1-based position within its run"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Step class, e.g. CustomOneQubit"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Step name and step_id"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "qubit",
+              "coupling",
+              "none"
+            ],
+            "title": "Scope",
+            "description": "What one target of the step is"
+          },
+          "execution_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Mode"
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "automatic",
+              "fixed",
+              "none"
+            ],
+            "title": "Schedule",
+            "description": "manual: the exact rounds of the source, checked before execution. automatic: groups are formed by the scheduler at run time. fixed: a SetCRSchedule schedule used as written without checks. none: the step does not schedule targets."
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionPlanRound"
+            },
+            "type": "array",
+            "title": "Rounds"
+          },
+          "tasks": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tasks",
+            "description": "Task names in call order; null when not stated literally"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "How the step's targets wait for each other"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionPlanIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "unchecked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unchecked",
+            "description": "Checks that could not run here; the worker runs them before the step"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "type",
+          "name",
+          "scope",
+          "schedule",
+          "summary"
+        ],
+        "title": "ExecutionPlanStep",
+        "description": "One step of a CalibService run, as stated in the saved source."
+      },
       "ExecutionResponseDetail": {
         "properties": {
           "name": {
@@ -22697,6 +22989,92 @@
         ],
         "title": "FileTreeNode",
         "description": "File tree node model."
+      },
+      "FlowExecutionPlanResponse": {
+        "properties": {
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "source_updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Source Updated At",
+            "description": "Version of the saved source the plan was read from"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "resolved",
+              "unresolved",
+              "invalid"
+            ],
+            "title": "Status",
+            "description": "resolved: every run and step was read from literals. unresolved: the source decides its steps at run time; reason says why. invalid: manual rounds that cannot run were found; execution would fail before measuring."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the plan is unresolved"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionPlanRun"
+            },
+            "type": "array",
+            "title": "Runs"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionPlanIssue"
+            },
+            "type": "array",
+            "title": "Issues",
+            "description": "Problems of manual steps found outside a resolved plan"
+          },
+          "has_manual_rounds": {
+            "type": "boolean",
+            "title": "Has Manual Rounds",
+            "description": "Whether the source writes execution_mode='manual' on a step",
+            "default": false
+          },
+          "target_override_allowed": {
+            "type": "boolean",
+            "title": "Target Override Allowed",
+            "default": true
+          },
+          "target_override_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Override Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow_name",
+          "chip_id",
+          "source_updated_at",
+          "status"
+        ],
+        "title": "FlowExecutionPlanResponse",
+        "description": "What the saved source of a flow states about its execution, without running it."
       },
       "FlowScheduleSummary": {
         "properties": {
@@ -27456,7 +27834,15 @@
             },
             "type": "array",
             "title": "One Qubit Execution Modes",
-            "description": "Values a one-qubit step accepts for execution_mode."
+            "description": "Values OneQubitCheck, OneQubitFineTune and CustomOneQubit accept for execution_mode; manual requires rounds."
+          },
+          "two_qubit_execution_modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Two Qubit Execution Modes",
+            "description": "Values TwoQubitCalibration and CustomTwoQubit accept for execution_mode; manual requires rounds."
           },
           "tasks": {
             "additionalProperties": {
@@ -27491,6 +27877,7 @@
           "backend_name",
           "step_types",
           "one_qubit_execution_modes",
+          "two_qubit_execution_modes",
           "tasks",
           "spec_version",
           "spec_schema"

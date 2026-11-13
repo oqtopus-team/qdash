@@ -15,6 +15,7 @@ from qdash.api.schemas.flow import (
     DeleteScheduleResponse,
     ExecuteFlowRequest,
     ExecuteFlowResponse,
+    FlowExecutionPlanResponse,
     FlowTemplate,
     FlowTemplateWithCode,
     GetFlowResponse,
@@ -223,6 +224,33 @@ async def get_flow(
 ) -> GetFlowResponse:
     """Get Flow details including code content."""
     return await service.get_flow(name, ctx.user.username, ctx.project_id)
+
+
+@router.get(
+    "/flows/{name}/execution-plan",
+    response_model=FlowExecutionPlanResponse,
+    summary="Preview a flow's execution plan",
+    operation_id="getFlowExecutionPlan",
+    responses={
+        400: {"model": Detail, "description": "No chip is selected or saved for the flow"},
+        404: {"model": Detail, "description": "The flow, its source or the chip is not found"},
+    },
+)
+async def get_flow_execution_plan(
+    name: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[FlowService, Depends(get_flow_service)],
+    chip_id: Annotated[
+        str | None, Query(description="Chip to check against; defaults to the flow's chip")
+    ] = None,
+) -> FlowExecutionPlanResponse:
+    """Read the saved source's steps and check manual rounds, without executing anything.
+
+    The source is parsed, never imported or run. Manual rounds are checked against
+    the chip's wiring and directed couplings with the checks the worker repeats
+    before any target measures. Automatic groups are described, not computed.
+    """
+    return await service.get_execution_plan(name, ctx.user.username, ctx.project_id, chip_id)
 
 
 @router.post(

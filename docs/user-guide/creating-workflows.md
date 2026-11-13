@@ -142,6 +142,7 @@ described in the table.
 | `parallel_by_round` | Qubits run in rounds of qubits from different MUXes; the next round starts after every qubit of the current round finishes |
 | `sequential` | One MUX and one qubit at a time |
 | `simultaneous_spectroscopy` | Experimental: each supported spectroscopy task measures a batch of qubits together |
+| `manual` | You list the rounds in `rounds`; they run exactly as written, waiting like `parallel_by_round`. See [Write Manual Execution Rounds](./manual-execution-rounds.md) |
 
 ![Three timelines on one time axis for qubits 0 and 1 on MUX 0 and qubits 8 and 9 on MUX 2. Each qubit's bar is split into its tasks: CheckRabi, then CreateHPIPulse, then CheckT1. In sequential, the qubits run one at a time in the order 0, 1, 8, 9. In parallel_by_mux, qubit 0 moves to CreateHPIPulse while qubit 8 is still on CheckRabi, and qubit 1 starts CheckRabi when qubit 0 finishes CheckT1, while qubit 8 is still on CheckT1. In parallel_by_round, qubits 0 and 8 also move through their tasks independently, but qubit 1 waits until qubit 8 finishes CheckT1, its last task, then qubits 1 and 9 start together as round 2.](/images/guides/one-qubit-execution-modes.gif)
 
@@ -248,9 +249,11 @@ With `max_parallel_ops = 2`, the same pairs need five groups: G1 splits into a g
 and 4 → 5 and a group with 12 → 13 and 16 → 17, which run one after the other although none of
 the four pairs conflict.
 
-Two-qubit steps never use `execution_mode`, and one-qubit steps never use this grouping; the
-steps of a workflow run one after another. To calibrate one pair at a time, set
-`max_parallel_ops` to `1`.
+This grouping is the two-qubit `execution_mode="automatic"`, the default; one-qubit steps never
+use it, and the steps of a workflow run one after another. To calibrate one pair at a time, set
+`max_parallel_ops` to `1`. To choose the groups yourself and have them checked before the run,
+use `execution_mode="manual"`; see
+[Write Two-Qubit Rounds](./manual-execution-rounds.md#write-two-qubit-rounds).
 
 `max_parallel_ops` only limits the size of each group: raising it never puts conflicting pairs
 together, and it does not guarantee that every pair of a group runs at the same moment. QDash
@@ -400,7 +403,9 @@ behavior of each mode is unchanged.
 1. Select **Save Flow** for a new workflow. For an existing workflow, select **Edit**, make the
    change, then select **Save**.
 2. Confirm that **Flow saved successfully!** appears without a save error.
-3. Select **Execute** and review **Flow Name**, **Username**, **Chip ID**, and **Tags**.
+3. Select **Execute** and review **Flow Name**, **Username**, **Chip ID**, and **Tags** on
+   **Settings**. Open **Execution preview** to see the steps and rounds the saved source states;
+   see [Review the Execution Preview](./manual-execution-rounds.md#review-the-execution-preview).
 4. Confirm that no other run should use the chip. A workflow reserves the entire chip until all
    its steps finish.
 5. Select **Execute**, then open **Execution** to follow task order, status, parameters, and

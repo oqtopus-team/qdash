@@ -564,3 +564,106 @@ class TestFlowCreateOnly:
         assert after is not None
         assert after.chip_id == "chip-2"
         assert Path(after.file_path).read_text(encoding="utf-8").endswith("# edited\n")
+
+
+MANUAL_FLOW = """
+from qdash.workflow import TaskCall
+from qdash.workflow.service import CalibService
+from qdash.workflow.service.steps import CustomOneQubit
+from qdash.workflow.service.targets import QubitTargets
+
+
+def run_manual(username, chip_id):
+    cal = CalibService(username, chip_id)
+    return cal.run(
+        QubitTargets(["0", "8"]),
+        steps=[
+            CustomOneQubit(
+                execution_mode="manual",
+                rounds=[["0", "8"]],
+                tasks=[TaskCall(name="CheckRabi")],
+            )
+        ],
+    )
+"""
+
+
+@pytest.fixture
+def manual_flow(test_project, tmp_path):
+    """A saved flow with manual rounds, its source file and its chip."""
+    from qdash.dbmodel.chip import ChipDocument
+
+    path = tmp_path / "manual_flow.py"
+    path.write_text(MANUAL_FLOW, encoding="utf-8")
+    ChipDocument(
+        chip_id="test_chip",
+        username="test_user",
+        project_id="test_project",
+        size=64,
+        system_info=SystemInfoModel(),
+    ).insert()
+    flow = FlowDocument(
+        project_id="test_project",
+        name="manual_flow",
+        username="test_user",
+        chip_id="test_chip",
+        flow_function_name="run_manual",
+        file_path=str(path),
+        deployment_id="manual-deployment",
+    )
+    flow.insert()
+    return flow
+
+
+def _viewer_headers() -> dict[str, str]:
+    user = UserDocument(
+        username="viewer_user",
+        hashed_password="hashed",
+        access_token="viewer_token",
+        default_project_id="test_project",
+        system_info=SystemInfoModel(),
+    )
+    user.insert()
+    ProjectMembershipDocument(
+        project_id="test_project",
+        user_id=user.user_id,
+        username="viewer_user",
+        role=ProjectRole.VIEWER,
+        status="active",
+        invited_by_user_id=user.user_id,
+        invited_by="test_user",
+    ).insert()
+    return {"Authorization": "Bearer viewer_token", "X-Project-Id": "test_project"}
+
+
+class TestFlowExecutionPlan:
+    """GET /flows/{name}/execution-plan is a read-only, project-scoped preview."""
+
+    def test_a_viewer_reads_the_plan_without_changing_the_flow(self, test_client, manual_flow):
+        before = FlowDocument.find_by_project_and_name("test_project", "manual_flow")
+        response = test_client.get("/flows/manual_flow/execution-plan", headers=_viewer_headers())
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["chip_id"] == "test_chip"
+        assert body["runs"][0]["steps"][0]["rounds"] == [{"number": 1, "targets": ["0", "8"]}]
+        assert body["target_override_allowed"] is False
+        after = FlowDocument.find_by_project_and_name("test_project", "manual_flow")
+        assert after is not None and before is not None
+        assert after.updated_at == before.updated_at
+
+    def test_the_plan_requires_authentication(self, test_client, manual_flow):
+        assert test_client.get("/flows/manual_flow/execution-plan").status_code == 401
+
+    def test_other_projects_and_chips_are_not_visible(self, test_client, manual_flow, auth_headers):
+        other = test_client.get(
+            "/flows/manual_flow/execution-plan",
+            headers={**auth_headers, "X-Project-Id": "other_project"},
+        )
+        assert other.status_code in {403, 404}
+        chip = test_client.get(
+            "/flows/manual_flow/execution-plan",
+            headers=auth_headers,
+            params={"chip_id": "unknown_chip"},
+        )
+        assert chip.status_code == 404

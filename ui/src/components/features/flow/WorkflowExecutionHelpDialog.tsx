@@ -12,7 +12,7 @@ const MEDIA_BASE_PATH = "/images/execution-help/";
 
 type HelpTopic = "one-qubit" | "two-qubit";
 
-interface HelpMedia {
+export interface HelpMedia {
   name: string;
   width: number;
   height: number;
@@ -29,7 +29,7 @@ const TOPICS: ReadonlyArray<{ id: HelpTopic; label: string }> = [
   { id: "two-qubit", label: "2Q CR groups" },
 ];
 
-const ONE_QUBIT_MEDIA: HelpMedia = {
+export const ONE_QUBIT_MEDIA: HelpMedia = {
   name: "one-qubit-execution-modes",
   width: 860,
   height: 792,
@@ -41,7 +41,7 @@ const ONE_QUBIT_MEDIA: HelpMedia = {
     "qubit 8 finishes its whole task list, then qubits 1 and 9 start together as round 2.",
 };
 
-const TWO_QUBIT_MEDIA: HelpMedia = {
+export const TWO_QUBIT_MEDIA: HelpMedia = {
   name: "two-qubit-cr-schedule",
   width: 860,
   height: 550,
@@ -68,6 +68,13 @@ const ONE_QUBIT_MODES: ReadonlyArray<{ mode: string; text: string }> = [
       "the current round finishes its whole task list.",
   },
   { mode: "sequential", text: "One MUX and one qubit at a time." },
+  {
+    mode: "manual",
+    text:
+      'You write the rounds, for example rounds=[["0", "8"], ["1", "9"]]. They run ' +
+      "exactly in that order and wait like parallel_by_round; QDash checks them before any " +
+      "qubit is measured and never regroups them.",
+  },
 ];
 
 function Code({ children }: { children: ReactNode }) {
@@ -99,7 +106,7 @@ function DocsLinks({ links }: { links: ReadonlyArray<DocsLink> }) {
  * Shows a still poster until the user presses Play, so the dialog never starts motion on its
  * own and the GIF is fetched only on request.
  */
-function HelpAnimation({ media, caption }: { media: HelpMedia; caption: string }) {
+export function HelpAnimation({ media, caption }: { media: HelpMedia; caption: string }) {
   const [playing, setPlaying] = useState(false);
   const gif = `${MEDIA_BASE_PATH}${media.name}.gif`;
   const src = playing ? gif : `${MEDIA_BASE_PATH}${media.name}-poster.png`;
@@ -178,6 +185,10 @@ function OneQubitHelp() {
             label: "Choose an execution mode",
             path: "user-guide/creating-workflows.html#choose-an-execution-mode",
           },
+          {
+            label: "Write manual rounds",
+            path: "user-guide/manual-execution-rounds.html#write-one-qubit-rounds",
+          },
         ]}
       />
     </div>
@@ -206,11 +217,21 @@ function TwoQubitHelp() {
         pairs together, and it does not guarantee that every pair of a group runs at the same
         moment. With a cap of 2, the four pairs of G1 above would run as two groups.
       </p>
+      <p className="text-base-content/70">
+        To choose the groups yourself, set <Code>execution_mode=&quot;manual&quot;</Code> with{" "}
+        <Code>rounds</Code> of directed <Code>(control, target)</Code> pairs. QDash checks the pairs
+        against the chip before the run and runs them as written; <Code>max_parallel_ops</Code> does
+        not apply.
+      </p>
       <DocsLinks
         links={[
           {
             label: "Schedule two-qubit calibration",
             path: "user-guide/creating-workflows.html#schedule-two-qubit-calibration",
+          },
+          {
+            label: "Write manual pair rounds",
+            path: "user-guide/manual-execution-rounds.html#write-two-qubit-rounds",
           },
           {
             label: "CR gate scheduler: conflict graph and groups",

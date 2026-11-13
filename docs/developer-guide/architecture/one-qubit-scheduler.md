@@ -145,6 +145,34 @@ the step classes and `get_one_qubit_strategy()` call `validate_one_qubit_executi
 raises `ValueError` for any other value. The [user guide](../../user-guide/creating-workflows.md#choose-an-execution-mode)
 shows the waiting rules as an animation.
 
+## Manual Rounds
+
+With `execution_mode="manual"` a step runs its own `rounds` instead of a schedule, so no strategy
+of `ONE_QUBIT_STRATEGIES` and no `OneQubitScheduler` method runs. `manual` belongs to
+`OneQubitStepExecutionMode`, which only `OneQubitCheck`, `OneQubitFineTune`, `CustomOneQubit`,
+and their pipeline specs accept; templates and `BringUp` keep `OneQubitExecutionMode`.
+
+`common/manual_rounds.py` holds every check that needs no worker runtime, so the worker, the
+pipeline `/validate` dry run, and the execution-plan preview reject the same rounds with the same
+messages, each naming the step, the 1-based round, and the targets:
+
+| Check | Function | When |
+| --- | --- | --- |
+| Shape: non-empty rounds of qubit ID strings, a qubit in one round only | `parse_qubit_rounds()` | Step construction and spec validation |
+| `rounds` only with `manual`, required with it | `qubit_rounds_for_mode()` | Step construction and spec validation |
+| Wired qubits, one qubit per MUX, one box stage per round, no shared Box B `ctrl` module among mixed MUXes | `qubit_round_issues()` | `Step.preflight()` before the pipeline reserves anything, again before the step's workers |
+| Rounds name exactly the step's current qubits | `qubit_candidate_issues()` | Before the step's workers |
+
+The hardware rules are this scheduler's model, so an automatically generated round passes them,
+and they share `channel_box_type()` and `channel_module_id()` with `OneQubitScheduler`. A qubit
+appears once per step because results are keyed by qubit. `CalibSession.run_pipeline()` calls
+`preflight()` on every step after `Pipeline` validation; `run_qubit_rounds()` in
+`workflow/service/manual_rounds.py` then runs each round through
+`run_qubit_calibrations_parallel()`, the `parallel_by_round` worker path, records stage
+`1q_manual` as `round_1`, `round_2`, ..., and never filters, reorders, or splits a round.
+`plan_pipeline_resources()` adds the round qubits to the reservation. The user procedure is
+[Write Manual Execution Rounds](../../user-guide/manual-execution-rounds.md).
+
 ### Migrate from the former names
 
 The former names are removed without aliases; old values, the `mode` key, and the `mode`
@@ -174,6 +202,10 @@ parameter fail validation instead of falling back to a default.
 - `workflow/engine/scheduler/one_qubit_plugins.py` defines ordering strategies.
 - `workflow/service/strategy.py` maps execution modes to strategies that consume schedules.
 - `datamodel/one_qubit_execution_mode.py` defines the execution modes and their validation.
+- `common/manual_rounds.py` and `workflow/service/manual_rounds.py` check and run manual rounds;
+  `tests/qdash/common/test_manual_rounds.py`,
+  `tests/qdash/workflow/service/test_manual_rounds_steps.py`, and
+  `tests/qdash/workflow/test_manual_rounds_fake_e2e.py` cover them.
 - `tests/qdash/workflow/engine/scheduler/test_one_qubit_scheduler.py` covers classification,
   grouping, rounds, and spectroscopy modes.
 

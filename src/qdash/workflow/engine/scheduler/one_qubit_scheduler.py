@@ -46,12 +46,12 @@ Example:
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
 
+from qdash.common.manual_rounds import channel_box_type, channel_module_id
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
@@ -154,21 +154,8 @@ class OneQubitScheduler:
         Returns:
             "A" for Box A, "B" for Box B, or None if unrecognized
         """
-        # Extract the module identifier (part before the channel number)
-        # e.g., "R21B-5" → "R21B", "Q73A-1" → "Q73A"
-        match = re.match(r"^([A-Za-z0-9]+)(?:-\d+)?$", module_name)
-        if not match:
-            return None
-
-        module_id = match.group(1)
-
-        # Check the last character of the module identifier
-        if module_id.endswith("A"):
-            return BOX_A
-        elif module_id.endswith("B"):
-            return BOX_B
-
-        return None
+        # One copy of the model, shared with the manual-round checks.
+        return channel_box_type(module_name)
 
     def _build_mux_box_map(self, wiring_config: list[dict[str, Any]]) -> dict[int, set[str]]:
         """Build mapping from MUX ID to box types used.
@@ -255,10 +242,7 @@ class OneQubitScheduler:
         Returns:
             Module identifier without channel (e.g., "R21B", "Q73A")
         """
-        match = re.match(r"^([A-Za-z0-9]+)(?:-\d+)?$", module_name)
-        if match:
-            return match.group(1)
-        return None
+        return channel_module_id(module_name)
 
     def _build_box_b_module_map(self, wiring_config: list[dict[str, Any]]) -> dict[str, list[int]]:
         """Build mapping from Box B module to MUX IDs that use it.

@@ -16,6 +16,7 @@ import type { AxiosResponse } from "axios";
 import { useChatDock } from "@/contexts/ChatDockContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
+import { useFlowExecutionPlan } from "@/hooks/useFlowExecutionPlan";
 import { useToast } from "@/components/ui/Toast";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import {
@@ -226,6 +227,14 @@ export function WorkflowEditorPageContent() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["flow", name],
     queryFn: () => getFlow(name),
+  });
+
+  // The preview reads the saved source, which is what Execute runs.
+  const executionPlan = useFlowExecutionPlan({
+    flowName: name,
+    chipId,
+    sourceVersion: data?.data?.updated_at,
+    enabled: showExecuteConfirm && Boolean(data?.data),
   });
 
   const availability = useExecutionAvailability(
@@ -1901,6 +1910,8 @@ export function WorkflowEditorPageContent() {
             tags={tags}
             targetDefaults={data?.data?.target_defaults}
             targetModes={data?.data?.target_modes}
+            plan={executionPlan}
+            hasUnsavedChanges={isDirty}
             disabledReason={executeDisabledReason}
             onConfirm={(targetOverride) => {
               if (executeDisabledReason) return;

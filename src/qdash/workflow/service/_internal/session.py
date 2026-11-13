@@ -1276,6 +1276,10 @@ class CalibSession:
             qids = targets.to_qids(self.chip_id)
             # Validate pipeline dependencies, step ids and filter references
             pipeline = Pipeline(steps)
+            # Manual rounds are checked against the chip before anything is
+            # reserved or measured, so a bad round fails the run up front.
+            for step in pipeline:
+                step.preflight(self)
             calibration_plan = self.calibration_plan(list(pipeline))
             self.plan_digest = calibration_plan["digest"]
             pipeline_note = {**(base_settings.note or {}), "calibration_plan": calibration_plan}

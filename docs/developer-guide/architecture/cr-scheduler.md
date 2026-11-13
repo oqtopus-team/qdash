@@ -75,6 +75,23 @@ not a repository coupling, or when either qubit is missing from `wiring.yaml`. V
 through the same intra/inter-MUX split, conflict coloring, and chunking as `generate()`.
 `metadata["direction_method"]` and `filtering_stats["direction_method"]` are `explicit`.
 
+## Manual Rounds
+
+`CustomTwoQubit` and `TwoQubitCalibration` take `execution_mode` (`TwoQubitExecutionMode` in
+`datamodel/two_qubit_execution_mode.py`): `automatic`, the default, keeps the behavior in
+[Workflow Integration](#workflow-integration), and `manual` runs the step's `rounds` of directed
+pairs without `CRScheduler`, without an earlier `cr_schedule`, and without chunking.
+`max_parallel_ops` now defaults to `None`, meaning 10 for automatic steps, so a manual step that
+sets it is rejected instead of silently ignoring or applying it; a spec rejects it only when the
+field is explicitly set. `pair_round_issues()` in `common/manual_rounds.py` applies the
+`schedule_pairs()` membership checks (exact `control-target` coupling ID, wired qubits) and the
+conflict rules of `group_cr_pairs_by_conflict()` (shared MUX, MUXes in `mux_conflicts()`, which
+`build_mux_conflict_map()` now delegates to) to each written round; shared qubits and repeated
+pairs fail in `parse_pair_rounds()`. Unlike automatic grouping, manual rounds may mix intra- and
+inter-MUX pairs. `pair_candidate_issues()` requires both qubits of each pair among the current
+candidates. `SetCRSchedule` remains the unchecked path. The user procedure is
+[Write Two-Qubit Rounds](../../user-guide/manual-execution-rounds.md#write-two-qubit-rounds).
+
 ## Conflict Graph and Groups
 
 `group_cr_pairs_by_conflict()` builds a conflict graph whose nodes are directed pairs, not qubits,

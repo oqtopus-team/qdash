@@ -4,6 +4,11 @@ This module defines steps for 2-qubit calibration:
 - CustomTwoQubit: Flexible custom 2Q task execution
 - GenerateCRSchedule: CR schedule generation
 - TwoQubitCalibration: Full 2Q calibration
+
+``CustomTwoQubit`` and ``TwoQubitCalibration`` take an ``execution_mode``:
+``automatic`` (default) runs an earlier CR schedule or generates one, and
+``manual`` runs the step's ``rounds`` of directed pairs exactly as written
+(see :mod:`qdash.datamodel.two_qubit_execution_mode`).
 """
 
 from __future__ import annotations
@@ -13,7 +18,13 @@ from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
 
+from qdash.common.manual_rounds import PairRounds, pair_rounds_for_mode
 from qdash.datamodel.task_call import StepCalls, TaskCall, normalize_calls
+from qdash.datamodel.two_qubit_execution_mode import (
+    DEFAULT_MAX_PARALLEL_OPS,
+    TwoQubitExecutionMode,
+    validate_two_qubit_execution_mode,
+)
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.service._internal.call_runner import latest_call_output
 from qdash.workflow.service.results import (
@@ -58,6 +69,44 @@ def _run_coupling_groups(
     return all_raw_results
 
 
+def _init_mode(step: Any) -> PairRounds | None:
+    """Validate ``execution_mode``, ``rounds`` and ``max_parallel_ops``; store pairs as tuples."""
+    step.execution_mode = validate_two_qubit_execution_mode(step.execution_mode)
+    rounds = pair_rounds_for_mode(
+        step.execution_mode, step.rounds, step.max_parallel_ops, step=step.name
+    )
+    step.rounds = [list(round_) for round_ in rounds] if rounds is not None else None
+    return rounds
+
+
+def _max_parallel_ops(step: Any) -> int:
+    value: int | None = step.max_parallel_ops
+    return DEFAULT_MAX_PARALLEL_OPS if value is None else value
+
+
+def _execute_manual_two_qubit(
+    step: Any, session: CalibSession, ctx: StepContext, plan: StepCalls
+) -> dict[str, Any]:
+    """Run manual rounds after checking them against the current candidate qubits."""
+    from qdash.workflow.service.manual_rounds import run_pair_rounds
+
+    if "cr_schedule" in ctx.metadata:
+        get_run_logger().info(
+            f"[{step.name}] Manual rounds run as written; the earlier CR schedule is not used"
+        )
+    assert step._rounds is not None
+    return run_pair_rounds(
+        session, step._rounds, plan=plan, candidates=ctx.candidate_qids, step=step.name
+    )
+
+
+def _preflight_manual(step: Any, session: CalibSession) -> None:
+    if step._rounds is not None:
+        from qdash.workflow.service.manual_rounds import check_pair_rounds
+
+        check_pair_rounds(session, step._rounds, step=step.name)
+
+
 @dataclass
 class CustomTwoQubit(CalibrationStep):
     """Custom 2-qubit calibration step with user-defined tasks.
@@ -82,16 +131,30 @@ class CustomTwoQubit(CalibrationStep):
             ],
         )
 
+        # Run exactly these rounds of directed (control, target) pairs
+        CustomTwoQubit(
+            step_name="cr_rounds",
+            execution_mode="manual",
+            rounds=[[("0", "1"), ("4", "5")], [("8", "9")]],
+            tasks=[TaskCall(name="CheckCrossResonance")],
+        )
+
     ``continue_on_failure`` keeps a pair's independent later calls running. A
     call's ``on_failure="stop"`` keeps a prerequisite fail-fast for that pair.
+
+    ``max_parallel_ops`` caps the pairs of an automatically generated group
+    (default 10). It is rejected with ``manual``, whose rounds are never split.
     """
 
     step_name: str = "custom_two_qubit"
     tasks: list[TaskCall] = field(default_factory=list)
-    max_parallel_ops: int = 10
+    max_parallel_ops: int | None = None
     continue_on_failure: bool = False
+    execution_mode: TwoQubitExecutionMode = "automatic"
+    rounds: list[list[tuple[str, str]]] | None = None
 
     def __post_init__(self) -> None:
+        self._rounds = _init_mode(self)
         if self.step_id is not None and self.step_id != self.step_name:
             raise ValueError(
                 f"CustomTwoQubit uses step_name as its step_id; got step_name="
@@ -114,6 +177,10 @@ class CustomTwoQubit(CalibrationStep):
     def provides(self) -> set[str]:
         return {self.step_name, "candidate_couplings"}
 
+    def preflight(self, session: CalibSession) -> None:
+        """Check manual rounds against the chip before the pipeline starts."""
+        _preflight_manual(self, session)
+
     def execute(
         self,
         session: CalibSession,
@@ -132,6 +199,18 @@ class CustomTwoQubit(CalibrationStep):
             f"[{self.name}] Starting with {len(self.tasks)} calls: "
             f"{[call.resolved_call_id for call in self.tasks]}"
         )
+
+        if self._rounds is not None:
+            manual_results = _execute_manual_two_qubit(self, session, ctx, plan)
+            session.record_stage_result(self.name, manual_results)
+            result = self._build_result(manual_results)
+            ctx.metadata[self.step_name] = result
+            ctx.record_step_result(self.resolved_step_id, result)
+            logger.info(
+                f"[{self.name}] Completed. "
+                f"{len(result.successful_couplings())}/{len(manual_results)} successful"
+            )
+            return ctx
 
         # Use pre-generated schedule if available, otherwise generate
         if "cr_schedule" in ctx.metadata:
@@ -158,7 +237,7 @@ class CustomTwoQubit(CalibrationStep):
             )
             schedule = scheduler.generate(
                 candidate_qubits=candidate_qubits,
-                max_parallel_ops=self.max_parallel_ops,
+                max_parallel_ops=_max_parallel_ops(self),
             )
             parallel_groups = schedule.parallel_groups
 
@@ -362,14 +441,20 @@ class TwoQubitCalibration(CalibrationStep):
     Uses schedule from GenerateCRSchedule if available in ctx.metadata["cr_schedule"],
     otherwise generates schedule internally.
 
+    With ``execution_mode="manual"`` it runs ``rounds`` of directed pairs exactly
+    as written instead, and ``max_parallel_ops`` is rejected.
+
     Requires: candidate_qids (and optionally cr_schedule in metadata)
     Provides: two_qubit, candidate_couplings
     """
 
     tasks: list[TaskCall] | None = None
-    max_parallel_ops: int = 10
+    max_parallel_ops: int | None = None
+    execution_mode: TwoQubitExecutionMode = "automatic"
+    rounds: list[list[tuple[str, str]]] | None = None
 
     def __post_init__(self) -> None:
+        self._rounds = _init_mode(self)
         calls = self.tasks if self.tasks is not None else FULL_2Q_TASKS
         self._calls = normalize_calls(calls, where=f"{self.name}.tasks")
 
@@ -388,6 +473,10 @@ class TwoQubitCalibration(CalibrationStep):
     def provides(self) -> set[str]:
         return {"two_qubit", "candidate_couplings"}
 
+    def preflight(self, session: CalibSession) -> None:
+        """Check manual rounds against the chip before the pipeline starts."""
+        _preflight_manual(self, session)
+
     def execute(
         self,
         session: CalibSession,
@@ -397,6 +486,17 @@ class TwoQubitCalibration(CalibrationStep):
         """Execute 2-qubit calibration."""
         logger = get_run_logger()
         plan = self.step_calls(session)
+
+        if self._rounds is not None:
+            manual_results = _execute_manual_two_qubit(self, session, ctx, plan)
+            session.record_stage_result(self.name, manual_results)
+            ctx.two_qubit = self._build_result(manual_results)
+            ctx.record_step_result(self.resolved_step_id, ctx.two_qubit)
+            logger.info(
+                f"[{self.name}] Completed. "
+                f"{len(ctx.two_qubit.successful_couplings())}/{len(manual_results)} successful"
+            )
+            return ctx
 
         candidate_qubits = ctx.candidate_qids
         if len(candidate_qubits) < 2:
@@ -421,7 +521,7 @@ class TwoQubitCalibration(CalibrationStep):
             )
             schedule = scheduler.generate(
                 candidate_qubits=candidate_qubits,
-                max_parallel_ops=self.max_parallel_ops,
+                max_parallel_ops=_max_parallel_ops(self),
             )
             parallel_groups = schedule.parallel_groups
 

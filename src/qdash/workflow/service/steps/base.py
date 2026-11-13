@@ -56,6 +56,13 @@ class Step(ABC):
         """Whether the pipeline owner needs a hardware connection for this step."""
         return True
 
+    def preflight(self, session: CalibSession) -> None:
+        """Reject what the step can never run, before any step of the pipeline starts.
+
+        Runs without hardware access. Steps with manual rounds check them
+        against the chip's wiring and couplings here. Default: no check.
+        """
+
     @abstractmethod
     def execute(
         self,

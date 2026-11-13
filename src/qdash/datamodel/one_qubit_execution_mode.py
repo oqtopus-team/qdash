@@ -33,6 +33,16 @@ below is illustrative; the actual grouping and order come from the scheduler::
 ``sequential``, ``parallel_by_mux`` and ``parallel_by_round`` keep the hardware
 stage constraints of the scheduler (for example, box stages still run one after
 another); ``simultaneous_spectroscopy`` keeps its own batch schedule.
+
+``manual``
+    The step's ``rounds`` list the rounds explicitly, e.g.
+    ``rounds=[["0", "8"], ["1", "9"]]``. Rounds run in the written order, the
+    qubits of a round run in parallel, and the next round starts after every
+    qubit of the round has finished, as in ``parallel_by_round``. The rounds are
+    never regrouped, reordered or split; :mod:`qdash.common.manual_rounds` checks
+    them before any qubit runs. Only calibration steps accept ``manual``
+    (:data:`OneQubitStepExecutionMode`); flow templates and ``BringUp`` take the
+    scheduled modes of :data:`OneQubitExecutionMode`.
 """
 
 from __future__ import annotations
@@ -54,6 +64,21 @@ ONE_QUBIT_EXECUTION_MODES: tuple[OneQubitExecutionMode, ...] = (
 )
 
 
+OneQubitStepExecutionMode = Literal[
+    "parallel_by_round",
+    "parallel_by_mux",
+    "simultaneous_spectroscopy",
+    "sequential",
+    "manual",
+]
+"""Modes of ``OneQubitCheck``, ``OneQubitFineTune`` and ``CustomOneQubit``."""
+
+ONE_QUBIT_STEP_EXECUTION_MODES: tuple[OneQubitStepExecutionMode, ...] = (
+    *ONE_QUBIT_EXECUTION_MODES,
+    "manual",
+)
+
+
 def validate_one_qubit_execution_mode(value: object) -> OneQubitExecutionMode:
     """Return ``value`` as an execution mode, or raise ``ValueError`` for any other value.
 
@@ -64,4 +89,12 @@ def validate_one_qubit_execution_mode(value: object) -> OneQubitExecutionMode:
     if isinstance(value, str) and value in ONE_QUBIT_EXECUTION_MODES:
         return cast("OneQubitExecutionMode", value)
     valid = ", ".join(ONE_QUBIT_EXECUTION_MODES)
+    raise ValueError(f"Unknown execution_mode {value!r}. Valid execution modes: {valid}")
+
+
+def validate_one_qubit_step_execution_mode(value: object) -> OneQubitStepExecutionMode:
+    """Like :func:`validate_one_qubit_execution_mode`, also accepting ``manual``."""
+    if isinstance(value, str) and value in ONE_QUBIT_STEP_EXECUTION_MODES:
+        return cast("OneQubitStepExecutionMode", value)
+    valid = ", ".join(ONE_QUBIT_STEP_EXECUTION_MODES)
     raise ValueError(f"Unknown execution_mode {value!r}. Valid execution modes: {valid}")

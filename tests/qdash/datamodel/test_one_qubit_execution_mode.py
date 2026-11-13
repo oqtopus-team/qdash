@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from qdash.datamodel.calibration_pipeline import CalibrationPipelineSpec, pipeline_warnings
 from qdash.datamodel.one_qubit_execution_mode import (
     ONE_QUBIT_EXECUTION_MODES,
+    ONE_QUBIT_STEP_EXECUTION_MODES,
     validate_one_qubit_execution_mode,
 )
 
@@ -29,6 +30,14 @@ def test_execution_modes_are_the_canonical_names() -> None:
 @pytest.mark.parametrize("mode", ONE_QUBIT_EXECUTION_MODES)
 def test_validate_accepts_every_canonical_mode(mode: str) -> None:
     assert validate_one_qubit_execution_mode(mode) == mode
+
+
+def test_scheduled_modes_exclude_manual_which_only_steps_accept() -> None:
+    # Templates and BringUp take the scheduled modes; manual needs rounds on a step.
+    assert "manual" not in ONE_QUBIT_EXECUTION_MODES
+    assert (*ONE_QUBIT_EXECUTION_MODES, "manual") == ONE_QUBIT_STEP_EXECUTION_MODES
+    with pytest.raises(ValueError, match="Unknown execution_mode 'manual'"):
+        validate_one_qubit_execution_mode("manual")
 
 
 @pytest.mark.parametrize("value", [*REMOVED, "fast", None, 1])
@@ -94,6 +103,8 @@ def test_schema_documents_execution_mode_only() -> None:
         properties = schema["$defs"][name]["properties"]
         assert "mode" not in properties
         assert properties["execution_mode"]["default"] == "parallel_by_round"
-        assert set(properties["execution_mode"]["enum"]) == set(ONE_QUBIT_EXECUTION_MODES)
+        assert set(properties["execution_mode"]["enum"]) == set(ONE_QUBIT_STEP_EXECUTION_MODES)
+        assert "manual" in properties["execution_mode"]["enum"]
+        assert "rounds" in properties
         description = properties["execution_mode"]["description"]
         assert "rounds" in description and "deprecated" not in description

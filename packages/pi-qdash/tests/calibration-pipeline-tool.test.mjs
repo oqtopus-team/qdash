@@ -209,7 +209,8 @@ test("catalog lists step types and tasks by type and keeps the schema in details
       { type: "OneQubitCheck", kind: "calibration", description: "Coarse one-qubit characterization.", requires: [], provides: ["one_qubit_check", "candidate_qids"], task_scope: "qubit", default_step_id: "one_qubit_check", default_tasks: [{ name: "CheckRabi" }, { name: "CheckT1" }], step_metrics: ["t1_average"] },
       { type: "FilterByStatus", kind: "transform", description: "Keep the qubits whose latest one-qubit step succeeded.", requires: ["one_qubit_check", "one_qubit_fine_tune"], provides: ["candidate_qids"], task_scope: null, default_tasks: [] },
     ],
-    one_qubit_execution_modes: ["parallel_by_round", "parallel_by_mux"],
+    one_qubit_execution_modes: ["parallel_by_round", "parallel_by_mux", "manual"],
+    two_qubit_execution_modes: ["automatic", "manual"],
     tasks: { qubit: ["CheckRabi", "CheckT1"], coupling: ["CheckCrossResonance"] },
     spec_version: 2,
     spec_schema: { title: "CalibrationPipelineSpec" },
@@ -227,6 +228,8 @@ test("catalog lists step types and tasks by type and keeps the schema in details
   assert.match(text, /every occurrence has its own call_id/);
   assert.match(text, /- FilterByStatus \[transform\]: .* needs one_qubit_check or one_qubit_fine_tune;/);
   assert.match(text, /- qubit \(2\): CheckRabi, CheckT1/);
+  assert.match(text, /Two-qubit execution_mode values: automatic, manual/);
+  assert.match(text, /"manual" requires rounds and runs them exactly as written/);
   assert.doesNotMatch(text, /CalibrationPipelineSpec/);
   assert.equal(result.details.data.spec_schema.title, "CalibrationPipelineSpec");
 });
