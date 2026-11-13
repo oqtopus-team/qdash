@@ -1,15 +1,22 @@
 # Upgrade MongoDB
 
-QDash v1.10.0 selects the MongoDB image from `MONGO_VERSION` in `.env`, as `mongo:<MONGO_VERSION>`.
-The setting is required: while it is missing or empty, every `docker compose` command fails
-before it creates a container, so QDash never chooses a release for existing data. The `.env`
-examples set `MONGO_VERSION=9.0.8` for a new installation. An existing deployment sets the
-release it runs now once, before the update, as in
-[Prepare the Update](./system-updates.md#prepare-the-update), so installing QDash v1.10.0 does not
-change MongoDB. QDash neither checks nor upgrades the MongoDB release at startup. After installing
-QDash v1.10.0, schedule a separate maintenance window in each deployment with existing data to
-upgrade MongoDB to 9.0, release `9.0.8`, with the procedure on this page before you install QDash
-v1.11.0.
+QDash v1.10.0 selects the MongoDB image from `MONGO_VERSION` in `.env`, as `mongo:<MONGO_VERSION>`,
+and never changes the MongoDB release of existing data on its own. A new installation only copies
+the `.env` example, as in [New Installations](#new-installations). A deployment with existing data
+first pins the release it runs now, then upgrades MongoDB to 9.0 in a separate maintenance window,
+starting at [Check and Pin the Running Release](#check-and-pin-the-running-release).
+
+## Who Upgrades and When
+
+The page applies to every deployment whose `MONGO_DATA_PATH` holds data written by MongoDB before
+9.0.8:
+
+- QDash v1.10.0, the current release, requires `MONGO_VERSION`. While it is missing or empty,
+  every `docker compose` command fails before it creates a container, so QDash never chooses a
+  release for existing data. QDash neither checks nor upgrades the MongoDB release at startup.
+- QDash v1.11.0 is planned to make `mongo:9.0.8` the standard release. Upgrade MongoDB with this
+  page after installing QDash v1.10.0 and before installing QDash v1.11.0, as described in
+  [Update to QDash v1.11.0](#update-to-qdash-v1-11-0).
 
 A checkout older than QDash v1.10.0 uses the unversioned `mongo` image, whatever image the Docker
 host has tagged `mongo:latest`. A `docker compose pull`, or a host without that image, fetches the
@@ -25,12 +32,18 @@ for that topology. Run every command from the QDash repository root.
 ## New Installations
 
 A new installation that copies `.env` from a QDash v1.10.0 example as in
-[Setup](./setup.md#create-the-environment-file) starts MongoDB `9.0.8` on an empty
-`MONGO_DATA_PATH` and creates its data at FCV `9.0`. It needs no step on this page. Keep
-`MONGO_VERSION=9.0.8` only for an empty data directory: data written by an older release follows
-the upgrade steps below.
+[Setup](./setup.md#create-the-environment-file) gets `MONGO_VERSION=9.0.8`, starts MongoDB `9.0.8`
+on an empty `MONGO_DATA_PATH`, and creates its data at FCV `9.0`. It needs no migration and no
+other step on this page. Keep `MONGO_VERSION=9.0.8` only for an empty data directory: data
+written by an older release follows the procedure for existing deployments.
 
-## Check the Running Release
+## Check and Pin the Running Release
+
+An existing deployment sets the release it runs now once, before the update to QDash v1.10.0, as
+in [Prepare the Update](./system-updates.md#prepare-the-update), so installing QDash v1.10.0 does
+not change MongoDB.
+
+### Check the Running Release
 
 With QDash running, read the MongoDB release and its feature compatibility version (FCV), the
 data format version that MongoDB writes. The command uses the credentials of the `mongo`
@@ -40,32 +53,16 @@ container:
 docker compose exec -T mongo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "print(db.version()); printjson(db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}).featureCompatibilityVersion)"'
 ```
 
-The output is the release and the FCV, for example `7.0.12` and `{ version: '7.0' }`. Later steps
-call this the status command. Find your path:
+For a MongoDB without authentication, drop the `-u`, `-p`, and `--authenticationDatabase`
+options here and in the later commands. The output is the release and the FCV, for example
+`7.0.12` and `{ version: '7.0' }`. Later steps call this the status command. If Compose fails
+because `MONGO_VERSION` is missing, see
+[Find the Release When Compose Fails](#find-the-release-when-compose-fails).
 
-| Running release | FCV before the first step | Image of each step | FCV to set after the step |
-| --- | --- | --- | --- |
-| 7.0 | `7.0` | `mongo:8.0.38`, then `mongo:9.0.8` | `8.0` after `8.0.38` |
-| 8.0 | `8.0` | `mongo:9.0.8` | None |
-| 8.2 | `8.2` | `mongo:8.3.17`, then `mongo:9.0.8` | `8.3` after `8.3.17` |
-| 8.3 | `8.3` | `mongo:9.0.8` | None |
-| 9.0 before 9.0.8 | `8.0`, `8.3`, or `9.0` | `mongo:9.0.8`, a patch update | None |
-| 9.0.8 or a later 9.0 patch | Any | None; pin the running release | None |
-
-These are the newest patch releases of each series on
-[Docker Hub](https://hub.docker.com/_/mongo/tags) as of 2026-11-13. Never use an image older than
-the running release. Do not skip a step: each release opens only data whose FCV is at most one
-step behind. For any other release, such as 6.0 or 8.1, find the path in the
-[MongoDB release notes](https://www.mongodb.com/docs/manual/release-notes/) first. If the FCV is
-lower than the running series, such as `6.0` on a 7.0 server, or shows a `targetVersion` field,
-set it to the running series first with the FCV command in
-[Upgrade One Step at a Time](#upgrade-one-step-at-a-time).
-
-## Pin the Running Release
+### Pin the Running Release
 
 Pin MongoDB to the exact running release so that a recreated container keeps the same release.
-QDash v1.10.0 and later require this line, which
-[Prepare the Update](./system-updates.md#prepare-the-update) sets. Change the existing
+QDash v1.10.0 and later require this line and have no fallback release. Change the existing
 `MONGO_VERSION` line in `.env` to the release that the status command printed, or add the line if
 it is missing:
 
@@ -98,7 +95,35 @@ docker compose config --images | grep '^mongo:'
 
 The command must print the pinned image.
 
-## Stop Writers and Back Up
+## Choose the Upgrade Path
+
+Find the row of the release and FCV that the status command printed. The upgrade later uses each
+image of that row in order:
+
+| Running release | FCV before the first step | Image of each step | FCV to set after the step |
+| --- | --- | --- | --- |
+| 7.0 | `7.0` | `mongo:8.0.38`, then `mongo:9.0.8` | `8.0` after `8.0.38` |
+| 8.0 | `8.0` | `mongo:9.0.8` | None |
+| 8.2 | `8.2` | `mongo:8.3.17`, then `mongo:9.0.8` | `8.3` after `8.3.17` |
+| 8.3 | `8.3` | `mongo:9.0.8` | None |
+| 9.0 before 9.0.8 | `8.0`, `8.3`, or `9.0` | `mongo:9.0.8`, a patch update | None |
+| 9.0.8 or a later 9.0 patch | Any | None; keep the pinned release | None |
+
+These are the newest patch releases of each series on
+[Docker Hub](https://hub.docker.com/_/mongo/tags) as of 2026-11-13. Never use an image older than
+the running release. Do not skip a step: each release opens only data whose FCV is at most one
+step behind. For any other release, such as 6.0 or 8.1, find the path in the
+[MongoDB release notes](https://www.mongodb.com/docs/manual/release-notes/) first. If the FCV is
+lower than the running series, such as `6.0` on a 7.0 server, or shows a `targetVersion` field,
+set it to the running series after the backup and before the first image change, with the FCV
+command in step 4 of [Upgrade One Step at a Time](#upgrade-one-step-at-a-time).
+
+## Back Up and Upgrade
+
+Run the upgrade in a maintenance window, with QDash stopped from the backup until the last step
+succeeds.
+
+### Stop Writers and Back Up
 
 1. Complete or cancel running calibrations and other workflows from **Execution**, and stop
    external clients that write to MongoDB.
@@ -120,9 +145,10 @@ The command must print the pinned image.
    docker compose exec -T mongo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "const d = db.getSiblingDB(\"${MONGO_DB_NAME:-qdash}\"); d.getCollectionNames().sort().forEach(c => print(c, d.getCollection(c).estimatedDocumentCount()))"' > mongo-counts-before.txt
    ```
 
-## Upgrade One Step at a Time
+### Upgrade One Step at a Time
 
-Repeat these steps for each image in your row of the table, in order.
+Repeat these steps for each image in your row of the
+[upgrade path table](#choose-the-upgrade-path), in order.
 
 1. Change `MONGO_VERSION` in `.env` to the release of this step, for example
    `MONGO_VERSION=8.0.38`, and confirm it with
@@ -143,7 +169,8 @@ Repeat these steps for each image in your row of the table, in order.
    ```
 
    Run the status command too. It must print the release of this step, with the FCV unchanged.
-   The comparison must print `counts match`, and the log must show no startup errors.
+   The comparison must print `counts match`, and the log must show no startup errors. If any
+   check fails, stop and follow [If a Step Fails](#if-a-step-fails).
 4. If the table names an FCV after this step, set it and run the status command again:
 
    ```bash
@@ -153,11 +180,11 @@ Repeat these steps for each image in your row of the table, in order.
    Replace `8.0` with the FCV of this step. The command must print `ok: 1`, and the status command
    must show that version with no `targetVersion`. If the command fails part way, run it again.
 
+## Verify the Upgrade and Set the Final FCV
+
 After the last step, start QDash with the command the deployment normally uses, including its
 profiles, such as `docker compose up -d`, and check it as in
 [Verify the Deployment](./system-updates.md#verify-the-deployment).
-
-## Set the Final FCV
 
 If the status command already shows FCV `9.0` with no `targetVersion`, only verify that the
 running release matches the pinned 9.0 release, at least `9.0.8`; no FCV change is needed.
@@ -165,10 +192,14 @@ running release matches the pinned 9.0 release, at least `9.0.8`; no FCV change 
 After a series upgrade, MongoDB 9.0 keeps the previous FCV, `8.0` or `8.3`, until you raise it.
 Keep it there for a burn-in period while QDash runs normally; until then, the official
 [9.0 downgrade procedures](https://www.mongodb.com/docs/manual/release-notes/9.0-downgrade/) still
-apply. Then run the FCV command of step 4 with `9.0` and confirm that the status command prints
-the pinned running 9.0 release (at least `9.0.8`) and `{ version: '9.0' }`. After this, only a backup returns the data to an older release.
+apply. Then run the FCV command in step 4 of
+[Upgrade One Step at a Time](#upgrade-one-step-at-a-time) with `9.0`, and confirm that the status
+command prints the pinned running 9.0 release (at least `9.0.8`) and `{ version: '9.0' }`. After
+this, only a backup returns the data to an older release.
 
-## If a Step Fails
+## Troubleshooting
+
+### If a Step Fails
 
 Stop and keep QDash stopped. Do not set `MONGO_VERSION` back to an older release on the chance
 that it opens the data: after a newer FCV is set, it cannot. Read `docker compose logs mongo`, then
@@ -177,7 +208,7 @@ recover with the official
 release or by restoring the backup with your organization's method, and keep `MONGO_VERSION` at
 the release that opens the restored data.
 
-## Find the Release When Compose Fails
+### Find the Release When Compose Fails
 
 When `.env` has no `MONGO_VERSION`, Compose prints
 `required variable MONGO_VERSION is missing a value` for every command, including
