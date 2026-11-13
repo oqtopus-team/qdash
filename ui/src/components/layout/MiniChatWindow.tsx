@@ -91,7 +91,6 @@ function useDrag(initialPosition: { x: number; y: number }) {
 const WINDOW_WIDTH = 400;
 const WINDOW_HEIGHT = 560;
 const MARGIN = 16;
-
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -126,26 +125,49 @@ export function MiniChatWindow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // Default position: bottom-right, shrunk to fit small viewports.
+  const [viewport, setViewport] = useState({
+    width: WINDOW_WIDTH + 2 * MARGIN,
+    bottom: WINDOW_HEIGHT + 2 * MARGIN,
+  });
+  useEffect(() => {
+    const dock = document.getElementById("mobile-tab-bar");
+    const updateViewport = () => {
+      const dockRect = dock?.getBoundingClientRect();
+      const visibleBottom = window.visualViewport
+        ? window.visualViewport.offsetTop + window.visualViewport.height
+        : window.innerHeight;
+      setViewport({
+        width: window.visualViewport?.width ?? window.innerWidth,
+        bottom:
+          dockRect && dockRect.height > 0 ? Math.min(dockRect.top, visibleBottom) : visibleBottom,
+      });
+    };
+    updateViewport();
+    const observer = new ResizeObserver(updateViewport);
+    if (dock) observer.observe(dock);
+    window.addEventListener("resize", updateViewport);
+    window.visualViewport?.addEventListener("resize", updateViewport);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateViewport);
+      window.visualViewport?.removeEventListener("resize", updateViewport);
+    };
+  }, []);
+
+  // Measure the dock's top edge so its safe-area padding is included.
   const size = useMemo(
     () => ({
-      width:
-        typeof window !== "undefined"
-          ? Math.min(WINDOW_WIDTH, window.innerWidth - 2 * MARGIN)
-          : WINDOW_WIDTH,
-      height:
-        typeof window !== "undefined"
-          ? Math.min(WINDOW_HEIGHT, window.innerHeight - 2 * MARGIN)
-          : WINDOW_HEIGHT,
+      width: Math.max(1, Math.min(WINDOW_WIDTH, viewport.width - 2 * MARGIN)),
+      height: Math.max(1, Math.min(WINDOW_HEIGHT, viewport.bottom - 2 * MARGIN)),
     }),
-    [],
+    [viewport],
   );
   const defaultPos = useMemo(
     () => ({
-      x: typeof window !== "undefined" ? window.innerWidth - size.width - MARGIN : 0,
-      y: typeof window !== "undefined" ? window.innerHeight - size.height - MARGIN : 0,
+      x: Math.max(0, viewport.width - size.width - MARGIN),
+      y: Math.max(0, viewport.bottom - size.height - MARGIN),
     }),
-    [size],
+    [viewport, size],
   );
 
   const { position, resetPosition, dragHandlers } = useDrag(defaultPos);
@@ -177,7 +199,7 @@ export function MiniChatWindow() {
       style={{
         left: position.x,
         top: position.y,
-        width: minimized ? 260 : size.width,
+        width: minimized ? Math.min(260, size.width) : size.width,
         height: minimized ? "auto" : size.height,
       }}
       role="dialog"
