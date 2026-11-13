@@ -1,20 +1,34 @@
 # Upgrade MongoDB
 
-After installing this QDash release, schedule a separate maintenance window in each deployment to
-upgrade MongoDB to 9.0, release `9.0.8`, before you install the next QDash release. The next
-release pins the MongoDB image in `compose.yaml`. This release still uses the unversioned `mongo`
-image, and QDash neither checks nor upgrades the MongoDB release at startup, so each deployment
-moves its own data with the procedure on this page.
+QDash v1.10.0 selects the MongoDB image from `MONGO_VERSION` in `.env`, as `mongo:<MONGO_VERSION>`.
+The setting is required: while it is missing or empty, every `docker compose` command fails
+before it creates a container, so QDash never chooses a release for existing data. The `.env`
+examples set `MONGO_VERSION=9.0.8` for a new installation. An existing deployment sets the
+release it runs now once, before the update, as in
+[Prepare the Update](./system-updates.md#prepare-the-update), so installing QDash v1.10.0 does not
+change MongoDB. QDash neither checks nor upgrades the MongoDB release at startup. After installing
+QDash v1.10.0, schedule a separate maintenance window in each deployment with existing data to
+upgrade MongoDB to 9.0, release `9.0.8`, with the procedure on this page before you install QDash
+v1.11.0.
 
-The unversioned `mongo` image is whatever image the Docker host has tagged `mongo:latest`. A
-`docker compose pull`, or a host without that image, fetches the newest MongoDB release, which can
-refuse data written by an older one. Until the upgrade, recreate MongoDB only after pinning its
-running release as in [Pin the Running Release](#pin-the-running-release).
+A checkout older than QDash v1.10.0 uses the unversioned `mongo` image, whatever image the Docker
+host has tagged `mongo:latest`. A `docker compose pull`, or a host without that image, fetches the
+newest MongoDB release, which can refuse data written by an older one. On such a checkout,
+recreate MongoDB only after pinning its running release as in
+[Pin the Running Release](#pin-the-running-release).
 
 The procedure covers the standalone `mongo` service of `compose.yaml`. For a replica set or a
 sharded cluster, follow the official
 [MongoDB 9.0 upgrade procedures](https://www.mongodb.com/docs/manual/release-notes/9.0-upgrade-standalone/)
 for that topology. Run every command from the QDash repository root.
+
+## New Installations
+
+A new installation that copies `.env` from a QDash v1.10.0 example as in
+[Setup](./setup.md#create-the-environment-file) starts MongoDB `9.0.8` on an empty
+`MONGO_DATA_PATH` and creates its data at FCV `9.0`. It needs no step on this page. Keep
+`MONGO_VERSION=9.0.8` only for an empty data directory: data written by an older release follows
+the upgrade steps below.
 
 ## Check the Running Release
 
@@ -49,10 +63,22 @@ set it to the running series first with the FCV command in
 
 ## Pin the Running Release
 
-Pin MongoDB to the exact running release in the Compose file this deployment already loads, so that
-a recreated container keeps the same release. Docker Compose loads `compose.override.yaml` next to
-`compose.yaml` automatically. Add the `image` line to it, merging into existing `services:` and
-`mongo:` entries; create the file if it does not exist, and do not overwrite other settings:
+Pin MongoDB to the exact running release so that a recreated container keeps the same release.
+QDash v1.10.0 and later require this line, which
+[Prepare the Update](./system-updates.md#prepare-the-update) sets. Change the existing
+`MONGO_VERSION` line in `.env` to the release that the status command printed, or add the line if
+it is missing:
+
+```dotenv
+MONGO_VERSION=7.0.12
+```
+
+A checkout older than QDash v1.10.0 ignores `MONGO_VERSION`; there `compose.yaml` shows
+`image: mongo` without `${MONGO_VERSION`. Until its update to QDash v1.10.0 or later, also add the
+same release to `compose.override.yaml` next to `compose.yaml`, which Docker Compose loads
+automatically, or to the last file of the selection when the deployment selects Compose files
+with `-f` or `COMPOSE_FILE`. Merge into existing `services:` and `mongo:` entries, create the file
+if it does not exist, and do not overwrite other settings:
 
 ```yaml
 services:
@@ -60,18 +86,17 @@ services:
     image: mongo:7.0.12
 ```
 
-Use the release that the status command printed. If the deployment selects Compose files with
-`-f` or `COMPOSE_FILE`, put the line in the last file of that selection instead, and keep using the
-same selection and `--profile` options in every command below. Do not retag `mongo:latest`: other
-projects on the Docker host share that tag. Confirm the image Compose resolves:
+Remove this line after the checkout reaches QDash v1.10.0, so that `.env` alone selects the
+release. An `image` line for `mongo` in `compose.override.yaml` or another Compose file overrides
+`MONGO_VERSION`, and a `MONGO_VERSION` set in the shell overrides `.env`. Keep the deployment's
+Compose file selection and `--profile` options in every command below. Do not retag
+`mongo:latest`: other projects on the Docker host share that tag. Confirm the image Compose resolves:
 
 ```bash
 docker compose config --images | grep '^mongo:'
 ```
 
-The command must print the pinned image. This override is a temporary migration tool, not a
-permanent organization change; [After the Next QDash Release](#after-the-next-qdash-release)
-removes it.
+The command must print the pinned image.
 
 ## Stop Writers and Back Up
 
@@ -99,8 +124,8 @@ removes it.
 
 Repeat these steps for each image in your row of the table, in order.
 
-1. Change the `image` line of the override to the image of this step, for example
-   `image: mongo:8.0.38`, and confirm it with
+1. Change `MONGO_VERSION` in `.env` to the release of this step, for example
+   `MONGO_VERSION=8.0.38`, and confirm it with
    `docker compose config --images | grep '^mongo:'`.
 2. Pull the image and recreate `mongo` alone with it:
 
@@ -145,25 +170,61 @@ the pinned running 9.0 release (at least `9.0.8`) and `{ version: '9.0' }`. Afte
 
 ## If a Step Fails
 
-Stop and keep QDash stopped. Do not set the `image` line back to an older release on the chance
+Stop and keep QDash stopped. Do not set `MONGO_VERSION` back to an older release on the chance
 that it opens the data: after a newer FCV is set, it cannot. Read `docker compose logs mongo`, then
 recover with the official
 [downgrade procedures](https://www.mongodb.com/docs/manual/release-notes/9.0-downgrade/) for your
-release or by restoring the backup with your organization's method, and keep the override at the
-release that opens the restored data.
+release or by restoring the backup with your organization's method, and keep `MONGO_VERSION` at
+the release that opens the restored data.
 
-## After the Next QDash Release
+## Find the Release When Compose Fails
 
-Keep the current MongoDB `image` override until you install the QDash release that pins MongoDB in
-`compose.yaml`. When you update to it as described in [System Updates](./system-updates.md), read
-the pinned image before stopping QDash:
+When `.env` has no `MONGO_VERSION`, Compose prints
+`required variable MONGO_VERSION is missing a value` for every command, including
+`docker compose ps` and `docker compose exec`. Read the release with Docker directly. List the
+MongoDB containers of all Compose projects:
 
 ```bash
-git show <target-tag>:compose.yaml | grep -A1 '^  mongo:'
+docker ps -a --filter label=com.docker.compose.service=mongo --format '{{.Names}}\t{{.Status}}\t{{.Label "com.docker.compose.project"}}'
 ```
 
-Remove the override line only if that image is the release that runs now or a later 9.0 patch,
-and confirm with `docker compose config --images | grep '^mongo:'` before starting QDash. If the
-pinned image is older than the running release, keep the override and report the mismatch instead
-of downgrading. Removing the line returns the deployment to the shared Compose configuration, with
-no MongoDB difference kept per organization.
+Choose the container for the deployment's actual Compose project (normally `ENV` from `.env`,
+unless `-p` or `COMPOSE_PROJECT_NAME` overrides it). Inspect its labels and mounts to confirm
+the checkout and `MONGO_DATA_PATH`; do not choose the first container in the list:
+
+```bash
+docker inspect <container> --format '{{json .Config.Labels}} {{json .Mounts}}'
+```
+
+For a running container, print its release with the container name in place of `<container>`:
+
+```bash
+docker exec <container> sh -c 'mongosh --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.version()"'
+```
+
+Do not start a stopped container to discover its version: its data directory might have been
+used by a newer container. Inspect its immutable image ID, then that image's metadata offline:
+
+```bash
+docker inspect <container> --format '{{.Image}}'
+docker image inspect <image-id> --format '{{json .Config.Env}}'
+```
+
+The `MONGO_VERSION` entry identifies the image's release. Use it only when deployment records
+confirm this container last wrote the selected data directory. If the image metadata is missing
+or the data history is uncertain, stop and recover the recorded release before proceeding.
+
+Set the printed release as `MONGO_VERSION` in `.env`. If no container of the project is listed,
+for example after `docker compose down` removed it, use the release recorded before the update.
+Without a recorded release, do not guess one and do not start MongoDB on the data with
+`9.0.8` or another release.
+
+## Update to QDash v1.11.0
+
+QDash v1.11.0 is planned to make `mongo:9.0.8` the standard MongoDB release for every deployment.
+It does not migrate existing data and does not apply `9.0.8` to it silently, so upgrade MongoDB
+with this page first. Keep `MONGO_VERSION` in `.env` at the running release until the v1.11.0
+release notes describe the change. Before stopping QDash for that update as described in
+[System Updates](./system-updates.md), confirm that the MongoDB release it selects is the release
+that runs now or a later 9.0 patch. If it would select an older release, keep the running release
+pinned and report the mismatch instead of downgrading.
