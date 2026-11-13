@@ -175,6 +175,11 @@ class CalibOrchestrator:
         config = self.config
         logger = get_run_logger()
 
+        from qdash.common.simulation_binding import check_backend_for_chip, chip_binding
+
+        binding = chip_binding(config.project_id, config.chip_id)
+        check_backend_for_chip(binding, config.backend_name, config.chip_id)
+
         # Create directory structure
         self._create_directories()
 
@@ -382,6 +387,13 @@ class CalibOrchestrator:
 
         config = self.config
 
+        from qdash.common.simulation_binding import check_hardware_export, chip_binding
+
+        check_hardware_export(
+            chip_binding(config.project_id, config.chip_id),
+            config.chip_id,
+            "calibration note export",
+        )
         try:
             repo = MongoCalibrationNoteRepository()
             latest_note = repo.find_one(

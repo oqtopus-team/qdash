@@ -1,6 +1,6 @@
 """Shared helpers for qibocal backend tests.
 
-``write_fake_runner`` writes a stand-in for ``tools/qibocal-runner/run_rabi_amplitude.py``
+``write_fake_runner`` writes a stand-in for ``src/qdash/workflow/qibocal_runner/run_protocol.py``
 that runs under the test interpreter. It exercises the real subprocess boundary of
 ``QibocalBackend`` (no shell, own process group, artifacts, result checks) without the
 Qibocal environment. ``run_task_through_executor`` runs a task through the real
@@ -19,6 +19,11 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+from qdash.api.services.chip.config_scaffold import QIBOCAL_PRESET, simulation_binding_for_preset
+from qdash.common.qibocal_platform import (
+    load_platform_template,
+    template_values,
+)
 from qdash.repository.inmemory import (
     InMemoryChipHistoryRepository,
     InMemoryChipRepository,
@@ -32,8 +37,10 @@ from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 UPSTREAM_PLATFORMS = REPO_ROOT / "config" / "domain" / "qibocal" / "platforms"
-RUNNER_PYTHON = REPO_ROOT / "tools" / "qibocal-runner" / ".venv" / "bin" / "python"
-RUNNER_SCRIPT = REPO_ROOT / "tools" / "qibocal-runner" / "run_rabi_amplitude.py"
+RUNNER_PYTHON = (
+    REPO_ROOT / "src" / "qdash" / "workflow" / "qibocal_runner" / ".venv" / "bin" / "python"
+)
+RUNNER_SCRIPT = REPO_ROOT / "src" / "qdash" / "workflow" / "qibocal_runner" / "run_protocol.py"
 EMULATOR = "qibolab._core.instruments.emulator.emulator.EmulatorController"
 
 FAKE_RUNNER = textwrap.dedent(
@@ -62,7 +69,7 @@ FAKE_RUNNER = textwrap.dedent(
         Path(out, "child_pid").write_text(str(child.pid))
         time.sleep(60)
     if SCENARIO == "watchdog":
-        # The real runner's parent watchdog, loaded from tools/qibocal-runner.
+        # The real runner's parent watchdog, loaded from src/qdash/workflow/qibocal_runner.
         import importlib.util
         spec = importlib.util.spec_from_file_location("qdash_runner", OVERRIDES["runner"])
         runner = importlib.util.module_from_spec(spec)
@@ -85,6 +92,13 @@ FAKE_RUNNER = textwrap.dedent(
     prob = [0.5 - 0.5 * math.cos(math.pi * a / 0.127) for a in amps]
     Path(out, "figure_0.json").write_text(json.dumps(
         {{"data": [{{"type": "scatter", "x": amps, "y": prob}}], "layout": {{}}}}))
+    applied = json.loads((platform_dir / "parameters.json").read_text())
+    values = request["calibration"]
+    applied["configs"]["0/drive"]["frequency"] = values["qibocal_qubit_frequency"] * 1e9
+    for gate, factor in [("RX", 1), ("RX90", 0.5)]:
+        pulse = applied["native_gates"]["single_qubit"]["0"][gate][0][1]
+        pulse["amplitude"] = values["qibocal_pi_amplitude"] * factor
+        pulse["duration"] = values["qibocal_pi_duration"]
     digest = tree(platform_dir)
     result = {{
         "status": "ok",
@@ -104,6 +118,7 @@ FAKE_RUNNER = textwrap.dedent(
             "controllers": ["dummy={emulator}"], "platform": request["platform"],
             "platform_sha256_before": digest, "platform_sha256_after": digest,
             "platform_unchanged": True, "rx_before": {{}}, "rx_after": {{}},
+            "applied_parameters": applied,
             "executor_update": False, "seed": request["seed"],
             "versions": {{"qibocal": "0.2.6", "qibolab": "0.2.16", "qibo": "0.3.3"}},
             "qibocal_output_dir": str(out / "qibocal"), "python_executable": sys.executable,
@@ -151,8 +166,10 @@ def fake_backend(
     platforms = settings.pop("platforms_dir", None) or copy_platforms(tmp_path)
     calib_dir = tmp_path / "calib"
     calib_dir.mkdir(parents=True, exist_ok=True)
-    return QibocalBackend(
+    backend = QibocalBackend(
         {
+            "project_id": "proj-1",
+            "chip_id": "emulator",
             "calib_data_path": str(calib_dir),
             "runner_python": sys.executable,
             "runner_script": str(write_fake_runner(tmp_path, scenario, overrides)),
@@ -161,10 +178,16 @@ def fake_backend(
             **settings,
         }
     )
+    binding = simulation_binding_for_preset(QIBOCAL_PRESET)
+    assert binding is not None
+    from unittest.mock import patch
+
+    patch.object(backend, "binding", return_value=binding).start()
+    return backend
 
 
 def real_backend(tmp_path: Path, **settings: Any) -> QibocalBackend:
-    """A ``QibocalBackend`` running the real runner from ``tools/qibocal-runner``."""
+    """A ``QibocalBackend`` running the real runner from ``src/qdash/workflow/qibocal_runner``."""
     calib_dir = tmp_path / "calib"
     calib_dir.mkdir(parents=True, exist_ok=True)
     return QibocalBackend({"calib_data_path": str(calib_dir), **settings})
@@ -198,6 +221,10 @@ def run_task_through_executor(
     The calibration repositories, the backend params updater, and calibration-note
     updates raise ``WriteBackReachedError`` if anything tries to use them.
     """
+    task.input_parameters_from_snapshot = True
+    for name, value in template_values(load_platform_template().parameters(), 0).items():
+        if name in task.input_parameters:
+            task.input_parameters[name].value = value
     history_repo = InMemoryTaskResultHistoryRepository()
     recorder = TaskHistoryRecorder(
         task_result_history_repo=history_repo,  # type: ignore[arg-type]

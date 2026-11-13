@@ -21,6 +21,11 @@ from qdash.dbmodel.user import UserDocument
 logger = logging.getLogger(__name__)
 
 
+def _binding_summary(doc: ChipDocument) -> dict[str, Any] | None:
+    binding = getattr(doc, "simulation_binding", None)
+    return binding.model_dump(mode="json") if binding is not None else None
+
+
 class MongoChipRepository:
     """MongoDB implementation of ChipRepository.
 
@@ -110,6 +115,7 @@ class MongoChipRepository:
             activity_status=chip.activity_status,
             installed_at=chip.installed_at,
             system_info=chip.system_info,
+            simulation_binding=chip.simulation_binding,
         )
         doc.insert()
         return self._to_model(doc)
@@ -217,6 +223,7 @@ class MongoChipRepository:
             activity_status=doc.activity_status,
             installed_at=doc.installed_at,
             system_info=doc.system_info,
+            simulation_binding=doc.simulation_binding,
         )
 
     # =========================================================================
@@ -298,6 +305,7 @@ class MongoChipRepository:
                 "activity_status": getattr(doc, "activity_status", "active"),
                 "current_cooldown_id": getattr(doc, "current_cooldown_id", None),
                 "note": doc.note.model_dump(mode="json"),
+                "simulation_binding": _binding_summary(doc),
                 "qubit_count": qubit_counts.get(doc.chip_id, 0),
                 "coupling_count": coupling_counts.get(doc.chip_id, 0),
             }
@@ -337,6 +345,7 @@ class MongoChipRepository:
             "activity_status": getattr(doc, "activity_status", "active"),
             "current_cooldown_id": getattr(doc, "current_cooldown_id", None),
             "note": doc.note.model_dump(mode="json"),
+            "simulation_binding": _binding_summary(doc),
             "qubit_count": qubit_counts.get(chip_id, 0),
             "coupling_count": coupling_counts.get(chip_id, 0),
         }

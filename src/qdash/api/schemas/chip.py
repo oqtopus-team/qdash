@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_serializer, field_validator, model_
 from qdash.common.utils.chip_id import validate_chip_id
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.note import NoteModel
+from qdash.datamodel.simulation import SimulationBindingModel
 from qdash.datamodel.task import TaskResultInputParameter, TaskResultOutputParameter
 
 
@@ -37,6 +38,14 @@ class ChipResponse(BaseModel):
     activity_status: Literal["active", "inactive"] = "active"
     current_cooldown_id: str | None = None
     note: NoteModel = Field(default_factory=NoteModel)
+    simulation_binding: SimulationBindingModel | None = Field(
+        default=None,
+        description=(
+            "Present only on chips created from a simulation preset (for example qibocal). "
+            "Such a chip runs only on its bound backend and its values are never exported to "
+            "hardware configuration. Absent means simulation identity is unknown; Qibocal execution is refused."
+        ),
+    )
 
 
 class ChipConfigOptions(BaseModel):

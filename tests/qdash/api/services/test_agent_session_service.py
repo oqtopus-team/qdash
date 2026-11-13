@@ -513,8 +513,16 @@ def test_commit_action_candidate_revalidates_and_audits_parameter_write(
     assert qubit.data["drive_amplitude"]["execution_id"] == "execution-1"
 
 
+@pytest.mark.parametrize(
+    "origin",
+    [
+        {"measurement_only_reason": "Legacy emulator measurement"},
+        {"provenance": {"synthetic": True, "source": "qibolab-emulator"}},
+    ],
+)
 def test_measurement_only_output_cannot_become_a_committed_candidate(
     service: AgentSessionService,
+    origin,
 ) -> None:
     """A measurement-only output (e.g. emulator data) is rejected even when policy allows it."""
     session = _create_session(service, max_actions=1)
@@ -530,7 +538,7 @@ def test_measurement_only_output_cannot_become_a_committed_candidate(
             "drive_amplitude": {
                 "value": 0.12,
                 "database_updated": False,
-                "measurement_only_reason": "Synthetic result from the Qibolab emulator",
+                **origin,
             }
         },
     )

@@ -5,7 +5,7 @@
 # `task deploy-local-qibocal` runs this with DEFAULT_BACKEND=qibocal and ENV=dev-qibocal.
 # Only the user-flow worker changes: it builds the `qibocal` target of the workflow
 # Dockerfile, which adds the isolated Qibocal runner environment under
-# /app/tools/qibocal-runner. Without this file no image contains Qibocal.
+# /app/src/qdash/workflow/qibocal_runner. Without this file no image contains Qibocal.
 # Runner settings are in config/app/qibocal.yaml and the Qibolab platform in
 # config/domain/qibocal/platforms, both mounted through ./config.
 services:

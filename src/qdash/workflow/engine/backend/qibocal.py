@@ -2,7 +2,8 @@
 
 QDash does not import Qibocal or Qibolab. Their pinned dependencies conflict with qubex
 (``cma<4`` against ``cma>=4``), so they live in their own environment under
-``tools/qibocal-runner`` and run as a subprocess. This module owns that boundary:
+``src/qdash/workflow/qibocal_runner`` and run as a subprocess. This module owns the protocol boundary;
+``qibocal_process`` owns process transport:
 
 * settings come from ``config/app/qibocal.yaml``, separate from the Qibolab platform files;
 * every run gets its own artifact directory and its own copy of the platform, so the
@@ -12,30 +13,30 @@ QDash does not import Qibocal or Qibolab. Their pinned dependencies conflict wit
 * the runner result is accepted only when it reports an emulator-only platform, an
   executor with ``update=False``, and an unchanged platform.
 
-The backend is limited to emulators. Its results are synthetic and are never written to
-accepted calibration state; see ``QibocalTask``.
+The backend is limited to emulators. Results can be adopted only on a matching bound chip.
 """
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import json
-import logging
-import os
 import shutil
-import signal
 import subprocess
 import uuid
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from qdash.common.config.loader import ConfigLoader
+from qdash.common.qibocal_platform import PlatformTemplate, native_assignments, readback_mismatches
+from qdash.common.simulation_binding import require_qibocal_binding
 from qdash.workflow.engine.backend.base import BaseBackend
+from qdash.workflow.engine.backend.persistence import PersistencePolicy
+from qdash.workflow.engine.backend.qibocal_process import run_process
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from qdash.datamodel.simulation import SimulationBindingModel
 
 SETTINGS_FILE = "app/qibocal.yaml"
 EMULATOR_CONTROLLER = "qibolab._core.instruments.emulator.emulator.EmulatorController"
@@ -85,7 +86,7 @@ class QibocalRunnerSettings:
 
         # Runner paths are relative to the directory that holds the config directory: the
         # repository root on a host, /app in the workflow image (/app/config is mounted there
-        # and the runner is installed under /app/tools/qibocal-runner).
+        # and the runner is installed under /app/src/qdash/workflow/qibocal_runner).
         app_root = ConfigLoader.get_config_dir().parent
 
         def repo_path(value: Any) -> Path:
@@ -129,17 +130,14 @@ class QibocalRunnerSettings:
 
 
 @dataclass(frozen=True)
-class RabiAmplitudeRequest:
-    """Parameters of one Qibocal ``rabi_amplitude`` run."""
+class QibocalRequest:
+    """An allowlisted protocol with final resolved calibration inputs."""
 
     qubit: int
-    min_amp: float
-    max_amp: float
-    step_amp: float
-    nshots: int
-    relaxation_time: float
+    protocol: str
+    parameters: dict[str, Any]
+    calibration: dict[str, float]
     seed: int
-    pulse_length: float | None = None
 
 
 @dataclass(frozen=True)
@@ -182,6 +180,7 @@ class QibocalBackend(BaseBackend):
     """Run Qibocal protocols on a Qibolab emulator through the isolated runner."""
 
     name: str = "qibocal"
+    persistence_policy = PersistencePolicy.BOUND_SIMULATION
 
     def __init__(self, config: dict[str, Any]) -> None:
         self._config = config
@@ -219,7 +218,7 @@ class QibocalBackend(BaseBackend):
             raise QibocalRunnerError(
                 "Qibocal backend is not installed: missing "
                 + ", ".join(missing)
-                + ". Run `uv sync --frozen` in tools/qibocal-runner."
+                + ". Run `uv sync --frozen` in src/qdash/workflow/qibocal_runner."
             )
         self._settings = settings
 
@@ -234,6 +233,14 @@ class QibocalBackend(BaseBackend):
         self.connect()
         return self
 
+    def binding(self) -> SimulationBindingModel:
+        settings = self.settings
+        return require_qibocal_binding(
+            self.config.get("project_id"),
+            self.config["chip_id"],
+            PlatformTemplate(settings.platforms_dir, settings.platform),
+        )
+
     def artifact_root(self) -> Path:
         """Directory below which each run gets its own folder."""
         calib_dir = self._config.get("calib_data_path")
@@ -244,16 +251,19 @@ class QibocalBackend(BaseBackend):
             calib_dir = str(Path(str(note_path)).parent.parent)
         return Path(str(calib_dir)) / "qibocal"
 
-    def run_rabi_amplitude(self, request: RabiAmplitudeRequest, label: str) -> QibocalRunResult:
-        """Run Qibocal ``rabi_amplitude`` and return the accepted result.
+    def run_protocol(self, request: QibocalRequest, label: str) -> QibocalRunResult:
+        """Run an allowlisted Qibocal protocol and return its verified result.
 
         Raises ``QibocalPlatformRejectedError`` when the platform is not an emulator,
         ``QibocalRunnerTimeoutError`` on timeout, and ``QibocalRunnerError`` for every
         other failure, including a changed platform.
         """
         settings = self.settings
+        binding = self.binding()
+        assignments = native_assignments(request.qubit, request.calibration)
         run_dir = self.artifact_root() / f"{label}_{uuid.uuid4().hex[:12]}"
         run_dir.mkdir(parents=True, exist_ok=False)
+        self.last_run_dir = run_dir
 
         source_hash = hash_tree(settings.platform_dir)
         platforms_copy = run_dir / "platforms"
@@ -264,6 +274,7 @@ class QibocalBackend(BaseBackend):
         )
         request_payload = {
             **asdict(request),
+            "targets": [request.qubit],
             "platform": settings.platform,
             "platforms_dir": str(platforms_copy),
             "output_dir": str(run_dir),
@@ -273,13 +284,19 @@ class QibocalBackend(BaseBackend):
 
         stdout_path = run_dir / "runner.stdout.log"
         stderr_path = run_dir / "runner.stderr.log"
-        returncode = self._run_subprocess(
-            [str(settings.python), "-I", str(settings.script), str(request_path)],
-            run_dir,
-            stdout_path,
-            stderr_path,
-            settings,
-        )
+        try:
+            returncode = run_process(
+                [str(settings.python), "-I", str(settings.script), str(request_path)],
+                cwd=run_dir,
+                stdout_path=stdout_path,
+                stderr_path=stderr_path,
+                timeout_seconds=settings.timeout_seconds,
+                terminate_grace_seconds=settings.terminate_grace_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise QibocalRunnerTimeoutError(
+                f"Qibocal runner exceeded {settings.timeout_seconds:g} s and was stopped"
+            ) from exc
 
         if hash_tree(settings.platform_dir) != source_hash:
             raise QibocalRunnerError(
@@ -306,6 +323,16 @@ class QibocalBackend(BaseBackend):
             )
 
         self._check_result(result, source_hash)
+        problems = readback_mismatches(
+            result["provenance"].get("applied_parameters", {}), assignments
+        )
+        if problems:
+            raise QibocalRunnerError("Calibration readback mismatch: " + "; ".join(problems))
+        # Recheck the model before allowing a result to be adopted.
+        self.binding()
+        result["provenance"]["simulation_binding"] = binding.model_dump(mode="json")
+        result["provenance"]["chip_id"] = self.config["chip_id"]
+        result["provenance"]["project_id"] = self.config.get("project_id")
         # Identify the exact runner build: the lock pins every distribution version.
         lock = settings.script.parent / "uv.lock"
         result["provenance"]["runner_script_sha256"] = hashlib.sha256(
@@ -346,60 +373,3 @@ class QibocalBackend(BaseBackend):
             raise QibocalRunnerError(
                 "Runner used or changed a platform other than the configured one"
             )
-
-    @staticmethod
-    def _run_subprocess(
-        command: list[str],
-        cwd: Path,
-        stdout_path: Path,
-        stderr_path: Path,
-        settings: QibocalRunnerSettings,
-    ) -> int:
-        """Run the runner without a shell and stop its process group on any exit path."""
-        env = {
-            "PATH": os.defpath,
-            "HOME": os.environ.get("HOME", str(cwd)),
-            "TMPDIR": os.environ.get("TMPDIR", "/tmp"),  # noqa: S108
-            "LANG": "C.UTF-8",
-            "MPLBACKEND": "Agg",
-            "JAX_PLATFORMS": "cpu",
-        }
-        logger.info("Starting Qibocal runner: %s", " ".join(command))
-        with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
-            process = subprocess.Popen(  # noqa: S603 - fixed argv, no shell
-                command,
-                cwd=cwd,
-                env=env,
-                stdin=subprocess.DEVNULL,
-                stdout=stdout,
-                stderr=stderr,
-                shell=False,
-                start_new_session=True,
-            )
-            try:
-                return process.wait(timeout=settings.timeout_seconds)
-            except subprocess.TimeoutExpired as exc:
-                QibocalBackend._stop(process, settings.terminate_grace_seconds)
-                raise QibocalRunnerTimeoutError(
-                    f"Qibocal runner exceeded {settings.timeout_seconds:g} s and was stopped"
-                ) from exc
-            except BaseException:
-                # Cancellation (Prefect termination, KeyboardInterrupt) or any other error:
-                # never leave the emulator running.
-                QibocalBackend._stop(process, settings.terminate_grace_seconds)
-                raise
-
-    @staticmethod
-    def _stop(process: subprocess.Popen[bytes], grace_seconds: float) -> None:
-        """Terminate the runner's process group, then kill it after ``grace_seconds``."""
-        if process.poll() is not None:
-            return
-        for sig in (signal.SIGTERM, signal.SIGKILL):
-            with contextlib.suppress(ProcessLookupError, PermissionError):
-                os.killpg(process.pid, sig)
-            try:
-                process.wait(timeout=grace_seconds)
-                return
-            except subprocess.TimeoutExpired:
-                continue
-        logger.error("Qibocal runner pid=%s did not exit after SIGKILL", process.pid)

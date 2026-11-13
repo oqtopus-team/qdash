@@ -32,4 +32,4 @@ config/quelware-client/
 agent-runtime/extensions/
 
 # Host-side Qibocal runner environment; images build their own from the lock.
-tools/qibocal-runner/.venv/
+src/qdash/workflow/qibocal_runner/.venv/

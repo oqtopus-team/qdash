@@ -1874,7 +1874,8 @@ const listChips = (
  * from QDash's templates. ``config.preset`` writes a complete virtual
  * configuration instead; a preset is accepted only when the deployment backend
  * is the preset's backend and the chip uses the preset's topology. The
- * ``qibocal`` preset writes no files.
+ * ``qibocal`` preset writes no files; it stores a simulation binding on the
+ * chip, the only way a chip becomes a simulation chip.
  *
  * Parameters
  * ----------

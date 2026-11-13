@@ -207,10 +207,13 @@ required input from the tasks before it.
 ### Run Qibocal protocols on an emulator
 
 The `qibocal` backend runs upstream Qibocal protocols in a separate runner environment through a
-subprocess, and its outputs are always measurement-only. See
+subprocess. Validated outputs may update only a matching simulation-bound chip in QDash. See
 [Qibocal Emulator Backend](./qibocal-backend.md).
 
 ### Add persistence behavior
+
+Declare the backend's save policy and native hooks as described in the
+[backend persistence boundary](./calibration-data-lifecycle.md#backend-persistence-boundary).
 
 Depend on repository protocols and inject an in-memory implementation in tests. State-transition
 rules belong in a state manager or service; database-specific query logic belongs in the repository

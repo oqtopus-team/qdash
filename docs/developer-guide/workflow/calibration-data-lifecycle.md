@@ -98,18 +98,46 @@ passed into the task context.
 A task class that declares `measurement_only_reason` overrides the control: its outputs are
 recorded as measurement-only with that reason for every value of
 `update_calibration_parameters` and `force_update_params`, and an agent session cannot commit
-them. The [Qibocal Emulator Backend](./qibocal-backend.md) uses this for synthetic emulator
-results.
+them. This also protects legacy emulator results. The [Qibocal Emulator Backend](./qibocal-backend.md)
+now adopts validated synthetic values only on a matching simulation-bound chip.
 
 The control is independent of parameter resolution. It changes where validated outputs are
 published, not which Input or Run parameters the experiment uses. See
 [Parameter Resolution](./parameter-resolution.md) for precedence, snapshots, and overrides.
+
+## Backend persistence boundary
+
+Each backend definition selects one `PersistencePolicy` from
+`engine/backend/persistence.py`. `BackendSaver` applies that policy for single, batch, and
+per-qubit MUX results; it does not select behavior from the backend name. QDash owns destination
+validation, database adoption, publish-target expansion, and the history comparison metadata.
+The backend's `create_params_updater()` and `update_note()` hooks own native synchronization
+and note persistence. The default hooks do nothing; qubex and fake provide the YAML updater,
+and only qubex implements note updates.
+
+| Policy | Adoption and synchronization |
+| --- | --- |
+| `QUBEX_COMPATIBLE` | Qubex and fake tasks share DB adoption. Notes run before the write-back gate. With write-back enabled, available outputs reach the DB; native qubit updates require success or `force_update_params`. |
+| `BOUND_SIMULATION` | Qibocal outputs require matching run and destination bindings, chip, and project. Only successful results with write-back enabled reach the DB. Force does not override this gate, and native stores are not updated. |
+
+The result processor still clears rejected outputs before saving. The policy does not change
+measurement validation. `QibocalBringUp` only seeds missing DB values, and repository guards
+continue to reject unbound, cross-chip, and legacy synthetic writes.
+
+A new backend must declare a supported policy explicitly. Unknown policies and incompatible
+task backends fail before persistence; MUX adoption also requires a backend. Explicit
+measurement-only tasks retain their history-only path without a backend policy. Test doubles
+that exercise adoption must set a real `PersistencePolicy` value and the native hooks they use;
+an unconstrained mock is not a persistence contract. Run the saver, params updater, and Qibocal
+database tests under `tests/qdash/workflow/` when changing this boundary.
 
 ## Implementation files
 
 - `src/qdash/workflow/engine/orchestrator.py`
 - `src/qdash/workflow/engine/task/executor.py`
 - `src/qdash/workflow/engine/task/backend_saver.py`
+- `src/qdash/workflow/engine/backend/persistence.py`
+- `src/qdash/workflow/engine/backend/base.py`
 - `src/qdash/workflow/engine/task/history_recorder.py`
 - `src/qdash/dbmodel/task_result_history.py`
 - `src/qdash/dbmodel/qubit.py`

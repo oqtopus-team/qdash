@@ -5032,7 +5032,7 @@
           "chip"
         ],
         "summary": "Create a new chip",
-        "description": "Create a new chip in the current project.\n\nBesides the database records, this creates ``<chip_id>/`` in the Qubex\nconfiguration tree (``system_id == chip_id``) unless ``config.create`` is\nfalse or the directory already exists. Wiring and hardware files are copied\nfrom ``config.source_system_id`` when given; parameter files always start\nfrom QDash's templates. ``config.preset`` writes a complete virtual\nconfiguration instead; a preset is accepted only when the deployment backend\nis the preset's backend and the chip uses the preset's topology. The\n``qibocal`` preset writes no files.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id, size and configuration options\nctx : ProjectContext\n    Project context with editor permission\nscaffolder : ChipConfigScaffolder\n    Writer of the chip's configuration directory\n\nReturns\n-------\nCreateChipResponse\n    Created chip information and the configuration outcome\n\nRaises\n------\nHTTPException\n    If chip_id already exists, size is invalid, or the configuration\n    source cannot be used",
+        "description": "Create a new chip in the current project.\n\nBesides the database records, this creates ``<chip_id>/`` in the Qubex\nconfiguration tree (``system_id == chip_id``) unless ``config.create`` is\nfalse or the directory already exists. Wiring and hardware files are copied\nfrom ``config.source_system_id`` when given; parameter files always start\nfrom QDash's templates. ``config.preset`` writes a complete virtual\nconfiguration instead; a preset is accepted only when the deployment backend\nis the preset's backend and the chip uses the preset's topology. The\n``qibocal`` preset writes no files; it stores a simulation binding on the\nchip, the only way a chip becomes a simulation chip.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id, size and configuration options\nctx : ProjectContext\n    Project context with editor permission\nscaffolder : ChipConfigScaffolder\n    Writer of the chip's configuration directory\n\nReturns\n-------\nCreateChipResponse\n    Created chip information and the configuration outcome\n\nRaises\n------\nHTTPException\n    If chip_id already exists, size is invalid, or the configuration\n    source cannot be used",
         "operationId": "createChip",
         "security": [
           {
@@ -19034,6 +19034,17 @@
           },
           "note": {
             "$ref": "#/components/schemas/NoteModel"
+          },
+          "simulation_binding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimulationBindingModel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present only on chips created from a simulation preset (for example qibocal). Such a chip runs only on its bound backend and its values are never exported to hardware configuration. Absent means simulation identity is unknown; Qibocal execution is refused."
           }
         },
         "type": "object",
@@ -19971,6 +19982,17 @@
           },
           "note": {
             "$ref": "#/components/schemas/NoteModel"
+          },
+          "simulation_binding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimulationBindingModel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present only on chips created from a simulation preset (for example qibocal). Such a chip runs only on its bound backend and its values are never exported to hardware configuration. Absent means simulation identity is unknown; Qibocal execution is refused."
           },
           "config": {
             "anyOf": [
@@ -29565,6 +29587,53 @@
         ],
         "title": "SettingsResponse",
         "description": "Settings for the QDash application."
+      },
+      "SimulationBindingModel": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "simulation",
+            "title": "Kind",
+            "description": "Always 'simulation'",
+            "default": "simulation"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend",
+            "description": "Backend that runs the chip, e.g. 'qibocal'"
+          },
+          "preset": {
+            "type": "string",
+            "title": "Preset",
+            "description": "Chip preset the chip was created from"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform",
+            "description": "Simulator platform the chip is bound to"
+          },
+          "template_fingerprint": {
+            "type": "string",
+            "title": "Template Fingerprint",
+            "description": "Structural fingerprint of the platform template at creation: its model, channels, and pulse shapes without the calibration values QDash owns"
+          },
+          "bound_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Bound At",
+            "description": "When the binding was created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "backend",
+          "preset",
+          "platform",
+          "template_fingerprint",
+          "bound_at"
+        ],
+        "title": "SimulationBindingModel",
+        "description": "Marks a chip as a simulated device, fixed when the chip is created from a preset.\n\nOnly the chip creation endpoint writes it, and only for a preset of the deployment's own\nbackend. A chip without a binding is treated as unknown hardware: a simulation backend never\nruns it and never writes calibration values to it. A bound chip runs only on its own\nbackend and platform, and its values never leave QDash's database (no Qubex YAML, props, or\nGitHub publication)."
       },
       "SourceFileResponse": {
         "properties": {

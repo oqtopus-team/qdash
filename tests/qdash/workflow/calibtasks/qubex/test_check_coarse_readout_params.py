@@ -19,6 +19,7 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_coarse_readout_param
     CheckCoarseReadoutParams,
 )
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_rabi import CheckRabi
+from qdash.workflow.engine.backend.persistence import PersistencePolicy
 from qdash.workflow.engine.backend.plugins.qubex_progress import (
     ReportingTqdm,
     capture_qubex_progress,
@@ -77,7 +78,14 @@ def coarse_readout(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         modified_frequencies=modified_frequencies,
         rabi_experiment=MagicMock(),
     )
-    backend = cast("Any", SimpleNamespace(name="qubex", update_note=MagicMock()))
+    backend = cast(
+        "Any",
+        SimpleNamespace(
+            name="qubex",
+            update_note=MagicMock(),
+            persistence_policy=PersistencePolicy.QUBEX_COMPATIBLE,
+        ),
+    )
     save_calibration = MagicMock()
     characterize = MagicMock(return_value=result)
     monkeypatch.setattr(task, "get_experiment", lambda _backend: experiment)

@@ -183,6 +183,10 @@ def create_chip_properties(
     if chip is None:
         raise ValueError(f"Chip {chip_id} not found in project {project_id}")
 
+    from qdash.common.simulation_binding import check_hardware_export
+
+    check_hardware_export(chip.simulation_binding, chip_id, "props YAML export")
+
     # Fetch qubit and coupling models from individual documents (scalable)
     qubit_models = chip_repo.get_all_qubit_models(project_id, chip_id)
     coupling_models = chip_repo.get_all_coupling_models(project_id, chip_id)

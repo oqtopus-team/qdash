@@ -575,6 +575,13 @@ class TaskExecutor:
             raise TaskExecutionError(f"Task {task_name} failed: {e}") from e
 
         finally:
+            from qdash.workflow.engine.task.measurement_only import output_provenance
+
+            provenance = output_provenance(task)
+            if provenance:
+                self.state_manager.get_task(task_name, task_type, qid).note["provenance"] = (
+                    provenance
+                )
             self.state_manager.end_task(task_name, task_type, qid)
 
             if execution_service is not None:

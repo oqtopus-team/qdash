@@ -216,6 +216,13 @@ class GitHubIntegration:
             # {"calib_note": "abc123def", "props": "def456ghi"}
             ```
         """
+        from qdash.common.simulation_binding import check_hardware_export, chip_binding
+
+        check_hardware_export(
+            chip_binding(self.project_id, self.chip_id),
+            self.chip_id,
+            "GitHub calibration publication",
+        )
         results: dict[str, Any] = {}
         pushed_any = False
         had_error = False
