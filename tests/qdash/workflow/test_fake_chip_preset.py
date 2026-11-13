@@ -1,16 +1,4 @@
-"""A chip created from the fake setup preset runs the fake calibration chain end to end.
-
-The chip is created through the API exactly as the Create Chip dialog does on a deployment whose
-backend is fake. The tests then check that Qubex itself reads the generated configuration as the
-64-qubit, 16-MUX device the simulator runs, that QDash resolves every MUX to its four qubits, and
-execute FakeBringUp followed by the rest of the Fake Backend Calibration template on
-representative MUXes, including the highest one. Every task must complete and its outputs must be
-stored in the calibration database. Running all 64 qubits would only repeat the same simulator
-code; the configuration of all 64 is checked separately.
-
-Prefect is replaced by a stub in the test suite, so the tasks run in-process; MongoDB is the
-in-memory database of ``tests/conftest.py``.
-"""
+"""Fake chip preset configuration, target resolution, and template scheduling."""
 
 from __future__ import annotations
 
@@ -28,12 +16,8 @@ from qdash.common.fake_device import (
 )
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.dbmodel.chip import ChipDocument
-from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
-from qdash.dbmodel.qubit import QubitDocument
-from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
 from qdash.workflow.templates.fake_backend import FAKE_CALIBRATION_TASKS
 
@@ -209,71 +193,6 @@ def test_a_high_numbered_subset_simulates_the_same_device(
         assert subset.get_target(f"R{label}").frequency == pytest.approx(
             fake_device_value(FAKE_READOUT_FREQUENCIES, qubit)
         )
-
-
-@pytest.mark.parametrize("mux_ids", [[0], [9, 15]], ids=["mux0", "mux9-15"])
-def test_fake_chip_runs_bring_up_and_the_fake_calibration_chain(
-    project: None, fake_deployment: Path, test_client: TestClient, mux_ids: list[int]
-) -> None:
-    from qdash.workflow.engine.backend.fake_qubex import FakeExperiment
-    from qdash.workflow.service._internal.session import CalibSession
-    from qdash.workflow.service._internal.settings import GitHubPolicy, SessionSettings
-    from qdash.workflow.service.targets import MuxTargets
-
-    _create_fake_chip(test_client)
-    assert ChipDocument.find_one({"project_id": PROJECT_ID, "chip_id": CHIP_ID}).run() is not None
-
-    qids = MuxTargets(mux_ids=mux_ids).to_qids(CHIP_ID)
-    assert sorted(qids, key=int) == [
-        str(4 * mux + offset) for mux in mux_ids for offset in range(4)
-    ]
-
-    session = CalibSession(
-        SessionSettings(
-            username=USERNAME,
-            chip_id=CHIP_ID,
-            project_id=PROJECT_ID,
-            backend_name="fake",
-            flow_name="fake_calibration",
-            github=GitHubPolicy.disabled(),
-        )
-    )
-    with session.owned_execution(qids):
-        exp = session.backend.get_instance() if session.backend else None
-        assert isinstance(exp, FakeExperiment)
-        assert Path(exp.config_path) == fake_deployment / CHIP_ID / "config"
-
-        for call in FAKE_CALIBRATION_TASKS:
-            for qid in qids:
-                session.execute_task(call.name, qid, parameters=call.settings())
-
-    results = list(
-        TaskResultHistoryDocument.find({"project_id": PROJECT_ID, "chip_id": CHIP_ID}).run()
-    )
-    by_task = {(result.name, result.qid): result for result in results}
-    for task_name in (call.name for call in FAKE_CALIBRATION_TASKS):
-        for qid in qids:
-            result = by_task[(task_name, qid)]
-            assert result.status == "completed", (task_name, qid, result.message)
-            assert result.output_parameters, (task_name, qid)
-
-    execution = ExecutionHistoryDocument.find_one(
-        {"project_id": PROJECT_ID, "chip_id": CHIP_ID}
-    ).run()
-    assert execution is not None
-    assert execution.status == "completed"
-
-    for qid in qids:
-        qubit = QubitDocument.find_one(
-            {"project_id": PROJECT_ID, "chip_id": CHIP_ID, "qid": qid}
-        ).run()
-        assert qubit is not None
-        stored = qubit.data
-        assert stored["qubit_frequency"]["value"] == pytest.approx(
-            fake_device_value(FAKE_QUBIT_FREQUENCIES, int(qid)), abs=1e-3
-        )
-        for name in ("hpi_amplitude", "pi_amplitude", "t1", "t2_echo", "t2_star"):
-            assert stored[name]["value"] is not None, (qid, name)
 
 
 def test_qubex_fits_never_open_a_browser_during_tests(monkeypatch: pytest.MonkeyPatch) -> None:

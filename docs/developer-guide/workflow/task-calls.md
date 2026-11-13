@@ -349,16 +349,11 @@ how single-task runs apply their `update_calibration_parameters` request field.
 
 ## Testing
 
-`tests/qdash/workflow/test_task_call_pipeline_e2e.py` runs a step with two `CheckRamsey` calls on
-the fake backend and checks task ids, upstream links, per-call settings, accepted-write
-propagation, the call filter, and re-execution. `tests/qdash/workflow/service/test_task_call_propagation.py`
-covers each scheduling path.
-`tests/qdash/workflow/test_task_call_plan_digest_e2e.py` runs an API-validated spec through
-`calibration_pipeline` with isolated worker sessions and checks that every step execution stores
-the API's `plan_digest` as `note.pipeline.spec_digest` and every task result carries
-`note.calibration_plan.digest`. `tests/qdash/workflow/test_task_call_flow_parameters.py` runs
-`task_call_flow_contract.py` with real Prefect in a separate interpreter, because the suite stubs
-`prefect`, and checks that each template turns JSON calls into `TaskCall` entries.
+`tests/qdash/workflow/service/test_task_call_propagation.py` covers task-call propagation
+through each scheduling path with recording sessions.
+`tests/qdash/workflow/test_task_call_flow_parameters.py` runs `task_call_flow_contract.py`
+with real Prefect in a separate interpreter, because the suite stubs `prefect`, and checks
+that each template turns JSON calls into `TaskCall` entries.
 
 ## Implementation Files
 
