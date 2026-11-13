@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import pytest
 from fastapi import HTTPException
@@ -26,9 +27,6 @@ from tests.qdash.api.services.test_flow_service import (
     _StubCoordinator,
     _StubDeploymentClient,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 UPDATED = datetime(2026, 11, 1, tzinfo=timezone.utc)
 WIRING = [
@@ -127,6 +125,32 @@ def test_the_manual_example_resolves_to_its_exact_rounds() -> None:
 def test_known_parameters_select_the_branch_that_runs() -> None:
     [run] = _plan(MANUAL, {"use_pairs": False}).runs
     assert [step.name for step in run.steps] == ["rabi"]
+
+
+def test_the_bundled_fast_template_previews_both_configure_all_steps() -> None:
+    # The fast template reconfigures before fine-tuning; each ConfigureAll keeps its own name.
+    import qdash.workflow as workflow
+
+    code = (Path(workflow.__file__).parent / "templates" / "fast_full_calibration.py").read_text()
+    response = build_execution_plan(
+        flow_name="fast_full_calibration",
+        chip_id="chip-1",
+        updated_at=UPDATED,
+        code=code,
+        function_name="fast_full_calibration",
+        parameters={"mux_ids": [0, 1]},
+        chip_model=lambda: MODEL,
+    )
+    assert response.status == "resolved" and response.reason is None
+    [run] = response.runs
+    names = [step.name for step in run.steps]
+    assert names[:5] == [
+        "configure_all",
+        "one_qubit_check",
+        "filter_by_status",
+        "configure_all_before_fine_tune",
+        "one_qubit_fine_tune",
+    ]
 
 
 def test_automatic_steps_are_described_not_computed() -> None:

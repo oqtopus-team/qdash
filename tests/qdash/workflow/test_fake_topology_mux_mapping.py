@@ -842,6 +842,119 @@ def test_topology_edit_during_a_run_keeps_the_planned_mapping(
         assert snapshot.to_mapping().qids_of(9) == ("38", "36", "39")
 
 
+def _two_qubit_steps(path: str) -> list[Any]:
+    """Each automatic 2Q step path that builds a CR schedule from candidate qubits."""
+    from qdash.workflow.service.steps import (
+        CustomTwoQubit,
+        GenerateCRSchedule,
+        TwoQubitCalibration,
+    )
+
+    probe = [TaskCall(name=COUPLING_PROBE)]
+    if path == "custom":
+        return [CustomTwoQubit(step_name="pairs", tasks=probe)]
+    if path == "generate":
+        return [GenerateCRSchedule(), CustomTwoQubit(step_name="pairs", tasks=probe)]
+    return [TwoQubitCalibration(tasks=probe)]
+
+
+@pytest.mark.parametrize("path", ["custom", "generate", "two_qubit_calibration"])
+def test_cr_schedule_keeps_the_pinned_mapping_after_a_topology_edit(
+    project: None,  # noqa: F811
+    fake_deployment: Path,  # noqa: F811
+    topologies: Path,
+    test_client: TestClient,
+    in_process_workers: None,
+    coupling_probe: type[BaseTask],
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+) -> None:
+    """Automatic 2Q scheduling groups pairs by the session's mapping, not an edited topology.
+
+    The session pins the sparse topology for its reservation and workers. When the real
+    ``CRScheduler`` starts, the chip is pointed at a template with the same qubits and
+    couplings whose MUX 9 now holds qubit 37. Scheduling must not read the chip topology
+    again: pairs on the pinned standalone qubits 20, 21 and 37 still run alone, and every
+    selected pair completes on the fake backend.
+    """
+    from qdash.common import mux_mapping as mux_mapping_module
+    from qdash.dbmodel.chip import ChipDocument
+    from qdash.workflow.engine.scheduler import cr_scheduler
+    from qdash.workflow.service.steps import two_qubit
+    from qdash.workflow.service.targets import QubitTargets
+
+    mutated_id = "synthetic-sparse-merged"
+    data = yaml.safe_load((topologies / f"{SPARSE_TOPOLOGY_ID}.yaml").read_text(encoding="utf-8"))
+    data.update(id=mutated_id, muxes={3: [14, 12, 15, 13], 9: [38, 36, 39, 37], 15: [61, 60]})
+    (topologies / f"{mutated_id}.yaml").write_text(yaml.safe_dump(data), encoding="utf-8")
+    _fake_chip(test_client, SPARSE_TOPOLOGY_ID)
+
+    lookups: list[tuple[str, tuple[Any, ...]]] = []
+
+    def spy(name: str, module: Any) -> None:
+        resolve = getattr(module, name)
+
+        def recording(*args: Any) -> Any:
+            lookups.append((name, args))
+            return resolve(*args)
+
+        monkeypatch.setattr(module, name, recording)
+
+    generate = cr_scheduler.CRScheduler.generate
+    schedulers: list[Any] = []
+
+    def edit_topology_then_generate(self: Any, *args: Any, **kwargs: Any) -> Any:
+        if not schedulers:
+            chip = ChipDocument.find_one({"project_id": PROJECT_ID, "chip_id": CHIP}).run()
+            assert chip is not None
+            chip.topology_id = mutated_id
+            chip.save()
+            spy("resolve_topology_mux_mapping", cr_scheduler)
+            spy("resolve_topology_mux_mapping", mux_mapping_module)
+            spy("resolve_chip_mux_mapping", mux_mapping_module)
+        schedulers.append(self)
+        return generate(self, *args, **kwargs)
+
+    monkeypatch.setattr(cr_scheduler.CRScheduler, "generate", edit_topology_then_generate)
+    groups: list[list[str]] = []
+    run_groups = two_qubit._run_coupling_groups
+
+    def recording_groups(session: Any, coupling_groups: list[list[str]], plan: Any) -> Any:
+        groups.extend(list(group) for group in coupling_groups)
+        return run_groups(session, coupling_groups, plan)
+
+    monkeypatch.setattr(two_qubit, "_run_coupling_groups", recording_groups)
+    selection = ["20", "21", "36", "37", "38", "39", "60", "61"]
+
+    _session().run_pipeline(QubitTargets(qids=selection), _two_qubit_steps(path))
+
+    # The edit took effect for anyone who would read the chip topology again.
+    chip = ChipDocument.find_one({"project_id": PROJECT_ID, "chip_id": CHIP}).run()
+    assert chip is not None and chip.topology_id == mutated_id
+    [scheduler] = schedulers
+    assert scheduler._mux_mapping.topology_id == SPARSE_TOPOLOGY_ID
+    assert lookups == []
+    # Pinned standalone qubits keep their pairs alone; the edit would have put 37 in MUX 9.
+    standalone = set(SPARSE_STANDALONE)
+    for group in groups:
+        if any(standalone & set(pair.split("-")) for pair in group):
+            assert len(group) == 1, groups
+    declared = {
+        frozenset((str(a), str(b)))
+        for a, b in SPARSE_COUPLINGS
+        if str(a) in selection and str(b) in selection
+    }
+    ran = [pair for group in groups for pair in group]
+    assert {frozenset(pair.split("-")) for pair in ran} == declared
+    assert len(ran) == len(declared)
+    by_key = _results()
+    for pair in ran:
+        result = by_key[(COUPLING_PROBE, pair)]
+        assert result.status == "completed", (pair, result.message)
+        control = result.output_parameters["coupling_probe_control"]["value"]
+        assert control == int(pair.split("-")[0]), pair
+
+
 def test_mux_fanout_never_resolves_a_repaired_topology(
     project: None,  # noqa: F811
     fake_deployment: Path,  # noqa: F811

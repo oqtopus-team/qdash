@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
+from qdash.common.mux_mapping import MuxMapping
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
 from qdash.workflow.service._internal.session import CalibSession
 from qdash.workflow.service._internal.settings import SessionSettings
@@ -178,7 +179,7 @@ def test_scheduler_errors_stop_the_run_before_the_pipeline(monkeypatch):
     run_pipeline = MagicMock(return_value={})
     monkeypatch.setattr(CalibSession, "run_pipeline", run_pipeline)
 
-    def reject(settings, pairs):
+    def reject(settings, pairs, *, mux_mapping=None):
         raise ValueError("Coupling pairs not found on chip chip: ['63-85']")
 
     monkeypatch.setattr(runs, "schedule_selected_pairs", reject)
@@ -209,8 +210,8 @@ def test_selected_pairs_use_the_chip_scheduler(monkeypatch):
     calls = {}
 
     class FakeScheduler:
-        def __init__(self, username, chip_id, *, wiring_config_path, project_id):
-            calls["init"] = (username, chip_id, project_id)
+        def __init__(self, username, chip_id, *, wiring_config_path, project_id, mux_mapping):
+            calls["init"] = (username, chip_id, project_id, mux_mapping)
 
         def schedule_pairs(self, pairs):
             calls["pairs"] = pairs
@@ -220,6 +221,57 @@ def test_selected_pairs_use_the_chip_scheduler(monkeypatch):
     settings = SessionSettings(
         username="user", chip_id="chip", project_id="project", backend_name="fake"
     )
+    pinned = MuxMapping.legacy()
 
-    assert runs.schedule_selected_pairs(settings, [("63", "85")]) == [[("63", "85")]]
-    assert calls == {"init": ("user", "chip", "project"), "pairs": [("63", "85")]}
+    assert runs.schedule_selected_pairs(settings, [("63", "85")], mux_mapping=pinned) == [
+        [("63", "85")]
+    ]
+    assert calls == {"init": ("user", "chip", "project", pinned), "pairs": [("63", "85")]}
+
+
+def test_selected_pairs_are_grouped_with_the_running_session_mapping(monkeypatch):
+    """The override schedule uses the MUX mapping the running session pinned, once."""
+    from qdash.workflow.service._internal import runs
+
+    context = SimpleNamespace(
+        flow_run=SimpleNamespace(context={TARGET_CONTEXT_KEY: SELECTED.model_dump()})
+    )
+    pinned = MuxMapping.from_groups({21: ["85", "84", "86", "87"]}, topology_id="synthetic-pin")
+    resolutions = []
+
+    def resolve(project_id, chip_id):
+        resolutions.append((project_id, chip_id))
+        return pinned if len(resolutions) == 1 else MuxMapping.legacy()
+
+    monkeypatch.setattr(
+        "qdash.workflow.service._internal.session.resolve_chip_mux_mapping", resolve
+    )
+    scheduled = {}
+
+    def schedule(settings, pairs, *, mux_mapping=None):
+        scheduled["mapping"] = mux_mapping
+        return [[tuple(pair)] for pair in pairs]
+
+    sessions = []
+
+    def run_pipeline(self, targets, steps):
+        sessions.append(self)
+        return {}
+
+    monkeypatch.setattr(runs, "schedule_selected_pairs", schedule)
+    monkeypatch.setattr(CalibSession, "run_pipeline", run_pipeline)
+    settings = SessionSettings(
+        username="user", chip_id="chip", project_id="project", backend_name="fake"
+    )
+    with patch.dict(
+        sys.modules,
+        {"prefect.context": SimpleNamespace(FlowRunContext=SimpleNamespace(get=lambda: context))},
+    ):
+        runs.run_calibration(
+            settings, CouplingTargets([("0", "1")]), [SetCRSchedule(schedule=[[("0", "1")]])]
+        )
+
+    [session] = sessions
+    assert scheduled["mapping"] is pinned
+    assert session.mux_mapping is pinned
+    assert resolutions == [("project", "chip")]

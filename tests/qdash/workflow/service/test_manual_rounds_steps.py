@@ -247,10 +247,12 @@ def test_pair_qubits_outside_the_candidates_fail(recorder: Recorder) -> None:
 
 def test_automatic_steps_keep_the_default_group_cap(monkeypatch: pytest.MonkeyPatch) -> None:
     requested: list[int] = []
+    mappings: list[Any] = []
+    pinned = MuxMapping.legacy()
 
     class Scheduler:
         def __init__(self, *args: Any, **kwargs: Any) -> None:
-            pass
+            mappings.append(kwargs["mux_mapping"])
 
         def generate(self, candidate_qubits: list[str], max_parallel_ops: int) -> Any:
             requested.append(max_parallel_ops)
@@ -264,7 +266,10 @@ def test_automatic_steps_keep_the_default_group_cap(monkeypatch: pytest.MonkeyPa
     logger = SimpleNamespace(info=lambda *_: None, warning=lambda *_: None)
     monkeypatch.setattr("qdash.workflow.service.steps.two_qubit.get_run_logger", lambda: logger)
     session = cast(
-        "CalibSession", SimpleNamespace(chip_id="c", username="u", project_id="p", plan_digest=None)
+        "CalibSession",
+        SimpleNamespace(
+            chip_id="c", username="u", project_id="p", plan_digest=None, mux_mapping=pinned
+        ),
     )
     ctx = StepContext(candidate_qids=["0", "1"])
 
@@ -274,6 +279,8 @@ def test_automatic_steps_keep_the_default_group_cap(monkeypatch: pytest.MonkeyPa
     )
 
     assert requested == [10, 3]
+    # Both steps schedule on the session's pinned mapping.
+    assert mappings == [pinned, pinned]
 
 
 # ---------------------------------------------------------------------------

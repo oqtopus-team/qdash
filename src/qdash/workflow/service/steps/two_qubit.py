@@ -36,6 +36,7 @@ from qdash.workflow.service.steps.base import CalibrationStep, TransformStep
 from qdash.workflow.service.tasks import FULL_2Q_TASKS
 
 if TYPE_CHECKING:
+    from qdash.workflow.engine import CRScheduler
     from qdash.workflow.service._internal.session import CalibSession
     from qdash.workflow.service.steps.pipeline import StepContext
     from qdash.workflow.service.targets import Target
@@ -67,6 +68,24 @@ def _run_coupling_groups(
             )
         )
     return all_raw_results
+
+
+def _cr_scheduler(session: CalibSession) -> CRScheduler:
+    """CR scheduler on the session's pinned MUX mapping.
+
+    The session resolved the chip topology once for its reservation and
+    workers; scheduling must group pairs by that same mapping instead of
+    reading a topology edited since.
+    """
+    from qdash.workflow.engine import CRScheduler
+
+    return CRScheduler(
+        session.username,
+        session.chip_id,
+        wiring_config_path=str(get_qubex_paths().wiring_yaml(session.chip_id)),
+        project_id=session.project_id,
+        mux_mapping=session.mux_mapping,
+    )
 
 
 def _init_mode(step: Any) -> PairRounds | None:
@@ -226,15 +245,7 @@ class CustomTwoQubit(CalibrationStep):
                 ctx.record_step_result(self.resolved_step_id, ctx.metadata[self.step_name])
                 return ctx
 
-            from qdash.workflow.engine import CRScheduler
-
-            wiring_config_path = str(get_qubex_paths().wiring_yaml(session.chip_id))
-            scheduler = CRScheduler(
-                session.username,
-                session.chip_id,
-                wiring_config_path=wiring_config_path,
-                project_id=session.project_id,
-            )
+            scheduler = _cr_scheduler(session)
             schedule = scheduler.generate(
                 candidate_qubits=candidate_qubits,
                 max_parallel_ops=_max_parallel_ops(self),
@@ -398,15 +409,7 @@ class GenerateCRSchedule(TransformStep):
             ctx.candidate_couplings = []
             return ctx
 
-        from qdash.workflow.engine import CRScheduler
-
-        wiring_config_path = str(get_qubex_paths().wiring_yaml(session.chip_id))
-        scheduler = CRScheduler(
-            session.username,
-            session.chip_id,
-            wiring_config_path=wiring_config_path,
-            project_id=session.project_id,
-        )
+        scheduler = _cr_scheduler(session)
         schedule = scheduler.generate(
             candidate_qubits=candidate_qubits,
             max_parallel_ops=self.max_parallel_ops,
@@ -510,15 +513,7 @@ class TwoQubitCalibration(CalibrationStep):
             parallel_groups = ctx.metadata["cr_schedule"]
             logger.info(f"[{self.name}] Using pre-generated CR schedule")
         else:
-            from qdash.workflow.engine import CRScheduler
-
-            wiring_config_path = str(get_qubex_paths().wiring_yaml(session.chip_id))
-            scheduler = CRScheduler(
-                session.username,
-                session.chip_id,
-                wiring_config_path=wiring_config_path,
-                project_id=session.project_id,
-            )
+            scheduler = _cr_scheduler(session)
             schedule = scheduler.generate(
                 candidate_qubits=candidate_qubits,
                 max_parallel_ops=_max_parallel_ops(self),

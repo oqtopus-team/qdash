@@ -113,6 +113,12 @@ adds the edge:
 `build_qubit_to_mux_map()` takes MUX membership from the chip topology's MUX mapping and joins
 it to the wiring by MUX ID, so a wired MUX the topology does not define has no qubits. A chip
 without a topology keeps the legacy convention: qubits `4N` to `4N + 3` belong to MUX `N`.
+`CRScheduler` resolves that mapping from the chip's `topology_id` only when the caller passes no
+`mux_mapping`. Workflow callers (`CustomTwoQubit`, `GenerateCRSchedule`, `TwoQubitCalibration`
+and the coupling target override) pass the session's mapping, which the reservation and workers
+already use, so a topology edited during the run does not change MUX membership in the schedule.
+Coupling direction and `checkerboard_cr` geometry still load the current topology; this is not
+a snapshot of the full topology.
 `build_mux_conflict_map()` makes two MUXes conflict when their entries claim a common module
 through `mux_module_resources()` in `src/qdash/common/wiring_resources.py`. That function reads
 only `read_out` and `ctrl`; other wiring fields, such as read-in or pump channels, do not create

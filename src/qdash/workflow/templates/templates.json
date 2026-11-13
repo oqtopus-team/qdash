@@ -101,7 +101,7 @@
   {
     "id": "fast_full_calibration",
     "name": "Fast Full Calibration",
-    "description": "Shortened full calibration for explicitly selected mux_ids: ConfigureAll -> fast 1Q check -> 1Q fine-tune without T1/T2 averages -> Filter -> CR Schedule -> 2Q.",
+    "description": "Shortened full calibration for explicitly selected mux_ids: ConfigureAll -> fast 1Q check with Ramsey -> Filter -> ConfigureAll -> 1Q fine-tune without T1/T2 averages -> Filter -> CR Schedule -> 2Q.",
     "category": "production",
     "backend": "qubex",
     "filename": "fast_full_calibration.py",
