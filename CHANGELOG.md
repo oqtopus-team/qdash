@@ -7,25 +7,21 @@ QDash release notes cover changes to calibration workflows, deployments, and dai
 QDash 1.10.0 introduces explicit task calls, project-shared calibration state, and a Pi-based
 AI runtime. It also improves execution planning, result inspection, and parameter provenance.
 
-> [!IMPORTANT]
-> Before deployment, migrate saved Python flows to `TaskCall` (they are not rewritten
-> automatically), configure the new model endpoints if you use AI, and pin `MONGO_VERSION`
-> in `.env` to the MongoDB version already running. Back up existing data before deployment.
-
 ### Breaking changes and upgrade requirements
 
 #### Workflow authoring
 
-Replace task-name strings with `TaskCall` objects, give repeated calls distinct `call_id` values,
-and move task parameters and failure handling into each call. Rename one-qubit `mode` to
-`execution_mode` and use the new execution-mode names. Replace `SetCRSchedule` with explicit
-rounds or directed coupling targets. Remove legacy session options, including
-`persist_output_parameters`; control calibration writes per call instead.
+Old flows cannot run unchanged with the new workflow syntax. **After deployment**, either
+create a new flow from a [current template](docs/user-guide/creating-workflows.md), or enable
+[AI assistance](docs/user-guide/setup/ai.md) and update an existing flow:
 
-Back up saved flows, update them, and test on the Fake backend before hardware use. Pipeline
-specifications now use version 2; new version 1 submissions return a converted specification
-for resubmission. See [saved-flow migration](docs/developer-guide/workflow/task-calls.md#migrate-saved-flows)
-for the complete replacements.
+1. Open the flow's file on the **Workflow** page.
+2. In the AI chat on the right, ask: **“Rewrite this workflow using the latest syntax.”**
+3. Review the proposed changes, select **Apply to editor**, and save the flow. Test it on the
+   Fake backend before running it on hardware.
+
+The new syntax uses explicit `TaskCall` objects and per-call settings. For manual edits and
+pipeline version 2 changes, see [saved-flow migration](docs/developer-guide/workflow/task-calls.md#migrate-saved-flows).
 
 #### AI configuration
 
@@ -42,18 +38,15 @@ conversation migrations can prevent an older runtime from reading it.
 
 #### MongoDB pinning and automatic calibration migration
 
-Manually pin the existing MongoDB server version once before deployment. `MONGO_VERSION` is
-required; the example value for new installations is not an upgrade instruction.
-QDash deployment does not upgrade the MongoDB server or its feature compatibility version.
-See [MongoDB pinning](docs/user-guide/mongodb-upgrade.md#check-and-pin-the-running-release).
+> [!IMPORTANT]
+> **Before QDash deployment**, set `MONGO_VERSION` in `.env` to the actual MongoDB version
+> currently running. **After QDash v1.10.0 deployment**, upgrade MongoDB to 9.0 by following
+> the [MongoDB upgrade guide](docs/user-guide/mongodb-upgrade.md), including its required
+> intermediate versions and feature compatibility version (FCV) steps. QDash does not upgrade
+> MongoDB automatically.
 
-Application data migrates automatically: `task deploy` and `task deploy-local` run the Compose
-`calibration-migration` service, and the API, deployment service, and worker wait for success.
-User-owned calibration state, indexes, and artifact paths become project-scoped; duplicate
-records are consolidated and displaced records archived. Back up databases, artifacts,
-configuration, and saved flows first. If migration fails, inspect its logs, fix the cause,
-and retry deployment. An older checkout does not reverse stored-data changes; recovery requires
-backups. Follow [System Updates](docs/user-guide/system-updates.md) for the routine upgrade.
+Back up existing data before deployment; see [System Updates](docs/user-guide/system-updates.md).
+Calibration data migrates automatically during deployment.
 
 #### Calibration writes and result history
 

@@ -14,7 +14,8 @@ switching versions.
 
 For the first update to **v1.10.0**, set `MONGO_VERSION` to the MongoDB version already running,
 as described in [Check and Pin the Running Release](./mongodb-upgrade.md#check-and-pin-the-running-release).
-This is a one-time preparation, not a database upgrade on every QDash update. Follow the
+After deploying QDash v1.10.0, follow [Upgrade MongoDB](./mongodb-upgrade.md) to upgrade to 9.0
+through the required intermediate versions and FCV steps. These are one-time upgrade actions. Follow the
 v1.10.0 release notes for calibration-data migration, saved workflow changes, and AI configuration.
 If a Pi runtime upgrade migrates existing conversations, back up the stopped `agent-runtime-state`
 volume first; see [durable conversations](../developer-guide/copilot/architecture.md#durable-conversations).
