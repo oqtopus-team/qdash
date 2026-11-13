@@ -59,14 +59,27 @@ def override_pipeline(
 ) -> tuple[Target, list[Step]]:
     """Apply an override to the pipeline targets and, for pairs, to its CR schedule.
 
+    A pipeline with a ``manual`` step rejects every override: its rounds name
+    their own targets and are never regrouped.
+
     A coupling override replaces every ``SetCRSchedule`` with a schedule that
     ``schedule_pairs`` builds from the selected pairs, so a source schedule can
     neither add pairs nor reverse them. Pipelines without ``SetCRSchedule``, or
     with ``GenerateCRSchedule`` (which rebuilds pairs from qubits), are rejected
     because they would calibrate pairs other than the selection.
     """
+    from qdash.common.manual_rounds import MANUAL_TARGET_OVERRIDE_REASON
     from qdash.workflow.service.steps import GenerateCRSchedule, SetCRSchedule
 
+    if override is not None:
+        manual = [
+            getattr(step, "name", type(step).__name__)
+            for step in steps
+            if getattr(step, "execution_mode", None) == "manual"
+        ]
+        if manual:
+            # Never replace written rounds with other targets or generated groups.
+            raise ValueError(f"{MANUAL_TARGET_OVERRIDE_REASON} Manual steps: {', '.join(manual)}")
     new_target = override_target(target, override)
     if override is None or override.coupling_pairs is None:
         return new_target, list(steps)

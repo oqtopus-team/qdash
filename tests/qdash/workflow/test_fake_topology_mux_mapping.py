@@ -49,6 +49,7 @@ if TYPE_CHECKING:
 
     from fastapi.testclient import TestClient
 
+    from qdash.datamodel.one_qubit_execution_mode import OneQubitStepExecutionMode
     from qdash.workflow.service._internal.session import CalibSession
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -318,10 +319,12 @@ def _session() -> CalibSession:
     )
 
 
-def _step(tasks: list[TaskCall], mode: str = "scheduled") -> Any:
+def _step(tasks: list[TaskCall], mode: OneQubitStepExecutionMode = "parallel_by_mux") -> Any:
     from qdash.workflow.service.steps import CustomOneQubit
 
-    return CustomOneQubit(step_name="check", tasks=tasks, mode=mode, continue_on_failure=True)
+    return CustomOneQubit(
+        step_name="check", tasks=tasks, execution_mode=mode, continue_on_failure=True
+    )
 
 
 def _results() -> dict[tuple[str, str], TaskResultHistoryDocument]:
@@ -518,7 +521,7 @@ def test_mixed_mux_and_standalone_qubits_all_run_under_a_chip_lock(
     ]
 
 
-def test_synchronized_mode_steps_by_declared_slot(
+def test_parallel_by_round_mode_rounds_by_declared_slot(
     project: None,  # noqa: F811
     fake_deployment: Path,  # noqa: F811
     topologies: Path,
@@ -526,7 +529,7 @@ def test_synchronized_mode_steps_by_declared_slot(
     in_process_workers: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Synchronized runs put qubits of one local slot together; standalone qubits run alone."""
+    """Rounds put qubits of one local slot together; standalone qubits run alone."""
     from qdash.workflow.service import strategy
     from qdash.workflow.service._internal.scheduling_tasks import (
         run_qubit_calibrations_parallel as original,
@@ -534,22 +537,24 @@ def test_synchronized_mode_steps_by_declared_slot(
     from qdash.workflow.service.targets import QubitTargets
 
     _fake_chip(test_client, SPARSE_TOPOLOGY_ID)
-    steps: list[list[str]] = []
+    rounds: list[list[str]] = []
 
     def recording(qids: list[str], *args: Any, **kwargs: Any) -> dict[str, Any]:
-        steps.append(list(qids))
+        rounds.append(list(qids))
         result: dict[str, Any] = original(qids, *args, **kwargs)
         return result
 
     monkeypatch.setattr(strategy, "run_qubit_calibrations_parallel", recording)
     targets = ["36", "37", "38", "20", "60", "61"]
 
-    _session().run_pipeline(QubitTargets(qids=targets), [_step(QUBIT_TASKS, mode="synchronized")])
+    _session().run_pipeline(
+        QubitTargets(qids=targets), [_step(QUBIT_TASKS, mode="parallel_by_round")]
+    )
 
     # MUX 9 and 15 are odd, so the checkerboard runs slot 2 first; neither selection has a
     # slot-2 qubit. Slot 0 (38 and 61, not the legacy 36 and 60) runs together, then slot 1,
-    # then each standalone qubit in a step of its own.
-    assert steps == [["38", "61"], ["36", "60"], ["20"], ["37"]]
+    # then each standalone qubit in a round of its own.
+    assert rounds == [["38", "61"], ["36", "60"], ["20"], ["37"]]
     _assert_completed(["FakeBringUp", "CheckRabi"], targets)
     assert {qid for _, qid in _results()} == set(targets)
 
@@ -929,3 +934,117 @@ def test_pinned_mux_batch_runs_once_for_the_declared_members(
         result = by_key[(MUX_PROBE, qid)]
         assert result.status == "completed", (qid, result.message)
         assert result.output_parameters["mux_probe_representative"]["value"] == 38, qid
+
+
+# ----------------------------------------------------------------------- manual rounds
+
+
+def test_manual_rounds_run_as_written_on_the_topology_mapping(
+    project: None,  # noqa: F811
+    fake_deployment: Path,  # noqa: F811
+    topologies: Path,
+    test_client: TestClient,
+    in_process_workers: None,
+    lock_claims: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Manual rounds keep their written order; a standalone qubit runs in a round of its own."""
+    from qdash.workflow.service._internal import scheduling_tasks
+    from qdash.workflow.service.steps import CustomOneQubit
+    from qdash.workflow.service.targets import QubitTargets
+
+    _fake_chip(test_client, SPARSE_TOPOLOGY_ID)
+    original = scheduling_tasks.run_qubit_calibrations_parallel
+    rounds: list[list[str]] = []
+
+    def recording(qids: list[str], *args: Any, **kwargs: Any) -> dict[str, Any]:
+        rounds.append(list(qids))
+        result: dict[str, Any] = original(qids, *args, **kwargs)
+        return result
+
+    monkeypatch.setattr(scheduling_tasks, "run_qubit_calibrations_parallel", recording)
+    # Slot 1 of MUX 9 (36) runs after slot 0 of MUX 15 (61): the written order, not slot order.
+    written = [["61", "38"], ["37"], ["36"]]
+    targets = ["38", "61", "36", "37"]
+    step = CustomOneQubit(
+        step_name="check",
+        tasks=QUBIT_TASKS,
+        execution_mode="manual",
+        rounds=written,
+        continue_on_failure=True,
+    )
+
+    _session().run_pipeline(QubitTargets(qids=targets), [step])
+
+    assert rounds == written
+    _assert_completed(["FakeBringUp", "CheckRabi"], targets)
+    assert len(lock_claims) == 1
+
+
+@pytest.mark.parametrize(
+    ("targets", "written", "reason"),
+    [
+        # 38 is in MUX 9 and 20 is standalone; qid // 4 would put 20 in MUX 5.
+        (["38", "20", "36"], [["38", "20"], ["36"]], "20 is standalone"),
+        # 38 and 36 are both members of MUX 9.
+        (["38", "36"], [["38", "36"]], "share MUX 9"),
+    ],
+)
+def test_manual_rounds_against_the_topology_fail_before_any_hardware(
+    project: None,  # noqa: F811
+    fake_deployment: Path,  # noqa: F811
+    topologies: Path,
+    test_client: TestClient,
+    in_process_workers: None,
+    lock_claims: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    targets: list[str],
+    written: list[list[str]],
+    reason: str,
+) -> None:
+    from qdash.common.manual_rounds import ManualRoundsError
+    from qdash.workflow.service.steps import CustomOneQubit
+    from qdash.workflow.service.targets import QubitTargets
+
+    _fake_chip(test_client, SPARSE_TOPOLOGY_ID)
+    connected = _record_fake_connects(monkeypatch)
+    step = CustomOneQubit(
+        step_name="check", tasks=QUBIT_TASKS, execution_mode="manual", rounds=written
+    )
+
+    with pytest.raises(ManualRoundsError, match=reason):
+        _session().run_pipeline(QubitTargets(qids=targets), [step])
+
+    assert connected == []
+    assert lock_claims == []
+    assert _results() == {}
+
+
+def test_manual_pair_rounds_keep_standalone_pairs_alone(
+    project: None,  # noqa: F811
+    fake_deployment: Path,  # noqa: F811
+    topologies: Path,
+    test_client: TestClient,
+    in_process_workers: None,
+    lock_claims: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """20-21 joins two standalone qubits: the CR scheduler never groups it, nor may a round."""
+    from qdash.common.manual_rounds import ManualRoundsError
+    from qdash.workflow.service.steps import CustomTwoQubit
+    from qdash.workflow.service.targets import QubitTargets
+
+    _fake_chip(test_client, SPARSE_TOPOLOGY_ID)
+    connected = _record_fake_connects(monkeypatch)
+    step = CustomTwoQubit(
+        step_name="cr",
+        tasks=[TaskCall(name="CheckCrossResonance")],
+        execution_mode="manual",
+        rounds=[[("14", "12"), ("20", "21")]],
+    )
+
+    with pytest.raises(ManualRoundsError, match="20-21 uses standalone qubit 20, 21"):
+        _session().run_pipeline(QubitTargets(qids=["14", "12", "20", "21"]), [step])
+
+    assert connected == []
+    assert lock_claims == []

@@ -69,7 +69,7 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
     step = CustomOneQubit(
         step_name="simple_tasks",
         tasks=[TaskCall(name="Configure", on_failure="stop"), TaskCall(name="CheckRabi")],
-        mode="scheduled",
+        execution_mode="parallel_by_mux",
         continue_on_failure=True,
     )
 
@@ -112,7 +112,7 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
         flow_name="one_qubit",
         note={},
     )
-    step = OneQubitCheck(mode="synchronized", tasks=[TaskCall(name="CheckRabi")])
+    step = OneQubitCheck(execution_mode="parallel_by_round", tasks=[TaskCall(name="CheckRabi")])
 
     step.execute(cast("CalibSession", session), QubitTargets(["2", "5"]), StepContext())
 

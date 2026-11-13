@@ -93,7 +93,6 @@ from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler, CRSchedule
 from qdash.workflow.engine.scheduler.one_qubit_plugins import (
     CheckerboardOrderingStrategy,
     DefaultOrderingStrategy,
-    DefaultSynchronizedStrategy,
     MuxOrderingStrategy,
     OrderingContext,
 )
@@ -105,10 +104,10 @@ from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_STANDALONE,
     MuxBatchScheduleResult,
     MuxBatchStepInfo,
+    OneQubitRound,
+    OneQubitRoundScheduleResult,
     OneQubitScheduleResult,
     OneQubitStageInfo,
-    SynchronizedOneQubitScheduleResult,
-    SynchronizedStepInfo,
 )
 
 # Task components
@@ -136,7 +135,6 @@ __all__ = [
     "CalibOrchestrator",
     "CheckerboardOrderingStrategy",
     "DefaultOrderingStrategy",
-    "DefaultSynchronizedStrategy",
     "ExecutionService",
     # Execution
     "ExecutionStateManager",
@@ -145,14 +143,14 @@ __all__ = [
     "MuxBatchScheduleResult",
     "MuxBatchStepInfo",
     "MuxOrderingStrategy",
+    # parallel_by_round scheduling
+    "OneQubitRound",
+    "OneQubitRoundScheduleResult",
     "OneQubitScheduleResult",
     "OneQubitScheduler",
     "OneQubitStageInfo",
     "OrderingContext",
     "R2ValidationError",
-    # Synchronized Scheduling
-    "SynchronizedOneQubitScheduleResult",
-    "SynchronizedStepInfo",
     # Task
     "TaskContext",
     "TaskExecutionError",

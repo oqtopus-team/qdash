@@ -11,6 +11,7 @@ import {
   FolderOpen,
   PanelLeftOpen,
   Tags,
+  Trash2,
   Workflow,
 } from "lucide-react";
 
@@ -18,6 +19,46 @@ import type { FlowSummary } from "@/schemas";
 
 import { countFlows, type FlowFolder, type FlowTreeNode } from "@/lib/flowFolders";
 import { formatDateTime } from "@/lib/utils/datetime";
+
+/**
+ * Selection and deletion controls for the listed flows. Absent for users who
+ * cannot delete flows, in which case the list renders read-only.
+ */
+export interface FlowSelection {
+  selected: ReadonlySet<string>;
+  /** True while a deletion is in progress; every control is disabled. */
+  disabled: boolean;
+  onToggle: (name: string) => void;
+  onDelete: (name: string) => void;
+}
+
+function FlowSelectCheckbox({ flow, selection }: { flow: FlowSummary; selection: FlowSelection }) {
+  return (
+    <input
+      type="checkbox"
+      className="checkbox checkbox-sm"
+      aria-label={`Select workflow ${flow.name}`}
+      checked={selection.selected.has(flow.name)}
+      disabled={selection.disabled}
+      onChange={() => selection.onToggle(flow.name)}
+    />
+  );
+}
+
+function FlowDeleteButton({ flow, selection }: { flow: FlowSummary; selection: FlowSelection }) {
+  return (
+    <button
+      type="button"
+      className="btn btn-ghost btn-xs btn-square text-error"
+      aria-label={`Delete workflow ${flow.name}`}
+      title={`Delete ${flow.name}`}
+      disabled={selection.disabled}
+      onClick={() => selection.onDelete(flow.name)}
+    >
+      <Trash2 className="h-4 w-4" />
+    </button>
+  );
+}
 
 function FlowMetaItem({
   icon,
@@ -37,14 +78,21 @@ function FlowMetaItem({
   );
 }
 
-function FlowCard({ flow }: { flow: FlowSummary }) {
+function FlowCard({ flow, selection }: { flow: FlowSummary; selection?: FlowSelection }) {
   return (
-    <Link
-      href={`/workflow/${flow.name}`}
-      className="block rounded-lg border border-base-300 bg-base-100 p-4 transition-colors hover:border-primary/50"
-    >
+    <div className="relative rounded-lg border border-base-300 bg-base-100 p-4 transition-colors hover:border-primary/50">
       <div className="flex min-w-0 items-center gap-2">
-        <h2 className="truncate text-sm font-medium">{flow.name}</h2>
+        {selection && (
+          <span className="relative z-10 flex">
+            <FlowSelectCheckbox flow={flow} selection={selection} />
+          </span>
+        )}
+        <h2 className="truncate text-sm font-medium">
+          {/* The link covers the whole card; the selection and delete controls sit above it. */}
+          <Link href={`/workflow/${flow.name}`} className="after:absolute after:inset-0">
+            {flow.name}
+          </Link>
+        </h2>
         {flow.file_exists === false && (
           <span
             className="badge badge-warning badge-sm shrink-0 gap-1"
@@ -52,6 +100,11 @@ function FlowCard({ flow }: { flow: FlowSummary }) {
           >
             <AlertTriangle className="h-3 w-3" />
             Missing
+          </span>
+        )}
+        {selection && (
+          <span className="relative z-10 ml-auto shrink-0">
+            <FlowDeleteButton flow={flow} selection={selection} />
           </span>
         )}
       </div>
@@ -87,26 +140,41 @@ function FlowCard({ flow }: { flow: FlowSummary }) {
           </span>
         )}
       </div>
-    </Link>
+    </div>
   );
 }
 
-function FlowTable({ flows }: { flows: FlowSummary[] }) {
+function FlowTable({ flows, selection }: { flows: FlowSummary[]; selection?: FlowSelection }) {
   return (
     <div className="overflow-x-auto">
       <table className="table table-zebra">
         <thead>
           <tr>
+            {selection && (
+              <th className="w-8">
+                <span className="sr-only">Select</span>
+              </th>
+            )}
             <th className="min-w-[200px]">Name</th>
             <th className="whitespace-nowrap">Chip</th>
             <th className="whitespace-nowrap">Function</th>
             <th>Tags</th>
             <th className="whitespace-nowrap text-right">Updated</th>
+            {selection && (
+              <th className="w-8">
+                <span className="sr-only">Actions</span>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
           {flows.map((flow) => (
             <tr key={flow.name} className="align-top">
+              {selection && (
+                <td>
+                  <FlowSelectCheckbox flow={flow} selection={selection} />
+                </td>
+              )}
               <td className="max-w-[260px]">
                 <Link
                   href={`/workflow/${flow.name}`}
@@ -149,6 +217,11 @@ function FlowTable({ flows }: { flows: FlowSummary[] }) {
               <td className="whitespace-nowrap text-right text-xs">
                 {formatDateTime(flow.updated_at)}
               </td>
+              {selection && (
+                <td className="text-right">
+                  <FlowDeleteButton flow={flow} selection={selection} />
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -158,15 +231,15 @@ function FlowTable({ flows }: { flows: FlowSummary[] }) {
 }
 
 /** The flows of one folder, as a table on large screens and cards below. */
-function FlowList({ flows }: { flows: FlowSummary[] }) {
+function FlowList({ flows, selection }: { flows: FlowSummary[]; selection?: FlowSelection }) {
   return (
     <>
       <div className="hidden lg:block">
-        <FlowTable flows={flows} />
+        <FlowTable flows={flows} selection={selection} />
       </div>
       <div className="grid grid-cols-1 gap-3 lg:hidden">
         {flows.map((flow) => (
-          <FlowCard key={flow.name} flow={flow} />
+          <FlowCard key={flow.name} flow={flow} selection={selection} />
         ))}
       </div>
     </>
@@ -178,10 +251,10 @@ function FlowList({ flows }: { flows: FlowSummary[] }) {
  * Subfolders are the creator's own filing, so none starts closed. Filing is
  * done in the Workflow editor's Explorer; this page only shows the result.
  */
-function FlowTreeView({ node }: { node: FlowTreeNode }) {
+function FlowTreeView({ node, selection }: { node: FlowTreeNode; selection?: FlowSelection }) {
   return (
     <div className="space-y-3">
-      {node.flows.length > 0 && <FlowList flows={node.flows} />}
+      {node.flows.length > 0 && <FlowList flows={node.flows} selection={selection} />}
       {node.children.map((child) => (
         <details
           key={child.path}
@@ -198,7 +271,7 @@ function FlowTreeView({ node }: { node: FlowTreeNode }) {
             </span>
           </summary>
           <div className="px-3 pb-3">
-            <FlowTreeView node={child} />
+            <FlowTreeView node={child} selection={selection} />
           </div>
         </details>
       ))}
@@ -212,7 +285,13 @@ function FlowTreeView({ node }: { node: FlowTreeNode }) {
  * everyone else's a click away. "Open in editor" shows the same space in the
  * editor's Explorer, where folders are made, renamed and moved.
  */
-export function FlowFolderSection({ folder }: { folder: FlowFolder }) {
+export function FlowFolderSection({
+  folder,
+  selection,
+}: {
+  folder: FlowFolder;
+  selection?: FlowSelection;
+}) {
   const count = folder.flows.length;
   return (
     <details
@@ -241,7 +320,7 @@ export function FlowFolderSection({ folder }: { folder: FlowFolder }) {
         )}
       </summary>
       <div className="px-4 pb-4 sm:px-6 sm:pb-6">
-        <FlowTreeView node={folder.root} />
+        <FlowTreeView node={folder.root} selection={selection} />
       </div>
     </details>
   );

@@ -21,6 +21,8 @@ interface TaskSelectorProps {
   selectedTask: string;
   onTaskSelect: (taskId: string) => void;
   disabled?: boolean;
+  /** Id for the search input so a visible `<label htmlFor>` can name it */
+  inputId?: string;
 }
 
 const PLACEHOLDER = "Select a task";
@@ -33,6 +35,7 @@ export function TaskSelector({
   selectedTask,
   onTaskSelect,
   disabled = false,
+  inputId,
 }: TaskSelectorProps) {
   const options: TaskOption[] = tasks.map((task) => ({
     value: task.name,
@@ -54,6 +57,7 @@ export function TaskSelector({
       className="text-base-content"
       isDisabled={disabled}
       styles={styles}
+      inputId={inputId}
     />
   );
 }

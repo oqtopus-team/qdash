@@ -80,12 +80,10 @@ def test_member_slot_without_control_port_is_rejected(tmp_path: Path) -> None:
         _scheduler(tmp_path, ctrl_ports=3).generate_from_mux(mux_ids=[4])
 
 
-def test_synchronized_steps_follow_local_slots(tmp_path: Path) -> None:
-    schedule = _scheduler(tmp_path).generate_synchronized_from_mux(
-        mux_ids=[4, 9], use_checkerboard=False
-    )
+def test_rounds_follow_local_slots(tmp_path: Path) -> None:
+    schedule = _scheduler(tmp_path).generate_rounds_from_mux(mux_ids=[4, 9], use_checkerboard=False)
 
-    assert [step.parallel_qids for step in schedule.steps] == [
+    assert [round_.parallel_qids for round_ in schedule.rounds] == [
         ["12", "0"],
         ["3", "17"],
         ["30", "5"],
@@ -94,12 +92,10 @@ def test_synchronized_steps_follow_local_slots(tmp_path: Path) -> None:
 
 
 def test_checkerboard_uses_slots_by_mux_parity(tmp_path: Path) -> None:
-    schedule = _scheduler(tmp_path).generate_synchronized_from_mux(
-        mux_ids=[4, 9], use_checkerboard=True
-    )
+    schedule = _scheduler(tmp_path).generate_rounds_from_mux(mux_ids=[4, 9], use_checkerboard=True)
 
     # MUX 4 (even) runs slots 0,1,2,3; MUX 9 (odd) runs slots 2,3,0,1.
-    assert [step.parallel_qids for step in schedule.steps] == [
+    assert [round_.parallel_qids for round_ in schedule.rounds] == [
         ["12", "5"],
         ["3", "2"],
         ["30", "0"],
@@ -107,8 +103,8 @@ def test_checkerboard_uses_slots_by_mux_parity(tmp_path: Path) -> None:
     ]
 
 
-def test_checkerboard_keeps_slot_steps_aligned_for_partial_muxes() -> None:
-    """A MUX without some slots leaves those steps empty; its other slots keep their step."""
+def test_checkerboard_keeps_slot_rounds_aligned_for_partial_muxes() -> None:
+    """A MUX without some slots leaves those rounds empty; its other slots keep their round."""
     context = OrderingContext(
         chip_id="chip-x",
         grid_size=8,
@@ -119,12 +115,12 @@ def test_checkerboard_keeps_slot_steps_aligned_for_partial_muxes() -> None:
         ),
     )
 
-    steps = CheckerboardOrderingStrategy().generate_synchronized_steps(
+    rounds = CheckerboardOrderingStrategy().generate_rounds(
         [6, 9, 15], ["24", "25", "26", "27", "28", "38", "36", "39", "61", "60"], context
     )
 
-    # Odd MUXes run slot 2 first: MUX 15 has none, so its slot 0 waits for step 2.
-    assert steps == [
+    # Odd MUXes run slot 2 first: MUX 15 has none, so its slot 0 waits for round 2.
+    assert rounds == [
         ["24", "39"],
         ["25"],
         ["26", "38", "61"],
@@ -239,8 +235,8 @@ def test_cr_scheduler_propagates_unusable_topology(monkeypatch: pytest.MonkeyPat
         scheduler._resolve_mux_mapping()
 
 
-def test_checkerboard_keeps_single_slot_neighbors_in_different_steps() -> None:
-    """Even MUX 0 = [1] and odd MUX 1 = [4] both use slot 0, which run in different steps."""
+def test_checkerboard_keeps_single_slot_neighbors_in_different_rounds() -> None:
+    """Even MUX 0 = [1] and odd MUX 1 = [4] both use slot 0, which run in different rounds."""
     context = OrderingContext(
         chip_id="chip-x",
         grid_size=8,
@@ -248,7 +244,7 @@ def test_checkerboard_keeps_single_slot_neighbors_in_different_steps() -> None:
         mux_mapping=MuxMapping.from_groups({0: ["1"], 1: ["4"]}),
     )
 
-    steps = CheckerboardOrderingStrategy().generate_synchronized_steps([0, 1], ["1", "4"], context)
+    rounds = CheckerboardOrderingStrategy().generate_rounds([0, 1], ["1", "4"], context)
 
-    # Even MUXes run slot 0 in step 0; odd MUXes run it in step 2 (order [2, 3, 0, 1]).
-    assert steps == [["1"], ["4"]]
+    # Even MUXes run slot 0 in round 0; odd MUXes run it in round 2 (order [2, 3, 0, 1]).
+    assert rounds == [["1"], ["4"]]

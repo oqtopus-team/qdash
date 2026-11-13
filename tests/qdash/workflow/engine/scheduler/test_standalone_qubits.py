@@ -79,13 +79,13 @@ def test_all_standalone_targets_need_no_wiring(tmp_path: Path) -> None:
     )
 
     schedule = scheduler.generate(qids=["2", "0"])
-    synchronized = scheduler.generate_synchronized(qids=["2", "0"])
+    rounds = scheduler.generate_rounds(qids=["2", "0"])
     batches = scheduler.generate_simultaneous_spectroscopy_batches(qids=["2", "0"], mode="all")
 
     assert [(s.box_type, s.parallel_groups) for s in schedule.stages] == [
         (BOX_STANDALONE, [["0", "2"]])
     ]
-    assert [(s.box_type, s.parallel_qids) for s in synchronized.steps] == [
+    assert [(r.box_type, r.parallel_qids) for r in rounds.rounds] == [
         (BOX_STANDALONE, ["0"]),
         (BOX_STANDALONE, ["2"]),
     ]
@@ -112,14 +112,14 @@ def test_unknown_qubits_are_rejected_not_treated_as_standalone(tmp_path: Path) -
         _scheduler(tmp_path).generate(qids=["0", "99"])
 
 
-def test_synchronized_runs_one_standalone_qubit_per_step_after_mux_steps(
+def test_rounds_run_one_standalone_qubit_per_round_after_mux_rounds(
     tmp_path: Path,
 ) -> None:
-    schedule = _scheduler(tmp_path).generate_synchronized_from_mux(
+    schedule = _scheduler(tmp_path).generate_rounds_from_mux(
         mux_ids=[4, 9], use_checkerboard=False, standalone_qids=["6", "1"]
     )
 
-    assert [(step.box_type, step.parallel_qids) for step in schedule.steps] == [
+    assert [(round_.box_type, round_.parallel_qids) for round_ in schedule.rounds] == [
         ("A", ["12", "0"]),
         ("A", ["3", "17"]),
         ("A", ["5"]),
@@ -127,7 +127,7 @@ def test_synchronized_runs_one_standalone_qubit_per_step_after_mux_steps(
         (BOX_STANDALONE, ["1"]),
         (BOX_STANDALONE, ["6"]),
     ]
-    assert [step.step_index for step in schedule.steps] == list(range(6))
+    assert [round_.round_index for round_ in schedule.rounds] == list(range(6))
 
 
 @pytest.mark.parametrize("mode", ["local_index", "all"])
@@ -274,7 +274,7 @@ def test_targeted_mux_without_a_wiring_row_is_rejected(tmp_path: Path) -> None:
     for generate in (
         lambda: scheduler.generate(["1"]),
         lambda: scheduler.generate(["0", "1"]),
-        lambda: scheduler.generate_synchronized(["1"]),
+        lambda: scheduler.generate_rounds(["1"]),
         lambda: scheduler.generate_simultaneous_spectroscopy_batches(["1"]),
         lambda: scheduler.generate_from_mux([7]),
     ):
@@ -302,7 +302,7 @@ def test_accepted_qubit_aliases_are_scheduled_by_canonical_id(tmp_path: Path) ->
     schedule = scheduler.generate(["Q17", "Q06", "17"])
 
     assert [stage.qids for stage in schedule.stages] == [["17"], ["6"]]
-    assert scheduler.generate_synchronized(["Q06"]).steps[0].parallel_qids == ["6"]
+    assert scheduler.generate_rounds(["Q06"]).rounds[0].parallel_qids == ["6"]
     batches = scheduler.generate_simultaneous_spectroscopy_batches(["Q17", "Q06"])
     assert [batch for step in batches.steps for batch in step.parallel_batches] == [
         ["17"],

@@ -14,8 +14,8 @@ from typing import Any
 
 import networkx as nx
 
+from qdash.common.manual_rounds import mux_conflicts
 from qdash.common.mux_mapping import MuxMapping
-from qdash.common.wiring_resources import mux_module_resources
 
 logger = logging.getLogger(__name__)
 
@@ -119,17 +119,8 @@ def build_mux_conflict_map(yaml_mux_list: list[dict[str, Any]]) -> dict[int, set
 
     MUXes conflict if they share the same readout or control module.
     """
-    module_to_muxes: dict[str, set[int]] = defaultdict(set)
-    for entry in yaml_mux_list:
-        for resource in mux_module_resources(entry):
-            module_to_muxes[resource].add(entry["mux"])
-
-    conflict_map: dict[int, set[int]] = defaultdict(set)
-    for muxes in module_to_muxes.values():
-        for mux_a, mux_b in itertools.combinations(muxes, 2):
-            conflict_map[mux_a].add(mux_b)
-            conflict_map[mux_b].add(mux_a)
-    return dict(conflict_map)
+    # One copy of the model, shared with the manual-round checks.
+    return mux_conflicts(yaml_mux_list)
 
 
 def build_qubit_to_mux_map(

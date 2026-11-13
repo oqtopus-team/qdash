@@ -53,10 +53,10 @@ def test_collect_qids_preserves_order_and_filters_duplicates() -> None:
         ]
     )
 
-    assert runner.collect_scheduled_qids(schedule, allowed_qids=["4", "8"]) == ["4", "8"]
+    assert runner.collect_mux_group_qids(schedule, allowed_qids=["4", "8"]) == ["4", "8"]
 
 
-def test_execute_scheduled_mux_schedule_hands_workers_the_owner_spec(
+def test_execute_parallel_by_mux_schedule_hands_workers_the_owner_spec(
     monkeypatch: Any,
 ) -> None:
     runner = OneQubitStageRunner(_session())
@@ -81,7 +81,7 @@ def test_execute_scheduled_mux_schedule_hands_workers_the_owner_spec(
     worker = _worker_spec()
 
     plan = _plan(TaskCall(name="CheckResonatorSpectroscopy"))
-    result = runner.execute_scheduled_mux_schedule(
+    result = runner.execute_parallel_by_mux_schedule(
         schedule,
         plan=plan,
         worker=worker,

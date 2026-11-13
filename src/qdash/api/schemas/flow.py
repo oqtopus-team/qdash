@@ -1,7 +1,7 @@
 """API schemas for user-defined flows."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -123,6 +123,94 @@ class GetFlowResponse(BaseModel):
     folder: str = Field(
         "", description='Folder path inside the creator\'s space, e.g. "daily/t1" (empty = root)'
     )
+
+
+class ExecutionPlanIssue(BaseModel):
+    """One problem that stops a step's manual rounds from running."""
+
+    round: int | None = Field(None, description="1-based round; null for the whole step")
+    targets: list[str] = Field(
+        default_factory=list, description="Qubit IDs or control-target pairs involved"
+    )
+    message: str
+
+
+class ExecutionPlanRound(BaseModel):
+    """One manual round exactly as the source writes it."""
+
+    number: int = Field(..., description="1-based position; rounds run in this order")
+    targets: list[str] = Field(
+        ..., description="Qubit IDs, or control-target pairs such as 0-1, in source order"
+    )
+
+
+class ExecutionPlanStep(BaseModel):
+    """One step of a CalibService run, as stated in the saved source."""
+
+    index: int = Field(..., description="1-based position within its run")
+    type: str = Field(..., description="Step class, e.g. CustomOneQubit")
+    name: str = Field(..., description="Step name and step_id")
+    scope: Literal["qubit", "coupling", "none"] = Field(
+        ..., description="What one target of the step is"
+    )
+    execution_mode: str | None = None
+    schedule: Literal["manual", "automatic", "fixed", "none"] = Field(
+        ...,
+        description=(
+            "manual: the exact rounds of the source, checked before execution. "
+            "automatic: groups are formed by the scheduler at run time. "
+            "fixed: a SetCRSchedule schedule used as written without checks. "
+            "none: the step does not schedule targets."
+        ),
+    )
+    rounds: list[ExecutionPlanRound] = Field(default_factory=list)
+    tasks: list[str] | None = Field(
+        None, description="Task names in call order; null when not stated literally"
+    )
+    summary: str = Field(..., description="How the step's targets wait for each other")
+    issues: list[ExecutionPlanIssue] = Field(default_factory=list)
+    unchecked: list[str] = Field(
+        default_factory=list,
+        description="Checks that could not run here; the worker runs them before the step",
+    )
+
+
+class ExecutionPlanRun(BaseModel):
+    """One CalibService.run call of the entrypoint."""
+
+    targets: FlowTargetOverride | None = Field(
+        None, description="Literal targets of the call; null when computed at run time"
+    )
+    steps: list[ExecutionPlanStep]
+
+
+class FlowExecutionPlanResponse(BaseModel):
+    """What the saved source of a flow states about its execution, without running it."""
+
+    flow_name: str
+    chip_id: str
+    source_updated_at: datetime = Field(
+        ..., description="Version of the saved source the plan was read from"
+    )
+    status: Literal["resolved", "unresolved", "invalid"] = Field(
+        ...,
+        description=(
+            "resolved: every run and step was read from literals. unresolved: the source "
+            "decides its steps at run time; reason says why. invalid: manual rounds that "
+            "cannot run were found; execution would fail before measuring."
+        ),
+    )
+    reason: str | None = Field(None, description="Why the plan is unresolved")
+    runs: list[ExecutionPlanRun] = Field(default_factory=list)
+    issues: list[ExecutionPlanIssue] = Field(
+        default_factory=list,
+        description="Problems of manual steps found outside a resolved plan",
+    )
+    has_manual_rounds: bool = Field(
+        False, description="Whether the source writes execution_mode='manual' on a step"
+    )
+    target_override_allowed: bool = True
+    target_override_reason: str | None = None
 
 
 class MoveFlowRequest(BaseModel):

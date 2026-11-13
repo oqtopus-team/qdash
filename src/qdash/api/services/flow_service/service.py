@@ -16,6 +16,7 @@ from qdash.api.schemas.execution import (
 from qdash.api.schemas.flow import (
     ExecuteFlowRequest,
     ExecuteFlowResponse,
+    FlowExecutionPlanResponse,
     FlowSummary,
     FlowTemplate,
     FlowTemplateWithCode,
@@ -31,6 +32,8 @@ from qdash.api.services.flow_service.execution import (
     ExecutionCoordinator,
     FlowDispatchError,
 )
+from qdash.api.services.flow_service.execution_plan import uses_manual_rounds
+from qdash.api.services.flow_service.plan_preview import build_execution_plan
 from qdash.api.services.flow_service.prefect_gateway import SystemDeploymentUnavailable
 from qdash.api.services.flow_service.source_store import FlowSourceStore
 from qdash.api.services.flow_service.target_defaults import (
@@ -45,6 +48,9 @@ from qdash.api.services.flow_service.validation import (
     validate_flow_code,
     validate_flow_name,
 )
+from qdash.api.services.manual_round_checks import load_chip_round_model
+from qdash.common.manual_rounds import MANUAL_TARGET_OVERRIDE_REASON
+from qdash.common.mux_mapping import resolve_topology_mux_mapping
 from qdash.config import get_settings
 from qdash.datamodel.flow_targets import TARGET_CONTEXT_KEY, FlowTargetOverride
 
@@ -375,6 +381,8 @@ class FlowService:
         run_context: dict[str, Any] = {}
         if request.target_override is not None:
             code = self._sources.read(Path(flow.file_path))
+            if uses_manual_rounds(code):
+                raise HTTPException(status_code=400, detail=MANUAL_TARGET_OVERRIDE_REASON)
             mode = request.target_override.mode
             if mode not in supported_target_modes(code, flow.flow_function_name):
                 raise HTTPException(
@@ -424,15 +432,67 @@ class FlowService:
         logger.info(f"Flow run created: {result.flow_run_id}")
         return _execute_response(result, f"Flow '{name}' execution started successfully")
 
-    def _validate_coupling_pairs(
-        self, project_id: str, chip_id: str, override: FlowTargetOverride
-    ) -> None:
-        """Reject pairs that are not directed couplings of the run's chip before dispatch."""
+    async def get_execution_plan(
+        self, name: str, username: str, project_id: str, chip_id: str | None
+    ) -> FlowExecutionPlanResponse:
+        """Preview what the saved source states about its execution on one chip.
+
+        Read-only: the source is parsed, never imported or run, and only the
+        chip's wiring file and coupling documents are read. Nothing is reserved,
+        scheduled, written or sent to hardware.
+        """
+        flow = self._flow_repo.find_by_project_and_name(project_id, name)
+        if not flow:
+            raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
+        file_path = Path(flow.file_path)
+        if not self._sources.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"Flow file not found: {file_path}")
+        chip = (chip_id or flow.chip_id or "").strip()
+        if not chip:
+            raise HTTPException(status_code=400, detail="Select a chip to preview the execution")
+        repository = self._chips()
+        found = repository.find_by_id(project_id, chip)
+        if found is None:
+            raise HTTPException(status_code=404, detail=f"Chip '{chip}' not found in this project")
+        # The chip's topology, resolved as the worker session resolves it.
+        topology_id = getattr(found, "topology_id", None)
+        # The parameters a run from the execution dialog receives.
+        parameters: dict[str, Any] = {
+            **flow.default_parameters,
+            "username": username,
+            "chip_id": chip,
+            "flow_name": name,
+            "project_id": project_id,
+        }
+        return build_execution_plan(
+            flow_name=name,
+            chip_id=chip,
+            updated_at=flow.updated_at,
+            code=self._sources.read(file_path),
+            function_name=flow.flow_function_name,
+            parameters=parameters,
+            chip_model=lambda: load_chip_round_model(
+                project_id,
+                chip,
+                repository.get_coupling_ids,
+                lambda: resolve_topology_mux_mapping(
+                    topology_id if isinstance(topology_id, str) else None
+                ),
+            ),
+        )
+
+    def _chips(self) -> ChipRepository:
         if self._chip_repo is None:
             from qdash.repository import MongoChipRepository
 
             self._chip_repo = MongoChipRepository()
-        known = set(self._chip_repo.get_coupling_ids(project_id, chip_id))
+        return self._chip_repo
+
+    def _validate_coupling_pairs(
+        self, project_id: str, chip_id: str, override: FlowTargetOverride
+    ) -> None:
+        """Reject pairs that are not directed couplings of the run's chip before dispatch."""
+        known = set(self._chips().get_coupling_ids(project_id, chip_id))
         unknown = [f"{c}-{t}" for c, t in override.pairs() if f"{c}-{t}" not in known]
         if unknown:
             raise HTTPException(

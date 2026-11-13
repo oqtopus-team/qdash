@@ -372,7 +372,7 @@ def test_qubit_targets_pass_standalone_qubits_to_the_strategy() -> None:
             qids=["20", "17", "6", "12"],
             plan=_plan(),
             stage_name="check",
-            mode="scheduled",
+            execution_mode="parallel_by_mux",
         )
 
     config = strategy.execute.call_args.args[1]
@@ -384,7 +384,7 @@ def test_qubit_targets_pass_standalone_qubits_to_the_strategy() -> None:
 def test_scheduled_strategy_runs_the_standalone_stage(tmp_path) -> None:
     import yaml
 
-    from qdash.workflow.service.strategy import OneQubitConfig, OneQubitScheduledStrategy
+    from qdash.workflow.service.strategy import OneQubitConfig, OneQubitParallelByMuxStrategy
 
     wiring = tmp_path / "wiring.yaml"
     wiring.write_text(
@@ -410,7 +410,7 @@ def test_scheduled_strategy_runs_the_standalone_stage(tmp_path) -> None:
         plan=_plan(),
         standalone_qids=["20", "6"],
     )
-    strategy = OneQubitScheduledStrategy()
+    strategy = OneQubitParallelByMuxStrategy()
     with (
         patch.object(strategy, "_get_wiring_config_path", return_value=str(wiring)),
         patch("qdash.workflow.service.strategy.run_mux_calibrations_parallel", run),

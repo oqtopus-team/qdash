@@ -483,3 +483,65 @@ describe("ExecutionPageContent failure investigation", () => {
     );
   });
 });
+
+describe("ExecutionPageContent status presentation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadingNextPage = false;
+  });
+
+  afterEach(() => {
+    cleanup();
+    executionDetail = DEFAULT_DETAIL;
+  });
+
+  it("labels list statuses with text and a static icon instead of a pulse", () => {
+    render(<ExecutionPageContent />);
+
+    const runningCard = screen.getByRole("button", {
+      name: "View Running Execution execution details",
+    });
+    const badge = within(runningCard).getByText("Running");
+    expect(badge.className).toContain("badge-info");
+    expect(badge.className).not.toContain("status-pulse");
+    expect(badge.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    expect(document.querySelector(".status-pulse")).toBeNull();
+  });
+
+  it("renders task rows flat with text status cues and toggles their figures", () => {
+    executionDetail = {
+      ...DEFAULT_DETAIL,
+      status: "running",
+      task: [
+        { name: "CheckRabi", qid: "0", status: "running", figure_path: ["a.png"] },
+        { name: "CheckT1", qid: "1", status: "unexpected" },
+      ],
+    };
+    render(<ExecutionPageContent />);
+    fireEvent.click(screen.getByText("Running Execution"));
+    const panel = screen.getByRole("complementary", { name: "Execution details" });
+
+    const row = within(panel).getByText("0-CheckRabi").closest("h4")?.parentElement
+      ?.parentElement as HTMLElement;
+    const runningLabel = within(row).getByText("Running");
+    expect(runningLabel.className).toContain("text-info");
+    expect(runningLabel.className).not.toContain("status-pulse");
+    expect(runningLabel.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    // Unknown task statuses keep reading as failed.
+    const unknownRow = within(panel).getByText("1-CheckT1").closest("h4")?.parentElement
+      ?.parentElement as HTMLElement;
+    expect(within(unknownRow).getByText("Failed").className).toContain("text-error");
+    expect(panel.querySelector(".status-pulse")).toBeNull();
+
+    expect(row.className).not.toMatch(/shadow-(md|lg)/);
+    expect(row.className).toContain("border-l-info");
+    expect(within(panel).queryByText("TaskFigure")).toBeNull();
+
+    fireEvent.click(row);
+    expect(row.className).toContain("border-l-info");
+    expect(within(panel).getByText("TaskFigure")).toBeTruthy();
+
+    fireEvent.click(row);
+    expect(within(panel).queryByText("TaskFigure")).toBeNull();
+  });
+});

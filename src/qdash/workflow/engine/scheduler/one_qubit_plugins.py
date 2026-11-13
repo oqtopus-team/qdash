@@ -103,13 +103,16 @@ class MuxOrderingStrategy(ABC):
         """
 
     @abstractmethod
-    def generate_synchronized_steps(
+    def generate_rounds(
         self,
         mux_ids: list[int],
         qids: list[str],
         context: OrderingContext,
     ) -> list[list[str]]:
-        """Generate synchronized parallel steps across all MUXes.
+        """Generate ``parallel_by_round`` rounds across the given MUXes.
+
+        A round lists qubits from different MUXes that run in parallel; each
+        runs the step's full task list before the next round starts.
 
         Args:
             mux_ids: List of MUX IDs to include
@@ -117,8 +120,8 @@ class MuxOrderingStrategy(ABC):
             context: Context object containing chip configuration
 
         Returns:
-            List of steps, where each step is a list of qubit IDs
-            that can be executed simultaneously
+            List of rounds, where each round is a list of qubit IDs that run
+            in parallel
         """
 
     def __repr__(self) -> str:
@@ -162,13 +165,16 @@ class DefaultOrderingStrategy(MuxOrderingStrategy):
             "description": "Natural qubit ID order",
         }
 
-    def generate_synchronized_steps(
+    def generate_rounds(
         self,
         mux_ids: list[int],
         qids: list[str],
         context: OrderingContext,
     ) -> list[list[str]]:
-        """Generate synchronized steps in local slot order.
+        """Generate rounds in local slot order: round N holds slot N of every MUX.
+
+        Example:
+            For MUXes [0, 1] on the legacy layout: [0, 4], [1, 5], [2, 6], [3, 7]
 
         Args:
             mux_ids: List of MUX IDs to include
@@ -176,17 +182,17 @@ class DefaultOrderingStrategy(MuxOrderingStrategy):
             context: Context object
 
         Returns:
-            One step per local slot (4 for 2x2 MUXes)
+            One non-empty round per occupied local slot (up to 4 for 2x2 MUXes)
         """
         qid_set = set(qids)
-        steps: dict[int, list[str]] = {}
+        rounds: dict[int, list[str]] = {}
 
         for mux_id in sorted(mux_ids):
             for slot, target_qid in sorted(context.slot_members(mux_id).items()):
                 if target_qid in qid_set:
-                    steps.setdefault(slot, []).append(target_qid)
+                    rounds.setdefault(slot, []).append(target_qid)
 
-        return [steps[slot] for slot in sorted(steps)]
+        return [rounds[slot] for slot in sorted(rounds)]
 
     def __repr__(self) -> str:
         """String representation."""
@@ -208,7 +214,7 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
         - Even MUX (mux_id % 2 == 0): [0, 1, 2, 3] slot order
         - Odd MUX (mux_id % 2 == 1): [2, 3, 0, 1] slot order
 
-    This creates a chip-wide checkerboard pattern where each step
+    This creates a chip-wide checkerboard pattern where each round
     calibrates qubits that are spatially and frequency-separated.
 
     Example:
@@ -220,10 +226,10 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
         # MUX 2 (even): offsets [0, 1, 2, 3] -> qids [8, 9, 10, 11]
         # MUX 3 (odd):  offsets [2, 3, 0, 1] -> qids [14, 15, 12, 13]
 
-        # Step 1: qids 0, 6, 8, 14, ... (checkerboard pattern)
-        # Step 2: qids 1, 7, 9, 15, ...
-        # Step 3: qids 2, 4, 10, 12, ...
-        # Step 4: qids 3, 5, 11, 13, ...
+        # Round 1: qids 0, 6, 8, 14, ... (checkerboard pattern)
+        # Round 2: qids 1, 7, 9, 15, ...
+        # Round 3: qids 2, 4, 10, 12, ...
+        # Round 4: qids 3, 5, 11, 13, ...
         ```
     """
 
@@ -261,17 +267,17 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
         """String representation."""
         return "CheckerboardOrderingStrategy()"
 
-    def generate_synchronized_steps(
+    def generate_rounds(
         self,
         mux_ids: list[int],
         qids: list[str],
         context: OrderingContext,
     ) -> list[list[str]]:
-        """Generate synchronized parallel steps across all MUXes.
+        """Generate checkerboard rounds across the given MUXes.
 
         Instead of ordering qubits within each MUX for sequential execution,
-        this method generates 4 steps where each step contains qubits from
-        all participating MUXes that can be executed simultaneously.
+        this method generates up to 4 rounds where each round contains qubits
+        from all participating MUXes that run in parallel.
 
         Args:
             mux_ids: List of MUX IDs to include
@@ -279,18 +285,18 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
             context: Context object containing chip configuration
 
         Returns:
-            List of 4 steps, where each step contains qubit IDs to execute
-            simultaneously across all MUXes in a checkerboard pattern.
+            Up to 4 rounds, where each round contains the qubit IDs that run
+            in parallel across all MUXes in a checkerboard pattern.
 
         Example:
             For MUXes [0, 1, 2, 3]:
-            - Step 0: [0, 6, 8, 14]  (checkerboard: non-adjacent)
-            - Step 1: [1, 7, 9, 15]
-            - Step 2: [2, 4, 10, 12]
-            - Step 3: [3, 5, 11, 13]
+            - Round 0: [0, 6, 8, 14]  (checkerboard: non-adjacent)
+            - Round 1: [1, 7, 9, 15]
+            - Round 2: [2, 4, 10, 12]
+            - Round 3: [3, 5, 11, 13]
         """
         qid_set = set(qids)
-        steps: dict[int, list[str]] = {}
+        rounds: dict[int, list[str]] = {}
 
         for mux_id in sorted(mux_ids):
             slots = context.slot_members(mux_id)
@@ -298,40 +304,14 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
             # Determine slot order for this MUX
             offset_order = self.EVEN_MUX_ORDER if mux_id % 2 == 0 else self.ODD_MUX_ORDER
 
-            # The step is the slot's position in the parity order, so a MUX that lacks a
-            # slot leaves that step empty instead of shifting its later slots forward.
+            # The round is the slot's position in the parity order, so a MUX that lacks a
+            # slot leaves that round empty instead of shifting its later slots forward.
             # Slots beyond the 2x2 order of a larger MUX follow in slot order.
             for slot in _ordered_slots(slots, offset_order):
                 target_qid = slots[slot]
                 if target_qid in qid_set:
-                    step_idx = offset_order.index(slot) if slot in offset_order else slot
-                    steps.setdefault(step_idx, []).append(target_qid)
+                    round_idx = offset_order.index(slot) if slot in offset_order else slot
+                    rounds.setdefault(round_idx, []).append(target_qid)
 
-        # Empty steps are never created
-        return [steps[step_idx] for step_idx in sorted(steps)]
-
-
-class DefaultSynchronizedStrategy(DefaultOrderingStrategy):
-    """Synchronized strategy using natural qubit order.
-
-    Inherits ordering and synchronized step generation from DefaultOrderingStrategy.
-    Exists as a named strategy for use when only synchronized execution is needed.
-
-    Example:
-        For MUXes [0, 1]:
-        - Step 0: [0, 4]  (offset 0 from each MUX)
-        - Step 1: [1, 5]  (offset 1 from each MUX)
-        - Step 2: [2, 6]  (offset 2 from each MUX)
-        - Step 3: [3, 7]  (offset 3 from each MUX)
-    """
-
-    def get_metadata(self) -> dict[str, Any]:
-        """Return strategy metadata."""
-        return {
-            "strategy_name": "default_synchronized",
-            "description": "Natural order synchronized steps",
-        }
-
-    def __repr__(self) -> str:
-        """String representation."""
-        return "DefaultSynchronizedStrategy()"
+        # Empty rounds are never created
+        return [rounds[round_idx] for round_idx in sorted(rounds)]

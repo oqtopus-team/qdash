@@ -66,6 +66,18 @@ def build_targets(spec: CalibrationPipelineSpec) -> Target:
     return QubitTargets(qids=list(targets.qids))
 
 
+def _qubit_rounds(rounds: list[list[str]] | None) -> list[list[str]] | None:
+    return [list(round_) for round_ in rounds] if rounds is not None else None
+
+
+def _two_qubit_mode(step: TwoQubitCalibrationStep | CustomTwoQubitStep) -> dict[str, Any]:
+    """Mode arguments: manual rounds as tuples, or the automatic group cap."""
+    if step.execution_mode == "manual":
+        rounds = [[(pair[0], pair[1]) for pair in round_] for round_ in step.rounds or []]
+        return {"execution_mode": "manual", "rounds": rounds}
+    return {"execution_mode": "automatic", "max_parallel_ops": step.max_parallel_ops}
+
+
 def build_step(step: PipelineStep) -> Step:
     """The Step object for one spec entry.
 
@@ -84,24 +96,27 @@ def build_step(step: PipelineStep) -> Step:
         return BringUp(step_id=step.step_id)
     if isinstance(step, OneQubitCheckStep):
         return OneQubitCheck(
-            mode=step.mode,
+            execution_mode=step.execution_mode,
             tasks=list(step.tasks) if step.tasks is not None else None,
             configure=step.configure,
+            rounds=_qubit_rounds(step.rounds),
             step_id=step.step_id,
         )
     if isinstance(step, OneQubitFineTuneStep):
         return OneQubitFineTune(
-            mode=step.mode,
+            execution_mode=step.execution_mode,
             tasks=list(step.tasks) if step.tasks is not None else None,
             configure=step.configure,
+            rounds=_qubit_rounds(step.rounds),
             step_id=step.step_id,
         )
     if isinstance(step, CustomOneQubitStep):
         return CustomOneQubit(
             step_name=step.step_name,
             tasks=list(step.tasks),
-            mode=step.mode,
+            execution_mode=step.execution_mode,
             continue_on_failure=step.continue_on_failure,
+            rounds=_qubit_rounds(step.rounds),
         )
     if isinstance(step, FilterByStatusStep):
         return FilterByStatus(step=step.step, call_id=step.call_id)
@@ -117,14 +132,14 @@ def build_step(step: PipelineStep) -> Step:
     if isinstance(step, TwoQubitCalibrationStep):
         return TwoQubitCalibration(
             tasks=list(step.tasks) if step.tasks is not None else None,
-            max_parallel_ops=step.max_parallel_ops,
+            **_two_qubit_mode(step),
             step_id=step.step_id,
         )
     if isinstance(step, CustomTwoQubitStep):
         return CustomTwoQubit(
             step_name=step.step_name,
             tasks=list(step.tasks),
-            max_parallel_ops=step.max_parallel_ops,
+            **_two_qubit_mode(step),
             continue_on_failure=step.continue_on_failure,
         )
     raise ValueError(f"unsupported pipeline step: {step!r}")
@@ -168,7 +183,9 @@ def parse_dispatched_spec(spec: dict[str, Any], logger: Any) -> CalibrationPipel
     The API only dispatches version 2 specs. A run queued before the upgrade can
     still carry a version 1 spec; it is converted here, at the flow boundary,
     with :func:`migrate_pipeline_spec` (the same conversion the API offers), and
-    the conversion is logged. Nothing else accepts version 1.
+    the conversion is logged. Nothing else accepts version 1. A queued spec that
+    still uses the removed one-qubit ``mode`` raises
+    :class:`~qdash.datamodel.calibration_pipeline.LegacyExecutionModeError`.
     """
     migration = migrate_pipeline_spec(spec)
     if migration.changed:

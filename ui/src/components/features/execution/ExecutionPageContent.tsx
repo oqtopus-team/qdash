@@ -6,12 +6,19 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowUpRight,
+  Ban,
   ChevronLeft,
   ChevronRight,
+  CircleCheck,
+  CircleHelp,
+  CirclePlay,
+  CircleX,
+  Clock,
   ExternalLink,
   StopCircle,
   UserRound,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -78,6 +85,44 @@ function getStatusBadgeClass(status: string) {
       return "badge-error";
     default:
       return "badge-ghost";
+  }
+}
+
+// Static icons pair each status color with a shape, so running and cancelling stay
+// recognizable without a continuous pulse and status never relies on color alone.
+function getStatusIcon(status: string): LucideIcon {
+  switch (status) {
+    case "running":
+      return CirclePlay;
+    case "completed":
+      return CircleCheck;
+    case "scheduled":
+    case "pending":
+      return Clock;
+    case "failed":
+      return CircleX;
+    case "cancelling":
+      return StopCircle;
+    case "cancelled":
+      return Ban;
+    default:
+      return CircleHelp;
+  }
+}
+
+// Task rows keep their established mapping: any status outside the known set reads as failed.
+function getTaskStatusDisplay(status?: string | null) {
+  switch (status) {
+    case "running":
+      return { label: "Running", textClass: "text-info", Icon: getStatusIcon("running") };
+    case "completed":
+      return { label: "Completed", textClass: "text-success", Icon: getStatusIcon("completed") };
+    case "scheduled":
+      return { label: "Scheduled", textClass: "text-warning", Icon: getStatusIcon("scheduled") };
+    case "cancelled":
+      return { label: "Cancelled", textClass: "text-neutral", Icon: getStatusIcon("cancelled") };
+    default:
+      return { label: "Failed", textClass: "text-error", Icon: getStatusIcon("failed") };
   }
 }
 
@@ -411,6 +456,7 @@ export function ExecutionPageContent() {
             const executionKey = getExecutionKey(execution);
             const isSelected = selectedExecutionId === execution.execution_id;
             const statusBorderStyle = getStatusBorderStyle(execution.status);
+            const StatusIcon = getStatusIcon(execution.status);
 
             return (
               <div
@@ -440,8 +486,9 @@ export function ExecutionPageContent() {
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="truncate text-sm font-medium">{execution.name}</h3>
                     <span
-                      className={`badge badge-sm flex-shrink-0 ${getStatusBadgeClass(execution.status)} ${execution.status === "running" || execution.status === "cancelling" ? "status-pulse" : ""}`}
+                      className={`badge badge-sm flex-shrink-0 gap-1 ${getStatusBadgeClass(execution.status)}`}
                     >
+                      <StatusIcon className="h-4 w-4" aria-hidden="true" />
                       {getStatusLabel(execution.status)}
                     </span>
                   </div>
@@ -602,11 +649,17 @@ export function ExecutionPageContent() {
                 executionDetailData.data.task &&
                 executionDetailData.data.task.map((detailTask, idx) => {
                   const taskBorderStyle = getStatusBorderStyle(detailTask.status ?? "unknown");
+                  const taskStatus = getTaskStatusDisplay(detailTask.status);
+                  const isTaskExpanded = expandedTaskIndex === idx;
 
                   return (
                     <div
                       key={idx}
-                      className={`mb-2 sm:mb-4 p-2 sm:p-4 rounded-lg shadow-md bg-base-100 cursor-pointer hover:shadow-lg transition-shadow ${taskBorderStyle}`}
+                      className={`mb-2 sm:mb-3 p-2 sm:p-3 rounded-box border cursor-pointer transition-colors ${
+                        isTaskExpanded
+                          ? "border-primary/40 bg-primary/5"
+                          : "border-base-content/10 bg-base-100 hover:bg-base-200/50"
+                      } ${taskBorderStyle}`}
                       onClick={() => handleTaskClick(idx)}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -629,27 +682,10 @@ export function ExecutionPageContent() {
                           )}
                         </h4>
                         <span
-                          className={`text-sm font-medium flex-shrink-0 ${
-                            detailTask.status === "running"
-                              ? "text-info status-pulse"
-                              : detailTask.status === "completed"
-                                ? "text-success"
-                                : detailTask.status === "scheduled"
-                                  ? "text-warning"
-                                  : detailTask.status === "cancelled"
-                                    ? "text-neutral"
-                                    : "text-error"
-                          }`}
+                          className={`inline-flex items-center gap-1 text-sm font-medium flex-shrink-0 ${taskStatus.textClass}`}
                         >
-                          {detailTask.status === "running"
-                            ? "Running"
-                            : detailTask.status === "completed"
-                              ? "Completed"
-                              : detailTask.status === "scheduled"
-                                ? "Scheduled"
-                                : detailTask.status === "cancelled"
-                                  ? "Cancelled"
-                                  : "Failed"}
+                          <taskStatus.Icon className="h-4 w-4" aria-hidden="true" />
+                          {taskStatus.label}
                         </span>
                       </div>
                       <div className="text-sm text-base-content/60 mt-1">
@@ -665,7 +701,7 @@ export function ExecutionPageContent() {
                         </span>
                       </div>
                       <ExecutionTaskProgress status={detailTask.status} note={detailTask.note} />
-                      {expandedTaskIndex === idx && (
+                      {isTaskExpanded && (
                         <div className="mt-2 sm:mt-3 space-y-2 sm:space-y-3">
                           {Array.isArray(detailTask.figure_path) &&
                           detailTask.figure_path.length > 0 ? (

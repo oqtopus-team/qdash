@@ -109,7 +109,7 @@ def good_spec() -> dict[str, Any]:
         "name": "coarse-then-coherence",
         "targets": {"qids": ["0", "1"]},
         "steps": [
-            {"type": "OneQubitCheck", "mode": "scheduled"},
+            {"type": "OneQubitCheck", "execution_mode": "parallel_by_mux"},
             {"type": "FilterByStatus"},
             {
                 "type": "CustomOneQubit",
@@ -138,7 +138,8 @@ class TestCatalog:
         assert data["spec_version"] == 2
         assert "CheckT1" in data["tasks"]["qubit"]
         assert "CheckCrossResonance" in data["tasks"]["coupling"]
-        assert "scheduled" in data["one_qubit_modes"]
+        assert "parallel_by_mux" in data["one_qubit_execution_modes"]
+        assert "scheduled" not in data["one_qubit_execution_modes"]
         assert "CalibrationPipelineSpec" in data["spec_schema"]["title"]
 
     def test_catalog_requires_authentication(self, test_client, chip):
@@ -215,6 +216,58 @@ class TestValidate:
             {"name": "CheckT1", "call_id": "CheckT1_2"},
         ]
         # Resubmitting the converted spec validates.
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": migrated},
+        )
+        assert response.json()["valid"] is True, response.json()["problems"]
+
+    def test_version_1_legacy_mode_is_rejected_without_a_converted_spec(
+        self, test_client, chip, auth_headers
+    ):
+        legacy: dict[str, Any] = {
+            "targets": {"qids": ["0", "1"]},
+            "steps": [
+                {"type": "OneQubitCheck"},
+                {
+                    "type": "CustomOneQubit",
+                    "step_name": "t1",
+                    "tasks": ["CheckT1"],
+                    "mode": "scheduled",
+                },
+            ],
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": legacy},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        assert data["spec_version"] == 1
+        # No converted spec is offered, and nothing tells the caller to submit one.
+        assert data["migrated_spec"] is None
+        [problem] = data["problems"]
+        assert problem["path"] == "steps[1]"
+        assert "steps[1].execution_mode='parallel_by_mux'" in problem["message"]
+        assert "migrated_spec" not in problem["message"]
+
+        # After the owner sets execution_mode, the spec converts and validates.
+        legacy["steps"][1] = {
+            "type": "CustomOneQubit",
+            "step_name": "t1",
+            "tasks": ["CheckT1"],
+            "execution_mode": "parallel_by_mux",
+        }
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": legacy},
+        )
+        migrated = response.json()["migrated_spec"]
+        assert migrated["steps"][1]["execution_mode"] == "parallel_by_mux"
         response = test_client.post(
             "/calibration-pipelines/validate",
             headers=auth_headers,
@@ -402,6 +455,31 @@ class TestValidate:
         data = response.json()
         assert data["valid"] is True, data["problems"]
         assert [warning["path"] for warning in data["warnings"]] == ["steps[3]"]
+
+    def test_removed_mode_names_are_a_problem(self, test_client, chip, auth_headers):
+        spec = good_spec()
+        spec["steps"][0] = {"type": "OneQubitCheck", "execution_mode": "scheduled"}
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is False
+        assert any("execution_mode" in p["path"] for p in data["problems"]), data["problems"]
+
+    def test_removed_mode_key_is_a_problem(self, test_client, chip, auth_headers):
+        # A saved spec that still uses ``mode`` must not silently run the default.
+        spec = good_spec()
+        spec["steps"][2]["mode"] = "sequential"
+        response = test_client.post(
+            "/calibration-pipelines/validate",
+            headers=auth_headers,
+            json={"chip_id": CHIP, "spec": spec},
+        )
+        data = response.json()
+        assert data["valid"] is False
+        assert any(p["path"].endswith("mode") for p in data["problems"]), data["problems"]
 
     def test_problems_carry_paths(self, test_client, chip, auth_headers):
         spec = good_spec()
@@ -650,7 +728,7 @@ class TestExecute:
         assert "pipeline" in parameters["tags"]
         # The worker gets the normalized spec, not the raw request body.
         assert parameters["spec"]["steps"][0]["configure"] is False
-        assert parameters["spec"]["steps"][2]["mode"] == "synchronized"
+        assert parameters["spec"]["steps"][2]["execution_mode"] == "parallel_by_round"
         assert parameters["spec"]["spec_version"] == 2
         assert [call["call_id"] for call in parameters["spec"]["steps"][2]["tasks"]] == [
             "t1_short",

@@ -52,12 +52,12 @@ Example:
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
 
+from qdash.common.manual_rounds import channel_box_type, channel_module_id
 from qdash.common.mux_mapping import (
     MuxMapping,
     MuxMappingError,
@@ -72,10 +72,10 @@ from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_STANDALONE,
     MuxBatchScheduleResult,
     MuxBatchStepInfo,
+    OneQubitRound,
+    OneQubitRoundScheduleResult,
     OneQubitScheduleResult,
     OneQubitStageInfo,
-    SynchronizedOneQubitScheduleResult,
-    SynchronizedStepInfo,
 )
 
 if TYPE_CHECKING:
@@ -171,21 +171,8 @@ class OneQubitScheduler:
         Returns:
             "A" for Box A, "B" for Box B, or None if unrecognized
         """
-        # Extract the module identifier (part before the channel number)
-        # e.g., "R21B-5" → "R21B", "Q73A-1" → "Q73A"
-        match = re.match(r"^([A-Za-z0-9]+)(?:-\d+)?$", module_name)
-        if not match:
-            return None
-
-        module_id = match.group(1)
-
-        # Check the last character of the module identifier
-        if module_id.endswith("A"):
-            return BOX_A
-        elif module_id.endswith("B"):
-            return BOX_B
-
-        return None
+        # One copy of the model, shared with the manual-round checks.
+        return channel_box_type(module_name)
 
     def _build_mux_box_map(self, wiring_config: list[dict[str, Any]]) -> dict[int, set[str]]:
         """Build mapping from MUX ID to box types used.
@@ -276,10 +263,7 @@ class OneQubitScheduler:
         Returns:
             Module identifier without channel (e.g., "R21B", "Q73A")
         """
-        match = re.match(r"^([A-Za-z0-9]+)(?:-\d+)?$", module_name)
-        if match:
-            return match.group(1)
-        return None
+        return channel_module_id(module_name)
 
     def _build_box_b_module_map(self, wiring_config: list[dict[str, Any]]) -> dict[str, list[int]]:
         """Build mapping from Box B module to MUX IDs that use it.
@@ -864,30 +848,29 @@ class OneQubitScheduler:
 
         return result
 
-    def generate_synchronized(
+    def generate_rounds(
         self,
         qids: list[str],
         use_checkerboard: bool = True,
-    ) -> SynchronizedOneQubitScheduleResult:
-        """Generate synchronized 1-qubit execution schedule.
+    ) -> OneQubitRoundScheduleResult:
+        """Generate the rounds of a ``parallel_by_round`` 1-qubit schedule.
 
-        This method creates a step-based schedule where each step contains
-        qubits that execute simultaneously across all MUXes. This ensures
-        true synchronization between MUXes at each step.
-
-        Unlike the original `generate()` method where MUXes execute independently,
-        this method guarantees that all MUXes complete step N before any MUX
-        starts step N+1.
+        A round is a set of qubits from different MUXes that run in parallel.
+        Each qubit of a round runs the step's full task list, and every qubit
+        of round N finishes before any qubit of round N+1 starts. Unlike
+        `generate()`, where each MUX advances to its next qubit independently,
+        MUXes wait for each other between rounds. A round is not a per-task
+        barrier and does not synchronize pulse timing.
 
         Execution pattern (with checkerboard strategy):
-            Box A (4 steps):
-                Step 0: [0, 6, 8, 14, 16, 22, ...] - all simultaneously
-                Step 1: [1, 7, 9, 15, 17, 23, ...] - all simultaneously
-                Step 2: [2, 4, 10, 12, 18, 20, ...] - all simultaneously
-                Step 3: [3, 5, 11, 13, 19, 21, ...] - all simultaneously
+            Box A (4 rounds):
+                Round 0: [0, 6, 8, 14, 16, 22, ...] - in parallel
+                Round 1: [1, 7, 9, 15, 17, 23, ...] - in parallel
+                Round 2: [2, 4, 10, 12, 18, 20, ...] - in parallel
+                Round 3: [3, 5, 11, 13, 19, 21, ...] - in parallel
 
-            Box Mixed (4 steps):
-                Step 0-3: Similar pattern for MIXED MUXes
+            Box Mixed (4 rounds):
+                Round 0-3: Similar pattern for MIXED MUXes
 
         Args:
             qids: List of qubit IDs to schedule
@@ -895,7 +878,7 @@ class OneQubitScheduler:
                 frequency isolation. If False, uses natural order.
 
         Returns:
-            SynchronizedOneQubitScheduleResult containing steps and metadata
+            OneQubitRoundScheduleResult containing rounds and metadata
 
         Raises:
             FileNotFoundError: If wiring configuration not found
@@ -905,28 +888,28 @@ class OneQubitScheduler:
             ```python
             scheduler = OneQubitScheduler(chip_id="64Qv3")
 
-            # Generate synchronized schedule with checkerboard pattern
-            schedule = scheduler.generate_synchronized(
+            # Generate rounds with the checkerboard pattern
+            schedule = scheduler.generate_rounds(
                 qids=[str(i) for i in range(64)],
                 use_checkerboard=True,
             )
 
-            # Execute all steps
-            for step in schedule.steps:
-                # Execute all qubits in step.parallel_qids simultaneously
-                execute_parallel(step.parallel_qids)
+            # Run the rounds one after another
+            for round_ in schedule.rounds:
+                # Run all qubits of the round in parallel; wait for all of them
+                execute_parallel(round_.parallel_qids)
 
-            # Total steps: ~12 (4 for Box A + 4 for Box B + 4 for MIXED)
-            print(f"Total steps: {schedule.total_steps}")
+            # Total rounds: ~12 (4 for Box A + 4 for Box B + 4 for MIXED)
+            print(f"Total rounds: {schedule.total_rounds}")
             ```
         """
         from qdash.workflow.engine.scheduler.one_qubit_plugins import (
             CheckerboardOrderingStrategy,
-            DefaultSynchronizedStrategy,
+            DefaultOrderingStrategy,
             OrderingContext,
         )
 
-        logger.info(f"Generating synchronized 1-qubit schedule for chip_id={self.chip_id}")
+        logger.info(f"Generating 1-qubit rounds for chip_id={self.chip_id}")
         logger.info(f"  Input qubits: {len(qids)} qubits")
         logger.info(f"  Checkerboard: {use_checkerboard}")
 
@@ -956,7 +939,7 @@ class OneQubitScheduler:
         if use_checkerboard:
             strategy = CheckerboardOrderingStrategy()
         else:
-            strategy = DefaultSynchronizedStrategy()
+            strategy = DefaultOrderingStrategy()
 
         # Classify qubits by box type
         box_a_qids, box_b_qids, mixed_qids = self._classify_qubits(
@@ -967,47 +950,45 @@ class OneQubitScheduler:
         logger.info(f"  Box B qubits: {len(box_b_qids)}")
         logger.info(f"  Mixed qubits: {len(mixed_qids)}")
 
-        # Build synchronized steps
-        all_steps: list[SynchronizedStepInfo] = []
+        # Build rounds
+        all_rounds: list[OneQubitRound] = []
 
-        # Helper function to generate steps for a set of qubits
-        def generate_steps_for_box(
+        # Helper function to generate rounds for a set of qubits
+        def generate_rounds_for_box(
             box_qids: list[str],
             box_type: str,
-            base_step_index: int,
-        ) -> list[SynchronizedStepInfo]:
+            base_round_index: int,
+        ) -> list[OneQubitRound]:
             if not box_qids:
                 return []
 
             # Get MUX IDs for these qubits
             mux_ids = sorted({qid_to_mux[qid] for qid in box_qids if qid in qid_to_mux})
 
-            # Generate synchronized steps using the strategy
-            raw_steps = strategy.generate_synchronized_steps(mux_ids, box_qids, context)
+            # Generate the rounds using the ordering strategy
+            raw_rounds = strategy.generate_rounds(mux_ids, box_qids, context)
 
-            steps = []
-            for idx, parallel_qids in enumerate(raw_steps):
-                steps.append(
-                    SynchronizedStepInfo(
-                        step_index=base_step_index + idx,
-                        box_type=box_type,
-                        parallel_qids=parallel_qids,
-                    )
+            return [
+                OneQubitRound(
+                    round_index=base_round_index + idx,
+                    box_type=box_type,
+                    parallel_qids=parallel_qids,
                 )
-            return steps
+                for idx, parallel_qids in enumerate(raw_rounds)
+            ]
 
-        # Generate steps for each box type (in order: A, B, MIXED)
-        step_index = 0
+        # Generate rounds for each box type (in order: A, B, MIXED)
+        round_index = 0
 
         if box_a_qids:
-            box_a_steps = generate_steps_for_box(box_a_qids, BOX_A, step_index)
-            all_steps.extend(box_a_steps)
-            step_index += len(box_a_steps)
+            box_a_rounds = generate_rounds_for_box(box_a_qids, BOX_A, round_index)
+            all_rounds.extend(box_a_rounds)
+            round_index += len(box_a_rounds)
 
         if box_b_qids:
-            box_b_steps = generate_steps_for_box(box_b_qids, BOX_B, step_index)
-            all_steps.extend(box_b_steps)
-            step_index += len(box_b_steps)
+            box_b_rounds = generate_rounds_for_box(box_b_qids, BOX_B, round_index)
+            all_rounds.extend(box_b_rounds)
+            round_index += len(box_b_rounds)
 
         if mixed_qids:
             # MIXED MUXes need special handling due to Box B module sharing
@@ -1022,8 +1003,8 @@ class OneQubitScheduler:
 
             logger.info(f"  MIXED MUX groups (Box B sharing): {mux_groups}")
 
-            # Generate steps for each MIXED group sequentially
-            # Each group gets 4 steps, so 2 groups = 8 steps total
+            # Generate rounds for each MIXED group sequentially
+            # Each group gets 4 rounds, so 2 groups = 8 rounds total
             for group_idx, mux_group in enumerate(mux_groups):
                 # Get qubits for this MUX group
                 group_qids = [
@@ -1031,34 +1012,35 @@ class OneQubitScheduler:
                 ]
 
                 if group_qids:
-                    # Generate synchronized steps for this group
-                    raw_steps = strategy.generate_synchronized_steps(mux_group, group_qids, context)
+                    # Generate the rounds of this group
+                    raw_rounds = strategy.generate_rounds(mux_group, group_qids, context)
 
-                    for idx, parallel_qids in enumerate(raw_steps):
-                        all_steps.append(
-                            SynchronizedStepInfo(
-                                step_index=step_index,
+                    for parallel_qids in raw_rounds:
+                        all_rounds.append(
+                            OneQubitRound(
+                                round_index=round_index,
                                 box_type=BOX_MIXED,
                                 parallel_qids=parallel_qids,
                             )
                         )
-                        step_index += 1
+                        round_index += 1
 
-        # Standalone qubits have no known hardware mapping: one step each, last.
+        # Standalone qubits have no known hardware mapping: one round each, last.
         for qid in standalone_qids:
-            all_steps.append(
-                SynchronizedStepInfo(
-                    step_index=step_index,
+            all_rounds.append(
+                OneQubitRound(
+                    round_index=round_index,
                     box_type=BOX_STANDALONE,
                     parallel_qids=[qid],
                 )
             )
-            step_index += 1
+            round_index += 1
 
-        logger.info(f"Generated {len(all_steps)} synchronized steps")
-        for step in all_steps:
+        logger.info(f"Generated {len(all_rounds)} rounds")
+        for round_ in all_rounds:
             logger.info(
-                f"  Step {step.step_index} ({step.box_type}): {len(step.parallel_qids)} qubits"
+                f"  Round {round_.round_index} ({round_.box_type}): "
+                f"{len(round_.parallel_qids)} qubits"
             )
 
         # Build metadata
@@ -1068,30 +1050,30 @@ class OneQubitScheduler:
             "box_b_count": len(box_b_qids),
             "mixed_count": len(mixed_qids),
             "standalone_count": len(standalone_qids),
-            "num_steps": len(all_steps),
+            "num_rounds": len(all_rounds),
             "chip_id": self.chip_id,
             "use_checkerboard": use_checkerboard,
             "strategy": strategy.get_metadata()["strategy_name"],
         }
 
-        return SynchronizedOneQubitScheduleResult(
-            steps=all_steps,
+        return OneQubitRoundScheduleResult(
+            rounds=all_rounds,
             metadata=metadata,
             mux_box_map=mux_box_map,
             qid_to_mux=qid_to_mux,
         )
 
-    def generate_synchronized_from_mux(
+    def generate_rounds_from_mux(
         self,
         mux_ids: list[int],
         exclude_qids: list[str] | None = None,
         use_checkerboard: bool = True,
         standalone_qids: list[str] | None = None,
-    ) -> SynchronizedOneQubitScheduleResult:
-        """Generate synchronized schedule from MUX IDs.
+    ) -> OneQubitRoundScheduleResult:
+        """Generate the rounds of a ``parallel_by_round`` schedule from MUX IDs.
 
-        Convenience method that converts MUX IDs to qubit IDs and generates
-        a synchronized schedule.
+        Convenience method that converts MUX IDs to qubit IDs and calls
+        :meth:`generate_rounds`.
 
         Args:
             mux_ids: List of MUX IDs to schedule
@@ -1100,7 +1082,7 @@ class OneQubitScheduler:
             standalone_qids: Standalone (non-multiplexed) qubits to schedule too
 
         Returns:
-            SynchronizedOneQubitScheduleResult containing steps and metadata
+            OneQubitRoundScheduleResult containing rounds and metadata
 
         Raises:
             FileNotFoundError: If wiring configuration not found
@@ -1111,18 +1093,18 @@ class OneQubitScheduler:
             scheduler = OneQubitScheduler(chip_id="64Qv3")
 
             # Schedule all 16 MUXes with checkerboard pattern
-            schedule = scheduler.generate_synchronized_from_mux(
+            schedule = scheduler.generate_rounds_from_mux(
                 mux_ids=list(range(16)),
                 use_checkerboard=True,
             )
 
-            # Results in ~12 steps (4 A + 4 B + 4 MIXED, depending on chip)
-            for step in schedule.steps:
-                print(f"Step {step.step_index}: {step.parallel_qids}")
+            # Results in ~12 rounds (4 A + 4 B + 4 MIXED, depending on chip)
+            for round_ in schedule.rounds:
+                print(f"Round {round_.round_index}: {round_.parallel_qids}")
             ```
         """
         qids = self._mux_ids_to_qids(mux_ids, exclude_qids, standalone_qids)
-        return self.generate_synchronized(qids=qids, use_checkerboard=use_checkerboard)
+        return self.generate_rounds(qids=qids, use_checkerboard=use_checkerboard)
 
     def generate_simultaneous_spectroscopy_batches(
         self,

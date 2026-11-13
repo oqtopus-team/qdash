@@ -30,24 +30,30 @@ from qdash.api.services.calibration_pipeline_preflight import (
     prerequisite_problems,
     run_parameter_problems,
 )
+from qdash.api.services.manual_round_checks import (
+    ChipRoundModel,
+    check_rounds,
+    load_chip_round_model,
+)
 from qdash.common.config.backend import (
     get_available_backends,
     get_default_backend,
     get_tasks,
 )
+from qdash.common.manual_rounds import mux_target_qids
 from qdash.common.mux_mapping import (
     MuxMappingError,
     qubex_mux_mapping_errors,
     resolve_topology_mux_mapping,
 )
 from qdash.datamodel.calibration_pipeline import (
-    ONE_QUBIT_MODES,
     SPEC_VERSION,
     STEP_CATALOG,
     CalibrationPipelineSpec,
     ConfigureAllStep,
     FilterByMetricStep,
     FilterByStatusStep,
+    LegacyExecutionModeError,
     PipelineStep,
     migrate_pipeline_spec,
     pipeline_spec_json_schema,
@@ -55,8 +61,11 @@ from qdash.datamodel.calibration_pipeline import (
     step_calls,
     step_continue_on_failure,
     step_id,
+    step_manual_rounds,
     step_name,
 )
+from qdash.datamodel.one_qubit_execution_mode import ONE_QUBIT_STEP_EXECUTION_MODES
+from qdash.datamodel.two_qubit_execution_mode import TWO_QUBIT_EXECUTION_MODES
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.qubit import QubitDocument
 
@@ -103,6 +112,12 @@ def _describe_ids(ids: list[int]) -> str:
     return shown if len(ids) <= 16 else f"{shown}, ..."
 
 
+def _default_chip_round_model(project_id: str, chip_id: str) -> ChipRoundModel:
+    from qdash.repository import MongoChipRepository
+
+    return load_chip_round_model(project_id, chip_id, MongoChipRepository().get_coupling_ids)
+
+
 class CalibrationPipelineService:
     """Resolve and validate pipeline specs for one project."""
 
@@ -116,6 +131,7 @@ class CalibrationPipelineService:
         task_catalog: Callable[[str], Mapping[str, TaskInfo]] | None = None,
         qubit_data: Callable[[str, str, str], Mapping[str, Any]] | None = None,
         source_run_parameters: Callable[[str, str], Mapping[str, Any] | None] | None = None,
+        chip_round_model: Callable[[str, str], ChipRoundModel] | None = None,
     ) -> None:
         """Create the service.
 
@@ -131,6 +147,9 @@ class CalibrationPipelineService:
             qubit_data: (project_id, chip_id, qid) -> the qubit's calibration data.
             source_run_parameters: (project_id, task_id) -> run parameters recorded
                 on that task result, or None when the task is unknown.
+            chip_round_model: (project_id, chip_id) -> the wiring and coupling IDs
+                that manual rounds are checked against. Defaults to reading the
+                chip's wiring.yaml and its coupling documents.
         """
         self._task_definitions = task_definition_repository
         self._default_backend = default_backend
@@ -139,6 +158,7 @@ class CalibrationPipelineService:
         self._task_catalog = task_catalog
         self._qubit_data = qubit_data
         self._source_run_parameters = source_run_parameters
+        self._chip_round_model = chip_round_model or _default_chip_round_model
 
     # ------------------------------------------------------------------ catalog
 
@@ -188,7 +208,8 @@ class CalibrationPipelineService:
                 )
                 for entry in STEP_CATALOG.values()
             ],
-            one_qubit_modes=list(ONE_QUBIT_MODES),
+            one_qubit_execution_modes=list(ONE_QUBIT_STEP_EXECUTION_MODES),
+            two_qubit_execution_modes=list(TWO_QUBIT_EXECUTION_MODES),
             tasks=by_type,
             spec_version=SPEC_VERSION,
             spec_schema=pipeline_spec_json_schema(),
@@ -228,6 +249,7 @@ class CalibrationPipelineService:
             self._validate_backend_mux_layout(project_id, chip_id, backend, problems)
             self._validate_tasks(project_id, backend, parsed, problems)
         self._validate_task_parameters(parsed, problems)
+        round_warnings = self._validate_manual_rounds(project_id, chip_id, parsed, problems)
         if not backend_problem:
             self._preflight(project_id, chip_id, backend, parsed, target_qids, problems)
 
@@ -238,7 +260,8 @@ class CalibrationPipelineService:
         return ValidatePipelineResponse(
             valid=not problems,
             problems=problems,
-            warnings=[_problem(path, message) for path, message in pipeline_warnings(parsed)],
+            warnings=[_problem(path, message) for path, message in pipeline_warnings(parsed)]
+            + round_warnings,
             backend_name=backend,
             spec_version=SPEC_VERSION,
             spec=parsed.model_dump(mode="json", exclude_none=True),
@@ -253,6 +276,54 @@ class CalibrationPipelineService:
             ),
         )
 
+    def _validate_manual_rounds(
+        self,
+        project_id: str,
+        chip_id: str,
+        spec: CalibrationPipelineSpec,
+        problems: list[PipelineProblem],
+    ) -> list[PipelineProblem]:
+        """Check manual rounds as the worker does before any target runs.
+
+        The current qubits of a step are known while no filter has run: they
+        are the spec's targets. Later steps are checked by the worker when they
+        start. Returns warnings for checks that could not run.
+        """
+        manual = [
+            (index, found)
+            for index, step in enumerate(spec.steps)
+            if (found := step_manual_rounds(step)) is not None
+        ]
+        if not manual:
+            return []
+        model = self._chip_round_model(project_id, chip_id)
+        targets = spec.targets
+        initial: list[str] | None
+        if targets.qids:
+            initial = list(targets.qids)
+        elif model.wiring is not None:
+            initial = mux_target_qids(
+                targets.mux_ids or [], targets.exclude_qids, model.wiring, model.mux_mapping
+            )
+        else:
+            initial = None
+        first_filter = next(
+            (
+                index
+                for index, step in enumerate(spec.steps)
+                if isinstance(step, FilterByStatusStep | FilterByMetricStep)
+            ),
+            len(spec.steps),
+        )
+        warnings: list[PipelineProblem] = []
+        for index, (scope, rounds) in manual:
+            candidates = initial if index < first_filter else None
+            result = check_rounds(scope, rounds, model, candidates)
+            path = f"steps[{index}].rounds"
+            problems.extend(_problem(path, issue.describe()) for issue in result.issues)
+            warnings.extend(_problem(path, reason) for reason in result.unchecked)
+        return warnings
+
     @staticmethod
     def _reject_old_version(
         spec: Any,
@@ -260,9 +331,22 @@ class CalibrationPipelineService:
         backend: str,
         problems: list[PipelineProblem],
     ) -> ValidatePipelineResponse:
-        """A version 1 spec is rejected with the same pipeline converted to version 2."""
+        """A version 1 spec is rejected with the same pipeline converted to version 2.
+
+        A version 1 spec whose one-qubit step uses the removed ``mode`` gets no
+        converted spec, only a problem at that step naming its ``execution_mode``
+        replacement, so callers are never told to submit a spec that is invalid.
+        """
         try:
             migration = migrate_pipeline_spec(spec)
+        except LegacyExecutionModeError as exc:
+            problems.extend(_problem(path, message) for path, message in exc.problems)
+            return ValidatePipelineResponse(
+                valid=False,
+                problems=problems,
+                backend_name=backend,
+                spec_version=version if isinstance(version, int) else None,
+            )
         except (ValueError, TypeError, AttributeError) as exc:
             problems.append(
                 _problem(

@@ -85,7 +85,7 @@ def one_qubit(
     # Step 1: coarse calibration through Ramsey, calibrating and checking all four pulse types.
     steps: list[Step] = [
         OneQubitCheck(
-            mode="synchronized",
+            execution_mode="parallel_by_round",
             tasks=[
                 # Apply the starting configuration before the readout search.
                 TaskCall(name="Configure", call_id="configure_initial"),
@@ -174,7 +174,7 @@ def one_qubit(
         # Run coarse -> filter successful qubits -> fine, with one Execution per stage.
         steps += [
             FilterByStatus(),  # Only proceed with successful qubits
-            OneQubitFineTune(mode="synchronized", tasks=fine_tasks),
+            OneQubitFineTune(execution_mode="parallel_by_round", tasks=fine_tasks),
         ]
 
     cal = CalibService(

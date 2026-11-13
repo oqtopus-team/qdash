@@ -30,13 +30,13 @@ def fake_calibration_service(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_coherence_limit_sets_the_1q_gate_duration_on_its_call() -> None:
     result = coherence_limit_module.coherence_limit(
-        username="alice", chip_id="64Q", qids=["0", "1"], mode="serial"
+        username="alice", chip_id="64Q", qids=["0", "1"], execution_mode="sequential"
     )
 
     one_qubit, schedule, two_qubit = result["steps"]
     assert isinstance(one_qubit, CustomOneQubit)
     assert one_qubit.name == "coherence_limit_1q"
-    assert one_qubit.mode == "serial"
+    assert one_qubit.execution_mode == "sequential"
     assert isinstance(schedule, GenerateCRSchedule)
     assert isinstance(two_qubit, CustomTwoQubit)
     assert two_qubit.name == "coherence_limit_2q"
@@ -56,7 +56,7 @@ def test_coherence_limit_prefers_mux_targets_and_requires_targets() -> None:
     assert isinstance(result["targets"], MuxTargets)
     assert result["targets"].mux_ids == [0]
     assert result["targets"].exclude_qids == ["2"]
-    assert result["steps"][0].mode == "scheduled"
+    assert result["steps"][0].execution_mode == "parallel_by_mux"
 
     qubits = coherence_limit_module.coherence_limit(username="alice", chip_id="64Q", qids=["0"])
     assert isinstance(qubits["targets"], QubitTargets)

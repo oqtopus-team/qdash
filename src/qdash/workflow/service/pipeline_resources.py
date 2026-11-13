@@ -84,4 +84,14 @@ def plan_pipeline_resources(
                 scope = merge_resource_scopes(scope, scope_of({"qids": qids}))
         elif type(step) not in target_scoped_steps:
             return ExecutionResourceScope(chip_id, exclusive=True)
+        manual = getattr(step, "rounds", None) if type(step) in target_scoped_steps else None
+        if manual and getattr(step, "execution_mode", None) == "manual":
+            # Manual rounds name their own qubits; reserve them as SetCRSchedule does.
+            qids = [
+                qid
+                for round_ in manual
+                for target in round_
+                for qid in ((target,) if isinstance(target, str) else target)
+            ]
+            scope = merge_resource_scopes(scope, scope_of({"qids": qids}))
     return scope

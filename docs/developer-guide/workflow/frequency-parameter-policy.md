@@ -76,7 +76,7 @@ without reading persisted anharmonicity. Its initial FH drive amplitude is
 `control_amplitude / sqrt(3)`, matching Qubex's default scaling. The task is available for explicit
 task lists but is not part of the `ef_calibration` template.
 
-The `ef_calibration` template keeps all EF tasks in one synchronized `CustomOneQubit` step. It
+The `ef_calibration` template keeps all EF tasks in one `CustomOneQubit` step with `execution_mode="parallel_by_round"`. It
 starts from existing GE control and readout frequencies and readout amplitude, then runs
 `ConfigureEF`, calibrates GE Rabi and HPI, measures the EF transition, and calibrates EF pulses and
 three-state readout. `CheckAdaptiveEFChevron` therefore receives the HPI parameters created earlier in the

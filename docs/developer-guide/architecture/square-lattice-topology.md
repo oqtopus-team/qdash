@@ -98,9 +98,9 @@ visualization:
 - The key is the MUX ID: the `mux` key of the matching `wiring.yaml` row, which keeps the MUX's
   hardware resources. The order in which MUXes are declared carries no meaning.
 - The array index of a member is its local slot: the hardware assignment to the `i`-th port in
-  that row's `ctrl` list. A slot is not a step: the ordering strategy maps it to a synchronized
-  step, and `CheckerboardOrderingStrategy` runs slot 2 of an odd MUX in step 0 (see
-  [MUX Ordering Strategies](./one-qubit-ordering-strategies.md)). QDash never sorts a member
+  that row's `ctrl` list. A slot is not a round: the ordering strategy maps it to a
+  `parallel_by_round` round, and `CheckerboardOrderingStrategy` runs slot 2 of an odd MUX in
+  round 0 (see [MUX Ordering Strategies](./one-qubit-ordering-strategies.md)). QDash never sorts a member
   list. Slot 0 is the representative qubit that runs MUX-level tasks.
 - MUX IDs may be sparse, MUXes may have different sizes, and members need not be consecutive.
 - A qubit in `qubits` that no MUX lists is **standalone** (not multiplexed). `muxes: {}` declares a
@@ -151,8 +151,9 @@ execution lock claims the whole chip. `scripts/generate_topology.py` writes `mux
 qubit shares. QDash schedules standalone qubits conservatively instead of inventing parallelism:
 
 - The 1-qubit schedules run standalone qubits after every MUX stage, one at a time (a
-  `STANDALONE` stage or one step per qubit). A run of only standalone qubits does not read the
+  `STANDALONE` stage or one round per qubit). A run of only standalone qubits does not read the
   wiring.
+- Manual rounds must list a standalone qubit, or a pair with one, alone in its round.
 - The CR scheduler keeps pairs with a standalone qubit and gives each such pair its own group.
   A pair of two standalone qubits is never an intra-MUX pair.
 - The execution lock reserves the whole chip for any target that includes a standalone qubit.
