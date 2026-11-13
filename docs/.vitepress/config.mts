@@ -121,6 +121,10 @@ export default withMermaid(
               items: [
                 { text: "Running Calibrations", link: "/user-guide/running-calibrations" },
                 { text: "Creating Workflows", link: "/user-guide/creating-workflows" },
+                {
+                  text: "Manual Execution Rounds",
+                  link: "/user-guide/manual-execution-rounds",
+                },
                 { text: "Task Parameters", link: "/user-guide/task-parameters" },
                 {
                   text: "Cryostats and Cool-downs",

@@ -5,7 +5,6 @@ import pytest
 from qdash.workflow.engine.scheduler.one_qubit_plugins import (
     CheckerboardOrderingStrategy,
     DefaultOrderingStrategy,
-    DefaultSynchronizedStrategy,
     OrderingContext,
 )
 
@@ -274,22 +273,22 @@ class TestOrderingContext:
         assert context.qid_to_mux["4"] == 1
 
 
-class TestCheckerboardSynchronizedSteps:
-    """Tests for CheckerboardOrderingStrategy.generate_synchronized_steps."""
+class TestCheckerboardRounds:
+    """Tests for CheckerboardOrderingStrategy.generate_rounds."""
 
-    def test_synchronized_steps_full_chip(self, context_64q):
-        """Test synchronized steps for full 64-qubit chip."""
+    def test_rounds_full_chip(self, context_64q):
+        """Test rounds for full 64-qubit chip."""
         strategy = CheckerboardOrderingStrategy()
 
         mux_ids = list(range(16))
         qids = [str(i) for i in range(64)]
 
-        steps = strategy.generate_synchronized_steps(mux_ids, qids, context_64q)
+        rounds = strategy.generate_rounds(mux_ids, qids, context_64q)
 
-        assert len(steps) == 4
+        assert len(rounds) == 4
 
         # Expected patterns
-        expected_steps = [
+        expected_rounds = [
             [
                 "0",
                 "6",
@@ -364,106 +363,80 @@ class TestCheckerboardSynchronizedSteps:
             ],
         ]
 
-        for i, step in enumerate(steps):
-            assert step == expected_steps[i], f"Step {i} mismatch"
+        for i, round_ in enumerate(rounds):
+            assert round_ == expected_rounds[i], f"Round {i} mismatch"
 
-    def test_synchronized_steps_subset_muxes(self, context_64q):
-        """Test synchronized steps for subset of MUXes."""
+    def test_rounds_subset_muxes(self, context_64q):
+        """Test rounds for subset of MUXes."""
         strategy = CheckerboardOrderingStrategy()
 
         # Only MUXes 0 and 1
         mux_ids = [0, 1]
         qids = [str(i) for i in range(8)]
 
-        steps = strategy.generate_synchronized_steps(mux_ids, qids, context_64q)
+        rounds = strategy.generate_rounds(mux_ids, qids, context_64q)
 
-        assert len(steps) == 4
+        assert len(rounds) == 4
 
         # MUX 0 (even): [0, 1, 2, 3]
         # MUX 1 (odd):  [6, 7, 4, 5]
-        expected_steps = [
-            ["0", "6"],  # Step 0
-            ["1", "7"],  # Step 1
-            ["2", "4"],  # Step 2
-            ["3", "5"],  # Step 3
+        expected_rounds = [
+            ["0", "6"],  # Round 0
+            ["1", "7"],  # Round 1
+            ["2", "4"],  # Round 2
+            ["3", "5"],  # Round 3
         ]
 
-        for i, step in enumerate(steps):
-            assert step == expected_steps[i], f"Step {i} mismatch"
+        for i, round_ in enumerate(rounds):
+            assert round_ == expected_rounds[i], f"Round {i} mismatch"
 
-    def test_synchronized_steps_partial_qids(self, context_64q):
-        """Test synchronized steps with partial qubit set."""
+    def test_rounds_partial_qids(self, context_64q):
+        """Test rounds with partial qubit set."""
         strategy = CheckerboardOrderingStrategy()
 
         mux_ids = [0, 1]
         # Only include some qubits
         qids = ["0", "1", "4", "5"]
 
-        steps = strategy.generate_synchronized_steps(mux_ids, qids, context_64q)
+        rounds = strategy.generate_rounds(mux_ids, qids, context_64q)
 
-        # Should filter out empty steps
-        assert len(steps) <= 4
+        # Should filter out empty rounds
+        assert len(rounds) <= 4
 
         # Verify included qubits
         all_qids = []
-        for step in steps:
-            all_qids.extend(step)
+        for round_ in rounds:
+            all_qids.extend(round_)
         assert set(all_qids) == {"0", "1", "4", "5"}
 
-    def test_synchronized_steps_each_step_has_16_qubits(self, context_64q):
-        """Test that each step has 16 qubits (one per MUX) for full chip."""
+    def test_rounds_each_round_has_16_qubits(self, context_64q):
+        """Test that each round has 16 qubits (one per MUX) for full chip."""
         strategy = CheckerboardOrderingStrategy()
 
         mux_ids = list(range(16))
         qids = [str(i) for i in range(64)]
 
-        steps = strategy.generate_synchronized_steps(mux_ids, qids, context_64q)
+        rounds = strategy.generate_rounds(mux_ids, qids, context_64q)
 
-        for i, step in enumerate(steps):
-            assert len(step) == 16, f"Step {i} should have 16 qubits"
+        for i, round_ in enumerate(rounds):
+            assert len(round_) == 16, f"Round {i} should have 16 qubits"
 
 
-class TestDefaultSynchronizedStrategy:
-    """Tests for DefaultSynchronizedStrategy."""
+class TestDefaultOrderingRounds:
+    """Tests for DefaultOrderingStrategy.generate_rounds."""
 
-    def test_natural_order(self, context_64q):
-        """Test natural order for individual MUX."""
-        strategy = DefaultSynchronizedStrategy()
+    def test_rounds_natural_order(self, context_64q):
+        """Round N holds offset N of every MUX."""
+        strategy = DefaultOrderingStrategy()
 
-        result = strategy.order_qids_in_mux(0, ["0", "1", "2", "3"], context_64q)
-        assert result == ["0", "1", "2", "3"]
+        rounds = strategy.generate_rounds([0, 1], [str(i) for i in range(8)], context_64q)
 
-    def test_synchronized_steps_natural_order(self, context_64q):
-        """Test synchronized steps use natural ordering."""
-        strategy = DefaultSynchronizedStrategy()
+        assert rounds == [["0", "4"], ["1", "5"], ["2", "6"], ["3", "7"]]
 
-        mux_ids = [0, 1]
-        qids = [str(i) for i in range(8)]
+    def test_rounds_skip_missing_offsets(self, context_64q):
+        """Empty rounds are dropped when a qubit offset is absent everywhere."""
+        strategy = DefaultOrderingStrategy()
 
-        steps = strategy.generate_synchronized_steps(mux_ids, qids, context_64q)
+        rounds = strategy.generate_rounds([0, 1], ["0", "1", "4", "5"], context_64q)
 
-        assert len(steps) == 4
-
-        # Natural order: MUX 0 -> [0,1,2,3], MUX 1 -> [4,5,6,7]
-        expected_steps = [
-            ["0", "4"],  # offset 0 from each MUX
-            ["1", "5"],  # offset 1
-            ["2", "6"],  # offset 2
-            ["3", "7"],  # offset 3
-        ]
-
-        for i, step in enumerate(steps):
-            assert step == expected_steps[i], f"Step {i} mismatch"
-
-    def test_metadata(self):
-        """Test metadata returns expected fields."""
-        strategy = DefaultSynchronizedStrategy()
-        metadata = strategy.get_metadata()
-
-        assert metadata["strategy_name"] == "default_synchronized"
-        assert "description" in metadata
-
-    def test_repr(self):
-        """Test string representation."""
-        strategy = DefaultSynchronizedStrategy()
-        assert "DefaultSynchronizedStrategy" in repr(strategy)
+        assert rounds == [["0", "4"], ["1", "5"]]

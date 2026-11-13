@@ -102,6 +102,68 @@ creates only the chip record.
 The new files exist only in the local tree until you open **Config** and select **Create PR**.
 Edit the copied wiring and boxes there when the new chip does not use every MUX of the source.
 
+## Check Parallel Execution on QuEL-3
+
+The `quel3` template provides a starting configuration for QuEL-3 hardware, but QDash's
+parallel scheduling does not know which QuEL-3 ports can run at the same time. QDash cannot
+determine from these files how many qubits or pairs your hardware can measure at once; each
+deployment must verify its boxes, ports, shared resources, and backend capability before running
+steps in parallel.
+
+These are the template's commented examples, uncommented. They show the shape of each file, not
+a working configuration:
+
+```yaml
+# system.yaml
+<chip_id>:
+  chip_id: <chip_id>
+  backend: quel3
+  quel3:
+    endpoint: "<QuEL-3-server-host>"
+    port: 50051
+    transport: grpc
+```
+
+```yaml
+# box.yaml: one entry per box, keyed by the box ID registered on your QuEL-3 server
+quel3-02-a01:
+  name: "<box-name>"
+  type: "quel3"
+```
+
+```yaml
+# wiring.yaml: one row per MUX; ports as <box ID>:<port>, matching the physical wiring
+<chip_id>:
+  - mux: 0
+    ctrl: ["quel3-02-a01:4", "quel3-02-a01:2", "quel3-02-a01:11", "quel3-02-a01:9"]
+    read_out: "quel3-02-a01:1"
+    read_in: "quel3-02-a01:0"
+```
+
+QDash assigns qubits `4N` to `4N + 3` to MUX `N`, so `ctrl` lists the control ports of those
+four qubits in order. With this wiring, QDash checks the following:
+
+| Part of QDash | What it separates on QuEL-3 | What it does not check |
+| --- | --- | --- |
+| One-qubit `parallel_by_mux` and `parallel_by_round` | Qubits in the same MUX run one after another | Shared QuEL-3 resources: `<box ID>:<port>` IDs give no Box A or Box B stage, so all MUXes share one stage and can run in parallel, even on the same box |
+| Two-qubit CR schedule | MUXes whose `ctrl` ports are on the same box, or whose `read_out` ports are | A control port against a readout port, `read_in` and pump ports, and finer port independence |
+| Hardware reservation | A second execution that needs MUXes or modules a running execution holds | Whether the groups inside one execution can run together |
+
+`sequential` runs one qubit at a time. The experimental `simultaneous_spectroscopy` mode uses
+a separate batch schedule and does not apply the A/B conflict rules; its task and backend must
+support the selected simultaneous measurement.
+
+The `quel1` template writes wiring in the same `<box ID>:<port>` form, such as `BOX_A:4`, so its
+one-qubit steps get no Box A or Box B stages either; the `type` in `box.yaml` does not change
+this. The stages apply only to wiring whose module names end in `A` or `B`, such as `R21B-5`.
+
+Until your deployment has verified which MUXes can run together, run one-qubit steps with
+`execution_mode="sequential"` or select MUXes that you have verified, and run two-qubit steps
+with a `max_parallel_ops` your hardware supports. Renaming QuEL-3 modules to end in `A` or `B`
+does not make the one-qubit stages match QuEL-3 hardware. How the schedulers classify wiring:
+[1-Qubit Calibration Scheduler](../../developer-guide/architecture/one-qubit-scheduler.md#wiring-model)
+and [CR Gate Scheduler](../../developer-guide/architecture/cr-scheduler.md#conflict-graph-and-groups).
+
 ## Use a Configuration Repository
 
 Set the repository values when the Qubex configuration tree is managed in Git:

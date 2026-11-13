@@ -30,8 +30,10 @@ import type {
   Detail,
   ExecuteFlowRequest,
   ExecuteFlowResponse,
+  FlowExecutionPlanResponse,
   FlowTemplate,
   FlowTemplateWithCode,
+  GetFlowExecutionPlanParams,
   GetFlowResponse,
   HTTPValidationError,
   ListAllFlowSchedulesParams,
@@ -986,6 +988,111 @@ export const useDeleteFlow = <TError = HTTPValidationError,
       return useMutation(getDeleteFlowMutationOptions(options), queryClient);
     }
     /**
+ * Read the saved source's steps and check manual rounds, without executing anything.
+ *
+ * The source is parsed, never imported or run. Manual rounds are checked against
+ * the chip's wiring and directed couplings with the checks the worker repeats
+ * before any target measures. Automatic groups are described, not computed.
+ * @summary Preview a flow's execution plan
+ */
+export const getFlowExecutionPlan = (
+    name: string,
+    params?: GetFlowExecutionPlanParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<FlowExecutionPlanResponse>(
+      {url: `/flows/${name}/execution-plan`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetFlowExecutionPlanQueryKey = (name: string,
+    params?: GetFlowExecutionPlanParams,) => {
+    return [
+    `/flows/${name}/execution-plan`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetFlowExecutionPlanQueryOptions = <TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(name: string,
+    params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFlowExecutionPlanQueryKey(name,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFlowExecutionPlan>>> = ({ signal }) => getFlowExecutionPlan(name,params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: name !== null && name !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetFlowExecutionPlanQueryResult = NonNullable<Awaited<ReturnType<typeof getFlowExecutionPlan>>>
+export type GetFlowExecutionPlanQueryError = Detail | HTTPValidationError
+
+
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+ name: string,
+    params: undefined |  GetFlowExecutionPlanParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFlowExecutionPlan>>,
+          TError,
+          Awaited<ReturnType<typeof getFlowExecutionPlan>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+ name: string,
+    params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getFlowExecutionPlan>>,
+          TError,
+          Awaited<ReturnType<typeof getFlowExecutionPlan>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+ name: string,
+    params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Preview a flow's execution plan
+ */
+
+export function useGetFlowExecutionPlan<TData = Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError = Detail | HTTPValidationError>(
+ name: string,
+    params?: GetFlowExecutionPlanParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowExecutionPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetFlowExecutionPlanQueryOptions(name,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * Execute a Flow via Prefect deployment.
  * @summary Execute a flow
  */

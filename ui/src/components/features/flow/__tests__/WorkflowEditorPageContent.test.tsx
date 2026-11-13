@@ -10,6 +10,7 @@ import {
   storedJourney,
 } from "@/components/features/first-calibration/__tests__/journeyTestUtils";
 import { WorkflowEditorPageContent } from "@/components/features/flow/WorkflowEditorPageContent";
+import { saveFlow } from "@/client/flow/flow";
 
 const mocks = vi.hoisted(() => ({
   executeFlow: vi.fn(),
@@ -264,5 +265,46 @@ describe("WorkflowEditorPageContent run callbacks", () => {
     expect(storedJourney("project-1").executionId).toBeNull();
     expect(storedJourney("project-2").executionId).toBeNull();
     expect(mocks.toastSuccess).not.toHaveBeenCalled();
+  });
+});
+
+describe("WorkflowEditorPageContent execution help", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    window.localStorage.clear();
+  });
+
+  it("opens and closes the help over the editor without saving or running the flow", async () => {
+    renderEditor();
+    const editor = await screen.findByTestId("editor");
+    // The header button and the mobile action menu both open the same dialog.
+    const triggers = screen.getAllByRole("button", { name: "Execution help" });
+    expect(triggers).toHaveLength(2);
+
+    triggers[0].focus();
+    fireEvent.click(triggers[0]);
+    const dialog = screen.getByRole("dialog", { name: "Execution help" });
+    fireEvent.click(within(dialog).getByRole("tab", { name: "2Q CR groups" }));
+    expect(within(dialog).getByRole("tabpanel")).toHaveTextContent(/max_parallel_ops/);
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(triggers[0]).toHaveFocus());
+    // The same editor instance stays mounted, so an unsaved draft survives.
+    expect(screen.getByTestId("editor")).toBe(editor);
+    expect(saveFlow).not.toHaveBeenCalled();
+    expect(mocks.executeFlow).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it("opens from the mobile action menu", async () => {
+    renderEditor();
+    await screen.findByTestId("editor");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Execution help" })[1]);
+
+    expect(screen.getByRole("dialog", { name: "Execution help" })).toBeInTheDocument();
   });
 });

@@ -6,7 +6,7 @@ These are internal implementation details and should not be imported directly.
 Tasks:
     calibrate_mux_qubits: Execute tasks for qubits in a single MUX sequentially
     calibrate_single_qubit: Execute tasks for a single qubit
-    calibrate_step_qubits_parallel: Execute tasks for synchronized step in parallel
+    calibrate_round_qubits_parallel: Execute the qubits of a parallel_by_round round in parallel
     execute_coupling_pair: Execute tasks for a single coupling pair
     calibrate_parallel_group: Execute coupling tasks for a parallel group
 
@@ -330,15 +330,15 @@ def calibrate_single_qubit(
 
 
 @task(log_prints=True)
-def calibrate_step_qubits_parallel(
+def calibrate_round_qubits_parallel(
     parallel_qids: list[str],
     plan: StepCalls,
     worker: WorkerSpec | None = None,
 ) -> dict[str, Any]:
-    """Execute tasks for all qubits in a synchronized step in parallel.
+    """Execute the step's calls for every qubit of one round in parallel.
 
-    All qubits in parallel_qids are from different MUXes and can be
-    calibrated simultaneously in a synchronized step.
+    The qubits of a ``parallel_by_round`` round come from different MUXes;
+    this returns after every qubit has run its full call list.
 
     When ``worker`` is provided, each qubit gets its own borrowed worker
     session with an independent Experiment instance, avoiding shared state

@@ -26,8 +26,29 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
+from qdash.common.manual_rounds import (
+    PairRounds,
+    QubitRounds,
+    pair_rounds_for_mode,
+    qubit_rounds_for_mode,
+)
+
+# Runtime imports: Pydantic validates execution_mode against these Literals,
+# and the migration names the accepted modes.
+from qdash.datamodel.one_qubit_execution_mode import (
+    ONE_QUBIT_STEP_EXECUTION_MODES,
+    OneQubitStepExecutionMode,
+)
 from qdash.datamodel.task_call import (
     CALL_ID_PATTERN,
     TaskCall,
@@ -37,6 +58,7 @@ from qdash.datamodel.task_call import (
     plan_digest,
 )
 from qdash.datamodel.task_settings import task_parameters_from_run_parameters
+from qdash.datamodel.two_qubit_execution_mode import TwoQubitExecutionMode  # noqa: TC001
 
 SPEC_VERSION = 2
 
@@ -159,14 +181,6 @@ def calls_with_configure(
     return (implicit, *own)
 
 
-ONE_QUBIT_MODES: tuple[str, ...] = (
-    "synchronized",
-    "scheduled",
-    "simultaneous_spectroscopy",
-    "serial",
-)
-OneQubitMode = Literal["synchronized", "scheduled", "simultaneous_spectroscopy", "serial"]
-
 # ---------------------------------------------------------------------------
 # Targets
 # ---------------------------------------------------------------------------
@@ -221,6 +235,51 @@ def _calls_or_none(value: Any) -> Any:
 
 def _calls(value: Any) -> Any:
     return list(normalize_calls(value))
+
+
+_EXECUTION_MODE_DESCRIPTION = (
+    "Where and when the step's targets run; every target runs the step's full task list. "
+    "parallel_by_round: the scheduler selects rounds of qubits from different MUXes and "
+    "the next round starts after every qubit of the current round finishes. "
+    "parallel_by_mux: MUXes run in parallel and the qubits of one MUX run one after "
+    "another, each MUX advancing independently. sequential: one MUX and one qubit at a time. "
+    "simultaneous_spectroscopy: experimental batch spectroscopy. "
+    "manual: run the rounds listed in `rounds` exactly as written."
+)
+_QUBIT_ROUNDS_DESCRIPTION = (
+    "Required with execution_mode manual and rejected otherwise: the rounds in run order, "
+    'each a list of qubit IDs, e.g. [["0", "8"], ["1", "9"]]. The qubits of a round run in '
+    "parallel and the next round starts after all of them finish. A qubit appears in one "
+    "round only, the qubits of a round use different MUXes, and the rounds must name exactly "
+    "the step's current qubits; nothing is regrouped, reordered or dropped."
+)
+_PAIR_ROUNDS_DESCRIPTION = (
+    "Required with execution_mode manual and rejected otherwise: the rounds in run order, "
+    'each a list of directed [control, target] pairs, e.g. [[["0", "1"], ["4", "5"]], '
+    '[["8", "9"]]]. Each pair must be a chip coupling in that direction, the pairs of a round '
+    "may not share a qubit, a MUX or a modeled readout/control module, and both qubits of "
+    "every pair must be current candidates. Rounds are never regrouped, reversed or split."
+)
+_TWO_QUBIT_MODE_DESCRIPTION = (
+    "automatic (default): run an earlier GenerateCRSchedule/SetCRSchedule schedule or generate "
+    "one from the candidate qubits. manual: run the pairs listed in `rounds` exactly as written."
+)
+_MAX_PARALLEL_OPS_DESCRIPTION = (
+    "Pairs per automatically generated CR group. Rejected with execution_mode manual."
+)
+
+QubitIdPair = Annotated[list[str], Field(min_length=2, max_length=2)]
+
+
+def _check_qubit_rounds(step: Any) -> Any:
+    qubit_rounds_for_mode(step.execution_mode, step.rounds, step=step_name(step))
+    return step
+
+
+def _check_pair_rounds(step: Any) -> Any:
+    explicit_cap = step.max_parallel_ops if "max_parallel_ops" in step.model_fields_set else None
+    pair_rounds_for_mode(step.execution_mode, step.rounds, explicit_cap, step=step_name(step))
+    return step
 
 
 def _check_configure_call(step: Any) -> Any:
@@ -294,7 +353,13 @@ class OneQubitCheckStep(_StepBase):
     step_id: str | None = Field(
         default=None, pattern=STEP_ID_PATTERN, description=_STEP_ID_DESCRIPTION
     )
-    mode: OneQubitMode = "synchronized"
+    execution_mode: OneQubitStepExecutionMode = Field(
+        default="parallel_by_round", description=_EXECUTION_MODE_DESCRIPTION
+    )
+    # Omitted from dumps when unset so specs without it keep their plan digest.
+    rounds: list[list[str]] | None = Field(
+        default=None, exclude_if=lambda value: value is None, description=_QUBIT_ROUNDS_DESCRIPTION
+    )
     tasks: list[TaskCall] | None = Field(
         default=None, description=_TASKS_DESCRIPTION + " Defaults to CHECK_1Q_TASKS."
     )
@@ -302,6 +367,7 @@ class OneQubitCheckStep(_StepBase):
 
     _normalize_tasks = field_validator("tasks", mode="before")(_calls_or_none)
     _check_configure = model_validator(mode="after")(_check_configure_call)
+    _check_rounds = model_validator(mode="after")(_check_qubit_rounds)
 
 
 class OneQubitFineTuneStep(_StepBase):
@@ -311,7 +377,13 @@ class OneQubitFineTuneStep(_StepBase):
     step_id: str | None = Field(
         default=None, pattern=STEP_ID_PATTERN, description=_STEP_ID_DESCRIPTION
     )
-    mode: OneQubitMode = "synchronized"
+    execution_mode: OneQubitStepExecutionMode = Field(
+        default="parallel_by_round", description=_EXECUTION_MODE_DESCRIPTION
+    )
+    # Omitted from dumps when unset so specs without it keep their plan digest.
+    rounds: list[list[str]] | None = Field(
+        default=None, exclude_if=lambda value: value is None, description=_QUBIT_ROUNDS_DESCRIPTION
+    )
     tasks: list[TaskCall] | None = Field(
         default=None,
         description=_TASKS_DESCRIPTION + " Defaults to FULL_1Q_TASKS_AFTER_CHECK.",
@@ -320,6 +392,7 @@ class OneQubitFineTuneStep(_StepBase):
 
     _normalize_tasks = field_validator("tasks", mode="before")(_calls_or_none)
     _check_configure = model_validator(mode="after")(_check_configure_call)
+    _check_rounds = model_validator(mode="after")(_check_qubit_rounds)
 
 
 class CustomOneQubitStep(_StepBase):
@@ -332,10 +405,17 @@ class CustomOneQubitStep(_StepBase):
         description="Name and step_id of this step; unique within the pipeline.",
     )
     tasks: list[TaskCall] = Field(min_length=1, description=_TASKS_DESCRIPTION)
-    mode: OneQubitMode = "synchronized"
+    execution_mode: OneQubitStepExecutionMode = Field(
+        default="parallel_by_round", description=_EXECUTION_MODE_DESCRIPTION
+    )
+    # Omitted from dumps when unset so specs without it keep their plan digest.
+    rounds: list[list[str]] | None = Field(
+        default=None, exclude_if=lambda value: value is None, description=_QUBIT_ROUNDS_DESCRIPTION
+    )
     continue_on_failure: bool = Field(default=False, description=_CONTINUE_DESCRIPTION)
 
     _normalize_tasks = field_validator("tasks", mode="before")(_calls)
+    _check_rounds = model_validator(mode="after")(_check_qubit_rounds)
 
 
 class _FilterReference(_StepBase):
@@ -385,7 +465,19 @@ class GenerateCRScheduleStep(_StepBase):
     )
 
 
-class TwoQubitCalibrationStep(_StepBase):
+class _TwoQubitModeStep(_StepBase):
+    """Two-qubit steps with an execution_mode; adds no fields."""
+
+    @model_serializer(mode="wrap")
+    def _drop_manual_cap(self, handler: SerializerFunctionWrapHandler) -> Any:
+        """Leave max_parallel_ops out of a manual step's dump so the dump validates again."""
+        data = handler(self)
+        if isinstance(data, dict) and getattr(self, "execution_mode", None) == "manual":
+            data.pop("max_parallel_ops", None)
+        return data
+
+
+class TwoQubitCalibrationStep(_TwoQubitModeStep):
     """Full coupling calibration on the scheduled pairs."""
 
     type: Literal["TwoQubitCalibration"]
@@ -395,12 +487,24 @@ class TwoQubitCalibrationStep(_StepBase):
     tasks: list[TaskCall] | None = Field(
         default=None, description=_TASKS_DESCRIPTION + " Defaults to FULL_2Q_TASKS."
     )
-    max_parallel_ops: int = Field(default=10, ge=1, le=100)
+    # Omitted from dumps at their defaults so existing specs keep their plan digest.
+    execution_mode: TwoQubitExecutionMode = Field(
+        default="automatic",
+        exclude_if=lambda value: value == "automatic",
+        description=_TWO_QUBIT_MODE_DESCRIPTION,
+    )
+    rounds: list[list[QubitIdPair]] | None = Field(
+        default=None, exclude_if=lambda value: value is None, description=_PAIR_ROUNDS_DESCRIPTION
+    )
+    max_parallel_ops: int = Field(
+        default=10, ge=1, le=100, description=_MAX_PARALLEL_OPS_DESCRIPTION
+    )
 
     _normalize_tasks = field_validator("tasks", mode="before")(_calls_or_none)
+    _check_rounds = model_validator(mode="after")(_check_pair_rounds)
 
 
-class CustomTwoQubitStep(_StepBase):
+class CustomTwoQubitStep(_TwoQubitModeStep):
     """Any sequence of coupling task calls on the candidate couplings."""
 
     type: Literal["CustomTwoQubit"]
@@ -410,10 +514,22 @@ class CustomTwoQubitStep(_StepBase):
         description="Name and step_id of this step; unique within the pipeline.",
     )
     tasks: list[TaskCall] = Field(min_length=1, description=_TASKS_DESCRIPTION)
-    max_parallel_ops: int = Field(default=10, ge=1, le=100)
+    # Omitted from dumps at their defaults so existing specs keep their plan digest.
+    execution_mode: TwoQubitExecutionMode = Field(
+        default="automatic",
+        exclude_if=lambda value: value == "automatic",
+        description=_TWO_QUBIT_MODE_DESCRIPTION,
+    )
+    rounds: list[list[QubitIdPair]] | None = Field(
+        default=None, exclude_if=lambda value: value is None, description=_PAIR_ROUNDS_DESCRIPTION
+    )
+    max_parallel_ops: int = Field(
+        default=10, ge=1, le=100, description=_MAX_PARALLEL_OPS_DESCRIPTION
+    )
     continue_on_failure: bool = Field(default=False, description=_CONTINUE_DESCRIPTION)
 
     _normalize_tasks = field_validator("tasks", mode="before")(_calls)
+    _check_rounds = model_validator(mode="after")(_check_pair_rounds)
 
 
 PipelineStep = Annotated[
@@ -613,6 +729,22 @@ def step_provides(step: PipelineStep) -> frozenset[str]:
     if own_id:
         provided.add(own_id)
     return frozenset(provided)
+
+
+def step_manual_rounds(
+    step: PipelineStep,
+) -> tuple[Literal["qubit"], QubitRounds] | tuple[Literal["coupling"], PairRounds] | None:
+    """The parsed rounds of a manual step with its task scope; None for other steps."""
+    if getattr(step, "execution_mode", None) != "manual":
+        return None
+    name = step_name(step)
+    if isinstance(step, CustomTwoQubitStep | TwoQubitCalibrationStep):
+        pairs = pair_rounds_for_mode("manual", step.rounds, None, step=name)
+        assert pairs is not None
+        return "coupling", pairs
+    qubits = qubit_rounds_for_mode("manual", getattr(step, "rounds", None), step=name)
+    assert qubits is not None
+    return "qubit", qubits
 
 
 def step_continue_on_failure(step: PipelineStep) -> bool:
@@ -951,6 +1083,59 @@ def _migrate_step_ids(steps: list[Any], notes: list[str]) -> None:
         )
 
 
+# One-qubit steps of a version 1 spec carried ``mode``. Version 2 replaced it with
+# ``execution_mode`` and renamed the values; the old names are listed here only
+# to name the replacement in the rejection message, never to convert a spec.
+_V1_MODE_STEPS = frozenset({"OneQubitCheck", "OneQubitFineTune", "CustomOneQubit"})
+_FORMER_ONE_QUBIT_MODE_NAMES: dict[str, str] = {
+    "synchronized": "parallel_by_round",
+    "scheduled": "parallel_by_mux",
+    "serial": "sequential",
+}
+
+
+class LegacyExecutionModeError(ValueError):
+    """A version 1 spec uses the removed one-qubit ``mode`` or a former mode name.
+
+    The migration does not convert these: the step owner chooses the
+    ``execution_mode``. ``problems`` holds one ``(path, message)`` per step.
+    """
+
+    def __init__(self, problems: list[tuple[str, str]]) -> None:
+        self.problems = problems
+        super().__init__("; ".join(f"{path}: {message}" for path, message in problems))
+
+
+def _legacy_execution_mode_problems(steps: Sequence[Any]) -> list[tuple[str, str]]:
+    problems: list[tuple[str, str]] = []
+    for index, step in enumerate(steps):
+        if not isinstance(step, Mapping) or step.get("type") not in _V1_MODE_STEPS:
+            continue
+        where = f"steps[{index}]"
+        for key in ("mode", "execution_mode"):
+            if key not in step:
+                continue
+            value = step[key]
+            former = value if isinstance(value, str) else None
+            if key == "execution_mode" and former not in _FORMER_ONE_QUBIT_MODE_NAMES:
+                continue
+            if key == "mode":
+                removed = f"{where}.mode={value!r} uses the removed mode setting"
+            else:
+                removed = f"{where}.execution_mode={value!r} uses a removed mode name"
+            current = _FORMER_ONE_QUBIT_MODE_NAMES.get(former, former) if former else None
+            replacement = (
+                f"set {where}.execution_mode={current!r} instead"
+                if current in ONE_QUBIT_STEP_EXECUTION_MODES
+                else f"set {where}.execution_mode to one of "
+                + ", ".join(ONE_QUBIT_STEP_EXECUTION_MODES)
+            )
+            problems.append(
+                (where, f"{removed}, which is not converted; {replacement} and resubmit")
+            )
+    return problems
+
+
 def migrate_pipeline_spec(spec: Mapping[str, Any]) -> SpecMigration:
     """Convert a pipeline spec to version 2 without changing what it runs.
 
@@ -964,6 +1149,11 @@ def migrate_pipeline_spec(spec: Mapping[str, Any]) -> SpecMigration:
     version 1 overrides applied to every occurrence of the task. A version 2 spec
     is returned unchanged. The function is pure and deterministic; it does not
     validate the result.
+
+    A version 1 one-qubit step with ``mode``, or with ``execution_mode`` set to
+    a former name (``synchronized``, ``scheduled``, ``serial``), raises
+    :class:`LegacyExecutionModeError` naming the step and its
+    ``execution_mode`` replacement: the conversion does not choose a mode.
     """
     version = spec.get("spec_version", 1)
     if version == SPEC_VERSION:
@@ -976,6 +1166,9 @@ def migrate_pipeline_spec(spec: Mapping[str, Any]) -> SpecMigration:
     notes: list[str] = []
     steps = converted.get("steps")
     if isinstance(steps, list):
+        legacy_modes = _legacy_execution_mode_problems(steps)
+        if legacy_modes:
+            raise LegacyExecutionModeError(legacy_modes)
         for index, step in enumerate(steps):
             if not isinstance(step, dict) or step.get("type") not in _V1_TASK_STEPS:
                 continue

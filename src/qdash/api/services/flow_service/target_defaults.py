@@ -33,12 +33,19 @@ def supported_target_modes(code: str, function_name: str) -> list[TargetMode]:
     receive ``CouplingTargets`` and a step list with ``SetCRSchedule``, which the
     runtime replaces with the selected pairs. Only the entrypoint is inspected;
     anything the check cannot follow statically keeps the MUX and qubit
-    overrides instead (see ``_runs_scheduled_pairs``). User code never executes.
+    overrides instead (see ``_runs_scheduled_pairs``). A source that writes
+    ``execution_mode="manual"`` on a step accepts no override. User code never
+    executes.
     """
+    from qdash.api.services.flow_service.execution_plan import uses_manual_rounds
+
     try:
         tree = ast.parse(code)
     except SyntaxError:
         return list(_QUBIT_MODES)
+    if uses_manual_rounds(code):
+        # Manual rounds name their own targets; no override may replace them.
+        return []
     function = _function(tree, function_name)
     if function is not None and _runs_scheduled_pairs(tree, function):
         return ["coupling_pairs"]
@@ -317,6 +324,9 @@ class _Resolver:
     invalidates the affected names so callers report "unknown" instead of a guess.
     """
 
+    # Constructors known not to mutate their arguments; names passed to them stay bound.
+    pure_calls: frozenset[str] = frozenset(_OVERRIDABLE_TARGETS)
+
     def __init__(self) -> None:
         self.bindings: dict[str, Any] = {}
         # Names that may share a mutable object; invalidating one invalidates all.
@@ -339,9 +349,13 @@ class _Resolver:
             if current in seen:
                 continue
             seen.add(current)
-            self.bindings.pop(current, None)
-            self.target_names.discard(current)
+            self._forget(current)
             pending.extend(self.links.get(current, ()))
+
+    def _forget(self, name: str) -> None:
+        """Drop everything known about one name."""
+        self.bindings.pop(name, None)
+        self.target_names.discard(name)
 
     def link(self, name: str, value: ast.expr) -> None:
         for node in ast.walk(value):
@@ -366,8 +380,12 @@ class _Resolver:
         except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError) as exc:
             raise _Unknown from exc
 
-    def assign(self, name: str, value: ast.expr | None) -> None:
+    def rebind(self, name: str) -> None:
+        """Forget a name before a plain assignment gives it a new value."""
         self.invalidate(name)
+
+    def assign(self, name: str, value: ast.expr | None) -> None:
+        self.rebind(name)
         if value is None:
             return
         self.link(name, value)
@@ -445,7 +463,7 @@ class _Resolver:
                     root = _root_name(node.func.value)
                     if root is not None:
                         self.invalidate(root)
-                if _call_name(node) not in _OVERRIDABLE_TARGETS and not _is_service(node):
+                if _call_name(node) not in self.pure_calls and not _is_service(node):
                     for argument in [*node.args, *(kw.value for kw in node.keywords)]:
                         root = _root_name(argument)
                         if root is not None:
@@ -474,11 +492,13 @@ def resolve_target_defaults(
         return None
 
 
-def _resolve(
+def _prepare(
     tree: ast.Module,
     function: ast.FunctionDef | ast.AsyncFunctionDef,
     parameters: dict[str, Any],
-) -> FlowTargetOverride | None:
+    resolver: _Resolver,
+) -> None:
+    """Bind module literals, then the entrypoint's defaults and the known parameters."""
     # Targets built in other module-level helpers are invisible from the entrypoint.
     for node in tree.body:
         if node is function:
@@ -489,7 +509,6 @@ def _resolve(
             ):
                 raise _Unknown
 
-    resolver = _Resolver()
     for statement in tree.body:
         if statement is function:
             # The entrypoint body is resolved statement by statement below.
@@ -517,6 +536,15 @@ def _resolve(
     for arg in declared:
         if arg.arg in parameters:
             resolver.bindings[arg.arg] = parameters[arg.arg]
+
+
+def _resolve(
+    tree: ast.Module,
+    function: ast.FunctionDef | ast.AsyncFunctionDef,
+    parameters: dict[str, Any],
+) -> FlowTargetOverride | None:
+    resolver = _Resolver()
+    _prepare(tree, function, parameters, resolver)
 
     candidates: list[FlowTargetOverride] = []
 

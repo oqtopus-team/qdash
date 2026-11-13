@@ -91,7 +91,7 @@ def _steps() -> list[Any]:
     return [
         CustomOneQubit(
             step_name="prepare",
-            mode="serial",
+            execution_mode="sequential",
             tasks=[
                 TaskCall(name="FakeBringUp"),
                 TaskCall(name="CheckRabi"),
@@ -101,7 +101,7 @@ def _steps() -> list[Any]:
         ),
         CustomOneQubit(
             step_name="ramsey",
-            mode="serial",
+            execution_mode="sequential",
             continue_on_failure=True,
             tasks=[
                 TaskCall(name="CheckRamsey", call_id="ramsey_coarse", run=COARSE),
@@ -109,7 +109,9 @@ def _steps() -> list[Any]:
             ],
         ),
         FilterByMetric(step="ramsey", call_id="ramsey_fine", metric="t2_star", threshold=0.0),
-        CustomOneQubit(step_name="after_filter", mode="serial", tasks=[TaskCall(name="CheckT1")]),
+        CustomOneQubit(
+            step_name="after_filter", execution_mode="sequential", tasks=[TaskCall(name="CheckT1")]
+        ),
     ]
 
 
@@ -198,7 +200,7 @@ def test_repeated_calls_in_one_step_are_traceable_end_to_end(
         "ramsey_coarse",
         "ramsey_fine",
     ]
-    stage = note["stage_results"]["1q_serial"]["result"]
+    stage = note["stage_results"]["1q_sequential"]["result"]
     assert [call["call_id"] for call in stage["1"]["calls"]] == ["ramsey_coarse", "ramsey_fine"]
 
     # --- the filter on the fine call drops qubit 1 although its coarse call succeeded
@@ -224,7 +226,7 @@ def test_repeated_calls_in_one_step_are_traceable_end_to_end(
         steps=[
             CustomOneQubit(
                 step_name="ramsey",
-                mode="serial",
+                execution_mode="sequential",
                 continue_on_failure=True,
                 # No run settings: the snapshot of each call supplies them.
                 tasks=[

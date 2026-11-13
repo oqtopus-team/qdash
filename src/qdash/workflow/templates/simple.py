@@ -31,6 +31,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode
 from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import (
@@ -54,7 +55,7 @@ def simple_calibration(
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
     tasks: list[TaskCall] | None = None,
-    mode: str = "scheduled",
+    execution_mode: OneQubitExecutionMode = "parallel_by_mux",
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
@@ -74,10 +75,13 @@ def simple_calibration(
         tasks: Task calls to run; flow runs pass [{"name": "CheckRabi"}, ...]
             (default: CheckRabi, CreateHPIPulse with hpi_duration=32, CheckHPIPulse).
             A custom list runs as given, with each call's own settings.
-        mode: Execution mode:
-            - "scheduled": Box-based parallelism with hardware constraints (default)
-            - "serial": Fully sequential execution
-            - "synchronized": Step-based synchronized execution
+        execution_mode: How the one-qubit targets run (default: "parallel_by_mux"):
+            - "parallel_by_mux": MUXes run in parallel within the scheduler's hardware
+              stages; the qubits of one MUX run one after another
+            - "parallel_by_round": the scheduler forms rounds of qubits from different
+              MUXes; the next round starts after every qubit of the round has run
+              all of its tasks
+            - "sequential": one MUX and one qubit at a time
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)
 
@@ -111,7 +115,7 @@ def simple_calibration(
                 TaskCall(name="CreateHPIPulse", run={"hpi_duration": 32}),
                 TaskCall(name="CheckHPIPulse"),
             ],
-            mode=mode,
+            execution_mode=execution_mode,
         ),
     ]
 

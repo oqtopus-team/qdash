@@ -237,3 +237,143 @@ describe("coupling pair targets", () => {
     },
   );
 });
+
+const manualPlan = (status: "resolved" | "invalid" | "unresolved" = "resolved") => ({
+  status: "ready" as const,
+  plan: {
+    flow_name: "calibration",
+    chip_id: "chip-1",
+    source_updated_at: "2026-11-01T00:00:00",
+    status,
+    reason: status === "unresolved" ? "the entrypoint calls helper(), which is not followed" : null,
+    runs:
+      status === "unresolved"
+        ? []
+        : [
+            {
+              targets: { qids: ["0", "8", "1", "9"], exclude_qids: [] },
+              steps: [
+                {
+                  index: 1,
+                  type: "CustomOneQubit",
+                  name: "rabi",
+                  scope: "qubit" as const,
+                  execution_mode: "manual",
+                  schedule: "manual" as const,
+                  rounds: [
+                    { number: 1, targets: ["0", "8"] },
+                    { number: 2, targets: ["1", "9"] },
+                  ],
+                  tasks: ["CheckRabi"],
+                  summary: "Runs 2 rounds in the order written.",
+                  issues:
+                    status === "invalid"
+                      ? [{ round: 2, targets: ["1", "9"], message: "qubits share MUX 0" }]
+                      : [],
+                  unchecked: [],
+                },
+              ],
+            },
+          ],
+    issues: [],
+    has_manual_rounds: true,
+    target_override_allowed: false,
+    target_override_reason: "This workflow runs manual rounds.",
+  },
+});
+
+describe("FlowExecuteConfirmModal tabs and execution preview", () => {
+  it("switches tabs with the keyboard and keeps edited targets", () => {
+    render(<FlowExecuteConfirmModal {...props} disabledReason={null} />);
+    const settings = screen.getByRole("tab", { name: "Settings" });
+    expect(settings).toHaveAttribute("aria-selected", "true");
+    fireEvent.change(screen.getByRole("textbox", { name: "MUX IDs" }), { target: { value: "4" } });
+    fireEvent.keyDown(settings, { key: "ArrowRight" });
+    const preview = screen.getByRole("tab", { name: "Execution preview" });
+    expect(preview).toHaveAttribute("aria-selected", "true");
+    expect(preview).toHaveFocus();
+    expect(screen.getByText(/Execution preview unavailable/)).toBeInTheDocument();
+    fireEvent.keyDown(preview, { key: "Home" });
+    expect(screen.getByRole("textbox", { name: "MUX IDs" })).toHaveValue("4");
+  });
+
+  it("shows the exact manual rounds and hides target overrides", () => {
+    const onConfirm = vi.fn();
+    render(
+      <FlowExecuteConfirmModal
+        {...props}
+        disabledReason={null}
+        onConfirm={onConfirm}
+        targetModes={[]}
+        plan={manualPlan()}
+      />,
+    );
+    expect(screen.queryByRole("textbox", { name: "MUX IDs" })).not.toBeInTheDocument();
+    expect(screen.getByText("This workflow runs manual rounds.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Execution preview" }));
+    const rows = screen.getAllByRole("row");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "RoundQubits, in parallel",
+      "10, 8",
+      "21, 9",
+    ]);
+    expect(screen.getByText("Manual rounds · user-defined")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+    expect(onConfirm).toHaveBeenCalledWith(undefined);
+  });
+
+  it("disables execution for invalid manual rounds and links to the problems", () => {
+    const onConfirm = vi.fn();
+    render(
+      <FlowExecuteConfirmModal
+        {...props}
+        disabledReason={null}
+        onConfirm={onConfirm}
+        targetModes={[]}
+        plan={manualPlan("invalid")}
+      />,
+    );
+    const execute = screen.getByRole("button", { name: "Execute" });
+    expect(execute).toBeDisabled();
+    expect(execute).toHaveAccessibleDescription(/Manual rounds in this workflow cannot run/);
+    fireEvent.click(screen.getByRole("button", { name: "Show problems" }));
+    expect(screen.getByRole("tab", { name: /Execution preview/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("Round 2 (1, 9): qubits share MUX 0")).toBeInTheDocument();
+    fireEvent.click(execute);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("explains an unresolved plan without blocking execution", () => {
+    render(
+      <FlowExecuteConfirmModal
+        {...props}
+        disabledReason={null}
+        plan={manualPlan("unresolved")}
+        hasUnsavedChanges
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Execution preview" }));
+    expect(
+      screen.getByText(
+        /Cannot resolve the steps before execution: the entrypoint calls helper\(\)/,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/unsaved changes/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Execute" })).toBeEnabled();
+  });
+
+  it("shows loading and stale states", () => {
+    const { rerender } = render(
+      <FlowExecuteConfirmModal {...props} disabledReason={null} plan={{ status: "loading" }} />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Execution preview" }));
+    expect(screen.getByText("Reading the saved workflow…")).toBeInTheDocument();
+    rerender(
+      <FlowExecuteConfirmModal {...props} disabledReason={null} plan={{ status: "stale" }} />,
+    );
+    expect(screen.getByText(/saved workflow changed after this page loaded/)).toBeInTheDocument();
+  });
+});

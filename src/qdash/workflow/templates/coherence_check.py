@@ -112,7 +112,7 @@ def coherence_check(
                     },
                 ),
             ],
-            mode="synchronized",
+            execution_mode="parallel_by_round",
         ),
     ]
 

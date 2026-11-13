@@ -386,7 +386,7 @@ def test_the_template_runs_through_the_hardware_box_scheduler(
 
     _create_fake_chip(test_client)
     targets, step = _template_run(monkeypatch, **params)
-    assert step.mode == "scheduled"
+    assert step.execution_mode == "parallel_by_mux"
 
     expected_groups = [
         [qid for qid in _mux_qids(mux) if qid not in excluded] for mux in expected_muxes
@@ -421,7 +421,7 @@ def test_the_template_runs_through_the_hardware_box_scheduler(
     ctx = step.execute(session, targets, StepContext())
 
     assert calls == [expected_groups]
-    assert list(session.stage_results) == ["1q_scheduled"]
+    assert list(session.stage_results) == ["1q_parallel_by_mux"]
     assert sorted(ctx.metadata["calibration"].successful_qids(), key=int) == [
         qid for group in expected_groups for qid in group
     ]

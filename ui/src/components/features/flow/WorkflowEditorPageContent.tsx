@@ -16,6 +16,7 @@ import type { AxiosResponse } from "axios";
 import { useChatDock } from "@/contexts/ChatDockContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useExecutionAvailability } from "@/hooks/useExecutionAvailability";
+import { useFlowExecutionPlan } from "@/hooks/useFlowExecutionPlan";
 import { useToast } from "@/components/ui/Toast";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import {
@@ -47,6 +48,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ChevronRight,
+  CircleHelp,
   Clock,
   Columns2,
   Command as CommandIcon,
@@ -82,6 +84,7 @@ import { executionHref } from "@/components/features/first-calibration/journeyPr
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
 import { FlowExplorer } from "@/components/features/flow/FlowExplorer";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
+import { WorkflowExecutionHelpDialog } from "@/components/features/flow/WorkflowExecutionHelpDialog";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { isExecutionTerminal } from "@/lib/executionStatus";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
@@ -153,6 +156,7 @@ export function WorkflowEditorPageContent() {
   const [lastFlowRunId, setLastFlowRunId] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
+  const [showExecutionHelp, setShowExecutionHelp] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [originalCode, setOriginalCode] = useState("");
   const [isSplitView, setIsSplitView] = useState(false);
@@ -223,6 +227,14 @@ export function WorkflowEditorPageContent() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["flow", name],
     queryFn: () => getFlow(name),
+  });
+
+  // The preview reads the saved source, which is what Execute runs.
+  const executionPlan = useFlowExecutionPlan({
+    flowName: name,
+    chipId,
+    sourceVersion: data?.data?.updated_at,
+    enabled: showExecuteConfirm && Boolean(data?.data),
   });
 
   const availability = useExecutionAvailability(
@@ -871,6 +883,16 @@ export function WorkflowEditorPageContent() {
           </div>
           {/* Desktop action buttons - hidden on mobile, use FAB instead */}
           <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowExecutionHelp(true)}
+              className="btn btn-sm btn-ghost"
+              title="Execution help"
+              aria-label="Execution help"
+            >
+              <CircleHelp size={16} />
+              <span className="ml-1 hidden md:inline">Execution help</span>
+            </button>
             <button
               type="button"
               onClick={() => setShowPropertiesModal(true)}
@@ -1549,6 +1571,20 @@ export function WorkflowEditorPageContent() {
           <div tabIndex={0} role="button" className="btn btn-circle btn-primary shadow-lg">
             <Plus size={20} />
           </div>
+          {/* Execution Help Button */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+              Execution help
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowExecutionHelp(true)}
+              className="btn btn-circle btn-outline bg-base-100 shadow-lg"
+              aria-label="Execution help"
+            >
+              <CircleHelp size={20} />
+            </button>
+          </div>
           {/* Properties Button */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
@@ -1639,6 +1675,8 @@ export function WorkflowEditorPageContent() {
             </button>
           </div>
         </div>
+
+        <WorkflowExecutionHelpDialog open={showExecutionHelp} onOpenChange={setShowExecutionHelp} />
 
         {/* Properties Modal */}
         {showPropertiesModal && (
@@ -1872,6 +1910,8 @@ export function WorkflowEditorPageContent() {
             tags={tags}
             targetDefaults={data?.data?.target_defaults}
             targetModes={data?.data?.target_modes}
+            plan={executionPlan}
+            hasUnsavedChanges={isDirty}
             disabledReason={executeDisabledReason}
             onConfirm={(targetOverride) => {
               if (executeDisabledReason) return;

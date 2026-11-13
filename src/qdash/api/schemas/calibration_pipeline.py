@@ -14,12 +14,12 @@ _SPEC_EXAMPLE: dict[str, Any] = {
     "name": "coarse-then-two-pass-ramsey",
     "targets": {"qids": ["0", "1"]},
     "steps": [
-        {"type": "OneQubitCheck", "mode": "scheduled"},
+        {"type": "OneQubitCheck", "execution_mode": "parallel_by_mux"},
         {"type": "FilterByStatus"},
         {
             "type": "CustomOneQubit",
             "step_name": "coherence",
-            "mode": "scheduled",
+            "execution_mode": "parallel_by_mux",
             "continue_on_failure": True,
             "tasks": [
                 {"name": "CheckT1"},
@@ -143,7 +143,8 @@ class ValidatePipelineResponse(BaseModel):
     migrated_spec: dict[str, Any] | None = Field(
         default=None,
         description=(
-            "For a version 1 spec: the same pipeline converted to version 2. Review it, "
+            "For a convertible version 1 spec: the same pipeline converted to version 2. "
+            "Absent when a one-qubit step uses a removed mode setting or name. Review it, "
             "rename generated call_ids if you like, and submit it instead."
         ),
     )
@@ -194,7 +195,18 @@ class PipelineCatalogResponse(BaseModel):
 
     backend_name: str
     step_types: list[PipelineStepTypeInfo]
-    one_qubit_modes: list[str]
+    one_qubit_execution_modes: list[str] = Field(
+        description=(
+            "Values OneQubitCheck, OneQubitFineTune and CustomOneQubit accept for "
+            "execution_mode; manual requires rounds."
+        )
+    )
+    two_qubit_execution_modes: list[str] = Field(
+        description=(
+            "Values TwoQubitCalibration and CustomTwoQubit accept for execution_mode; "
+            "manual requires rounds."
+        )
+    )
     tasks: dict[str, list[str]] = Field(
         description='Available task names by task_type ("qubit", "coupling", ...).'
     )

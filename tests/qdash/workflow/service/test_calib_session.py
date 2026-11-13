@@ -1171,20 +1171,22 @@ def pipeline_execution_env(mock_flow_session_deps, monkeypatch):
         monkeypatch.setattr(CalibSession, method, MagicMock())
     schedule = SimpleNamespace(
         stages=[SimpleNamespace(box_type="A", parallel_groups=[["0", "1"]])],
+        rounds=[SimpleNamespace(box_type="A", parallel_qids=["0", "1"], round_index=0)],
+        total_rounds=1,
+        # Batch steps of simultaneous_spectroscopy.
         steps=[SimpleNamespace(box_type="A", parallel_qids=["0", "1"], step_index=0)],
-        total_steps=1,
         metadata={"strategy": "test"},
     )
     scheduler = MagicMock()
     scheduler.generate_from_mux.return_value = schedule
-    scheduler.generate_synchronized_from_mux.return_value = schedule
+    scheduler.generate_rounds_from_mux.return_value = schedule
     scheduler.generate_simultaneous_spectroscopy_batches_from_mux.return_value = schedule
     monkeypatch.setattr("qdash.workflow.service.strategy.OneQubitScheduler", lambda **kw: scheduler)
     return SimpleNamespace(records=records, lock=lock, claims=claims)
 
 
 @pytest.mark.parametrize(
-    "mode", ["synchronized", "scheduled", "serial", "simultaneous_spectroscopy"]
+    "mode", ["parallel_by_round", "parallel_by_mux", "sequential", "simultaneous_spectroscopy"]
 )
 def test_pipeline_owns_one_execution_per_calibration_step(
     pipeline_execution_env, monkeypatch, mode
@@ -1233,9 +1235,9 @@ def test_pipeline_owns_one_execution_per_calibration_step(
     session.run_pipeline(
         QubitTargets(["0", "1"]),
         steps=[
-            OneQubitCheck(mode=mode, tasks=[TaskCall(name=check_task)]),
+            OneQubitCheck(execution_mode=mode, tasks=[TaskCall(name=check_task)]),
             FilterByStatus(),
-            OneQubitFineTune(mode=mode, tasks=[TaskCall(name=fine_task)]),
+            OneQubitFineTune(execution_mode=mode, tasks=[TaskCall(name=fine_task)]),
         ],
     )
 

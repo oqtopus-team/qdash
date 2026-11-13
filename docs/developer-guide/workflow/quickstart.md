@@ -76,7 +76,7 @@ def coherence_sample(
                 TaskCall(name="CheckT1"),
                 TaskCall(name="CheckRamsey"),
             ],
-            mode="synchronized",
+            execution_mode="parallel_by_round",
         )
     ]
     service = CalibService(
@@ -110,7 +110,7 @@ steps = [
             TaskCall(name="CheckT1"),
             TaskCall(name="CheckRamsey"),
         ],
-        mode="synchronized",
+        execution_mode="parallel_by_round",
     )
 ]
 context = resolve_calib_context("alice", "64Qv3", project_id="my-project")
