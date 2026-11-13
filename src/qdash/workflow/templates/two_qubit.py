@@ -168,6 +168,9 @@ def two_qubit(
     # Define Pipeline Steps
     # =========================================================================
 
+    # GenerateCRSchedule forms the groups at run time. To write checked rounds
+    # yourself, replace both steps with one execution_mode="manual" step whose
+    # pairs use only qubits of qids; see the two_qubit_scheduled template.
     steps: list[Step] = [
         # Generate CR schedule from candidate qubits with explicit direction
         GenerateCRSchedule(

@@ -83,6 +83,11 @@ def one_qubit(
     # Task lists are explicit so this template can be reviewed and edited on its own.
     # Tests keep these stages aligned with coarse_one and fine_one.
     # Step 1: coarse calibration through Ramsey, calibrating and checking all four pulse types.
+    # To choose rounds yourself, edit a step to execution_mode="manual" with
+    # rounds=[["0", "8"], ["1", "9"]]: rounds run in order, the qubits of a round in
+    # parallel, and the chip checks run before any qubit. The rounds must name
+    # exactly the step's current qubits, so a manual OneQubitFineTune fails when
+    # FilterByStatus drops a qubit it lists. See docs/user-guide/manual-execution-rounds.md.
     steps: list[Step] = [
         OneQubitCheck(
             execution_mode="parallel_by_round",

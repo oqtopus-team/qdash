@@ -22,6 +22,39 @@ Example:
             [("2", "3"), ("8", "9")],   # Group 2: run after group 1
         ],
     )
+
+Schedule versus manual rounds:
+    ``schedule`` feeds a ``SetCRSchedule`` step, the legacy way to hand-write
+    groups. The groups run as written but QDash does not check them against
+    the chip. A two-qubit step with ``execution_mode="manual"`` and ``rounds``
+    runs the same kind of groups and checks them before any pair runs: every
+    pair is a coupling of the chip in the written direction, both of its
+    qubits are among the step's current qubits, a pair appears in only one
+    round, and the pairs of a round share no qubit, no MUX, and no readout or
+    control module that the chip wiring shares between MUXes.
+
+    This flow has no ``rounds`` parameter, so neither ``schedule`` nor any
+    other argument turns on manual rounds. Edit a copy of the template:
+    replace the entire Validation and Extract pairs for target definition
+    sections with the targets below. This removes the requirement to supply
+    ``schedule`` or ``coupling_pairs``. Replace both the ``SetCRSchedule`` step
+    and the calibration step with one manual step::
+
+        targets = CouplingTargets(pairs=[("0", "1"), ("4", "5"), ("8", "9")])
+        steps = [
+            CustomTwoQubit(
+                step_name="two_qubit_scheduled",
+                execution_mode="manual",
+                rounds=[[("0", "1"), ("4", "5")], [("8", "9")]],
+                tasks=[TaskCall(name="CheckCrossResonance")],
+            ),
+        ]
+
+    Rounds run one after another, and the pairs of a round run in parallel.
+    ``TwoQubitCalibration(tasks=..., execution_mode="manual", rounds=...)``
+    works the same way. A manual step ignores an earlier ``SetCRSchedule``,
+    rejects ``max_parallel_ops``, and Execute offers no coupling pair override
+    for it. See docs/user-guide/manual-execution-rounds.md.
 """
 
 from typing import Any
@@ -86,6 +119,8 @@ def two_qubit_scheduled(
         schedule: Pre-defined schedule as list of parallel groups.
             Each group is a list of (control, target) qubit ID tuples.
             Groups are executed sequentially, pairs within a group run in parallel.
+            The groups go to ``SetCRSchedule`` and are not checked against the
+            chip; manual rounds are an edit to the steps, not this argument.
             Example: [[("0", "1"), ("4", "5")], [("2", "3")]]
         coupling_pairs: Directed (control, target) pairs to calibrate instead of
             ``schedule``. Takes precedence over ``schedule``. Without an execution
@@ -156,7 +191,9 @@ def two_qubit_scheduled(
     # =========================================================================
 
     steps: list[Step] = [
-        # Set the pre-defined schedule
+        # Set the pre-defined schedule. SetCRSchedule runs its groups without
+        # chip checks; for checked groups, replace this step and the next one
+        # with a manual step (see "Schedule versus manual rounds" above).
         SetCRSchedule(schedule=schedule),
         # Execute 2Q calibration using the schedule
     ]
