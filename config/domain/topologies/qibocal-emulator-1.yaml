@@ -1,0 +1,20 @@
+# One-qubit topology of the Qibocal emulator preset.
+# The upstream Qibolab `qubit` platform (config/domain/qibocal/platforms/qubit) has exactly one
+# qubit, 0. Chips created from the `qibocal` preset use this topology so that QDash never shows
+# more qubits than the emulator runs.
+id: qibocal-emulator-1
+name: Qibocal Emulator (1 qubit)
+description: Single emulated qubit of the upstream Qibolab `qubit` platform; no couplings
+grid_size: 1
+num_qubits: 1
+layout_type: grid
+mux:
+  enabled: false
+qubits:
+  0:
+    row: 0
+    col: 0
+couplings: []
+visualization:
+  show_mux_boundaries: false
+  region_size: 1

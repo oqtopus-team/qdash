@@ -28,7 +28,13 @@ packages = [
 
 [tool.ruff]
 line-length = 100
-exclude = ["tools", "scripts", "postgres_data"]
+exclude = [
+    "tools",
+    "scripts",
+    "postgres_data",
+    # Upstream Qibocal platform, kept byte-identical (see config/domain/qibocal/UPSTREAM.md)
+    "config/domain/qibocal/platforms",
+]
 src = ["src", "clients/python/src"]
 target-version = "py310"
 lint.unfixable = ["F401"]
@@ -112,7 +118,7 @@ lint.ignore = [
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
-exclude = ["tools", "scripts", "user_flows"]
+exclude = ["tools", "scripts", "user_flows", "src/qdash/workflow/qibocal_runner"]
 # Disable error codes for known issues:
 # - misc: FastAPI untyped decorator warnings
 # - override: Liskov substitution violations in calibtasks (design issue)
@@ -189,6 +195,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
+exclude = ["src/qdash/workflow/qibocal_runner"]
 members = [
     "clients/python",
     "src/qdash/api",

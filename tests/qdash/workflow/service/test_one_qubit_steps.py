@@ -151,3 +151,48 @@ def test_fine_tune_respects_coarse_status_filter(monkeypatch, successful_qids) -
         execute.assert_not_called()
         assert ctx.one_qubit_fine_tune is not None
         assert ctx.one_qubit_fine_tune.qubits == {}
+
+
+def test_qubit_targets_of_a_backend_without_wiring_run_directly(monkeypatch) -> None:
+    """The Qibocal emulator has no MUXes or boxes; its qubits skip the wiring scheduler."""
+    from unittest.mock import MagicMock
+
+    from qdash.workflow.service.steps.pipeline import StepContext
+    from qdash.workflow.service.targets import QubitTargets
+
+    monkeypatch.setattr(
+        "qdash.workflow.service.strategy.get_one_qubit_strategy",
+        MagicMock(side_effect=AssertionError("no wiring scheduler for qibocal")),
+    )
+    run = MagicMock(return_value={"0": {"status": "success"}})
+    monkeypatch.setattr(
+        "qdash.workflow.service._internal.scheduling_tasks.run_qubit_calibrations_parallel",
+        run,
+    )
+    session = SimpleNamespace(
+        chip_id="QIBOCAL",
+        backend_name="qibocal",
+        worker_spec=MagicMock(return_value=object()),
+        record_stage_result=MagicMock(),
+    )
+    step = CustomOneQubit(
+        step_name="qibocal", tasks=[TaskCall(name="QibocalRabiAmplitude")], mode="serial"
+    )
+
+    step.execute(cast("CalibSession", session), QubitTargets(["0"]), StepContext())
+
+    assert run.call_args.kwargs["qids"] == ["0"]
+    session.record_stage_result.assert_called_once_with(
+        "qibocal", {"direct": {"0": {"status": "success"}}}
+    )
+
+
+def test_mux_targets_are_rejected_on_a_backend_without_wiring() -> None:
+    from qdash.workflow.service.steps.pipeline import StepContext
+    from qdash.workflow.service.targets import MuxTargets
+
+    session = SimpleNamespace(chip_id="QIBOCAL", backend_name="qibocal")
+    step = CustomOneQubit(step_name="qibocal", tasks=[TaskCall(name="QibocalRabiAmplitude")])
+
+    with pytest.raises(ValueError, match="no MUX wiring; target qubits with qids"):
+        step.execute(cast("CalibSession", session), MuxTargets(mux_ids=[0]), StepContext())

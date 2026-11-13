@@ -513,6 +513,64 @@ def test_commit_action_candidate_revalidates_and_audits_parameter_write(
     assert qubit.data["drive_amplitude"]["execution_id"] == "execution-1"
 
 
+@pytest.mark.parametrize(
+    "origin",
+    [
+        {"measurement_only_reason": "Legacy emulator measurement"},
+        {"provenance": {"synthetic": True, "source": "qibolab-emulator"}},
+    ],
+)
+def test_measurement_only_output_cannot_become_a_committed_candidate(
+    service: AgentSessionService,
+    origin,
+) -> None:
+    """A measurement-only output (e.g. emulator data) is rejected even when policy allows it."""
+    session = _create_session(service, max_actions=1)
+    action = service.submit_action(
+        project_id="project-1",
+        session_id=session.session_id,
+        body=_run_task_action(),
+    )
+    _attach_completed_task_result(
+        session_id=session.session_id,
+        action_id=action.action_id,
+        output_parameters={
+            "drive_amplitude": {
+                "value": 0.12,
+                "database_updated": False,
+                **origin,
+            }
+        },
+    )
+
+    candidate = service.list_action_candidates(
+        project_id="project-1",
+        session_id=session.session_id,
+        action_id=action.action_id,
+    ).items[0]
+    assert not candidate.accepted
+    assert "measurement-only" in candidate.reason
+
+    with pytest.raises(HTTPException) as exc_info:
+        service.commit_action_candidate(
+            project_id="project-1",
+            session_id=session.session_id,
+            action_id=action.action_id,
+            parameter_name="drive_amplitude",
+            username="reviewer",
+            body=CommitAgentCandidateRequest(
+                idempotency_key="commit-measurement-only",
+                expected_state_version=1,
+                task_id="task-result-1",
+            ),
+        )
+    assert exc_info.value.status_code == 409
+    qubit = QubitDocument.find_one(
+        {"project_id": "project-1", "chip_id": "chip-001", "qid": "Q00"}
+    ).run()
+    assert qubit is None or "drive_amplitude" not in qubit.data
+
+
 def test_commit_candidate_set_updates_final_set_once(
     service: AgentSessionService,
 ) -> None:

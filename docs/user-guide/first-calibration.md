@@ -41,7 +41,9 @@ If you chose an existing chip, continue to [Review and Run](#review-and-run).
 2. Select **Create Chip**.
 
 QDash creates the [virtual chip configuration](./setup/fake-backend.md#create-a-chip) and opens
-**New Flow** with the **Fake Backend Calibration** template and the new chip selected.
+**New Flow** with the **Fake Backend Calibration** template and the new chip selected. On a
+[Qibocal deployment](./setup/qibocal-backend.md) the guide creates the one-qubit emulator chip
+and opens the **Qibocal Emulator Calibration** template instead.
 
 ### Review and Run
 

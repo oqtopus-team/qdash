@@ -29,6 +29,12 @@ addresses, their wiring and skew, and operating parameters for every qubit taken
 :mod:`qdash.common.fake_device`. Every generated file says it describes virtual
 hardware.
 
+When the deployment runs the qibocal backend, the ``qibocal`` preset creates a one-qubit chip
+for the upstream Qibolab emulator platform (see :data:`QIBOCAL_PRESET`). That backend reads its
+platform from ``config/domain/qibocal/platforms`` and never reads the Qubex tree, so the preset
+writes no files there. The chip gets a simulation binding instead
+(:func:`simulation_binding_for_preset`).
+
 An existing chip directory is never modified.
 """
 
@@ -52,7 +58,10 @@ from qdash.common import fake_device
 from qdash.common.config.backend import get_default_backend
 from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.path_resolver import resolve_config_base_path
+from qdash.common.qibocal_platform import load_platform_template
 from qdash.common.utils.chip_id import CHIP_ID_PATTERN, RESERVED_CHIP_IDS, validate_chip_id
+from qdash.common.utils.datetime import now
+from qdash.datamodel.simulation import SimulationBindingModel
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -99,6 +108,12 @@ class ConfigPreset:
     n_qubits: int
     mux_count: int
     workflow_template_id: str
+    # Whether the preset writes ``<chip_id>/`` into the Qubex configuration tree, and so
+    # needs one mounted.
+    requires_config_tree: bool = True
+    # Whether chips created from the preset get a simulation binding (see
+    # :func:`simulation_binding_for_preset`).
+    binds_simulation: bool = False
 
 
 FAKE_PRESET = ConfigPreset(
@@ -114,7 +129,53 @@ FAKE_PRESET = ConfigPreset(
     mux_count=fake_device.FAKE_DEVICE_MUXES,
     workflow_template_id="fake_calibration",
 )
-PRESETS: dict[str, ConfigPreset] = {FAKE_PRESET.preset_id: FAKE_PRESET}
+QIBOCAL_PRESET = ConfigPreset(
+    preset_id="qibocal",
+    name="Qibocal emulator qubit",
+    description=(
+        "The single qubit (0) of the upstream Qibolab `qubit` emulator platform. The chip is "
+        "bound to the emulator: its calibration values are seeded from the platform template, "
+        "updated by Qibocal's own fits, and never leave QDash. No hardware is contacted and no "
+        "Qubex configuration is written."
+    ),
+    deployment_backend="qibocal",
+    topology_id="qibocal-emulator-1",
+    n_qubits=1,
+    mux_count=0,
+    workflow_template_id="qibocal_emulator_calibration",
+    requires_config_tree=False,
+    binds_simulation=True,
+)
+PRESETS: dict[str, ConfigPreset] = {
+    preset.preset_id: preset for preset in (FAKE_PRESET, QIBOCAL_PRESET)
+}
+
+
+def simulation_binding_for_preset(preset: ConfigPreset) -> SimulationBindingModel | None:
+    """The simulation binding a chip created from ``preset`` gets, or None for hardware.
+
+    The binding records the configured Qibolab platform and the structural fingerprint of its
+    template, so a later change of the simulated model is detected instead of silently mixing
+    values calibrated against another model.
+    """
+    if not preset.binds_simulation:
+        return None
+    template = load_platform_template()
+    try:
+        fingerprint = template.fingerprint()
+    except (OSError, ValueError) as exc:
+        raise ChipConfigError(
+            f"The '{preset.preset_id}' preset needs the platform template {template.directory}: "
+            f"{exc}"
+        ) from exc
+    return SimulationBindingModel(
+        backend=preset.deployment_backend,
+        preset=preset.preset_id,
+        platform=template.name,
+        template_fingerprint=fingerprint,
+        bound_at=now(),
+    )
+
 
 # The virtual hardware of the fake preset: one QuEL-1 A box per MUX. 192.0.2.0/24
 # (TEST-NET-1, RFC 5737) is reserved for documentation and never routed, so a hardware backend
@@ -453,6 +514,17 @@ class ChipConfigScaffolder:
             raise ChipConfigError(
                 f"The '{preset.preset_id}' preset describes a {preset.n_qubits}-qubit chip; "
                 f"use the {preset.topology_id} topology"
+            )
+        if not preset.requires_config_tree:
+            logger.info("Chip %s uses preset %s; no configuration files", chip_id, preset.preset_id)
+            return ScaffoldResult(
+                status="skipped",
+                path=chip_id,
+                preset=preset.preset_id,
+                message=(
+                    f"{chip_id} uses the {preset.name}; this backend reads its own platform "
+                    "and needs no files in the configuration tree."
+                ),
             )
         if not self.available:
             # A preset chip is only usable with its configuration, so never create it without.

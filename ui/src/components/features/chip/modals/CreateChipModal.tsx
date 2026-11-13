@@ -16,9 +16,14 @@ import { useToast } from "@/components/ui/Toast/useToast";
 import { newFlowTemplateHref } from "@/lib/flowTemplates";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import type { ChipCreateSubmission } from "@/components/features/first-calibration/useChipPageJourney";
-import type { ChipConfigResult, ConfigPresetResponse } from "@/schemas";
+import type { ChipConfigOptionsPreset, ChipConfigResult, ConfigPresetResponse } from "@/schemas";
 
-import { FAKE_PRESET_ID, canCreateFakeChip, resolveChipSetupMode } from "../chipSetupMode";
+import {
+  canCreatePresetChip,
+  presetBackendLabel,
+  presetTemplateName,
+  resolveChipSetupMode,
+} from "../chipSetupMode";
 
 interface TopologyItem {
   id: string;
@@ -98,12 +103,13 @@ export function CreateChipModal({
   });
   const configAvailable = configSourcesData?.data?.available ?? false;
   const configSources = configSourcesData?.data?.sources ?? [];
-  // A fake deployment creates only its fixed virtual device; until the deployment is known,
-  // no setup controls are shown so a fake deployment never offers hardware settings.
+  // A preset deployment (fake or qibocal) creates only its fixed device; until the deployment is
+  // known, no setup controls are shown so a preset deployment never offers hardware settings.
   const setupMode = resolveChipSetupMode(configSourcesData?.data, {
     isError: isConfigSourcesError,
   });
-  const fakePreset = setupMode.kind === "fake" ? setupMode.preset : null;
+  const devicePreset = setupMode.kind === "preset" ? setupMode.preset : null;
+  const presetBackend = setupMode.kind === "preset" ? setupMode.backend : null;
 
   // Fetch available topologies
   const { data: topologiesData, isLoading: isLoadingTopologies } = useListTopologies(undefined, {
@@ -161,11 +167,15 @@ export function CreateChipModal({
 
         const config = data.data?.config;
         if (config?.message) {
-          if (config.status === "created") {
+          // A preset without configuration files reports "skipped" but is ready to run.
+          const presetReady =
+            config.status === "created" || (config.status === "skipped" && config.preset != null);
+          if (presetReady) {
             const templateId =
               !guidedByJourney &&
-              config.preset === FAKE_PRESET_ID &&
-              fakePreset?.workflow_template_id;
+              presetBackend !== null &&
+              config.preset === devicePreset?.preset_id &&
+              devicePreset?.workflow_template_id;
             toast.success(
               config.message,
               templateId
@@ -174,7 +184,7 @@ export function CreateChipModal({
                       label: "Open template",
                       onClick: () =>
                         router.push(
-                          newFlowTemplateHref(FAKE_PRESET_ID, templateId, data.data.chip_id),
+                          newFlowTemplateHref(presetBackend ?? "", templateId, data.data.chip_id),
                         ),
                     },
                   }
@@ -213,15 +223,15 @@ export function CreateChipModal({
   const submit = (data: CreateChipFormData) => {
     if (setupMode.kind === "pending") return;
     setServerError(null);
-    if (setupMode.kind === "fake") {
-      // Never fall back to a hardware chip on a fake deployment.
-      if (!canCreateFakeChip(setupMode)) return;
+    if (setupMode.kind === "preset") {
+      // Never fall back to a hardware chip on a preset deployment.
+      if (!canCreatePresetChip(setupMode)) return;
       create({
         data: {
           chip_id: data.chipId,
           size: setupMode.preset.n_qubits,
           topology_id: setupMode.preset.topology_id,
-          config: { preset: FAKE_PRESET_ID },
+          config: { preset: setupMode.preset.preset_id as ChipConfigOptionsPreset },
         },
       });
       return;
@@ -296,8 +306,9 @@ export function CreateChipModal({
                 <span className="text-sm text-base-content/60">Checking the deployment...</span>
               </div>
             )
-          ) : setupMode.kind === "fake" ? (
-            <FakeDeviceSetup
+          ) : setupMode.kind === "preset" ? (
+            <PresetDeviceSetup
+              backend={setupMode.backend}
               preset={setupMode.preset}
               configAvailable={setupMode.configAvailable}
               chipId={chipIdValue.trim()}
@@ -465,7 +476,7 @@ export function CreateChipModal({
               disabled={
                 createChipMutation.isPending ||
                 setupMode.kind === "pending" ||
-                (setupMode.kind === "fake" && !canCreateFakeChip(setupMode))
+                (setupMode.kind === "preset" && !canCreatePresetChip(setupMode))
               }
             >
               {createChipMutation.isPending ? (
@@ -484,60 +495,80 @@ export function CreateChipModal({
   );
 }
 
-interface FakeDeviceSetupProps {
+interface PresetDeviceSetupProps {
+  backend: string;
   preset: ConfigPresetResponse | null;
   configAvailable: boolean;
   chipId: string;
   topologyName?: string;
 }
 
-/** The fixed virtual device every chip of a fake deployment is; nothing to choose. */
-function FakeDeviceSetup({ preset, configAvailable, chipId, topologyName }: FakeDeviceSetupProps) {
+/** The fixed device every chip of a preset deployment is; nothing to choose. */
+function PresetDeviceSetup({
+  backend,
+  preset,
+  configAvailable,
+  chipId,
+  topologyName,
+}: PresetDeviceSetupProps) {
+  const backendLabel = presetBackendLabel(backend);
   if (!preset) {
     return (
       <div className="alert alert-error alert-soft" role="alert">
         <span className="min-w-0 break-words">
-          This deployment runs the fake backend, but the API does not offer its virtual device
+          This deployment runs the {backendLabel}, but the API does not offer its device
           configuration, so no chip can be created here.
         </span>
       </div>
     );
   }
+  const writesConfig = preset.requires_config_tree !== false;
   return (
     <fieldset
       className="min-w-0 space-y-2 rounded-lg border border-base-300 p-3"
-      aria-describedby="fake-device-summary"
+      aria-describedby="preset-device-summary"
     >
-      <legend className="px-1 text-sm font-medium">Virtual device</legend>
-      <p id="fake-device-summary" className="text-xs break-words text-base-content/60">
+      <legend className="px-1 text-sm font-medium">{preset.name}</legend>
+      <p id="preset-device-summary" className="text-xs break-words text-base-content/60">
         Fixed by this deployment. No hardware is contacted.
       </p>
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
         <dt className="text-base-content/60">Backend</dt>
-        <dd className="min-w-0">Fake backend</dd>
+        <dd className="min-w-0">{backendLabel.charAt(0).toUpperCase() + backendLabel.slice(1)}</dd>
         <dt className="text-base-content/60">Topology</dt>
-        <dd className="min-w-0 break-words" data-testid="fake-device-topology">
+        <dd className="min-w-0 break-words" data-testid="preset-device-topology">
           {topologyName ? `${topologyName} ` : ""}
           <code className="break-all text-xs">{preset.topology_id}</code>
         </dd>
         <dt className="text-base-content/60">Size</dt>
         <dd className="min-w-0">
-          {preset.n_qubits} qubits, {preset.mux_count} MUX
+          {preset.n_qubits === 1 ? "1 qubit" : `${preset.n_qubits} qubits`}
+          {preset.mux_count > 0 ? `, ${preset.mux_count} MUX` : ""}
         </dd>
         <dt className="text-base-content/60">Configuration</dt>
         <dd className="min-w-0 break-words">
-          <code className="break-all">{chipId || "<chip_id>"}/</code> generated from the chip ID
+          {writesConfig ? (
+            <>
+              <code className="break-all">{chipId || "<chip_id>"}/</code> generated from the chip ID
+            </>
+          ) : (
+            "None; the backend uses its own platform files"
+          )}
         </dd>
       </dl>
-      {configAvailable ? (
+      {!writesConfig ? (
         <p className="text-xs break-words text-base-content/60">
-          Writes the virtual device&apos;s configuration files and keeps an existing directory as
-          is. Calibrate it with the Fake Backend Calibration template.
+          {preset.description} Run it with the {presetTemplateName({ backend })} template.
+        </p>
+      ) : configAvailable ? (
+        <p className="text-xs break-words text-base-content/60">
+          Writes the device&apos;s configuration files and keeps an existing directory as is.
+          Calibrate it with the {presetTemplateName({ backend })} template.
         </p>
       ) : (
         <div className="alert alert-warning alert-soft" role="alert">
           <span className="min-w-0 break-words">
-            No Qubex configuration tree is mounted, so the virtual configuration cannot be generated
+            No Qubex configuration tree is mounted, so the device configuration cannot be generated
             and no chip can be created. Mount the configuration tree for this deployment, then
             reopen this dialog.
           </span>

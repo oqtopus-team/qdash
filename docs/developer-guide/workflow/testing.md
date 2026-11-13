@@ -71,5 +71,6 @@ state instead of private call order unless call order is the contract.
 | `service/` | `service/` |
 | `templates/` | Top-level `test_*_template.py` files |
 | `calibtasks/fake/` | `calibtasks/test_fake_backend_sync.py`, `calibtasks/test_fake_bring_up.py` |
+| `engine/backend/qibocal.py`, `calibtasks/qibocal/` | `engine/backend/test_qibocal_backend.py`, `calibtasks/test_qibocal_*.py`; the real-library tests need `QDASH_QIBOCAL_INTEGRATION=1` ([Qibocal Emulator Backend](./qibocal-backend.md#reproduce-a-run)) |
 
 Paths in the table are relative to `src/qdash/workflow/` and `tests/qdash/workflow/`.

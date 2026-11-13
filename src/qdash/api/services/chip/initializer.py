@@ -7,6 +7,7 @@ from typing import Any
 from pymongo.errors import DuplicateKeyError
 
 from qdash.common.config.topology import TopologyDefinition, load_topology
+from qdash.datamodel.simulation import SimulationBindingModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.qubit import QubitDocument
@@ -144,6 +145,7 @@ class ChipInitializer:
         size: int,
         project_id: str | None = None,
         topology_id: str | None = None,
+        simulation_binding: SimulationBindingModel | None = None,
     ) -> ChipDocument:
         """Create a new chip with full initialization.
 
@@ -159,6 +161,8 @@ class ChipInitializer:
             size: Chip size (number of qubits)
             project_id: Project ID for multi-tenancy
             topology_id: Topology template ID (required)
+            simulation_binding: Binding of a chip created from a simulation preset; the only
+                place a binding is ever written
 
         Returns:
         -------
@@ -195,6 +199,7 @@ class ChipInitializer:
                 size=size,
                 topology_id=topology_id,
                 system_info={},
+                simulation_binding=simulation_binding,
             )
             try:
                 chip.save()

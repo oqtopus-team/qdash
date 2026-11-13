@@ -86,11 +86,18 @@ def _execute_scheduled_one_qubit(
     stage_name: str,
     execution_mode: OneQubitExecutionMode,
 ) -> dict[str, Any]:
-    """Run explicit qubit targets through the same scheduler used by MUX targets."""
+    """Run explicit qubit targets through the same scheduler used by MUX targets.
+
+    A backend without wiring (``requires_wiring: false`` in ``config/app/backend.yaml``) has
+    no MUXes or boxes to schedule, so its qubits run directly.
+    """
+    from qdash.common.config.backend import backend_requires_wiring
     from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
 
     if not qids:
         return {}
+    if not backend_requires_wiring(session.backend_name):
+        return _execute_direct_one_qubit(session, qids=qids, plan=plan, stage_name=stage_name)
 
     # Standalone qubits are scheduled after the MUX stages, one at a time.
     mux_ids, standalone_qids = session.mux_mapping.partition_qids(qids)
@@ -115,8 +122,13 @@ def _execute_mux_one_qubit(
     execution_mode: OneQubitExecutionMode,
 ) -> dict[str, Any]:
     """Run MUX targets through the selected one-qubit strategy."""
+    from qdash.common.config.backend import backend_requires_wiring
     from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
 
+    if not backend_requires_wiring(session.backend_name):
+        raise ValueError(
+            f"Backend '{session.backend_name}' has no MUX wiring; target qubits with qids"
+        )
     config = OneQubitConfig(
         mux_ids=targets.mux_ids,
         exclude_qids=targets.exclude_qids,

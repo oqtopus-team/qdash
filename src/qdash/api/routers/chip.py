@@ -56,6 +56,7 @@ from qdash.api.services.chip import (
     ChipInitializer,
     ChipService,
 )
+from qdash.api.services.chip.config_scaffold import simulation_binding_for_preset
 from qdash.api.services.chip.initializer import ChipAlreadyExistsError
 from qdash.api.services.reanalysis_service import ReanalysisService
 from qdash.datamodel.note import NoteModel
@@ -126,6 +127,7 @@ def list_chip_config_sources(
                 n_qubits=preset.n_qubits,
                 mux_count=preset.mux_count,
                 workflow_template_id=preset.workflow_template_id,
+                requires_config_tree=preset.requires_config_tree,
             )
             for preset in scaffolder.list_presets()
         ],
@@ -150,8 +152,10 @@ def create_chip(
     false or the directory already exists. Wiring and hardware files are copied
     from ``config.source_system_id`` when given; parameter files always start
     from QDash's templates. ``config.preset`` writes a complete virtual
-    configuration instead; the ``fake`` preset is accepted only when the
-    deployment backend is fake and the chip uses the preset's topology.
+    configuration instead; a preset is accepted only when the deployment backend
+    is the preset's backend and the chip uses the preset's topology. The
+    ``qibocal`` preset writes no files; it stores a simulation binding on the
+    chip, the only way a chip becomes a simulation chip.
 
     Parameters
     ----------
@@ -182,12 +186,16 @@ def create_chip(
         ChipInitializer.check_chip_available(request.chip_id, ctx.project_id)
         topology_id, topology = ChipInitializer._load_topology(request.topology_id, request.size)
         preset_id = options.preset if options else None
+        simulation_binding = None
         if preset_id is not None:
             preset = scaffolder.resolve_preset(preset_id)
             if topology_id != preset.topology_id:
                 raise ChipConfigError(
                     f"The '{preset_id}' preset needs the {preset.topology_id} topology"
                 )
+            # Only a preset of the deployment's own backend binds a chip to a simulator; no
+            # other request field can, and nothing updates the binding afterwards.
+            simulation_binding = simulation_binding_for_preset(preset)
         config_result = None
         if create_config:
             outcome = scaffolder.scaffold(
@@ -214,6 +222,7 @@ def create_chip(
                 size=request.size,
                 project_id=ctx.project_id,
                 topology_id=request.topology_id,
+                simulation_binding=simulation_binding,
             )
         except ChipAlreadyExistsError:
             # A concurrent creator may already be using this configuration tree.
@@ -233,6 +242,7 @@ def create_chip(
             coupling_count=0,  # Will be populated by ChipInitializer
             installed_at=chip.installed_at,
             activity_status=chip.activity_status,
+            simulation_binding=chip.simulation_binding,
             config=config_result,
         )
     except (ValueError, ChipConfigError) as e:

@@ -1195,6 +1195,11 @@ class CalibSession:
         """Export calibration note to a local JSON file."""
         assert self.task_context is not None
         assert self.execution_service is not None
+        from qdash.common.simulation_binding import check_hardware_export, chip_binding
+
+        check_hardware_export(
+            chip_binding(self.project_id, self.chip_id), self.chip_id, "calibration note export"
+        )
         try:
             from qdash.repository import MongoCalibrationNoteRepository
 

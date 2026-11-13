@@ -19,6 +19,6 @@ export interface ChipConfigOptions {
   source_system_id?: ChipConfigOptionsSourceSystemId;
   /** Backend of the new system; taken from the source system when one is given */
   backend?: ChipConfigOptionsBackend;
-  /** Write a complete virtual configuration instead of hardware files. 'fake' is offered only when the deployment backend is fake and needs its preset topology */
+  /** Create the chip from the deployment backend's preset instead of hardware files. 'fake' writes the virtual device's configuration and is offered only on the fake backend; 'qibocal' creates the one-qubit emulator chip, writes no files, and is offered only on the qibocal backend. Each preset needs its own topology */
   preset?: ChipConfigOptionsPreset;
 }

@@ -36,7 +36,8 @@ interface ChipPageJourneyOptions {
  * - Showing the journey's chip after one of its results was inspected finishes the journey.
  * - `adoptsCreatedChip` tells the Create Chip dialog that the guide takes the user on from the
  *   created chip, so it does not offer its own shortcut to the template.
- * - On a fake deployment, creating the guide's chip opens the New Flow editor on the fake template
+ * - On a preset deployment (fake or qibocal), creating the guide's chip opens the New Flow editor on
+ *   the preset's template
  *   for that chip, once, as the answer to that submission. `leavingForGuide` then tells the page
  *   to stop writing its URL state, because a Chip page URL written after the push cancels it. On hardware the user stays on the page,
  *   where the guide asks them to confirm the chip's configuration before the editor.
@@ -127,7 +128,7 @@ export function useChipPageJourney({ selectedChip, openCreateChip }: ChipPageJou
       if (!context.followsSubmittedJourney()) return "stay";
       if (context.record({ type: "chipSelected", chipId })?.chipId !== chipId) return "stay";
       handledChips.current.add(chipId);
-      const href = setup.kind === "fake" ? journeyNewFlowHref(setup, chipId) : null;
+      const href = setup.kind === "preset" ? journeyNewFlowHref(setup, chipId) : null;
       if (!href) return "stay";
       // Back returns to the Chip page showing the new chip, not to the reopened dialog.
       const params = new URLSearchParams(window.location.search);

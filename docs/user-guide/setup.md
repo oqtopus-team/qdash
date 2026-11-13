@@ -12,7 +12,8 @@ theme, several deployments on one host, and remote access are optional and can b
 | --- | --- |
 | Evaluate QDash without quantum hardware | [Fake](./setup/fake-backend.md); no backend configuration before startup |
 | Operate a Qubex-connected lab deployment | [Qubex](./setup/qubex-backend.md); place the Qubex configuration before startup |
-| Connect another hardware stack | Not supported by deployment settings, which accept only `fake` and `qubex`; an additional backend requires QDash code changes. |
+| Calibrate a dedicated emulated qubit with official Qibocal protocols | [Qibocal emulator](./setup/qibocal-backend.md); an opt-in Compose overlay, no backend configuration |
+| Connect another hardware stack | Not supported by deployment settings, which accept only `fake`, `qubex`, and `qibocal`; an additional backend requires QDash code changes. |
 
 The backend determines the available calibration tasks and hardware connection.
 
@@ -63,6 +64,15 @@ cp .env.example.qubex .env
 Prepare the configuration root at `CONFIG_PATH` before startup. Place existing chips' hardware
 and parameter files there as described in [Qubex backend](./setup/qubex-backend.md). You can
 create a new chip's configuration after signing in.
+
+For the Qibocal emulator, copy the Qibocal example:
+
+```bash
+cp .env.example.qibocal .env
+```
+
+It adds the Qibocal Compose overlay and uses `UI_PORT=5794` and its own data directories, as
+[Qibocal emulator backend](./setup/qibocal-backend.md#start-a-qibocal-deployment) describes.
 
 ## Configure Shared Deployment Settings
 
