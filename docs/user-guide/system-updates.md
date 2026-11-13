@@ -89,11 +89,9 @@ unavailable.
 
 ## Check Direct Service Access
 
-Check this section when updating from a release without the `caddy` service. The `caddy` service serves the UI, the API under `/api`, and Prefect under `/prefect` on
-`UI_PORT`, the only port QDash opens on the host. The API, Prefect, MongoDB, PostgreSQL,
-mongo-express, and deployment service ports are reachable only from the other QDash containers,
-not from the QDash host itself. Updating from a release without `caddy` needs no `.env` change;
-`docker compose up -d` also rebuilds the UI image, so it does not keep serving an older UI.
+When upgrading from a release without `caddy`, direct service connections must move to the
+single `UI_PORT` entry point. Caddy routes `/api` and `/prefect`; other services expose no
+host ports. No `.env` change is required, and `docker compose up -d` rebuilds the UI image.
 
 Check what reached those services directly, from another machine or from the QDash host:
 

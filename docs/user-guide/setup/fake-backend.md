@@ -1,14 +1,10 @@
 # Fake Backend
 
-The Fake backend lets you evaluate QDash pages, workflows, persistence, and result handling
-without connecting quantum hardware. It runs the Qubex calibration tasks against a simulator
-instead of hardware and never opens a hardware session or contacts a box. Database records, task
-results, figures, and other QDash state still persist in the paths configured in `.env`.
+The Fake backend runs Qubex calibration tasks against a simulator without connecting to
+hardware. Results, figures, and calibration state still persist in the paths set by `.env`.
 
-A Fake deployment needs no backend configuration before startup:
-[Setup](../setup.md#create-the-environment-file) creates `.env` from `.env.example`, which already
-sets `DEFAULT_BACKEND=fake`. This page explains what the simulator runs and how its chips are
-created once QDash is running.
+Use the default `.env.example` as described in [Setup](../setup.md#create-the-environment-file);
+no backend configuration is needed before startup.
 
 ## What the Fake Backend Runs
 

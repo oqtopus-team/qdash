@@ -1,10 +1,8 @@
 # Task Calls
 
-A task call is one planned invocation of a calibration task inside a step. Every step lists its
-work as `TaskCall` entries, so one step can run the same task more than once with different
-settings, and every result can be traced back to the call that produced it. The model is
-`qdash.datamodel.task_call.TaskCall`, exported as `from qdash.workflow import TaskCall`; Python
-flows and [pipeline specs](./calibration-pipeline.md) use the same class.
+A `TaskCall` identifies one task invocation in a step, with its own settings and traceable
+results. Python flows and [pipeline specs](./calibration-pipeline.md) share
+`qdash.datamodel.task_call.TaskCall`, exported from `qdash.workflow`.
 
 ```python
 from qdash.workflow import TaskCall, sweep

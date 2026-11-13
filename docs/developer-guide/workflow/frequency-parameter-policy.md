@@ -170,16 +170,10 @@ bringup as a recalibration operation.
 
 ### Readout transitions
 
-| Operation with publication enabled and validation passed | `resonator_frequency` | `readout_frequency` |
-| --- | --- | --- |
-| Resonator Spectroscopy | Update | Update to the measured resonance |
-| Filtered CKP | Update to the fitted ground-state resonance | Update to the photon-limited optimum |
-| Readout frequency optimization | Retain | Update to the optimized drive |
-
-Repeating Resonator Spectroscopy intentionally restores the measured resonance as the operational
-readout starting point. Run readout optimization afterward when the optimal drive should differ.
-
-Frequency selection alone does not establish that an old optimization remains suitable after other readout settings change. Show other updated outputs, such as readout amplitude, alongside the frequency behavior. Do not claim that all readout settings are preserved when only the frequency is retained.
+The [task matrix](#resonator-and-readout-frequency) defines readout publication. Repeating
+Resonator Spectroscopy resets the operational frequency to the measured resonance; run readout
+optimization afterward if the drive should differ. Review other updated outputs, including
+amplitude, because retaining a frequency does not preserve every readout setting.
 
 ### Coarse readout scan settings
 
@@ -205,9 +199,13 @@ All four calibration inputs are recorded for snapshot re-execution. Explicit inp
 
 The default scan includes the current frequency and amplitude: 13 frequency points over ±15 MHz and 5 amplitude points over ±20%. Amplitudes are capped at 1 and duplicate points are removed, so a reference near the upper bound can produce fewer than 5 amplitude points. The reference amplitude must be finite and within `(0, 1]`; invalid references fail rather than being replaced or clipped.
 
-Normally this performs 65 Rabi traces, compared with the previous 147-point grid using ±25 MHz and amplitudes from zero to the configured value. The shot count is halved from 2048 to 1024, while the default Rabi time window and shot interval are retained. These are adjustable starting settings, not a claim of equivalent measurement quality. Operators can widen the scan, change the Rabi time window, or restore 2048 shots using run parameters.
+The default scan performs 65 Rabi traces. Widen the ranges or change shots and the Rabi time
+window through run parameters when the experiment needs it.
 
-The progress plan uses the effective frequency count multiplied by the effective amplitude count, after clipping and duplicate removal. The UI shows all-sweep progress from the first Rabi trace: normally 65 sweeps, or 39 with a reference amplitude of 1 and the default ranges. The displayed count is completed sweeps out of the total; the percentage also includes progress within the active sweep. After the first sweep completes, the remaining-time estimate extrapolates the total elapsed measurement time across the planned sweeps. It includes time between sweeps and remains an estimate, since measurement speed can vary. The UI hides the inner Rabi time-point count and per-sweep ETA for this search.
+Progress uses the effective frequency count times the amplitude count after clipping and
+deduplication: normally 65 sweeps, or 39 at reference amplitude 1. The percentage includes the
+active sweep; the remaining-time estimate starts after the first sweep and includes inter-sweep
+time. The UI omits the inner Rabi point count and per-sweep estimate.
 
 Older snapshots without the newly declared reference inputs cannot silently use current settings; handle missing snapshot inputs according to [Parameter Resolution](./parameter-resolution.md#effective-input-validation).
 

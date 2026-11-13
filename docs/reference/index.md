@@ -5,9 +5,7 @@ Explanations and change procedures remain in the Developer Guide.
 
 ## Database
 
-| Information | Reference |
-| --- | --- |
-| Collection names and their document classes | [Database Collections](./database-structure.md) |
+Look up collection names and document classes in [Database Collections](./database-structure.md).
 
 ## API and Clients
 

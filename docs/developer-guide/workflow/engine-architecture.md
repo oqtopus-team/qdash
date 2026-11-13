@@ -203,16 +203,12 @@ only fake-only task is `FakeBringUp`, which seeds a fresh project with the simul
 parameters in place of the hardware bring-up tasks. `BackendSaver` persists fake outputs through
 the same path as qubex outputs, so a routed task finds what the task before it published.
 
-To add a qubex task to the fake backend, list it in `backend.yaml` and run the fake template; a
-gap in the simulator shows up as an `AttributeError` on `FakeExperiment`, which is fixed in
-`simulation.py`, never by a fake copy of the task. Keep the fix at the measurement level: the
-simulator answers `sweep_parameter`, `repeat_sequence` and the coherence experiments with
-physically shaped IQ data, and qubex's own analysis and figures (for example the chevron matched
-transform in `qubex.contrib`) run on top of it unchanged. An emulator-side re-implementation of a
-qubex analysis is drift waiting to happen and is removed when found. `tests/qdash/workflow/calibtasks/
-test_fake_backend_sync.py` fails when the list names a task qubex no longer has, when a fake
-class shadows a qubex task, or when the template's default chain can no longer resolve a
-required input from the tasks before it.
+To support another Qubex task, add it to `backend.yaml` and run the fake template. Implement
+missing `FakeExperiment` operations in `simulation.py` at the measurement level; reuse Qubex
+analysis and figures rather than copying the task or analysis.
+
+`tests/qdash/workflow/calibtasks/test_fake_backend_sync.py` checks task availability, prevents
+fake classes from shadowing Qubex tasks, and verifies the template's required-input chain.
 
 ### Add persistence behavior
 

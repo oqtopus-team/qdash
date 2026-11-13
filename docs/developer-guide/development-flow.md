@@ -1,97 +1,63 @@
 # Development Flow
 
+Develop changes on branches from `develop`; release from `main`.
+
 ## Branch Strategy
 
-As shown in the diagram below, the `develop` branch is branched off from the `main` branch, and feature branches (`feature/xxx`) are branched off from the `develop` branch for development. The `main` branch is the release branch, while the `develop` branch is for development.
-
-The `develop` branch always maintains the latest merged code, so when performing hotfixes, branches are created from the `develop` branch for the necessary fixes.
+Create feature, bug-fix, and hotfix branches from `develop`, which contains the latest merged code.
 
 <Diagram name="development-flow" caption="Work branches off develop and returns by squash-merged PR; releases go from develop to main through the release PR and a version tag." />
 
 ### Branch Naming
 
-While there are no strict rules, the following naming conventions are recommended:
-
-- `feature/xxx`: (xxx represents the feature being added)
-- `bugfix/xxx`: (xxx represents the bug being fixed)
-- `hotfix/xxx`: (xxx represents the urgent fix)
+Use `feature/<topic>`, `bugfix/<topic>`, or `hotfix/<topic>`.
 
 ## Conventional Commits
 
-The commit messages should preferably follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) guidelines.
+Use `<type>(<scope>): <summary>` with a short English summary and no trailing period, following
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/). Use `api`, `workflow`,
+`ui`, `docs`, `infra`, or `repo` as the scope when applicable.
 
 ### Commit Message Format
 
-By using `.gitmessage`, a template for commit messages is provided. This template can be enabled locally for this project by configuring `git config --local`.
+Enable the repository template locally:
 
 ```bash
 git config --local commit.template .gitmessage
 ```
 
-Once configured, running `git commit` will display the contents of `.gitmessage` in your editor (Vim by default).
+The template opens in your Git editor when you commit. For example:
 
-```bash
-git commit
-# Overview (Uncomment one of the following templates)
-#feat:
-# └  A new feature
-#fix:
-# └  A bug fix
-#docs:
-# └  Documentation only changes
-#style:
-# └  Changes that do not affect the meaning of the code
-#    (white-space, formatting, missing semi-colons, etc)
-#refactor:
-# └  A code change that neither fixes a bug nor adds a featur
-#test:
-# └  Adding missing or correcting existing tests
-#ci:
-# └  Changes to our CI configuration files and scripts
-#chore:
-# └  Updating grunt tasks etc; no production code change
-
+```text
+docs(docs): simplify workflow authoring guide
 ```
 
-Select the appropriate template and uncomment it, then write your commit message.
-
-```bash
-docs: Update README.md
-# └  Documentation only changes
-```
+On the host, commit with `nix develop -c git commit` so hooks use the pinned scanner; see
+[Before Pushing](#before-pushing).
 
 ## Correspondence between Commit Messages and Labels
 
 When creating a PR to the `main` branch, labels are automatically assigned based on the commit messages.
 Below is the correspondence between prefixes and labels:
 
-| Prefix    | Label           | Description                                                                                            |
-| --------- | --------------- | ------------------------------------------------------------------------------------------------------ |
-| feat:     | `feature`       | Adding a new feature                                                                                   |
-| fix:      | `bugfix`        | Bug fixes                                                                                              |
-| docs:     | `documentation` | Documentation only changes                                                                             |
-| style:    | `style`         | Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc) |
-| refactor: | `refactor`      | Code changes that neither fix a bug nor add a feature                                                  |
-| test:     | `test`          | Adding or correcting existing tests                                                                    |
-| ci:       | `ci`            | Adding or updating CI configuration and scripts                                                        |
-| chore:    | `chore`         | Minor changes or maintenance tasks                                                                     |
+| Prefix | Label | Description |
+| --- | --- | --- |
+| feat: | `feature` | Adding a new feature |
+| fix: | `bugfix` | Bug fixes |
+| docs: | `documentation` | Documentation only changes |
+| style: | `style` | Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc) |
+| refactor: | `refactor` | Code changes that neither fix a bug nor add a feature |
+| test: | `test` | Adding or correcting existing tests |
+| ci: | `ci` | Adding or updating CI configuration and scripts |
+| chore: | `chore` | Minor changes or maintenance tasks |
 
 ## Secret Scanning
 
 Betterleaks runs on every commit via a Lefthook-managed pre-commit hook and blocks the commit on any finding. Trufflehog scans git history in CI for verified leaks. See [Credential Scanning](./conventions/credential-scan.md) for tool roles, output reading, and false-positive handling.
 
-| Command                  | Description                                              |
-| ------------------------ | -------------------------------------------------------- |
-| `task scan-leaks`        | Scan the entire repository with Betterleaks              |
-| `task scan-leaks-local` | Scan tracked working files and commits absent from the target branch |
-| `task scan-leaks-staged` | Scan staged files only                                   |
-| `task scan-secrets`      | Scan git history with Trufflehog (verified secrets only) |
-| `task scan-secrets-all`  | Scan git history with Trufflehog (all findings)          |
-
-`task check` includes `scan-leaks-local`. The default target is `origin/develop`;
-use `task check LEAKS_BASE=origin/main` for another target. See the
-[local scan boundaries](./conventions/credential-scan.md#running-locally) for prerequisites
-and excluded files.
+`task check` includes the local leak scan. See
+[Credential Scanning](./conventions/credential-scan.md#running-locally) for scan commands,
+file coverage, and target-branch configuration.
 
 ## Pull Requests
 

@@ -210,21 +210,9 @@ A re-execution must not silently fall back to current database values. Such fall
 
 ### Model boundaries
 
-Task classes declare immutable intent with `InputParameterSpec`, `RunParameterSpec`, and `OutputParameterSpec`. Each task instance receives the matching mutable runtime model: `InputParameterModel`, `RunParameterModel`, and `OutputParameterModel`. All three specs use `default` for their initial value and expose `create_model()` for the conversion.
-
-The three runtime models may share persisted calibration metadata internally, but their distinct types keep input, run, and output roles visible at API boundaries and in type checking.
-
-```mermaid
-flowchart LR
-    D[InputParameterSpec<br/>task input spec] --> R[CalibrationInputResolver]
-    P[Execution context<br/>fresh or re-execution] --> R
-    S[Snapshot history] --> R
-    DB[Calibration DB] --> R
-    O[Permitted user overrides] --> R
-    R --> V[InputParameterModel<br/>effective task value]
-    V --> T[Task preprocess and run]
-    V --> H[Task result history]
-```
+Task specs declare immutable intent; each instance gets separate mutable Input, Run, and Output
+models through `create_model()`. The specs use `default` for initial values. Distinct runtime
+types preserve parameter roles at API and type-checking boundaries.
 
 ## Snapshot re-execution
 
@@ -271,17 +259,8 @@ sequenceDiagram
 
 The second override application preserves values computed during preprocessing while guaranteeing that explicit user input remains authoritative. The snapshot marker prevents preprocessing from replacing calibration inputs with current database values.
 
-Calibration inputs are resolved before task preprocessing and passed as `InputParameterModel` values:
-
-```text
-Execution request
-  -> CalibrationInputResolver(operation context)
-  -> Apply permitted user overrides
-  -> Task.preprocess(resolved inputs)
-  -> Task.run()
-```
-
-Task preprocessing may compute derived runtime values, but it must not independently change the selected point-in-time source. Database access for declared calibration inputs belongs to `CalibrationInputResolver`.
+Preprocessing may compute derived runtime values but must preserve the selected point-in-time
+source. `CalibrationInputResolver` owns database access for declared inputs.
 
 ### Effective-input validation
 
@@ -369,14 +348,9 @@ request never reaches hardware:
 The deprecated name and the nested form will be removed in a later release. A run queued with
 `persist_output_parameters` before an upgrade still applies its value, `false` included.
 
-A successful measurement-only task keeps its outputs in task history and metrics but does not
-replace current calibration values, update the workflow's in-memory calibration state, or update
-mapped backend files. Its output parameters explicitly record `database_updated: false`, allowing
-Task Result views to label it as measurement-only. Persisted outputs record `database_updated:
-true` with `previous_database_value`, which the UI presents as a Previous/New comparison.
-Validation-rejected outputs are still cleared before history aggregation;
-figures, raw data, quality metrics, and the validation message remain available for diagnosis
-without introducing rejected values into Metrics.
+See [Output outcomes](./calibration-data-lifecycle.md#output-outcomes) for history, metrics,
+accepted-state, and backend-file behavior. Applied outputs also record `previous_database_value`
+for the UI's Previous/New comparison.
 
 When persistence is enabled:
 

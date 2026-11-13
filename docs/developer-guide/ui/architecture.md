@@ -7,7 +7,7 @@ the API. Backend services remain the source of truth for project data and permis
 
 | Layer | Location | Responsibility |
 | --- | --- | --- |
-| Routes | `ui/src/app/` | App Router entry points, layouts, and the Copilot stream proxy |
+| Routes | `ui/src/app/` | App Router entry points and layouts |
 | Feature UI | `ui/src/components/features/` | Page behavior and feature-specific composition |
 | Shared UI | `ui/src/components/ui/` | Reusable interaction and presentation primitives |
 | Layout | `ui/src/components/layout/` | Navigation, global indicators, and chat surfaces |
@@ -88,16 +88,10 @@ that storage directly.
 
 ## User Avatars
 
-The browser renders every user avatar locally with the `glyph-avatar` package bundled into the
-UI, pinned to exactly `0.1.0`. `UserAvatar` builds a `data:` URI from a canonical spec string
-and shows it in an `<img>`, so an avatar makes no image request and its SVG cannot run script.
-No CDN or generator service is involved; once the UI assets have loaded, avatars depend only on
-the username.
-
-A user without a custom choice shows the automatic spec `v1:<username>::solid:c`. Its seed is the
-username, so the same username gets the same avatar on every instance that bundles the same
-package version. `UserAvatar` renders this spec immediately and keeps it while avatar data is
-loading, when the API or network fails, and when a stored spec fails validation.
+`UserAvatar` renders a validated `glyph-avatar` spec as an SVG `data:` URI in an `<img>`,
+without an external image service. The package is pinned to `0.1.0`. The automatic spec,
+`v1:<username>::solid:c`, gives the same username the same avatar for that package version.
+It is also the fallback while custom data loads or fails validation or retrieval.
 
 A custom choice from the picker in **Settings** is saved per instance as a spec string. The API
 validates the spec with `parse_avatar_spec` and stores it in the `user_avatar` collection with

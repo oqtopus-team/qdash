@@ -29,10 +29,9 @@ application configuration (`workflow.params_updater.parameter_file_map`).
 
 ## Create a bounded session
 
-A session fixes everything the agent may touch: the chip, the qubits, the tasks, the bounds a
-proposed parameter must fall in, the quality a result must reach, how many actions the agent
-may propose, when the grant expires, which skill and model are acting, and whether the agent may
-reconfigure hardware. Nothing outside the session is accepted later.
+A session fixes the chip, qubits, allowed tasks, parameter bounds, quality gates, action budget,
+expiry, skill/model identity, and hardware-reconfiguration permission. Later actions must stay
+within that scope.
 
 ```bash
 qdash-agent --profile local start-session \
@@ -174,15 +173,16 @@ and planner decision, and the final set of carried parameters.
 
 ### Autonomous plan
 
-With `--planner evaluation` the plan chooses its next node from the calibration evaluation
-of each result instead of following `on_pass` and `on_rollback` alone. After a node, QDash
-evaluates the node's task result with the calibration-evaluation model (the QCalEval
-questions), the planner reads the status the model chose, and the task's knowledge says what
-that status leads to: the table under `next_actions` in the task's `task.md` frontmatter
-(see the [knowledge layout](../developer-guide/copilot/knowledge-layout.md)). The planner never
-invents a step: `continue` follows the plan, `retry` runs the same node again, `run_task` jumps
-to the node of the plan that runs the named task, and `request_human` stops. A status the
-table does not cover stops the plan too.
+With `--planner evaluation`, each result's AI evaluation selects the next node through the
+task knowledge's `next_actions` table; see [Knowledge Layout](../developer-guide/copilot/knowledge-layout.md).
+The planner can only choose nodes already in the approved plan:
+
+| Action | Effect |
+| --- | --- |
+| `continue` | Follow the plan |
+| `retry` | Run the same node again |
+| `run_task` | Jump to the node for the named task |
+| `request_human` or an unlisted status | Stop for review |
 
 The session must grant it. Create the session with `--autonomy auto`; the policy then records
 that a person approved the plan, the bounds, and the budget once, and the command refuses any

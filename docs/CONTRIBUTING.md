@@ -5,7 +5,7 @@ Contribute to QDash through GitHub issues and pull requests on
 
 ## Code of Conduct
 
-This project adopts a [Code of Conduct](./CODE_OF_CONDUCT.md). Please adhere to this Code of Conduct when participating, contributing, and communicating in the project.
+Follow the [Code of Conduct](./CODE_OF_CONDUCT.md) when participating in the project.
 
 ## Reporting Bugs
 
@@ -23,7 +23,7 @@ Request a feature with the [Feature Request Template](https://github.com/oqtopus
 
 ## Coding Guidelines
 
-For branch naming, commits, and the checks to run before pushing, see the [Development Flow](./developer-guide/development-flow.md).
+Follow [Development Flow](./developer-guide/development-flow.md) for branches and pre-push checks.
 
 ## Commit Message Guidelines
 

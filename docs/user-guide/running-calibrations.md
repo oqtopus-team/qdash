@@ -89,18 +89,16 @@ finished and which one is being measured, and the running task shows its measure
 Cancelling a run sends a cancellation request to the worker. A task that is inside an operation
 that cannot be interrupted can take time to stop.
 
-The activity chart at the top of the page counts the chip's runs for the last **7d**, **30d** or
-**90d** as blocks stacked by status; it opens on 30 days. The 30- and 90-day views show one column
-per day (**Executions per day**). The 7-day view shows **Executions per 6 hours**: 28 columns that
-start at 00:00, 06:00, 12:00 and 18:00 in the deployment's time zone, ending with the 6 hours
-that include the current time. Days and periods without runs keep an empty column.
+The activity chart groups the chip's runs by status over **7d**, **30d** (default), or **90d**:
 
-Each block represents one execution, and the axis on the left shows execution counts. For busy
-periods, the chart labels how many executions a full block represents; the top block of a column
-is only partly filled when it holds fewer. Hover over or focus a column to see its exact counts.
-Select a column to limit the list below to its day; in the 7-day view, a 6-hour column selects
-its whole day, because the list filters by day. Select a column of that day again to return to
-the latest runs.
+- **30d** and **90d** show one column per day.
+- **7d** shows 28 six-hour periods starting at 00:00, 06:00, 12:00, and 18:00 in the
+  deployment's time zone, including the current period.
+
+Empty periods keep their columns. The chart labels how many executions a full block represents;
+a partially filled block holds fewer. Hover over or focus a column for exact counts. Select it
+to filter the list to that day, even in the six-hour view; select the same day again to clear
+the filter.
 
 ## Inspect a Result
 

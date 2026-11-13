@@ -59,34 +59,22 @@ devices. They do not apply to AI evaluations or forum replies, which stay the sa
 and they cannot skip the approval of write operations. A **Your instructions** link in the chat
 composer shows when they are on.
 
-**What Copilot is told**, below the instructions, shows read-only what the application sends the
-chat model: QDash's system prompt, your instructions as they are appended to it, and the tools the
-chat offers. It is the running text, so it reflects the current skills, tools, and language
-settings; the application's part is edited in the deployment, not in Settings.
+**What Copilot is told** shows the current system prompt, your appended instructions, and
+available tools. The application-owned text is read-only; change it in the deployment.
 
 ## Investigate a Failure
 
-Use **Investigate with AI** when an execution or a task failed and you want to know why. The
-button appears in the **Error Log** of a failed execution on the **Execution** page and on its
-detail page, in the **Error Log** of a failed task result, and on a failed task in an execution's
-task details. It works when the execution failed before any task result was recorded.
+Use **Investigate with AI** in an **Error Log** to investigate a failed execution or task,
+even when no task result was recorded.
 
-1. Select **Investigate with AI** in the **Error Log** header.
-2. The chat opens and sends the investigation for you. On the **Execution** pages, in task
-   details, and in a task result preview, it opens in the floating chat window, so the details
-   panel stays in view; on a task result's own page it opens in the chat sidebar. QDash adds the
-   recorded error message and stack trace, and the execution, task, qubit, and chip identifiers
-   to the chat.
-3. Read the answer, then ask follow-up questions in the same chat.
+1. Select **Investigate with AI**. QDash opens a chat and sends the recorded error, stack trace,
+   and execution context. It uses a floating window to keep details visible, or the sidebar on
+   a task result's own page.
+2. Read the likely cause, supporting logs and source references, and proposed next step.
+3. Ask follow-up questions for deeper analysis. The assistant does not apply fixes or re-run tasks.
 
-The assistant reads available source code, starting from the code that raised the error. The
-answer gives a likely cause, supporting logs and code references, and a next step or proposed fix.
-The assistant reads more code only when the evidence is unclear; ask a follow-up
-question for a deeper analysis. It does not apply fixes or re-run anything.
-
-QDash does not record which source revision an execution ran with. The answer names the revision
-of the source it read, or says it is unknown, and says that it cannot confirm that this source
-matches the failed run. When the logs are missing or too long, the answer says what is missing.
+The answer identifies missing or truncated logs and the source revision it inspected. QDash
+does not record the source revision of a failed run, so the assistant cannot confirm a match.
 
 Selecting the button again for the same failure reopens that chat instead of starting a new one.
 To run the investigation again from the start, select **New chat** while the investigation chat is

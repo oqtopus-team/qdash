@@ -18,9 +18,6 @@ Related model layers serve different contracts:
 | HTTP schemas | `src/qdash/api/schemas/` | Request and response payloads |
 | Public API | [OpenAPI](./openapi.md) | Generated HTTP operations and schemas |
 
-Do not copy a field or index definition into documentation when the code can answer it directly.
-Explain lifecycle and ownership decisions in the Developer Guide instead.
-
 ## Identity and Projects
 
 | Collection | Document | Module |

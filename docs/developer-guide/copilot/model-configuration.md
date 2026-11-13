@@ -125,12 +125,10 @@ tools as reported by the chat; the runtime checks that they are tools the chat o
 each value appears in their results. The block goes out as `details.ui`, the same `ui` event and
 stored block `render_ui` produces.
 
-The decision reads the answer's `probabilities` only. The chosen category is accepted when its
-probability is at least 0.6 and leads the runner-up by at least 0.2. With four categories an uninformed answer gives each 0.25, so the defaults ask
-for a clear majority; they are heuristics, not calibrated accuracy, and are not configurable. The answer's `confidence`
-is a separate service-defined score and is not used. An error, abort, or timeout
-(5 seconds), an invalid answer, an ambiguous one, or records the layout cannot
-hold give no UI and a result telling the chat to use `render_ui` or text; the turn continues.
+The chosen category must have probability ≥0.6 and lead the runner-up by ≥0.2. These fixed
+heuristics use `probabilities`, not the service-defined `confidence` score. Errors, cancellation,
+a 5-second timeout, invalid or ambiguous answers, and incompatible records return no UI and tell
+the chat to use `render_ui` or text.
 
 The classifier runs as a nested call, `qdash.presentation.classify`, under a fixed key of the
 replay-safe `present_results` call, so its result is journaled with the call. After a restart
@@ -194,14 +192,10 @@ guessing:
 | Next investigation | Which of a few possible checks is most likely to explain the problem? |
 | Presentation | Does a custom `render_ui` view, `render_chart`, or text suit values the fixed layouts do not cover? |
 
-The guideline keeps the rest with the chat. The chat skips `classify` when a tool result, a
-threshold, a status, or the user's words already decide. It calls `present_results` directly
-for the fixed layouts, so a layout is classified once. It passes only facts it read, and the
-classifier supplies no value to show. The answer is evidence, not authority: the chat weighs
-it against the data and says when it relies on it. An `ambiguous` answer counts as weak
-evidence or prompts `ask_user`, and the chat decides itself when the call fails. A
-classification never approves a write tool or replaces its approval card. The call shows nothing
-but its own step and renders no view.
+Skip classification when tool results, a threshold, status, or the user's words already decide.
+Use `present_results` directly for its fixed layouts. Pass observed facts only; treat the
+classification as evidence and disclose reliance on it. Ambiguity can prompt `ask_user`; errors
+leave the decision with the chat. Classification neither renders a view nor approves a write.
 
 | Argument | Bounds |
 | --- | --- |
@@ -209,16 +203,14 @@ but its own step and renders no view.
 | `categories` | 2 to 8 entries of a snake_case `name` (up to 40 characters, distinct) and a `description` (up to 200 characters); sent as its `criteria` |
 | `context` | 1 to 4,000 characters of facts from tool results or the user; sent as `state.context` |
 
-The decision reads the answer's `probabilities` only, as for `present_results`. The outcome is
-`classified` when the chosen category's probability is at least 0.6 and leads the runner-up by
-at least 0.2, and `ambiguous` otherwise; an ambiguous answer is still returned, and the result
-tells the chat to treat it as weak evidence or ask the user. Either way the chat gets the
-category, its probability and lead, and every category's probability. An unavailable model, an
-error, cancellation, a timeout (5 seconds), or a malformed answer ends the call as an error with
-outcome `failed` and one fixed reason (`classifier unavailable`, `classifier request failed`,
-`cancelled`, `timed out after 5 s`, or `invalid classifier answer`). The provider's own message
-goes only to the runtime log. The tool is not replay-safe, so a call a restart interrupted ends
-as an error rather than asking the classifier again.
+`classify` uses the same probability and lead thresholds as `present_results`. It returns
+`classified` or `ambiguous`, with the selected category, probability, lead, and all category
+probabilities. An ambiguous answer remains available as weak evidence.
+
+Failures return `failed` with one fixed reason: `classifier unavailable`,
+`classifier request failed`, `cancelled`, `timed out after 5 s`, or `invalid classifier answer`.
+Provider messages go only to runtime logs. The tool is not replay-safe; a restart-interrupted
+call fails instead of requesting another classification.
 
 The result's `details.classification` holds the classifier's `provider/model`, the outcome, and
 those numbers, never the classifier's input. `events.ts` copies it onto the `classify` call's
@@ -255,7 +247,7 @@ for both API styles and both model roles. Deployment steps are in
 ## Environment Variables
 
 | Variable | Purpose |
-|----------|---------|
+| --- | --- |
 | `OPENAI_API_KEY` | OpenAI API authentication |
 | `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` | OpenAI-compatible API base URL through `/v1`; the suffix is operator-defined |
 | `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` | API key for the endpoint with the matching suffix; it can be a placeholder for a keyless endpoint |

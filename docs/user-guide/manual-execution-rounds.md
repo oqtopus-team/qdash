@@ -5,18 +5,9 @@ qubits, or which directed coupling pairs, run together and in what order, and QD
 that list. Use it when a procedure needs a specific grouping that the automatic modes in
 [Creating Workflows](./creating-workflows.md#choose-an-execution-mode) do not produce.
 
-A round is a set of targets that run in parallel. Every target of a round runs the step's whole
-task list, and the next round starts only after every target of the current round has finished.
-Rounds run in the order you write them, and the targets of a round are submitted in the order you write
-them. QDash never regroups, reorders, splits or reverses manual rounds, and it does not
-synchronize pulses or tasks between the targets of a round: a round is the same waiting rule as
-`parallel_by_round`, with your grouping instead of the scheduler's.
-
-| Execution mode | Who forms the rounds or groups | Where to read more |
-| --- | --- | --- |
-| `parallel_by_round` (one-qubit default) | The scheduler, from the chip wiring, when the run starts | [Choose an Execution Mode](./creating-workflows.md#choose-an-execution-mode) |
-| `automatic` (two-qubit default) | The CR scheduler, or an earlier `GenerateCRSchedule` step | [Schedule Two-Qubit Calibration](./creating-workflows.md#schedule-two-qubit-calibration) |
-| `manual` | You, in the `rounds` of the step | This page |
+Each target runs the whole task list independently. The next round waits for every target in
+the current round to finish, as in `parallel_by_round`. QDash preserves round and target
+submission order without regrouping, splitting, reversing, or synchronizing pulses.
 
 ## Write One-Qubit Rounds
 
@@ -127,17 +118,13 @@ and `rounds` fields work in calibration pipeline specs, where pairs are written 
 durations. The illustration under the steps is an example with other qubits and is labelled as
 not this run.
 
-The preview reads the source without running it. When the steps depend on values only known at
-run time, such as a condition on a runtime value, a loop, or a helper function, the preview says
-it cannot resolve the steps and shows no partial plan; you can still execute, and QDash checks
-manual rounds again before any qubit or pair is measured. The same applies when a `return` that
-depends on a runtime value comes before a `cal.run(...)` call, and when the saved parameters
-reach a `raise`. A check that raises an error on a runtime value, such as
-`if not qids: raise ValueError(...)`, does not affect the preview: it stops a failing run, and a
-run that passes it runs the steps shown. Unsaved editor changes are not part of the preview or the
-run. The preview shows planned steps assuming runtime checks pass; a failed check can stop
-execution. Preview and execution are not locked to the same saved-source version: another save
-between them can change the source that executes.
+The preview reads saved source without executing it. Runtime-dependent steps, loops, helper
+functions, early returns, or a reachable `raise` can make the plan unresolvable; QDash then
+shows no partial plan but still permits execution. A guard such as
+`if not qids: raise ValueError(...)` permits preview of the steps that run when the guard passes.
+
+QDash validates manual rounds again before measurement. Unsaved edits are excluded, and another
+save between preview and execution can change the executed source.
 
 ## What the Checks Cover
 
