@@ -36,7 +36,14 @@ sequenceDiagram
 ```
 
 `QibocalBackend.run_protocol()` in `src/qdash/workflow/engine/backend/qibocal.py` owns
-the subprocess:
+run directories, platform snapshots, request serialization, binding checks, and result validation.
+It passes argv, the existing working directory, stdout/stderr paths, timeout, and termination
+grace to `run_process()` in `engine/backend/qibocal_process.py`. That helper owns the minimal
+environment, process launch, log handles, waiting, and exception cleanup. It returns the exit code
+or propagates the exception after cleanup; it does not interpret protocols, calibration mappings,
+or result files, create run directories, or remove artifacts.
+
+The boundary preserves these behaviors:
 
 - Each run gets its own directory, `<execution calib dir>/qibocal/<task>_q<qid>_<random>/`,
   holding the request, a copy of the platform, the runner logs, `result.json`, the report
@@ -45,7 +52,7 @@ the subprocess:
   configured platform is hashed before and after the run; a change fails the task.
 - The command is a fixed argument list started without a shell, with `-I` and a minimal
   environment, in a new process group. On timeout, cancellation, or any other exception the
-  backend sends `SIGTERM` to the group and `SIGKILL` after the grace period. The runner also
+  process helper sends `SIGTERM` to the group and `SIGKILL` after the grace period. The runner also
   exits when its parent process disappears.
 - Runner exit code 3 means the platform was rejected and raises
   `QibocalPlatformRejectedError`; exit code 4 means an invalid request, including a qubit that
@@ -55,6 +62,13 @@ the subprocess:
 - If the workflow process is killed with `SIGKILL` and cannot run that cleanup, the runner's
   watchdog (`_exit_with_parent()`) sees its parent change and exits within a second. The run
   directory keeps the request, the platform copy, and both logs, with no `result.json`.
+
+The child owns `_exit_with_parent()` because parent-side cleanup cannot run after parent death.
+It is separate from the parent's normal timeout and cancellation handling, not another timeout
+controller. The task's 1800-second limit covers the task lifecycle; the configured runner timeout
+(default 600 seconds) covers the subprocess wait, followed by the configured termination grace
+(default 5 seconds). These limits remain independent. The backend translates a transport timeout
+into `QibocalRunnerTimeoutError` and retains `last_run_dir` for failed-task artifact tracking.
 
 ## Invariants
 
@@ -200,13 +214,15 @@ platform `LICENSE` and `UPSTREAM.md` under `/app/src/qdash/workflow/qibocal_runn
 
 To add another Qibocal protocol, add a `QibocalTask` subclass under
 `src/qdash/workflow/calibtasks/qibocal/`, an allowlisted runner protocol that calls the upstream
-protocol through `Executor` with `update=False`, a backend method that reuses
-`_run_subprocess()`, and the task name in the `qibocal` section of `config/app/backend.yaml`.
+protocol through `Executor` with `update=False`, and the task name in the `qibocal` section of
+`config/app/backend.yaml`. Use the existing backend `run_protocol()` request/result boundary;
+protocol extensions do not change the process helper.
 Run `task generate-task-catalog` afterwards.
 
 | Concern | Tests |
 | --- | --- |
-| Subprocess, isolation, timeout, cancellation, result checks, platform hash | `tests/qdash/workflow/engine/backend/test_qibocal_backend.py` |
+| Backend isolation, timeout translation, cancellation, result checks, platform hash | `tests/qdash/workflow/engine/backend/test_qibocal_backend.py` |
+| Process exit codes, stdio capture, minimal environment, forced group termination, launch failure | `tests/qdash/workflow/engine/backend/test_qibocal_process.py` |
 | Task request validation, outputs, failures, every write-back setting, orchestrator run | `tests/qdash/workflow/calibtasks/test_qibocal_rabi_amplitude.py` |
 | Real Qibocal and Qibolab emulator | `tests/qdash/workflow/calibtasks/test_qibocal_database.py` (`qibocal_emulator` marker) |
 | GitHub policy, agent candidates | `tests/qdash/workflow/service/test_single_task_flow.py`, `tests/qdash/api/services/test_agent_session_service.py` |
