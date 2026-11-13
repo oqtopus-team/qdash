@@ -370,6 +370,14 @@ export function QubitGrid({
   const [currentScale, setCurrentScale] = useState<number | null>(null);
   const lodTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (lodTimeoutRef.current !== null) {
+        clearTimeout(lodTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const numRegions = Math.floor(gridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
 
