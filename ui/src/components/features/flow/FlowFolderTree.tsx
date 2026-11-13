@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type React from "react";
+import { useEffect, useRef } from "react";
 import {
   AlertTriangle,
   CalendarClock,
@@ -29,6 +30,8 @@ export interface FlowSelection {
   /** True while a deletion is in progress; every control is disabled. */
   disabled: boolean;
   onToggle: (name: string) => void;
+  /** Select (true) or deselect (false) every named flow, leaving the rest of the selection as is. */
+  onSetMany: (names: readonly string[], selected: boolean) => void;
   onDelete: (name: string) => void;
 }
 
@@ -41,6 +44,38 @@ function FlowSelectCheckbox({ flow, selection }: { flow: FlowSummary; selection:
       checked={selection.selected.has(flow.name)}
       disabled={selection.disabled}
       onChange={() => selection.onToggle(flow.name)}
+    />
+  );
+}
+
+/**
+ * Selects or deselects every workflow of one creator, including flows in
+ * subfolders and in a closed folder. Mixed when only some of them are selected.
+ */
+function FolderSelectCheckbox({
+  folder,
+  selection,
+}: {
+  folder: FlowFolder;
+  selection: FlowSelection;
+}) {
+  const names = folder.flows.map((flow) => flow.name);
+  const selectedCount = names.filter((name) => selection.selected.has(name)).length;
+  const all = names.length > 0 && selectedCount === names.length;
+  const some = selectedCount > 0 && !all;
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = some;
+  }, [some]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className="checkbox checkbox-sm"
+      aria-label={`Select all workflows by ${folder.creator}`}
+      checked={all}
+      disabled={selection.disabled || names.length === 0}
+      onChange={() => selection.onSetMany(names, !all)}
     />
   );
 }
@@ -283,7 +318,8 @@ function FlowTreeView({ node, selection }: { node: FlowTreeNode; selection?: Flo
  * One creator's workflows behind a folder header. The signed-in user's folder
  * starts open and the others closed, so the list shows your own work first and
  * everyone else's a click away. "Open in editor" shows the same space in the
- * editor's Explorer, where folders are made, renamed and moved.
+ * editor's Explorer, where folders are made, renamed and moved. With a
+ * selection, a checkbox beside the header selects all of the creator's workflows.
  */
 export function FlowFolderSection({
   folder,
@@ -294,34 +330,43 @@ export function FlowFolderSection({
 }) {
   const count = folder.flows.length;
   return (
-    <details
-      open={folder.mine}
-      className="group card bg-base-200 shadow-sm"
-      data-testid={`flow-folder-${folder.creator}`}
-    >
-      <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
-        <ChevronRight className="h-4 w-4 shrink-0 text-base-content/60 transition-transform group-open:rotate-90" />
-        <FolderOpen className="h-5 w-5 shrink-0 text-primary" />
-        <span className="truncate text-sm font-medium">{folder.creator}</span>
-        {folder.mine && <span className="badge badge-primary badge-sm shrink-0">You</span>}
-        <span className="ml-auto shrink-0 text-xs text-base-content/60">
-          {count} {count === 1 ? "workflow" : "workflows"}
+    <div className="card relative bg-base-200 shadow-sm">
+      {/* The folder checkbox sits beside the disclosure, not inside its summary, so selecting
+          a creator's workflows never opens or closes the folder. */}
+      {selection && (
+        <span className="absolute left-4 top-3 z-10 flex h-6 items-center sm:left-6">
+          <FolderSelectCheckbox folder={folder} selection={selection} />
         </span>
-        {folder.flows[0] && (
-          <Link
-            href={`/workflow/${encodeURIComponent(folder.flows[0].name)}?space=${encodeURIComponent(folder.creator)}`}
-            className="btn btn-ghost btn-xs gap-1"
-            title="Open this space in the editor's Explorer, where folders can be arranged"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <PanelLeftOpen className="h-4 w-4" />
-            <span className="hidden sm:inline">Open in editor</span>
-          </Link>
-        )}
-      </summary>
-      <div className="px-4 pb-4 sm:px-6 sm:pb-6">
-        <FlowTreeView node={folder.root} selection={selection} />
-      </div>
-    </details>
+      )}
+      <details open={folder.mine} className="group" data-testid={`flow-folder-${folder.creator}`}>
+        <summary
+          className={`flex cursor-pointer select-none items-center gap-2 py-3 pr-4 sm:pr-6 [&::-webkit-details-marker]:hidden ${
+            selection ? "pl-11 sm:pl-13" : "pl-4 sm:pl-6"
+          }`}
+        >
+          <ChevronRight className="h-4 w-4 shrink-0 text-base-content/60 transition-transform group-open:rotate-90" />
+          <FolderOpen className="h-5 w-5 shrink-0 text-primary" />
+          <span className="truncate text-sm font-medium">{folder.creator}</span>
+          {folder.mine && <span className="badge badge-primary badge-sm shrink-0">You</span>}
+          <span className="ml-auto shrink-0 text-xs text-base-content/60">
+            {count} {count === 1 ? "workflow" : "workflows"}
+          </span>
+          {folder.flows[0] && (
+            <Link
+              href={`/workflow/${encodeURIComponent(folder.flows[0].name)}?space=${encodeURIComponent(folder.creator)}`}
+              className="btn btn-ghost btn-xs gap-1"
+              title="Open this space in the editor's Explorer, where folders can be arranged"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+              <span className="hidden sm:inline">Open in editor</span>
+            </Link>
+          )}
+        </summary>
+        <div className="px-4 pb-4 sm:px-6 sm:pb-6">
+          <FlowTreeView node={folder.root} selection={selection} />
+        </div>
+      </details>
+    </div>
   );
 }
