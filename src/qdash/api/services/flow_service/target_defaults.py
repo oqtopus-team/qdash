@@ -196,6 +196,8 @@ def _runs_pair_pipelines(
             return False
         if not _builtin_steps(steps, body, parents, set(runs), bound):
             return False
+        if not _has_pair_before_run(steps, run, parents, bound):
+            return False
     return True
 
 
@@ -214,27 +216,91 @@ def _step_list(
     node: ast.expr,
     bound: Callable[[str, Callable[[ast.expr], bool], bool], bool],
 ) -> bool:
-    """A list literal of built-in steps with a guaranteed two-qubit step.
+    """A list literal containing only built-in steps, possibly empty."""
+    return isinstance(node, (ast.List, ast.Tuple)) and all(
+        _is_step_call(element)
+        or (isinstance(element, ast.Name) and bound(element.id, _is_step_call, False))
+        for element in node.elts
+    )
 
-    An element is a step call or a name whose every assignment is one.
+
+def _has_pair_before_run(
+    steps: ast.expr,
+    run: ast.Call,
+    parents: dict[ast.AST, ast.AST],
+    bound: Callable[[str, Callable[[ast.expr], bool], bool], bool],
+) -> bool:
+    """Check pair presence using only statements guaranteed to precede this run.
+
+    Built-in membership and mutations are checked separately. Do not infer that
+    an addition in a conditional branch happened, or follow arbitrary control
+    flow. A possible reassignment discards the previous guarantee.
     """
 
-    def is_pair_step(value: ast.expr) -> bool:
-        return isinstance(value, ast.Call) and _call_name(value) in _PAIR_STEPS
+    def pair(value: ast.expr) -> bool:
+        def constructor(node: ast.expr) -> bool:
+            return isinstance(node, ast.Call) and _call_name(node) in _PAIR_STEPS
 
-    return (
-        isinstance(node, (ast.List, ast.Tuple))
-        and all(
-            _is_step_call(element)
-            or (isinstance(element, ast.Name) and bound(element.id, _is_step_call, False))
-            for element in node.elts
+        return constructor(value) or (
+            isinstance(value, ast.Name) and bound(value.id, constructor, False)
         )
-        and any(
-            is_pair_step(element)
-            or (isinstance(element, ast.Name) and bound(element.id, is_pair_step, False))
-            for element in node.elts
-        )
-    )
+
+    def contains_pair(value: ast.expr | None) -> bool:
+        return isinstance(value, (ast.List, ast.Tuple)) and any(pair(v) for v in value.elts)
+
+    if not isinstance(steps, ast.Name):
+        return contains_pair(steps)
+
+    # Collect the prefixes of the enclosing blocks, outermost first. Only if
+    # and with blocks have straightforward entry ordering; reject other forms.
+    prefixes: list[list[ast.stmt]] = []
+    child: ast.AST = run
+    while child in parents:
+        parent = parents[child]
+        if isinstance(child, ast.stmt):
+            if not isinstance(parent, (ast.Module, ast.If, ast.With, ast.AsyncWith)):
+                return False
+            for _, value in ast.iter_fields(parent):
+                if isinstance(value, list) and child in value:
+                    prefixes.append(value[: value.index(child)])
+        child = parent
+
+    present = False
+    for prefix in reversed(prefixes):
+        for statement in prefix:
+            if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+                targets = (
+                    statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+                )
+                if any(isinstance(t, ast.Name) and t.id == steps.id for t in targets):
+                    present = contains_pair(statement.value)
+            elif (
+                isinstance(statement, ast.AugAssign)
+                and isinstance(statement.target, ast.Name)
+                and statement.target.id == steps.id
+            ):
+                present = present or contains_pair(statement.value)
+            elif (
+                isinstance(statement, ast.Expr)
+                and isinstance(call := statement.value, ast.Call)
+                and isinstance(call.func, ast.Attribute)
+                and isinstance(call.func.value, ast.Name)
+                and call.func.value.id == steps.id
+            ):
+                # _builtin_steps has already checked the method and arguments.
+                added = call.args[0] if call.func.attr == "extend" else call.args[-1]
+                present = present or (
+                    contains_pair(added) if call.func.attr == "extend" else pair(added)
+                )
+            elif any(
+                isinstance(node, ast.Name)
+                and node.id == steps.id
+                and isinstance(node.ctx, (ast.Store, ast.Del))
+                and not isinstance(parents.get(node), ast.AugAssign)
+                for node in ast.walk(statement)
+            ):
+                present = False
+    return present
 
 
 def _builtin_steps(
@@ -269,6 +335,8 @@ def _builtin_steps(
                 return False
             continue
         if isinstance(parent, (ast.Assign, ast.AnnAssign)) and isinstance(node.ctx, ast.Store):
+            if isinstance(parent, ast.Assign) and len(parent.targets) != 1:
+                return False
             continue
         if (
             isinstance(node.ctx, ast.Load)

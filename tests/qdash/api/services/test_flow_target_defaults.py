@@ -294,3 +294,75 @@ def test_each_run_requires_a_pair_step():
         + "\n"
         + PAIR_RUN.format(targets=PAIRS, steps="[]")
     ) == ["mux_ids", "qids"]
+
+
+@pytest.mark.parametrize("initial", ["[]", "[GenerateCRSchedule()]"])
+@pytest.mark.parametrize("pair", ["TwoQubitCalibration()", "CustomTwoQubit(tasks=[])"])
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "steps.append({pair})",
+        "steps.extend([{pair}])",
+        "steps.insert(0, {pair})",
+        "steps += [{pair}]",
+    ],
+)
+def test_pair_additions_enable_overrides(initial, pair, addition):
+    assert _modes(
+        f"steps = {initial}\n{addition.format(pair=pair)}\n"
+        + PAIR_RUN.format(targets=PAIRS, steps="steps")
+    ) == ["coupling_pairs"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "steps = []\n{run}\nsteps.append(TwoQubitCalibration())",
+        "steps = []\nif s:\n    steps.append(TwoQubitCalibration())\n{run}",
+        "steps = []\nif s:\n    steps += [TwoQubitCalibration()]\n{run}",
+        "steps = []\nsteps.append(TwoQubitCalibration())\nsteps = []\n{run}",
+        "steps = [TwoQubitCalibration()]\nif s:\n    steps = []\n{run}",
+        "steps = []\n{run}\nsteps.extend([TwoQubitCalibration()])\n{run}",
+        "steps = [TwoQubitCalibration()]\n{run}\nsteps = []\n{run}",
+        "steps = []\nsteps.append(TwoQubitCalibration())\nsteps.clear()\n{run}",
+        "steps = []\nsteps.append(TwoQubitCalibration())\nalias = steps\n{run}",
+        "steps = alias = []\nsteps.append(TwoQubitCalibration())\nalias.clear()\n{run}",
+        "steps = []\nsteps.append(TwoQubitCalibration())\nedit(steps)\n{run}",
+        "steps = []\nsteps.append(TwoQubitCalibration())\nsteps[0] = ConfigureAll()\n{run}",
+        "steps = []\nsteps.extend(build_steps())\nsteps.append(TwoQubitCalibration())\n{run}",
+        "steps = []\nsteps.append(OpaqueStep())\nsteps.append(TwoQubitCalibration())\n{run}",
+        "steps = []\nif s:\n    steps.append(TwoQubitCalibration())\nelse:\n    {run}",
+    ],
+)
+def test_pair_additions_require_guaranteed_presence_at_every_run(body):
+    assert _modes(body.format(run=PAIR_RUN.format(targets=PAIRS, steps="steps"))) == [
+        "mux_ids",
+        "qids",
+    ]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "steps = []\nsteps.append(TwoQubitCalibration())\n{run}\nsteps.append(ConfigureAll())\n{run}",
+        "steps = []\nif s:\n    steps.append(TwoQubitCalibration())\n    {run}",
+        "steps = []\nif s:\n    steps.append(TwoQubitCalibration())\n    {run}\nelse:\n    steps.append(CustomTwoQubit(tasks=[]))\n    {run}",
+        "steps = [TwoQubitCalibration()]\nif s:\n    steps.append(ConfigureAll())\n{run}",
+        "steps = [TwoQubitCalibration()]\n{run}\nsteps = []\nsteps.append(CustomTwoQubit(tasks=[]))\n{run}",
+        "pair = TwoQubitCalibration()\nsteps = [pair]\n{run}",
+    ],
+)
+def test_pair_presence_follows_enclosing_blocks_and_each_run(body):
+    assert _modes(body.format(run=PAIR_RUN.format(targets=PAIRS, steps="steps"))) == [
+        "coupling_pairs"
+    ]
+
+
+def test_manual_pair_addition_still_disallows_overrides():
+    assert (
+        _modes(
+            'steps = []\nsteps.append(CustomTwoQubit(execution_mode="manual", rounds=[]))\n'
+            + PAIR_RUN.format(targets=PAIRS, steps="steps")
+        )
+        == []
+    )
