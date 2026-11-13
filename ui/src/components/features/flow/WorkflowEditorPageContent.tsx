@@ -991,10 +991,11 @@ export function WorkflowEditorPageContent() {
         {executeDisabledReason && (
           <div
             id="flow-execution-availability"
-            className="alert alert-info mx-4 mt-2"
+            className="alert mx-4 mt-2 gap-2 border-base-content/10! px-3 py-1.5 text-base-content/70"
             role="status"
           >
-            <span>{executeDisabledReason}</span>
+            <Info size={16} className="shrink-0 text-base-content/60" aria-hidden="true" />
+            <span className="min-w-0">{executeDisabledReason}</span>
           </div>
         )}
 

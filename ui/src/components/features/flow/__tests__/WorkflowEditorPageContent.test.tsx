@@ -180,6 +180,9 @@ describe("WorkflowEditorPageContent run callbacks", () => {
     const execute = await screen.findByTitle("Checking hardware availability…");
     expect(execute).toHaveAttribute("data-coachmark", "flow-execute");
     expect(execute).not.toHaveAttribute("data-coachmark-ready");
+    expect(execute).toBeDisabled();
+    expect(execute).toHaveAccessibleDescription("Checking hardware availability…");
+    expect(screen.getByRole("status")).toHaveTextContent("Checking hardware availability…");
 
     mocks.disabledReason = null;
     view.rerender();
