@@ -33,6 +33,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip
 import { useCouplingTaskResults } from "@/hooks/useCouplingTaskResults";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import {
@@ -198,16 +199,20 @@ export function CouplingGrid({
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
   const [isDirectionReversed, setIsDirectionReversed] = useState(false);
   const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
 
-  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
+  // grid is not square.
   useEffect(() => {
-    if (!isSquareGrid && viewMode === "region") {
-      setViewMode("pan-zoom");
+    if (!isSquareGrid) {
+      setZoomMode("full");
+      setSelectedRegion(null);
+      setRegionSelectionEnabled(false);
     }
-  }, [isSquareGrid, viewMode]);
+  }, [isSquareGrid]);
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -764,18 +769,16 @@ export function CouplingGrid({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg py-2">
         <div className="flex items-center gap-4">
           <div className="tabs tabs-boxed bg-base-300 w-fit">
-            {isSquareGrid && (
-              <button
-                type="button"
-                className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-                onClick={() => setViewMode("region")}
-                title="Lock"
-                aria-label="Lock"
-              >
-                <Lock className="h-4 w-4" />
-                <span className="hidden sm:inline">Lock</span>
-              </button>
-            )}
+            <button
+              type="button"
+              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+              onClick={() => setViewMode("region")}
+              title="Lock"
+              aria-label="Lock"
+            >
+              <Lock className="h-4 w-4" />
+              <span className="hidden sm:inline">Lock</span>
+            </button>
             <button
               type="button"
               className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
@@ -920,7 +923,7 @@ export function CouplingGrid({
         className={`flex-1 relative flex justify-center ${
           viewMode === "pan-zoom"
             ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "bg-base-200/60 rounded-lg"
+            : "items-start overflow-hidden bg-base-200/60 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
@@ -942,6 +945,7 @@ export function CouplingGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",
@@ -953,7 +957,9 @@ export function CouplingGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <div className="min-w-0 min-h-0 flex-1 self-stretch overflow-auto flex justify-center-safe items-start">
+            {gridContent}
+          </div>
         )}
       </div>
 

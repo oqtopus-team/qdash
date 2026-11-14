@@ -28,6 +28,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
@@ -352,7 +353,7 @@ export function QubitGrid({
   }, [selectedForDownload, taskResponse?.data?.result]);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
   const [selectedRegion, setSelectedRegion] = useState<{
@@ -364,6 +365,7 @@ export function QubitGrid({
     col: number;
   } | null>(null);
   const { isFullscreen, toggleFullscreen, exitFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
 
   // LOD: store zoom scale, compute visibility flags from effective cell size.
   // Initialize to a conservative value; will be updated on first transform.
@@ -381,12 +383,15 @@ export function QubitGrid({
   const numRegions = Math.floor(gridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
 
-  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
+  // grid is not square.
   useEffect(() => {
-    if (!isSquareGrid && viewMode === "region") {
-      setViewMode("pan-zoom");
+    if (!isSquareGrid) {
+      setZoomMode("full");
+      setSelectedRegion(null);
+      setRegionSelectionEnabled(false);
     }
-  }, [isSquareGrid, viewMode]);
+  }, [isSquareGrid]);
 
   // Calculate displayed grid size based on zoom mode
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -744,18 +749,16 @@ export function QubitGrid({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg py-2">
         <div className="flex items-center gap-4">
           <div className="tabs tabs-boxed bg-base-300 w-fit">
-            {isSquareGrid && (
-              <button
-                type="button"
-                className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-                onClick={() => setViewMode("region")}
-                title="Lock"
-                aria-label="Lock"
-              >
-                <Lock className="h-4 w-4" />
-                <span className="hidden sm:inline">Lock</span>
-              </button>
-            )}
+            <button
+              type="button"
+              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+              onClick={() => setViewMode("region")}
+              title="Lock"
+              aria-label="Lock"
+            >
+              <Lock className="h-4 w-4" />
+              <span className="hidden sm:inline">Lock</span>
+            </button>
             <button
               type="button"
               className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
@@ -918,6 +921,7 @@ export function QubitGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",
@@ -929,7 +933,9 @@ export function QubitGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <div className="min-w-0 min-h-0 flex-1 self-stretch overflow-auto flex justify-center-safe items-start">
+            {gridContent}
+          </div>
         )}
       </div>
 

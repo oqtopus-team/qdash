@@ -16,6 +16,7 @@ import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
   buildMuxCellMap,
@@ -285,7 +286,7 @@ export function QubitMetricsGrid({
   );
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
   const [selectedRegion, setSelectedRegion] = useState<{
@@ -307,6 +308,7 @@ export function QubitMetricsGrid({
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
   const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
     cols: displayCols,
     rows: displayRows,
@@ -319,12 +321,15 @@ export function QubitMetricsGrid({
   const numRegions = Math.floor(effectiveGridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
 
-  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
+  // grid is not square.
   useEffect(() => {
-    if (!isSquareGrid && viewMode === "region") {
-      setViewMode("pan-zoom");
+    if (!isSquareGrid) {
+      setZoomMode("full");
+      setSelectedRegion(null);
+      setRegionSelectionEnabled(false);
     }
-  }, [isSquareGrid, viewMode]);
+  }, [isSquareGrid]);
 
   // Debounced LOD update to avoid excessive re-renders during zoom
   const handleTransform = useCallback((_: unknown, state: { scale: number }) => {
@@ -633,18 +638,16 @@ export function QubitMetricsGrid({
       {/* View Mode Toggle */}
       <div className="flex items-center gap-4">
         <div className="tabs tabs-boxed bg-base-200 w-fit">
-          {isSquareGrid && (
-            <button
-              type="button"
-              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("region")}
-              title="Lock"
-              aria-label="Lock"
-            >
-              <Lock className="h-4 w-4" />
-              <span className="hidden sm:inline">Lock</span>
-            </button>
-          )}
+          <button
+            type="button"
+            className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+            onClick={() => setViewMode("region")}
+            title="Lock"
+            aria-label="Lock"
+          >
+            <Lock className="h-4 w-4" />
+            <span className="hidden sm:inline">Lock</span>
+          </button>
           <button
             type="button"
             className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
@@ -702,7 +705,7 @@ export function QubitMetricsGrid({
         className={`flex-1 relative flex justify-center ${
           viewMode === "pan-zoom"
             ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "items-start bg-base-200/60 rounded-lg"
+            : "items-start overflow-hidden bg-base-200/60 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
@@ -724,6 +727,7 @@ export function QubitMetricsGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",
@@ -735,7 +739,9 @@ export function QubitMetricsGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <div className="min-w-0 min-h-0 flex-1 self-stretch overflow-auto flex justify-center-safe items-start">
+            {gridContent}
+          </div>
         )}
       </div>
 
