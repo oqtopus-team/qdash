@@ -1,6 +1,9 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
@@ -25,16 +28,53 @@ interface FlowSchedulePanelProps {
   flowName: string;
 }
 
+const SCHEDULED_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+/** Builds the schedule form schema, rejecting a cron expression that an existing schedule uses. */
+function createScheduleFormSchema(existingSchedules: readonly Pick<FlowScheduleSummary, "cron">[]) {
+  return z.discriminatedUnion("scheduleType", [
+    z.object({
+      scheduleType: z.literal("cron"),
+      cronExpression: z
+        .string()
+        .trim()
+        .min(1, "Please enter a cron expression")
+        .refine(
+          (cron) => !existingSchedules.some((schedule) => schedule.cron === cron),
+          "This cron schedule already exists",
+        ),
+      scheduledTime: z.string(),
+      isActive: z.boolean(),
+    }),
+    z.object({
+      scheduleType: z.literal("one-time"),
+      cronExpression: z.string(),
+      scheduledTime: z
+        .string()
+        .trim()
+        .regex(SCHEDULED_TIME_PATTERN, "Please select a scheduled time"),
+      isActive: z.boolean(),
+    }),
+  ]);
+}
+
+type ScheduleFormSchema = ReturnType<typeof createScheduleFormSchema>;
+type ScheduleFormInput = z.input<ScheduleFormSchema>;
+type ScheduleFormData = z.output<ScheduleFormSchema>;
+
+const SCHEDULE_FORM_DEFAULTS: ScheduleFormInput = {
+  scheduleType: "cron",
+  cronExpression: "",
+  scheduledTime: "",
+  isActive: true,
+};
+
 /**
  * Schedule panel for a single flow: create cron or one-time schedules and list them by next run time.
  */
 export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const [cronExpression, setCronExpression] = useState("");
-  const [scheduledTime, setScheduledTime] = useState("");
-  const [scheduleType, setScheduleType] = useState<"cron" | "one-time">("cron");
-  const [isActive, setIsActive] = useState(true);
   const [scheduleToDeleteId, setScheduleToDeleteId] = useState<string | null>(null);
 
   // Fetch schedules for this flow
@@ -49,6 +89,22 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       [],
   );
 
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    reset,
+    getValues,
+    clearErrors,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<ScheduleFormInput, unknown, ScheduleFormData>({
+    resolver: zodResolver(createScheduleFormSchema(schedules)),
+    defaultValues: SCHEDULE_FORM_DEFAULTS,
+  });
+  const scheduleType = watch("scheduleType");
+  const scheduledTime = watch("scheduledTime");
+
   // Create schedule mutation
   const createScheduleMutation = useMutation({
     mutationFn: ({ data }: { data: ScheduleFlowRequest }) => scheduleFlow(flowName, data),
@@ -56,8 +112,11 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       queryClient.invalidateQueries({ queryKey: ["flow-schedules", flowName] });
       queryClient.invalidateQueries({ queryKey: ["flow-schedules"] });
       toast.success("Schedule created successfully!");
-      setCronExpression("");
-      setScheduledTime("");
+      reset({
+        ...SCHEDULE_FORM_DEFAULTS,
+        scheduleType: getValues("scheduleType"),
+        isActive: getValues("isActive"),
+      });
     },
     onError: (error: Error) => {
       toast.error(`Failed to create schedule: ${getApiErrorMessage(error, "Unknown error")}`);
@@ -92,36 +151,35 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
     },
   });
 
-  const handleCreateSchedule = () => {
-    if (scheduleType === "cron") {
-      if (!cronExpression.trim()) {
-        toast.error("Please enter a cron expression");
-        return;
-      }
-      const trimmedCron = cronExpression.trim();
-      if (schedules.some((schedule) => schedule.cron === trimmedCron)) {
-        toast.error("This cron schedule already exists");
-        return;
-      }
+  /** Submits a validated cron or one-time schedule to the API. */
+  const handleCreateSchedule = (data: ScheduleFormData) => {
+    if (data.scheduleType === "cron") {
       createScheduleMutation.mutate({
         data: {
-          cron: trimmedCron,
-          active: isActive,
+          cron: data.cronExpression,
+          active: data.isActive,
           parameters: {},
         },
       });
     } else {
-      if (!scheduledTime.trim()) {
-        toast.error("Please select a scheduled time");
-        return;
-      }
       createScheduleMutation.mutate({
         data: {
-          scheduled_time: scheduledTime.trim(),
+          scheduled_time: data.scheduledTime,
           parameters: {},
         },
       });
     }
+  };
+
+  /** Switches the form between cron and one-time schedules and clears stale field errors. */
+  const selectScheduleType = (type: ScheduleFormInput["scheduleType"]) => {
+    setValue("scheduleType", type);
+    clearErrors();
+  };
+
+  /** Stores the JST scheduled time composed from the date, hour and minute controls. */
+  const setScheduledTime = (value: string) => {
+    setValue("scheduledTime", value, { shouldValidate: true });
   };
 
   const handleToggleActive = (schedule: FlowScheduleSummary) => {
@@ -144,146 +202,170 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
     <div className="space-y-4">
       <h3 className="text-sm font-medium">Schedule</h3>
 
-      {/* Schedule Type Toggle */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setScheduleType("cron")}
-          className={`btn btn-xs flex-1 ${scheduleType === "cron" ? "btn-primary" : "btn-ghost"}`}
-        >
-          Cron
-        </button>
-        <button
-          onClick={() => setScheduleType("one-time")}
-          className={`btn btn-xs flex-1 ${
-            scheduleType === "one-time" ? "btn-primary" : "btn-ghost"
-          }`}
-        >
-          One-time
-        </button>
-      </div>
-
-      {/* Cron Schedule Form */}
-      {scheduleType === "cron" && (
-        <div className="space-y-3">
-          <div className="form-control flex flex-col gap-1">
-            <label className="label">
-              <span className="label-text text-xs">Cron Expression</span>
-            </label>
-            <input
-              type="text"
-              placeholder="0 2 * * * (daily at 2:00 JST)"
-              className="input input-bordered input-sm font-mono text-xs"
-              value={cronExpression}
-              onChange={(e) => setCronExpression(e.target.value)}
-            />
-            <label className="label">
-              <span className="label-text-alt text-xs">Timezone: Asia/Tokyo (JST)</span>
-            </label>
-            <label className="label py-0">
-              <span className="label-text-alt text-xs">You can add multiple cron schedules</span>
-            </label>
-          </div>
-
-          <div className="form-control flex flex-col gap-1">
-            <label className="cursor-pointer label justify-start gap-2">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm checkbox-primary"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-              />
-              <span className="label-text text-xs">Enable schedule immediately</span>
-            </label>
-            <label className="label">
-              <span className="label-text-alt text-xs">
-                If unchecked, the schedule will be created but paused
-              </span>
-            </label>
-          </div>
+      <form className="space-y-4" onSubmit={handleSubmit(handleCreateSchedule)} noValidate>
+        {/* Schedule Type Toggle */}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => selectScheduleType("cron")}
+            className={`btn btn-xs flex-1 ${scheduleType === "cron" ? "btn-primary" : "btn-ghost"}`}
+          >
+            Cron
+          </button>
+          <button
+            type="button"
+            onClick={() => selectScheduleType("one-time")}
+            className={`btn btn-xs flex-1 ${
+              scheduleType === "one-time" ? "btn-primary" : "btn-ghost"
+            }`}
+          >
+            One-time
+          </button>
         </div>
-      )}
 
-      {/* One-time Schedule Form */}
-      {scheduleType === "one-time" && (
-        <div className="space-y-3">
-          <div className="form-control flex flex-col gap-1">
-            <label className="label">
-              <span className="label-text text-xs">Date (JST)</span>
-            </label>
-            <input
-              type="date"
-              className="input input-bordered input-sm text-xs"
-              value={scheduledTime.split("T")[0] || ""}
-              onChange={(e) => {
-                const timePart = scheduledTime.split("T")[1] || "00:00";
-                setScheduledTime(`${e.target.value}T${timePart}`);
-              }}
-            />
-          </div>
-          <div className="form-control flex flex-col gap-1">
-            <label className="label">
-              <span className="label-text text-xs">Time (JST)</span>
-            </label>
-            <div className="flex gap-2">
-              <select
-                className="select select-bordered select-sm text-xs flex-1"
-                value={scheduledTime.split("T")[1]?.split(":")[0] || "00"}
-                onChange={(e) => {
-                  const date = scheduledTime.split("T")[0] || dateToDateInput(new Date());
-                  const currentMinute = scheduledTime.split("T")[1]?.split(":")[1] || "00";
-                  setScheduledTime(`${date}T${e.target.value}:${currentMinute}`);
-                }}
-              >
-                {Array.from({ length: 24 }, (_, i) => {
-                  const hour = i.toString().padStart(2, "0");
-                  return (
-                    <option key={hour} value={hour}>
-                      {hour}
-                    </option>
-                  );
-                })}
-              </select>
-              <span className="text-sm">:</span>
-              <select
-                className="select select-bordered select-sm text-xs flex-1"
-                value={scheduledTime.split("T")[1]?.split(":")[1] || "00"}
-                onChange={(e) => {
-                  const date = scheduledTime.split("T")[0] || dateToDateInput(new Date());
-                  const currentHour = scheduledTime.split("T")[1]?.split(":")[0] || "00";
-                  setScheduledTime(`${date}T${currentHour}:${e.target.value}`);
-                }}
-              >
-                {Array.from({ length: 12 }, (_, i) => {
-                  const minute = (i * 5).toString().padStart(2, "0");
-                  return (
-                    <option key={minute} value={minute}>
-                      {minute}
-                    </option>
-                  );
-                })}
-              </select>
+        {/* Cron Schedule Form */}
+        {scheduleType === "cron" && (
+          <div className="space-y-3">
+            <div className="form-control flex flex-col gap-1">
+              <label className="label" htmlFor="schedule-cron-input">
+                <span className="label-text text-xs">Cron Expression</span>
+              </label>
+              <input
+                id="schedule-cron-input"
+                type="text"
+                placeholder="0 2 * * * (daily at 2:00 JST)"
+                className={`input input-bordered input-sm font-mono text-xs ${
+                  errors.cronExpression ? "input-error" : ""
+                }`}
+                aria-invalid={Boolean(errors.cronExpression)}
+                aria-describedby={errors.cronExpression ? "schedule-cron-error" : undefined}
+                {...register("cronExpression")}
+              />
+              {errors.cronExpression && (
+                <p id="schedule-cron-error" className="text-xs text-error">
+                  {errors.cronExpression.message}
+                </p>
+              )}
+              <label className="label">
+                <span className="label-text-alt text-xs">Timezone: Asia/Tokyo (JST)</span>
+              </label>
+              <label className="label py-0">
+                <span className="label-text-alt text-xs">You can add multiple cron schedules</span>
+              </label>
+            </div>
+
+            <div className="form-control flex flex-col gap-1">
+              <label className="cursor-pointer label justify-start gap-2">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm checkbox-primary"
+                  {...register("isActive")}
+                />
+                <span className="label-text text-xs">Enable schedule immediately</span>
+              </label>
+              <label className="label">
+                <span className="label-text-alt text-xs">
+                  If unchecked, the schedule will be created but paused
+                </span>
+              </label>
             </div>
           </div>
-          <label className="label py-0">
-            <span className="label-text-alt text-xs">Timezone: Asia/Tokyo (JST)</span>
-          </label>
-        </div>
-      )}
-
-      {/* Create Button */}
-      <button
-        onClick={handleCreateSchedule}
-        className="btn btn-sm btn-primary w-full"
-        disabled={createScheduleMutation.isPending}
-      >
-        {createScheduleMutation.isPending ? (
-          <span className="loading loading-spinner loading-xs"></span>
-        ) : scheduleType === "cron" ? (
-          "Add Cron Schedule"
-        ) : (
-          "Create One-time Schedule"
         )}
-      </button>
+
+        {/* One-time Schedule Form */}
+        {scheduleType === "one-time" && (
+          <div className="space-y-3">
+            <div className="form-control flex flex-col gap-1">
+              <label className="label" htmlFor="schedule-date-input">
+                <span className="label-text text-xs">Date (JST)</span>
+              </label>
+              <input
+                id="schedule-date-input"
+                type="date"
+                className={`input input-bordered input-sm text-xs ${
+                  errors.scheduledTime ? "input-error" : ""
+                }`}
+                aria-invalid={Boolean(errors.scheduledTime)}
+                aria-describedby={errors.scheduledTime ? "schedule-time-error" : undefined}
+                value={scheduledTime.split("T")[0] || ""}
+                onChange={(e) => {
+                  const timePart = scheduledTime.split("T")[1] || "00:00";
+                  setScheduledTime(`${e.target.value}T${timePart}`);
+                }}
+              />
+              {errors.scheduledTime && (
+                <p id="schedule-time-error" className="text-xs text-error">
+                  {errors.scheduledTime.message}
+                </p>
+              )}
+            </div>
+            <div className="form-control flex flex-col gap-1">
+              <label className="label">
+                <span className="label-text text-xs">Time (JST)</span>
+              </label>
+              <div className="flex gap-2">
+                <select
+                  aria-label="Hour (JST)"
+                  className="select select-bordered select-sm text-xs flex-1"
+                  value={scheduledTime.split("T")[1]?.split(":")[0] || "00"}
+                  onChange={(e) => {
+                    const date = scheduledTime.split("T")[0] || dateToDateInput(new Date());
+                    const currentMinute = scheduledTime.split("T")[1]?.split(":")[1] || "00";
+                    setScheduledTime(`${date}T${e.target.value}:${currentMinute}`);
+                  }}
+                >
+                  {Array.from({ length: 24 }, (_, i) => {
+                    const hour = i.toString().padStart(2, "0");
+                    return (
+                      <option key={hour} value={hour}>
+                        {hour}
+                      </option>
+                    );
+                  })}
+                </select>
+                <span className="text-sm">:</span>
+                <select
+                  aria-label="Minute (JST)"
+                  className="select select-bordered select-sm text-xs flex-1"
+                  value={scheduledTime.split("T")[1]?.split(":")[1] || "00"}
+                  onChange={(e) => {
+                    const date = scheduledTime.split("T")[0] || dateToDateInput(new Date());
+                    const currentHour = scheduledTime.split("T")[1]?.split(":")[0] || "00";
+                    setScheduledTime(`${date}T${currentHour}:${e.target.value}`);
+                  }}
+                >
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const minute = (i * 5).toString().padStart(2, "0");
+                    return (
+                      <option key={minute} value={minute}>
+                        {minute}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+            <label className="label py-0">
+              <span className="label-text-alt text-xs">Timezone: Asia/Tokyo (JST)</span>
+            </label>
+          </div>
+        )}
+
+        {/* Create Button */}
+        <button
+          type="submit"
+          className="btn btn-sm btn-primary w-full"
+          disabled={createScheduleMutation.isPending || isSubmitting}
+        >
+          {createScheduleMutation.isPending ? (
+            <span className="loading loading-spinner loading-xs"></span>
+          ) : scheduleType === "cron" ? (
+            "Add Cron Schedule"
+          ) : (
+            "Create One-time Schedule"
+          )}
+        </button>
+      </form>
 
       {/* Existing Schedules List */}
       <div className="divider my-2"></div>
