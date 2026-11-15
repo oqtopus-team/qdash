@@ -1,8 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useMemo, useRef, useState } from "react";
+import { useForm, type FieldErrors } from "react-hook-form";
 import { z } from "zod";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -76,6 +76,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [scheduleToDeleteId, setScheduleToDeleteId] = useState<string | null>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch schedules for this flow
   const { data: schedulesData, isLoading } = useQuery({
@@ -84,10 +85,17 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
     refetchInterval: 10000, // Refresh every 10 seconds
   });
 
-  const schedules = sortSchedulesByNextRun(
-    (schedulesData?.data && "schedules" in schedulesData.data && schedulesData.data.schedules) ||
-      [],
+  const schedules = useMemo(
+    () =>
+      sortSchedulesByNextRun(
+        (schedulesData?.data &&
+          "schedules" in schedulesData.data &&
+          schedulesData.data.schedules) ||
+          [],
+      ),
+    [schedulesData],
   );
+  const resolver = useMemo(() => zodResolver(createScheduleFormSchema(schedules)), [schedules]);
 
   const {
     register,
@@ -99,7 +107,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<ScheduleFormInput, unknown, ScheduleFormData>({
-    resolver: zodResolver(createScheduleFormSchema(schedules)),
+    resolver,
     defaultValues: SCHEDULE_FORM_DEFAULTS,
   });
   const scheduleType = watch("scheduleType");
@@ -171,6 +179,13 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
     }
   };
 
+  /** Moves focus to the date input when the scheduled time fails validation. */
+  const handleInvalidSchedule = (fieldErrors: FieldErrors<ScheduleFormInput>) => {
+    if (fieldErrors.scheduledTime) {
+      dateInputRef.current?.focus();
+    }
+  };
+
   /** Switches the form between cron and one-time schedules and clears stale field errors. */
   const selectScheduleType = (type: ScheduleFormInput["scheduleType"]) => {
     setValue("scheduleType", type);
@@ -202,7 +217,11 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
     <div className="space-y-4">
       <h3 className="text-sm font-medium">Schedule</h3>
 
-      <form className="space-y-4" onSubmit={handleSubmit(handleCreateSchedule)} noValidate>
+      <form
+        className="space-y-4"
+        onSubmit={handleSubmit(handleCreateSchedule, handleInvalidSchedule)}
+        noValidate
+      >
         {/* Schedule Type Toggle */}
         <div className="flex gap-2">
           <button
@@ -242,7 +261,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                 {...register("cronExpression")}
               />
               {errors.cronExpression && (
-                <p id="schedule-cron-error" className="text-xs text-error">
+                <p id="schedule-cron-error" role="alert" className="text-xs text-error">
                   {errors.cronExpression.message}
                 </p>
               )}
@@ -281,6 +300,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
               </label>
               <input
                 id="schedule-date-input"
+                ref={dateInputRef}
                 type="date"
                 className={`input input-bordered input-sm text-xs ${
                   errors.scheduledTime ? "input-error" : ""
@@ -294,7 +314,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                 }}
               />
               {errors.scheduledTime && (
-                <p id="schedule-time-error" className="text-xs text-error">
+                <p id="schedule-time-error" role="alert" className="text-xs text-error">
                   {errors.scheduledTime.message}
                 </p>
               )}

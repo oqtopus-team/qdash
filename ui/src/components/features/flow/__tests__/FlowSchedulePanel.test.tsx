@@ -67,6 +67,7 @@ describe("FlowSchedulePanel schedule form", () => {
     const error = await screen.findByText("Please enter a cron expression");
     const input = screen.getByLabelText("Cron Expression");
     expect(error.id).toBe("schedule-cron-error");
+    expect(error).toHaveAttribute("role", "alert");
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(input).toHaveAttribute("aria-describedby", "schedule-cron-error");
     expect(mocks.scheduleFlow).not.toHaveBeenCalled();
@@ -188,8 +189,10 @@ describe("FlowSchedulePanel schedule form", () => {
     const error = await screen.findByText("Please select a scheduled time");
     const dateInput = screen.getByLabelText("Date (JST)");
     expect(error.id).toBe("schedule-time-error");
+    expect(error).toHaveAttribute("role", "alert");
     expect(dateInput).toHaveAttribute("aria-invalid", "true");
     expect(dateInput).toHaveAttribute("aria-describedby", "schedule-time-error");
+    expect(dateInput).toHaveFocus();
     expect(mocks.scheduleFlow).not.toHaveBeenCalled();
     expect(mocks.toast.error).not.toHaveBeenCalled();
   });
