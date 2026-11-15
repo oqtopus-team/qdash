@@ -359,6 +359,60 @@ describe("ExecutionDAG node interaction", () => {
     }
   });
 
+  it("fits the final width when the canvas is locked during the preview transition", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      act(() => {
+        vi.runAllTimers();
+      });
+      mocks.fitView.mockClear();
+
+      fireEvent.click(screen.getByTestId("node-task-1"));
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
+      // The lock button fits the intermediate width at once.
+      expect(mocks.fitView).toHaveBeenCalledTimes(1);
+      expect(mocks.fitView).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 0 }));
+
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).toHaveBeenCalledTimes(2);
+      expect(mocks.fitView).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 300 }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not re-fit when the canvas is locked after the preview transition", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      fireEvent.click(screen.getByTestId("node-task-1"));
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      mocks.fitView.mockClear();
+      fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).toHaveBeenCalledTimes(1);
+      expect(mocks.fitView).toHaveBeenLastCalledWith(expect.objectContaining({ duration: 0 }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("lets Escape close the preview before it exits fullscreen", () => {
     const { container } = render(<ExecutionDAG tasks={tasks} />);
 

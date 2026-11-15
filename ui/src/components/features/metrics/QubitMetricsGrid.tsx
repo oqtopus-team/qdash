@@ -375,10 +375,11 @@ export function QubitMetricsGrid({
     [selectedRegion, regionSize],
   );
 
-  // LOD flags
-  const showLabels = lodLevel !== "low" || zoomMode === "region";
-  const showValues = lodLevel !== "low" || zoomMode === "region";
-  const showUnits = lodLevel === "high" || zoomMode === "region";
+  // LOD flags. The locked view draws the grid at its default size, so it ignores the LOD that
+  // the last zoom left behind.
+  const showLabels = lodLevel !== "low" || viewMode === "region";
+  const showValues = lodLevel !== "low" || viewMode === "region";
+  const showUnits = lodLevel === "high" || viewMode === "region";
 
   // Pre-compute grid cells data for memoization
   const gridCellsData = useMemo(() => {

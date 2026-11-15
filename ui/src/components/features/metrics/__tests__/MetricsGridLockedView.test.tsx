@@ -1,4 +1,6 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
+
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CouplingMetricsGrid } from "../CouplingMetricsGrid";
@@ -33,6 +35,26 @@ vi.mock("@/hooks/useGridLayout", () => ({
     gap: 8,
     padding: 32,
   }),
+}));
+
+// Stands in for the pan/zoom canvas: the button reports a zoom-out to the grid.
+vi.mock("react-zoom-pan-pinch", () => ({
+  TransformWrapper: ({
+    children,
+    onTransform,
+  }: {
+    children: ReactNode;
+    onTransform?: (ref: unknown, state: { scale: number }) => void;
+  }) => (
+    <div>
+      <button type="button" onClick={() => onTransform?.(null, { scale: 0.5 })}>
+        Report zoom-out
+      </button>
+      {children}
+    </div>
+  ),
+  TransformComponent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  useControls: () => ({ zoomIn: vi.fn(), zoomOut: vi.fn(), resetTransform: vi.fn() }),
 }));
 
 vi.mock("../QubitMetricHistoryModal", () => ({
@@ -74,6 +96,29 @@ describe("metrics grids locked view", () => {
   it("wraps the locked qubit metrics grid in a scroller", () => {
     const { container } = render(<QubitMetricsGrid {...commonProps} />);
     expectLockedScroller(container, ["grid", "rounded-xl"]);
+  });
+
+  it("restores qubit labels, values and units when the zoomed-out grid is locked", () => {
+    vi.useFakeTimers();
+    try {
+      render(<QubitMetricsGrid {...commonProps} />);
+      expect(screen.getAllByText("N/A")).toHaveLength(24);
+
+      fireEvent.click(screen.getByRole("button", { name: "Report zoom-out" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+      expect(screen.queryByText("N/A")).toBeNull();
+      expect(screen.queryByText("(us)")).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "Lock" }));
+
+      expect(screen.getAllByText("N/A")).toHaveLength(24);
+      expect(screen.getAllByText("(us)")).toHaveLength(24);
+      expect(screen.getByText("23")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("wraps the locked coupling metrics grid in a scroller", () => {
