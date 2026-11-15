@@ -337,6 +337,28 @@ describe("ExecutionDAG node interaction", () => {
     expect(canvas).not.toHaveClass("lg:mr-[calc(40vw-2.5rem)]");
   });
 
+  it("cancels the pending preview fit when the canvas is unlocked before it runs", () => {
+    vi.useFakeTimers();
+    try {
+      render(<ExecutionDAG tasks={tasks} />);
+      fireEvent.click(screen.getByRole("button", { name: "Lock view" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+      mocks.fitView.mockClear();
+
+      fireEvent.click(screen.getByTestId("node-task-1"));
+      fireEvent.click(screen.getByRole("button", { name: "Unlock view" }));
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(mocks.fitView).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("lets Escape close the preview before it exits fullscreen", () => {
     const { container } = render(<ExecutionDAG tasks={tasks} />);
 

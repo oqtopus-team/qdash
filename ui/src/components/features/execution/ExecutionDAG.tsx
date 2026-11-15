@@ -181,17 +181,18 @@ function FlowContent({
   }, [isFullscreen, fitView]);
 
   // The canvas gives up width to the preview sidebar with a CSS transition; once that has
-  // finished, glide the locked graph into the space that is left.
+  // finished, glide the locked graph into the space that is left. Unlocking re-runs the effect,
+  // so its cleanup cancels a pending fit that would otherwise reset the user's new viewport.
   const previousPreviewOpen = useRef(isPreviewOpen);
   useEffect(() => {
     if (previousPreviewOpen.current === isPreviewOpen) return;
     previousPreviewOpen.current = isPreviewOpen;
-    if (!isLockedRef.current) return;
+    if (!isLocked) return;
     const timer = setTimeout(() => {
       fitView({ ...FIT_VIEW_OPTIONS, duration: PREVIEW_TRANSITION_MS });
     }, PREVIEW_TRANSITION_MS + 50);
     return () => clearTimeout(timer);
-  }, [isPreviewOpen, fitView]);
+  }, [isPreviewOpen, isLocked, fitView]);
 
   return (
     <ReactFlow
