@@ -64,6 +64,10 @@ class ConfigureAll(QubexTask):
         if not isinstance(mode, str) or mode not in get_args(ConfigurationMode):
             raise ValueError(f"Unsupported configuration_mode: {mode!r}")
         configuration_mode = cast("ConfigurationMode", mode)
+        # This task builds its own Experiment, so it must run the backend's
+        # MUX layout check itself before touching the boxes, and must not hand
+        # Qubex a MUX that the chip topology does not define.
+        mux_ids = backend.ensure_mux_mapping_compatible().check_mux_ids(mux_ids)
 
         qubex_paths = get_qubex_paths()
         config_dir = backend.config.get("config_dir", str(qubex_paths.config_dir(chip_id)))
@@ -86,7 +90,18 @@ class ConfigureAll(QubexTask):
             params_dir=exp.params_path,
             configuration_mode=configuration_mode,
         )
-        print(f"[ConfigureAll] Pushing system_manager (box_ids={exp.box_ids})")
-        exp.system_manager.push(box_ids=exp.box_ids, confirm=False, parallel=False)
+        # Experiment.targets is scoped to the qubits in the selected MUXes,
+        # whereas system_manager.load rebuilds the complete system model.
+        target_labels = sorted(exp.targets)
+        print(
+            f"[ConfigureAll] Pushing system_manager "
+            f"(box_ids={exp.box_ids}, target_labels={target_labels})"
+        )
+        exp.system_manager.push(
+            box_ids=exp.box_ids,
+            confirm=False,
+            parallel=False,
+            target_labels=target_labels,
+        )
         print("[ConfigureAll] Done")
         return RunResult(raw_result={"mux_ids": mux_ids, "box_ids": exp.box_ids})

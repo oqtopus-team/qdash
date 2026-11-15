@@ -27,13 +27,11 @@ and a duplicate request whose idempotency key carries different arguments. The b
 proposed actions; committing an accepted candidate advances the state version without spending
 one.
 
-The policy also records how much a person delegated: `autonomy` is `confirm_each` (every
-measurement confirmed by a person, the default) or `auto` (the plan, bounds, and budget
-confirmed once; the plan then chooses each next node from the calibration evaluation of the
-last result and the task knowledge's `next_actions` table), and `max_rounds_per_target` caps how
-often one node runs on a target in `auto`. The grant changes nothing server-side: every action
-still passes the same policy checks. It is what the client's evaluation planner requires before
-it runs unattended, and what the audit shows a reviewer.
+The immutable policy also records `autonomy`: `confirm_each` (default) requires per-measurement
+confirmation; `auto` grants the approved plan its bounds and budget once. In `auto`,
+`max_rounds_per_target` limits node visits. The client
+[evaluation planner](./agentic-calibration.md#the-evaluation-planner) requires this grant;
+server-side action checks remain unchanged.
 
 ## Operation dispatch
 

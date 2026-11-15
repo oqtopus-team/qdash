@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # Timezone
     timezone: str = "Asia/Tokyo"
 
+    @property
+    def public_url(self) -> str:
+        """Return the browser-facing QDash URL: CLIENT_URL, else the local UI port."""
+        return self.client_url.rstrip("/") or f"http://localhost:{self.ui_port}"
+
     @field_validator("slack_forum_notification", mode="before")
     @classmethod
     def _empty_str_as_false(cls, value: object) -> object:

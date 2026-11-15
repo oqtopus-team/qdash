@@ -14,9 +14,11 @@ Extracted from TaskExecutor to isolate MUX distribution concerns.
 import logging
 from typing import TYPE_CHECKING
 
+from qdash.common.mux_mapping import MuxMappingError, canonical_qid
 from qdash.workflow.engine.task.backend_saver import resolve_publish_targets
 
 if TYPE_CHECKING:
+    from qdash.common.mux_mapping import MuxMapping
     from qdash.datamodel.task_invocation import TaskInvocation
     from qdash.repository import FilesystemCalibDataSaver
     from qdash.workflow.calibtasks.results import RunResult
@@ -48,6 +50,12 @@ class MuxDistributor:
         Recorder for task history
     backend_saver : BackendSaver
         Backend-specific persistence handler
+    mux_mapping : MuxMapping | None
+        The execution's MUX membership, pinned when the run was planned. A chip
+        without a topology is pinned as :meth:`MuxMapping.legacy`. None means
+        no mapping was pinned (for example the chip topology failed to
+        resolve): MUX fan-out then raises :class:`MuxMappingError` and never
+        reads the chip topology itself.
     """
 
     def __init__(
@@ -58,6 +66,7 @@ class MuxDistributor:
         data_saver: "FilesystemCalibDataSaver",
         history_recorder: "TaskHistoryRecorder",
         backend_saver: "BackendSaver",
+        mux_mapping: "MuxMapping | None" = None,
     ) -> None:
         self._state_manager = state_manager
         self._execution_id = execution_id
@@ -65,6 +74,22 @@ class MuxDistributor:
         self._data_saver = data_saver
         self._history_recorder = history_recorder
         self._backend_saver = backend_saver
+        self._mux_mapping = mux_mapping
+
+    def require_mapping(self, task_name: str) -> "MuxMapping":
+        """The pinned MUX mapping; raises ``MuxMappingError`` if none was pinned.
+
+        Fan-out must use the membership the execution was planned with. Reading
+        the chip topology here could write results to a MUX that a repaired or
+        edited topology defines, which the run never reserved or scheduled.
+        """
+        if self._mux_mapping is None:
+            raise MuxMappingError(
+                f"{task_name} is a MUX-level task, but execution {self._execution_id} "
+                "has no pinned MUX mapping to fan out its result; the chip topology "
+                "could not be resolved when the execution was planned"
+            )
+        return self._mux_mapping
 
     def distribute(
         self,
@@ -94,23 +119,28 @@ class MuxDistributor:
         representative_qid : str
             The representative qubit ID (the one that executed the task)
         """
-        # Calculate other qids in the MUX (assuming 4 qubits per MUX)
-        try:
-            mux_base_qid = (int(representative_qid) // 4) * 4
-        except ValueError:
+        # Members come from the execution's pinned mapping, so a topology edited
+        # or repaired during the run cannot redirect results; an explicit mapping
+        # that does not know the representative raises instead of fanning out to
+        # guessed qids.
+        mapping = self.require_mapping(task.get_name())
+        if mapping.unbounded and mapping.find_mux(representative_qid) is None:
             logger.warning(
                 "Could not parse representative_qid=%s as integer, skipping MUX distribution",
                 representative_qid,
             )
             return
+        mux_id = mapping.mux_of(representative_qid)
 
         # Distributed results belong to the same planned call as the representative.
         representative = self._state_manager.get_task(
             task.get_name(), task.get_task_type(), representative_qid
         )
-        for pos_in_mux in range(4):
-            target_qid = str(mux_base_qid + pos_in_mux)
-            if target_qid == representative_qid:
+        # Members are canonical IDs; compare the representative in the same form
+        # so that "Q12" never receives a second result as member "12".
+        representative_member = canonical_qid(representative_qid)
+        for target_qid in mapping.qids_of(mux_id):
+            if target_qid == representative_member:
                 continue
             self._distribute_to_qid(
                 task,

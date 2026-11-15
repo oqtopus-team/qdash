@@ -51,17 +51,14 @@ preserve the connection without creating transcript entries.
 
 ## Change and Test Streaming
 
-The runtime derives its events from the durable conversation view: `agent-runtime/src/server.ts`
-watches it with `Conversation.watch()`, and `ViewEventTranslator` in
-`agent-runtime/src/view-events.ts` turns each new revision into text, thinking, and tool-call
-argument appends and tool starts and ends. A revision can skip states while the stream writes, so
-the translator takes an answer's unseen tail from its entry and ends a tool from its result entry.
-A revision's entries are a window of the newest 50 to 100, so when the window has moved past the
-last entry the stream wrote, `ViewEventStream` reads the skipped entries with
-`Conversation.entries()` before translating it. When the turn settles, `ViewEventStream.finish()`
-stops the watch and translates the view read after settlement, so tool, chart, and text events the
-watch had not delivered yet still reach the stream before `done` or `error`.
-`agent-runtime/src/events.ts` maps these events to NDJSON lines.
+`agent-runtime/src/server.ts` watches durable conversation revisions with `Conversation.watch()`.
+`ViewEventTranslator` in `view-events.ts` emits unseen text and arguments from entries, and tool
+completion from result entries, so skipped intermediate states do not lose output.
+
+The view holds the newest 50–100 entries. If its window passes the stream's last entry,
+`ViewEventStream` fetches the gap with `Conversation.entries()`. On settlement, `finish()` stops
+the watch and translates the final view before emitting `done` or `error`. `events.ts` serializes
+the translated events as NDJSON.
 
 Update `agent-runtime/src/events.ts` when the runtime event contract changes, and
 `agent-runtime/src/view-events.ts` when Pi's conversation view changes. Update

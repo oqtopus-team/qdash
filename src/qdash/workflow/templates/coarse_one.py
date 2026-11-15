@@ -65,7 +65,7 @@ def coarse_one(
 
     steps = [
         OneQubitCheck(
-            mode="synchronized",
+            execution_mode="parallel_by_round",
             tasks=[
                 # Apply the starting configuration before the readout search.
                 TaskCall(name="Configure", call_id="configure_initial"),

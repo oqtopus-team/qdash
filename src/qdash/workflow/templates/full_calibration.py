@@ -165,10 +165,10 @@ def full_calibration(
         # Stage 0: Push current configuration to all selected MUXes
         ConfigureAll(),
         # Stage 1: Basic 1Q characterization
-        OneQubitCheck(mode="synchronized", tasks=FULL_1Q_CHECK_TASKS),
+        OneQubitCheck(execution_mode="parallel_by_round", tasks=FULL_1Q_CHECK_TASKS),
         FilterByStatus(),  # Only proceed with successful qubits
         # Stage 2: Advanced 1Q calibration (DRAG, RB, IRB)
-        OneQubitFineTune(mode="synchronized", tasks=FULL_1Q_FINE_TUNE_TASKS),
+        OneQubitFineTune(execution_mode="parallel_by_round", tasks=FULL_1Q_FINE_TUNE_TASKS),
         # Stage 3: Filter by X90 fidelity
         FilterByMetric(metric="x90_fidelity", threshold=fidelity_threshold),
         # Stage 4: Generate 2Q schedule with explicit direction

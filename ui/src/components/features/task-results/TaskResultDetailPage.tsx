@@ -10,7 +10,10 @@ import { FigureStrip } from "@/components/charts/FigureStrip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ExecutionTaskProgress } from "@/components/features/execution/ExecutionTaskProgress";
 import { useRecordJourneyResultView } from "@/components/features/first-calibration/useRecordJourneyResultView";
-import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
+import {
+  TaskArtifactDownloads,
+  hasTaskArtifactDownloads,
+} from "@/components/features/chip/TaskArtifactDownloads";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
 import { SpectroscopyManualCorrection } from "@/components/features/task-results/SpectroscopyManualCorrection";
@@ -301,13 +304,17 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         </div>
       )}
 
-      {((taskResult.json_figure_path && taskResult.json_figure_path.length > 0) ||
-        (taskResult.raw_data_path && taskResult.raw_data_path.length > 0)) && (
+      {hasTaskArtifactDownloads({
+        jsonFigurePaths: taskResult.json_figure_path,
+        rawDataPaths: taskResult.raw_data_path,
+        imagePaths: taskResult.figure_path,
+      }) && (
         <div className="mb-4 rounded-lg bg-base-200/50 p-4">
           <h2 className="mb-3 text-sm font-medium">Artifacts</h2>
           <TaskArtifactDownloads
             jsonFigurePaths={taskResult.json_figure_path}
             rawDataPaths={taskResult.raw_data_path}
+            imagePaths={taskResult.figure_path}
           />
         </div>
       )}

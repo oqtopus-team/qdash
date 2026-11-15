@@ -122,7 +122,7 @@ def fine_one(
         TaskCall(name="X90InterleavedRandomizedBenchmarking"),
     ]
 
-    steps = [OneQubitFineTune(mode="synchronized", tasks=fine_tasks)]
+    steps = [OneQubitFineTune(execution_mode="parallel_by_round", tasks=fine_tasks)]
 
     cal = CalibService(
         username,

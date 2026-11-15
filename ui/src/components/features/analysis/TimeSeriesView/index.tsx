@@ -2,6 +2,7 @@
 
 import { useMemo, useEffect } from "react";
 
+import { ChartLine } from "lucide-react";
 import Select from "react-select";
 
 import type { ParameterKey, TagKey } from "@/types/analysis";
@@ -485,11 +486,13 @@ export function TimeSeriesView() {
         type: "date",
         tickformat: "%Y-%m-%d %H:%M",
         zeroline: false,
+        automargin: true,
         domain: showSecondaryAxis ? [0, 0.92] : [0, 1],
       },
       yaxis: {
         type: "linear",
         zeroline: false,
+        automargin: true,
         exponentformat: "e" as const,
         title: {
           text: `${currentMetricConfig?.title || metadata.description} [${currentMetricConfig?.unit || metadata.unit}]`,
@@ -516,6 +519,7 @@ export function TimeSeriesView() {
         overlaying: "y",
         side: "right",
         zeroline: false,
+        automargin: true,
         exponentformat: "e" as const,
         title: {
           text: `${secondaryMetricConfig?.title || secondaryMetadata.description} [${secondaryMetricConfig?.unit || secondaryMetadata.unit}]`,
@@ -991,22 +995,7 @@ export function TimeSeriesView() {
       {/* Plot Area */}
       <PlotCard
         title="Time Series Plot"
-        icon={
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-6 h-6"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M3 3v18h18"></path>
-            <path d="M3 12h18"></path>
-            <path d="M12 3v18"></path>
-          </svg>
-        }
+        icon={<ChartLine className="w-4 h-4 text-base-content/60" aria-hidden="true" />}
         isLoading={isLoadingTimeseries || isLoadingSecondary}
         hasData={Boolean(selectedChip && selectedParameter && plotData.length > 0)}
         emptyStateMessage={

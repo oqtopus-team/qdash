@@ -1,7 +1,6 @@
 # pi-qdash
 
-pi-qdash registers the following tools with pi. All tools reuse the current
-session profile/chip context when their parameters are omitted.
+pi-qdash tools reuse the session's profile and chip when callers omit those parameters.
 
 ## Configuration
 
@@ -20,11 +19,9 @@ session profile/chip context when their parameters are omitted.
 | `qdash_get_timeseries`, `qdash_plot_timeseries`, `qdash_inspect_timeseries_csv`, `qdash_compare_timeseries` | Timeseries retrieval, plotting, local CSV inspection, and comparison. |
 | `qdash_list_task_results`, `qdash_get_task_result`, `qdash_get_task_knowledge` | Task results and full or summarized task knowledge. |
 | `qdash_list_flows`, `qdash_get_flow` | Saved flows. |
-| `qdash_get_pipeline_catalog`, `qdash_plan_pipeline` | Pipeline catalog and validation without execution. |
 | `qdash_list_executions`, `qdash_get_execution`, `qdash_wait_execution`, `qdash_compare_executions` | Execution history, status, and comparison. |
 | `qdash_get_provenance_stats` | Provenance statistics. |
 | `qdash_list_forum_posts`, `qdash_get_forum_post`, `qdash_list_forum_replies` | Forum posts and replies. |
-| `qdash_preview_forum_evidence_reply`, `qdash_preview_forum_image_reply` | Read-only Forum reply previews. |
 | `qdash_list_source_roots`, `qdash_search_source`, `qdash_read_source` | Source trees the server serves with their revisions, literal search of contents or paths, and up to 400 numbered lines of one file. A traceback path such as `/app/qdash/workflow/x.py` is mapped onto its root. |
 | `qdash_get_figure`, `qdash_get_task_figures`, `qdash_recent_calibration_figure`, `qdash_analyze_figure_json`, `qdash_build_qcal_evidence` | Figure retrieval, analysis, and evaluation evidence. |
 
@@ -69,7 +66,6 @@ session profile/chip context when their parameters are omitted.
 | Tool | Return or limit |
 | --- | --- |
 | Forum read tools | Compact boxed list, detail, and reply summaries. |
-| Figure tools | Calibration PNG or JSON figures by path or task result; PNG figures render in the TUI. |
 | `qdash_analyze_figure_json` | Numeric summaries of Plotly scatter and heatmap traces. |
 | `qdash_build_qcal_evidence` | Task, target, sweep, and run settings as evaluation context plus the figure as image content. `includeMetrics` and `includeInputs` add fitted outputs and inputs to text; details retain all records. |
 | `qdash_preview_forum_evidence_reply`, `qdash_preview_forum_image_reply` | Read-only previews of evidence or locally generated analysis images. |

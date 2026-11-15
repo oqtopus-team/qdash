@@ -29,7 +29,7 @@ export interface ValidatePipelineResponse {
   spec_version?: ValidatePipelineResponseSpecVersion;
   /** The normalized spec, when it parsed; defaults filled in. */
   spec?: ValidatePipelineResponseSpec;
-  /** For a version 1 spec: the same pipeline converted to version 2. Review it, rename generated call_ids if you like, and submit it instead. */
+  /** For a convertible version 1 spec: the same pipeline converted to version 2. Absent when a one-qubit step uses a removed mode setting or name. Review it, rename generated call_ids if you like, and submit it instead. */
   migrated_spec?: ValidatePipelineResponseMigratedSpec;
   /** Digest of the validated spec, stored as note.pipeline.spec_digest on each step execution. Task results carry the worker's resolved-plan digest (note.calibration_plan.digest) in invocation.plan_digest. */
   plan_digest?: ValidatePipelineResponsePlanDigest;

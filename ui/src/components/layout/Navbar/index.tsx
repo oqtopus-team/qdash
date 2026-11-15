@@ -17,15 +17,19 @@ import { GlobalCommandPalette } from "@/components/layout/GlobalCommandPalette";
 import { GlobalExecutionIndicator } from "@/components/layout/GlobalExecutionIndicator";
 import { NotificationsMenu } from "@/components/layout/NotificationsMenu";
 
+/** Opens the mobile navigation drawer, which holds the destinations the tab bar omits. */
 function HiddenIcon() {
-  const { toggleMobileSidebar } = useSidebar();
+  const { isMobileOpen, toggleMobileSidebar } = useSidebar();
 
   return (
     <div className="flex items-center gap-2 lg:hidden">
       <button
+        type="button"
         onClick={toggleMobileSidebar}
         className="btn btn-ghost btn-square"
         aria-label="Open menu"
+        aria-haspopup="dialog"
+        aria-expanded={isMobileOpen}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"

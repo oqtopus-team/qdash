@@ -26,7 +26,7 @@ Running a workflow or task requires project edit permission.
 5. Under **Calibration targets**, review the defaults from the saved workflow. To change them
    for this run, select **MUX IDs** or **Qubit IDs** and enter IDs separated by commas or spaces.
    For MUX targets, use **Excluded qubit IDs** to omit individual qubits. For a two-qubit workflow
-   with a fixed CR schedule, enter **Coupling pairs** instead, as described below.
+   that groups selected directed pairs automatically, enter **Coupling pairs** instead, as described below.
 6. Confirm the run, then open **Execution** to follow its progress.
 
 Leaving the target fields unchanged preserves the workflow's code settings. **Use code defaults**
@@ -35,17 +35,17 @@ current flow run; later filtering steps still apply. The saved workflow and sche
 A workflow that targets all MUXes, or targets couplings without offering **Coupling pairs**, stops
 with an error when you change its targets.
 
-**Coupling pairs** replaces the MUX and qubit fields for workflows that calibrate fixed coupling
-pairs with a fixed CR schedule, such as those created from **2Q Scheduled Calibration**. Other
-workflows, including ones that generate the CR schedule from qubits or build their calibration
-steps in helper functions, do not offer it. Write each
-pair as `control-target`, for example `63-85`, and separate pairs with commas, spaces, or new
-lines. Direction matters: `85-63` calibrates the opposite direction of `63-85`, and each directed
-pair must exist as a coupling on the run's chip, or QDash rejects the run before it starts. QDash
-groups the pairs into parallel groups from the chip's hardware constraints, replacing the groups
-saved in the workflow for this run only. A workflow created from **2Q Scheduled
-Calibration** saves no pairs of its own, so enter coupling pairs each time you run it; a run left
-unchanged fails before calibrating.
+**Coupling pairs** replaces the MUX and qubit fields for automatic pair workflows, such as
+**2Q Automatic Pairs**. Workflows that choose pairs from qubits or build opaque step lists in
+helper functions do not offer it. Write each pair as `control-target`, for example `63-85`,
+and separate pairs with commas, spaces, or new lines. Direction matters: `85-63` calibrates
+the opposite direction, and each directed pair must exist on the run's chip. QDash groups only
+these pairs using the chip's hardware constraints and the step's parallelism cap. Later filters
+can remove pairs whose qubits no longer qualify.
+
+**2Q Automatic Pairs** requires a saved `coupling_pairs` selection or a selection in **Execute**.
+**2Q Manual Rounds** uses the rounds and targets saved in its source and offers no target override;
+see [Write Two-Qubit Rounds](./manual-execution-rounds.md#write-two-qubit-rounds).
 
 If targets depend on runtime calculations or differ within the workflow, the dialog cannot show a
 single default. Leave the fields unchanged to use the code, or enter an explicit selection for the
@@ -89,18 +89,16 @@ finished and which one is being measured, and the running task shows its measure
 Cancelling a run sends a cancellation request to the worker. A task that is inside an operation
 that cannot be interrupted can take time to stop.
 
-The activity chart at the top of the page counts the chip's runs for the last **7d**, **30d** or
-**90d** as blocks stacked by status; it opens on 30 days. The 30- and 90-day views show one column
-per day (**Executions per day**). The 7-day view shows **Executions per 6 hours**: 28 columns that
-start at 00:00, 06:00, 12:00 and 18:00 in the deployment's time zone, ending with the 6 hours
-that include the current time. Days and periods without runs keep an empty column.
+The activity chart groups the chip's runs by status over **7d**, **30d** (default), or **90d**:
 
-Each block represents one execution, and the axis on the left shows execution counts. For busy
-periods, the chart labels how many executions a full block represents; the top block of a column
-is only partly filled when it holds fewer. Hover over or focus a column to see its exact counts.
-Select a column to limit the list below to its day; in the 7-day view, a 6-hour column selects
-its whole day, because the list filters by day. Select a column of that day again to return to
-the latest runs.
+- **30d** and **90d** show one column per day.
+- **7d** shows 28 six-hour periods starting at 00:00, 06:00, 12:00, and 18:00 in the
+  deployment's time zone, including the current period.
+
+Empty periods keep their columns. The chart labels how many executions a full block represents;
+a partially filled block holds fewer. Hover over or focus a column for exact counts. Select it
+to filter the list to that day, even in the six-hour view; select the same day again to clear
+the filter.
 
 ## Inspect a Result
 

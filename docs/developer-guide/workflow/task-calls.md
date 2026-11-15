@@ -1,10 +1,8 @@
 # Task Calls
 
-A task call is one planned invocation of a calibration task inside a step. Every step lists its
-work as `TaskCall` entries, so one step can run the same task more than once with different
-settings, and every result can be traced back to the call that produced it. The model is
-`qdash.datamodel.task_call.TaskCall`, exported as `from qdash.workflow import TaskCall`; Python
-flows and [pipeline specs](./calibration-pipeline.md) use the same class.
+A `TaskCall` identifies one task invocation in a step, with its own settings and traceable
+results. Python flows and [pipeline specs](./calibration-pipeline.md) share
+`qdash.datamodel.task_call.TaskCall`, exported from `qdash.workflow`.
 
 ```python
 from qdash.workflow import TaskCall, sweep
@@ -31,7 +29,7 @@ pointer to the [migration](#migrate-saved-flows). Built-in steps (`OneQubitCheck
 `qdash.workflow.service.tasks`.
 
 A flow parameter annotated `list[TaskCall] | None`, as in the Simple Calibration, Fake Backend
-Calibration, 2Q Calibration, and 2Q Scheduled Calibration templates, takes calls as JSON objects
+Calibration, 2Q Calibration from Qubits, 2Q Automatic Pairs, and 2Q Manual Rounds templates, takes calls as JSON objects
 in the `parameters` of `POST /flows/{name}/execute` (the pi `qdash_execute_flow` tool sends the
 same body; the workflow editor's run dialog sends no `tasks`, so the source default applies), for
 example:
@@ -114,7 +112,7 @@ Calls do not change how a step schedules its targets:
 
 | Path | Unit of work | Synchronization |
 | --- | --- | --- |
-| `serial`, `scheduled`, `synchronized`, two-qubit groups | One target runs every call in order (`run_target_calls`) | Targets do not wait for each other between calls |
+| `sequential`, `parallel_by_mux`, `parallel_by_round`, two-qubit groups | One target runs every call in order (`run_target_calls`) | Targets do not wait for each other between calls |
 | `simultaneous_spectroscopy` | One call runs once over a batch of qubits (`run_batch_calls`) | Each call is a barrier for its batch |
 | Step boundary | The pipeline finishes the step's Execution | All targets |
 
@@ -349,16 +347,11 @@ how single-task runs apply their `update_calibration_parameters` request field.
 
 ## Testing
 
-`tests/qdash/workflow/test_task_call_pipeline_e2e.py` runs a step with two `CheckRamsey` calls on
-the fake backend and checks task ids, upstream links, per-call settings, accepted-write
-propagation, the call filter, and re-execution. `tests/qdash/workflow/service/test_task_call_propagation.py`
-covers each scheduling path.
-`tests/qdash/workflow/test_task_call_plan_digest_e2e.py` runs an API-validated spec through
-`calibration_pipeline` with isolated worker sessions and checks that every step execution stores
-the API's `plan_digest` as `note.pipeline.spec_digest` and every task result carries
-`note.calibration_plan.digest`. `tests/qdash/workflow/test_task_call_flow_parameters.py` runs
-`task_call_flow_contract.py` with real Prefect in a separate interpreter, because the suite stubs
-`prefect`, and checks that each template turns JSON calls into `TaskCall` entries.
+`tests/qdash/workflow/service/test_task_call_propagation.py` covers task-call propagation
+through each scheduling path with recording sessions.
+`tests/qdash/workflow/test_task_call_flow_parameters.py` runs `task_call_flow_contract.py`
+with real Prefect in a separate interpreter, because the suite stubs `prefect`, and checks
+that each template turns JSON calls into `TaskCall` entries.
 
 ## Implementation Files
 

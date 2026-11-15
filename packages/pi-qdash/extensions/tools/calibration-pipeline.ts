@@ -76,7 +76,8 @@ export type PipelineCatalog = {
     default_tasks: Array<{ name: string; call_id?: string | null }>;
     step_metrics?: string[];
   }>;
-  one_qubit_modes: string[];
+  one_qubit_execution_modes: string[];
+  two_qubit_execution_modes?: string[];
   tasks: Record<string, string[]>;
   spec_version?: number;
   spec_schema: Record<string, unknown>;
@@ -189,7 +190,16 @@ export function formatPipelineCatalog(catalog: PipelineCatalog): string {
     const defaults = step.default_tasks.length ? `; default ${step.default_tasks.length} calls` : "";
     lines.push(`- ${step.type} [${step.kind}${scope}]: ${step.description}${needs}${defaults}`);
   }
-  lines.push("", `One-qubit modes: ${catalog.one_qubit_modes.join(", ")}`, "", "Tasks by type:");
+  lines.push("", `One-qubit execution_mode values: ${catalog.one_qubit_execution_modes.join(", ")}`);
+  if (catalog.two_qubit_execution_modes?.length) {
+    lines.push(`Two-qubit execution_mode values: ${catalog.two_qubit_execution_modes.join(", ")}`);
+  }
+  if ([...catalog.one_qubit_execution_modes, ...(catalog.two_qubit_execution_modes ?? [])].includes("manual")) {
+    lines.push(
+      'execution_mode "manual" requires rounds and runs them exactly as written: [["0", "8"], ["1", "9"]] for qubits, [[["0", "1"], ["4", "5"]], [["8", "9"]]] for directed pairs. Validate the spec to check rounds against the chip.',
+    );
+  }
+  lines.push("", "Tasks by type:");
   for (const [taskType, names] of Object.entries(catalog.tasks)) {
     lines.push(`- ${taskType} (${names.length}): ${names.join(", ")}`);
   }

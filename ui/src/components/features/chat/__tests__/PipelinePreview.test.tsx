@@ -26,7 +26,7 @@ const SPEC = {
   name: "coarse-then-coherence",
   targets: { qids: ["0", "1"] },
   steps: [
-    { type: "OneQubitCheck", mode: "scheduled" },
+    { type: "OneQubitCheck", execution_mode: "parallel_by_mux" },
     { type: "FilterByStatus" },
     {
       type: "CustomOneQubit",

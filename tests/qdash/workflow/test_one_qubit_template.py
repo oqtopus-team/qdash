@@ -162,7 +162,7 @@ def test_fine_one_optimizes_readout_before_classification_in_fine_tune_stage(
     assert len(result["steps"]) == 1
     step = result["steps"][0]
     assert isinstance(step, OneQubitFineTune)
-    assert step.mode == "synchronized"
+    assert step.execution_mode == "parallel_by_round"
     assert step.tasks is not None
     tasks = names(step.tasks)
     # Every repeated pulse calibration is its own call, named after its round.

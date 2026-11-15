@@ -47,6 +47,9 @@ services:
       # container (see .devcontainer/post-start.sh). VS Code sets the same
       # variable from devcontainer.json.
       - QDASH_HOST_WORKSPACE=${PWD}
+      # `task dev-local` run here: Caddy and the Pi Agent Runtime reach its API
+      # and UI by this service name on custom_net (see compose.dev-local.yaml).
+      - QDASH_DEV_HOST=devcontainer
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

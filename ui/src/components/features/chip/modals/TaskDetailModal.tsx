@@ -11,7 +11,10 @@ import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureC
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { CalibrationUpdateStatusBadge } from "@/components/features/metrics/ParametersTable";
-import { TaskArtifactDownloads } from "@/components/features/chip/TaskArtifactDownloads";
+import {
+  TaskArtifactDownloads,
+  hasTaskArtifactDownloads,
+} from "@/components/features/chip/TaskArtifactDownloads";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import { ParameterLineageDialog } from "@/components/features/provenance/ParameterLineageDialog";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -292,10 +295,18 @@ export function TaskDetailModal({
             </div>
           )}
 
-          {(jsonFigures.length > 0 || rawDataPaths.length > 0) && (
+          {hasTaskArtifactDownloads({
+            jsonFigurePaths: jsonFigures,
+            rawDataPaths,
+            imagePaths: figures,
+          }) && (
             <div className="mb-6 rounded-xl bg-base-200 p-4">
               <h4 className="mb-2 font-medium">Artifacts</h4>
-              <TaskArtifactDownloads jsonFigurePaths={jsonFigures} rawDataPaths={rawDataPaths} />
+              <TaskArtifactDownloads
+                jsonFigurePaths={jsonFigures}
+                rawDataPaths={rawDataPaths}
+                imagePaths={figures}
+              />
             </div>
           )}
 

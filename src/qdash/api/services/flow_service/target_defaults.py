@@ -10,6 +10,8 @@ from pydantic import ValidationError
 from qdash.datamodel.flow_targets import FlowTargetOverride, TargetMode
 
 _OVERRIDABLE_TARGETS = {"MuxTargets", "QubitTargets", "CouplingTargets"}
+# Steps that run the target pairs; a pair override needs one of them.
+_PAIR_STEPS = frozenset({"CustomTwoQubit", "TwoQubitCalibration"})
 _QUBIT_MODES: list[TargetMode] = ["mux_ids", "qids"]
 
 
@@ -30,25 +32,32 @@ def supported_target_modes(code: str, function_name: str) -> list[TargetMode]:
     """Return the override types the execution dialog may offer for this source.
 
     Pair overrides need every ``CalibService.run`` the entrypoint executes to
-    receive ``CouplingTargets`` and a step list with ``SetCRSchedule``, which the
-    runtime replaces with the selected pairs. Only the entrypoint is inspected;
-    anything the check cannot follow statically keeps the MUX and qubit
-    overrides instead (see ``_runs_scheduled_pairs``). User code never executes.
+    receive ``CouplingTargets`` and a list of built-in steps. The selected pairs
+    replace those targets, and the automatic two-qubit steps group exactly
+    them. Only the entrypoint is inspected; anything the check cannot follow
+    statically keeps the MUX and qubit overrides instead (see
+    ``_runs_pair_pipelines``). A source that writes ``execution_mode="manual"``
+    on a step accepts no override. User code never executes.
     """
+    from qdash.api.services.flow_service.execution_plan import uses_manual_rounds
+
     try:
         tree = ast.parse(code)
     except SyntaxError:
         return list(_QUBIT_MODES)
+    if uses_manual_rounds(code):
+        # Manual rounds name their own targets; no override may replace them.
+        return []
     function = _function(tree, function_name)
-    if function is not None and _runs_scheduled_pairs(tree, function):
+    if function is not None and _runs_pair_pipelines(tree, function):
         return ["coupling_pairs"]
     return list(_QUBIT_MODES)
 
 
-def _runs_scheduled_pairs(
+def _runs_pair_pipelines(
     tree: ast.Module, function: ast.FunctionDef | ast.AsyncFunctionDef
 ) -> bool:
-    """Whether every pipeline the entrypoint runs is a scheduled coupling pipeline.
+    """Whether every pipeline the entrypoint runs is a pipeline of target pairs.
 
     Conservative by design. Pair mode is rejected when the entrypoint:
 
@@ -56,11 +65,13 @@ def _runs_scheduled_pairs(
       comprehension or lambda;
     - defines nested functions or classes, or references any function or class
       defined in the module (a helper may run its own pipeline);
-    - builds other target types or ``GenerateCRSchedule``;
+    - builds other target types, or calls no ``CustomTwoQubit`` or
+      ``TwoQubitCalibration``;
     - passes targets that are not ``CouplingTargets(...)`` bound in the entrypoint;
-    - passes steps that are not a list literal, or a list name whose every
-      assignment is a literal containing ``SetCRSchedule`` and which is changed
-      only through ``append``, ``extend``, ``insert`` or ``+=`` with step calls.
+    - passes steps that are not a list literal of built-in step calls, or a list
+      name whose every assignment is such a literal and which is changed only
+      through ``append``, ``extend``, ``insert`` or ``+=`` with built-in step
+      calls. A custom step could calibrate pairs other than the selection.
 
     Module statements outside functions must not build services or targets.
     Calls into other modules are not followed.
@@ -90,6 +101,7 @@ def _runs_scheduled_pairs(
         ]
     }
     parents: dict[ast.AST, ast.AST] = {}
+    runs_pairs = False
     for node in ast.walk(body):
         if isinstance(
             node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Global, ast.Nonlocal)
@@ -99,12 +111,13 @@ def _runs_scheduled_pairs(
             return False
         if isinstance(node, ast.Call):
             name = _call_name(node)
-            if name == "GenerateCRSchedule" or (
-                name.endswith("Targets") and name != "CouplingTargets"
-            ):
+            if name.endswith("Targets") and name != "CouplingTargets":
                 return False
+            runs_pairs = runs_pairs or name in _PAIR_STEPS
         for child in ast.iter_child_nodes(node):
             parents[child] = node
+    if not runs_pairs:
+        return False
 
     # Every write to each name: the value for plain assignments, else None.
     writes: dict[str, list[ast.expr | None]] = {}
@@ -181,7 +194,9 @@ def _runs_scheduled_pairs(
         targets, steps = arguments.get("targets"), arguments.get("steps")
         if targets is None or steps is None or not is_coupling(targets):
             return False
-        if not _scheduled_steps(steps, body, parents, set(runs), bound):
+        if not _builtin_steps(steps, body, parents, set(runs), bound):
+            return False
+        if not _has_pair_before_run(steps, run, parents, bound):
             return False
     return True
 
@@ -191,34 +206,119 @@ def _is_coupling_call(node: ast.expr) -> bool:
 
 
 def _is_step_call(node: ast.expr) -> bool:
-    """A direct step constructor call other than ``GenerateCRSchedule``."""
-    return isinstance(node, ast.Call) and _call_name(node) not in {"", "GenerateCRSchedule"}
+    """A direct constructor call of a built-in step."""
+    from qdash.api.services.flow_service.execution_plan import STEP_TYPES
+
+    return isinstance(node, ast.Call) and _call_name(node) in STEP_TYPES
 
 
-def _scheduled_list(node: ast.expr) -> bool:
-    """A step list literal with ``SetCRSchedule`` and only direct step calls."""
-    if not isinstance(node, (ast.List, ast.Tuple)):
-        return False
-    calls = [element for element in node.elts if isinstance(element, ast.Call)]
-    return (
-        len(calls) == len(node.elts)
-        and all(_is_step_call(call) for call in calls)
-        and any(_call_name(call) == "SetCRSchedule" for call in calls)
+def _step_list(
+    node: ast.expr,
+    bound: Callable[[str, Callable[[ast.expr], bool], bool], bool],
+) -> bool:
+    """A list literal containing only built-in steps, possibly empty."""
+    return isinstance(node, (ast.List, ast.Tuple)) and all(
+        _is_step_call(element)
+        or (isinstance(element, ast.Name) and bound(element.id, _is_step_call, False))
+        for element in node.elts
     )
 
 
-def _scheduled_steps(
+def _has_pair_before_run(
+    steps: ast.expr,
+    run: ast.Call,
+    parents: dict[ast.AST, ast.AST],
+    bound: Callable[[str, Callable[[ast.expr], bool], bool], bool],
+) -> bool:
+    """Check pair presence using only statements guaranteed to precede this run.
+
+    Built-in membership and mutations are checked separately. Do not infer that
+    an addition in a conditional branch happened, or follow arbitrary control
+    flow. A possible reassignment discards the previous guarantee.
+    """
+
+    def pair(value: ast.expr) -> bool:
+        def constructor(node: ast.expr) -> bool:
+            return isinstance(node, ast.Call) and _call_name(node) in _PAIR_STEPS
+
+        return constructor(value) or (
+            isinstance(value, ast.Name) and bound(value.id, constructor, False)
+        )
+
+    def contains_pair(value: ast.expr | None) -> bool:
+        return isinstance(value, (ast.List, ast.Tuple)) and any(pair(v) for v in value.elts)
+
+    if not isinstance(steps, ast.Name):
+        return contains_pair(steps)
+
+    # Collect the prefixes of the enclosing blocks, outermost first. Only if
+    # and with blocks have straightforward entry ordering; reject other forms.
+    prefixes: list[list[ast.stmt]] = []
+    child: ast.AST = run
+    while child in parents:
+        parent = parents[child]
+        if isinstance(child, ast.stmt):
+            if not isinstance(parent, (ast.Module, ast.If, ast.With, ast.AsyncWith)):
+                return False
+            for _, value in ast.iter_fields(parent):
+                if isinstance(value, list) and child in value:
+                    prefixes.append(value[: value.index(child)])
+        child = parent
+
+    present = False
+    for prefix in reversed(prefixes):
+        for statement in prefix:
+            if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+                targets = (
+                    statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+                )
+                if any(isinstance(t, ast.Name) and t.id == steps.id for t in targets):
+                    present = contains_pair(statement.value)
+            elif (
+                isinstance(statement, ast.AugAssign)
+                and isinstance(statement.target, ast.Name)
+                and statement.target.id == steps.id
+            ):
+                present = present or contains_pair(statement.value)
+            elif (
+                isinstance(statement, ast.Expr)
+                and isinstance(call := statement.value, ast.Call)
+                and isinstance(call.func, ast.Attribute)
+                and isinstance(call.func.value, ast.Name)
+                and call.func.value.id == steps.id
+            ):
+                # _builtin_steps has already checked the method and arguments.
+                added = call.args[0] if call.func.attr == "extend" else call.args[-1]
+                present = present or (
+                    contains_pair(added) if call.func.attr == "extend" else pair(added)
+                )
+            elif any(
+                isinstance(node, ast.Name)
+                and node.id == steps.id
+                and isinstance(node.ctx, (ast.Store, ast.Del))
+                and not isinstance(parents.get(node), ast.AugAssign)
+                for node in ast.walk(statement)
+            ):
+                present = False
+    return present
+
+
+def _builtin_steps(
     steps: ast.expr,
     body: ast.Module,
     parents: dict[ast.AST, ast.AST],
     runs: set[ast.Call],
     bound: Callable[[str, Callable[[ast.expr], bool], bool], bool],
 ) -> bool:
-    """Whether ``steps`` always holds ``SetCRSchedule`` and never another schedule."""
+    """Whether ``steps`` only ever holds built-in steps."""
+
+    def step_list(node: ast.expr) -> bool:
+        return _step_list(node, bound)
+
     if not isinstance(steps, ast.Name):
-        return _scheduled_list(steps)
+        return step_list(steps)
     name = steps.id
-    if not bound(name, _scheduled_list, True):
+    if not bound(name, step_list, True):
         return False
     for node in ast.walk(body):
         if not (isinstance(node, ast.Name) and node.id == name and node is not steps):
@@ -235,6 +335,8 @@ def _scheduled_steps(
                 return False
             continue
         if isinstance(parent, (ast.Assign, ast.AnnAssign)) and isinstance(node.ctx, ast.Store):
+            if isinstance(parent, ast.Assign) and len(parent.targets) != 1:
+                return False
             continue
         if (
             isinstance(node.ctx, ast.Load)
@@ -317,6 +419,9 @@ class _Resolver:
     invalidates the affected names so callers report "unknown" instead of a guess.
     """
 
+    # Constructors known not to mutate their arguments; names passed to them stay bound.
+    pure_calls: frozenset[str] = frozenset(_OVERRIDABLE_TARGETS)
+
     def __init__(self) -> None:
         self.bindings: dict[str, Any] = {}
         # Names that may share a mutable object; invalidating one invalidates all.
@@ -339,9 +444,13 @@ class _Resolver:
             if current in seen:
                 continue
             seen.add(current)
-            self.bindings.pop(current, None)
-            self.target_names.discard(current)
+            self._forget(current)
             pending.extend(self.links.get(current, ()))
+
+    def _forget(self, name: str) -> None:
+        """Drop everything known about one name."""
+        self.bindings.pop(name, None)
+        self.target_names.discard(name)
 
     def link(self, name: str, value: ast.expr) -> None:
         for node in ast.walk(value):
@@ -366,8 +475,12 @@ class _Resolver:
         except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError) as exc:
             raise _Unknown from exc
 
-    def assign(self, name: str, value: ast.expr | None) -> None:
+    def rebind(self, name: str) -> None:
+        """Forget a name before a plain assignment gives it a new value."""
         self.invalidate(name)
+
+    def assign(self, name: str, value: ast.expr | None) -> None:
+        self.rebind(name)
         if value is None:
             return
         self.link(name, value)
@@ -445,7 +558,7 @@ class _Resolver:
                     root = _root_name(node.func.value)
                     if root is not None:
                         self.invalidate(root)
-                if _call_name(node) not in _OVERRIDABLE_TARGETS and not _is_service(node):
+                if _call_name(node) not in self.pure_calls and not _is_service(node):
                     for argument in [*node.args, *(kw.value for kw in node.keywords)]:
                         root = _root_name(argument)
                         if root is not None:
@@ -474,11 +587,13 @@ def resolve_target_defaults(
         return None
 
 
-def _resolve(
+def _prepare(
     tree: ast.Module,
     function: ast.FunctionDef | ast.AsyncFunctionDef,
     parameters: dict[str, Any],
-) -> FlowTargetOverride | None:
+    resolver: _Resolver,
+) -> None:
+    """Bind module literals, then the entrypoint's defaults and the known parameters."""
     # Targets built in other module-level helpers are invisible from the entrypoint.
     for node in tree.body:
         if node is function:
@@ -489,7 +604,6 @@ def _resolve(
             ):
                 raise _Unknown
 
-    resolver = _Resolver()
     for statement in tree.body:
         if statement is function:
             # The entrypoint body is resolved statement by statement below.
@@ -517,6 +631,15 @@ def _resolve(
     for arg in declared:
         if arg.arg in parameters:
             resolver.bindings[arg.arg] = parameters[arg.arg]
+
+
+def _resolve(
+    tree: ast.Module,
+    function: ast.FunctionDef | ast.AsyncFunctionDef,
+    parameters: dict[str, Any],
+) -> FlowTargetOverride | None:
+    resolver = _Resolver()
+    _prepare(tree, function, parameters, resolver)
 
     candidates: list[FlowTargetOverride] = []
 

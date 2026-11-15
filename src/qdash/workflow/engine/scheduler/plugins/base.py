@@ -22,6 +22,8 @@ class FilterContext:
         qubit_models: Qubit data from individual QubitDocument collection (scalable)
         topology_directions: Pre-computed set of valid coupling directions from topology.
             If set, used by FrequencyDirectionalityFilter instead of design/measured methods.
+        standalone_qids: Known qubits that the chip topology lists in no MUX.
+            They are valid CR targets even though ``qid_to_mux`` lacks them.
     """
 
     chip: ChipModel
@@ -30,6 +32,7 @@ class FilterContext:
     qid_to_mux: dict[str, int] = field(default_factory=dict)
     qubit_models: dict[str, Any] = field(default_factory=dict)
     topology_directions: set[str] | None = None
+    standalone_qids: frozenset[str] = field(default_factory=frozenset)
 
 
 @dataclass

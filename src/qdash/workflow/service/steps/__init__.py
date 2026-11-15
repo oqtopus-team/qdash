@@ -70,7 +70,6 @@ from qdash.workflow.service.steps.pipeline import (
 from qdash.workflow.service.steps.two_qubit import (
     CustomTwoQubit,
     GenerateCRSchedule,
-    SetCRSchedule,
     TwoQubitCalibration,
 )
 
@@ -91,7 +90,6 @@ __all__ = [
     "OneQubitCheck",
     "OneQubitFineTune",
     "Pipeline",
-    "SetCRSchedule",
     # Base classes
     "Step",
     # Context and Pipeline

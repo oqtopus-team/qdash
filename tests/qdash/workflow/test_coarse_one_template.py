@@ -34,7 +34,7 @@ def test_coarse_one_configures_before_readout_search_and_calibrates_all_pulses()
     assert len(result["steps"]) == 1
     step = result["steps"][0]
     assert isinstance(step, OneQubitCheck)
-    assert step.mode == "synchronized"
+    assert step.execution_mode == "parallel_by_round"
     assert names(step.tasks) == [
         "Configure",
         "CheckCoarseReadoutParams",

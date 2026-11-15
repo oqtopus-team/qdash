@@ -26,7 +26,7 @@ src/qdash/api/                      tests/qdash/api/
 ├── schemas/task_result.py          ├── schemas/test_task_result.py
 ├── services/flow_service/          ├── services/flow_service/test_execution.py
 │   └── execution.py                │
-└── dependencies.py                 └── test_dependencies.py
+└── dependencies/                  └── test_dependencies.py
 ```
 
 Name a test for the action and observable result, such as `test_get_chip_wrong_project`. Classes

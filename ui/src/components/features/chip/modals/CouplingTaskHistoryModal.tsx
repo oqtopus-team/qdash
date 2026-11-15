@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import React, { useState, useMemo } from "react";
 import { ChevronRight, History, FileText, GitBranch, ListTodo } from "lucide-react";
 
@@ -19,7 +18,6 @@ import {
 } from "@/components/features/task-history/ExecutionHistoryModalContent";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
-import { AskAiButton } from "@/components/features/evaluations/AskAiButton";
 import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { TaskResultEvaluations } from "@/components/features/evaluations/TaskResultEvaluations";
 import { TaskResultThreads } from "@/components/features/forum/TaskResultThreads";
@@ -27,11 +25,6 @@ import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import type { TaskChatContext } from "@/types/copilotChat";
 import { useChatDock } from "@/contexts/ChatDockContext";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
-
-const PlotlyRenderer = dynamic(
-  () => import("@/components/charts/PlotlyRenderer").then((mod) => mod.PlotlyRenderer),
-  { ssr: false },
-);
 
 interface CouplingTaskHistoryModalProps {
   chipId: string;
@@ -53,7 +46,6 @@ export function CouplingTaskHistoryModal({
 }: CouplingTaskHistoryModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedExecutionTaskIndex, setSelectedExecutionTaskIndex] = useState(0);
-  const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [mobileTab, setMobileTab] = useState<ExecutionHistoryMobileTab>("history");
   const { openMiniChat } = useChatDock();
   const manualOverrides = useManualOverrides(couplingId);
@@ -144,7 +136,6 @@ export function CouplingTaskHistoryModal({
         ? [selectedTask.json_figure_path]
         : []
     : [];
-  const hasJsonFigures = jsonFigures.length > 0;
   const rawDataPaths = selectedTask?.raw_data_path ?? [];
 
   const chatContext: TaskChatContext | null = useMemo(() => {
@@ -160,13 +151,11 @@ export function CouplingTaskHistoryModal({
 
   const handleSelectIndex = (idx: number) => {
     setSelectedIndex(idx);
-    setViewMode("static");
     setMobileTab("tasks");
   };
 
   const handleSelectExecutionTask = (idx: number) => {
     setSelectedExecutionTaskIndex(idx);
-    setViewMode("static");
     setMobileTab("details");
   };
 
@@ -381,23 +370,12 @@ export function CouplingTaskHistoryModal({
               {selectedExecutionId ? "Select a task to view details" : "Select an execution first"}
             </p>
           </div>
-        ) : viewMode === "interactive" && hasJsonFigures ? (
-          jsonFigures.map((jf, i) => (
-            <div
-              key={i}
-              className="min-h-[250px] min-w-[400px] flex-shrink-0 flex justify-center items-center"
-            >
-              <PlotlyRenderer
-                className="w-full h-full"
-                fullPath={`/api/executions/figure?path=${encodeURIComponent(jf)}`}
-              />
-            </div>
-          ))
         ) : figures.length > 0 ? (
           figures.map((fig, i) => (
             <TaskFigure
               key={i}
               path={fig}
+              jsonFigurePath={jsonFigures[i]}
               qid={couplingId}
               className="h-full w-auto object-contain"
             />
@@ -415,21 +393,6 @@ export function CouplingTaskHistoryModal({
           </div>
         )}
       </div>
-
-      {/* View mode toggle (static / interactive) */}
-      {hasJsonFigures && (
-        <div className="flex justify-center mt-2 gap-2 items-center">
-          {viewMode === "static" ? (
-            <button className="btn btn-xs btn-primary" onClick={() => setViewMode("interactive")}>
-              Interactive
-            </button>
-          ) : (
-            <button className="btn btn-xs btn-ghost" onClick={() => setViewMode("static")}>
-              Static
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Task Metadata */}
       {selectedTask && (
@@ -467,8 +430,12 @@ export function CouplingTaskHistoryModal({
               <span>{formatDateTime(String(selectedTask.end_at))}</span>
             </div>
           )}
-          <TaskArtifactDownloads jsonFigurePaths={jsonFigures} rawDataPaths={rawDataPaths} />
-          {/* Lineage and Ask AI */}
+          <TaskArtifactDownloads
+            jsonFigurePaths={jsonFigures}
+            rawDataPaths={rawDataPaths}
+            imagePaths={figures}
+          />
+          {/* Lineage */}
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
             <LineageButton
               target={inExecution(
@@ -484,17 +451,6 @@ export function CouplingTaskHistoryModal({
               <GitBranch className="h-3 w-3" />
               Lineage
             </LineageButton>
-            {chatContext && (
-              <AskAiButton
-                taskId={chatContext.taskId}
-                chipId={chatContext.chipId}
-                taskName={chatContext.taskName}
-                qid={chatContext.qid}
-                chatContext={chatContext}
-                onChat={() => openMiniChat(chatContext)}
-                size="xs"
-              />
-            )}
           </div>
         </div>
       )}
@@ -505,7 +461,7 @@ export function CouplingTaskHistoryModal({
 
       {/* Parameters */}
       {selectedTask && (
-        <div className="flex flex-col gap-2 mt-2">
+        <div className="flex flex-col gap-2 mt-2 mb-6">
           {selectedTask.input_parameters &&
             Object.keys(selectedTask.input_parameters).length > 0 && (
               <ParametersTable
@@ -540,6 +496,7 @@ export function CouplingTaskHistoryModal({
           chipId={chipId}
           taskName={selectedTask.name || taskName}
           qid={couplingId}
+          executionId={selectedExecutionId || undefined}
           onChat={chatContext ? () => openMiniChat(chatContext) : undefined}
         />
       )}

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from qdash.common.mux_mapping import MuxMapping
 from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service.steps.one_qubit import CustomOneQubit
 
@@ -20,6 +21,7 @@ def test_custom_one_qubit_direct_targets_reuse_step_execution(monkeypatch) -> No
         run,
     )
     session = SimpleNamespace(
+        mux_mapping=MuxMapping.legacy(),
         chip_id="64Qv3",
         worker_spec=MagicMock(return_value=spec),
         record_stage_result=MagicMock(),
@@ -53,6 +55,7 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
     )
 
     session = SimpleNamespace(
+        mux_mapping=MuxMapping.legacy(),
         username="alice",
         chip_id="64Qv3",
         backend_name="qubex",
@@ -66,7 +69,7 @@ def test_custom_one_qubit_qubit_targets_use_scheduled_strategy(monkeypatch) -> N
     step = CustomOneQubit(
         step_name="simple_tasks",
         tasks=[TaskCall(name="Configure", on_failure="stop"), TaskCall(name="CheckRabi")],
-        mode="scheduled",
+        execution_mode="parallel_by_mux",
         continue_on_failure=True,
     )
 
@@ -98,6 +101,7 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
     )
 
     session = SimpleNamespace(
+        mux_mapping=MuxMapping.legacy(),
         username="alice",
         chip_id="64Qv3",
         backend_name="qubex",
@@ -108,7 +112,7 @@ def test_one_qubit_check_qubit_targets_use_scheduled_strategy(monkeypatch) -> No
         flow_name="one_qubit",
         note={},
     )
-    step = OneQubitCheck(mode="synchronized", tasks=[TaskCall(name="CheckRabi")])
+    step = OneQubitCheck(execution_mode="parallel_by_round", tasks=[TaskCall(name="CheckRabi")])
 
     step.execute(cast("CalibSession", session), QubitTargets(["2", "5"]), StepContext())
 

@@ -3,10 +3,11 @@
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, status
+from fastapi import APIRouter, Depends, Form, Header, HTTPException, Response, status
 
 from qdash.api.dependencies import get_auth_service
 from qdash.api.lib.auth import authenticate_user, get_admin_user, get_current_active_user
+from qdash.api.lib.prefect_access import is_prefect_read_request
 from qdash.api.schemas.auth import (
     PasswordChange,
     PasswordReset,
@@ -149,6 +150,59 @@ def get_current_user(current_user: Annotated[User, Depends(get_current_active_us
     """
     logger.debug(f"Reading user info for: {current_user.username}")
     return current_user
+
+
+@router.get(
+    "/prefect-access",
+    include_in_schema=False,
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def check_prefect_access(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    x_forwarded_method: Annotated[str | None, Header()] = None,
+    x_forwarded_uri: Annotated[str | None, Header()] = None,
+    x_forwarded_upgrade: Annotated[str | None, Header()] = None,
+) -> Response:
+    """Authorize a Prefect request forwarded by the reverse proxy.
+
+    Signed-in users may perform read-only Prefect operations; every other operation
+    requires a system administrator. Missing forwarded headers are denied for everyone.
+
+    Parameters
+    ----------
+    current_user : User
+        Current active user injected via dependency
+    x_forwarded_method : str | None
+        HTTP method of the original request
+    x_forwarded_uri : str | None
+        Raw URI of the original request
+    x_forwarded_upgrade : str | None
+        Upgrade header of the original request, if any
+
+    Returns
+    -------
+    Response
+        Empty 204 response when access is allowed
+
+    Raises
+    ------
+    HTTPException
+        403 if the headers are missing or the operation requires a system administrator
+
+    """
+    if not x_forwarded_method or not x_forwarded_uri:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Prefect request context is missing",
+        )
+    if current_user.system_role != SystemRole.ADMIN and not is_prefect_read_request(
+        x_forwarded_method, x_forwarded_uri, x_forwarded_upgrade or ""
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Prefect operations that change state require a system administrator",
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch(

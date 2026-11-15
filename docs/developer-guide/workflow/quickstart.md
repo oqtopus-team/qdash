@@ -21,7 +21,7 @@ The smallest useful flow has four parts:
 
 1. A Prefect `@flow` with QDash terminal hooks.
 2. A `Target` selected from MUX IDs or explicit qubit IDs.
-3. An explicit list of task names inside one or more `Step` objects.
+3. Explicit `TaskCall` lists inside one or more `Step` objects.
 4. A `CalibService` that runs those steps.
 
 ## Define a Flow
@@ -76,7 +76,7 @@ def coherence_sample(
                 TaskCall(name="CheckT1"),
                 TaskCall(name="CheckRamsey"),
             ],
-            mode="synchronized",
+            execution_mode="parallel_by_round",
         )
     ]
     service = CalibService(
@@ -110,7 +110,7 @@ steps = [
             TaskCall(name="CheckT1"),
             TaskCall(name="CheckRamsey"),
         ],
-        mode="synchronized",
+        execution_mode="parallel_by_round",
     )
 ]
 context = resolve_calib_context("alice", "64Qv3", project_id="my-project")
@@ -124,10 +124,16 @@ and how to migrate arguments that `CalibService` no longer accepts.
 
 | Target | Use when | Resolution |
 | --- | --- | --- |
-| `MuxTargets` | Hardware scheduling starts from MUX IDs | Expands each MUX to four qubits and removes `exclude_qids` |
+| `MuxTargets` | Hardware scheduling starts from MUX IDs | Expands each MUX to its topology members and removes `exclude_qids` |
 | `QubitTargets` | The caller selected individual qubits | Uses the supplied qubit IDs |
 | `CouplingTargets` | The flow starts from directed two-qubit pairs | Exposes both coupling IDs and their endpoint qubits |
-| `AllMuxTargets` | The flow targets a 64-qubit layout's MUX IDs 0–15 | Expands that fixed MUX set and applies exclusions |
+| `AllMuxTargets` | The flow targets every MUX of the chip | Expands the topology's declared MUXes (MUX IDs 0–15 without a topology) and applies exclusions |
+| `AllQubitTargets` | The flow targets every qubit, including standalone ones | Adds the topology's standalone qubits to its MUX members and applies exclusions; exclusions may remove every MUX member |
+
+`AllMuxTargets` raises `ValueError` when the topology declares no MUX; use `AllQubitTargets` or
+`QubitTargets` for standalone qubits. With a topology, a targeted MUX without a `wiring.yaml` row
+raises `MuxMappingError` instead of selecting part of the chip. Qubit IDs such as `Q07` are
+accepted and scheduled as `7`, the form the topology and the wiring use.
 
 When both `mux_ids` and `qids` are supplied, standard templates prefer `mux_ids`. Preserve that
 rule across templates so UI and scheduled executions resolve the same request consistently.
@@ -198,8 +204,8 @@ come from task and workflow settings. See [Parameter Resolution](./parameter-res
 precedence and snapshot re-execution, and [Calibration Data Lifecycle](./calibration-data-lifecycle.md)
 for output promotion.
 
-Parallel coupling workers receive the step session's `WorkerSpec` (the run's settings and the
-step's Execution ID), then open borrowed sessions. Within each coupling, tasks run sequentially;
+Parallel coupling workers receive the step session's `WorkerSpec` (the run's settings, its MUX
+mapping and the step's Execution ID), then open borrowed sessions. Within each coupling, tasks run sequentially;
 workers do not share Python objects. See [CR Gate Scheduler](../architecture/cr-scheduler.md#workflow-integration)
 for schedule reuse and group ordering.
 
@@ -257,17 +263,11 @@ settings take precedence over `default_run_parameters`; a field the call leaves 
 `task_run_parameters` with a `TypeError`; see
 [Migrate per-task defaults](./task-calls.md#migrate-per-task-defaults).
 
-`TaskCall.run` and `default_run_parameters` use the same
-value syntax. `run` sets run parameters the task declares in its `run_spec`. `input` replaces
-calibration inputs the task declares in its `input_spec`; the value applies to every qid the call
-runs on. Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, or `sweep.range` for generated
-run ranges, `sweep.values(...)` for explicit points, and plain values for other run values and
-`input` entries. The helper records the constructor without creating an array in the workflow
-process, and a parameter that declares one sweep constructor accepts any of them. Setting
-`update_calibration_parameters=False` retains task history without promoting validated outputs to
-the current calibration state. A name in the wrong section, or one the task does not declare,
-fails when the task is created. The complete precedence rules are in [Task Calls](./task-calls.md#settings)
-and [Parameter Resolution](./parameter-resolution.md).
+Use `sweep.linspace`, `sweep.logspace`, `sweep.arange`, `sweep.range`, or `sweep.values` for
+sweeps; other run and input values are plain values. Input overrides apply to every selected
+target. `update_calibration_parameters=False` keeps outputs in history without publishing them.
+See [Task Calls](./task-calls.md#settings) for syntax and precedence, and
+[Parameter Resolution](./parameter-resolution.md) for declaration validation and snapshots.
 
 ## Preserve Terminal Handling
 

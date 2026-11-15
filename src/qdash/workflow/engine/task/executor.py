@@ -38,6 +38,7 @@ from qdash.workflow.engine.task.types import (
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from qdash.common.mux_mapping import MuxMapping
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.execution.service import ExecutionService
 
@@ -86,6 +87,7 @@ class TaskExecutor:
         source_task_id: str | None = None,
         force_update_params: bool = False,
         update_calibration_parameters: bool = True,
+        mux_mapping: "MuxMapping | None" = None,
     ) -> None:
         self.state_manager = state_manager
         self.execution_id = execution_id
@@ -112,6 +114,7 @@ class TaskExecutor:
             data_saver=self.data_saver,
             history_recorder=self.history_recorder,
             backend_saver=self._backend_saver,
+            mux_mapping=mux_mapping,
         )
 
     def execute_task(
@@ -358,6 +361,11 @@ class TaskExecutor:
 
             # 1. Start task
             self.state_manager.start_task(task_name, task_type, qid)
+
+            # 1.1 A MUX-level task fans its result out after it runs; reject it
+            #     before any hardware work when the execution pinned no mapping.
+            if execution_service is not None and getattr(task, "is_mux_level", False):
+                self._mux_distributor.require_mapping(task_name)
 
             # 1.5 Apply snapshot overrides early so initial history record
             #     contains the correct (overridden) parameter values.
@@ -626,6 +634,13 @@ class TaskExecutor:
                 self.state_manager.start_task(task_name, task_type, qid)
                 started_qids.append(qid)
 
+            # A MUX-level task must run against the execution's pinned mapping, as
+            # in execute(); reject the whole batch before any hardware work so every
+            # qid is recorded as failed once and nothing is saved.
+            if execution_service is not None and getattr(task, "is_mux_level", False):
+                self._mux_distributor.require_mapping(task_name)
+
+            for qid in qids:
                 if self._snapshot_loader is not None:
                     self._apply_snapshot_overrides(task, task_name, task_type, qid)
 

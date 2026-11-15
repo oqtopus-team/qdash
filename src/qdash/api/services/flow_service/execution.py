@@ -88,7 +88,7 @@ class ExecutionCoordinator:
         scope = (
             resolve_workflow_resource_scope(chip_id)
             if workflow
-            else resolve_execution_resource_scope(chip_id, parameters)
+            else resolve_execution_resource_scope(chip_id, parameters, project_id=project_id)
         )
         if self._locks.has_conflict(project_id, scope):
             return False, _WHOLE_CHIP_REASON if workflow else _SCOPED_CONFLICT_REASON
@@ -142,9 +142,9 @@ class ExecutionCoordinator:
         settings = get_settings()
         return DispatchResult(
             flow_run_id=flow_run_id,
-            flow_run_url=_flow_run_url(settings.prefect_port, flow_run_id),
+            flow_run_url=_flow_run_url(settings.public_url, flow_run_id),
             execution_id=execution_id,
-            qdash_ui_url=_qdash_ui_url(settings.ui_port, chip_id, execution_id),
+            qdash_ui_url=_qdash_ui_url(settings.public_url, chip_id, execution_id),
         )
 
     async def dispatch_background(
@@ -196,7 +196,7 @@ class ExecutionCoordinator:
         scope = (
             resolve_workflow_resource_scope(chip_id)
             if workflow
-            else resolve_execution_resource_scope(chip_id, parameters)
+            else resolve_execution_resource_scope(chip_id, parameters, project_id=project_id)
         )
         if not self._locks.try_lock(
             project_id=project_id,
@@ -293,14 +293,14 @@ class ExecutionCoordinator:
             return None
 
 
-def _flow_run_url(prefect_port: int, flow_run_id: str) -> str:
-    """Build the Prefect UI URL of a flow run."""
-    return f"http://localhost:{prefect_port}/runs/flow-run/{flow_run_id}"
+def _flow_run_url(public_url: str, flow_run_id: str) -> str:
+    """Build the Prefect UI URL of a flow run, served under /prefect of the QDash URL."""
+    return f"{public_url}/prefect/runs/flow-run/{flow_run_id}"
 
 
-def _qdash_ui_url(ui_port: int, chip_id: str | None, execution_id: str | None) -> str:
+def _qdash_ui_url(public_url: str, chip_id: str | None, execution_id: str | None) -> str:
     """Build the QDash UI URL of an execution."""
-    base = f"http://localhost:{ui_port}/execution"
+    base = f"{public_url}/execution"
     if not chip_id:
         return base
     if not execution_id:

@@ -258,7 +258,7 @@ test("every catalog component has an argument list, with the catalog's enums", (
   assert.deepEqual(properties.alerts.items.properties.tone.enum, ["info", "success", "warning", "error"]);
 });
 
-/** Keywords Anthropic's strict tool mode rejects (pi-ai 1.5.0 anthropic-messages.js). */
+/** Keywords Anthropic's strict tool mode rejects (pi-ai 1.5.2 anthropic-messages.js). */
 const ANTHROPIC_STRICT_UNSUPPORTED = [
   "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "maxItems",
   "uniqueItems", "minContains", "maxContains", "minProperties", "maxProperties", "minItems", "format",

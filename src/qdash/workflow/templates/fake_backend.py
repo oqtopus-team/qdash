@@ -14,8 +14,9 @@ Default task order:
 
 Targets are MUXes, as on hardware. The flow resolves each MUX to its qubits from the chip's
 wiring and schedules them with the same box-aware scheduler the hardware templates use
-(``mode="scheduled"``): MUX groups that share no box run in parallel, and the qubits of a MUX
-run one after another. Target arguments follow the hardware templates: ``mux_ids`` selects
+(``execution_mode="parallel_by_mux"`` by default): the scheduler places MUXes in box stages that
+run one after another, the MUX groups of one stage run in parallel, and the qubits of a MUX run
+one after another. Target arguments follow the hardware templates: ``mux_ids`` selects
 MUXes, otherwise ``qids`` selects qubits. With neither, the flow calibrates ``MUX_IDS``, MUX 0
 to 15, every qubit of the 64-qubit, 16-MUX virtual device that the Create Chip dialog
 configures on a fake deployment.
@@ -46,6 +47,7 @@ from typing import Any
 
 from prefect import flow
 
+from qdash.datamodel.one_qubit_execution_mode import OneQubitExecutionMode
 from qdash.workflow import TaskCall
 from qdash.workflow.service import CalibService, resolve_calib_context
 from qdash.workflow.service.calib_service import (
@@ -86,7 +88,7 @@ def fake_calibration(
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
-    mode: str = "scheduled",
+    execution_mode: OneQubitExecutionMode = "parallel_by_mux",
     tasks: list[TaskCall] | None = None,
     backend_name: str | None = None,
     tags: list[str] | None = None,
@@ -102,10 +104,13 @@ def fake_calibration(
             15) when qids is not given either.
         exclude_qids: Qubit IDs to leave out of the selected MUXes
         qids: Qubit IDs to calibrate when mux_ids is not set
-        mode: Execution mode, as in the hardware templates:
-            - "scheduled": Box-based parallelism with hardware constraints (default)
-            - "synchronized": Step-based synchronized execution
-            - "serial": One MUX at a time
+        execution_mode: How the one-qubit targets run (default: "parallel_by_mux"):
+            - "parallel_by_mux": MUXes run in parallel within the scheduler's hardware
+              stages; the qubits of one MUX run one after another
+            - "parallel_by_round": the scheduler forms rounds of qubits from different
+              MUXes; the next round starts after every qubit of the round has run
+              all of its tasks
+            - "sequential": one MUX and one qubit at a time
         tasks: Task calls to run, e.g. [TaskCall(name="CheckRabi")]; flow runs pass
             [{"name": "CheckRabi"}]. Default: FAKE_CALIBRATION_TASKS.
         backend_name: Backend to use ("fake" for testing, "qubex" for production,
@@ -130,7 +135,11 @@ def fake_calibration(
     else:
         targets = MuxTargets(mux_ids=MUX_IDS, exclude_qids=exclude_qids)
     steps = [
-        CustomOneQubit(step_name="calibration", tasks=tasks, mode=mode),
+        CustomOneQubit(
+            step_name="calibration",
+            tasks=tasks,
+            execution_mode=execution_mode,
+        ),
     ]
 
     # The backend is part of the execution context; the default comes from

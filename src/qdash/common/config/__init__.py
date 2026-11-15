@@ -51,7 +51,7 @@ from qdash.common.config.paths import (
 )
 from qdash.common.config.topology import (
     TOPOLOGIES_DIR,
-    MuxConfig,
+    MuxesSource,
     QubitPosition,
     TopologyDefinition,
     VisualizationConfig,
@@ -77,7 +77,7 @@ __all__ = [
     "EvaluationConfig",
     "MetricMetadata",
     "MetricsConfig",
-    "MuxConfig",
+    "MuxesSource",
     "PathOutsideCalibData",
     "QubitPosition",
     "ThresholdConfig",

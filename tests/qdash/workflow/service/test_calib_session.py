@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from qdash.common.mux_mapping import MuxMapping, MuxMappingSnapshot
 from qdash.datamodel.task_call import TaskCall
 from qdash.workflow.service._internal.lifecycle import (
     is_cancellation as _is_cancellation,
@@ -271,6 +272,7 @@ def _worker(
             execution_id=execution_id,
             reservation=ReservationScope.of(reservation) if reservation is not None else None,
         ),
+        mux_mapping=MuxMapping.legacy(),
     )
     session._initialize(qids)
     return session
@@ -327,6 +329,29 @@ class ExternalSignal(BaseException):
 
 class TerminationSignal(ExternalSignal):
     """Stand-in for prefect.exceptions.TerminationSignal."""
+
+
+LEGACY_MAPPING = MuxMappingSnapshot.of(MuxMapping.legacy())
+"""What an owner of a chip without a topology hands its workers."""
+
+
+@pytest.fixture(autouse=True)
+def chips_without_topology(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Any, ...]]:
+    """Store every chip of these tests as a legacy chip (no ``topology_id``).
+
+    Only the chip document lookup is replaced: ``resolve_chip_mux_mapping``,
+    the Qubex layout check and the scope checks still run, so sessions resolve
+    the legacy mapping exactly as they do for such a chip in production. Tests
+    about unusable topologies live in the MUX mapping test modules.
+    """
+    lookups: list[tuple[Any, ...]] = []
+
+    def find_one(*args: Any, **kwargs: Any) -> Any:
+        lookups.append(args)
+        return SimpleNamespace(run=lambda: SimpleNamespace(topology_id=None))
+
+    monkeypatch.setattr("qdash.dbmodel.chip.ChipDocument.find_one", find_one)
+    return lookups
 
 
 @pytest.fixture(autouse=True)
@@ -633,7 +658,9 @@ class TestCalibSessionInitialization:
     def test_borrowed_session_only_releases_its_backend(self, mock_flow_session_deps):
         settings = _settings(github=GitHubPolicy.pull_and_push())
         spec = WorkerSpec(
-            settings=settings.for_worker(), lease=WorkerLease(execution_id="parent-execution")
+            settings=settings.for_worker(),
+            lease=WorkerLease(execution_id="parent-execution"),
+            mux_mapping=LEGACY_MAPPING,
         )
 
         with borrowed_session(spec, ["0"]) as session:
@@ -1171,20 +1198,22 @@ def pipeline_execution_env(mock_flow_session_deps, monkeypatch):
         monkeypatch.setattr(CalibSession, method, MagicMock())
     schedule = SimpleNamespace(
         stages=[SimpleNamespace(box_type="A", parallel_groups=[["0", "1"]])],
+        rounds=[SimpleNamespace(box_type="A", parallel_qids=["0", "1"], round_index=0)],
+        total_rounds=1,
+        # Batch steps of simultaneous_spectroscopy.
         steps=[SimpleNamespace(box_type="A", parallel_qids=["0", "1"], step_index=0)],
-        total_steps=1,
         metadata={"strategy": "test"},
     )
     scheduler = MagicMock()
     scheduler.generate_from_mux.return_value = schedule
-    scheduler.generate_synchronized_from_mux.return_value = schedule
+    scheduler.generate_rounds_from_mux.return_value = schedule
     scheduler.generate_simultaneous_spectroscopy_batches_from_mux.return_value = schedule
     monkeypatch.setattr("qdash.workflow.service.strategy.OneQubitScheduler", lambda **kw: scheduler)
     return SimpleNamespace(records=records, lock=lock, claims=claims)
 
 
 @pytest.mark.parametrize(
-    "mode", ["synchronized", "scheduled", "serial", "simultaneous_spectroscopy"]
+    "mode", ["parallel_by_round", "parallel_by_mux", "sequential", "simultaneous_spectroscopy"]
 )
 def test_pipeline_owns_one_execution_per_calibration_step(
     pipeline_execution_env, monkeypatch, mode
@@ -1233,9 +1262,9 @@ def test_pipeline_owns_one_execution_per_calibration_step(
     session.run_pipeline(
         QubitTargets(["0", "1"]),
         steps=[
-            OneQubitCheck(mode=mode, tasks=[TaskCall(name=check_task)]),
+            OneQubitCheck(execution_mode=mode, tasks=[TaskCall(name=check_task)]),
             FilterByStatus(),
-            OneQubitFineTune(mode=mode, tasks=[TaskCall(name=fine_task)]),
+            OneQubitFineTune(execution_mode=mode, tasks=[TaskCall(name=fine_task)]),
         ],
     )
 
@@ -1399,14 +1428,15 @@ def pipeline_wiring(tmp_path, monkeypatch):
     monkeypatch.setattr(execution_resources, "resolve_config_base_path", lambda: tmp_path)
 
 
-def test_pipeline_plan_includes_later_configuration_and_schedule(pipeline_wiring):
+def test_pipeline_plan_includes_later_configuration_and_target_pairs(pipeline_wiring):
     from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
-    from qdash.workflow.service.steps import ConfigureAll, OneQubitCheck, SetCRSchedule
+    from qdash.workflow.service.steps import ConfigureAll, OneQubitCheck, TwoQubitCalibration
+    from qdash.workflow.service.targets import CouplingTargets
 
     scope = plan_pipeline_resources(
         "chip-1",
-        QubitTargets(["0"]),
-        [OneQubitCheck(), ConfigureAll(mux_ids=[1]), SetCRSchedule(schedule=[[("8", "12")]])],
+        CouplingTargets([("0", "1"), ("8", "12")]),
+        [OneQubitCheck(), ConfigureAll(mux_ids=[1]), TwoQubitCalibration()],
     )
     assert not scope.exclusive
     assert {r for r in scope.resources if r.startswith("mux:")} == {
@@ -1418,18 +1448,17 @@ def test_pipeline_plan_includes_later_configuration_and_schedule(pipeline_wiring
 
 
 def test_coupling_override_plans_only_the_selected_pairs(pipeline_wiring):
-    """A source schedule replaced by a pair override no longer reserves its qubits."""
+    """Source pairs replaced by a pair override no longer reserve their qubits."""
     from qdash.datamodel.flow_targets import FlowTargetOverride
     from qdash.workflow.service.flow_targets import override_pipeline
     from qdash.workflow.service.pipeline_resources import plan_pipeline_resources
-    from qdash.workflow.service.steps import SetCRSchedule, TwoQubitCalibration
+    from qdash.workflow.service.steps import TwoQubitCalibration
     from qdash.workflow.service.targets import CouplingTargets
 
     targets, steps = override_pipeline(
         CouplingTargets([("8", "12")]),
-        [SetCRSchedule(schedule=[[("8", "12")]]), TwoQubitCalibration()],
+        [TwoQubitCalibration()],
         FlowTargetOverride(coupling_pairs=[["1", "0"]]),
-        lambda pairs: [pairs],
     )
     scope = plan_pipeline_resources("chip-1", targets, steps)
     assert not scope.exclusive
@@ -1520,14 +1549,14 @@ def test_pipeline_rejects_unplanned_targets_before_later_hardware_step(
     pipeline_wiring,
     monkeypatch,
 ):
-    from qdash.workflow.service.steps import CustomOneQubit, SetCRSchedule
+    from qdash.workflow.service.steps import CustomOneQubit, GenerateCRSchedule
 
     def change_targets(self, session, targets, ctx):
-        ctx.candidate_qids = ["12"]  # The declared schedule only reserved MUX 0.
+        ctx.candidate_qids = ["12"]  # The declared targets only reserved MUX 0.
         return ctx
 
     run_step = MagicMock()
-    monkeypatch.setattr(SetCRSchedule, "execute", change_targets)
+    monkeypatch.setattr(GenerateCRSchedule, "execute", change_targets)
     monkeypatch.setattr(CustomOneQubit, "execute", run_step)
     session = _session(
         username="alice",
@@ -1536,9 +1565,7 @@ def test_pipeline_rejects_unplanned_targets_before_later_hardware_step(
         lock_repo=pipeline_execution_env.lock,
     )
     with pytest.raises(RuntimeError, match="outside the workflow"):
-        session.run_pipeline(
-            QubitTargets(["0"]), [SetCRSchedule(schedule=[[("0", "1")]]), CustomOneQubit()]
-        )
+        session.run_pipeline(QubitTargets(["0", "1"]), [GenerateCRSchedule(), CustomOneQubit()])
     run_step.assert_not_called()
     assert not pipeline_execution_env.lock.locked
 
@@ -1548,6 +1575,7 @@ def _borrowing_worker(scope: Any, **overrides: Any) -> CalibSession:
     return CalibSession(
         _settings(username="alice", chip_id="chip-1", project_id="project-1", **overrides),
         lease=WorkerLease(execution_id="child", reservation=ReservationScope.of(scope)),
+        mux_mapping=MuxMapping.legacy(),
     )
 
 
@@ -1571,6 +1599,7 @@ def test_task_and_isolated_worker_reject_unreserved_hardware(
     spec = WorkerSpec(
         settings=_settings(username="alice", chip_id="chip-1", project_id="project-1"),
         lease=WorkerLease(execution_id="child", reservation=ReservationScope.of(scope)),
+        mux_mapping=LEGACY_MAPPING,
     )
     with pytest.raises(RuntimeError, match="outside the workflow"), borrowed_session(spec, ["4"]):
         pass
@@ -1853,7 +1882,9 @@ def test_workers_apply_the_inherited_snapshot_and_force_override(
         "qdash.workflow.engine.task.snapshot_loader.SnapshotParameterLoader", RecordingLoader
     )
     spec = WorkerSpec(
-        settings=_rerun_settings().for_worker(), lease=WorkerLease(execution_id="exec-step")
+        settings=_rerun_settings().for_worker(),
+        lease=WorkerLease(execution_id="exec-step"),
+        mux_mapping=LEGACY_MAPPING,
     )
 
     with borrowed_session(spec, ["0"]) as worker:

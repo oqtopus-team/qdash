@@ -21,8 +21,8 @@ Python backend code for QDash.
 
 ## Documentation
 
-See [docs/development/](../../docs/development/) for details.
+See [docs/developer-guide/](../../docs/developer-guide/) for details.
 
-- [API Design Guidelines](../../docs/development/api/design.md)
-- [Workflow Engine Architecture](../../docs/development/workflow/engine-architecture.md)
-- [Development Setup](../../docs/development/setup.md)
+- [API Design Guidelines](../../docs/developer-guide/api/design.md)
+- [Workflow Engine Architecture](../../docs/developer-guide/workflow/engine-architecture.md)
+- [Development Setup](../../docs/developer-guide/setup.md)

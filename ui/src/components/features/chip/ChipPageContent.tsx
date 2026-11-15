@@ -13,7 +13,7 @@ import { QubitGrid } from "./QubitGrid";
 import { ChipManageModal } from "./ChipManageModal";
 import { CreateChipModal } from "./modals/CreateChipModal";
 
-import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
+import type { Task, MuxDetailResponse, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
 
 import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
 import { useListTaskInfo, useGetTaskFileSettings } from "@/client/task-file/task-file";
@@ -330,11 +330,9 @@ export function ChipPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Only re-run when qid changes, not the entire selectedTaskInfo object
   }, [muxData?.data, selectedTaskInfo?.qid]);
 
-  // Get all QIDs for this mux (always 4 qids based on mux number)
-  const getQidsForMux = (muxNum: number): string[] => {
-    const startQid = muxNum * 4;
-    return [String(startQid), String(startQid + 1), String(startQid + 2), String(startQid + 3)];
-  };
+  // Member QIDs of a MUX in local slot order, as resolved from the chip topology by the API
+  const getQidsForMux = (muxDetail: MuxDetailResponse): string[] =>
+    muxDetail.qids && muxDetail.qids.length > 0 ? muxDetail.qids : Object.keys(muxDetail.detail);
 
   // Group tasks by name for each mux
   const getTaskGroups = (detail: MuxDetailResponseDetail) => {
@@ -648,7 +646,7 @@ export function ChipPageContent() {
                     ? "No updates"
                     : formatRelativeTime(updateInfo.time);
                 const isExpanded = expandedMuxes[muxId];
-                const qids = getQidsForMux(muxDetail.mux_id);
+                const qids = getQidsForMux(muxDetail);
                 const taskGroups = getTaskGroups(muxDetail.detail);
 
                 return (

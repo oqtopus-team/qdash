@@ -49,7 +49,7 @@ def test_coherence_check_runs_expected_calls_in_one_step() -> None:
     (step,) = result["steps"]
     assert isinstance(step, CustomOneQubit)
     assert step.name == "coherence_check"
-    assert step.mode == "synchronized"
+    assert step.execution_mode == "parallel_by_round"
     # The default per-target fail-fast policy applies to every call.
     assert step.continue_on_failure is False
     assert all(call.on_failure is None for call in step.tasks)

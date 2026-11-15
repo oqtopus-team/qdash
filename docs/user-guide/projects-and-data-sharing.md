@@ -22,9 +22,8 @@ projects and switch between them without copying data.
 | Editor | Viewer access plus calibration runs and changes to shared operational state. |
 | Owner | Editor access plus project settings, membership, and deletion. |
 
-Assign Viewer when a member only reviews or discusses work. Assign Editor when they run
-calibrations or change project data. Each project has one Owner; transfer ownership before that
-person leaves the project. The previous Owner remains an Editor after a transfer.
+Each project has one Owner; transfer ownership before that person leaves. The previous Owner
+remains an Editor.
 
 Project roles are independent of the system Admin role. A system Admin can manage accounts and
 projects from **Admin**, but needs project membership to open that project's calibration data.
@@ -55,6 +54,8 @@ description, invite existing QDash users, change member roles, and remove member
 
 4. Remove the member when they no longer need project access.
 
+   ![Removing a project member from Settings](/images/guides/remove-project-member.gif)
+
 Deleting a project removes its project-scoped records and is not reversible through the UI.
 Review membership, chips, executions, and artifacts before confirming deletion.
 
@@ -72,6 +73,6 @@ another member will continue work from an existing result.
 
 ## Programmatic Access
 
-Use a saved [QDash Client](../reference/clients/python.md) profile for scripts and agents, then
-select the project through the profile or client API. Data cannot be moved between projects as a
+Scripts and agents select the project through a saved client profile, as
+[Connect to a Deployment](../reference/clients/python.md#connect-to-a-deployment) describes. Data cannot be moved between projects as a
 normal operation; create or import it in the intended project instead.

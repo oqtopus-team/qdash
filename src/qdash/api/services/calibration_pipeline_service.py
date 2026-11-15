@@ -30,19 +30,30 @@ from qdash.api.services.calibration_pipeline_preflight import (
     prerequisite_problems,
     run_parameter_problems,
 )
+from qdash.api.services.manual_round_checks import (
+    ChipRoundModel,
+    check_rounds,
+    load_chip_round_model,
+)
 from qdash.common.config.backend import (
     get_available_backends,
     get_default_backend,
     get_tasks,
 )
+from qdash.common.manual_rounds import mux_target_qids
+from qdash.common.mux_mapping import (
+    MuxMappingError,
+    qubex_mux_mapping_errors,
+    resolve_topology_mux_mapping,
+)
 from qdash.datamodel.calibration_pipeline import (
-    ONE_QUBIT_MODES,
     SPEC_VERSION,
     STEP_CATALOG,
     CalibrationPipelineSpec,
     ConfigureAllStep,
     FilterByMetricStep,
     FilterByStatusStep,
+    LegacyExecutionModeError,
     PipelineStep,
     migrate_pipeline_spec,
     pipeline_spec_json_schema,
@@ -50,8 +61,11 @@ from qdash.datamodel.calibration_pipeline import (
     step_calls,
     step_continue_on_failure,
     step_id,
+    step_manual_rounds,
     step_name,
 )
+from qdash.datamodel.one_qubit_execution_mode import ONE_QUBIT_STEP_EXECUTION_MODES
+from qdash.datamodel.two_qubit_execution_mode import TWO_QUBIT_EXECUTION_MODES
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.qubit import QubitDocument
 
@@ -62,8 +76,6 @@ if TYPE_CHECKING:
     from qdash.repository.task_definition import MongoTaskDefinitionRepository
 
 logger = logging.getLogger(__name__)
-
-QUBITS_PER_MUX = 4
 
 
 def _problem(path: str, message: str) -> PipelineProblem:
@@ -88,6 +100,24 @@ def _pydantic_problems(error: ValidationError) -> list[PipelineProblem]:
     return problems
 
 
+def _describe_ids(ids: list[int]) -> str:
+    """Compact ``0-11`` or ``0, 2, 5`` description of sorted MUX IDs."""
+    if not ids:
+        return "none"
+    # Sorted and unique, so a span equal to the count is contiguous. Comparing
+    # with a range would allocate every ID between sparse MUX IDs.
+    if ids[-1] - ids[0] + 1 == len(ids):
+        return f"{ids[0]}-{ids[-1]}" if len(ids) > 1 else str(ids[0])
+    shown = ", ".join(str(mux_id) for mux_id in ids[:16])
+    return shown if len(ids) <= 16 else f"{shown}, ..."
+
+
+def _default_chip_round_model(project_id: str, chip_id: str) -> ChipRoundModel:
+    from qdash.repository import MongoChipRepository
+
+    return load_chip_round_model(project_id, chip_id, MongoChipRepository().get_coupling_ids)
+
+
 class CalibrationPipelineService:
     """Resolve and validate pipeline specs for one project."""
 
@@ -101,6 +131,7 @@ class CalibrationPipelineService:
         task_catalog: Callable[[str], Mapping[str, TaskInfo]] | None = None,
         qubit_data: Callable[[str, str, str], Mapping[str, Any]] | None = None,
         source_run_parameters: Callable[[str, str], Mapping[str, Any] | None] | None = None,
+        chip_round_model: Callable[[str, str], ChipRoundModel] | None = None,
     ) -> None:
         """Create the service.
 
@@ -116,6 +147,9 @@ class CalibrationPipelineService:
             qubit_data: (project_id, chip_id, qid) -> the qubit's calibration data.
             source_run_parameters: (project_id, task_id) -> run parameters recorded
                 on that task result, or None when the task is unknown.
+            chip_round_model: (project_id, chip_id) -> the wiring and coupling IDs
+                that manual rounds are checked against. Defaults to reading the
+                chip's wiring.yaml and its coupling documents.
         """
         self._task_definitions = task_definition_repository
         self._default_backend = default_backend
@@ -124,6 +158,7 @@ class CalibrationPipelineService:
         self._task_catalog = task_catalog
         self._qubit_data = qubit_data
         self._source_run_parameters = source_run_parameters
+        self._chip_round_model = chip_round_model or _default_chip_round_model
 
     # ------------------------------------------------------------------ catalog
 
@@ -173,7 +208,8 @@ class CalibrationPipelineService:
                 )
                 for entry in STEP_CATALOG.values()
             ],
-            one_qubit_modes=list(ONE_QUBIT_MODES),
+            one_qubit_execution_modes=list(ONE_QUBIT_STEP_EXECUTION_MODES),
+            two_qubit_execution_modes=list(TWO_QUBIT_EXECUTION_MODES),
             tasks=by_type,
             spec_version=SPEC_VERSION,
             spec_schema=pipeline_spec_json_schema(),
@@ -210,8 +246,10 @@ class CalibrationPipelineService:
 
         targets, target_qids = self._validate_targets(project_id, chip_id, parsed, problems)
         if not backend_problem:
+            self._validate_backend_mux_layout(project_id, chip_id, backend, problems)
             self._validate_tasks(project_id, backend, parsed, problems)
         self._validate_task_parameters(parsed, problems)
+        round_warnings = self._validate_manual_rounds(project_id, chip_id, parsed, problems)
         if not backend_problem:
             self._preflight(project_id, chip_id, backend, parsed, target_qids, problems)
 
@@ -222,7 +260,8 @@ class CalibrationPipelineService:
         return ValidatePipelineResponse(
             valid=not problems,
             problems=problems,
-            warnings=[_problem(path, message) for path, message in pipeline_warnings(parsed)],
+            warnings=[_problem(path, message) for path, message in pipeline_warnings(parsed)]
+            + round_warnings,
             backend_name=backend,
             spec_version=SPEC_VERSION,
             spec=parsed.model_dump(mode="json", exclude_none=True),
@@ -237,6 +276,54 @@ class CalibrationPipelineService:
             ),
         )
 
+    def _validate_manual_rounds(
+        self,
+        project_id: str,
+        chip_id: str,
+        spec: CalibrationPipelineSpec,
+        problems: list[PipelineProblem],
+    ) -> list[PipelineProblem]:
+        """Check manual rounds as the worker does before any target runs.
+
+        The current qubits of a step are known while no filter has run: they
+        are the spec's targets. Later steps are checked by the worker when they
+        start. Returns warnings for checks that could not run.
+        """
+        manual = [
+            (index, found)
+            for index, step in enumerate(spec.steps)
+            if (found := step_manual_rounds(step)) is not None
+        ]
+        if not manual:
+            return []
+        model = self._chip_round_model(project_id, chip_id)
+        targets = spec.targets
+        initial: list[str] | None
+        if targets.qids:
+            initial = list(targets.qids)
+        elif model.wiring is not None:
+            initial = mux_target_qids(
+                targets.mux_ids or [], targets.exclude_qids, model.wiring, model.mux_mapping
+            )
+        else:
+            initial = None
+        first_filter = next(
+            (
+                index
+                for index, step in enumerate(spec.steps)
+                if isinstance(step, FilterByStatusStep | FilterByMetricStep)
+            ),
+            len(spec.steps),
+        )
+        warnings: list[PipelineProblem] = []
+        for index, (scope, rounds) in manual:
+            candidates = initial if index < first_filter else None
+            result = check_rounds(scope, rounds, model, candidates)
+            path = f"steps[{index}].rounds"
+            problems.extend(_problem(path, issue.describe()) for issue in result.issues)
+            warnings.extend(_problem(path, reason) for reason in result.unchecked)
+        return warnings
+
     @staticmethod
     def _reject_old_version(
         spec: Any,
@@ -244,9 +331,22 @@ class CalibrationPipelineService:
         backend: str,
         problems: list[PipelineProblem],
     ) -> ValidatePipelineResponse:
-        """A version 1 spec is rejected with the same pipeline converted to version 2."""
+        """A version 1 spec is rejected with the same pipeline converted to version 2.
+
+        A version 1 spec whose one-qubit step uses the removed ``mode`` gets no
+        converted spec, only a problem at that step naming its ``execution_mode``
+        replacement, so callers are never told to submit a spec that is invalid.
+        """
         try:
             migration = migrate_pipeline_spec(spec)
+        except LegacyExecutionModeError as exc:
+            problems.extend(_problem(path, message) for path, message in exc.problems)
+            return ValidatePipelineResponse(
+                valid=False,
+                problems=problems,
+                backend_name=backend,
+                spec_version=version if isinstance(version, int) else None,
+            )
         except (ValueError, TypeError, AttributeError) as exc:
             problems.append(
                 _problem(
@@ -306,6 +406,57 @@ class CalibrationPipelineService:
     def _step_name(step: PipelineStep) -> str:
         return step_name(step)
 
+    @staticmethod
+    def _validate_backend_mux_layout(
+        project_id: str, chip_id: str, backend: str, problems: list[PipelineProblem]
+    ) -> None:
+        """Report a MUX layout the Qubex backend would refuse before connecting."""
+        if backend != "qubex":
+            return
+        chip = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
+        if chip is None:
+            return
+        try:
+            mapping = resolve_topology_mux_mapping(chip.topology_id)
+        except MuxMappingError:
+            return  # Reported against the targets.
+        errors = qubex_mux_mapping_errors(mapping)
+        if errors:
+            problems.append(
+                _problem(
+                    "backend_name",
+                    f"the Qubex backend cannot drive the MUX layout of topology "
+                    f"{chip.topology_id!r}: {'; '.join(errors)}. Qubex requires every qubit "
+                    "to be in a MUX, and MUX N to list qubits 4N, 4N+1, 4N+2, 4N+3 in "
+                    "this order",
+                )
+            )
+
+    @staticmethod
+    def _validate_configure_all_mux_ids(
+        spec: CalibrationPipelineSpec,
+        groups: Mapping[int, Any],
+        chip_id: str,
+        problems: list[PipelineProblem],
+    ) -> None:
+        """Report a ConfigureAll step's explicit MUX IDs that the chip does not define.
+
+        Whatever the targets, these IDs replace the targets' MUXes and reach the
+        boxes as they are, so each one must be a MUX of the chip topology.
+        """
+        defined = _describe_ids(sorted(groups))
+        for step_index, step in enumerate(spec.steps):
+            if not isinstance(step, ConfigureAllStep) or step.mux_ids is None:
+                continue
+            for index, mux in enumerate(step.mux_ids):
+                if mux not in groups:
+                    problems.append(
+                        _problem(
+                            f"steps[{step_index}].mux_ids[{index}]",
+                            f"MUX {mux} is not defined for chip {chip_id} (defined: {defined})",
+                        )
+                    )
+
     def _validate_targets(
         self,
         project_id: str,
@@ -324,6 +475,11 @@ class CalibrationPipelineService:
         }
         targets = spec.targets
         if targets.qids:
+            try:
+                mapping = resolve_topology_mux_mapping(chip.topology_id)
+            except MuxMappingError as exc:
+                problems.append(_problem("targets.qids", str(exc)))
+                return None, []
             for index, qid in enumerate(targets.qids):
                 if qid not in known:
                     problems.append(
@@ -331,20 +487,54 @@ class CalibrationPipelineService:
                             f"targets.qids[{index}]", f"qubit {qid!r} is not on chip {chip_id}"
                         )
                     )
+                elif not mapping.is_known(qid):
+                    problems.append(
+                        _problem(
+                            f"targets.qids[{index}]",
+                            f"qubit {qid!r} is not defined by topology {chip.topology_id!r}",
+                        )
+                    )
+            self._validate_configure_all_mux_ids(
+                spec,
+                mapping.groups_for_qubit_count(int(chip.size)),
+                chip_id,
+                problems,
+            )
+            standalone = [qid for qid in targets.qids if mapping.is_standalone(qid)]
+            for index, step in enumerate(spec.steps):
+                derives_muxes = step.type == "BringUp" or (
+                    isinstance(step, ConfigureAllStep) and step.mux_ids is None
+                )
+                if standalone and derives_muxes:
+                    problems.append(
+                        _problem(
+                            f"steps[{index}]",
+                            f"{step.type} works on whole MUXes and cannot target "
+                            f"standalone qubits {standalone} (in no MUX of topology "
+                            f"{chip.topology_id!r})",
+                        )
+                    )
             return (
                 ResolvedPipelineTargets(qids=list(targets.qids)),
                 [qid for qid in targets.qids if qid in known],
             )
 
-        mux_count = max(1, int(chip.size) // QUBITS_PER_MUX)
+        try:
+            mapping = resolve_topology_mux_mapping(chip.topology_id)
+        except MuxMappingError as exc:
+            problems.append(_problem("targets.mux_ids", str(exc)))
+            return None, []
+        groups = mapping.groups_for_qubit_count(int(chip.size))
+        defined = _describe_ids(list(groups))
         for index, mux in enumerate(targets.mux_ids or []):
-            if mux < 0 or mux >= mux_count:
+            if mux not in groups:
                 problems.append(
                     _problem(
                         f"targets.mux_ids[{index}]",
-                        f"MUX {mux} is out of range for chip {chip_id} (0-{mux_count - 1})",
+                        f"MUX {mux} is not defined for chip {chip_id} (defined: {defined})",
                     )
                 )
+        self._validate_configure_all_mux_ids(spec, groups, chip_id, problems)
         for index, qid in enumerate(targets.exclude_qids):
             if qid not in known:
                 problems.append(
@@ -354,12 +544,7 @@ class CalibrationPipelineService:
                     )
                 )
         excluded = set(targets.exclude_qids)
-        mux_qids = [
-            str(qid)
-            for mux in targets.mux_ids or []
-            if 0 <= mux < mux_count
-            for qid in range(mux * QUBITS_PER_MUX, (mux + 1) * QUBITS_PER_MUX)
-        ]
+        mux_qids = [qid for mux in targets.mux_ids or [] if mux in groups for qid in groups[mux]]
         return (
             ResolvedPipelineTargets(
                 qids=[],

@@ -61,7 +61,7 @@ sequenceDiagram
     Runner->>Executor: execute lifecycle
     Executor-->>Orchestrator: task state and calibration data
     Orchestrator-->>Service: task outputs
-    Service->>Service: finish, fail, or cancel; release reservation
+    Service->>Service: finish, fail, or cancel, then release reservation
 ```
 
 The Prefect wrappers in `engine/task_runner.py` are intentionally thin. They invoke the executor
@@ -140,6 +140,16 @@ backend when the block ends.
 | `force_update_params` | Inherited |
 | GitHub pull and push | Disabled; the owner pulls before and pushes after its Execution |
 | Execution and reservation | Borrowed through `WorkerLease`; never claimed, created, finished, locked, or unlocked |
+| MUX mapping | Inherited as the owner resolved it (`MuxMappingSnapshot`); the worker never rereads the chip topology, so an edit during the run changes neither representatives nor MUX result fan-out. An owner that cannot resolve its mapping creates no worker; it does not retry the lookup later |
+
+MUX result fan-out reads only the mapping pinned on the Execution's `CalibConfig.mux_mapping`. A
+chip without a topology is pinned as the legacy `qid // 4` mapping. A fake-backend owner whose
+topology fails to resolve pins no mapping: system and global tasks still run, but `TaskExecutor`
+rejects every MUX-level task with `MuxMappingError` before the task runs. Both `execute()` and
+`execute_batch()` apply this check, so a batch call fails every qid before `batch_run()` and saves
+no result. `MuxDistributor` never
+reads the chip topology itself, so a topology repaired or edited during the run cannot receive
+fanned-out results.
 
 Serial and batch strategies run in the owner's session, which an in-process Prefect task reads
 through `session_context.get_session()`.
@@ -193,16 +203,12 @@ only fake-only task is `FakeBringUp`, which seeds a fresh project with the simul
 parameters in place of the hardware bring-up tasks. `BackendSaver` persists fake outputs through
 the same path as qubex outputs, so a routed task finds what the task before it published.
 
-To add a qubex task to the fake backend, list it in `backend.yaml` and run the fake template; a
-gap in the simulator shows up as an `AttributeError` on `FakeExperiment`, which is fixed in
-`simulation.py`, never by a fake copy of the task. Keep the fix at the measurement level: the
-simulator answers `sweep_parameter`, `repeat_sequence` and the coherence experiments with
-physically shaped IQ data, and qubex's own analysis and figures (for example the chevron matched
-transform in `qubex.contrib`) run on top of it unchanged. An emulator-side re-implementation of a
-qubex analysis is drift waiting to happen and is removed when found. `tests/qdash/workflow/calibtasks/
-test_fake_backend_sync.py` fails when the list names a task qubex no longer has, when a fake
-class shadows a qubex task, or when the template's default chain can no longer resolve a
-required input from the tasks before it.
+To support another Qubex task, add it to `backend.yaml` and run the fake template. Implement
+missing `FakeExperiment` operations in `simulation.py` at the measurement level; reuse Qubex
+analysis and figures rather than copying the task or analysis.
+
+`tests/qdash/workflow/calibtasks/test_fake_backend_sync.py` checks task availability, prevents
+fake classes from shadowing Qubex tasks, and verifies the template's required-input chain.
 
 ### Add persistence behavior
 

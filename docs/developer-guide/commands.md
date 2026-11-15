@@ -7,7 +7,7 @@ Run commands from the repository root unless noted.
 ```bash
 task -l                  # list tasks
 task dev-local-setup     # install host-side Python/UI dependencies
-task dev-local           # Docker services + host API/UI
+task dev-local           # Caddy and Docker services + hot-reload API/UI
 task dev-local-down      # stop host API/UI and local Docker Compose services
 task deploy-local        # full Docker Compose stack
 ```
@@ -40,6 +40,7 @@ task build               # UI production build
 task build-client-ts     # build the local TypeScript client for pi CLI development
 task build-docs          # documentation build
 task check-docs-links    # documentation build, links, and anchors
+task check-docs-mermaid  # documentation build, every Mermaid diagram rendered in Chromium
 ```
 
 ## Secrets

@@ -80,9 +80,8 @@ clears the rest. Open the linked record to recover its project and result contex
 
 ## Share and Hand Off a Result
 
-Before sending a QDash link, confirm that the recipient belongs to the active project. Project
-membership controls access; removing a member revokes access without deleting the records they
-produced.
+Confirm that the recipient [belongs to the project](./projects-and-data-sharing.md#share-results)
+before sharing a link.
 
 When another member will continue the calibration:
 

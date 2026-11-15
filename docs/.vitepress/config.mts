@@ -64,7 +64,9 @@ export default withMermaid(
       theme: "neutral",
     },
     mermaidPlugin: {
-      class: "mermaid my-class",
+      // Not "mermaid": mermaid's startOnLoad handler re-parses every `.mermaid` element on window
+      // load and can replace an already rendered diagram with a syntax-error SVG.
+      class: "mermaid-diagram",
     },
 
     themeConfig: {
@@ -97,40 +99,67 @@ export default withMermaid(
                 {
                   text: "Setup",
                   items: [
-                    { text: "Choose a Backend", link: "/user-guide/setup" },
+                    { text: "Install and Sign In", link: "/user-guide/setup" },
                     { text: "Fake Backend", link: "/user-guide/setup/fake-backend" },
                     { text: "Qubex Backend", link: "/user-guide/setup/qubex-backend" },
+                    { text: "AI Setup", link: "/user-guide/setup/ai" },
                   ],
                 },
                 { text: "Operations", link: "/user-guide/operations" },
                 { text: "System Updates", link: "/user-guide/system-updates" },
+                { text: "Upgrade MongoDB", link: "/user-guide/mongodb-upgrade" },
               ],
             },
             {
-              text: "Work in QDash",
+              text: "Get Started",
               items: [
+                { text: "Run Your First Calibration", link: "/user-guide/first-calibration" },
                 { text: "Application Tour", link: "/user-guide/application-tour" },
-                {
-                  text: "Authentication and Users",
-                  link: "/user-guide/authentication-and-users",
-                },
-                {
-                  text: "Projects and Data Sharing",
-                  link: "/user-guide/projects-and-data-sharing",
-                },
-                { text: "Dashboard", link: "/user-guide/dashboard" },
+              ],
+            },
+            {
+              text: "Run Calibrations",
+              items: [
                 { text: "Running Calibrations", link: "/user-guide/running-calibrations" },
                 { text: "Creating Workflows", link: "/user-guide/creating-workflows" },
+                {
+                  text: "Manual Execution Rounds",
+                  link: "/user-guide/manual-execution-rounds",
+                },
                 { text: "Task Parameters", link: "/user-guide/task-parameters" },
-                { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
-                { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
-                { text: "AI Evaluations", link: "/user-guide/ai-evaluations" },
-                { text: "AI Chat", link: "/user-guide/ai-chat" },
-                { text: "Agent Calibration", link: "/user-guide/agent-calibration" },
                 {
                   text: "Cryostats and Cool-downs",
                   link: "/user-guide/cryostats-and-cool-downs",
                 },
+              ],
+            },
+            {
+              text: "Review Results",
+              items: [
+                { text: "Dashboard", link: "/user-guide/dashboard" },
+                { text: "Data and Provenance", link: "/user-guide/data-and-provenance" },
+                { text: "Reviewing Results", link: "/user-guide/reviewing-results" },
+              ],
+            },
+            {
+              text: "Collaborate and Manage Access",
+              items: [
+                {
+                  text: "Projects and Data Sharing",
+                  link: "/user-guide/projects-and-data-sharing",
+                },
+                {
+                  text: "Authentication and Users",
+                  link: "/user-guide/authentication-and-users",
+                },
+              ],
+            },
+            {
+              text: "Use AI Assistance",
+              items: [
+                { text: "AI Chat", link: "/user-guide/ai-chat" },
+                { text: "AI Evaluations", link: "/user-guide/ai-evaluations" },
+                { text: "Agent Calibration", link: "/user-guide/agent-calibration" },
               ],
             },
           ],
@@ -196,6 +225,7 @@ export default withMermaid(
               collapsed: true,
               items: [
                 { text: "Architecture", link: "/developer-guide/copilot/architecture" },
+                { text: "Model Configuration", link: "/developer-guide/copilot/model-configuration" },
                 { text: "Pi Packages", link: "/developer-guide/copilot/packages" },
                 { text: "Pi Extension Design", link: "/developer-guide/copilot/extensions" },
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },

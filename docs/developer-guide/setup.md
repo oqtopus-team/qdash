@@ -7,20 +7,20 @@ the project toolchain.
 
 ### Required Tools
 
-| Tool                                                       | Version | Description                              |
-| ---------------------------------------------------------- | ------- | ---------------------------------------- |
-| [Docker](https://docs.docker.com/get-docker/)              | -       | Container virtualization platform        |
-| [Docker Compose](https://docs.docker.com/compose/install/) | v2.24+  | Management of multiple Docker containers |
-| [go-task](https://taskfile.dev/installation/)              | v3.41+  | Task runner for development commands     |
-| [uv](https://docs.astral.sh/uv/)                           | -       | Python package manager                   |
+| Tool | Version | Description |
+| --- | --- | --- |
+| [Docker](https://docs.docker.com/get-docker/) | - | Container virtualization platform |
+| [Docker Compose](https://docs.docker.com/compose/install/) | v2.24.4+ | Management of multiple Docker containers |
+| [go-task](https://taskfile.dev/installation/) | v3.41+ | Task runner for development commands |
+| [uv](https://docs.astral.sh/uv/) | - | Python package manager |
 
 ### Optional Tools (for local development)
 
-| Tool                                        | Version   | Description                          |
-| ------------------------------------------- | --------- | ------------------------------------ |
-| [Python](https://www.python.org/downloads/) | 3.11-3.12 | Backend development                  |
-| [Bun](https://bun.sh/)                      | 1.4.0+    | Frontend package manager and runtime |
-| [Node.js](https://nodejs.org/)              | 24.22.1+ (24.x) or 26.12.1+ | Next.js production runtime         |
+| Tool | Version | Description |
+| --- | --- | --- |
+| [Python](https://www.python.org/downloads/) | 3.11-3.12 | Backend development |
+| [Bun](https://bun.sh/) | 1.4.0+ | Frontend package manager and runtime |
+| [Node.js](https://nodejs.org/) | 24.22.1+ (24.x) or 26.12.1+ | Next.js production runtime |
 
 ## Clone the Repository
 
@@ -32,22 +32,14 @@ git clone https://github.com/oqtopus-team/qdash.git
 cd qdash
 ```
 
-The DevContainer bind-mounts the checkout at `/workspace/qdash` and, by default, its host parent
-directory at `/workspace/repos`. Git changes and commits in QDash are visible from either
-environment. With the default mount, clones made under `/workspace/repos` in the container appear
-beside QDash on the host; clones made beside QDash on the host appear under `/workspace/repos` in
-the container. For example, this creates a second checkout from the container:
+The DevContainer mounts this checkout at `/workspace/qdash` and its host parent at
+`/workspace/repos`. Changes are visible in both environments; additional repositories cloned
+under `/workspace/repos` appear beside QDash on the host. Use `/workspace/qdash` for QDash
+development so dependencies stay in its separate volumes.
 
-```shell
-git clone https://github.com/oqtopus-team/qdash.git /workspace/repos/qdash-copy
-```
-
-Use `/workspace/qdash` for QDash development so its dependencies stay in the separate
-DevContainer volumes. The initial QDash clone must be made on the host because its Compose file
-is needed to start the DevContainer. If you want a different shared directory, create it on the
-host and export `QDASH_SHARED_REPOS_DIR` with its absolute path before starting the container.
-The directory must already exist and be writable by your host user. No repository manager is
-required. Setting the override only in `.env` does not pass it to the host-side preflight check.
+To share another directory, create it on the host and export its absolute path as
+`QDASH_SHARED_REPOS_DIR` before starting the container. It must be writable by your host user.
+Setting it only in `.env` does not reach the host-side preflight check.
 
 A DevContainer can start without `.env`. Before running Qubex-backed calibration tasks, follow
 [Operator Setup](../user-guide/setup.md) for `.env` and `CONFIG_PATH` configuration.
@@ -146,21 +138,7 @@ After entering the Nix shell for the first time, install project dependencies:
 task dev-local-setup
 ```
 
-Then start the lightweight development stack:
-
-```shell
-task dev-local
-```
-
-This starts MongoDB, PostgreSQL, Prefect, the deployment service, and the user flow worker with
-Docker Compose, then runs the API and UI on the host. The UI is available at
-<http://localhost:5714>.
-
-Stop the host API/UI processes and Docker Compose services:
-
-```shell
-task dev-local-down
-```
+Continue with [Run the Development Stack](#run-the-development-stack).
 
 ## Refresh Dependencies
 
@@ -181,23 +159,39 @@ DevContainer or Nix shell.
 task dev-local
 ```
 
-This starts the supporting services in Docker Compose and runs the API and UI directly on the
-host. Use this flow when editing backend or frontend code frequently.
+This starts the supporting services in Docker Compose and runs the API and UI with hot reload,
+on the host or in the DevContainer. It needs a `.env` with `MONGO_VERSION`, which Compose
+requires: a `.env` copied from an example has `9.0.8`, and an older `.env` needs the release that
+already wrote its `MONGO_DATA_PATH`, read as in
+[Prepare the Update](../user-guide/system-updates.md#prepare-the-update). Use this flow when editing backend or frontend code
+frequently. The `caddy` service of the Compose deployment serves the browser on `UI_PORT` with
+the same Caddyfile, so `/api`, `/prefect` with its sign-in check, and the Copilot chat stream
+behave as in production.
 
 The component tasks are:
 
-- `task dev-services`: start MongoDB, PostgreSQL, Prefect, deployment-service, and user-flow-worker
-- `task dev-api-local`: run the FastAPI app on the host against Docker services
-- `task dev-ui-local`: run the Next.js app on the host against the local API
+- `task dev-services`: start Caddy, MongoDB, PostgreSQL, Prefect, deployment-service,
+  user-flow-worker, and the Pi Agent Runtime, adding `compose.dev-local.yaml`, which points Caddy
+  at the API and UI below and publishes MongoDB (`MONGO_PORT`), Prefect (`PREFECT_PORT`), the
+  deployment service (`DEPLOYMENT_SERVICE_PORT`), and the runtime (`AGENT_RUNTIME_PORT`, default
+  `8002`) on `127.0.0.1`
+- `task dev-api-local`: run the FastAPI app with `--reload` on `API_PORT`
+- `task dev-ui-local` (or `task dev-ui`): run `next dev` on `UI_DEV_PORT`, default `5713`, behind
+  Caddy; it needs `task dev-services` running
 
-### Access Points
+| Service | URL |
+| --- | --- |
+| QDash UI | http://localhost:5714 |
+| API Documentation | http://localhost:5714/api/docs |
+| Prefect Dashboard | http://localhost:5714/prefect/ (signed in) |
 
-| Service           | URL                        |
-| ----------------- | -------------------------- |
-| QDash UI          | http://localhost:5714      |
-| API Documentation | http://localhost:5715/docs |
-| Prefect Dashboard | http://localhost:4200      |
-| MongoDB Admin     | http://localhost:8081      |
+Two development stacks on one host also need distinct `API_PORT`, `UI_DEV_PORT`, and the
+loopback ports above. On macOS the API and Next.js listen on `127.0.0.1`. On a Linux host they
+listen on `0.0.0.0` so that Caddy can reach them through the Docker host gateway, which also
+exposes them to the local network; set `QDASH_DEV_BIND` to narrow this. A DevContainer created
+before this setting existed must be recreated so that `QDASH_DEV_HOST` is set; see
+[how Caddy reaches the development servers](./architecture.md#browser-entry-point).
+`task dev-local-down` stops the host processes and the services with the same overlay.
 
 Use [Developer Commands](./commands.md) for linting, tests, builds, generation,
 and documentation tasks. Use [Operator Setup](../user-guide/setup.md) when you need the full
@@ -205,7 +199,10 @@ Compose deployment rather than the host-side development stack.
 
 ## Secret Scanning Tools
 
-The DevContainer and the [Nix host shell](#nix-host-shell) provide Betterleaks, Trufflehog, and Lefthook. Both pin Betterleaks to `BETTERLEAKS_VERSION` in `.devcontainer/Dockerfile`, and every leak scan rejects any other release; see [scanner version](./conventions/credential-scan.md#scanner-version). A Betterleaks installed by Homebrew or from the latest GitHub release is usually newer and fails that check, so on the host run checks and commits through `nix develop`.
+The DevContainer and [Nix host shell](#nix-host-shell) provide Betterleaks, Trufflehog, and
+Lefthook. Checks and commits require the
+[pinned Betterleaks release](./conventions/credential-scan.md#scanner-version); run them inside
+one of these environments.
 
 Enable the git hooks from the Nix shell or the DevContainer:
 

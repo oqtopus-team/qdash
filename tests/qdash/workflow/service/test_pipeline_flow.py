@@ -10,6 +10,7 @@ import pytest
 from qdash.datamodel.calibration_pipeline import (
     STEP_CATALOG,
     CalibrationPipelineSpec,
+    LegacyExecutionModeError,
     PipelineStep,
     step_calls,
     step_provides,
@@ -44,7 +45,7 @@ EVERY_STEP: list[dict[str, object]] = [
         "call": {"name": "ConfigureAll", "run": {"configuration_mode": "ge-ef-cr"}},
     },
     {"type": "BringUp", "tasks": [{"name": "CheckResonatorSpectroscopy"}]},
-    {"type": "OneQubitCheck", "mode": "scheduled", "configure": True},
+    {"type": "OneQubitCheck", "execution_mode": "parallel_by_mux", "configure": True},
     {"type": "FilterByStatus"},
     {"type": "OneQubitFineTune", "tasks": [{"name": "CheckRabi"}]},
     {"type": "FilterByMetric", "metric": "t1", "threshold": 30.0},
@@ -55,7 +56,7 @@ EVERY_STEP: list[dict[str, object]] = [
             {"name": "CheckRamsey", "call_id": "ramsey_coarse", "run": {"detuning": 0.001}},
             {"name": "CheckRamsey", "call_id": "ramsey_fine", "run": {"detuning": 0.0002}},
         ],
-        "mode": "serial",
+        "execution_mode": "sequential",
         "continue_on_failure": True,
     },
     {"type": "GenerateCRSchedule", "max_parallel_ops": 4, "inverse": True},
@@ -107,14 +108,18 @@ def test_fields_reach_the_step_objects() -> None:
     built = build_steps(parsed)
     check = built[2]
     assert isinstance(check, OneQubitCheck)
-    assert (check.mode, check.configure, check.tasks) == ("scheduled", True, None)
+    assert (check.execution_mode, check.configure, check.tasks) == ("parallel_by_mux", True, None)
     assert next(call.name for call in check.calls()) == "Configure"
     metric = built[5]
     assert isinstance(metric, FilterByMetric)
     assert (metric.metric, metric.threshold, metric.step) == ("t1", 30.0, None)
     custom = built[6]
     assert isinstance(custom, CustomOneQubit)
-    assert (custom.step_name, custom.mode, custom.continue_on_failure) == ("coh", "serial", True)
+    assert (custom.step_name, custom.execution_mode, custom.continue_on_failure) == (
+        "coh",
+        "sequential",
+        True,
+    )
     assert [(call.call_id, call.run) for call in custom.tasks] == [
         ("ramsey_coarse", {"detuning": {"value": 0.001}}),
         ("ramsey_fine", {"detuning": {"value": 0.0002}}),
@@ -180,6 +185,16 @@ def test_queued_version_1_spec_is_converted_at_the_flow_boundary() -> None:
         "CheckRabi": {"run": {"shots": {"value": 512}}, "input": {}}
     }
     logger.warning.assert_called_once()
+
+
+def test_queued_version_1_spec_with_legacy_mode_fails_with_the_replacement() -> None:
+    logger = MagicMock()
+    with pytest.raises(LegacyExecutionModeError, match=r"steps\[0\]\.execution_mode='sequential'"):
+        parse_dispatched_spec(
+            {"targets": {"qids": ["0"]}, "steps": [{"type": "OneQubitCheck", "mode": "serial"}]},
+            logger,
+        )
+    logger.warning.assert_not_called()
 
 
 def test_queued_version_1_spec_with_repeated_builtin_steps_builds() -> None:

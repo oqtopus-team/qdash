@@ -31,14 +31,14 @@ def fake_calibration_service(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_box_setup_corrects_each_mux() -> None:
     result = box_setup_module.box_setup(
-        username="alice", chip_id="64Q", mux_ids=[0, 1], mode="serial"
+        username="alice", chip_id="64Q", mux_ids=[0, 1], execution_mode="sequential"
     )
 
     assert result["targets"] == MuxTargets(mux_ids=[0, 1], exclude_qids=[])
     (correct,) = result["steps"]
     assert isinstance(correct, BringUp)
     assert names(correct.tasks) == ["CorrectCaptureDelay"]
-    assert correct.mode == "serial"
+    assert correct.execution_mode == "sequential"
 
 
 def test_box_setup_settings_match_task_defaults() -> None:

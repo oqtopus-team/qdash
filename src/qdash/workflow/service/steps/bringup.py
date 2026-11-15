@@ -4,7 +4,7 @@ This module defines steps for initial qubit characterization:
 - BringUp: Resonator and qubit spectroscopy for frequency estimation
 
 Tasks include:
-- MUX-level tasks: Executed once per MUX for representative qubit (qid % 4 == 0)
+- MUX-level tasks: Executed once per MUX for representative qubit (local slot 0)
 - Qubit-level tasks: Executed for each qubit individually
 """
 
@@ -16,6 +16,10 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from prefect import get_run_logger
 
 from qdash.datamodel.calibration_pipeline import BRINGUP_METRICS
+from qdash.datamodel.one_qubit_execution_mode import (
+    OneQubitExecutionMode,
+    validate_one_qubit_execution_mode,
+)
 from qdash.datamodel.task_call import StepCalls, TaskCall, normalize_calls
 from qdash.workflow.service._internal.call_runner import (
     NOT_MUX_REPRESENTATIVE,
@@ -51,8 +55,12 @@ class BringUp(CalibrationStep):
     task outputs are passed through QDash state without reloading backend params
     between tasks.
 
-    MUX-level tasks run once per MUX for the representative qubit (qid % 4 == 0).
+    MUX-level tasks run once per MUX for the representative qubit (local slot 0).
     Qubit-level tasks run for each qubit individually.
+
+    ``execution_mode`` applies to MUX targets and defaults to ``parallel_by_mux``;
+    explicit qubit targets run directly in parallel. The modes are described in
+    :mod:`qdash.datamodel.one_qubit_execution_mode`.
 
     Provides: bringup
 
@@ -73,13 +81,14 @@ class BringUp(CalibrationStep):
         ])
     """
 
-    mode: str = "scheduled"
+    execution_mode: OneQubitExecutionMode = "parallel_by_mux"
     tasks: list[TaskCall] = field(default_factory=lambda: list(BRINGUP_TASKS))
     resonator_assignment_order: list[int] | None = None
 
     step_metrics: ClassVar[tuple[str, ...]] = BRINGUP_METRICS
 
     def __post_init__(self) -> None:
+        self.execution_mode = validate_one_qubit_execution_mode(self.execution_mode)
         self.tasks = list(normalize_calls(self.tasks, where=f"{self.name}.tasks"))
 
     @property
@@ -125,7 +134,10 @@ class BringUp(CalibrationStep):
         logger = get_run_logger()
         plan = self.step_calls(session)
 
-        logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(plan.calls)} calls")
+        logger.info(
+            f"[{self.name}] Starting with execution_mode={self.execution_mode}, "
+            f"{len(plan.calls)} calls"
+        )
 
         from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
         from qdash.workflow.service.targets import MuxTargets
@@ -136,10 +148,18 @@ class BringUp(CalibrationStep):
                 exclude_qids=targets.exclude_qids,
                 plan=plan,
             )
-            strategy = get_one_qubit_strategy(self.mode)
+            strategy = get_one_qubit_strategy(self.execution_mode)
             raw_results = strategy.execute(session, config)
         else:
-            qids = targets.to_qids(session.chip_id)
+            qids = targets.to_qids(session.chip_id, mux_mapping=session.mux_mapping)
+            _, standalone_qids = session.mux_mapping.partition_qids(qids)
+            if standalone_qids:
+                # Bring-up runs MUX-level tasks; a standalone qubit has no MUX.
+                msg = (
+                    f"[{self.name}] MUX-level bring-up cannot target standalone qubits "
+                    f"{standalone_qids}; target MUXes or multiplexed qubits only"
+                )
+                raise ValueError(msg)
             raw_results = self._execute_direct(session, qids, plan)
 
         # Build typed result

@@ -67,7 +67,7 @@ def test_defaults_to_mux_0_to_15_scheduled_like_hardware() -> None:
     [step] = result["steps"]
     assert names(step.tasks) == names(fake_backend_module.FAKE_CALIBRATION_TASKS)
     # The hardware templates (bringup, check_waveform) default to the box-aware scheduler.
-    assert step.mode == "scheduled"
+    assert step.execution_mode == "parallel_by_mux"
 
 
 def test_mux_subset_exclusions_and_tasks_narrow_the_run() -> None:
@@ -77,14 +77,14 @@ def test_mux_subset_exclusions_and_tasks_narrow_the_run() -> None:
         mux_ids=[9, 15],
         exclude_qids=["37"],
         tasks=[TaskCall(name="CheckRabi")],
-        mode="serial",
+        execution_mode="sequential",
     )
 
     targets = result["targets"]
     assert targets.mux_ids == [9, 15]
     assert targets.exclude_qids == ["37"]
     assert names(result["steps"][0].tasks) == ["CheckRabi"]
-    assert result["steps"][0].mode == "serial"
+    assert result["steps"][0].execution_mode == "sequential"
 
 
 def test_qids_select_qubits_when_no_mux_ids_are_given() -> None:

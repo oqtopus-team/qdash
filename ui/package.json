@@ -72,7 +72,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.3",
+    "@tailwindcss/postcss": "4.3.3",
     "@tailwindcss/typography": "^0.5.20",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.0",
@@ -90,7 +90,7 @@
     "oxlint": "1.75.0",
     "postcss": "^8.5.25",
     "postcss-load-config": "^6.0.1",
-    "tailwindcss": "^4.3.3",
+    "tailwindcss": "4.3.3",
     "typescript": "^6.0.3",
     "vite": "^8.1.5",
     "vitest": "^4.1.11"

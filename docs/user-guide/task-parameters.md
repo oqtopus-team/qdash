@@ -30,16 +30,14 @@ explicit overrides for the run, but **Reload** does not change the calibration d
 Enter an input value when this run must use a value other than the current calibration state.
 Enter experiment settings such as shots or sweep limits under **Run parameters**.
 
-A run parameter that sweeps a range shows a form selector next to its arguments. The default form
-is marked **(default)**; the others are **np.linspace**, **np.logspace**, **np.arange**, **range**,
-and **list**. Changing the form keeps the sweep: the linear forms and **list** exchange the same
-points, so you can edit them one by one, and a change to or from **np.logspace** keeps the first
-point, the last point, and the number of points. When the new form cannot express the sweep, for
-example **range** with a fractional step, the arguments stay as typed and the line under the field
-reports the result. That line shows how many points the sweep produces and its first and last
-values. When it reports that the numbers produce no sweep, **Run task**
-shows the problem instead of starting the run. The task result records the form the run used, and
-re-running that result restores it.
+For sweep parameters, choose the default form or **np.linspace**, **np.logspace**, **np.arange**,
+**range**, or **list**. Linear forms and **list** preserve the points; conversions to or from
+**np.logspace** preserve the endpoints and point count.
+
+Check the preview below the field for the point count and endpoints. If the new form cannot
+express the sweep, such as **range** with a fractional step, QDash keeps the typed arguments
+and reports the problem. An invalid sweep blocks the run. Results record the selected form,
+and re-running a result restores it.
 
 QDash uses an entered input value before a current calibration value or a task fallback. A task
 that requires a missing value stops with the parameter name instead of silently using zero.

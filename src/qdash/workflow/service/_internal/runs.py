@@ -113,33 +113,17 @@ def run_calibration(
     *,
     repositories: SessionRepositories | None = None,
 ) -> dict[str, Any]:
-    """Run a pipeline under one owner session, applying the run's target override."""
+    """Run a pipeline under one owner session, applying the run's target override.
+
+    Selected pairs replace the initial ``CouplingTargets``; the automatic
+    two-qubit steps group them with the session's pinned MUX mapping, the one
+    its reservation and workers use.
+    """
     from qdash.workflow.service.flow_targets import override_pipeline, read_target_override
 
-    targets, pipeline_steps = override_pipeline(
-        targets,
-        steps,
-        read_target_override(),
-        lambda pairs: schedule_selected_pairs(settings, pairs),
-    )
+    targets, pipeline_steps = override_pipeline(targets, steps, read_target_override())
     session = CalibSession(settings, repositories=repositories)
     return session.run_pipeline(targets, pipeline_steps)
-
-
-def schedule_selected_pairs(
-    settings: SessionSettings, pairs: list[tuple[str, str]]
-) -> list[list[tuple[str, str]]]:
-    """Group explicitly selected pairs with the chip's CR scheduling constraints."""
-    from qdash.workflow.engine import CRScheduler
-    from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
-
-    scheduler = CRScheduler(
-        settings.username,
-        settings.chip_id,
-        wiring_config_path=str(get_qubex_paths().wiring_yaml(settings.chip_id)),
-        project_id=settings.project_id,
-    )
-    return scheduler.schedule_pairs(pairs).parallel_groups
 
 
 def run_single_task(

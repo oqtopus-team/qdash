@@ -802,17 +802,38 @@ class MetricsPDFGenerator:
         mux_size = self.mux_size
         muxes_per_row = self.grid_size // mux_size
 
-        for mux_row in range(muxes_per_row):
-            for mux_col in range(muxes_per_row):
-                # Rectangle corners
-                x0 = mux_col * mux_size - 0.5
-                y0 = mux_row * mux_size - 0.5
-                x1 = (mux_col + 1) * mux_size - 0.5
-                y1 = (mux_row + 1) * mux_size - 0.5
+        boxes: list[tuple[float, float, float, float]] = []
+        if self.topology is not None:
+            # Outline each declared MUX around its member positions. Standalone
+            # qubits get no box, and layouts with missing corners no phantom box.
+            if self.topology.visualization.show_mux_boundaries:
+                for members in self.topology.muxes.values():
+                    positions = [self.topology.qubits[qid] for qid in members]
+                    boxes.append(
+                        (
+                            min(pos.col for pos in positions) - 0.5,
+                            min(pos.row for pos in positions) - 0.5,
+                            max(pos.col for pos in positions) + 0.5,
+                            max(pos.row for pos in positions) + 0.5,
+                        )
+                    )
+        else:
+            # Chips without a topology keep the legacy 2x2 MUX blocks.
+            for mux_row in range(muxes_per_row):
+                for mux_col in range(muxes_per_row):
+                    boxes.append(
+                        (
+                            mux_col * mux_size - 0.5,
+                            mux_row * mux_size - 0.5,
+                            (mux_col + 1) * mux_size - 0.5,
+                            (mux_row + 1) * mux_size - 0.5,
+                        )
+                    )
 
-                # Draw rectangle as line path
-                shapes_x.extend([x0, x1, x1, x0, x0, None])
-                shapes_y.extend([y0, y0, y1, y1, y0, None])
+        for x0, y0, x1, y1 in boxes:
+            # Draw rectangle as line path
+            shapes_x.extend([x0, x1, x1, x0, x0, None])
+            shapes_y.extend([y0, y0, y1, y1, y0, None])
 
         return go.Scatter(
             x=shapes_x,

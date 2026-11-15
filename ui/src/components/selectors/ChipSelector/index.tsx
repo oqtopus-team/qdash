@@ -21,6 +21,8 @@ interface ChipOption {
 interface ChipSelectorProps {
   selectedChip: string;
   onChipSelect: (chipId: string) => void;
+  /** Id for the search input so a visible `<label htmlFor>` can name it */
+  inputId?: string;
 }
 
 const PLACEHOLDER = "Select a chip";
@@ -28,7 +30,7 @@ const PLACEHOLDER = "Select a chip";
 /**
  * Component for selecting a chip from available chips
  */
-export function ChipSelector({ selectedChip, onChipSelect }: ChipSelectorProps) {
+export function ChipSelector({ selectedChip, onChipSelect, inputId }: ChipSelectorProps) {
   // Use lightweight endpoint (~0.2KB vs ~300KB with embedded data)
   const { data: chips, isLoading, isError } = useListChips();
 
@@ -75,6 +77,7 @@ export function ChipSelector({ selectedChip, onChipSelect }: ChipSelectorProps) 
       placeholder={PLACEHOLDER}
       className="text-base-content"
       styles={styles}
+      inputId={inputId}
     />
   );
 }

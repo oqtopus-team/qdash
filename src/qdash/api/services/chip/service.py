@@ -25,6 +25,7 @@ from qdash.api.schemas.chip import (
 from qdash.api.schemas.success import SuccessResponse
 from qdash.api.services.chip.initializer import ChipInitializer
 from qdash.common.config.metrics import load_metrics_config
+from qdash.common.mux_mapping import MuxMapping, MuxMappingError, resolve_topology_mux_mapping
 from qdash.common.utils.datetime import now
 from qdash.datamodel.note import NoteModel
 from qdash.dbmodel.chip import ChipDocument
@@ -182,7 +183,12 @@ class ChipService:
 
         """
         task_names = get_task_names()
-        qids = [str(mux_id * 4 + i) for i in range(4)]
+        mapping = self._mux_mapping(project_id, chip_id)
+        if not mapping.has_mux(mux_id):
+            raise HTTPException(
+                status_code=404, detail=f"MUX {mux_id} is not defined for chip {chip_id}"
+            )
+        qids = list(mapping.qids_of(mux_id))
 
         # Fetch task results
         all_results = self._task_result_repo.find_latest_by_chip_and_qids(
@@ -202,7 +208,19 @@ class ChipService:
             if name not in task_results[qid]:
                 task_results[qid][name] = result
 
-        return self._build_mux_detail(mux_id, task_names, task_results)
+        return self._build_mux_detail(mux_id, qids, task_names, task_results)
+
+    def _mux_mapping(self, project_id: str, chip_id: str) -> MuxMapping:
+        """MUX membership from the chip topology (legacy ``qid // 4`` without one)."""
+        chip = self._chip_repo.find_by_id(project_id, chip_id)
+        if chip is None:
+            raise HTTPException(
+                status_code=404, detail=f"Chip {chip_id} not found in project {project_id}"
+            )
+        try:
+            return resolve_topology_mux_mapping(chip.topology_id)
+        except MuxMappingError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     def get_all_mux_details(
         self,
@@ -228,8 +246,8 @@ class ChipService:
 
         """
         task_names = get_task_names()
-        mux_num = int(chip_size // 4)
-        qids = [str(i) for i in range(chip_size)]
+        groups = self._mux_mapping(project_id, chip_id).groups_for_qubit_count(chip_size)
+        qids = [qid for members in groups.values() for qid in members]
 
         # Fetch all task results in one query
         all_results = self._task_result_repo.find_latest_by_chip_and_qids(
@@ -251,19 +269,19 @@ class ChipService:
 
         # Build mux details
         muxes: dict[int, MuxDetailResponse] = {}
-        for mux_id in range(mux_num):
-            muxes[mux_id] = self._build_mux_detail(mux_id, task_names, task_results)
+        for mux_id, members in groups.items():
+            muxes[mux_id] = self._build_mux_detail(mux_id, list(members), task_names, task_results)
 
         return muxes
 
     def _build_mux_detail(
         self,
         mux_id: int,
+        qids: list[str],
         task_names: list[str],
         task_results: dict[str, dict[str, Any]],
     ) -> MuxDetailResponse:
-        """Build MuxDetailResponse from task results."""
-        qids = [str(mux_id * 4 + i) for i in range(4)]
+        """Build MuxDetailResponse from task results; ``qids`` are in slot order."""
         detail: dict[str, dict[str, MuxTask]] = {}
 
         for qid in qids:
@@ -304,7 +322,7 @@ class ChipService:
                     )
                 detail[qid][task_name] = task_result
 
-        return MuxDetailResponse(mux_id=mux_id, detail=detail)
+        return MuxDetailResponse(mux_id=mux_id, qids=qids, detail=detail)
 
     # =========================================================================
     # Optimized methods for scalability (256+ qubits)

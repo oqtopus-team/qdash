@@ -223,6 +223,118 @@ test("strict tool schemas are enabled only on endpoints that declare them", () =
   assert.deepEqual(providers.openai.modelOverrides["gpt-5.4"], { maxTokens: 4096 });
 });
 
+const GATEWAY_ENV = {
+  OPENAI_COMPATIBLE_BASE_URL_CHAT: "https://gateway.example/v1",
+  OPENAI_COMPATIBLE_BASE_URL_RESPONSES: "https://responses.example/v1",
+  OPENAI_COMPATIBLE_API_KEY_CHAT: "secret-gateway-key",
+};
+
+test("gateway compat options map per model and keep an explicit false", () => {
+  const yaml = `${OPENAI_COMPATIBLE_YAML}
+    prompt_cache_key_mode: enabled
+    requires_non_null_assistant_content: true
+    requires_tools_with_tool_history: false
+  - provider: openai-compatible-chat
+    name: gemma4:31b
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    strict_tool_schemas: true
+    prompt_cache_key_mode: disabled
+    requires_tools_with_tool_history: true
+  - provider: openai-compatible-chat
+    name: plain
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+`;
+  const { providers } = buildModelsConfig(yaml, undefined, GATEWAY_ENV);
+  const provider = providers["openai-compatible-chat"];
+  const [qwen, gemma, plain] = provider.models;
+
+  // Coexists with the Qwen thinking format.
+  assert.deepEqual(qwen.compat, {
+    thinkingFormat: "qwen-chat-template",
+    promptCacheKeyMode: "enabled",
+    requiresNonNullAssistantContent: true,
+    requiresToolsWithToolHistory: false,
+  });
+  // Coexists with strict tool schemas.
+  assert.deepEqual(gemma.compat, {
+    supportsStrictMode: true,
+    promptCacheKeyMode: "disabled",
+    requiresToolsWithToolHistory: true,
+  });
+  // A model that states none keeps Pi's defaults.
+  assert.equal(plain.compat, undefined);
+  // The shared provider compat is unchanged, so one model cannot leak into another.
+  assert.deepEqual(provider.compat, {
+    supportsDeveloperRole: false,
+    supportsReasoningEffort: false,
+    supportsStore: false,
+    maxTokensField: "max_tokens",
+  });
+  assert.equal(provider.apiKey, "$OPENAI_COMPATIBLE_API_KEY_CHAT");
+  assert.doesNotMatch(JSON.stringify(providers), /secret-gateway-key/);
+});
+
+test("invalid gateway compat values are dropped with a warning that omits the value", (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  const yaml = `
+chat_models:
+  - provider: openai-compatible-chat
+    name: bad
+    api_style: completion
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
+    prompt_cache_key_mode: secret-gateway-key
+    requires_non_null_assistant_content: "true"
+    requires_tools_with_tool_history: 1
+`;
+  const { providers } = buildModelsConfig(yaml, undefined, GATEWAY_ENV);
+  const [bad] = providers["openai-compatible-chat"].models;
+  assert.equal(bad.compat, undefined);
+
+  const messages = warn.mock.calls.map((call) => String(call.arguments[0]));
+  assert.equal(messages.length, 3);
+  assert.match(messages[0], /prompt_cache_key_mode on openai-compatible-chat\/bad: expected one of auto, enabled, disabled/);
+  assert.match(messages[1], /requires_non_null_assistant_content .*expected true or false/);
+  assert.match(messages[2], /requires_tools_with_tool_history .*expected true or false/);
+  for (const message of messages) assert.doesNotMatch(message, /secret-gateway-key/);
+});
+
+test("completions-only compat flags are dropped on a responses endpoint", (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  const yaml = `
+chat_models:
+  - provider: openai-compatible-responses
+    name: model
+    api_style: responses
+    base_url: env:OPENAI_COMPATIBLE_BASE_URL_RESPONSES
+    prompt_cache_key_mode: disabled
+    requires_non_null_assistant_content: true
+    requires_tools_with_tool_history: false
+`;
+  const { providers } = buildModelsConfig(yaml, undefined, GATEWAY_ENV);
+  const provider = providers["openai-compatible-responses"];
+  assert.equal(provider.api, "openai-responses");
+  assert.deepEqual(provider.models[0].compat, { promptCacheKeyMode: "disabled" });
+  assert.equal(warn.mock.callCount(), 2);
+  for (const call of warn.mock.calls) {
+    assert.match(String(call.arguments[0]), /applies only to api_style completion/);
+  }
+});
+
+test("catalog models do not take gateway compat options", () => {
+  const yaml = `
+chat_models:
+  - provider: openai
+    name: gpt-5.4
+    max_output_tokens: 4096
+    prompt_cache_key_mode: disabled
+    requires_tools_with_tool_history: true
+`;
+  const { providers } = buildModelsConfig(yaml, undefined, {});
+  assert.deepEqual(providers.openai, { modelOverrides: { "gpt-5.4": { maxTokens: 4096 } } });
+});
+
 test("suffixed OpenAI-compatible providers keep endpoints separate", () => {
   const evaluationYaml = `
 evaluation_models:

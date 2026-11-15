@@ -19,7 +19,11 @@ TEXT_SIZE_COMPACT = 10
 
 @dataclass
 class ChipGeometry:
-    """Grid geometry describing qubit positions on a chip."""
+    """Grid geometry describing qubit positions on a chip.
+
+    ``mux_size`` only places qubits that have no explicit position (chips
+    without a topology), using the legacy 2x2 MUX block layout.
+    """
 
     n_qubits: int
     grid_size: int
@@ -33,7 +37,6 @@ def chip_geometry_from_topology(topology: TopologyDefinition) -> ChipGeometry:
     return ChipGeometry(
         n_qubits=topology.num_qubits,
         grid_size=topology.grid_size,
-        mux_size=topology.mux.size if topology.mux.enabled else 2,
         qubit_positions=positions,
     )
 

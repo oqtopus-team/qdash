@@ -1,124 +1,100 @@
 # System Updates
 
-Update a QDash source deployment from the host by selecting a stable release tag and rebuilding
-the Docker Compose stack.
+Update QDash by selecting `main` or a release tag in its Git repository, then running the
+deployment command for your environment.
 
-Run these commands from the QDash repository root. Schedule a maintenance window because QDash is
-unavailable while its containers are stopped and rebuilt.
+Run these commands from the QDash repository root. Deployment rebuilds and recreates services,
+so finish running calibrations before updating.
 
 ## Prepare the Update
 
-Read the target release notes before changing the checkout. A release that changes stored data
-can require a backup or a release-specific procedure.
+Read the target release notes for any required configuration changes, backups, or migrations.
+Keep your existing `.env`, configuration, and data. Preserve local source changes before
+switching versions.
 
-1. Confirm that no calibration or other workflow is running.
-2. Complete or cancel running work from the QDash execution pages.
-3. Back up MongoDB, PostgreSQL, calibration data, and Qubex configuration when required by the
-   release notes or your recovery policy.
-4. Confirm that the checkout is on `main` and has no tracked changes:
+For the first update to **v1.10.0**, set `MONGO_VERSION` to the MongoDB version already running,
+as described in [Check and Pin the Running Release](./mongodb-upgrade.md#check-and-pin-the-running-release).
+After deploying QDash v1.10.0, follow [Upgrade MongoDB](./mongodb-upgrade.md) to upgrade to 9.0
+through the required intermediate versions and FCV steps. These are one-time upgrade actions. Follow the
+v1.10.0 release notes for calibration-data migration, saved workflow changes, and AI configuration.
+If a Pi runtime upgrade migrates existing conversations, back up the stopped `agent-runtime-state`
+volume first; see [durable conversations](../developer-guide/copilot/architecture.md#durable-conversations).
 
-   ```bash
-   git branch --show-current
-   git describe --tags --exact-match
-   git status --short
-   ```
+## Select a Version
 
-   The branch command must print `main`. Record the version printed by the tag command in case a
-   rollback is necessary. The status command must print nothing. Commit or preserve local changes
-   before continuing.
-
-## Select a Release
-
-Fetch the release tags from `origin`:
+Fetch the available branches and tags:
 
 ```bash
-git fetch origin --tags --prune
-git tag --list 'v[0-9]*' --sort=-v:refname
+git fetch origin --tags
 ```
 
-Select a stable `vMAJOR.MINOR.PATCH` tag. Do not select a prerelease tag such as
-`v2.0.0-rc.1`. Replace `<target-tag>` in the following steps with the selected tag.
+Choose **one** of the following:
 
-Confirm that the target belongs to the stable branch before stopping QDash:
+- To use the latest `main`:
 
-```bash
-git merge-base --is-ancestor <target-tag> origin/main
-```
+  ```bash
+  git switch main
+  git pull --ff-only origin main
+  ```
 
-The command must exit successfully. If it does not, do not deploy that tag.
+- To use a specific release, replace `v1.10.0` with the desired tag:
+
+  ```bash
+  git switch --detach v1.10.0
+  ```
+
+A detached checkout is expected when deploying a tag. To return to `main` later, use the first
+option. If Git reports conflicting local changes or a divergent branch, resolve them before
+deploying.
 
 ## Deploy the Release
 
-Stop QDash before advancing `main`:
+Run the command that matches your existing deployment:
+
+| Deployment | Command |
+| --- | --- |
+| Docker Compose without the bundled Cloudflare Tunnel | `task deploy-local` |
+| Docker Compose with the bundled Cloudflare Tunnel configured | `task deploy` |
+
+Both commands update the configured Copilot knowledge repository and rebuild and start the
+Compose stack. `task deploy` also enables the `tunnel` profile and restarts the API after startup.
+You do not need to stop and remove the stack first for a routine update.
+
+Without Go Task, rebuild and start the Compose stack directly:
 
 ```bash
-docker compose down
-```
-
-When upgrading a Copilot deployment to a newer Pi release, such as Pi 1.3 to 1.4 or Pi 1.4 to
-1.5, back up the stopped `agent-runtime-state` Docker volume before continuing. The new Pi release
-migrates saved conversations when the new runtime first opens or writes them. A previous release cannot read the migrated volume; restore the
-pre-update volume backup before starting that release during a rollback. How this works:
-[Copilot architecture](../developer-guide/copilot/architecture.md#durable-conversations).
-
-Advance `main` to the target without creating a merge commit, validate Compose, and rebuild:
-
-```bash
-git merge --ff-only <target-tag>
-docker compose config --quiet
 docker compose up -d --build
 ```
 
-`git merge --ff-only` refuses a divergent update instead of combining release code with local
-commits. Resolve the branch state before retrying; do not force the merge.
+Retain the Compose files and profiles your deployment uses. This direct command does not update
+the optional knowledge repository or add the Tunnel profile.
 
 ## Verify the Deployment
 
-Check the containers and browser-facing services after the build finishes:
+Check that services are running, then open QDash:
 
 ```bash
 docker compose ps
 ```
 
 - QDash UI: <http://localhost:5714/login>
-- API documentation: <http://localhost:5715/docs>
-- Prefect: <http://localhost:4200>
+- API documentation: <http://localhost:5714/api/docs>
+- Prefect: <http://localhost:5714/prefect/dashboard>
 
-Use the ports from `.env` if the deployment overrides the defaults. Follow service logs as
-described in [Operations](./operations.md#inspect-logs) when a container is unhealthy or a page is
-unavailable.
+Use your configured public URL or `UI_PORT` if it differs. If a service fails to start, inspect
+its logs as described in [Operations](./operations.md#inspect-logs).
 
-## Check Saved Workflows
+## Check Direct Service Access
 
-Workflows saved before task calls list tasks by name and stop before they measure on a release
-that requires task calls. QDash does not convert them; each workflow owner updates their own.
-Before anyone edits them, copy the saved workflows from the checkout so every owner can compare
-against the original:
-
-```bash
-cp -a src/qdash/workflow/user_flows user_flows-backup
-```
-
-After the update, each owner edits their workflows as described in
-[Update a flow saved before task calls](./creating-workflows.md#update-a-flow-saved-before-task-calls)
-and tests each one on the Fake backend before it measures on hardware again. Pipeline specs queued
-before the update run after conversion, and a new version 1 spec is rejected with a converted
-spec to submit instead. The full list of edits:
-[Migrate Saved Flows](../developer-guide/workflow/task-calls.md#migrate-saved-flows).
+When updating from a release without Caddy, change direct API and Prefect connections to
+`http://<host>:<UI_PORT>/api` and `http://<host>:<UI_PORT>/prefect`. Only `UI_PORT` is published;
+use [database shells inside the containers](./operations.md#open-a-database-shell) for database
+access. Remove any Compose override that publishes `UI_PORT` on the `ui` service, because Caddy
+now owns it. Existing proxies targeting `UI_PORT` can keep that address; follow
+[remote access setup](./setup.md#enable-remote-access) for the public URL and hostname settings.
 
 ## Recover from a Failed Update
 
-Follow the target release notes when deployment fails after stored data changes. Moving the Git
-checkout back does not reverse MongoDB, PostgreSQL, calibration-data, or configuration changes.
-Restore the backups required by that release before starting the previous application version.
-
-If the failure occurs before stored data changes are applied and the release notes permit a
-code-only rollback, move `main` back to the previously deployed stable tag and rebuild:
-
-```bash
-git reset --hard <previous-tag>
-docker compose up -d --build
-```
-
-`git reset --hard` discards tracked changes. Confirm the target tag and preserve any local work
-before running it.
+Check the release-specific recovery instructions before selecting an earlier tag and deploying
+again. Changing the checkout does not reverse stored-data or AI conversation migrations; restore
+the corresponding backups when the release requires them.

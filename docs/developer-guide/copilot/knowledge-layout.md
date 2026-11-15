@@ -8,7 +8,11 @@ Copilot's behaviour comes from three kinds of knowledge that live in three place
 | Tools and procedures | Tool definitions, "which tool for which question", diagnosis workflows, agent-session workflows | `packages/pi-qdash/` (`extensions/`, `skills/`) | Included from the same QDash checkout in the Agent Runtime image |
 | Product behaviour | Persona, approval cards, `ask_user`, output language, turn budgets, model catalog | This repository | `agent-runtime/src/prompt.ts`, `config/copilot/*.yaml` |
 
-The evaluation reference is derived from `task.md`, not written separately: the API's `GET /tasks/{name}/knowledge` serves `reference` with the background (`This is a <task> experiment: <intro>. <Expected plot prose>`), the parameters to extract (one `float` per bullet under **Parameters to extract**), and the status criteria (`SUCCESS` from the "A good result" sentence, then one `UPPER_SNAKE` code per bullet under **Common failures**, with the text up to the first `;` as its criterion). The evaluation model is asked the six QCalEval questions against exactly that, so write those sections as criteria a reader could apply to a plot; the derivation rules and the question each part fills are in [Calibration Evaluation](./evaluation.md). An example under `examples/` may carry `status`, `suggested_range` and `parameters` next to its `outcome`; those are what the in-context demonstrations show for the status, significance and extraction questions.
+The API derives the evaluation reference from `task.md`; do not maintain a second copy.
+Write **Expected plot**, **Common failures**, and **Parameters to extract** as criteria that
+can be applied to a figure. [Calibration Evaluation](./evaluation.md) defines the derivation
+and maps the reference to the six questions. Labeled examples supply `status`, `suggested_range`,
+and `parameters` for in-context evaluation.
 
 `task.md` and the example files use YAML frontmatter for machine-readable fields. A task declares
 `type: qdash.calibration-task`, `profile: qdash-calibration/v1`, its `name`, and its `category`;
@@ -27,7 +31,8 @@ prose behind the table for the planner and the reviewer. Neither the frontmatter
 reaches the evaluation prompt, which reads only the intro, the expected plot, the common failures,
 and the parameters to extract.
 
-The split follows what changes together. A skill that names `qdash_list_cooldowns` must ship with the version of pi-qdash that defines that tool, so skills live next to the tools. Task physics is the same whether it is read by Ask AI in the analysis sidebar, the chat, or a pi CLI user, so it has one source that every consumer queries. The approval-card flow exists only in the QDash UI, so its instructions stay here.
+Skills ship with the tools they name; task physics has one source shared by chat, evaluation,
+and standalone pi. QDash-only interaction rules stay in the runtime prompt.
 
 ## Rules
 

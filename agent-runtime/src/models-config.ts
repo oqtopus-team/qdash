@@ -38,7 +38,20 @@ interface ChatModel {
   sampling_params?: unknown;
   sampling_params_by_thinking_level?: unknown;
   strict_tool_schemas?: unknown;
+  prompt_cache_key_mode?: unknown;
+  requires_non_null_assistant_content?: unknown;
+  requires_tools_with_tool_history?: unknown;
 }
+
+/** Values Pi accepts for `compat.promptCacheKeyMode`. */
+const PROMPT_CACHE_KEY_MODES = ["auto", "enabled", "disabled"] as const;
+type PromptCacheKeyMode = (typeof PROMPT_CACHE_KEY_MODES)[number];
+
+/** chat.yaml boolean keys that map onto Pi's OpenAI completions compat flags. */
+const COMPLETIONS_COMPAT_FLAGS = {
+  requires_non_null_assistant_content: "requiresNonNullAssistantContent",
+  requires_tools_with_tool_history: "requiresToolsWithToolHistory",
+} as const satisfies Partial<Record<keyof ChatModel, string>>;
 
 interface ModelEntry {
   id: string;
@@ -138,15 +151,6 @@ export function buildModelsConfig(
     const maxTokens = asNumber(model.max_output_tokens);
     const reasoningEffort = asString(model.reasoning_effort)?.toLowerCase();
     const reasoning = reasoningEffort !== undefined && reasoningEffort !== "none";
-    const modelCompat = {
-      ...(reasoning && isOpenAiCompatibleProvider(rawProvider) && isQwenModel(name)
-        ? { thinkingFormat: "qwen-chat-template" }
-        : {}),
-      // Only the operator knows whether a custom endpoint enforces OpenAI
-      // `strict` function schemas; pi assumes it does not. Tools that prefer
-      // constrained sampling, such as render_ui, then send `strict: true`.
-      ...(model.strict_tool_schemas === true ? { supportsStrictMode: true } : {}),
-    };
 
     if (!baseUrlSetting) {
       if (!sampling && maxTokens === undefined) continue;
@@ -194,6 +198,16 @@ export function buildModelsConfig(
     });
     const models_ = (entry.models ??= []);
     if (models_.some((existing) => existing.id === name)) continue;
+    const modelCompat = {
+      ...(reasoning && isOpenAiCompatibleProvider(rawProvider) && isQwenModel(name)
+        ? { thinkingFormat: "qwen-chat-template" }
+        : {}),
+      // Only the operator knows whether a custom endpoint enforces OpenAI
+      // `strict` function schemas; pi assumes it does not. Tools that prefer
+      // constrained sampling, such as render_ui, then send `strict: true`.
+      ...(model.strict_tool_schemas === true ? { supportsStrictMode: true } : {}),
+      ...gatewayCompat(model, `${providerId}/${name}`, entry.api),
+    };
     models_.push({
       id: name,
       contextWindow: asNumber(model.num_ctx) ?? DEFAULT_CONTEXT_WINDOW,
@@ -254,6 +268,56 @@ function cloudflareAccessHeaders(
     "CF-Access-Client-Id": `$${CF_ACCESS_ENV.clientId}`,
     "CF-Access-Client-Secret": `$${CF_ACCESS_ENV.clientSecret}`,
   };
+}
+
+/**
+ * Opt-in compat for gateways and proxies whose OpenAI dialect differs from Pi's
+ * defaults. Every key is per model and unset unless chat.yaml states it, so Pi
+ * keeps its own defaults; an explicit `false` is written as `false`.
+ *
+ * - `prompt_cache_key_mode` sets `promptCacheKeyMode`. Pi's `auto` sends
+ *   `prompt_cache_key` on the responses API but, on completions, only to
+ *   api.openai.com; `enabled` sends it to a proxy that routes on it and
+ *   `disabled` omits it for an endpoint that rejects the field.
+ * - `requires_non_null_assistant_content` and `requires_tools_with_tool_history`
+ *   only exist on Pi's completions API, so a responses-style endpoint ignores them.
+ *
+ * Invalid values are dropped with a warning that names the key, never the value.
+ */
+function gatewayCompat(
+  model: ChatModel,
+  label: string,
+  api: string | undefined,
+): Record<string, unknown> {
+  const compat: Record<string, unknown> = {};
+  const mode = model.prompt_cache_key_mode;
+  if (mode !== undefined) {
+    if (isPromptCacheKeyMode(mode)) {
+      compat.promptCacheKeyMode = mode;
+    } else {
+      console.warn(
+        `[agent-runtime] ignoring prompt_cache_key_mode on ${label}: expected one of ${PROMPT_CACHE_KEY_MODES.join(", ")}`,
+      );
+    }
+  }
+  for (const [key, field] of Object.entries(COMPLETIONS_COMPAT_FLAGS)) {
+    const value = model[key as keyof typeof COMPLETIONS_COMPAT_FLAGS];
+    if (value === undefined) continue;
+    if (typeof value !== "boolean") {
+      console.warn(`[agent-runtime] ignoring ${key} on ${label}: expected true or false`);
+    } else if (api !== "openai-completions") {
+      console.warn(
+        `[agent-runtime] ignoring ${key} on ${label}: it applies only to api_style completion`,
+      );
+    } else {
+      compat[field] = value;
+    }
+  }
+  return compat;
+}
+
+function isPromptCacheKeyMode(value: unknown): value is PromptCacheKeyMode {
+  return PROMPT_CACHE_KEY_MODES.includes(value as PromptCacheKeyMode);
 }
 
 /** A suffix gives each OpenAI-compatible endpoint its own provider namespace. */

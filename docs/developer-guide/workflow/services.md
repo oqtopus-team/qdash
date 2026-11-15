@@ -15,9 +15,7 @@ connects dispatched flow runs to QDash execution history, hardware reservations,
 | `CalibService` | The workflow author's contract: a checked context, run metadata, and `run(targets, steps)` | Execution IDs, reservations, workers, or cleanup |
 | `CalibSession` | In-process pipeline, execution, reservation, worker, and terminal lifecycle | Deployment registration or project authorization |
 
-The API is the authority for project context and QDash metadata. Prefect is the orchestration
-authority. MongoDB execution documents remain the QDash-facing history even though each record can
-carry a Prefect `flow_run_id`.
+MongoDB execution documents provide QDash history; `flow_run_id` links them to Prefect orchestration.
 
 ## Workflow Author Contract
 
@@ -197,13 +195,13 @@ exactly one non-empty mode: `mux_ids` with optional `exclude_qids`, `qids`, or `
 `GetFlowResponse.target_modes` lists the modes a saved source accepts, computed by
 `supported_target_modes()` from the entrypoint's syntax tree without executing the source. It is
 `["coupling_pairs"]` only when every `CalibService` `.run()` call in the entrypoint receives
-`CouplingTargets(...)` and a step list that always contains `SetCRSchedule`; otherwise it is
-`["mux_ids", "qids"]`. The step list must be a list literal or a name assigned only list literals
-with `SetCRSchedule` and changed only by `append`, `extend`, `insert`, or `+=` with step calls.
-Pipeline construction the check cannot prove keeps `["mux_ids", "qids"]`: no `.run()` call, a run
-inside a loop, comprehension, or lambda, targets or services from parameters, nested functions,
-any reference to a function or class defined in the module, other `*Targets` or
-`GenerateCRSchedule` calls in the entrypoint, and services or targets built at module level.
+`CouplingTargets(...)` and a list of built-in steps, with an automatic two-qubit step in each
+run; otherwise it is `["mux_ids", "qids"]`. The step list must be a literal or a name
+assigned only literal lists, changed only by `append`, `extend`, `insert`, or `+=` with built-in
+step calls. Named steps must also resolve to built-in constructors. `GenerateCRSchedule` is
+supported. Opaque steps, runs inside loops, comprehensions or lambdas, targets or services from
+parameters, nested functions, references to module-local helpers, other target classes, and
+services or targets built at module level do not enable pair overrides.
 Unused module functions do not affect the result, and calls into other modules are not followed.
 `target_defaults` can then report literal `CouplingTargets` pairs as `coupling_pairs`. The execute
 dialog offers only the listed modes and ignores defaults of a mode it does not offer. `execute_flow()` rejects a mode outside `target_modes` with
@@ -217,22 +215,60 @@ sets the other mode's argument to `None`, so templates that validate targets bef
 `CalibService` accept the selection. Otherwise the saved parameters stay unchanged. Workflows that
 pass literal targets directly to `CalibService.run()` keep their source and function signature
 unchanged. The API never derives other arguments, such as a `schedule`, from the override. The
-`two_qubit_scheduled` template therefore declares `coupling_pairs` beside an optional `schedule`:
-`coupling_pairs` takes precedence, a call with neither fails before calibrating, and a direct call
-with `coupling_pairs` and no override runs each pair in its own group. Deploy the API and workflow
-workers together to enable this behavior.
+`two_qubit_pairs` template declares `coupling_pairs`, requires a non-empty selection, and groups
+those directed pairs automatically. The `two_qubit_manual_rounds` template instead declares
+literal rounds and targets in its source and accepts no target override. Deploy the API and
+workflow workers together to enable this behavior.
 
 `CalibService.run()` applies the override through `override_pipeline()` in
 `service/flow_targets.py`. A MUX or qubit override replaces the initial `MuxTargets` or
 `QubitTargets`; a pair override replaces the initial `CouplingTargets`. Other target types, such as
-`AllMuxTargets`, fail with an error instead of running unchanged. A pair override also replaces the
-`schedule` of every `SetCRSchedule` step with groups that `CRScheduler.schedule_pairs()` builds from
-the selected pairs, so the saved schedule can neither add nor reverse pairs. Pipelines with
-`GenerateCRSchedule`, which rebuilds pairs from qubits, or without `SetCRSchedule` fail with an
-error. Every service in the current flow uses the
+`AllMuxTargets`, fail with an error instead of running unchanged. A pair override requires built-in steps and at least one `CustomTwoQubit` or
+`TwoQubitCalibration`; unknown step types fail before execution. Automatic two-qubit steps and
+`GenerateCRSchedule` call `CRScheduler.schedule_pairs()` for `CouplingTargets`, keeping exactly
+the selected directions whose qubits remain candidates. Every service in the current flow uses the
 selection; later pipeline filters and isolated workers retain their derived subsets. Separate
 nested Prefect flows do not inherit this context, and explicit task-level IDs are not rewritten.
 Omitting the override preserves code behavior. The complete workflow still reserves its chip.
+
+A source that writes `execution_mode="manual"` on a built-in step accepts no override:
+`supported_target_modes()` returns `[]`, `execute_flow()` answers HTTP 400 for any
+`target_override`, and `override_pipeline()` raises before the pipeline starts when any step is
+manual, so a client that bypasses the API cannot replace written rounds either.
+
+### Execution Plan Preview
+
+`GET /flows/{name}/execution-plan?chip_id=` (`getFlowExecutionPlan`) returns
+`FlowExecutionPlanResponse` for the saved source, the version `execute_flow()` dispatches; its
+`source_updated_at` lets the client discard a plan of another saved version. It uses the
+read-only project context, checks that the chip belongs to the project, and reads only the source
+file, the chip's `wiring.yaml`, and its coupling documents. It writes nothing, reserves nothing,
+and contacts neither Prefect nor hardware.
+
+`flow_service/execution_plan.py` extends the bounded resolver of `target_defaults.py`: every
+`CalibService` `.run()` call must receive literal constructor calls of built-in steps, or names
+bound to them, with literal or simply bound arguments, and the entrypoint may call only known
+constructors, builtins, logger methods, and service methods. A branch on an unknown value that
+decides a run, a run inside a loop, comprehension, or conditional expression, a mutated step
+list, a module-local helper, or any other call makes the whole plan `unresolved` with a `reason`
+and no runs; a partial plan is never returned. `flow_service/plan_preview.py` turns the literal
+plan into steps: manual steps carry their exact rounds and the issues of
+`api/services/manual_round_checks.py`, automatic steps carry only a description, because their
+groups depend on run-time candidates and calibration data. Candidates are checked only while they
+still equal the run's literal targets, that is before any filter step;
+`OneQubitCheck` always uses the targets. Known-invalid manual literals make the plan `invalid`
+even when the rest is unresolved, and the dialog then disables **Execute**.
+
+QDash bounds parallelism itself: manual and automatic rounds, the hardware reservation, and the
+16-process Dask cluster per round or group (`_DEFAULT_DASK_WORKERS`). It provisions no Prefect
+concurrency limit: `start_worker.py` starts the worker without `--limit`, and neither
+`setup_work_pool.py`, `_ensure_work_pool()`, nor `create_deployment()` sets a
+`concurrency_limit`. A work pool, queue, or deployment limit set on a server admits whole flow
+runs, so it does not split a round; a tag-based task concurrency limit whose tag reaches the
+worker task runs, or a global limit that code acquires, could run fewer targets of a round at
+once. Operators who add such limits must keep them consistent with QDash's rounds; QDash does not
+read or clear them. Deployment re-registration on save keeps schedules and parameters but not a
+concurrency limit set outside QDash.
 
 ## Manage Schedules
 
@@ -265,17 +301,16 @@ never pull or push.
 
 ## Handle Terminal States
 
-Top-level flow hooks reconcile cancellations, failures, and crashes that interrupt normal runtime
-cleanup. They find QDash executions by `flow_run_id`, finalize unfinished tasks, and release the
-owning reservation. Nested worker flows use keep-lock variants because the parent pipeline owns
-the reservation. See [Workflow Engine Architecture](./engine-architecture.md#cancellation) for the
-in-process rules.
+Top-level hooks reconcile interrupted executions and tasks and release the owning reservation.
+Nested flows use keep-lock variants. See
+[Cancellation](./engine-architecture.md#cancellation) for the shared lifecycle policy.
 
 ## Source and Tests
 
 | Concern | Source | Focused tests |
 | --- | --- | --- |
 | Flow CRUD and dispatch | `src/qdash/api/services/flow_service/` | `tests/qdash/api/services/test_flow_service.py`, `tests/qdash/api/services/flow_service/` |
+| Execution plan preview | `src/qdash/api/services/flow_service/execution_plan.py`, `plan_preview.py`, `src/qdash/api/services/manual_round_checks.py` | `tests/qdash/api/services/test_flow_execution_plan.py`, `tests/qdash/api/routers/test_flow.py` |
 | Schedule API policy | `src/qdash/api/services/flow_schedule_service.py` | `tests/qdash/api/services/test_flow_schedule_service.py` |
 | Prefect registration service | `src/qdash/workflow/deployment_service.py` | `tests/qdash/workflow/test_deployment_service.py` |
 | Author contract and migration errors | `src/qdash/workflow/service/calib_service.py` | `tests/qdash/workflow/service/test_calib_service.py` |

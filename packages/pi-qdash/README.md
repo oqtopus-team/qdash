@@ -42,7 +42,7 @@ Or try it without installing:
 pi -e npm:@oqtopus-team/pi-qdash
 ```
 
-The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.5.0.
+The package declares Node.js 20 or later and is tested with Node.js 24 and pi 1.5.2.
 Published releases pin the matching `@oqtopus-team/qdash-client` version.
 Use the `beta` dist-tag to try changes merged into QDash's `develop` branch:
 
@@ -83,7 +83,7 @@ Citation information is available in the [CITATION](https://github.com/oqtopus-t
 
 Open a [QDash issue](https://github.com/oqtopus-team/qdash/issues) or email us:
 
-- [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team[at]googlegroups.com)
+- [oqtopus-team[at]googlegroups.com](mailto:oqtopus-team@googlegroups.com)
 
 ## License
 

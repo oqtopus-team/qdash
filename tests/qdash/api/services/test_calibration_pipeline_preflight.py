@@ -219,7 +219,7 @@ def test_batch_mode_rejects_input_overrides_before_dispatch() -> None:
             {
                 "type": "CustomOneQubit",
                 "step_name": "spectroscopy",
-                "mode": "simultaneous_spectroscopy",
+                "execution_mode": "simultaneous_spectroscopy",
                 "tasks": [
                     {"name": "CheckRabi", "call_id": "first"},
                     {"name": "CheckRabi", "call_id": "second", "input": {"readout_amplitude": 1}},
@@ -231,12 +231,18 @@ def test_batch_mode_rejects_input_overrides_before_dispatch() -> None:
     assert list(problems) == ["steps[0].tasks[1]"]
     assert "simultaneous_spectroscopy" in problems["steps[0].tasks[1]"]
     defaults = spec(
-        [{"type": "OneQubitCheck", "mode": "simultaneous_spectroscopy"}],
+        [{"type": "OneQubitCheck", "execution_mode": "simultaneous_spectroscopy"}],
         task_parameters={"CheckRabi": {"input": {"readout_amplitude": 1}}},
     )
     assert list(paths(batch_input_problems(defaults))) == ["steps[0]"]
+    # A saved spec with the deprecated mode key is still checked the same way.
+    legacy = spec(
+        [{"type": "OneQubitCheck", "execution_mode": "simultaneous_spectroscopy"}],
+        task_parameters={"CheckRabi": {"input": {"readout_amplitude": 1}}},
+    )
+    assert list(paths(batch_input_problems(legacy))) == ["steps[0]"]
     serial = spec(
-        [{"type": "OneQubitCheck", "mode": "serial"}],
+        [{"type": "OneQubitCheck", "execution_mode": "sequential"}],
         task_parameters={"CheckRabi": {"input": {"readout_amplitude": 1}}},
     )
     assert batch_input_problems(serial) == []

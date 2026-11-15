@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" role="img" aria-label="UI request paths: generated hooks call customInstance, which adds the bearer token and project header and sends requests through the Next.js /api rewrite to FastAPI, or directly when NEXT_PUBLIC_API_URL is set. proxy.ts guards page requests, the Copilot stream uses its own route handler, and orval generates the hooks from the OpenAPI document.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" role="img" aria-label="UI request paths: generated hooks call customInstance, which adds the bearer token and project header and sends /api requests through Caddy to FastAPI, or directly when NEXT_PUBLIC_API_URL is set. Caddy sends page requests to Next.js, where proxy.ts guards them, streams the Copilot SSE response chunk by chunk, and orval generates the hooks from the OpenAPI document.">
   <style>
     .qd-root { font-family: var(--vp-font-family-base, -apple-system, "Segoe UI", Roboto, sans-serif); }
     .qd-title { fill: var(--vp-c-text-1, #1f2328); font-size: 14px; font-weight: 600; text-anchor: middle; }
@@ -24,7 +24,7 @@
     <rect x="40" y="40" width="375" height="415" rx="12" class="qd-group"/>
     <text x="56" y="64" class="qd-group-title">Browser</text>
     <rect x="440" y="40" width="260" height="415" rx="12" class="qd-group"/>
-    <text x="456" y="64" class="qd-group-title">Next.js server</text>
+    <text x="456" y="64" class="qd-group-title">Caddy on UI_PORT</text>
     <rect x="440" y="500" width="535" height="100" rx="12" class="qd-group"/>
     <text x="456" y="524" class="qd-group-title">Build time (task generate)</text>
 
@@ -54,18 +54,18 @@
     <text x="330" y="404" class="qd-title">Copilot chat</text>
     <text x="330" y="422" class="qd-sub">POST, reads SSE</text>
 
-    <!-- Next.js server -->
+    <!-- Caddy routes -->
     <rect x="455" y="80" width="230" height="56" rx="8" class="qd-ui"/>
-    <text x="570" y="104" class="qd-title">proxy.ts</text>
+    <text x="570" y="104" class="qd-title">/ → Next.js proxy.ts</text>
     <text x="570" y="122" class="qd-sub">no access_token → /login</text>
 
     <rect x="455" y="280" width="230" height="56" rx="8" class="qd-ui"/>
-    <text x="570" y="304" class="qd-title">/api/:path* rewrite</text>
-    <text x="570" y="322" class="qd-sub">to INTERNAL_API_URL</text>
+    <text x="570" y="304" class="qd-title">/api/* → FastAPI</text>
+    <text x="570" y="322" class="qd-sub">prefix kept for root_path</text>
 
     <rect x="455" y="380" width="230" height="56" rx="8" class="qd-ui"/>
-    <text x="570" y="404" class="qd-title">Stream route handler</text>
-    <text x="570" y="422" class="qd-sub">/api/copilot/chat/stream</text>
+    <text x="570" y="404" class="qd-title">Chat stream</text>
+    <text x="570" y="422" class="qd-sub">SSE flushed per chunk</text>
 
     <!-- API -->
     <rect x="790" y="280" width="170" height="156" rx="8" class="qd-api"/>

@@ -80,5 +80,13 @@ class ConfigureAll(CalibrationStep):
             return list(self.mux_ids)
         if isinstance(targets, MuxTargets):
             return list(targets.mux_ids)
-        qids = targets.to_qids(session.chip_id)
-        return sorted({int(qid) // 4 for qid in qids})
+        qids = targets.to_qids(session.chip_id, mux_mapping=session.mux_mapping)
+        mux_ids, standalone_qids = session.mux_mapping.partition_qids(qids)
+        if standalone_qids:
+            # Boxes are configured per MUX; a standalone qubit has no MUX to configure.
+            msg = (
+                f"[{self.name}] ConfigureAll derives MUXes from its targets and cannot target "
+                f"standalone qubits {standalone_qids}; pass mux_ids explicitly"
+            )
+            raise ValueError(msg)
+        return mux_ids

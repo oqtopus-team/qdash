@@ -3,13 +3,15 @@
   "devDependencies": {
     "markdown-it-emoji": "^3.0.0",
     "mermaid": "^11.16.1",
+    "playwright": "^1.65.0",
     "vitepress": "^1.6.4",
     "vitepress-plugin-mermaid": "^2.0.17"
   },
   "scripts": {
     "docs:dev": "vitepress dev",
     "docs:build": "vitepress build",
-    "docs:preview": "vitepress preview"
+    "docs:preview": "vitepress preview",
+    "docs:check-mermaid": "bun scripts/check-mermaid.ts"
   },
   "dependencies": {
     "vitepress-openapi": "^0.2.0"

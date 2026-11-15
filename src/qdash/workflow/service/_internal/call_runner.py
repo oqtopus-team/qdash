@@ -126,7 +126,18 @@ def run_target_calls(
                 _call_entry(call, SKIPPED, reason=STOPPED_AFTER_FAILURE, after_call_id=stopped_by)
             )
             continue
-        if skip_call is not None and skip_call(call, target):
+        try:
+            skipped = skip_call is not None and skip_call(call, target)
+        except Exception as exc:
+            # The call cannot run on this target at all (for example a MUX task
+            # on a standalone qubit): record it as failed, never on guessed hardware.
+            entry = _failure_entry(call, exc, target)
+            logger.error(f"Cannot run {call.name} ({call.resolved_call_id}) for {target}: {exc}")
+            calls.append(entry)
+            if plan.stops_after_failure(call):
+                stopped_by = call.resolved_call_id
+            continue
+        if skipped:
             logger.info(
                 f"Skipping MUX task {call.name} ({call.resolved_call_id}) for {target} "
                 "(not MUX representative)"
