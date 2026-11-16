@@ -25,6 +25,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
@@ -41,6 +42,7 @@ import {
   type ChatThinkingLevel,
 } from "@/lib/chatThinking";
 import type { ModelOption } from "@/lib/copilotModels";
+import type { ChatModelListStatus } from "@/hooks/useChatModelSelection";
 
 const MAX_HEIGHT_PX = 240;
 
@@ -69,6 +71,8 @@ interface ChatComposerProps {
   modelOptions: ModelOption[];
   selectedModelKey: string;
   onModelChange: (key: string) => void;
+  /** Whether the configured model list has loaded; switching waits for it. */
+  modelStatus?: ChatModelListStatus;
   /** How much the model thinks before answering; omitted on surfaces without the menu. */
   thinkingChoice?: ChatThinkingChoice;
   /** What "Auto" amounts to for the selected model. */
@@ -103,6 +107,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     modelOptions,
     selectedModelKey,
     onModelChange,
+    modelStatus = "ready",
     thinkingChoice,
     thinkingModelDefault,
     onThinkingChange,
@@ -301,31 +306,15 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             </Tooltip>
           </>
         )}
-        {modelOptions.length > 1 && selected && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                disabled={isStreaming || disabled}
-                className="btn btn-ghost btn-xs h-7 gap-1.5 rounded-lg font-normal text-base-content/60 max-w-[60%]"
-                aria-label="Chat model"
-              >
-                <Cpu className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">
-                  {compact ? (selected.model?.name ?? "Default model") : selected.label}
-                </span>
-                <ChevronDown className="w-3 h-3 shrink-0" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top">
-              {modelOptions.map((option) => (
-                <DropdownMenuItem key={option.key} onSelect={() => onModelChange(option.key)}>
-                  <span className="flex-1 truncate">{option.label}</span>
-                  {option.key === selected.key && <Check className="w-3.5 h-3.5 text-primary" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {selected && (
+          <ModelControl
+            options={modelOptions}
+            selected={selected}
+            status={modelStatus}
+            onChange={onModelChange}
+            disabled={isStreaming || disabled}
+            compact={compact}
+          />
         )}
         {thinkingChoice && onThinkingChange && (
           <DropdownMenu>
@@ -410,3 +399,99 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     </form>
   );
 });
+
+/** Why the model cannot be switched, when it cannot. */
+function fixedModelReason(status: ChatModelListStatus, optionCount: number): string | null {
+  if (status === "loading") return "Loading the configured chat models";
+  if (status === "error") return "Could not load the chat models; the configured default answers";
+  if (optionCount < 2) return "Only one chat model is configured";
+  return null;
+}
+
+/**
+ * The model the next message goes to, with a menu of the configured chat models.
+ * It names the model the default resolves to rather than an opaque "Default", and
+ * says why it cannot be switched when only one model is configured.
+ */
+function ModelControl({
+  options,
+  selected,
+  status,
+  onChange,
+  disabled,
+  compact,
+}: {
+  options: ModelOption[];
+  selected: ModelOption;
+  status: ChatModelListStatus;
+  onChange: (key: string) => void;
+  disabled: boolean;
+  compact: boolean;
+}) {
+  const name = status === "loading" ? "Loading models…" : selected.label;
+  const fixedReason = fixedModelReason(status, options.length);
+  const content = (
+    <>
+      <Cpu className="w-3.5 h-3.5 shrink-0" />
+      <span className="truncate">{name}</span>
+      {!compact && selected.isConfiguredDefault && status === "ready" && (
+        <span className="shrink-0 text-base-content/40">default</span>
+      )}
+    </>
+  );
+  const className =
+    "btn btn-ghost btn-xs h-7 gap-1.5 rounded-lg font-normal text-base-content/60 max-w-[60%]";
+
+  if (fixedReason) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-disabled="true"
+            aria-label={`Chat model: ${name}. ${fixedReason}`}
+            className={`${className} cursor-default hover:bg-transparent`}
+          >
+            {content}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{fixedReason}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className={className}
+          aria-label={`Chat model: ${name}`}
+          title="Model for your next message"
+        >
+          {content}
+          <ChevronDown className="w-3 h-3 shrink-0" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="top">
+        <DropdownMenuLabel className="text-xs font-normal text-base-content/50">
+          Model for your next message
+        </DropdownMenuLabel>
+        {options.map((option) => (
+          <DropdownMenuItem key={option.key} onSelect={() => onChange(option.key)}>
+            <span className="flex-1 min-w-0">
+              <span className="block truncate">{option.label}</span>
+              <span className="block text-xs text-base-content/50">
+                {[option.resolvedModel?.provider, option.isConfiguredDefault ? "default" : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </span>
+            {option.key === selected.key && <Check className="w-3.5 h-3.5 text-primary" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

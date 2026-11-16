@@ -10,8 +10,11 @@ import type { TaskChatContext, CopilotBlocksResult } from "@/types/copilotChat";
 
 import { useCopilotChat } from "../useCopilotChat";
 
+const copilotConfig = vi.hoisted(() => ({ current: undefined as object | undefined }));
 vi.mock("@/client/copilot/copilot", () => ({
-  useGetCopilotConfig: () => ({ data: undefined }),
+  useGetCopilotConfig: () => ({
+    data: copilotConfig.current ? { data: copilotConfig.current } : undefined,
+  }),
 }));
 
 function sse(event: string, data: unknown): string {
@@ -69,6 +72,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  copilotConfig.current = undefined;
+  localStorage.clear();
 });
 
 /** The chat as one surface sees it, plus the shared store. */
@@ -400,6 +405,47 @@ describe("useCopilotChat streaming", () => {
     expect(result.current.chat.messages[0].attachedImage).toBe(true);
   });
 
+  it("sends the model and thinking chosen on another surface, also on an edit", async () => {
+    const kimi = { provider: "openai-compatible-chat", name: "kimi" };
+    copilotConfig.current = {
+      chat_models: [{ provider: "openai-compatible-chat", name: "qwen" }, kimi],
+    };
+    const { result } = renderHook(
+      () => ({
+        page: useCopilotChat(),
+        dock: useCopilotChat(),
+        store: useCopilotChatSessionContext(),
+      }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.store.isLoadingSessions).toBe(false));
+    expect(result.current.page.model.selected).toMatchObject({ label: "qwen", model: null });
+
+    act(() => {
+      result.current.dock.model.select("model:openai-compatible-chat:kimi");
+      result.current.dock.thinking.select("high");
+    });
+    act(() => result.current.page.send("Show T1"));
+    await waitFor(() => expect(result.current.page.isStreaming).toBe(true));
+    expect(streamRequest().body).toMatchObject({ model_override: kimi, thinking_level: "high" });
+    stream.push(sse("result", { blocks: [{ type: "text", content: "Here", chart: null }] }));
+    stream.close();
+    await waitFor(() => expect(result.current.page.isStreaming).toBe(false));
+
+    // Back to the default: no override, so the server's first chat model answers.
+    act(() => {
+      result.current.dock.model.select("default");
+      result.current.dock.thinking.select("auto");
+    });
+    stream = controllableStream();
+    fetchMock.mockClear();
+    act(() => result.current.page.editMessage(0, "Show T2"));
+    await waitFor(() => expect(result.current.page.isStreaming).toBe(true));
+    const body = streamRequest().body;
+    expect(body.model_override).toBeNull();
+    expect(body).not.toHaveProperty("thinking_level");
+  });
+
   it("shares one streaming turn between every surface showing the chat", async () => {
     const { result } = renderHook(
       () => ({ sidebar: useCopilotChat(), floating: useCopilotChat() }),
@@ -482,6 +528,67 @@ describe("image turn replay", () => {
       expect(result.current.chat.send("Second")).toBe(false);
     });
     await waitFor(() => expect(result.current.chat.messages[0]?.content).toBe("First"));
+  });
+});
+
+describe("turn request IDs", () => {
+  const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  const realCrypto = globalThis.crypto;
+
+  function streamBodies() {
+    return fetchMock.mock.calls
+      .filter(([url]) => String(url).endsWith("/stream"))
+      .map(([, init]) => JSON.parse(String(init.body)));
+  }
+
+  async function finishTurn(result: Result) {
+    stream.push(sse("result", { blocks: [{ type: "text", content: "Ok", chart: null }] }));
+    stream.close();
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(false));
+    stream = controllableStream();
+  }
+
+  it("sends fresh UUID v4 request IDs when served over plain HTTP", async () => {
+    // Insecure contexts expose getRandomValues but not randomUUID.
+    const getRandomValues = vi.fn(realCrypto.getRandomValues.bind(realCrypto));
+    vi.stubGlobal("crypto", { getRandomValues });
+    const result = await renderChat();
+
+    act(() => result.current.chat.send("First"));
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+    await finishTurn(result);
+    act(() => result.current.chat.send("Second"));
+    await waitFor(() => expect(streamBodies()).toHaveLength(2));
+
+    const [first, second] = streamBodies();
+    expect(first.request_id).toMatch(UUID_V4);
+    expect(second.request_id).toMatch(UUID_V4);
+    // Each turn is its own request; the conversation stays one session.
+    expect(second.request_id).not.toBe(first.request_id);
+    expect(second.session_id).toBe(first.session_id);
+    expect(getRandomValues).toHaveBeenCalled();
+  });
+
+  it("uses the native randomUUID in secure contexts", async () => {
+    const ids = ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"];
+    const randomUUID = vi.fn(() => ids.shift()!);
+    vi.stubGlobal("crypto", {
+      randomUUID,
+      getRandomValues: realCrypto.getRandomValues.bind(realCrypto),
+    });
+    const result = await renderChat();
+
+    act(() => result.current.chat.send("First"));
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+    await finishTurn(result);
+    act(() => result.current.chat.send("Second"));
+    await waitFor(() => expect(streamBodies()).toHaveLength(2));
+
+    expect(streamBodies().map((body) => body.request_id)).toEqual([
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    ]);
+    expect(randomUUID).toHaveBeenCalledTimes(2);
   });
 });
 

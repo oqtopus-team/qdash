@@ -31,6 +31,8 @@ import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
 import { Loader } from "@/components/ui/Loader";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
+import { useToast } from "@/components/ui/Toast";
+import { copyText } from "@/lib/utils/clipboard";
 import { answerStartIndex } from "@/lib/copilotChatStream";
 import { answerFeedback } from "@/hooks/useCopilotChat";
 import type {
@@ -122,16 +124,20 @@ function AssistantRow({ className = "", children, ...rest }: React.HTMLAttribute
 }
 
 function CopyButton({ text }: { text: string }) {
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const copy = useCallback(() => {
-    navigator.clipboard.writeText(text).then(
+    copyText(text).then(
       () => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       },
-      () => {},
+      () => {
+        setCopied(false);
+        toast.error("Failed to copy to clipboard");
+      },
     );
-  }, [text]);
+  }, [text, toast]);
   return (
     <ActionButton label={copied ? "Copied" : "Copy"} onClick={copy}>
       {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}

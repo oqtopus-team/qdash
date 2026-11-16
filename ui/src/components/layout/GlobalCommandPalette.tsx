@@ -21,6 +21,7 @@ import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AVAILABLE_THEMES } from "@/constants/themes";
 import { useToast } from "@/components/ui/Toast";
+import { copyText } from "@/lib/utils/clipboard";
 
 export function GlobalCommandPalette() {
   const router = useRouter();
@@ -79,7 +80,7 @@ export function GlobalCommandPalette() {
 
   const copyPageLink = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await copyText(window.location.href);
       setOpen(false);
       toast.success("Page link copied");
     } catch {

@@ -37,10 +37,11 @@ only in what they open with:
 | `agent-runtime/src/exec-env.ts` | The workspace: one `agent-exec` connection per conversation behind `bash`, `read`, `write`, `edit` |
 | `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`); request schemas |
 | `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter |
-| `src/qdash/copilot/config/settings.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `TaskChatConfig`; YAML loading with local override |
+| `src/qdash/copilot/config/settings.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `TaskChatConfig`, loaded through `ConfigLoader.load_copilot` |
 | `src/qdash/datamodel/task_knowledge.py` | `TaskKnowledge` model with domain-specific knowledge per calibration task |
 | `config/copilot/config.yaml` | Enablement, languages, how a task chat opens |
 | `config/copilot/chat.yaml` | Planner models for every chat |
+| `config/copilot/profiles/<name>/` | A deployment's own `chat.yaml` and `evaluation.yaml`, selected by `QDASH_COPILOT_PROFILE` ([Deployment Profiles](./model-configuration.md#deployment-profiles)) |
 | `config/copilot/classifier.yaml` | Optional classifier models any feature can use; the first usable one is used |
 | `agent-runtime/src/classifier-models.ts` | Reads `classifier_models`, registers System One endpoints as Pi providers, and selects a feature's model |
 | `agent-runtime/src/presentation-tool.ts` | `present_results`: classifier-chosen layouts of values the chat passes, offered when a classifier is usable |

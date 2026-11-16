@@ -8,8 +8,10 @@ registry at startup. Operators set the endpoints as described in
 
 ## Configuration Files
 
-`config.yaml`, `chat.yaml`, and `evaluation.yaml` each accept an optional `*.local.yaml` overlay,
-deep-merged by `ConfigLoader`. The runtime reads `classifier.yaml` separately; see
+`ConfigLoader` deep-merges `config.yaml`, `chat.yaml`, and `evaluation.yaml` for the API; the Pi
+runtime reads the same `chat.yaml` and `evaluation.yaml` for its models. A
+[deployment profile](#deployment-profiles) replaces `chat.yaml` and `evaluation.yaml`. Neither
+reads a `*.local.yaml` overlay. The runtime reads `classifier.yaml` separately; see
 [Presentation Classifier](#presentation-classifier).
 
 ```yaml
@@ -45,6 +47,124 @@ YAML string values support shell-style environment variable references such as
 `${OPENAI_API_KEY}`, so environment-specific or sensitive values come from environment
 variables instead of committed files. The Pi runtime builds its `models.json` from `chat_models`
 and `evaluation_models` at startup.
+
+## Deployment Profiles
+
+A deployment profile is a named pair of `chat.yaml` and `evaluation.yaml` that one deployment
+uses instead of the default files, so sites that serve different models share one checkout.
+`QDASH_COPILOT_PROFILE` selects it; the API and the Pi runtime resolve it with the same rules:
+
+| `QDASH_COPILOT_PROFILE` | Chat and evaluation models from |
+| --- | --- |
+| Unset or empty | `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml` |
+| A profile name, such as `oqtopus` | `config/copilot/profiles/<name>/chat.yaml` and `evaluation.yaml` |
+
+An empty value selects the defaults because a Compose `env_file` line `QDASH_COPILOT_PROFILE=`
+passes an empty string. `config.yaml` and `classifier.yaml` stay shared by every profile. A
+profile is named after the deployment, not after its models, and its files replace the default
+files as a whole: no list is merged with the default one.
+
+A named profile never falls back to the default files. The API and the runtime both fail with
+a `CopilotProfileError` that names the variable or file when:
+
+- the name does not match `^[a-z0-9][a-z0-9_-]{0,62}$`, which also rules out `/`, `..`, and
+  surrounding whitespace;
+- `profiles/<name>/` or either of its two files is missing;
+- a file, after following symbolic links, lies outside `config/copilot/profiles/`;
+- a file is not valid YAML, holds more than one document, or repeats a key;
+- a file sets a top-level key other than `chat_models` (in `chat.yaml`) or `evaluation_models`
+  (in `evaluation.yaml`);
+- `chat_models` is empty. An empty `evaluation_models: []` is allowed and offers no evaluation
+  model;
+- an entry breaks a [profile model rule](#profile-model-rules), or repeats the `provider` and
+  `name` of an earlier entry in the same file.
+
+The error names the file, the entry index, and the field, such as
+`chat_models[0].max_output_tokens must be a whole number`. The runtime fails at startup, before
+it writes `models.json`; the API fails every Copilot request until the profile is fixed. The
+default files keep their earlier handling: they are not checked field by field, and a missing
+`evaluation.yaml` means no evaluation models. The runtime's `CHAT_CONFIG_PATH` and
+`EVALUATION_CONFIG_PATH` overrides apply to the default files only and conflict with a profile.
+
+The API reads the variable each time its cached configuration is rebuilt: at startup and after
+`POST /admin/config/reload`. The runtime reads it once, at startup. A changed value reaches a
+container only when the container is recreated, so both services are recreated together.
+The UI fetches `GET /copilot/config` again whenever a chat surface or **Settings → Copilot**
+mounts, the window regains focus, or the network reconnects, so open pages show the new
+`chat_models` without a reload. The browser stores a chosen chat model by `provider:name`
+(`ui/src/hooks/useChatModelSelection.ts`); a choice the new list no longer contains is sent as
+no override, so `chat_models[0]` answers.
+
+### Profile Model Rules
+
+Without these checks, the API's `ModelConfig` coerces some values, such as the string `"4096"`,
+that the runtime's `models.json` generation silently drops, so the two would run with different
+settings. Every entry in a profile is therefore checked against one set of rules in both
+runtimes, before either builds a model from it:
+
+| Field | Accepted value |
+| --- | --- |
+| `provider`, `name` | Required non-empty string |
+| `api_style` | `responses` or `completion` |
+| `base_url` | `http://` or `https://` URL, or `env:NAME` |
+| `api_key_env` | Environment variable name, such as `OPENAI_COMPATIBLE_API_KEY_CHAT` |
+| `max_output_tokens` | Whole number of at least 1; less than `num_ctx` when both are set |
+| `num_ctx` | Whole number of at least 1 |
+| `temperature` | Finite number of at least 0 |
+| `top_p` | Finite number greater than 0 and at most 1 |
+| `top_k` | Whole number of at least -1 |
+| `keep_alive` | Non-empty string, such as `30m` |
+| `reasoning_effort` | `none`, `minimal`, `low`, `medium`, or `high` |
+| `disable_thinking_instruction`, `strict_tool_schemas`, `requires_non_null_assistant_content`, `requires_tools_with_tool_history` | `true` or `false` |
+| `prompt_cache_key_mode` | `auto`, `enabled`, or `disabled` |
+| `sampling_params` | Mapping, passed to the request unchanged |
+| `sampling_params_by_thinking_level` | Mapping from `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max` to a mapping |
+
+A whole number may be written as `4096`, `4096.0`, or `4.096e3`, but not as a string, a boolean,
+or a value beyond 2^53 - 1. Fields that `ModelConfig` allows to be null (`temperature`,
+`base_url`, `api_key_env`, `keep_alive`, `num_ctx`, `top_p`, `top_k`, `reasoning_effort`) may be
+left empty; any other empty field is an error. Any field not in the table is an error, which
+catches a misspelled key such as `max_output_token`. `strict_tool_schemas` and the
+[gateway compatibility keys](#gateway-compatibility-keys) require a `base_url`, and the two
+`requires_*` keys are refused with `api_style: responses`.
+
+The runtime parses YAML with the YAML 1.2 core schema; PyYAML implements YAML 1.1. The API
+therefore reads profile files with a YAML 1.2 core loader that also refuses duplicate keys and
+`<<` merge keys, so both runtimes see the same values: `yes` and `1_000` are strings, `010` is
+ten, and `1e3` is a number. Profile strings are literal: shell-style variable
+interpolation is not performed. Use `base_url: env:NAME` and `api_key_env: NAME` for endpoint
+and credential references in both runtimes.
+
+The rules check a profile's settings, not the serving API. Whether an endpoint serves the model
+name, accepts images, or supports the configured context length and output limit is for the
+operator to confirm against the deployment.
+
+### Sample Profile
+
+The supplied `profiles/oqtopus/` profile is a sample that names `Qwen/Qwen3.8-27B` for chat and
+evaluation through `api_style: completion`, on the `CHAT` and `EVALUATION` endpoint variables.
+No serving API has been tested with it. Its comments list what the deployment must provide: an
+OpenAI-compatible Chat Completions API for that model name, image input for evaluation, and a
+context length and output limit that cover `num_ctx` and `max_output_tokens`. Its
+`temperature: 0.0` requests greedy sampling for evaluation; whether repeated runs then agree is
+not verified. The profile sets no `reasoning_effort`, so the runtime does not mark the model as
+a reasoning model or apply the Qwen chat-template thinking format to it. pi-qcaleval uses a
+model whose id contains `Ising-Calibration` when the chat planner evaluates without naming a
+model; in a profile without one, that evaluation runs on the conversation's model and is marked
+as a fallback. Runs started from **AI Evaluations** pass the
+selected model explicitly.
+
+### Add a Profile
+
+To add a profile for another deployment, such as `osaka`:
+
+1. Copy `config/copilot/profiles/oqtopus/` to `config/copilot/profiles/osaka/`.
+2. Replace the models in both files with the ones the deployment serves, and set `num_ctx` and
+   `max_output_tokens` to what that deployment supports. Keep endpoints and keys in
+   `OPENAI_COMPATIBLE_*_<SUFFIX>` variables; the files hold only their names.
+3. Commit the directory with the rest of `config/`, or keep it untracked in the deployment's
+   checkout: Compose mounts `./config`, so both work.
+4. Select it as described in [AI Setup](../../user-guide/setup/ai.md#select-a-deployment-profile).
 
 ## Endpoint URLs and Provider Names
 
@@ -101,8 +221,9 @@ responses-style requests always send it. Use `enabled` for a proxy that routes o
 key and `disabled` for an endpoint that rejects the field. Pi omits an empty `tools` array by
 default because vLLM 0.20 and later reject it; set `requires_tools_with_tool_history: true` only
 for a proxy that needs it. The two `requires_*` keys exist only for `api_style: completion`; the
-runtime drops them on a responses-style endpoint. An invalid value is dropped with a startup
-warning that names the key and the model, not the value.
+runtime drops them on a responses-style endpoint. In the default files, an invalid value is
+dropped with a startup warning that names the key and the model, not the value; a
+[deployment profile](#profile-model-rules) refuses it.
 
 ## Presentation Classifier
 
@@ -248,6 +369,7 @@ for both API styles and both model roles. Deployment steps are in
 
 | Variable | Purpose |
 | --- | --- |
+| `QDASH_COPILOT_PROFILE` | [Deployment profile](#deployment-profiles) for chat and evaluation models; unset or empty uses the default files |
 | `OPENAI_API_KEY` | OpenAI API authentication |
 | `OPENAI_COMPATIBLE_BASE_URL_<SUFFIX>` | OpenAI-compatible API base URL through `/v1`; the suffix is operator-defined |
 | `OPENAI_COMPATIBLE_API_KEY_<SUFFIX>` | API key for the endpoint with the matching suffix; it can be a placeholder for a keyless endpoint |
@@ -275,12 +397,17 @@ the corresponding YAML model. Variable renaming does not transform the URL: for 
 
 ## Implementation Files
 
-- `src/qdash/copilot/config/settings.py`: `CopilotConfig` and `ModelConfig`; YAML loading with
-  the `*.local.yaml` overlay
+- `src/qdash/copilot/config/settings.py`: `CopilotConfig` and `ModelConfig`
+- `src/qdash/common/config/loader.py` and `copilot_profile.py`: `ConfigLoader.load_copilot` and
+  profile selection for the API
+- `agent-runtime/src/copilot-profile.ts`: profile selection and validation for the runtime; keep
+  its rules and messages in step with `copilot_profile.py`.
+  `tests/data/copilot_profile_cases.json` holds the names, model fields, and documents both test
+  suites check
 - `agent-runtime/src/models-config.ts`: `models.json` generation, compat fields, and Cloudflare
   Access headers
 - `agent-runtime/src/classifier-models.ts`: `classifier_models` loading and selection
 - `agent-runtime/src/presentation-tool.ts`: `present_results`
 - `agent-runtime/src/classify-tool.ts`: `classify`
-- `config/copilot/config.yaml`, `chat.yaml`, `evaluation.yaml`, `classifier.yaml`: supplied
-  configuration
+- `config/copilot/config.yaml`, `chat.yaml`, `evaluation.yaml`, `classifier.yaml`,
+  `profiles/oqtopus/`: supplied configuration

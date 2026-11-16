@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy, Cpu } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -11,10 +11,10 @@ import { ProfileSettingsPanel } from "@/components/features/settings/ProfileSett
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectedLabel } from "@/components/ui/SelectedLabel";
+import { useToast } from "@/components/ui/Toast";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
-import { useGetCopilotConfig } from "@/client/copilot/copilot";
 import {
   getListProjectMembersQueryKey,
   useInviteProjectMember,
@@ -22,14 +22,10 @@ import {
   useRemoveProjectMember,
   useUpdateProjectMember,
 } from "@/client/projects/projects";
-import {
-  buildChatModelOptions,
-  getStoredChatModelKey,
-  resolveChatModelOption,
-  setStoredChatModelKey,
-} from "@/lib/copilotModels";
+import { useChatModelSelection } from "@/hooks/useChatModelSelection";
 import type { MemberResponse, ProjectRole } from "@/schemas";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
+import { copyText } from "@/lib/utils/clipboard";
 
 import { CopilotInstructionsSettings } from "./CopilotInstructionsSettings";
 import { CopilotSystemPromptView } from "./CopilotSystemPromptView";
@@ -48,18 +44,9 @@ function roleBadgeClass(role: ProjectRole) {
 
 /** Copilot settings for the chat model, custom instructions and system prompt. */
 function CopilotSettingsPanel() {
-  const [selectedModelKey, setSelectedModelKey] = useState(getStoredChatModelKey);
-  const { data: copilotConfigResponse, isLoading } = useGetCopilotConfig();
-  const modelOptions = useMemo(
-    () => buildChatModelOptions(copilotConfigResponse?.data ?? null),
-    [copilotConfigResponse?.data],
-  );
-  const selectedModel = resolveChatModelOption(modelOptions, selectedModelKey);
-
-  const handleModelChange = (key: string) => {
-    setSelectedModelKey(key);
-    setStoredChatModelKey(key);
-  };
+  const { options, selected, select, status, unavailableModel } = useChatModelSelection();
+  const effective = selected.resolvedModel;
+  const canSwitch = status === "ready" && options.length > 1;
 
   return (
     <div className="card bg-base-200 shadow-sm" key="copilot">
@@ -67,40 +54,59 @@ function CopilotSettingsPanel() {
         <h2 className="card-title mb-4">Copilot Settings</h2>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
-            <label className="text-sm font-medium">Default chat model</label>
+            <label className="text-sm font-medium" htmlFor="copilot-chat-model">
+              Default chat model
+            </label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <select
+                id="copilot-chat-model"
                 className="select select-bordered w-full sm:max-w-md"
-                value={selectedModel.key}
-                onChange={(event) => handleModelChange(event.target.value)}
-                disabled={isLoading}
+                value={selected.key}
+                onChange={(event) => select(event.target.value)}
+                disabled={!canSwitch}
+                aria-describedby="copilot-chat-model-help"
               >
                 <SelectedLabel />
-                {modelOptions.map((option) => (
+                {options.map((option) => (
                   <option key={option.key} value={option.key}>
-                    {option.label}
+                    {option.isConfiguredDefault && status === "ready"
+                      ? `${option.label} (default)`
+                      : option.label}
                   </option>
                 ))}
               </select>
-              <div className="badge badge-neutral gap-1 w-fit">
-                <Cpu className="h-3 w-3" />
-                {selectedModel.model?.provider ?? "configured"}
-              </div>
+              {effective && (
+                <div className="badge badge-neutral gap-1 w-fit">
+                  <Cpu className="h-3 w-3" />
+                  {effective.provider}
+                </div>
+              )}
             </div>
-            <p className="text-sm text-base-content/60">
-              This controls the default model used when asking about calibration task results in Ask
-              AI. The available choices come from copilot.yaml.
+            <p id="copilot-chat-model-help" className="text-sm text-base-content/60">
+              {status === "loading"
+                ? "Loading the configured chat models…"
+                : status === "error"
+                  ? "Could not load the chat models. Chats use the configured default model."
+                  : options.length > 1
+                    ? "AI Chat sends your messages to this model. You can also switch it from the chat input. The choices come from chat_models in chat.yaml."
+                    : "Only one chat model is configured, so there is nothing to switch to. An operator can offer more by adding entries to chat_models in chat.yaml."}
             </p>
+            {unavailableModel && (
+              <div role="status" className="alert alert-warning alert-soft text-sm">
+                <span>
+                  Your previous choice, <span className="font-mono">{unavailableModel}</span>, is no
+                  longer configured. Chats use {selected.label} instead.
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="bg-base-100 rounded-lg p-4">
             <div className="text-xs font-medium text-base-content/50 mb-2">
-              Current effective model
+              Model for new messages
             </div>
             <div className="font-mono text-sm break-all">
-              {selectedModel.model
-                ? `${selectedModel.model.provider}:${selectedModel.model.name}`
-                : selectedModel.label}
+              {effective ? `${effective.provider}:${effective.name}` : selected.label}
             </div>
           </div>
 
@@ -121,6 +127,7 @@ function ProjectMembersPanel() {
   const { user } = useAuth();
   const { currentProject, projects, projectId, isOwner, switchProject } = useProject();
   const [inviteUsername, setInviteUsername] = useState("");
+  const toast = useToast();
   const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null);
   const [inviteRole, setInviteRole] = useState<ProjectRole>("viewer");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -154,7 +161,12 @@ function ProjectMembersPanel() {
   };
 
   const handleCopyProjectId = async (id: string) => {
-    await navigator.clipboard.writeText(id);
+    try {
+      await copyText(id);
+    } catch {
+      toast.error("Failed to copy project ID");
+      return;
+    }
     setCopiedProjectId(id);
     setTimeout(() => setCopiedProjectId(null), 2000);
   };

@@ -9,6 +9,7 @@ import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 import { ChatSidebar } from "./ChatSidebar";
 import { MiniChatWindow } from "./MiniChatWindow";
+import { MobileTabBar } from "./MobileTabBar";
 
 import { FirstCalibrationBanner } from "@/components/features/first-calibration/FirstCalibrationBanner";
 import { FirstCalibrationCoachmarks } from "@/components/features/first-calibration/FirstCalibrationCoachmarks";
@@ -87,9 +88,12 @@ export function AppLayout({ children }: AppLayoutProps) {
     <SidebarProvider>
       <CopilotChatSessionProvider>
         <ChatDockProvider>
-          <div className="flex w-full h-screen overflow-hidden">
+          {/* `h-dvh` tracks the visible viewport on mobile browsers, so the tab bar at the
+              bottom of the column stays on screen; the side and top padding keep the
+              chrome clear of display cutouts once the viewport extends under them. */}
+          <div className="flex w-full h-dvh overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
             <Sidebar />
-            <div className="flex-1 flex flex-col h-screen w-0 min-w-0 transition-[flex] duration-300 ease-in-out">
+            <div className="flex-1 flex flex-col h-full w-0 min-w-0 transition-[flex] duration-300 ease-in-out">
               <Navbar />
               {!showProjectAccessState && <FirstCalibrationBanner />}
               <main className="flex-1 overflow-y-auto bg-base-100">
@@ -99,6 +103,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   {showProjectAccessState ? <ProjectAccessState /> : children}
                 </div>
               </main>
+              <MobileTabBar />
             </div>
             <ChatSidebar />
           </div>
