@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import { AlertCircle, Info } from "lucide-react";
 
 import { useToast } from "@/components/ui/Toast";
+import { copyText } from "@/lib/utils/clipboard";
 
 interface TaskMessagePanelProps {
   status: string | null | undefined;
@@ -100,7 +101,7 @@ export function TaskMessagePanel({
 
   const copyStackTrace = async () => {
     try {
-      await navigator.clipboard.writeText(trimmedStackTrace ?? "");
+      await copyText(trimmedStackTrace ?? "");
       toast.success("Copied to clipboard");
     } catch {
       toast.error("Failed to copy to clipboard");

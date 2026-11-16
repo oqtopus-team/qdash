@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, Eye, EyeOff, Info, Loader2, Play } from "lucide-react";
 
+import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { copyText } from "@/lib/utils/clipboard";
 
 type CurlMode = "standard" | "cloudflare";
 
@@ -60,6 +62,7 @@ function formatResponseBody(responseText: string, contentType: string) {
 export function ApiAccessTokenPanel() {
   const { accessToken } = useAuth();
   const { projectId } = useProject();
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [copiedResponse, setCopiedResponse] = useState(false);
@@ -113,20 +116,35 @@ export function ApiAccessTokenPanel() {
 
   const handleCopyToken = async () => {
     if (!accessToken) return;
-    await navigator.clipboard.writeText(accessToken);
+    try {
+      await copyText(accessToken);
+    } catch {
+      toast.error("Failed to copy token");
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleCopyCurl = async () => {
-    await navigator.clipboard.writeText(curlCommand);
+    try {
+      await copyText(curlCommand);
+    } catch {
+      toast.error("Failed to copy curl command");
+      return;
+    }
     setCopiedCurl(true);
     setTimeout(() => setCopiedCurl(false), 2000);
   };
 
   const handleCopyResponse = async () => {
     if (!testResult) return;
-    await navigator.clipboard.writeText(testResult.responseBody);
+    try {
+      await copyText(testResult.responseBody);
+    } catch {
+      toast.error("Failed to copy response");
+      return;
+    }
     setCopiedResponse(true);
     setTimeout(() => setCopiedResponse(false), 2000);
   };

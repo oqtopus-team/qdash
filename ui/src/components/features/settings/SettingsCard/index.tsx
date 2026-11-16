@@ -4,6 +4,7 @@ import { useCallback } from "react";
 
 import { useGetSettings } from "@/client/settings/settings";
 import { useToast } from "@/components/ui/Toast";
+import { copyText } from "@/lib/utils/clipboard";
 
 export function SettingsCard() {
   const toast = useToast();
@@ -11,8 +12,10 @@ export function SettingsCard() {
 
   const handleCopy = useCallback(
     (value: string) => {
-      navigator.clipboard.writeText(value);
-      toast.success("Copied to clipboard!");
+      copyText(value).then(
+        () => toast.success("Copied to clipboard!"),
+        () => toast.error("Failed to copy to clipboard"),
+      );
     },
     [toast],
   );
