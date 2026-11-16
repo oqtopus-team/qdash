@@ -364,7 +364,7 @@ test("every generation field of a valid profile reaches models.json", () => {
   }
 });
 
-test("the committed oqtopus profile serves Kimi for chat and evaluation", () => {
+test("the committed oqtopus profile serves Qwen for chat and evaluation", () => {
   const root = mkdtempSync(join(tmpdir(), "copilot-oqtopus-"));
   try {
     const copilot = join(root, "copilot");
@@ -389,8 +389,14 @@ test("the committed oqtopus profile serves Kimi for chat and evaluation", () => 
       assert.equal(entry.apiKey, `$OPENAI_COMPATIBLE_API_KEY_${suffix}`);
       assert.deepEqual(
         entry.models.map((model) => model.id),
-        ["moonshotai/Kimi-K3"],
+        ["Qwen/Qwen3.8-27B"],
       );
+      // The profile sets no reasoning_effort, so the Qwen chat-template
+      // thinking format, which applies only to reasoning models, stays off.
+      const [model] = entry.models;
+      assert.equal(model.reasoning, undefined);
+      assert.equal(model.compat?.thinkingFormat, undefined);
+      assert.equal(model.contextWindow, 131072);
     }
   } finally {
     rmSync(root, { recursive: true, force: true });

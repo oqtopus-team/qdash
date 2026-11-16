@@ -16,7 +16,7 @@ evaluation_models:
   # this model name, and accepting image input, because evaluation sends the
   # task's figures. OPENAI_COMPATIBLE_BASE_URL_EVALUATION must include /v1.
   - provider: openai-compatible-evaluation
-    name: moonshotai/Kimi-K3
+    name: Qwen/Qwen3.8-27B
     api_style: completion
     base_url: env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION
     api_key_env: OPENAI_COMPATIBLE_API_KEY_EVALUATION
