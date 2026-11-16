@@ -23,6 +23,7 @@ import {
 } from "@/lib/copilotChatStream";
 import { buildHeaders, consumeSSEEvents, readErrorResponse } from "@/lib/sse-utils";
 import { investigationFromStored, toInvestigationRequest } from "@/lib/copilotInvestigation";
+import { createRequestId } from "@/lib/utils/requestId";
 import type {
   TaskChatContext,
   AnswerFeedback,
@@ -330,7 +331,7 @@ function buildTurnRequest(
       // Required by the Pi backend, which restores conversation state from the
       // persisted session rather than from the request body.
       session_id: sessionId,
-      request_id: crypto.randomUUID(),
+      request_id: createRequestId(),
       conversation_history: history.map((m) => ({ role: m.role, content: m.content })),
       model_override: modelOverride,
       ...(thinkingLevel ? { thinking_level: thinkingLevel } : {}),
