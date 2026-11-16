@@ -19,6 +19,8 @@ import {
   ALLOWED_TOOL_NAMES,
   REVIEWED_WRITE_TOOL_NAMES,
   TRUSTED_EXTENSION_PACKAGES,
+  isDeferredTool,
+  isNestedReadTool,
   isReviewedWriteTool,
 } from "./allowed-tools.ts";
 import type { QDashConnection } from "./auth.ts";
@@ -74,6 +76,42 @@ async function conversationModel(
 function asJson(value: unknown): JsonValue | undefined {
   if (value === undefined) return undefined;
   return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
+/**
+ * What a Code Mode script receives from a nested QDash tool: the redacted
+ * response data the tool's text summarizes, untruncated, so a script can
+ * filter and aggregate it. Any JSON value.
+ */
+export const QDASH_DATA_SCHEMA = {
+  description:
+    "The tool's redacted QDash response data as JSON: the data its text answer summarizes, not truncated.",
+} as const;
+
+/** Text blocks of a tool result, joined. */
+function textOf(content: ReadonlyArray<{ type: string; text?: string }>): string {
+  return content
+    .map((block) => (block.type === "text" && typeof block.text === "string" ? block.text : ""))
+    .join("\n");
+}
+
+/**
+ * The value a script gets for a nested call: pi-qdash's `details.data`,
+ * else the text answer parsed as JSON, else the text itself.
+ */
+export function nestedDataOf(result: {
+  content: ReadonlyArray<{ type: string; text?: string }>;
+  details?: unknown;
+}): JsonValue {
+  const data = (result.details as { data?: unknown } | undefined)?.data;
+  const json = asJson(data);
+  if (json !== undefined) return json;
+  const text = textOf(result.content);
+  try {
+    return JSON.parse(text) as JsonValue;
+  } catch {
+    return text;
+  }
 }
 
 /** A write call waiting for the user, as stored in the tool result and shown in the UI. */
@@ -199,6 +237,14 @@ export function adaptCodingAgentTool(
     fillImages?: boolean;
     /** Fill an omitted `knowledge` argument (and `criteria`, when declared) with QDash's reference for `task_name`. */
     fillKnowledge?: boolean;
+    /**
+     * Let Code Mode scripts call the tool, which then returns its response
+     * data as structured output. Only audited read-only tools; every other
+     * tool can only be called by the model.
+     */
+    nested?: boolean;
+    /** Offer the tool to the model only once `tool_search` (or a call by name) loaded it. */
+    deferred?: boolean;
   } = {},
 ): ToolRegistration {
   const writesQDash = isReviewedWriteTool(tool.name);
@@ -213,6 +259,11 @@ export function adaptCodingAgentTool(
     // and a write never runs inside the harness, so replaying the call only
     // re-issues the approval request.
     replay: options.replay ?? "safe",
+    // Writes and unaudited tools never run inside a script: their approval
+    // card and rendering only exist for a call the model made.
+    callers: options.nested && !writesQDash ? ["model", "tools"] : ["model"],
+    ...(options.deferred ? { deferred: true as const } : {}),
+    ...(options.nested && !writesQDash ? { structuredOutputSchema: QDASH_DATA_SCHEMA } : {}),
     ...(tool.prepareArguments ? { prepareArguments: tool.prepareArguments } : {}),
     ...(tool.executionMode ? { executionMode: tool.executionMode } : {}),
     execute: async (args, api: ToolExecutionApi, context: Context) => {
@@ -306,6 +357,10 @@ export function adaptCodingAgentTool(
         ...(result.isError === undefined ? {} : { isError: result.isError }),
         ...(result.usage === undefined ? {} : { usage: result.usage }),
         ...(result.terminate ? { control: { terminate: true as const } } : {}),
+        // An error result carries no value: the script gets its text as the error.
+        ...(options.nested && !writesQDash && !result.isError
+          ? { structuredOutput: nestedDataOf(result) }
+          : {}),
       };
     },
   });
@@ -413,13 +468,22 @@ export function buildQDashExtension(
   connection: QDashConnection,
   localExtensionRoots: readonly string[] = [],
   trustedPackages: readonly string[] = TRUSTED_EXTENSION_PACKAGES,
-): { extension: Extension; writeTools: QDashWriteTools } {
+): {
+  extension: Extension;
+  writeTools: QDashWriteTools;
+  /** Tools Code Mode scripts may call. */
+  nestedTools: string[];
+  /** Tools offered only once loaded. */
+  deferredTools: string[];
+} {
   const allowed = new Set<string>([
     ...ALLOWED_TOOL_NAMES,
     ...REVIEWED_WRITE_TOOL_NAMES,
   ]);
   const tools = new Map<string, ToolRegistration>();
   const writes = new Map<string, CodingAgentTool>();
+  const nested = new Set<string>();
+  const deferred = new Set<string>();
   const trusted = (extension: { path?: string }) =>
     isTrusted(extension, localExtensionRoots, trustedPackages);
   // Pinned extensions first, so a trusted definition is the one that replaces.
@@ -436,19 +500,30 @@ export function buildQDashExtension(
       // Only trusted extensions evaluate figures; pi-qdash tools fetch them.
       const fillImages = local && acceptsImages(registered.definition.parameters);
       const fillKnowledge = local && acceptsKnowledge(registered.definition.parameters);
+      // Only the pinned, audited implementation of a read tool may run from a
+      // script; a trusted checkout's replacement is model-only.
+      const nestedRead = !local && !writeName && isNestedReadTool(name);
+      const deferredTool = isDeferredTool(name);
       tools.set(
         name,
         adaptCodingAgentTool(registered.definition, modelRuntime, cwd, connection, {
           replay,
           fillImages,
           fillKnowledge,
+          nested: nestedRead,
+          deferred: deferredTool,
         }),
       );
+      if (nestedRead) nested.add(name);
+      else nested.delete(name);
+      if (deferredTool) deferred.add(name);
       if (writeName) writes.set(name, registered.definition);
     }
   }
   return {
     extension: defineExtension({ name: "qdash", tools: [...tools.values()] }),
     writeTools: new QDashWriteTools(writes, modelRuntime, cwd, connection),
+    nestedTools: [...nested],
+    deferredTools: [...deferred],
   };
 }

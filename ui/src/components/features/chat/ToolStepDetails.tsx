@@ -29,6 +29,14 @@ const WORKSPACE_TOOLS = new Set(["bash", "read", "write", "edit"]);
 /** The tool that asks the configured classifier model (agent-runtime classify-tool.ts). */
 const CLASSIFY_TOOL = "classify";
 
+/** The tool that runs a JavaScript script calling read-only QDash tools (agent-runtime codemode.ts). */
+export const CODEMODE_TOOL = "codemode";
+
+/** Language of a tool call's `code` argument. */
+function codeLanguage(tool: string): string {
+  return tool === CODEMODE_TOOL ? "javascript" : "python";
+}
+
 export function isWorkspaceTool(tool: string): boolean {
   return WORKSPACE_TOOLS.has(tool);
 }
@@ -39,6 +47,7 @@ export function toolIcon(tool: string) {
   if (tool === "write") return FilePenLine;
   if (tool === "edit") return FileDiff;
   if (tool === CLASSIFY_TOOL) return Tags;
+  if (tool === CODEMODE_TOOL) return Code2;
   if (tool.includes("python") || tool.endsWith("_flow")) return Code2;
   if (tool.includes("chart") || tool.includes("timeseries") || tool.includes("plot")) {
     return LineChart;
@@ -214,6 +223,12 @@ export function stepTitle(step: ToolStep): string {
       return `${drafting || step.status === "running" ? "Editing" : "Edited"}${path ? ` ${path}` : ""}`;
     case "read":
       return `${step.status === "done" || step.status === "error" ? "Read" : "Reading"}${path ? ` ${path}` : ""}`;
+    case CODEMODE_TOOL:
+      return drafting
+        ? "Writing a script"
+        : step.status === "running"
+          ? "Running a script"
+          : "Ran a script";
     case "qdash_save_flow":
       return drafting ? `Writing flow${name ? ` ${name}` : ""}` : step.label;
     case CLASSIFY_TOOL: {
@@ -242,7 +257,7 @@ function DraftView({ step }: { step: ToolStep }) {
     draft.command !== undefined
       ? "bash"
       : draft.code !== undefined
-        ? "python"
+        ? codeLanguage(step.tool)
         : languageForPath(path);
   const others = Object.entries(draft).filter(
     ([key]) => !["content", "code", "command"].includes(key),
@@ -326,7 +341,7 @@ function EditsView({ edits }: { edits: unknown[] }) {
 }
 
 /** Any tool's arguments: source as code, the rest as JSON. */
-function ArgsView({ args }: { args: unknown }) {
+function ArgsView({ tool, args }: { tool: string; args: unknown }) {
   if (args === undefined || args === null) return null;
   if (typeof args === "string")
     return (
@@ -339,7 +354,7 @@ function ArgsView({ args }: { args: unknown }) {
     typeof values.command === "string"
       ? { key: "command", language: "bash" }
       : typeof values.code === "string"
-        ? { key: "code", language: "python" }
+        ? { key: "code", language: codeLanguage(tool) }
         : undefined;
   if (!source)
     return (
@@ -443,6 +458,20 @@ export function ToolDetails({ step }: { step: ToolStep }) {
   if (step.tool === CLASSIFY_TOOL && args) {
     return <ClassifyArgsView args={args} />;
   }
+  if (step.tool === CODEMODE_TOOL) {
+    // The script, then what it printed and one line per tool call it made.
+    const code = text(args?.code);
+    return (
+      <div>
+        {code && (
+          <CodeBlock compact language="javascript">
+            {code}
+          </CodeBlock>
+        )}
+        <OutputPanel step={step} />
+      </div>
+    );
+  }
   if (step.tool === "read") {
     const offset = args?.offset;
     const limit = args?.limit;
@@ -459,7 +488,7 @@ export function ToolDetails({ step }: { step: ToolStep }) {
   }
   return (
     <div>
-      <ArgsView args={step.args} />
+      <ArgsView tool={step.tool} args={step.args} />
       <OutputPanel step={step} />
     </div>
   );

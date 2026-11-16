@@ -10,6 +10,7 @@ import {
 } from "@/contexts/CopilotChatSessionContext";
 import { thinkingLevelForRequest } from "@/lib/chatThinking";
 import { useChatModelSelection, useChatThinkingSelection } from "@/hooks/useChatModelSelection";
+import { canResendSteer, isUnresolvedSteer, type PendingSteer } from "@/lib/copilotSteer";
 
 export type CopilotSession = CopilotChatSession;
 
@@ -27,7 +28,14 @@ export function useCopilotChat(sessionId?: string | null) {
   const modelOverride = model.selected.model;
   const thinking = useChatThinkingSelection(model);
   const thinkingLevel = thinkingLevelForRequest(thinking.choice);
-  const { sendMessage, stop: stopSession } = ctx;
+  const {
+    sendMessage,
+    stop: stopSession,
+    steer: steerSession,
+    checkSteer,
+    dismissSteer,
+    dismissNotice,
+  } = ctx;
   const id = session?.id;
   // The page the user has open, read when a turn goes out; null on the chat page.
   const dock = useOptionalChatDock();
@@ -62,6 +70,55 @@ export function useCopilotChat(sessionId?: string | null) {
   const stop = useCallback(() => {
     if (id) stopSession(id);
   }, [id, stopSession]);
+
+  const steers: PendingSteer[] = useMemo(
+    () => (id ? (ctx.steers[id] ?? []) : []),
+    [ctx.steers, id],
+  );
+
+  /** Send `text` to the answer being written; it reads it after its current step. */
+  const steer = useCallback(
+    (text: string) => (id ? steerSession(id, text) : false),
+    [id, steerSession],
+  );
+
+  /**
+   * Send a steer the runtime said was not delivered again: to the answer streaming
+   * now, or as a new message when none is. One whose delivery is not confirmed is
+   * never sent again: the answer may have read it.
+   */
+  const resendSteer = useCallback(
+    (requestId: string) => {
+      if (!id) return;
+      const pending = steers.find((s) => s.requestId === requestId);
+      if (!pending || !canResendSteer(pending)) return;
+      const sent = run ? steerSession(id, pending.text) : send(pending.text);
+      if (sent) dismissSteer(id, requestId);
+    },
+    [id, steers, run, steerSession, send, dismissSteer],
+  );
+
+  /**
+   * Continue the last answer, which was stopped or failed, without a new message.
+   * A failed answer's error is replaced by the continuation; a stopped answer stays.
+   */
+  // A steer the runtime may hold that the chat does not show yet would be part of
+  // what a continue answers: wait until the chat knows where each one stands.
+  // Before the steers a reload left are restored, one may be hidden: wait for them too.
+  const steersSettled = ctx.steersReady && !steers.some(isUnresolvedSteer);
+
+  const continueLast = useCallback(() => {
+    if (!id || run || !steersSettled || !canContinueMessages(messages)) return;
+    const last = messages[messages.length - 1];
+    sendMessage("", {
+      sessionId: id,
+      continueRun: true,
+      history: isErrorContent(last) ? messages.slice(0, -1) : messages,
+      modelOverride,
+      thinkingLevel,
+      page: currentPage?.() ?? null,
+    });
+  }, [id, run, steersSettled, messages, sendMessage, modelOverride, thinkingLevel, currentPage]);
 
   /** Re-send the last user message, replacing the failed or stopped answer. */
   const retryLast = useCallback(() => {
@@ -101,6 +158,31 @@ export function useCopilotChat(sessionId?: string | null) {
     [id, messages, modelOverride, thinkingLevel, run, sendMessage, currentPage],
   );
 
+  /**
+   * Start a new chat from the answer at `index`, through that answer, and switch to it.
+   * Only a completed answer saved with its runtime entry qualifies (see `canBranchAt`).
+   */
+  const branchingEntry = id ? ctx.branching[id] : undefined;
+  const { branchFrom: branchSession } = ctx;
+  const canBranchAt = useCallback(
+    (index: number) =>
+      Boolean(id) &&
+      !run &&
+      steersSettled &&
+      !branchingEntry &&
+      session?.messagesLoaded === true &&
+      isBranchableAnswer(messages[index]),
+    [id, run, steersSettled, branchingEntry, session?.messagesLoaded, messages],
+  );
+  const branchFrom = useCallback(
+    (index: number) => {
+      const entryId = messages[index]?.entryId;
+      if (!id || !entryId || !canBranchAt(index)) return;
+      void branchSession(id, entryId);
+    },
+    [id, messages, canBranchAt, branchSession],
+  );
+
   /** Rate the assistant message at `index`; rating it the same way again clears it. */
   const rateAnswer = useCallback(
     (index: number, feedback: AnswerFeedback) => {
@@ -134,7 +216,79 @@ export function useCopilotChat(sessionId?: string | null) {
       !run && messages[index]?.role === "user" && recoverMessageImages(messages[index]) !== null,
     editMessage,
     rateAnswer,
+    steers,
+    steer,
+    resendSteer,
+    checkSteer: (requestId: string) => {
+      if (id) checkSteer(id, requestId);
+    },
+    dismissSteer: (requestId: string) => {
+      if (id) dismissSteer(id, requestId);
+    },
+    notice: id ? (ctx.notices[id] ?? null) : null,
+    dismissNotice: () => {
+      if (id) dismissNotice(id);
+    },
+    continueLast,
+    canContinue: !run && steersSettled && canContinueMessages(messages),
+    branchFrom,
+    canBranchAt,
+    /** The index of the answer being branched from, while its request runs. */
+    branchingIndex: branchingEntry
+      ? messages.findIndex((m) => m.role === "assistant" && m.entryId === branchingEntry)
+      : -1,
   };
+}
+
+function isErrorContent(message: ChatMessage | undefined): boolean {
+  return message?.role === "assistant" && message.content.startsWith("Error: ");
+}
+
+/**
+ * Whether a chat can be branched from this message: an answer the runtime completed,
+ * saved with its entry ID. Never one without an ID (older answers, segments a steer
+ * closed off), an error, a stopped answer, or one that ended on a question, an
+ * approval, or a proposed edit: a branch must not make that card actionable again.
+ * The runtime checks the same and refuses otherwise.
+ */
+export function isBranchableAnswer(message: ChatMessage | undefined): boolean {
+  if (!message || message.role !== "assistant" || !message.entryId) return false;
+  if (isErrorContent(message)) return false;
+  try {
+    const parsed = JSON.parse(message.content) as {
+      stopped?: unknown;
+      blocks?: Array<{ type?: unknown }>;
+    };
+    if (parsed.stopped === true) return false;
+    return !(parsed.blocks ?? []).some(
+      (b) => b.type === "ask" || b.type === "approval" || b.type === "edit",
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether the last answer ended without finishing (stopped, or an error) so it may be
+ * continued. An answer that ended on a question, an approval or a proposed edit is
+ * answered instead; the runtime refuses to continue past one as well.
+ */
+export function canContinueMessages(messages: ChatMessage[]): boolean {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "assistant") return false;
+  if (isErrorContent(last)) return messages.some((m) => m.role === "user");
+  try {
+    const parsed = JSON.parse(last.content) as {
+      stopped?: unknown;
+      blocks?: Array<{ type?: unknown }>;
+    };
+    if (parsed.stopped !== true) return false;
+    return !(parsed.blocks ?? []).some(
+      (b) => b.type === "ask" || b.type === "approval" || b.type === "edit",
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** The stored rating of an assistant message, if any. */

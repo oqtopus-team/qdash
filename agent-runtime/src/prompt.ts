@@ -21,6 +21,8 @@ export function buildSystemPrompt(
   presentationGuideline: string | null = null,
   /** Guideline of `classify`, when a classifier is usable; see classify-tool.ts. */
   classifyGuideline: string | null = null,
+  /** Guidelines of `codemode` and of the deferred tools; see codemode.ts. */
+  tooling: { codemode?: string | null; deferredTools?: string | null } = {},
 ): string {
   const thinkingLanguageName = languageName(thinkingLanguage);
   return [
@@ -47,6 +49,7 @@ export function buildSystemPrompt(
           "- Use the workspace for arithmetic, statistics, fitting and data wrangling rather than computing in your head: write the data to a file, run a short Python script with `bash`, and print only what you need.",
         ]
       : []),
+    ...(tooling.codemode ? [tooling.codemode] : []),
     "- When you need the user to choose between concrete options (which qubit, which task, whether to proceed), call `ask_user` with 2-4 short options instead of asking in prose. The turn ends there and their pick arrives as the next message.",
     "- Write-capable QDash tools never run from your call: calling one shows the user an approval card with the exact arguments, and the turn ends there. Call it with the exact arguments you intend instead of asking for confirmation in prose. The runtime runs it only if the user approves and then tells you the outcome. If they decline, do not call it again unless they ask.",
     `- Reason internally in ${thinkingLanguageName}. ${responseInstruction(responseLanguage)}`,
@@ -57,6 +60,7 @@ export function buildSystemPrompt(
           toolGuide,
         ]
       : []),
+    ...(tooling.deferredTools ? ["", tooling.deferredTools] : []),
     ...(localToolGuide
       ? [
           "",

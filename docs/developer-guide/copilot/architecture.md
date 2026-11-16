@@ -34,6 +34,11 @@ only in what they open with:
 | `src/qdash/copilot/runtime.py` | Data loading: `build_task_context()`, `build_images_sent_metadata()`, qubit/task/history queries |
 | `src/qdash/api/services/pi_chat_service.py` | Runtime bridge: request payloads, the task chat's opening message and figures, NDJSON to SSE translation, `thread_reply` / `complete_once` for forum reply turns |
 | `src/qdash/copilot/` | Shared Copilot runtime used outside the API process |
+| `agent-runtime/src/codemode.ts` | `codemode` scripts, `tool_search`, and the hooks that keep scripts to audited read-only tools and internal tools to their callers ([Code Mode and deferred tools](#code-mode-and-deferred-tools)) |
+| `agent-runtime/src/branch.ts` | Branching a chat at an answer: the Pi fork, its checks, and the `qdash.branches` receipts ([Branches](./chat-streaming.md#branches)) |
+| `src/qdash/api/services/copilot_chat_session_service.py` | Chat sessions, the store each one uses, branch creation, and store cleanup with the last session |
+| `agent-runtime/src/chat-registry.ts` | Per-session chat registry: QDash tools, copilot tools, preferences, page context, workspace tools, and Code Mode |
+| `agent-runtime/src/allowed-tools.ts` | Which pi-qdash tools the chat offers, which need approval, which scripts may call, and which are deferred |
 | `agent-runtime/src/exec-env.ts` | The workspace: one `agent-exec` connection per conversation behind `bash`, `read`, `write`, `edit` |
 | `src/qdash/copilot/contracts/models.py` | Pydantic models: `TaskContext`, `TaskContextBundle`, `ChatRequest` (with `task`); request schemas |
 | `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter |
@@ -73,8 +78,10 @@ The pinned pi-qdash version accepts a configuration file rather than an injected
 
 ## Durable conversations
 
-`agent-runtime/src/runtime.ts` opens one Pi SQLite store per user and session in the
-`agent-runtime-state` volume. Pi 1.4 upgrades existing stores to schema version 2 on first open;
+`agent-runtime/src/runtime.ts` opens one Pi SQLite store per user and store session in the
+`agent-runtime-state` volume. A chat that was never branched is the root conversation of its own
+store; a branch is another conversation in the store of the chat it was branched from (see
+[Branches](./chat-streaming.md#branches)). Pi 1.4 upgrades existing stores to schema version 2 on first open;
 Pi 1.3 cannot reopen an upgraded store. Pi 1.5 keeps that schema but stores the `pi.live`,
 `pi.tool`, and `pi.generation` documents at new versions when a conversation is next written; Pi 1.4
 cannot read such a conversation and leaves its tasks blocked. Back up the stopped volume before
@@ -92,6 +99,87 @@ Pi reports storage failures, faulted or interrupted tasks, migrations, and exten
 `onReport`. `agent-runtime/src/durable-report.ts` logs the report kind as `type`, the task and
 extension names, the reason and restart count, and the error type under the hashed session filename. It omits error messages, prompts, tool
 arguments, and user identifiers from these logs.
+
+## Code Mode and deferred tools
+
+The chat agent has two Pi tools besides the QDash tools: `codemode` runs a model-written
+JavaScript script, and `tool_search` loads deferred tools. Both come from
+`@earendil-works/pi-durable`; `agent-runtime/src/codemode.ts` defines them and the tool policy,
+and `buildChatRegistry` in `agent-runtime/src/chat-registry.ts` installs them for every chat.
+They have no configuration.
+
+A `codemode` script calls tools as `await tools.qdash_list_chips({})` in a QuickJS sandbox
+(`@earendil-works/pi-codemode`) and prints what it needs with `text(...)`. Only the printed output
+reaches the model, so one script can fetch a chip's qubits, filter them, and return a short table.
+Each call a script makes is a nested durable tool call: Pi journals its result, and a script
+interrupted by a restart reruns from its start with the journaled results, without repeating
+finished calls. The rerun ends the call with an error instead when the script's deadline passed
+meanwhile, or when the sandbox's fingerprint (QuickJS and prelude versions, heap limit) or the
+code mode version changed, as a Pi upgrade or a new `CODEMODE_MEMORY_LIMIT_BYTES` can do.
+
+Scripts hold no credentials and reach QDash only through tools, which run in the runtime with the
+requesting user's connection. A script may call only the bundled pi-qdash reads in
+`NESTED_READ_TOOL_NAMES`: QDash API reads without images, local files, or long waits. Three
+mechanisms enforce the list:
+
+- Each tool's `callers` field. `buildQDashExtension` gives listed reads `["model", "tools"]`; all
+  other tools, including writes, trusted extension tools, workspace tools, and the chat's own
+  tools, get `["model"]`.
+- The `codemode` tool gives a script, and the prompt section that describes script tools lists,
+  only the listed reads. Any other tool is absent from a script's `tools` and `searchTools()`.
+- A `beforeTool` hook in `toolPolicyExtension` blocks a nested call to a tool outside the list,
+  including a tool that was never given `callers`.
+
+The hook allows one other kind of nested call: an internal tool called by the tool that owns it.
+`present_results` calls its classifier, `qdash.presentation.classify` (`callers: ["tools"]`), as
+a nested call. `PRESENTATION_INTERNAL_CALLS` names `present_results` as the classifier's only
+caller. The policy wraps `present_results` to note its task while it executes, and allows a
+classifier call only when its parent is that task. A script's parent is the `codemode` call, so a
+script cannot reach the classifier even with Code Mode unfiltered. The note lives in the runtime
+process; a nested call whose parent it cannot match is blocked, and `present_results` then falls
+back to `render_ui` or text.
+
+Write tools therefore still run only after the user approves the model's own call on the
+approval card, never from a script. In a script, a listed read resolves to its redacted response
+data (`details.data` of the pi-qdash result) as JSON rather than its truncated text answer. A failed call rejects with
+the tool's error text. Pi journals nested results until the script ends and does not bound
+structured output, so the policy hook drops a nested result's `details` and fails a call whose
+data exceeds 512 KiB of JSON (`MAX_NESTED_DATA_BYTES`), with a message that asks for a narrower
+request.
+
+A script runs in its own worker thread with a 128 MiB QuickJS heap. The runtime admits at most
+eight script workers at once; these bound each VM, not the memory of the runtime process. A
+script without `timeout_ms` gets a deadline of 120 seconds, and longer deadlines are cut to 300
+seconds. A `timeout_ms` that Code Mode rejects, such as a string or `0`, is passed through
+unchanged, and the script fails with Code Mode's error. On Bun, a cancelled or timed-out worker can keep computing inside a long built-in call
+until that call returns. Scripts cannot start model calls (`models: false`). Each open session
+has its own sandbox, which `openSession` closes after the harness.
+
+Pi offers a tool with `deferred: true` to the model only after it is loaded. The pi-qdash tools in
+`DEFERRED_TOOL_NAMES` (cryostat and wiring context, forum, pipelines, agent workflow state, source
+code, and similar narrower workflows) are deferred. The tool guide in the system prompt marks
+them with `*`, and the prompt lists the deferred tools the guide does not name. The
+model loads one with `tool_search`, which records it in the conversation's `modelTools`. The tool
+stays offered on that conversation branch, also after compaction or a runtime restart. A model
+that calls a deferred tool by name without loading it gets an error result; an `afterTool` hook in
+`toolPolicyExtension` loads the tool for the next request and asks the model to call it again.
+Scripts may call deferred read tools without loading them.
+
+Pi records the changed tool set in the transcript. pi-ai sends it as a mid-conversation tool
+addition only to providers whose compatibility settings declare mid-conversation system messages
+and tool additions (`supportsMidConvoToolAdditions`, off by default for OpenAI-compatible
+endpoints); for other providers it sends the full current tool list with each request. Loading a tool changes the request's tool list, so the prompt cache before the
+change is lost once.
+
+A finished `codemode` call's `tool_end` event carries the script output followed by one line per
+tool call (status, tool, duration, error). The chat shows the step as **Ran a script** with the
+script and that output, so failed nested calls are visible. Nested calls are not streamed while
+the script runs. The runtime log records blocked and failed nested calls. Tests: `agent-runtime/test/codemode.test.mjs`
+runs a Harness with a faux model through scripts, approval exclusion, the data limit, and
+deferred loading, including recovery of a direct call and persistence across a reopened store.
+`agent-runtime/test/chat-registry.test.mjs` runs the production `buildChatRegistry` assembly:
+`present_results` reaches its classifier, scripts reach only the listed reads, the policy hook
+blocks the classifier for any other parent, and a script past the worker limit is refused.
 
 ## Page context and editor edits
 
@@ -233,6 +321,8 @@ as a whole. Additional checkouts are trusted by path, with these limits:
   `annotations.readOnlyHint` is `true`.
 - A trusted checkout that reuses a bundled tool's name replaces it, with a
   replacement message in the startup log.
+- Checkout tools are callable only by the model, never from a `codemode` script,
+  including a replacement of a tool in `NESTED_READ_TOOL_NAMES`.
 
 Checkout tools receive `modelRegistry` and the same context as pi-qdash tools. Their
 `promptSnippet` and `promptGuidelines` appear under "Additional tools" in the system prompt.

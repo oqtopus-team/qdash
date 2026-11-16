@@ -26,6 +26,71 @@ analysis.
 The assistant can inspect chips, metrics, task results, forum threads, workflows, and provenance.
 Confirm the active project and chip, then check important conclusions against the cited records.
 
+### Add to an Answer in Progress, or Continue One
+
+You can type while an answer is still being written. Press Enter or the arrow button beside
+**Stop**: the message goes to the answer in progress, which reads it after its current step,
+such as a tool that is still waiting on a calibration, instead of starting a new answer. It shows
+under the answer as **Read after the current step**, then moves into the conversation where the
+assistant read it. Figures cannot go with such a message; send them as a new message. A message
+that arrives after the assistant wrote its last step is answered next, after the current answer.
+
+When you stop an answer, or the connection drops, before the chat sees whether the answer read a
+message, the message shows **Checking whether the answer read it…** until QDash finds out. If the
+assistant read it, the message moves into the conversation right after the answer it interrupted,
+with the note **Sent while the answer above was written; it read this during or after that
+answer**, and stays there after a reload. If QDash cannot find out, the message shows **Not
+confirmed whether the answer read it** with **Check again**; it is not offered for sending again, because the assistant may have read it. Such a message stays shown after you reload the page in the same browser tab, and QDash checks it again.
+
+If the assistant service stopped unexpectedly while a message waited to be read, the assistant reads it when
+you next send a message in that chat, and answers it before your new message. The message then
+moves into the conversation before your new message, with the same note.
+
+An answer that the stopped service was still writing is not lost: sending a new message in that
+chat resumes it, finishes it first, and then answers your message. **Continue** is refused for
+such an answer because it is still the chat's current answer; send a new message instead.
+
+A message the answer never read stays below the conversation with the reason: the answer had
+already finished, was stopped, or ended with an error. **Send as new message** sends it on its
+own, and **Dismiss** removes it.
+
+When an answer was stopped or ended with an error, **Continue** lets the assistant go on from
+where it ended without your message being sent again. **Retry** or **Regenerate** instead sends
+your last message again. Continue is not offered after a complete answer, while a message you
+sent during the answer is still being checked, and it is refused while a question, an approval
+card, or a proposed edit waits for you; answer those instead.
+
+### Branch from an Answer
+
+Use **Branch from here** under a completed answer to try a different direction without changing
+the original chat. QDash opens a new chat with the conversation up to that answer; the assistant
+remembers exactly what it knew at that answer, including tools it had loaded and values its
+scripts had kept. The new chat appears in the session list with a branch icon.
+
+The button explains two things before you use it, and the branched chat repeats them at the top:
+
+- The branch shares the original chat's workspace files as they are now, not as they were at
+  that answer. A file changed in either chat is changed in both.
+- The original chat and its branches answer one at a time. While one of them answers, a message
+  sent in another, or a new branch, is refused with a note that another branch is answering; try
+  again when it has finished.
+
+**Branch from here** is offered only for an answer that finished normally while nothing is
+answering in the chat. It is not offered for a stopped or failed answer, an answer that ends with
+a question, an approval card, or a proposed edit, or answers saved before QDash added branching.
+The branch keeps the model you choose in the chat, not the model used for the original answer.
+
+After **Retry**, **Regenerate**, or editing a message, the chat shows only the new exchange, but
+the assistant still remembers the replaced one. A branch from a later answer remembers it too.
+
+Deleting the original chat keeps its branches working. QDash removes the shared workspace and
+the saved conversation only when you delete the last chat that uses them. Deleting a chat stops
+its answer if one is running; other branches keep answering. If the assistant service cannot
+remove them right away, QDash retries the next time it loads your chat list.
+
+If a branch fails because the assistant service could not be reached, select **Branch from
+here** again: QDash finishes the same branch rather than making a second one.
+
 ### Ask AI Beside Any Page
 
 **Ask AI** opens a sidebar with the current page as context. Drag its left edge to resize it, or

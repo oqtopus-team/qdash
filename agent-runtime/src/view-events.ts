@@ -35,6 +35,7 @@ import type {
   LiveState,
 } from "@earendil-works/pi-durable";
 
+import { steerRequestId } from "./chat-control.ts";
 import type { SessionEventLike } from "./events.ts";
 
 type Block = { type?: unknown; [key: string]: unknown };
@@ -61,6 +62,15 @@ function newestEntryId(view: ViewRevision): number {
   const last = view.entries.at(-1);
   if (last) return Number(last.id);
   return view.before === undefined ? 0 : Number(view.before);
+}
+
+/** The concatenated text blocks of a message; a plain-string content as is. */
+function textOf(message: unknown): string {
+  const content = (message as { content?: unknown } | undefined)?.content;
+  if (typeof content === "string") return content;
+  return blocksOf(message)
+    .map((block) => (block.type === "text" && typeof block.text === "string" ? block.text : ""))
+    .join("");
 }
 
 function blocksOf(message: unknown): Block[] {
@@ -102,6 +112,8 @@ export class ViewEventTranslator {
   readonly #callArgs = new Map<string, unknown>();
   /** Calls of the current run's tool rounds that have not ended, with their tool names. */
   readonly #open = new Map<string, string>();
+  /** Text of the answer the newest entry ended a run with; empty after a tool round. */
+  #lastAnswer = "";
 
   /** Start from the watch's first value: everything in it is history. */
   constructor(initial: ViewRevision) {
@@ -179,6 +191,19 @@ export class ViewEventTranslator {
   }
 
   #entryEvents(entry: EntryRecord): SessionEventLike[] {
+    const steer = steerRequestId(entry);
+    if (steer !== undefined) {
+      // Where the user's steer landed: after a tool round, or after an answer it then follows up.
+      const event: SessionEventLike = {
+        type: "steer_placed",
+        requestId: steer,
+        entryId: String(entry.id),
+        text: textOf(entry.model?.[0]),
+        answer: this.#lastAnswer,
+      };
+      this.#lastAnswer = "";
+      return [event];
+    }
     const message = entry.model?.[0] as
       | { role?: unknown; toolCallId?: unknown; toolName?: unknown; isError?: unknown }
       | undefined;
@@ -198,6 +223,7 @@ export class ViewEventTranslator {
       if (!streamingThis) this.#streamed = new Map();
       // An attempt that failed or was aborted keeps what it showed; its retry streams anew.
       const stop = (message as { stopReason?: unknown }).stopReason;
+      this.#lastAnswer = stop === "toolUse" || stop === "error" || stop === "aborted" ? "" : textOf(message);
       const changes = stop === "error" || stop === "aborted" ? [] : this.#diffMessage(message);
       if (streamingThis) this.#consumed.add(key);
       this.#streamed = new Map();
@@ -206,6 +232,7 @@ export class ViewEventTranslator {
     }
     if (message?.role === "toolResult" && typeof message.toolCallId === "string") {
       const id = message.toolCallId;
+      this.#lastAnswer = "";
       if (this.#ended.has(id)) return [];
       const name = typeof message.toolName === "string" ? message.toolName : "unknown";
       const out: SessionEventLike[] = [];
@@ -318,6 +345,7 @@ export class ViewEventStream {
   readonly #conversation: WatchedConversation;
   readonly #emit: (event: SessionEventLike) => void;
   readonly #context: Context;
+  readonly #steerBeforeTurn: ((entryId: number) => Promise<boolean>) | undefined;
   #queue: Promise<void> = Promise.resolve();
   #closed = false;
 
@@ -326,11 +354,17 @@ export class ViewEventStream {
     initial: ViewRevision,
     emit: (event: SessionEventLike) => void,
     context: Context,
+    /**
+     * Whether a steer placed as `entryId` landed before the turn's own message. Asked for each placed steer, in
+     * stream order; its answer is reported as `beforeTurn`.
+     */
+    steerBeforeTurn?: (entryId: number) => Promise<boolean>,
   ) {
     this.#conversation = conversation;
     this.#translator = new ViewEventTranslator(initial);
     this.#emit = emit;
     this.#context = context;
+    this.#steerBeforeTurn = steerBeforeTurn;
   }
 
   /**
@@ -386,6 +420,11 @@ export class ViewEventStream {
         cursor = page.next;
       } while (cursor !== undefined);
     }
-    for (const event of this.#translator.advance(view, missing)) this.#emit(event);
+    for (const event of this.#translator.advance(view, missing)) {
+      if (event.type === "steer_placed" && this.#steerBeforeTurn && event.entryId !== undefined) {
+        if (await this.#steerBeforeTurn(Number(event.entryId))) event.beforeTurn = true;
+      }
+      this.#emit(event);
+    }
   }
 }

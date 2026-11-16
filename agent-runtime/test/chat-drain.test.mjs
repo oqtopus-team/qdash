@@ -40,7 +40,7 @@ for (const failure of ["watch", "entries"]) {
         BACKGROUND_CONTEXT,
         SharedRuntime: { create: async () => ({
           listToolNames: () => [],
-          openSession: async () => ({ conversation, close: async () => { closed = true; } }),
+          openSession: async () => ({ conversation, harness: { resume: () => {} }, close: async () => { closed = true; } }),
         }) },
         answerText: async () => "Answer",
         pendingApproval: async () => undefined,

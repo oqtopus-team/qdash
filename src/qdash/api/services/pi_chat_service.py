@@ -20,6 +20,16 @@ from typing import TYPE_CHECKING, Any, Protocol
 import httpx
 
 from qdash.api.lib.sse import sse_event
+from qdash.api.services.copilot_chat_session_service import (
+    BranchRefusedError,
+    ForkedBranch,
+    ForkSettledError,
+    RuntimeTarget,
+    store_in_use,
+)
+from qdash.api.services.copilot_chat_session_service import (
+    runtime_target as _stored_runtime_target,
+)
 from qdash.copilot.prompts.models import TaskChatPromptOptions
 from qdash.copilot.prompts.task_chat import build_language_instruction, build_task_chat_prompt
 from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
@@ -42,6 +52,8 @@ MAX_UI_BLOCK_CHARS = 200_000
 # every few seconds (translated to SSE comments below), so a dead runtime still
 # surfaces as a closed stream rather than a hang.
 REQUEST_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0)
+# A fork call; the pending branch's lease (BRANCH_LEASE) outlasts it.
+FORK_TIMEOUT = 60.0
 
 # Maps QDash's reasoning_effort vocabulary onto Pi thinking levels.
 _THINKING_LEVELS = {
@@ -53,12 +65,19 @@ _THINKING_LEVELS = {
 }
 
 
+# Runtime tools whose derived label would not say what they do.
+_TOOL_LABELS = {"codemode": "Code mode script", "tool_search": "Search tools"}
+
+
 def tool_label(name: str) -> str:
     """Render a tool name for display.
 
     Derived rather than looked up: pi-qdash ships 30+ tools and the set changes
-    with the package, so a hand-maintained label table would rot.
+    with the package, so a hand-maintained label table would rot. Only the
+    agent runtime's own tools named in ``_TOOL_LABELS`` are looked up.
     """
+    if name in _TOOL_LABELS:
+        return _TOOL_LABELS[name]
     return name.removeprefix("qdash_").replace("_", " ").capitalize() or name
 
 
@@ -80,6 +99,9 @@ def _ensure_agent_session(username: str, session_id: str) -> None:
     """Create a minimal analysis session when only a browser-cached session exists."""
     if _find_session(username, session_id) is not None:
         return
+    if store_in_use(username, session_id):
+        # A deleted chat whose branches still use its store; it is not recreated.
+        return
     from pymongo.errors import DuplicateKeyError
 
     try:
@@ -98,11 +120,28 @@ async def ensure_agent_session(username: str, session_id: str) -> None:
     await asyncio.to_thread(_ensure_agent_session, username, session_id)
 
 
-async def abort_runtime_turn(username: str, session_id: str) -> bool:
+async def runtime_target(username: str, session_id: str) -> RuntimeTarget:
+    """Where the runtime keeps the user's chat, resolved from its stored session only.
+
+    Raises ``ChatUnavailableError`` for a branch still being created, or a
+    deleted chat whose store its branches still use.
+    """
+    return await _stored_runtime_target(username, session_id)
+
+
+def _target_payload(session_id: str, target: RuntimeTarget | None) -> dict[str, str]:
+    """The runtime fields naming where a chat lives; a chat never branched is its own store's root."""
+    return (target or RuntimeTarget(session_id)).payload()
+
+
+async def abort_runtime_turn(
+    username: str, session_id: str, target: RuntimeTarget | None = None
+) -> bool:
     """Stop the turn the runtime is running for this session, if any.
 
     Closing the SSE stream alone does not cancel durable work in the runtime,
-    so the chat's Stop button calls this. Returns False when nothing was
+    so the chat's Stop button calls this. It stops only this chat's turn, never
+    one of another branch of the same store. Returns False when nothing was
     running or the runtime could not be reached.
     """
     try:
@@ -110,7 +149,11 @@ async def abort_runtime_turn(username: str, session_id: str) -> bool:
             response = await client.post(
                 f"{RUNTIME_URL}/chat/abort",
                 headers=_runtime_headers(),
-                json={"owner_id": username, "conversation_id": session_id},
+                json={
+                    "owner_id": username,
+                    "conversation_id": session_id,
+                    **_target_payload(session_id, target),
+                },
             )
     except (httpx.HTTPError, RuntimeError):
         logger.warning("Could not abort Pi turn for session %s", session_id, exc_info=True)
@@ -118,8 +161,163 @@ async def abort_runtime_turn(username: str, session_id: str) -> bool:
     return response.status_code == httpx.codes.OK
 
 
-async def delete_runtime_session_state(username: str, session_id: str) -> None:
-    """Best-effort cleanup of Pi state after its QDash session is deleted."""
+class SteerRefusedError(Exception):
+    """The runtime refused a steer for a reason the user cannot fix by resending it."""
+
+    def __init__(self, status_code: int, detail: str) -> None:
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
+_STEER_STATUSES = ("queued", "applied", "withdrawn", "rejected", "not_found")
+
+
+async def steer_runtime_turn(
+    username: str,
+    session_id: str,
+    *,
+    request_id: str,
+    message: str,
+    auth: QDashAuth,
+    target: RuntimeTarget | None = None,
+) -> dict[str, Any]:
+    """Send a message to the turn running for this session, read before its next step.
+
+    The runtime submits it to the harness the running turn already has open, so
+    the turn keeps its own credentials; ``auth`` only proves the caller and must
+    name the same project. Returns the steer's status (``queued``, ``applied``,
+    ``withdrawn``, or ``rejected`` when nothing was running and the runtime's store
+    has never seen this request ID).
+    """
+    return await _post_steer(
+        "/chat/steer",
+        {
+            "owner_id": username,
+            "conversation_id": session_id,
+            "request_id": request_id,
+            "message": message,
+            **_target_payload(session_id, target),
+        },
+        auth,
+    )
+
+
+async def steer_runtime_status(
+    username: str,
+    session_id: str,
+    *,
+    request_id: str,
+    auth: QDashAuth,
+    target: RuntimeTarget | None = None,
+) -> dict[str, Any]:
+    """Where a steer stands, read from the runtime's store without sending it.
+
+    Never admits the steer or starts a run. ``not_found`` means it was never
+    admitted, and the runtime will not admit a request with that ID later.
+    """
+    return await _post_steer(
+        "/chat/steer/status",
+        {
+            "owner_id": username,
+            "conversation_id": session_id,
+            "request_id": request_id,
+            **_target_payload(session_id, target),
+        },
+        auth,
+    )
+
+
+async def _post_steer(path: str, payload: dict[str, Any], auth: QDashAuth) -> dict[str, Any]:
+    async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
+        response = await client.post(
+            f"{RUNTIME_URL}{path}",
+            headers={**_runtime_headers(), **auth.headers()},
+            json=payload,
+        )
+    try:
+        body = response.json()
+    except ValueError:
+        body = {}
+    if response.status_code in (httpx.codes.OK, httpx.codes.CONFLICT) and isinstance(body, dict):
+        status = body.get("status")
+        if status in _STEER_STATUSES:
+            return {
+                "status": status,
+                "reason": body.get("reason") if isinstance(body.get("reason"), str) else None,
+                "entry_id": body.get("entry_id") if isinstance(body.get("entry_id"), str) else None,
+            }
+    if response.status_code == httpx.codes.FORBIDDEN:
+        raise SteerRefusedError(403, "The message belongs to another project")
+    detail = body.get("error") if isinstance(body, dict) else None
+    raise SteerRefusedError(
+        502, str(detail or f"Agent runtime returned HTTP {response.status_code}")
+    )
+
+
+async def fork_runtime_branch(
+    username: str,
+    store_session_id: str,
+    source_conversation_id: str | None,
+    entry_id: str,
+    target_session_id: str,
+    *,
+    auth: QDashAuth,
+) -> ForkedBranch:
+    """Fork the chat's conversation at one answer, in its runtime store.
+
+    Idempotent by ``target_session_id``. Raises ``BranchRefusedError`` when the
+    runtime refused the fork (it then created nothing), ``ForkSettledError``
+    when the runtime failed it or was never reached, and another
+    ``httpx.HTTPError`` when the request may still run there (a timeout).
+    """
+    try:
+        async with httpx.AsyncClient(timeout=FORK_TIMEOUT, trust_env=False) as client:
+            response = await client.post(
+                f"{RUNTIME_URL}/chat/branch",
+                headers={**_runtime_headers(), **auth.headers()},
+                json={
+                    "owner_id": username,
+                    "store_session_id": store_session_id,
+                    **(
+                        {"source_conversation_id": source_conversation_id}
+                        if source_conversation_id is not None
+                        else {}
+                    ),
+                    "entry_id": entry_id,
+                    "target_session_id": target_session_id,
+                },
+            )
+    except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+        raise ForkSettledError("The agent runtime was not reached") from exc
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    if response.status_code == httpx.codes.OK and isinstance(body, dict):
+        conversation_id = body.get("conversation_id")
+        if isinstance(conversation_id, str) and conversation_id:
+            return ForkedBranch(conversation_id, body.get("created") is True)
+    if response.status_code in (400, 404, 409):
+        detail = body.get("error") if isinstance(body, dict) else None
+        reason = body.get("reason") if isinstance(body, dict) else None
+        raise BranchRefusedError(
+            response.status_code,
+            str(detail or "The answer cannot be branched from"),
+            reason if isinstance(reason, str) else None,
+        )
+    msg = f"Agent runtime returned HTTP {response.status_code}"
+    raise ForkSettledError(msg)
+
+
+async def delete_runtime_session_state(username: str, session_id: str) -> bool:
+    """Remove a Pi store and workspace no QDash session uses any more; True once removed.
+
+    ``session_id`` names the store: the chat's own ID, or for branches the
+    store they share, removed with the last session that uses it. The runtime
+    refuses while a turn, a fork, or another removal holds the store; that and
+    any other failure is logged and answers False.
+    """
     try:
         async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
             response = await client.request(
@@ -136,6 +334,33 @@ async def delete_runtime_session_state(username: str, session_id: str) -> None:
             username,
             exc_info=True,
         )
+        return False
+    return True
+
+
+async def remove_runtime_store(
+    username: str,
+    store_session_id: str,
+    deleted_chats: list[tuple[str, RuntimeTarget]],
+    *,
+    attempts: int = 3,
+    retry_delay: float = 0.5,
+) -> bool:
+    """Remove a store after its last session was deleted; True once the runtime confirmed it.
+
+    When the runtime refuses because a turn still holds the store, the turns
+    of ``deleted_chats`` (the deleted chats of that store, each by its exact
+    target) are stopped and the removal is tried again, up to ``attempts``
+    times. A chat that is not deleted is never stopped.
+    """
+    for attempt in range(attempts):
+        if await delete_runtime_session_state(username, store_session_id):
+            return True
+        for session_id, target in deleted_chats:
+            await abort_runtime_turn(username, session_id, target)
+        if attempt + 1 < attempts:
+            await asyncio.sleep(retry_delay * (attempt + 1))
+    return False
 
 
 class EvaluationRecorder(Protocol):
@@ -204,6 +429,7 @@ def _request_payload(
     request: ChatRequest,
     config: CopilotConfig,
     username: str,
+    target: RuntimeTarget | None = None,
 ) -> dict[str, Any]:
     instructions = user_instructions(username)
     return {
@@ -214,6 +440,8 @@ def _request_payload(
         **({"page_context": request.page.model_dump()} if request.page else {}),
         "owner_id": username,
         "conversation_id": request.session_id,
+        # Where the chat lives in the runtime, resolved from its stored session.
+        **_target_payload(request.session_id or "", target),
         "request_id": request.request_id,
         "message": request.message,
         "model": {"provider": config.model.provider, "name": config.model.name},
@@ -231,6 +459,8 @@ def _request_payload(
             else {}
         ),
         **approval_payload(request.approval),
+        # Continue the run that ended without an answer; the message is not sent.
+        **({"continue": True} if request.continue_run else {}),
     }
 
 
@@ -314,6 +544,7 @@ async def stream(
     images_sent: dict[str, Any] | None = None,
     recorder: EvaluationRecorder | None = None,
     opening_message: str | None = None,
+    target: RuntimeTarget | None = None,
 ) -> AsyncGenerator[str, None]:
     """Proxy one chat turn through the Pi Agent Runtime as SSE events.
 
@@ -331,7 +562,7 @@ async def stream(
         )
         return
 
-    payload = _request_payload(request, config, username)
+    payload = _request_payload(request, config, username, target)
     extra_result: dict[str, Any] | None = None
     if opening_message is not None:
         try:
@@ -421,6 +652,13 @@ async def stream_payload(
 def _status_detail(response: httpx.Response) -> str:
     """Explain a non-200 from the runtime."""
     if response.status_code == httpx.codes.CONFLICT:
+        # A refused continue says why (nothing to continue, waiting for the user).
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict) and body.get("reason") and isinstance(body.get("error"), str):
+            return str(body["error"])
         return "Another request is already running for this conversation"
     if response.status_code == httpx.codes.BAD_REQUEST:
         # The runtime rejects models missing from chat.yaml / evaluation.yaml.
@@ -495,7 +733,9 @@ async def translate(
                 interactions.append(
                     {"type": "edit", "content": None, "chart": None, "edit": event["edit"]}
                 )
-            elif kind in ("text_delta", "thinking_delta") and not isinstance(event["delta"], str):
+            elif (
+                kind in ("text_delta", "thinking_delta") and not isinstance(event["delta"], str)
+            ) or (kind == "steer" and not isinstance(event["request_id"], str)):
                 raise TypeError(kind)
         except (ValueError, KeyError, TypeError):
             logger.warning("Malformed NDJSON line from agent runtime")
@@ -588,6 +828,39 @@ async def translate(
                 yield sse_event("ui", ui)
         elif kind in ("chart", "ask", "approval", "edit"):
             pass
+        elif kind == "steer" and event.get("status") == "applied":
+            # The user's message landed here in the transcript. What streamed before it
+            # is the answer so far: its charts, UIs and, when the steer came after the
+            # run's last tool round, the answer it follows up.
+            segment = build_blocks_result(str(event.get("answer") or ""), visuals, interactions)
+            visuals = []
+            interactions = []
+            applied: dict[str, Any] = {
+                "request_id": event["request_id"],
+                "status": "applied",
+                "entry_id": event.get("entry_id"),
+                "text": str(event.get("text") or ""),
+                "result": segment,
+            }
+            # A run recovered after the runtime died placed it before this turn's
+            # message: it belongs to an earlier turn.
+            if event.get("before_turn") is True:
+                applied["before_turn"] = True
+            yield sse_event("steer", applied)
+        elif kind == "steer":
+            # Settled without being placed: the run failed or was stopped first.
+            yield sse_event(
+                "steer",
+                {
+                    "request_id": event["request_id"],
+                    "status": "withdrawn",
+                    "reason": str(event.get("reason") or ""),
+                },
+            )
+        elif kind == "noop":
+            # A continue found the last answer complete: nothing was asked or added.
+            yield sse_event("noop", {"reason": str(event.get("reason") or "nothing_to_answer")})
+            return
         elif kind == "error":
             yield sse_event(
                 "error",
@@ -607,6 +880,10 @@ async def translate(
                     {"step": step, "detail": "The model returned an empty response"},
                 )
                 return
+            # The answer's durable entry, so a later request can name it.
+            entry_id = event.get("entry_id")
+            if isinstance(entry_id, str) and entry_id:
+                result["entry_id"] = entry_id
             yield sse_event("status", {"step": "complete", "message": "Done"})
             yield sse_event("result", {**result, **(extra_result or {})})
             return

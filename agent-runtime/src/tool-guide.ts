@@ -9,18 +9,33 @@
  *
  * Only tools the runtime actually exposes are kept: the allowlist and the
  * write-tools switch drop some pi-qdash tools, and a guide that names a tool
- * the model cannot call just invites a failed call.
+ * the model cannot call just invites a failed call. Deferred tools, which the
+ * model loads with `tool_search` before calling, are marked `*` so the model
+ * searches first instead of failing one call per tool.
  */
 
 export const TOOL_GUIDE_SKILL = "qdash";
 const SECTION_HEADING = /^## preferred tools\s*$/i;
 const TOOL_REF = /`(qdash_[a-z0-9_]+)`/g;
 
-/** The "Preferred tools" section of the skill, limited to `enabledTools`, or null. */
+/** Marker after a deferred tool's name in the guide. */
+export const DEFERRED_MARK = "*";
+
+/** The tool names a guide mentions. */
+export function toolGuideNames(guide: string | null): Set<string> {
+  return new Set(guide ? [...guide.matchAll(TOOL_REF)].map((m) => m[1]) : []);
+}
+
+/**
+ * The "Preferred tools" section of the skill, limited to `enabledTools`, with
+ * `deferredTools` marked, or null.
+ */
 export function extractToolGuide(
   skillMarkdown: string,
   enabledTools: Iterable<string>,
+  deferredTools: Iterable<string> = [],
 ): string | null {
+  const deferred = new Set(deferredTools);
   const enabled = new Set(enabledTools);
   const lines = skillMarkdown.split("\n");
   const start = lines.findIndex((line) => SECTION_HEADING.test(line));
@@ -54,7 +69,10 @@ export function extractToolGuide(
     kept.push(text.replace(/,\s*$/, "").replace(/,\s*,/g, ","));
   }
 
-  const body = dropEmptyParents(kept).join("\n").trim();
+  const body = dropEmptyParents(kept)
+    .join("\n")
+    .replace(TOOL_REF, (ref, name: string) => (deferred.has(name) ? `${ref}${DEFERRED_MARK}` : ref))
+    .trim();
   return body ? body : null;
 }
 

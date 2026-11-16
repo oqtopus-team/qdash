@@ -45,6 +45,8 @@ type JsonObject = ClassifierContext["state"];
 export const PRESENT_TOOL = "present_results";
 /** Internal nested tool behind the classification; never offered to the model. */
 export const CLASSIFY_TOOL = "qdash.presentation.classify";
+/** The classifier is an internal tool only present_results may call (see codemode.ts' tool policy). */
+export const PRESENTATION_INTERNAL_CALLS = { [CLASSIFY_TOOL]: [PRESENT_TOOL] } as const;
 /** The nested call's key, fixed so a rerun reattaches to the committed classification. */
 const CLASSIFY_KEY = "classify";
 

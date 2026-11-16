@@ -5,7 +5,13 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
-import { ALLOWED_TOOL_NAMES, ALLOWLISTED_PACKAGES, REVIEWED_WRITE_TOOL_NAMES } from "../src/allowed-tools.ts";
+import {
+  ALLOWED_TOOL_NAMES,
+  ALLOWLISTED_PACKAGES,
+  DEFERRED_TOOL_NAMES,
+  NESTED_READ_TOOL_NAMES,
+  REVIEWED_WRITE_TOOL_NAMES,
+} from "../src/allowed-tools.ts";
 import { buildQDashExtension } from "../src/durable-tools.ts";
 import {
   bundledExtensionCheckouts, bundledSourceVersion, extensionPackage,
@@ -52,6 +58,15 @@ test("bundled packages load tools and skills offline, retaining the pi-qdash all
     const extra = names.find((name) => name.startsWith("qdash_") && !ALLOWED_TOOL_NAMES.includes(name) && !REVIEWED_WRITE_TOOL_NAMES.includes(name));
     assert.ok(extra);
     assert.ok(!toolNames.includes(extra));
+    // Code Mode and deferred loading name real pi-qdash tools; scripts reach only the audited reads.
+    for (const name of [...NESTED_READ_TOOL_NAMES, ...DEFERRED_TOOL_NAMES]) assert.ok(toolNames.includes(name), name);
+    assert.deepEqual(adapted.nestedTools.sort(), [...NESTED_READ_TOOL_NAMES].sort());
+    assert.deepEqual(adapted.deferredTools.sort(), [...DEFERRED_TOOL_NAMES].sort());
+    for (const tool of adapted.extension.tools) {
+      const nested = NESTED_READ_TOOL_NAMES.includes(tool.name);
+      assert.deepEqual(tool.callers, nested ? ["model", "tools"] : ["model"], tool.name);
+      assert.equal(tool.deferred === true, DEFERRED_TOOL_NAMES.includes(tool.name), tool.name);
+    }
     const evaluator = extensions.find(({ tools }) => tools.has("qcal_evaluate"));
     const info = extensionPackage(evaluator.path, paths, paths);
     assert.equal(info.source, "package");

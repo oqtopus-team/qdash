@@ -39,7 +39,27 @@ export type NdjsonEvent =
   | { type: "approval"; approval: unknown }
   /** A change the model proposes to the editor the user has open (propose_code_edit). */
   | { type: "edit"; edit: unknown }
-  | { type: "done"; text: string }
+  /**
+   * A message the user sent while the answer was written, placed in the transcript as `entry_id`. `answer` is the
+   * text of the answer it follows, when it came after the run's last tool round; a new run answers it.
+   * `before_turn`: it landed before this request's own message, in a run recovered from an earlier request (the
+   * runtime died while the steer was queued), so it belongs to an earlier turn, not after this request's message.
+   */
+  | {
+      type: "steer";
+      request_id: string;
+      status: "applied";
+      entry_id: string;
+      text: string;
+      answer: string;
+      before_turn?: true;
+    }
+  /** A steer the harness settled without placing: the run failed or was stopped before its next tool round ended. */
+  | { type: "steer"; request_id: string; status: "withdrawn"; reason: string }
+  /** `entry_id`: the durable entry of the answer. */
+  | { type: "done"; text: string; entry_id?: string }
+  /** A continue found nothing to answer: no request was sent and nothing was added. */
+  | { type: "noop"; reason: "nothing_to_answer" }
   | { type: "error"; message: string }
   /** Keepalive while a turn is quiet (long tool calls); carries no content. */
   | { type: "ping" };
@@ -87,6 +107,13 @@ export type SessionEventLike = {
     block?: unknown;
   }>;
   result?: { details?: unknown; structuredOutput?: unknown };
+  /** `steer_placed`: the steer's request ID, entry, text, and the answer it follows. */
+  requestId?: string;
+  /** `steer_placed`: it landed before the turn's own message (see the `steer` NDJSON event). */
+  beforeTurn?: boolean;
+  entryId?: string;
+  text?: string;
+  answer?: string;
   entry?: {
     model?: ReadonlyArray<{
       role?: string;
@@ -97,8 +124,38 @@ export type SessionEventLike = {
   };
 };
 
-/** Tools whose answer the chat shows under the step: the workspace's. QDash tools answer the model only. */
-const OUTPUT_TOOLS = new Set(["bash", "read", "write", "edit"]);
+/**
+ * Tools whose answer the chat shows under the step: the workspace's, and a
+ * Code Mode script's output with the tool calls it made. QDash tools answer
+ * the model only.
+ */
+const OUTPUT_TOOLS = new Set(["bash", "read", "write", "edit", "codemode"]);
+/** Longest error text of one script tool call in the summary. */
+const MAX_NESTED_ERROR_CHARS = 300;
+
+/**
+ * The tool calls a Code Mode script made, one line each, from its result's
+ * details (`CodemodeToolDetails.calls`): status, tool, duration, and error.
+ */
+export function nestedCallSummary(details: unknown): string | undefined {
+  const calls = (details as { calls?: unknown } | undefined)?.calls;
+  if (!Array.isArray(calls) || calls.length === 0) return undefined;
+  const lines = calls.flatMap((call) => {
+    if (!call || typeof call !== "object") return [];
+    const { name, status, durationMs, error } = call as Record<string, unknown>;
+    if (typeof name !== "string") return [];
+    const state = typeof status === "string" ? status : "unknown";
+    const time = typeof durationMs === "number" ? ` (${Math.round(durationMs)} ms)` : "";
+    const why =
+      typeof error === "string" && error
+        ? `: ${error.replace(/\s+/g, " ").slice(0, MAX_NESTED_ERROR_CHARS)}`
+        : "";
+    return [`${state.padEnd(9)} ${name}${time}${why}`];
+  });
+  if (lines.length === 0) return undefined;
+  const failed = calls.filter((call) => (call as { status?: unknown })?.status === "error").length;
+  return [`Tool calls: ${lines.length}${failed ? `, ${failed} failed` : ""}`, ...lines].join("\n");
+}
 /** Longest output a tool_end line carries; the tail, as the model's own window keeps the tail. */
 export const MAX_TOOL_OUTPUT_CHARS = 4000;
 
@@ -133,6 +190,12 @@ function toolOutput(event: SessionEventLike): { output?: string; exitCode?: numb
     }
   }
   text = text?.trim();
+  if (event.toolName === "codemode") {
+    const details = event.result?.details ?? event.entry?.model?.[0]?.details;
+    const summary = nestedCallSummary(details);
+    // Last, so the tail kept below always shows which calls ran and failed.
+    if (summary) text = text ? `${text}\n\n${summary}` : summary;
+  }
   if (text && text.length > MAX_TOOL_OUTPUT_CHARS) text = `…${text.slice(-MAX_TOOL_OUTPUT_CHARS)}`;
   return { ...(text ? { output: text } : {}), ...(exitCode !== undefined ? { exitCode } : {}) };
 }
@@ -143,6 +206,20 @@ function toolOutput(event: SessionEventLike): { output?: string; exitCode?: numb
  * `done` and `error` are built by the server after `prompt()` settles, not here.
  */
 export function toNdjsonEvents(event: SessionEventLike): NdjsonEvent[] {
+  if (event.type === "steer_placed") {
+    if (typeof event.requestId !== "string" || typeof event.entryId !== "string") return [];
+    return [
+      {
+        type: "steer",
+        request_id: event.requestId,
+        status: "applied",
+        entry_id: event.entryId,
+        text: event.text ?? "",
+        answer: event.answer ?? "",
+        ...(event.beforeTurn ? { before_turn: true as const } : {}),
+      },
+    ];
+  }
   if (event.type === "message_update") {
     // Text and thinking appends drive the live answer in the chat UI. A tool
     // call being written streams too, so the chat can show code as it is

@@ -24,7 +24,10 @@ The runtime additionally controls which tools it exposes, as described in
 [Copilot Architecture](./architecture.md#developing-a-pi-extension-against-the-runtime).
 To expose a new pi-qdash tool in Copilot, add its reviewed name to the appropriate
 read or write list in `agent-runtime/src/allowed-tools.ts` and update the runtime
-allowlist checks in `agent-runtime/test/bundled-extensions.test.mjs`. Standalone pi
+allowlist checks in `agent-runtime/test/bundled-extensions.test.mjs`. Decide also
+whether `codemode` scripts may call a read tool (`NESTED_READ_TOOL_NAMES`) and
+whether the model loads it on demand (`DEFERRED_TOOL_NAMES`); see
+[Code Mode and deferred tools](./architecture.md#code-mode-and-deferred-tools). Standalone pi
 users can load the extension without this runtime list.
 
 Figure tools return PNGs as image content so the model can inspect the curve;
