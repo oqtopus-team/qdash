@@ -1,8 +1,13 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 
 import { parse } from "yaml";
 
 import { compactionBudget, type CompactionBudget } from "./budget.ts";
+import {
+  readCopilotModelYaml,
+  type CopilotModelFiles,
+  type CopilotModelYaml,
+} from "./copilot-profile.ts";
 
 /**
  * Build pi's models.json from QDash's chat.yaml and evaluation.yaml.
@@ -332,28 +337,21 @@ function isQwenModel(name: string): boolean {
   return name.toLowerCase().includes("qwen");
 }
 
-/** Generate models.json next to the agent dir and return its path. */
+/**
+ * Generate models.json next to the agent dir and return its path.
+ *
+ * `files` is the selection of copilot-profile.ts; a named profile's files are
+ * validated, the default files are read as they always were.
+ */
 export function writeModelsConfig(
-  chatConfigPath: string,
-  evaluationConfigPath: string,
+  files: CopilotModelFiles,
   outPath: string,
-): string {
-  const config = buildModelsConfig(
-    readFileSync(chatConfigPath, "utf8"),
-    readFileIfPresent(evaluationConfigPath),
-    process.env,
-  );
+  env: NodeJS.ProcessEnv = process.env,
+): { path: string; yaml: CopilotModelYaml } {
+  const yaml = readCopilotModelYaml(files);
+  const config = buildModelsConfig(yaml.chatYaml, yaml.evaluationYaml, env);
   writeFileSync(outPath, `${JSON.stringify(config, null, 2)}\n`);
-  return outPath;
-}
-
-function readFileIfPresent(path: string): string | undefined {
-  try {
-    return readFileSync(path, "utf8");
-  } catch (error) {
-    console.warn(`[agent-runtime] could not read ${path}, ignoring:`, error);
-    return undefined;
-  }
+  return { path: outPath, yaml };
 }
 
 /**

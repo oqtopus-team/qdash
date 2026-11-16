@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -9,7 +10,14 @@ from typing import Any
 
 import yaml
 
+from qdash.common.config.copilot_profile import (
+    copilot_profile_files,
+    load_copilot_profile_file,
+    selected_copilot_profile,
+)
 from qdash.common.config.paths import CONFIG_DIR
+
+logger = logging.getLogger(__name__)
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -77,14 +85,24 @@ class ConfigLoader:
     @classmethod
     @lru_cache(maxsize=1)
     def load_copilot(cls) -> dict[str, Any]:
-        """Load copilot configuration."""
-        config: dict[str, Any] = {}
-        for filename in (
-            "copilot/config.yaml",
-            "copilot/chat.yaml",
-            "copilot/evaluation.yaml",
-        ):
-            config = _deep_merge(config, cls._load_config(filename))
+        """Load copilot configuration.
+
+        ``config.yaml`` is shared. The chat and evaluation models come from
+        ``chat.yaml`` and ``evaluation.yaml``, or from the profile that
+        ``QDASH_COPILOT_PROFILE`` names (see ``copilot_profile``). The
+        variable is read on every uncached load, so ``clear_cache`` picks up
+        the current selection.
+        """
+        config = cls._load_config("copilot/config.yaml")
+        profile = selected_copilot_profile()
+        if profile is None:
+            for filename in ("copilot/chat.yaml", "copilot/evaluation.yaml"):
+                config = _deep_merge(config, cls._load_config(filename))
+            return config
+        files = copilot_profile_files(cls.get_config_dir() / "copilot", profile)
+        logger.info("Copilot profile %s: %s", profile, files["chat"].parent)
+        for kind, path in files.items():
+            config = _deep_merge(config, load_copilot_profile_file(kind, path))
         return config
 
     @classmethod

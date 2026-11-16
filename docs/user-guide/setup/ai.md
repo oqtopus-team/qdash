@@ -7,6 +7,7 @@ QDash runs calibrations without AI endpoints.
 | --- | --- | --- |
 | [Chat endpoint](#connect-model-endpoints) | **AI Chat**, the **Ask AI** sidebar, and forum AI replies | For chat |
 | [Evaluation endpoint](#connect-model-endpoints) | **AI Evaluations** and **Evaluate** on **Chip** | For evaluations |
+| [Deployment profile](#select-a-deployment-profile) | Chat and evaluation models specific to this deployment | No |
 | [Classifier endpoint](#add-a-classifier) | Fixed result layouts and category judgments in chat | No |
 | [Cloudflare Access service token](#authenticate-ai-endpoints-with-cloudflare-access) | Endpoints behind Cloudflare Access | Only for such endpoints |
 
@@ -23,14 +24,58 @@ internal authentication; no AI Compose profile or UI enable flag is needed.
    | `OPENAI_COMPATIBLE_BASE_URL_CHAT` / `OPENAI_COMPATIBLE_API_KEY_CHAT` | Chat |
    | `OPENAI_COMPATIBLE_BASE_URL_EVALUATION` / `OPENAI_COMPATIBLE_API_KEY_EVALUATION` | Figure evaluation |
 
-2. Select the models in `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml`. The
-   supplied files reference the variables above. Further endpoints, provider names, and
+2. Select the models in `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml`, or
+   [select a deployment profile](#select-a-deployment-profile). The supplied files reference the
+   variables above. Further endpoints, provider names, and
    gateway compatibility keys are described in
    [Copilot Model Configuration](../../developer-guide/copilot/model-configuration.md).
 3. [Apply the changes](#apply-ai-changes).
 
 Copilot write operations require your approval and project permissions. No extra enable setting
 is needed; the retired `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` variable has no effect and can be removed.
+
+## Select a Deployment Profile
+
+A deployment profile gives one deployment its own chat and evaluation models while the default
+files stay unchanged for other deployments. Each profile is a directory under
+`config/copilot/profiles/`. The supplied `oqtopus` profile is a sample that names
+`moonshotai/Kimi-K3` for chat and evaluation; it has not been tested against any serving API.
+
+1. Confirm that the deployment serving the profile's models meets what the profile assumes, and
+   edit the profile where it does not. For `oqtopus`, the serving API must offer OpenAI-compatible
+   Chat Completions for `moonshotai/Kimi-K3` and accept image input for evaluation, and its
+   maximum context length and output limit must cover the profile's `num_ctx` and
+   `max_output_tokens`. QDash checks the profile's settings, not the endpoint.
+2. Set the profile name in `.env`:
+
+   ```dotenv
+   QDASH_COPILOT_PROFILE=oqtopus
+   ```
+
+   Leave the value unset or empty to use `config/copilot/chat.yaml` and
+   `config/copilot/evaluation.yaml`.
+3. Set the endpoint variables of [Connect Model Endpoints](#connect-model-endpoints) for the
+   endpoints the profile serves. The `oqtopus` profile uses the `CHAT` and `EVALUATION` pairs.
+4. Recreate the API and the AI runtime. A restart keeps the environment a container was created
+   with, so it does not apply a changed `.env` value:
+
+   ```bash
+   docker compose up -d --no-deps --force-recreate api agent-runtime
+   ```
+
+   With the host-side development stack, stop and rerun `task dev-api-local`, then recreate the
+   runtime with
+   `docker compose -f compose.yaml -f compose.dev-local.yaml up -d --no-deps --force-recreate agent-runtime`.
+5. Check the runtime log with `docker compose logs agent-runtime`. It reports
+   `copilot models: profile oqtopus` and the two files it read.
+
+QDash does not fall back to the default models when a profile is misconfigured. If the name is
+invalid, the profile directory or one of its files is missing, or a model setting is missing,
+unknown, or has a value of the wrong type or range, the AI runtime stops at startup, Copilot
+requests fail, and the logs of both services name the file, the model entry, and the setting.
+Fix the profile or the variable and recreate both services again. To add a profile for another
+deployment, see
+[Deployment Profiles](../../developer-guide/copilot/model-configuration.md#deployment-profiles).
 
 ## Add a Classifier
 
