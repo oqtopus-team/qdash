@@ -364,13 +364,14 @@ describe("FirstCalibrationCoachmarks in a modal dialog", () => {
   });
 
   it("leaves no nodes or listeners behind when the dialog closes or the guide unmounts", async () => {
-    const added: Array<[EventTarget, string, unknown]> = [];
+    const added: Array<[EventTarget, string, unknown, AbortSignal | undefined]> = [];
     const removed: Array<[EventTarget, string, unknown]> = [];
     for (const target of [window, document] as EventTarget[]) {
       const add = target.addEventListener.bind(target);
       const remove = target.removeEventListener.bind(target);
       vi.spyOn(target, "addEventListener").mockImplementation((type, listener, options) => {
-        added.push([target, type, listener]);
+        const signal = typeof options === "object" ? options.signal : undefined;
+        added.push([target, type, listener, signal]);
         add(type, listener, options);
       });
       vi.spyOn(target, "removeEventListener").mockImplementation((type, listener, options) => {
@@ -409,9 +410,11 @@ describe("FirstCalibrationCoachmarks in a modal dialog", () => {
     expect(document.querySelector(".driver-layer, .driver-overlay")).toBeNull();
 
     const left = added.filter(
-      ([target, type, listener]) =>
+      ([target, type, listener, signal]) =>
         // React keeps one document-level listener for the root for its whole life.
         type !== "selectionchange" &&
+        // An aborted signal removes its listener without calling removeEventListener.
+        !signal?.aborted &&
         !removed.some(([t, ty, l]) => t === target && ty === type && l === listener),
     );
     expect(
