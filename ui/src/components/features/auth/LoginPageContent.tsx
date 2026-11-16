@@ -70,83 +70,79 @@ export function LoginPageContent() {
   }, []);
 
   return (
-    <main className="login-page-bg min-h-dvh overflow-x-hidden px-4 py-8 sm:px-6 lg:px-8">
-      <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-4rem)] w-full max-w-6xl items-center gap-10 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-16">
-        <section className="mx-auto max-w-xl text-center lg:mx-0 lg:text-left">
-          <Image
-            src="/oqtopus_logo.svg"
-            alt="Oqtopus"
-            width={176}
-            height={176}
-            priority
-            className="floating-logo mx-auto h-28 w-28 object-contain sm:h-36 sm:w-36 lg:mx-0 lg:h-44 lg:w-44"
-          />
+    <main className="grid min-h-dvh grid-rows-[auto_1fr] bg-base-100 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-1 lg:p-3">
+      <section
+        aria-label="QDash"
+        className="relative isolate flex flex-col overflow-hidden bg-base-200 px-5 pb-8 pt-4 sm:px-8 sm:pb-10 lg:justify-between lg:rounded-box lg:p-10 xl:p-12"
+      >
+        {/* Brand field: the logo's own blue and red, diffused into two static soft forms. */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute -left-20 -top-28 h-64 w-80 rounded-full bg-[#1f1fdd]/35 blur-3xl sm:-left-24 sm:h-72 sm:w-[28rem] lg:-left-[15%] lg:top-[10%] lg:h-[60%] lg:w-[75%]" />
+          <div className="absolute -bottom-32 -right-16 h-64 w-72 rounded-full bg-[#e21331]/30 blur-3xl sm:-right-20 sm:h-72 sm:w-96 lg:-right-[20%] lg:bottom-[-15%] lg:h-[65%] lg:w-[70%]" />
+          <div className="absolute right-[10%] top-[-20%] hidden h-[40%] w-[40%] rounded-full bg-[#1f1fdd]/20 blur-3xl lg:block" />
+        </div>
 
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
-            <h1 className="login-title-gradient text-5xl font-bold tracking-tight sm:text-6xl">
-              QDash
-            </h1>
-            <EnvironmentBadge className="badge-lg" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 className="text-xl font-medium">QDash</h1>
+            {/* Operational context, not decoration: stays legible and wraps rather than overflows. */}
+            <EnvironmentBadge className="badge-md h-auto min-h-0 max-w-full whitespace-normal break-all py-1 text-left" />
           </div>
-
-          <p className="mx-auto mt-5 max-w-lg text-sm leading-relaxed text-base-content/70 lg:mx-0">
-            Run calibration tasks, watch executions and read chip metrics for your superconducting
-            qubit chips
-          </p>
-
-          <nav
-            aria-label="QDash resources"
-            className="mt-6 flex flex-wrap justify-center gap-2 lg:justify-start"
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="btn btn-ghost btn-sm btn-square shrink-0 text-base-content/70 hover:text-base-content"
+            aria-label={`Switch to ${isDarkTheme ? "light" : "dark"} theme`}
           >
-            <a
-              href="https://oqtopus-team.github.io/qdash/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-ghost btn-sm gap-2"
-            >
-              <BookOpen size={18} aria-hidden="true" />
-              Docs
-            </a>
-            <a
-              href="https://github.com/oqtopus-team/qdash"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-ghost btn-sm gap-2"
-            >
-              <GitBranch size={18} aria-hidden="true" />
-              GitHub
-            </a>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="btn btn-ghost btn-sm gap-2"
-              aria-label={`Switch to ${isDarkTheme ? "light" : "dark"} theme`}
-            >
-              {isDarkTheme ? (
-                <Sun size={18} aria-hidden="true" />
-              ) : (
-                <Moon size={18} aria-hidden="true" />
-              )}
-              {isDarkTheme ? "Light" : "Dark"}
-            </button>
-          </nav>
-        </section>
+            {isDarkTheme ? (
+              <Sun size={18} aria-hidden="true" />
+            ) : (
+              <Moon size={18} aria-hidden="true" />
+            )}
+          </button>
+        </div>
 
-        <section
-          aria-labelledby="sign-in-heading"
-          className="card mx-auto w-full max-w-sm border border-base-300 bg-base-100 shadow-sm"
-        >
-          <div className="card-body gap-0 p-6 sm:p-8">
-            <h2 id="sign-in-heading" className="text-xl font-medium tracking-tight">
-              Sign in
-            </h2>
+        {/* Same composition at every width: tagline left, logo right, bottom aligned. */}
+        <div className="mt-6 grid gap-6 sm:mt-8 lg:mt-0 lg:flex-1 lg:grid-rows-[1fr_auto] lg:gap-10 lg:pt-16">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-5 sm:gap-8">
+            <p className="max-w-[16rem] text-lg font-medium leading-snug tracking-tight sm:max-w-sm sm:text-2xl lg:text-3xl lg:leading-tight xl:text-4xl">
+              Calibration workflows for superconducting qubit chips
+            </p>
+            <Image
+              src="/oqtopus_logo.svg"
+              alt="Oqtopus"
+              width={320}
+              height={320}
+              preload
+              className="h-16 w-16 object-contain sm:h-24 sm:w-24 lg:h-40 lg:w-40 xl:h-52 xl:w-52"
+            />
+          </div>
+          <div className="hidden text-xs text-base-content/60 lg:block">
+            <p className="font-medium text-base-content/80">OQTOPUS</p>
+            <p>Open Quantum Toolchain for OPerators and USers</p>
+          </div>
+        </div>
+      </section>
 
-            <form onSubmit={onSubmit} className="mt-6" aria-busy={loading} noValidate>
-              <fieldset disabled={loading} className="contents">
-                <div className="form-control">
-                  <label className="label" htmlFor="userName">
-                    <span className="label-text font-medium">User ID</span>
-                  </label>
+      <section
+        aria-labelledby="sign-in-heading"
+        className="flex flex-col px-5 pb-10 pt-8 sm:px-10 sm:pt-10 lg:grid lg:grid-rows-[1fr_auto_1fr] lg:px-16 lg:py-10"
+      >
+        <div className="mx-auto w-full max-w-[380px] lg:row-start-2">
+          <h2 id="sign-in-heading" className="text-xl font-medium">
+            Sign in
+          </h2>
+
+          {/* Each credential is one row: the label sits inside the field so the pair reads as a
+              single surface instead of a stacked label, box and helper line. */}
+          <form onSubmit={onSubmit} className="mt-6" aria-busy={loading} noValidate>
+            <fieldset disabled={loading} className="flex flex-col gap-3">
+              <div>
+                <label
+                  htmlFor="userName"
+                  className={`input w-full focus-within:input-primary ${errors.username ? "input-error" : ""}`}
+                >
+                  <span className="label w-22 shrink-0 border-e-0">User ID</span>
                   <input
                     id="userName"
                     type="text"
@@ -154,29 +150,32 @@ export function LoginPageContent() {
                     autoCapitalize="none"
                     spellCheck="false"
                     autoFocus
-                    className={`input input-bordered w-full focus:input-primary ${errors.username ? "input-error" : ""}`}
+                    className="min-w-0"
                     aria-required="true"
                     aria-invalid={Boolean(errors.username)}
                     aria-describedby={describedBy(errors.username?.message && "userName-error")}
                     {...register("username")}
                   />
-                  {errors.username && (
-                    <p id="userName-error" className="mt-1 text-sm text-error">
-                      {errors.username.message}
-                    </p>
-                  )}
-                </div>
+                </label>
+                {errors.username && (
+                  <p id="userName-error" className="mt-1.5 text-sm text-error">
+                    {errors.username.message}
+                  </p>
+                )}
+              </div>
 
-                <div className="form-control mt-3">
-                  <label className="label" htmlFor="password">
-                    <span className="label-text font-medium">Password</span>
-                  </label>
-                  <div className="relative">
+              <div>
+                <div className="relative">
+                  <label
+                    htmlFor="password"
+                    className={`input w-full pr-12 focus-within:input-primary ${errors.password ? "input-error" : ""}`}
+                  >
+                    <span className="label w-22 shrink-0 border-e-0">Password</span>
                     <input
                       id="password"
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
-                      className={`input input-bordered w-full pr-12 focus:input-primary ${errors.password ? "input-error" : ""}`}
+                      className="min-w-0"
                       aria-required="true"
                       aria-invalid={Boolean(errors.password)}
                       aria-describedby={describedBy(
@@ -185,52 +184,71 @@ export function LoginPageContent() {
                       )}
                       {...register("password")}
                     />
-                    <span className="absolute right-1 top-1/2 -translate-y-1/2">
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((visible) => !visible)}
-                        className="btn btn-ghost btn-sm btn-square"
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                      >
-                        {showPassword ? (
-                          <EyeOff size={18} aria-hidden="true" />
-                        ) : (
-                          <Eye size={18} aria-hidden="true" />
-                        )}
-                      </button>
-                    </span>
-                  </div>
-                  {errors.password && (
-                    <p id="password-error" className="mt-1 text-sm text-error">
-                      {errors.password.message}
-                    </p>
-                  )}
+                  </label>
+                  {/* Outside the label so a click toggles visibility without also activating the field. */}
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    className="btn btn-ghost btn-sm btn-square absolute right-1 top-1/2 -translate-y-1/2 text-base-content/60 hover:text-base-content"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={18} aria-hidden="true" />
+                    ) : (
+                      <Eye size={18} aria-hidden="true" />
+                    )}
+                  </button>
                 </div>
-              </fieldset>
+                {errors.password && (
+                  <p id="password-error" className="mt-1.5 text-sm text-error">
+                    {errors.password.message}
+                  </p>
+                )}
+              </div>
+            </fieldset>
 
-              {error && (
-                <div id="login-error" role="alert" className="alert alert-error mt-4 py-3">
-                  <AlertCircle size={20} className="shrink-0" aria-hidden="true" />
-                  <span className="text-sm">{error}</span>
-                </div>
-              )}
+            {error && (
+              <div id="login-error" role="alert" className="alert alert-error alert-soft mt-4 py-3">
+                <AlertCircle size={20} className="shrink-0" aria-hidden="true" />
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
 
-              <button
-                type="submit"
-                disabled={loading || isSubmitting}
-                className="btn btn-primary mt-6 w-full"
-              >
-                {loading && <Loader2 size={18} className="animate-spin" aria-hidden="true" />}
-                {loading ? "Signing in…" : "Sign in"}
-              </button>
-            </form>
+            <button
+              type="submit"
+              disabled={loading || isSubmitting}
+              className="btn btn-primary mt-5 w-full"
+            >
+              {loading && <Loader2 size={18} className="animate-spin" aria-hidden="true" />}
+              {loading ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
+        </div>
 
-            <p className="mt-5 text-center text-xs text-base-content/50">
-              Accounts are created by a QDash administrator
-            </p>
-          </div>
-        </section>
-      </div>
+        <nav
+          aria-label="QDash resources"
+          className="mx-auto mt-auto flex w-full max-w-[380px] items-center gap-x-5 pt-12 text-xs text-base-content/60 lg:row-start-3 lg:self-end lg:pt-0"
+        >
+          <a
+            href="https://oqtopus-team.github.io/qdash/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link link-hover inline-flex items-center gap-1.5 hover:text-base-content"
+          >
+            <BookOpen size={16} aria-hidden="true" />
+            Docs
+          </a>
+          <a
+            href="https://github.com/oqtopus-team/qdash"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link link-hover inline-flex items-center gap-1.5 hover:text-base-content"
+          >
+            <GitBranch size={16} aria-hidden="true" />
+            GitHub
+          </a>
+        </nav>
+      </section>
     </main>
   );
 }
