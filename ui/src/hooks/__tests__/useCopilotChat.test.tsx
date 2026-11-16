@@ -10,8 +10,11 @@ import type { TaskChatContext, CopilotBlocksResult } from "@/types/copilotChat";
 
 import { useCopilotChat } from "../useCopilotChat";
 
+const copilotConfig = vi.hoisted(() => ({ current: undefined as object | undefined }));
 vi.mock("@/client/copilot/copilot", () => ({
-  useGetCopilotConfig: () => ({ data: undefined }),
+  useGetCopilotConfig: () => ({
+    data: copilotConfig.current ? { data: copilotConfig.current } : undefined,
+  }),
 }));
 
 function sse(event: string, data: unknown): string {
@@ -69,6 +72,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  copilotConfig.current = undefined;
+  localStorage.clear();
 });
 
 /** The chat as one surface sees it, plus the shared store. */
@@ -398,6 +403,47 @@ describe("useCopilotChat streaming", () => {
     });
     // Only the opening turn carries the figures.
     expect(result.current.chat.messages[0].attachedImage).toBe(true);
+  });
+
+  it("sends the model and thinking chosen on another surface, also on an edit", async () => {
+    const kimi = { provider: "openai-compatible-chat", name: "kimi" };
+    copilotConfig.current = {
+      chat_models: [{ provider: "openai-compatible-chat", name: "qwen" }, kimi],
+    };
+    const { result } = renderHook(
+      () => ({
+        page: useCopilotChat(),
+        dock: useCopilotChat(),
+        store: useCopilotChatSessionContext(),
+      }),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.store.isLoadingSessions).toBe(false));
+    expect(result.current.page.model.selected).toMatchObject({ label: "qwen", model: null });
+
+    act(() => {
+      result.current.dock.model.select("model:openai-compatible-chat:kimi");
+      result.current.dock.thinking.select("high");
+    });
+    act(() => result.current.page.send("Show T1"));
+    await waitFor(() => expect(result.current.page.isStreaming).toBe(true));
+    expect(streamRequest().body).toMatchObject({ model_override: kimi, thinking_level: "high" });
+    stream.push(sse("result", { blocks: [{ type: "text", content: "Here", chart: null }] }));
+    stream.close();
+    await waitFor(() => expect(result.current.page.isStreaming).toBe(false));
+
+    // Back to the default: no override, so the server's first chat model answers.
+    act(() => {
+      result.current.dock.model.select("default");
+      result.current.dock.thinking.select("auto");
+    });
+    stream = controllableStream();
+    fetchMock.mockClear();
+    act(() => result.current.page.editMessage(0, "Show T2"));
+    await waitFor(() => expect(result.current.page.isStreaming).toBe(true));
+    const body = streamRequest().body;
+    expect(body.model_override).toBeNull();
+    expect(body).not.toHaveProperty("thinking_level");
   });
 
   it("shares one streaming turn between every surface showing the chat", async () => {

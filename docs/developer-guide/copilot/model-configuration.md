@@ -89,6 +89,11 @@ default files keep their earlier handling: they are not checked field by field, 
 The API reads the variable each time its cached configuration is rebuilt: at startup and after
 `POST /admin/config/reload`. The runtime reads it once, at startup. A changed value reaches a
 container only when the container is recreated, so both services are recreated together.
+The UI fetches `GET /copilot/config` again whenever a chat surface or **Settings → Copilot**
+mounts, the window regains focus, or the network reconnects, so open pages show the new
+`chat_models` without a reload. The browser stores a chosen chat model by `provider:name`
+(`ui/src/hooks/useChatModelSelection.ts`); a choice the new list no longer contains is sent as
+no override, so `chat_models[0]` answers.
 
 ### Profile Model Rules
 
