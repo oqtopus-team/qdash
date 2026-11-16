@@ -48,6 +48,14 @@ deleted with it.
 
 ### Thinking and Your Own Instructions
 
+The model picker under the message box names the model your next message goes to; the default
+is marked **default**. Choose another model there or in **Settings → Copilot → Default chat
+model**; the two stay in step and your browser remembers the choice. The picker cannot be opened
+while an answer is streaming, or when the deployment offers only one chat model. The list of
+models comes from the deployment and is refreshed when you open a chat or **Settings**, or
+return to the window. If your chosen model is no longer offered, chats use the default and
+**Settings** says so.
+
 The **Thinking** menu next to the model picker sets how much the model reasons before it answers:
 **Auto** (the model's configured default), **Off**, **Low**, **Medium**, or **High**. The choice
 applies from the next message and is remembered in your browser.
