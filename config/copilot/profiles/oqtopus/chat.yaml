@@ -14,7 +14,7 @@ chat_models:
   # Operator prerequisite: an OpenAI-compatible Chat Completions API serving
   # this model name. OPENAI_COMPATIBLE_BASE_URL_CHAT must include /v1.
   - provider: openai-compatible-chat
-    name: moonshotai/Kimi-K3
+    name: Qwen/Qwen3.8-27B
     api_style: completion
     base_url: env:OPENAI_COMPATIBLE_BASE_URL_CHAT
     api_key_env: OPENAI_COMPATIBLE_API_KEY_CHAT

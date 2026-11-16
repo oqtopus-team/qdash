@@ -136,15 +136,17 @@ operator to confirm against the deployment.
 
 ### Sample Profile
 
-The supplied `profiles/oqtopus/` profile is a sample that names `moonshotai/Kimi-K3` for chat and
+The supplied `profiles/oqtopus/` profile is a sample that names `Qwen/Qwen3.8-27B` for chat and
 evaluation through `api_style: completion`, on the `CHAT` and `EVALUATION` endpoint variables.
 No serving API has been tested with it. Its comments list what the deployment must provide: an
 OpenAI-compatible Chat Completions API for that model name, image input for evaluation, and a
 context length and output limit that cover `num_ctx` and `max_output_tokens`. Its
 `temperature: 0.0` requests greedy sampling for evaluation; whether repeated runs then agree is
-not verified. pi-qcaleval uses a model whose id contains `Ising-Calibration` when the chat
-planner evaluates without naming a model; in a profile without one, that evaluation runs on the
-conversation's model and is marked as a fallback. Runs started from **AI Evaluations** pass the
+not verified. The profile sets no `reasoning_effort`, so the runtime does not mark the model as
+a reasoning model or apply the Qwen chat-template thinking format to it. pi-qcaleval uses a
+model whose id contains `Ising-Calibration` when the chat planner evaluates without naming a
+model; in a profile without one, that evaluation runs on the conversation's model and is marked
+as a fallback. Runs started from **AI Evaluations** pass the
 selected model explicitly.
 
 ### Add a Profile

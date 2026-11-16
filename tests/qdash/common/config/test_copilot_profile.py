@@ -371,7 +371,7 @@ def test_unreadable_profile_documents_fail_through_the_loader(
         ConfigLoader.load_copilot()
 
 
-def test_committed_oqtopus_profile_uses_kimi_for_chat_and_evaluation(
+def test_committed_oqtopus_profile_uses_qwen_for_chat_and_evaluation(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     root = tmp_path / "config"
@@ -388,12 +388,12 @@ def test_committed_oqtopus_profile_uses_kimi_for_chat_and_evaluation(
     assert config.enabled is default_config["enabled"]
     assert config.response_language == default_config["response_language"]
     assert [(m.provider, m.name, m.api_style) for m in config.chat_models] == [
-        ("openai-compatible-chat", "moonshotai/Kimi-K3", "completion")
+        ("openai-compatible-chat", "Qwen/Qwen3.8-27B", "completion")
     ]
     assert config.chat_models[0].base_url == "env:OPENAI_COMPATIBLE_BASE_URL_CHAT"
     assert config.chat_models[0].api_key_env == "OPENAI_COMPATIBLE_API_KEY_CHAT"
     assert [(m.provider, m.name, m.api_style) for m in config.evaluation_models] == [
-        ("openai-compatible-evaluation", "moonshotai/Kimi-K3", "completion")
+        ("openai-compatible-evaluation", "Qwen/Qwen3.8-27B", "completion")
     ]
     assert config.evaluation_models[0].base_url == "env:OPENAI_COMPATIBLE_BASE_URL_EVALUATION"
     assert config.evaluation_models[0].api_key_env == "OPENAI_COMPATIBLE_API_KEY_EVALUATION"
