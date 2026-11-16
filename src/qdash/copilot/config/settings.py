@@ -1,8 +1,9 @@
 """Copilot configuration loader.
 
-Three YAML files, each with an optional `*.local.yaml` overlay, merged by
-ConfigLoader: config.yaml (shared), chat.yaml (planner models) and
-evaluation.yaml (the calibration evaluation model).
+Three YAML files merged by ConfigLoader: config.yaml (shared), chat.yaml
+(planner models) and evaluation.yaml (the calibration evaluation model). The
+last two come from config/copilot/profiles/<name>/ when QDASH_COPILOT_PROFILE
+names a profile.
 """
 
 from __future__ import annotations
@@ -34,7 +35,9 @@ class ModelConfig(BaseModel):
     disable_thinking_instruction: bool = False
     # OpenAI-compatible servers vary in which endpoint they expose. Use
     # "responses" for the /v1/responses API (OpenAI, Ollama 0.13.3+) and
-    # "chat_completions" for /v1/chat/completions only providers (e.g. DeepSeek).
+    # "completion" for /v1/chat/completions only providers (e.g. DeepSeek). The
+    # runtime treats any value other than "responses" as completion; a profile
+    # accepts only these two (see qdash.common.config.copilot_profile).
     api_style: str = "responses"
 
 

@@ -253,6 +253,7 @@ export const ChatThread = forwardRef<ChatThreadHandle, ChatThreadProps>(function
       modelOptions={model.options}
       selectedModelKey={model.selected.key}
       onModelChange={model.select}
+      modelStatus={model.status}
       thinkingChoice={thinking.choice}
       thinkingModelDefault={thinking.modelDefault}
       onThinkingChange={thinking.select}

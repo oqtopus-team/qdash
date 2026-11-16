@@ -1,3 +1,5 @@
+import { createStoredChoice } from "@/lib/storedChoice";
+
 export interface ModelOverride {
   provider: string;
   name: string;
@@ -11,12 +13,19 @@ export interface ModelOverride {
 
 export interface ModelOption {
   key: string;
+  /** The model's name as the menus show it. */
   label: string;
+  /** The per-request override to send; null leaves the server's default in force. */
   model: ModelOverride | null;
   isConfiguredDefault?: boolean;
+  /** The model this option runs, also for the default option when the config names it. */
+  resolvedModel?: ModelOverride | null;
   /** The configured reasoning effort of the model this option runs, for the thinking menu. */
   reasoningEffort?: string | null;
 }
+
+const DEFAULT_CHAT_MODEL_KEY = "default";
+const CHAT_MODEL_KEY_PREFIX = "model:";
 
 const CHAT_MODEL_STORAGE_KEY = "qdash_chat_model_key";
 
@@ -48,26 +57,31 @@ function modelIdentity(model: ModelOverride): string {
   return `${model.provider}:${model.name}`;
 }
 
-export function buildChatModelOptions(config: Record<string, unknown> | null): ModelOption[] {
-  if (!config) {
-    return [
-      {
-        key: "default",
-        label: "Configured model",
-        model: null,
-        isConfiguredDefault: true,
-      },
-    ];
-  }
+/** The stored key of a chat model: its identity, so a reordered config keeps the choice. */
+function chatModelKey(model: ModelOverride): string {
+  return `${CHAT_MODEL_KEY_PREFIX}${modelIdentity(model)}`;
+}
 
-  const chatModels = Array.isArray(config.chat_models) ? config.chat_models : [];
-  const configuredModel = readModel(chatModels[0]) ?? readModel(config.model);
+/** The `provider:name` a stored model key names, or null for the default and legacy keys. */
+export function chatModelIdentityOfKey(key: string): string | null {
+  return key.startsWith(CHAT_MODEL_KEY_PREFIX) ? key.slice(CHAT_MODEL_KEY_PREFIX.length) : null;
+}
+
+/**
+ * The chat models a user can pick, default first. The default option sends no
+ * override, so the server's `chat_models[0]` answers; it is labelled with that
+ * model's name once the config is known.
+ */
+export function buildChatModelOptions(config: Record<string, unknown> | null): ModelOption[] {
+  const chatModels = config && Array.isArray(config.chat_models) ? config.chat_models : [];
+  const configuredModel = config ? (readModel(chatModels[0]) ?? readModel(config.model)) : null;
   const options: ModelOption[] = [
     {
-      key: "default",
-      label: configuredModel ? `Configured: ${configuredModel.name}` : "Configured model",
+      key: DEFAULT_CHAT_MODEL_KEY,
+      label: configuredModel?.name ?? "Configured default",
       model: null,
       isConfiguredDefault: true,
+      resolvedModel: configuredModel,
       reasoningEffort: configuredModel?.reasoning_effort ?? null,
     },
   ];
@@ -76,24 +90,23 @@ export function buildChatModelOptions(config: Record<string, unknown> | null): M
     seen.add(modelIdentity(configuredModel));
   }
 
-  const addOption = (key: string, label: string, value: unknown) => {
+  const addOption = (value: unknown) => {
     const model = readModel(value);
     if (!model) return;
     const identity = modelIdentity(model);
     if (seen.has(identity)) return;
     seen.add(identity);
     options.push({
-      key,
-      label: `${label}: ${model.name}`,
+      key: chatModelKey(model),
+      label: model.name,
       model,
+      resolvedModel: model,
       reasoningEffort: model.reasoning_effort ?? null,
     });
   };
 
-  chatModels.forEach((model, index) => {
-    addOption(`chat-${index}`, `Chat ${index + 1}`, model);
-  });
-  addOption("general", "General", config.model);
+  chatModels.forEach(addOption);
+  if (config) addOption(config.model);
 
   return options;
 }
@@ -119,15 +132,11 @@ export function buildEvaluationModelOptions(config: Record<string, unknown> | nu
   return options;
 }
 
-export function getStoredChatModelKey(): string {
-  if (typeof window === "undefined") return "default";
-  return localStorage.getItem(CHAT_MODEL_STORAGE_KEY) || "default";
-}
-
-export function setStoredChatModelKey(key: string) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(CHAT_MODEL_STORAGE_KEY, key);
-}
+/** The remembered chat model, shared by Settings and every chat surface. */
+export const chatModelChoice = createStoredChoice<string>(
+  CHAT_MODEL_STORAGE_KEY,
+  (raw) => raw || DEFAULT_CHAT_MODEL_KEY,
+);
 
 export function resolveChatModelOption(options: ModelOption[], key: string): ModelOption {
   return (

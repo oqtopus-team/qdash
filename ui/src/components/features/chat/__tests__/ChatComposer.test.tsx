@@ -66,6 +66,74 @@ describe("ChatComposer thinking menu", () => {
   });
 });
 
+describe("ChatComposer model control", () => {
+  const qwen = { provider: "openai-compatible-chat", name: "qwen" };
+  const kimi = { provider: "openai-compatible-chat", name: "kimi" };
+  const defaultOption = {
+    key: "default",
+    label: "qwen",
+    model: null,
+    isConfiguredDefault: true,
+    resolvedModel: qwen,
+  };
+  const kimiOption = { key: "model:openai-compatible-chat:kimi", label: "kimi", model: kimi };
+
+  it("names the model the default resolves to and switches between configured models", async () => {
+    const onModelChange = vi.fn();
+    render(
+      <ChatComposer
+        {...props()}
+        modelOptions={[defaultOption, kimiOption]}
+        selectedModelKey="default"
+        onModelChange={onModelChange}
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "Chat model: qwen" });
+    expect(trigger).toHaveTextContent("qwendefault");
+
+    fireEvent.pointerDown(trigger);
+    fireEvent.click(await screen.findByRole("menuitem", { name: /kimi/ }));
+    expect(onModelChange).toHaveBeenCalledWith("model:openai-compatible-chat:kimi");
+  });
+
+  it("shows a single configured model and why it cannot be switched", () => {
+    render(<ChatComposer {...props()} modelOptions={[defaultOption]} selectedModelKey="default" />);
+    const model = screen.getByRole("button", {
+      name: "Chat model: qwen. Only one chat model is configured",
+    });
+    expect(model).toHaveAttribute("aria-disabled", "true");
+    fireEvent.pointerDown(model);
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("waits for the model list before offering a switch", () => {
+    render(
+      <ChatComposer
+        {...props()}
+        modelOptions={[{ ...defaultOption, label: "Configured default", resolvedModel: null }]}
+        selectedModelKey="default"
+        modelStatus="loading"
+      />,
+    );
+    expect(screen.getByRole("button", { name: /Chat model: Loading models/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("cannot be switched while an answer streams", () => {
+    render(
+      <ChatComposer
+        {...props()}
+        isStreaming
+        modelOptions={[defaultOption, kimiOption]}
+        selectedModelKey={kimiOption.key}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Chat model: kimi" })).toBeDisabled();
+  });
+});
+
 describe("thinkingLabel", () => {
   it("names the level, and Auto with its default when known", async () => {
     const { thinkingLabel } = await import("../ChatComposer");

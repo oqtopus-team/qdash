@@ -1,7 +1,7 @@
 # Copilot Shared Configuration
 #
 # The chat planner models live in chat.yaml, the calibration evaluation model
-# in evaluation.yaml. Each file may have a `*.local.yaml` overlay.
+# in evaluation.yaml, or in profiles/<name>/ when QDASH_COPILOT_PROFILE names one.
 
 enabled: true
 

@@ -84,6 +84,7 @@ import {
 import { formatSettledDetail } from "./events.ts";
 import { logDurableReport } from "./durable-report.ts";
 import { fetchKnowledgeDraft, fetchTaskExamples, fetchTaskKnowledge } from "./knowledge-context.ts";
+import { resolveCopilotModelFiles } from "./copilot-profile.ts";
 import { chatCompactionOverrides, PROVIDER_ALIASES, writeModelsConfig } from "./models-config.ts";
 import {
   buildPageContextSection,
@@ -99,9 +100,8 @@ const AGENT_DIR = process.env.PI_CODING_AGENT_DIR ?? "/app/.pi-agent";
 const WORK_DIR = process.env.AGENT_WORK_DIR ?? "/app/workspace";
 const STATE_DIR = process.env.AGENT_STATE_DIR ?? "/app/state";
 const COPILOT_CONFIG_PATH = process.env.COPILOT_CONFIG_PATH ?? "/app/config/copilot/config.yaml";
-const CHAT_CONFIG_PATH = process.env.CHAT_CONFIG_PATH ?? "/app/config/copilot/chat.yaml";
-const EVALUATION_CONFIG_PATH =
-  process.env.EVALUATION_CONFIG_PATH ?? "/app/config/copilot/evaluation.yaml";
+// chat.yaml and evaluation.yaml, or those of QDASH_COPILOT_PROFILE, resolved
+// once per process in SharedRuntime.create (see copilot-profile.ts).
 // Optional: the classifier models QDash features may use; present_results and
 // classify are offered when one of them is usable.
 const CLASSIFIER_CONFIG_PATH =
@@ -255,9 +255,12 @@ export class SharedRuntime {
       else console.log(report.message);
     }
 
-    const modelsPath = writeModelsConfig(
-      CHAT_CONFIG_PATH,
-      EVALUATION_CONFIG_PATH,
+    const modelFiles = resolveCopilotModelFiles(process.env, COPILOT_CONFIG_PATH);
+    console.log(
+      `[agent-runtime] copilot models: ${modelFiles.profile === undefined ? "default" : `profile ${modelFiles.profile}`} (${modelFiles.chatPath}, ${modelFiles.evaluationPath})`,
+    );
+    const { path: modelsPath, yaml: modelYaml } = writeModelsConfig(
+      modelFiles,
       join(AGENT_DIR, "models.json"),
     );
     const modelRuntime = await ModelRuntime.create({
@@ -409,7 +412,7 @@ export class SharedRuntime {
     }
 
     const modelCompactionOverrides = chatCompactionOverrides(
-      readFileSync(CHAT_CONFIG_PATH, "utf8"),
+      modelYaml.chatYaml,
       (provider, modelId) => modelRuntime.getModel(provider, modelId),
     );
     return new SharedRuntime(

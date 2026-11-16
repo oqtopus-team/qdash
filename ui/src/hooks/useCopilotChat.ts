@@ -1,71 +1,17 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { recoverMessageImages } from "@/lib/chatAttachments";
-import { useGetCopilotConfig } from "@/client/copilot/copilot";
 import type { AnswerFeedback, ChatImageAttachment, ChatMessage } from "@/types/copilotChat";
 import {
   useCopilotChatSessionContext,
   type CopilotChatSession,
 } from "@/contexts/CopilotChatSessionContext";
-import {
-  getStoredThinkingChoice,
-  levelOfEffort,
-  setStoredThinkingChoice,
-  thinkingLevelForRequest,
-  type ChatThinkingChoice,
-  type ChatThinkingLevel,
-} from "@/lib/chatThinking";
-import {
-  buildChatModelOptions,
-  getStoredChatModelKey,
-  resolveChatModelOption,
-  setStoredChatModelKey,
-  type ModelOption,
-} from "@/lib/copilotModels";
+import { thinkingLevelForRequest } from "@/lib/chatThinking";
+import { useChatModelSelection, useChatThinkingSelection } from "@/hooks/useChatModelSelection";
 
 export type CopilotSession = CopilotChatSession;
-
-export interface ChatModelSelection {
-  options: ModelOption[];
-  selected: ModelOption;
-  select: (key: string) => void;
-}
-
-/**
- * Model menu for a chat. Every chat, with or without a task result as its
- * context, picks the planner from `chat_models`; the evaluation model is not a
- * planner and is configured separately (evaluation.yaml).
- */
-function useChatModel(): ChatModelSelection {
-  const { data } = useGetCopilotConfig();
-  const config = data?.data ?? null;
-  const [chatKey, setChatKey] = useState(getStoredChatModelKey);
-  const chatOptions = useMemo(() => buildChatModelOptions(config), [config]);
-  const select = useCallback((key: string) => {
-    setChatKey(key);
-    setStoredChatModelKey(key);
-  }, []);
-  return { options: chatOptions, selected: resolveChatModelOption(chatOptions, chatKey), select };
-}
-
-export interface ChatThinkingSelection {
-  choice: ChatThinkingChoice;
-  select: (choice: ChatThinkingChoice) => void;
-  /** What "auto" amounts to for the selected model, when its config says. */
-  modelDefault: ChatThinkingLevel | null;
-}
-
-/** Thinking menu for a chat; remembered across chats like the model. */
-function useChatThinking(model: ChatModelSelection): ChatThinkingSelection {
-  const [choice, setChoice] = useState<ChatThinkingChoice>(getStoredThinkingChoice);
-  const select = useCallback((next: ChatThinkingChoice) => {
-    setChoice(next);
-    setStoredThinkingChoice(next);
-  }, []);
-  return { choice, select, modelDefault: levelOfEffort(model.selected?.reasoningEffort) };
-}
 
 /** One chat (the active one by default) as seen by a chat surface. */
 export function useCopilotChat(sessionId?: string | null) {
@@ -75,9 +21,11 @@ export function useCopilotChat(sessionId?: string | null) {
       ? ctx.activeSession
       : (ctx.sessions.find((s) => s.id === sessionId) ?? null);
   const run = session ? ctx.runs[session.id] : undefined;
-  const model = useChatModel();
-  const modelOverride = model.selected?.model ?? null;
-  const thinking = useChatThinking(model);
+  // Every chat, with or without a task result as its context, picks the planner
+  // from `chat_models`; the evaluation model is configured separately.
+  const model = useChatModelSelection();
+  const modelOverride = model.selected.model;
+  const thinking = useChatThinkingSelection(model);
   const thinkingLevel = thinkingLevelForRequest(thinking.choice);
   const { sendMessage, stop: stopSession } = ctx;
   const id = session?.id;

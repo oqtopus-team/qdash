@@ -7,6 +7,8 @@
  * turn, so a change applies from the next message on.
  */
 
+import { createStoredChoice } from "@/lib/storedChoice";
+
 export type ChatThinkingLevel = "off" | "low" | "medium" | "high";
 export type ChatThinkingChoice = "auto" | ChatThinkingLevel;
 
@@ -47,21 +49,10 @@ function isThinkingChoice(value: unknown): value is ChatThinkingChoice {
   return THINKING_CHOICES.some((choice) => choice.value === value);
 }
 
-export function getStoredThinkingChoice(): ChatThinkingChoice {
-  if (typeof window === "undefined") return "auto";
-  try {
-    const value = localStorage.getItem(STORAGE_KEY);
-    return isThinkingChoice(value) ? value : "auto";
-  } catch {
-    return "auto";
-  }
-}
+/** The remembered thinking choice, shared by every chat surface. */
+export const thinkingChoiceStore = createStoredChoice<ChatThinkingChoice>(STORAGE_KEY, (raw) =>
+  isThinkingChoice(raw) ? raw : "auto",
+);
 
-export function setStoredThinkingChoice(choice: ChatThinkingChoice) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, choice);
-  } catch {
-    // Remembering the choice is a convenience; the selection still applies.
-  }
-}
+export const getStoredThinkingChoice = thinkingChoiceStore.read;
+export const setStoredThinkingChoice = thinkingChoiceStore.write;
