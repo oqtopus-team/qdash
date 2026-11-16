@@ -1,6 +1,6 @@
-# Copilot Evaluation Models: riken profile (sample)
+# Copilot Evaluation Models: oqtopus profile (sample)
 #
-# Used when QDASH_COPILOT_PROFILE=riken. Replaces config/copilot/evaluation.yaml
+# Used when QDASH_COPILOT_PROFILE=oqtopus. Replaces config/copilot/evaluation.yaml
 # as a whole; it is not merged with it. Only `evaluation_models` may be set
 # here. The first entry is the default in the evaluation request dialog. Every
 # entry is checked when the profile loads; see

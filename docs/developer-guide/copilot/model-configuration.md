@@ -57,7 +57,7 @@ uses instead of the default files, so sites that serve different models share on
 | `QDASH_COPILOT_PROFILE` | Chat and evaluation models from |
 | --- | --- |
 | Unset or empty | `config/copilot/chat.yaml` and `config/copilot/evaluation.yaml` |
-| A profile name, such as `riken` | `config/copilot/profiles/<name>/chat.yaml` and `evaluation.yaml` |
+| A profile name, such as `oqtopus` | `config/copilot/profiles/<name>/chat.yaml` and `evaluation.yaml` |
 
 An empty value selects the defaults because a Compose `env_file` line `QDASH_COPILOT_PROFILE=`
 passes an empty string. `config.yaml` and `classifier.yaml` stay shared by every profile. A
@@ -136,7 +136,7 @@ operator to confirm against the deployment.
 
 ### Sample Profile
 
-The supplied `profiles/riken/` profile is a sample that names `moonshotai/Kimi-K3` for chat and
+The supplied `profiles/oqtopus/` profile is a sample that names `moonshotai/Kimi-K3` for chat and
 evaluation through `api_style: completion`, on the `CHAT` and `EVALUATION` endpoint variables.
 No serving API has been tested with it. Its comments list what the deployment must provide: an
 OpenAI-compatible Chat Completions API for that model name, image input for evaluation, and a
@@ -151,7 +151,7 @@ selected model explicitly.
 
 To add a profile for another deployment, such as `osaka`:
 
-1. Copy `config/copilot/profiles/riken/` to `config/copilot/profiles/osaka/`.
+1. Copy `config/copilot/profiles/oqtopus/` to `config/copilot/profiles/osaka/`.
 2. Replace the models in both files with the ones the deployment serves, and set `num_ctx` and
    `max_output_tokens` to what that deployment supports. Keep endpoints and keys in
    `OPENAI_COMPATIBLE_*_<SUFFIX>` variables; the files hold only their names.
@@ -403,4 +403,4 @@ the corresponding YAML model. Variable renaming does not transform the URL: for 
 - `agent-runtime/src/presentation-tool.ts`: `present_results`
 - `agent-runtime/src/classify-tool.ts`: `classify`
 - `config/copilot/config.yaml`, `chat.yaml`, `evaluation.yaml`, `classifier.yaml`,
-  `profiles/riken/`: supplied configuration
+  `profiles/oqtopus/`: supplied configuration

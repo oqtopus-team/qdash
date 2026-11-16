@@ -1,7 +1,7 @@
 {
   "_comment": "Shared by tests/qdash/common/config/test_copilot_profile.py and agent-runtime/test/copilot-profile.test.mjs so the API and the Pi Agent Runtime accept and reject the same profiles. `documents` are parsed and validated; `error` is a substring of both runtimes' message. `unreadable_documents` fail to parse in both runtimes.",
-  "valid_names": ["riken", "osaka", "site-2", "lab_b", "a", "0lab"],
-  "invalid_names": [" riken", "riken ", "Riken", "-riken", "_riken", ".", "..", "../riken", "../../etc", "riken/..", "riken/chat", "riken\\chat", "/etc", "osaka.local", "riken\u0000", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "riken\n", "riken\r\n", "\nriken"],
+  "valid_names": ["oqtopus", "osaka", "site-2", "lab_b", "a", "0lab"],
+  "invalid_names": [" oqtopus", "oqtopus ", "Oqtopus", "-oqtopus", "_oqtopus", ".", "..", "../oqtopus", "../../etc", "oqtopus/..", "oqtopus/chat", "oqtopus\\chat", "/etc", "osaka.local", "oqtopus\u0000", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "oqtopus\n", "oqtopus\r\n", "\noqtopus"],
   "model_fields": ["api_key_env", "api_style", "base_url", "disable_thinking_instruction", "keep_alive", "max_output_tokens", "name", "num_ctx", "prompt_cache_key_mode", "provider", "reasoning_effort", "requires_non_null_assistant_content", "requires_tools_with_tool_history", "sampling_params", "sampling_params_by_thinking_level", "strict_tool_schemas", "temperature", "top_k", "top_p"],
   "documents": [
     {"kind": "chat", "valid": true, "yaml": "chat_models:\n  - provider: openai-compatible-chat\n    name: m\n"},

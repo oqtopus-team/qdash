@@ -364,12 +364,12 @@ test("every generation field of a valid profile reaches models.json", () => {
   }
 });
 
-test("the committed riken profile serves Kimi for chat and evaluation", () => {
-  const root = mkdtempSync(join(tmpdir(), "copilot-riken-"));
+test("the committed oqtopus profile serves Kimi for chat and evaluation", () => {
+  const root = mkdtempSync(join(tmpdir(), "copilot-oqtopus-"));
   try {
     const copilot = join(root, "copilot");
     cpSync(REPO_COPILOT, copilot, { recursive: true });
-    const env = { [COPILOT_PROFILE_ENV]: "riken" };
+    const env = { [COPILOT_PROFILE_ENV]: "oqtopus" };
     const files = resolveCopilotModelFiles(env, join(copilot, "config.yaml"));
     const { path } = writeModelsConfig(files, join(root, "models.json"), ENDPOINTS);
     const { providers } = JSON.parse(readFileSync(path, "utf8"));

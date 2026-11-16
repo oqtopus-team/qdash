@@ -1,6 +1,6 @@
-# Copilot Chat Models: riken profile (sample)
+# Copilot Chat Models: oqtopus profile (sample)
 #
-# Used when QDASH_COPILOT_PROFILE=riken. Replaces config/copilot/chat.yaml as a
+# Used when QDASH_COPILOT_PROFILE=oqtopus. Replaces config/copilot/chat.yaml as a
 # whole; it is not merged with it. Only `chat_models` may be set here; shared
 # settings stay in config/copilot/config.yaml. The first entry is the default.
 # Every entry is checked when the profile loads; see

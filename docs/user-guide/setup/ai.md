@@ -38,24 +38,24 @@ is needed; the retired `AGENT_RUNTIME_ENABLE_WRITE_TOOLS` variable has no effect
 
 A deployment profile gives one deployment its own chat and evaluation models while the default
 files stay unchanged for other deployments. Each profile is a directory under
-`config/copilot/profiles/`. The supplied `riken` profile is a sample that names
+`config/copilot/profiles/`. The supplied `oqtopus` profile is a sample that names
 `moonshotai/Kimi-K3` for chat and evaluation; it has not been tested against any serving API.
 
 1. Confirm that the deployment serving the profile's models meets what the profile assumes, and
-   edit the profile where it does not. For `riken`, the serving API must offer OpenAI-compatible
+   edit the profile where it does not. For `oqtopus`, the serving API must offer OpenAI-compatible
    Chat Completions for `moonshotai/Kimi-K3` and accept image input for evaluation, and its
    maximum context length and output limit must cover the profile's `num_ctx` and
    `max_output_tokens`. QDash checks the profile's settings, not the endpoint.
 2. Set the profile name in `.env`:
 
    ```dotenv
-   QDASH_COPILOT_PROFILE=riken
+   QDASH_COPILOT_PROFILE=oqtopus
    ```
 
    Leave the value unset or empty to use `config/copilot/chat.yaml` and
    `config/copilot/evaluation.yaml`.
 3. Set the endpoint variables of [Connect Model Endpoints](#connect-model-endpoints) for the
-   endpoints the profile serves. The `riken` profile uses the `CHAT` and `EVALUATION` pairs.
+   endpoints the profile serves. The `oqtopus` profile uses the `CHAT` and `EVALUATION` pairs.
 4. Recreate the API and the AI runtime. A restart keeps the environment a container was created
    with, so it does not apply a changed `.env` value:
 
@@ -67,7 +67,7 @@ files stay unchanged for other deployments. Each profile is a directory under
    runtime with
    `docker compose -f compose.yaml -f compose.dev-local.yaml up -d --no-deps --force-recreate agent-runtime`.
 5. Check the runtime log with `docker compose logs agent-runtime`. It reports
-   `copilot models: profile riken` and the two files it read.
+   `copilot models: profile oqtopus` and the two files it read.
 
 QDash does not fall back to the default models when a profile is misconfigured. If the name is
 invalid, the profile directory or one of its files is missing, or a model setting is missing,

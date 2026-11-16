@@ -371,13 +371,13 @@ def test_unreadable_profile_documents_fail_through_the_loader(
         ConfigLoader.load_copilot()
 
 
-def test_committed_riken_profile_uses_kimi_for_chat_and_evaluation(
+def test_committed_oqtopus_profile_uses_kimi_for_chat_and_evaluation(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     root = tmp_path / "config"
     shutil.copytree(REPO_CONFIG / "copilot", root / "copilot")
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", root)
-    monkeypatch.setenv(COPILOT_PROFILE_ENV, "riken")
+    monkeypatch.setenv(COPILOT_PROFILE_ENV, "oqtopus")
     _reset()
     try:
         config = load_copilot_config()
