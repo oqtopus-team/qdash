@@ -181,9 +181,13 @@ a.card:hover {
   border-color: color-mix(in oklch, var(--color-base-content) 25%, transparent);
 }
 
+/* :focus-within covers DaisyUI wrappers (`label.input` with a nested input). */
 .input:focus,
+.input:focus-within,
 .select:focus,
-.textarea:focus {
+.select:focus-within,
+.textarea:focus,
+.textarea:focus-within {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 15%, transparent);
   outline: none;
@@ -508,7 +512,7 @@ html[data-theme="dark"],
 @import "daisyui/theme/abyss.css";
 
 /* ----------------------------------------
-   Login Page Styles - VitePress Hero Inspired
+   Error and 404 Page Styles - VitePress Hero Inspired
    ---------------------------------------- */
 
 /* Login page background gradient - Light mode */
@@ -555,52 +559,6 @@ html[data-theme="dark"],
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-
-/* Sign-in and 404 hero: the one place the logo may float and glow. */
-/* Login page floating logo animation */
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes glow-light {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 8px rgba(31, 31, 221, 0.3));
-  }
-  50% {
-    filter: drop-shadow(0 0 15px rgba(31, 31, 221, 0.4))
-      drop-shadow(0 0 25px rgba(226, 19, 49, 0.2));
-  }
-}
-
-@keyframes glow-dark {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 8px rgba(85, 85, 240, 0.4));
-  }
-  50% {
-    filter: drop-shadow(0 0 15px rgba(85, 85, 240, 0.5))
-      drop-shadow(0 0 25px rgba(246, 111, 129, 0.3));
-  }
-}
-
-.floating-logo {
-  animation:
-    float 4s ease-in-out infinite,
-    glow-light 3s ease-in-out infinite;
-}
-
-[data-theme="dark"] .floating-logo {
-  animation:
-    float 4s ease-in-out infinite,
-    glow-dark 3s ease-in-out infinite;
 }
 
 /* 404 Page - Lost logo animation */
