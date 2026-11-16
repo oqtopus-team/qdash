@@ -135,6 +135,38 @@ describe("GlobalCommandPalette", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
+  it("copies the page link over HTTP when the Clipboard API is unavailable", async () => {
+    vi.stubGlobal(
+      "navigator",
+      new Proxy(navigator, {
+        get(target, property) {
+          if (property === "clipboard") return undefined;
+          return Reflect.get(target, property, target);
+        },
+      }),
+    );
+    let copiedValue: string | undefined;
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      writable: true,
+      value: vi.fn(() => {
+        copiedValue = (document.activeElement as HTMLTextAreaElement | null)?.value;
+        return true;
+      }),
+    });
+
+    try {
+      render(<GlobalCommandPalette />);
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      fireEvent.click(screen.getByRole("option", { name: "Copy current page link" }));
+      await waitFor(() => expect(success).toHaveBeenCalledWith("Page link copied"));
+      expect(copiedValue).toBe(window.location.href);
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
+
   it("ignores shortcut repeats and IME composition", () => {
     render(<GlobalCommandPalette />);
     fireEvent.keyDown(window, { key: "k", metaKey: true, isComposing: true });

@@ -150,6 +150,43 @@ describe("withCodeBlockCopyButton", () => {
     expect(toastErrorMock).toHaveBeenCalledWith("Failed to copy code");
   });
 
+  it("copies with the legacy fallback when navigator.clipboard is unavailable", async () => {
+    const dom = document.createElement("div");
+    const code = document.createElement("code");
+    code.textContent = "print('http')";
+    dom.appendChild(code);
+    document.body.appendChild(dom);
+
+    mockMissingClipboard();
+    let copiedValue: string | undefined;
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      writable: true,
+      value: vi.fn(() => {
+        copiedValue = (document.activeElement as HTMLTextAreaElement | null)?.value;
+        return true;
+      }),
+    });
+
+    try {
+      const result = buildWrappedRender({ dom, contentDOM: code })(undefined, undefined);
+      const button = result.dom.querySelector<HTMLButtonElement>(".bn-code-block-copy-button");
+      const copyIcon = button?.innerHTML;
+
+      button?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(copiedValue).toBe("print('http')");
+      expect(button?.innerHTML).not.toBe(copyIcon);
+      expect(toastErrorMock).not.toHaveBeenCalled();
+      result.destroy?.();
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+      dom.remove();
+    }
+  });
+
   it("chains the original destroy callback", () => {
     const dom = document.createElement("div");
     const code = document.createElement("code");

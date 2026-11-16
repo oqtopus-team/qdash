@@ -11,6 +11,9 @@ import sql from "highlight.js/lib/languages/sql";
 import typescript from "highlight.js/lib/languages/typescript";
 import yaml from "highlight.js/lib/languages/yaml";
 
+import { useToast } from "@/components/ui/Toast";
+import { copyText } from "@/lib/utils/clipboard";
+
 hljs.registerLanguage("bash", bash);
 hljs.registerLanguage("javascript", javascript);
 hljs.registerLanguage("json", json);
@@ -54,17 +57,20 @@ export function CodeBlock({
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
+  const toast = useToast();
+
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(children).then(
+    copyText(children).then(
       () => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       },
       () => {
-        // Clipboard can be unavailable on insecure origins; keep the button idle.
+        setCopied(false);
+        toast.error("Failed to copy code");
       },
     );
-  }, [children]);
+  }, [children, toast]);
 
   const html = useMemo(() => highlight(children, language), [children, language]);
 

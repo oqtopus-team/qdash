@@ -11,6 +11,7 @@ import { ProfileSettingsPanel } from "@/components/features/settings/ProfileSett
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SelectedLabel } from "@/components/ui/SelectedLabel";
+import { useToast } from "@/components/ui/Toast";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
@@ -24,6 +25,7 @@ import {
 import { useChatModelSelection } from "@/hooks/useChatModelSelection";
 import type { MemberResponse, ProjectRole } from "@/schemas";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
+import { copyText } from "@/lib/utils/clipboard";
 
 import { CopilotInstructionsSettings } from "./CopilotInstructionsSettings";
 import { CopilotSystemPromptView } from "./CopilotSystemPromptView";
@@ -125,6 +127,7 @@ function ProjectMembersPanel() {
   const { user } = useAuth();
   const { currentProject, projects, projectId, isOwner, switchProject } = useProject();
   const [inviteUsername, setInviteUsername] = useState("");
+  const toast = useToast();
   const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null);
   const [inviteRole, setInviteRole] = useState<ProjectRole>("viewer");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -158,7 +161,12 @@ function ProjectMembersPanel() {
   };
 
   const handleCopyProjectId = async (id: string) => {
-    await navigator.clipboard.writeText(id);
+    try {
+      await copyText(id);
+    } catch {
+      toast.error("Failed to copy project ID");
+      return;
+    }
     setCopiedProjectId(id);
     setTimeout(() => setCopiedProjectId(null), 2000);
   };

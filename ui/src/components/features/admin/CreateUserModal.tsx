@@ -6,6 +6,8 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/Dialog";
+import { useToast } from "@/components/ui/Toast";
+import { copyText } from "@/lib/utils/clipboard";
 
 type CreateUserModalProps = {
   onClose: () => void;
@@ -33,6 +35,7 @@ type CreateUserFormData = z.output<typeof createUserSchema>;
 export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUserModalProps) {
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const [createdUsername, setCreatedUsername] = useState("");
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   const {
     register,
@@ -65,7 +68,12 @@ export function CreateUserModal({ onClose, onSave, isLoading, error }: CreateUse
 
   const handleCopyPassword = async () => {
     if (!temporaryPassword) return;
-    await navigator.clipboard.writeText(temporaryPassword);
+    try {
+      await copyText(temporaryPassword);
+    } catch {
+      toast.error("Failed to copy password");
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
