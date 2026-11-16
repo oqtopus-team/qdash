@@ -32,6 +32,10 @@ describe("globals.css", () => {
       });
     });
     expect(relativeTopLevelSelectors).toEqual([]);
-    expect(result.css).toMatch(/:where\(:focus, :has\(:focus\)\)\s*\{\s*z-index: 2/);
+    // daisyUI 5.8 writes the focus rule as `:where(:scope > :focus, :scope > :has(:focus))`;
+    // earlier releases write `:where(:focus, :has(:focus))`.
+    expect(result.css).toMatch(
+      /:where\((?::scope > )?:focus, (?::scope > )?:has\(:focus\)\)\s*\{\s*z-index: 2/,
+    );
   });
 });

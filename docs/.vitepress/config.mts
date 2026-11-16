@@ -23,6 +23,12 @@ export default withMermaid(
           target: "es2022",
         },
       },
+      ssr: {
+        // vitepress-openapi >= 0.2.13 imports `useData` from "vitepress" in its
+        // client bundle. Bundle it for SSR so that import resolves to the
+        // VitePress client runtime instead of the Node entry, which lacks it.
+        noExternal: ["vitepress-openapi"],
+      },
     },
     base: "/qdash/",
     title: "QDash",
