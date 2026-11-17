@@ -362,10 +362,10 @@ export function CreateChipModal({
                   </p>
                 ) : (
                   <>
-                    <label className="flex cursor-pointer items-start gap-2 text-sm">
+                    <label className="choice-field text-sm">
                       <input
                         type="checkbox"
-                        className="checkbox checkbox-sm mt-0.5 shrink-0"
+                        className="checkbox checkbox-sm"
                         disabled={createChipMutation.isPending}
                         {...register("createConfig")}
                       />
@@ -470,7 +470,11 @@ export function CreateChipModal({
             >
               {createChipMutation.isPending ? (
                 <>
-                  <span className="loading loading-spinner loading-sm" aria-hidden="true"></span>
+                  <span
+                    data-icon="inline-start"
+                    className="loading loading-spinner loading-sm"
+                    aria-hidden="true"
+                  ></span>
                   Creating...
                 </>
               ) : (

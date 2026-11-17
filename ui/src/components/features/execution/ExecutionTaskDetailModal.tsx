@@ -313,9 +313,9 @@ export function ExecutionTaskDetailModal({
                 ),
                 executionId,
               )}
-              className="btn btn-xs btn-outline gap-1"
+              className="btn btn-xs btn-outline"
             >
-              <GitBranch className="h-3 w-3" />
+              <GitBranch data-icon="inline-start" />
               Lineage
             </LineageButton>
           </div>

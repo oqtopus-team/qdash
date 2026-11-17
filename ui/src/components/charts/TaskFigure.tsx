@@ -114,13 +114,13 @@ function ExpandableImage({
         <span>Failed to load image</span>
         <button
           type="button"
-          className="btn btn-xs btn-ghost gap-1"
+          className="btn btn-xs btn-ghost"
           onClick={(event) => {
             event.stopPropagation();
             retry();
           }}
         >
-          <RotateCw className="h-3 w-3" aria-hidden="true" />
+          <RotateCw data-icon="inline-start" aria-hidden="true" />
           Retry
         </button>
       </div>

@@ -98,11 +98,11 @@ export function NotificationsPageContent() {
           </span>
         </div>
         <button
-          className="btn btn-sm btn-ghost gap-2"
+          className="btn btn-sm btn-ghost"
           onClick={() => markAllRead.mutate()}
           disabled={unreadCount === 0 || markAllRead.isPending}
         >
-          <CheckCheck className="h-4 w-4" />
+          <CheckCheck data-icon="inline-start" />
           Mark all read
         </button>
       </div>

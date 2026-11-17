@@ -181,12 +181,12 @@ export function ColorRangeSlider({
       {unit && <span className="shrink-0 text-base-content/50">{unit}</span>}
       <button
         type="button"
-        className="btn btn-ghost btn-xs gap-1"
+        className="btn btn-ghost btn-xs"
         onClick={onReset}
         disabled={!isOverridden}
         title="Reset color range to default"
       >
-        <RotateCcw className="h-3 w-3" aria-hidden="true" />
+        <RotateCcw data-icon="inline-start" aria-hidden="true" />
         Reset
       </button>
     </div>

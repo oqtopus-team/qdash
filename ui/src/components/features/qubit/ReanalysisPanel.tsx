@@ -432,11 +432,11 @@ function PanelShell({ title, children, mutation, onSubmit, onReset }: PanelShell
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              className="btn btn-sm btn-ghost gap-2"
+              className="btn btn-sm btn-ghost"
               onClick={onReset}
               disabled={mutation.isPending}
             >
-              <RotateCcw size={14} />
+              <RotateCcw data-icon="inline-start" />
               Reset
             </button>
             <button type="submit" className="btn btn-sm btn-primary" disabled={mutation.isPending}>
@@ -630,9 +630,9 @@ interface CheckboxFieldProps {
 /** Labelled checkbox wired to React Hook Form. */
 function CheckboxField({ id, label, registration }: CheckboxFieldProps) {
   return (
-    <label htmlFor={id} className="label cursor-pointer justify-start gap-3">
+    <label htmlFor={id} className="choice-field gap-3 text-xs">
       <input id={id} type="checkbox" className="checkbox checkbox-sm" {...registration} />
-      <span className="label-text text-xs font-mono">{label}</span>
+      <span className="font-mono">{label}</span>
     </label>
   );
 }

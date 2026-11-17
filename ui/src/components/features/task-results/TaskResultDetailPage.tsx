@@ -98,8 +98,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         description="The requested task result does not exist or has been removed."
         emoji="magnifying-glass"
         action={
-          <button onClick={() => router.back()} className="btn btn-sm btn-ghost gap-1">
-            <ArrowLeft className="h-4 w-4" />
+          <button onClick={() => router.back()} className="btn btn-sm btn-ghost">
+            <ArrowLeft data-icon="inline-start" />
             Go back
           </button>
         }
@@ -135,9 +135,9 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             {canReExecute && (
               <button
                 onClick={() => router.push(`/tasks?sourceTaskId=${encodeURIComponent(taskId)}`)}
-                className="btn btn-sm btn-primary gap-1"
+                className="btn btn-sm btn-primary"
               >
-                <RefreshCw className="h-3.5 w-3.5" />
+                <RefreshCw data-icon="inline-start" />
                 Run again
               </button>
             )}
@@ -179,10 +179,10 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             {taskResult.source_task_id && (
               <a
                 href={`/task-results/${taskResult.source_task_id}`}
-                className="btn btn-sm btn-outline shrink-0 gap-2"
+                className="btn btn-sm btn-outline shrink-0"
               >
                 View source result
-                <ExternalLink size={14} />
+                <ExternalLink data-icon="inline-end" />
               </a>
             )}
           </div>

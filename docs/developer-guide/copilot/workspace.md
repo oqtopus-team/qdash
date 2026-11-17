@@ -85,11 +85,13 @@ the chat only through `render_chart`.
 
 ## In the chat
 
-The trace under an answer shows a workspace step as what it did: the command for `bash`, the
-file and its code for `write`, the old and new text of each `edit`, the file for `read`, and
-under each the tool's answer (`output` on `tool_end`, the tail when long, with the exit code of a
-failed command). While the model is still writing a call, the row shows the code as it is typed
-(`tool_draft` and `tool_args_delta` in [Chat Streaming](./chat-streaming.md)); a save of a flow
+Workspace tool rows start collapsed, with a tool icon and a short activity label such as
+**Running bun** or **Writing fit.py**. Opening a row shows the command for `bash`, the file and
+its code for `write`, the old and new text of each `edit`, or the file for `read`. The expanded
+row also shows the tool's answer (`output` on `tool_end`, the tail when long, with the exit code
+of a failed command). The user's open or closed choice persists as the call starts and finishes.
+While the model writes a call, an expanded row shows the code as it is typed (`tool_draft` and
+`tool_args_delta` in [Chat Streaming](./chat-streaming.md)). A save of a flow
 (`qdash_save_flow`) shows the whole flow as code on its approval card. Components:
 `ui/src/components/features/chat/ToolStepDetails.tsx`, `ChatInteractionCards.tsx`.
 

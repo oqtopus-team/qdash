@@ -81,12 +81,12 @@ export function MetricsPdfDownloadButton({
       >
         {isDownloading ? (
           <>
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 data-icon="inline-start" className="animate-spin" />
             <span>Generating...</span>
           </>
         ) : (
           <>
-            <Download className="h-4 w-4" />
+            <Download data-icon="inline-start" />
             <span>PDF</span>
           </>
         )}

@@ -2,6 +2,8 @@
 
 import Select from "react-select";
 
+import { useSelectStyles } from "@/hooks/useSelectStyles";
+
 import type { Tag } from "@/schemas/tag";
 import type { SingleValue } from "react-select";
 
@@ -23,6 +25,7 @@ export function TagSelector({
   onTagSelect,
   disabled = false,
 }: TagSelectorProps) {
+  const styles = useSelectStyles<TagOption>();
   const options: TagOption[] = tags.map((tag) => ({
     value: tag.name,
     label: tag.name,
@@ -34,6 +37,7 @@ export function TagSelector({
 
   return (
     <Select<TagOption>
+      styles={styles}
       isClearable
       options={options}
       value={options.find((option) => option.value === selectedTag) ?? null}

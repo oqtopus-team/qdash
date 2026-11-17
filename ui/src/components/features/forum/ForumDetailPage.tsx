@@ -652,7 +652,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
       <div className="flex flex-col items-center justify-center gap-4 py-16">
         <p className="text-base-content/60">Forum thread not found</p>
         <Link href={forumReturnHref} className="btn btn-sm btn-ghost">
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft data-icon="inline-start" />
           Back to Forum
         </Link>
       </div>

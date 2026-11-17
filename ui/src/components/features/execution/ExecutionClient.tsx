@@ -35,6 +35,7 @@ import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
+import { useSelectStyles } from "@/hooks/useSelectStyles";
 
 type FilterOption = {
   value: string;
@@ -160,27 +161,16 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     }
   }, [filterTaskName, uniqueTaskNames]);
 
+  const selectStyles = useSelectStyles<FilterOption>();
   const filterSelectStyles = useMemo<StylesConfig<FilterOption, false>>(
     () => ({
-      control: (provided) => ({
-        ...provided,
-        minHeight: 34,
-        height: 34,
-      }),
-      valueContainer: (provided) => ({
-        ...provided,
-        padding: "2px 8px",
-      }),
-      indicatorsContainer: (provided) => ({
-        ...provided,
-        height: 34,
-      }),
-      menu: (provided) => ({
-        ...provided,
+      ...selectStyles,
+      menu: (provided, state) => ({
+        ...(selectStyles.menu?.(provided, state) ?? provided),
         zIndex: 40,
       }),
     }),
-    [],
+    [selectStyles],
   );
 
   // Filter tasks based on selected filters
@@ -229,8 +219,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     <div className="w-full px-4 py-6">
       <div className="space-y-6">
         {/* Back navigation */}
-        <Link href="/execution" className="btn btn-ghost btn-sm gap-2 w-fit">
-          <ArrowLeft size={16} />
+        <Link href="/execution" className="btn btn-ghost btn-sm w-fit">
+          <ArrowLeft data-icon="inline-start" />
           Back to Executions
         </Link>
 
@@ -355,9 +345,9 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                           document.body.removeChild(link);
                           URL.revokeObjectURL(url);
                         }}
-                        className="btn btn-sm btn-primary gap-2"
+                        className="btn btn-sm btn-primary"
                       >
-                        <Download size={14} />
+                        <Download data-icon="inline-start" />
                         Download JSON
                       </button>
                     </div>

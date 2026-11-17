@@ -202,14 +202,14 @@ function CompareBar({
         {ready ? (
           <Link
             href={compareHref(picked[0].run_id, picked[1].run_id)}
-            className="btn btn-primary btn-sm gap-1"
+            className="btn btn-primary btn-sm"
           >
-            <ArrowLeftRight className="h-4 w-4" />
+            <ArrowLeftRight data-icon="inline-start" />
             Compare
           </Link>
         ) : (
-          <button type="button" className="btn btn-primary btn-sm gap-1" disabled>
-            <ArrowLeftRight className="h-4 w-4" />
+          <button type="button" className="btn btn-primary btn-sm" disabled>
+            <ArrowLeftRight data-icon="inline-start" />
             Compare
           </button>
         )}

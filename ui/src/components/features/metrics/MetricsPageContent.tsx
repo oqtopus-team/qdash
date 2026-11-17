@@ -473,7 +473,7 @@ export function MetricsPageContent() {
                       <button
                         type="button"
                         aria-pressed={selectionMode === "latest"}
-                        className={`join-item btn btn-sm ${selectionMode === "latest" ? "btn-primary" : ""}`}
+                        className={`join-item btn ${selectionMode === "latest" ? "btn-primary" : ""}`}
                         onClick={() => setSelectionMode("latest")}
                       >
                         Latest
@@ -481,7 +481,7 @@ export function MetricsPageContent() {
                       <button
                         type="button"
                         aria-pressed={selectionMode === "best"}
-                        className={`join-item btn btn-sm ${selectionMode === "best" ? "btn-primary" : ""}`}
+                        className={`join-item btn ${selectionMode === "best" ? "btn-primary" : ""}`}
                         onClick={() => setSelectionMode("best")}
                         disabled={!isBestModeSupported}
                         title={
@@ -495,7 +495,7 @@ export function MetricsPageContent() {
                       <button
                         type="button"
                         aria-pressed={selectionMode === "average"}
-                        className={`join-item btn btn-sm ${selectionMode === "average" ? "btn-primary" : ""}`}
+                        className={`join-item btn ${selectionMode === "average" ? "btn-primary" : ""}`}
                         onClick={() => setSelectionMode("average")}
                         title="Show average values within time range"
                       >

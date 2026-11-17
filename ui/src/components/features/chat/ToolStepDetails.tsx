@@ -30,14 +30,14 @@ const WORKSPACE_TOOLS = new Set(["bash", "read", "write", "edit"]);
 const CLASSIFY_TOOL = "classify";
 
 /** The tool that runs a JavaScript script calling read-only QDash tools (agent-runtime codemode.ts). */
-export const CODEMODE_TOOL = "codemode";
+const CODEMODE_TOOL = "codemode";
 
 /** Language of a tool call's `code` argument. */
 function codeLanguage(tool: string): string {
   return tool === CODEMODE_TOOL ? "javascript" : "python";
 }
 
-export function isWorkspaceTool(tool: string): boolean {
+function isWorkspaceTool(tool: string): boolean {
   return WORKSPACE_TOOLS.has(tool);
 }
 
@@ -92,26 +92,41 @@ function firstLine(value: string): string {
   return line.length > 90 ? `${line.slice(0, 90)}…` : line;
 }
 
-/** A short one-line hint of what the tool was asked, e.g. `qid: 0, parameter: t1`. */
-function argsPreview(args: unknown): string | null {
-  const entries = Object.entries(record(args) ?? {}).filter(
-    ([, v]) => v !== null && v !== undefined && v !== "",
-  );
-  if (entries.length === 0) return null;
-  const line = entries
-    .map(([k, v]) => `${k}: ${typeof v === "string" ? v.split("\n")[0] : JSON.stringify(v)}`)
-    .join(", ");
-  return line.length > 90 ? `${line.slice(0, 90)}…` : line;
+/** Words that only set up the command that follows them. */
+const COMMAND_PREFIXES = new Set(["sudo", "env", "time", "nohup", "exec", "command"]);
+
+/**
+ * The program a shell command runs, for a short row title: `bun` for
+ * `cd ui && bun run test`. It reads only the first line and skips a leading
+ * `cd`, environment assignments and wrapper words; anything it does not
+ * recognise as a plain program name gives null, so the caller falls back to a
+ * generic title instead of showing a fragment of the command.
+ */
+export function commandName(command: string | undefined): string | null {
+  if (!command) return null;
+  const line = command.split("\n").find((l) => l.trim()) ?? "";
+  // This is a display hint, not a shell parser. Quoting, escapes and expansion
+  // can hide whitespace or separators inside values; never display their fragments.
+  if (/["'`\\$]/.test(line)) return null;
+  for (const segment of line.split(/&&|\|\||;|\|/)) {
+    const words = segment.trim().split(/\s+/).filter(Boolean);
+    while (words.length > 0 && (/^\w+=/.test(words[0]) || COMMAND_PREFIXES.has(words[0]))) {
+      words.shift();
+    }
+    const program = words[0]?.split("/").pop();
+    if (!program || program === "cd") continue;
+    return /^[\w][\w.+-]{0,31}$/.test(program) ? program : null;
+  }
+  return null;
 }
 
-/** The one-line hint next to a step's label: the command, the file, or the arguments. */
+/**
+ * A short, curated hint next to a step's title, such as an edit count or a
+ * flow name. Raw commands, code and arguments stay in the details.
+ */
 export function stepPreview(step: ToolStep): string | null {
   const args = record(step.status === "drafting" ? step.draft : step.args);
-  if (!args) return step.status === "drafting" ? "writing…" : null;
-  if (step.tool === "bash") {
-    const command = text(args.command);
-    return command ? `$ ${firstLine(command)}` : null;
-  }
+  if (!args || step.tool === "bash") return null;
   if (isWorkspaceTool(step.tool)) {
     // The path is in the title; only an edit count adds anything.
     const edits = Array.isArray(args.edits) ? args.edits.length : 0;
@@ -125,7 +140,7 @@ export function stepPreview(step: ToolStep): string | null {
     const question = text(args.question);
     return question ? firstLine(question) : null;
   }
-  return argsPreview(args);
+  return null;
 }
 
 /** How long the shown text may trail the streamed text while catching up. */
@@ -215,8 +230,12 @@ export function stepTitle(step: ToolStep): string {
     }
   }
   switch (step.tool) {
-    case "bash":
-      return drafting ? "Writing a command" : step.status === "running" ? "Running" : "Ran";
+    case "bash": {
+      if (drafting) return "Writing a command";
+      const program = commandName(text(args?.command));
+      const verb = step.status === "running" ? "Running" : "Ran";
+      return `${verb} ${program ?? "a command"}`;
+    }
     case "write":
       return `${drafting || step.status === "running" ? "Writing" : "Wrote"}${path ? ` ${path}` : ""}`;
     case "edit":
@@ -285,10 +304,22 @@ function DraftView({ step }: { step: ToolStep }) {
   );
 }
 
+/**
+ * Code a call ran, held to a bounded scroll box so an expanded script does not
+ * push the newest output far below the fold.
+ */
+function BoundedCode(props: Parameters<typeof CodeBlock>[0]) {
+  return (
+    <div className="max-h-72 overflow-y-auto" data-testid="tool-code">
+      <CodeBlock compact {...props} />
+    </div>
+  );
+}
+
 function PathLine({ path, detail }: { path: string | undefined; detail?: string }) {
   if (!path) return null;
   return (
-    <div className="mb-1 font-mono text-xs text-base-content/60">
+    <div className="mb-1 break-all font-mono text-xs text-base-content/60">
       {path}
       {detail && <span className="text-base-content/40"> · {detail}</span>}
     </div>
@@ -343,12 +374,7 @@ function EditsView({ edits }: { edits: unknown[] }) {
 /** Any tool's arguments: source as code, the rest as JSON. */
 function ArgsView({ tool, args }: { tool: string; args: unknown }) {
   if (args === undefined || args === null) return null;
-  if (typeof args === "string")
-    return (
-      <CodeBlock compact language="json">
-        {args}
-      </CodeBlock>
-    );
+  if (typeof args === "string") return <BoundedCode language="json">{args}</BoundedCode>;
   const values = record(args) ?? {};
   const source =
     typeof values.command === "string"
@@ -356,22 +382,13 @@ function ArgsView({ tool, args }: { tool: string; args: unknown }) {
       : typeof values.code === "string"
         ? { key: "code", language: codeLanguage(tool) }
         : undefined;
-  if (!source)
-    return (
-      <CodeBlock compact language="json">
-        {JSON.stringify(args, null, 2)}
-      </CodeBlock>
-    );
+  if (!source) return <BoundedCode language="json">{JSON.stringify(args, null, 2)}</BoundedCode>;
   const { [source.key]: code, ...rest } = values;
   return (
     <>
-      <CodeBlock compact language={source.language}>
-        {String(code)}
-      </CodeBlock>
+      <BoundedCode language={source.language}>{String(code)}</BoundedCode>
       {Object.keys(rest).length > 0 && (
-        <CodeBlock compact language="json">
-          {JSON.stringify(rest, null, 2)}
-        </CodeBlock>
+        <BoundedCode language="json">{JSON.stringify(rest, null, 2)}</BoundedCode>
       )}
     </>
   );
@@ -421,11 +438,7 @@ export function ToolDetails({ step }: { step: ToolStep }) {
     const command = text(args?.command);
     return (
       <div>
-        {command && (
-          <CodeBlock compact language="bash">
-            {command}
-          </CodeBlock>
-        )}
+        {command && <BoundedCode language="bash">{command}</BoundedCode>}
         <OutputPanel step={step} />
       </div>
     );
@@ -437,9 +450,9 @@ export function ToolDetails({ step }: { step: ToolStep }) {
       <div>
         {content === undefined && <PathLine path={path} />}
         {content !== undefined && (
-          <CodeBlock compact language={languageForPath(path)} title={path}>
+          <BoundedCode language={languageForPath(path)} title={path}>
             {content}
-          </CodeBlock>
+          </BoundedCode>
         )}
         <OutputPanel step={step} />
       </div>
@@ -463,11 +476,7 @@ export function ToolDetails({ step }: { step: ToolStep }) {
     const code = text(args?.code);
     return (
       <div>
-        {code && (
-          <CodeBlock compact language="javascript">
-            {code}
-          </CodeBlock>
-        )}
+        {code && <BoundedCode language="javascript">{code}</BoundedCode>}
         <OutputPanel step={step} />
       </div>
     );

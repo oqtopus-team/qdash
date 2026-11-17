@@ -187,11 +187,11 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
               <div className="flex justify-end">
                 <button
                   type="button"
-                  className="btn btn-sm btn-primary gap-1"
+                  className="btn btn-sm btn-primary"
                   onClick={handleSave}
                   disabled={updateChip.isPending}
                 >
-                  <Save className="h-4 w-4" />
+                  <Save data-icon="inline-start" />
                   {updateChip.isPending ? "Saving…" : "Save changes"}
                 </button>
               </div>
@@ -228,7 +228,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
                     </div>
                   )}
                   {!impact.can_delete_safely && (
-                    <label className="flex items-center gap-2 mt-1 cursor-pointer">
+                    <label className="choice-field mt-1">
                       <input
                         type="checkbox"
                         className="checkbox checkbox-sm checkbox-error"
@@ -258,7 +258,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
                 )}
                 <button
                   type="button"
-                  className="btn btn-sm btn-error gap-1"
+                  className="btn btn-sm btn-error"
                   onClick={handleDelete}
                   disabled={
                     deleteChip.isPending ||
@@ -268,7 +268,7 @@ export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalP
                       !forceDelete)
                   }
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 data-icon="inline-start" />
                   {deleteChip.isPending
                     ? "Deleting…"
                     : confirmDelete

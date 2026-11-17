@@ -102,7 +102,9 @@ export function DownloadConfirmModal({
             onClick={onConfirm}
             disabled={isSubmitting || selectedItemCount === 0}
           >
-            {isSubmitting ? <span className="loading loading-spinner loading-xs" /> : null}
+            {isSubmitting ? (
+              <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
+            ) : null}
             Download
           </button>
         </div>
@@ -126,24 +128,22 @@ function DownloadOptionRow({
 }) {
   return (
     <label
-      className={`flex items-center justify-between gap-3 rounded-lg border border-base-300 px-3 py-2 ${
-        count === 0 ? "opacity-50" : "cursor-pointer hover:bg-base-200"
+      className={`choice-field items-center gap-3 rounded-lg border border-base-300 px-3 py-2 ${
+        count === 0 ? "" : "hover:bg-base-200"
       }`}
     >
-      <span className="flex items-center gap-2 text-sm">
+      <span className="flex flex-1 items-center gap-2 text-sm">
         {icon}
         {label}
       </span>
-      <span className="flex items-center gap-3">
-        <span className="text-xs text-base-content/60">{count}</span>
-        <input
-          type="checkbox"
-          className="checkbox checkbox-sm"
-          checked={checked}
-          onChange={onToggle}
-          disabled={count === 0}
-        />
-      </span>
+      <span className="text-xs text-base-content/60">{count}</span>
+      <input
+        type="checkbox"
+        className="checkbox checkbox-sm"
+        checked={checked}
+        onChange={onToggle}
+        disabled={count === 0}
+      />
     </label>
   );
 }

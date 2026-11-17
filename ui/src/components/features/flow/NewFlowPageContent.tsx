@@ -1,8 +1,10 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useForm, useWatch, type FieldErrors } from "react-hook-form";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { parseAsString, useQueryState } from "nuqs";
@@ -29,6 +31,11 @@ import {
   useFirstCalibrationJourney,
   type JourneyContext,
 } from "@/components/features/first-calibration/useFirstCalibrationJourney";
+import {
+  flowMetadataSchema,
+  type FlowMetadataFormData,
+  type FlowMetadataFormInput,
+} from "@/components/features/flow/flowMetadataSchema";
 import { getTaskFileSettings, listTaskFileBackends } from "@/client/task-file/task-file";
 import { JOURNEY_QUERY_VALUE, suggestJourneyFlowName } from "@/lib/firstCalibrationJourney";
 import { formatMuxIds, summarizeFlowCode } from "@/lib/flowCodeSummary";
@@ -49,6 +56,16 @@ interface SaveSubmission {
 
 type SaveError = { kind: "conflict"; name: string } | { kind: "failed"; message: string };
 
+/** Metadata fields in form order, used to pick the first invalid one to reveal. */
+const METADATA_FIELD_ORDER: readonly (keyof FlowMetadataFormInput)[] = [
+  "name",
+  "description",
+  "flow_function_name",
+  "username",
+  "tags",
+  "folder",
+];
+
 type TemplateOption = {
   value: string;
   label: string;
@@ -66,21 +83,41 @@ type TemplateOption = {
 export function NewFlowPageContent() {
   const router = useRouter();
   const toast = useToast();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const {
+    control,
+    register,
+    handleSubmit,
+    getValues,
+    setValue,
+    setFocus,
+    formState: { errors },
+  } = useForm<FlowMetadataFormInput, unknown, FlowMetadataFormData>({
+    resolver: zodResolver(flowMetadataSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      flow_function_name: "",
+      username: "",
+      tags: "",
+      folder: "",
+    },
+    shouldFocusError: false,
+  });
+  const name = useWatch({ control, name: "name" });
+  const username = useWatch({ control, name: "username" });
   const [code, setCode] = useState("");
-  const [flowFunctionName, setFlowFunctionName] = useState("");
-  const [username, setUsername] = useState("");
   const [chipId, setChipId] = useQueryState("chip_id", parseAsString.withDefault(""));
-  const [tags, setTags] = useState("");
-  const [folder, setFolder] = useState("");
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [saveError, setSaveError] = useState<SaveError | null>(null);
-  const nameInputRef = useRef<HTMLInputElement>(null);
+  const pendingFieldFocus = useRef<keyof FlowMetadataFormInput | null>(null);
+  const [fieldFocusRequest, setFieldFocusRequest] = useState(0);
   const nameInputId = useId();
   const nameErrorId = useId();
+  const nameFieldErrorId = useId();
+  const usernameInputId = useId();
+  const usernameErrorId = useId();
   // Templates are listed per backend, like the task catalog on the Tasks page.
   const [selectedBackend, setSelectedBackend] = useQueryState("backend", parseAsString);
   // A link may name the template to open first, e.g. after creating a fake preset chip.
@@ -132,8 +169,9 @@ export function NewFlowPageContent() {
   useEffect(() => {
     if (!fromJourney || suggestedName.current || !flowNames) return;
     suggestedName.current = true;
-    setName((current) => current || suggestJourneyFlowName(flowNames.map((flow) => flow.name)));
-  }, [flowNames, fromJourney]);
+    if (getValues("name")) return;
+    setValue("name", suggestJourneyFlowName(flowNames.map((flow) => flow.name)));
+  }, [flowNames, fromJourney, getValues, setValue]);
 
   const { data: settingsData, isPending: isSettingsPending } = useQuery({
     queryKey: ["taskFileSettings"],
@@ -190,9 +228,9 @@ export function NewFlowPageContent() {
   // Set default username and chip_id
   useEffect(() => {
     if (userData?.data?.username && !username) {
-      setUsername(userData.data.username);
+      setValue("username", userData.data.username);
     }
-  }, [userData, username]);
+  }, [userData, username, setValue]);
 
   useEffect(() => {
     if (chipsData?.data?.chips && chipsData.data.chips.length > 0 && !chipId) {
@@ -211,6 +249,7 @@ export function NewFlowPageContent() {
   const latestTemplateRequest = useRef(0);
   const sourceVersion = useRef(0);
 
+  /** Loads a template's code, entrypoint and description, unless a newer pick or an edit won. */
   const loadTemplate = async (templateId: string, { notify }: { notify: boolean }) => {
     const requestId = ++latestTemplateRequest.current;
     const sourceAtRequest = sourceVersion.current;
@@ -223,8 +262,8 @@ export function NewFlowPageContent() {
       const template = response.data;
 
       setCode(template.code);
-      setFlowFunctionName(template.function_name);
-      setDescription(template.description);
+      setValue("flow_function_name", template.function_name);
+      setValue("description", template.description);
       if (notify) toast.success("Template loaded successfully");
     } catch (error) {
       console.error("Failed to load template:", error);
@@ -277,7 +316,7 @@ export function NewFlowPageContent() {
       if (isAxiosError(error) && error.response?.status === 409) {
         // The inputs stay as they are; only the name has to change.
         setSaveError({ kind: "conflict", name: request.name });
-        nameInputRef.current?.focus();
+        revealField("name");
         return;
       }
       setSaveError({
@@ -293,37 +332,40 @@ export function NewFlowPageContent() {
     setSaveError(null);
   }, [projectId]);
 
-  const handleSave = () => {
-    if (!name.trim()) {
-      toast.error("Please enter a flow name");
-      return;
-    }
+  /** Shows the Properties panel and focuses a metadata field once the panel has rendered. */
+  const revealField = (field: keyof FlowMetadataFormInput) => {
+    setIsSidebarVisible(true);
+    pendingFieldFocus.current = field;
+    setFieldFocusRequest((request) => request + 1);
+  };
 
-    if (!/^[a-zA-Z0-9_]+$/.test(name)) {
-      toast.error("Flow name must contain only alphanumeric characters and underscores");
-      return;
-    }
+  useEffect(() => {
+    const field = pendingFieldFocus.current;
+    if (!field) return;
+    pendingFieldFocus.current = null;
+    setFocus(field);
+  }, [fieldFocusRequest, setFocus]);
 
-    if (!username.trim()) {
-      toast.error("Please enter a username");
-      return;
-    }
+  /** Reveals the first invalid metadata field, in form order, so a hidden panel never hides it. */
+  const revealInvalidField = (fieldErrors: FieldErrors<FlowMetadataFormInput>) => {
+    const field = METADATA_FIELD_ORDER.find((key) => fieldErrors[key]);
+    if (field) revealField(field);
+  };
 
+  /** Submits the validated metadata with the editor code and the chip from the URL. */
+  const submitFlow = (values: FlowMetadataFormData) => {
     const request: SaveFlowRequest = {
       // Creating never replaces a flow, even one created since this page opened.
       create_only: true,
-      name: name.trim(),
-      description: description.trim(),
+      name: values.name,
+      description: values.description,
       code,
-      flow_function_name: flowFunctionName.trim() || undefined,
+      flow_function_name: values.flow_function_name,
       chip_id: chipId.trim(),
-      tags: tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      folder: folder.trim(),
+      tags: values.tags,
+      folder: values.folder,
       default_parameters: {
-        username: username.trim(),
+        username: values.username,
         chip_id: chipId.trim(),
       },
     };
@@ -335,6 +377,8 @@ export function NewFlowPageContent() {
       forJourney: fromJourney,
     });
   };
+  const handleSave = handleSubmit(submitFlow, revealInvalidField);
+  const nameConflict = saveError?.kind === "conflict";
 
   return (
     <>
@@ -558,20 +602,26 @@ export function NewFlowPageContent() {
                     <span className="label-text text-xs">Flow Name *</span>
                   </label>
                   <input
-                    ref={nameInputRef}
                     id={nameInputId}
                     data-coachmark="flow-name"
                     type="text"
                     placeholder="my_flow"
-                    className={`input input-bordered input-sm ${saveError?.kind === "conflict" ? "input-error" : ""}`}
-                    value={name}
-                    aria-invalid={saveError?.kind === "conflict" || undefined}
-                    aria-describedby={saveError?.kind === "conflict" ? nameErrorId : undefined}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      if (saveError?.kind === "conflict") setSaveError(null);
-                    }}
+                    className={`input input-bordered input-sm ${errors.name || nameConflict ? "input-error" : ""}`}
+                    aria-invalid={Boolean(errors.name) || nameConflict || undefined}
+                    aria-describedby={
+                      errors.name ? nameFieldErrorId : nameConflict ? nameErrorId : undefined
+                    }
+                    {...register("name", {
+                      onChange: () => {
+                        if (nameConflict) setSaveError(null);
+                      },
+                    })}
                   />
+                  {errors.name && (
+                    <p id={nameFieldErrorId} className="mt-1 text-xs text-error">
+                      {errors.name.message}
+                    </p>
+                  )}
                   <label className="label">
                     <span className="label-text-alt text-xs">
                       Alphanumeric and underscores only
@@ -586,9 +636,8 @@ export function NewFlowPageContent() {
                   <textarea
                     className="textarea textarea-bordered textarea-sm"
                     placeholder="Describe your flow..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
                     rows={3}
+                    {...register("description")}
                   />
                 </div>
 
@@ -600,8 +649,7 @@ export function NewFlowPageContent() {
                     type="text"
                     placeholder="simple_flow"
                     className="input input-bordered input-sm"
-                    value={flowFunctionName}
-                    onChange={(e) => setFlowFunctionName(e.target.value)}
+                    {...register("flow_function_name")}
                   />
                   <label className="label">
                     <span className="label-text-alt text-xs">
@@ -611,16 +659,23 @@ export function NewFlowPageContent() {
                 </div>
 
                 <div className="form-control">
-                  <label className="label">
+                  <label className="label" htmlFor={usernameInputId}>
                     <span className="label-text text-xs">Username *</span>
                   </label>
                   <input
+                    id={usernameInputId}
                     type="text"
                     placeholder="your_username"
-                    className="input input-bordered input-sm"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    className={`input input-bordered input-sm ${errors.username ? "input-error" : ""}`}
+                    aria-invalid={Boolean(errors.username)}
+                    aria-describedby={errors.username ? usernameErrorId : undefined}
+                    {...register("username")}
                   />
+                  {errors.username && (
+                    <p id={usernameErrorId} className="mt-1 text-xs text-error">
+                      {errors.username.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-control">
@@ -644,8 +699,7 @@ export function NewFlowPageContent() {
                     type="text"
                     placeholder="tag1, tag2, tag3"
                     className="input input-bordered input-sm"
-                    value={tags}
-                    onChange={(e) => setTags(e.target.value)}
+                    {...register("tags")}
                   />
                   <label className="label">
                     <span className="label-text-alt text-xs">Comma-separated</span>
@@ -660,8 +714,7 @@ export function NewFlowPageContent() {
                     type="text"
                     placeholder="daily/t1"
                     className="input input-bordered input-sm"
-                    value={folder}
-                    onChange={(e) => setFolder(e.target.value)}
+                    {...register("folder")}
                   />
                   <label className="label">
                     <span className="label-text-alt text-xs">

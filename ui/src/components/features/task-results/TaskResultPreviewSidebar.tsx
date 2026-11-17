@@ -215,8 +215,8 @@ export function TaskResultPreviewSidebar({
             )}
             <p className="mt-1 font-mono text-xs text-base-content/50">{taskId}</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Link href={`/task-results/${taskId}`} className="btn btn-primary btn-sm gap-1">
-                <ExternalLink className="h-3.5 w-3.5" />
+              <Link href={`/task-results/${taskId}`} className="btn btn-primary btn-sm">
+                <ExternalLink data-icon="inline-start" />
                 Open full page
               </Link>
               {showExecutionLink && taskResult?.chip_id && taskResult?.execution_id && (
@@ -224,9 +224,9 @@ export function TaskResultPreviewSidebar({
                   href={`/execution/${encodeURIComponent(taskResult.chip_id)}/${encodeURIComponent(
                     taskResult.execution_id,
                   )}`}
-                  className="btn btn-ghost btn-sm gap-1"
+                  className="btn btn-ghost btn-sm"
                 >
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <ExternalLink data-icon="inline-start" />
                   Execution
                 </Link>
               )}

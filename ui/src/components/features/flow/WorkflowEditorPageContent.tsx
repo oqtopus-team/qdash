@@ -4,6 +4,7 @@ import type { OnMount } from "@monaco-editor/react";
 import dynamic from "next/dynamic";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { FieldErrors } from "react-hook-form";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ExecuteFlowRequest, ExecuteFlowResponse, ExecutionResponseDetail } from "@/schemas";
@@ -78,7 +79,12 @@ import { executionHref } from "@/components/features/first-calibration/journeyPr
 import { FlowExecuteConfirmModal } from "@/components/features/flow/FlowExecuteConfirmModal";
 import { FlowExplorer } from "@/components/features/flow/FlowExplorer";
 import { FlowSchedulePanel } from "@/components/features/flow/FlowSchedulePanel";
-import { type FlowDocument, useFlowDocument } from "@/components/features/flow/useFlowDocument";
+import type { FlowPropertiesFormInput } from "@/components/features/flow/flowMetadataSchema";
+import {
+  type FlowDocument,
+  type FlowPropertyField,
+  useFlowDocument,
+} from "@/components/features/flow/useFlowDocument";
 import { WorkflowExecutionHelpDialog } from "@/components/features/flow/WorkflowExecutionHelpDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { WorkflowEditorPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
@@ -138,6 +144,22 @@ interface DiscardPrompt {
 
 const PANE_LABEL: Record<Pane, string> = { primary: "Left", secondary: "Right" };
 
+/** Input ids of each property field in the side panel and in the properties modal, in form order. */
+const PROPERTY_INPUT_IDS: Record<FlowPropertyField, { side: string; modal: string }> = {
+  description: { side: "flow-side-description", modal: "flow-description" },
+  flow_function_name: { side: "flow-side-entrypoint", modal: "flow-entrypoint" },
+  username: { side: "flow-side-username", modal: "flow-username" },
+  chip_id: { side: "flow-side-chip-id", modal: "flow-chip-id" },
+  tags: { side: "flow-side-tags", modal: "flow-tags" },
+  folder: { side: "flow-side-folder", modal: "flow-folder" },
+  default_interval: { side: "flow-side-default-interval", modal: "flow-interval" },
+};
+
+/**
+ * Editor for saved flows: the code in Monaco and its properties in the side panel and the
+ * properties modal, per pane in split view. Saving, by button, Cmd/Ctrl+S or the command palette,
+ * validates that pane's properties while the editor is unlocked and reveals the first invalid one.
+ */
 export function WorkflowEditorPageContent() {
   const router = useRouter();
   const params = useParams();
@@ -179,6 +201,8 @@ export function WorkflowEditorPageContent() {
   const [isBottomPanelOpen, setIsBottomPanelOpen] = useState(false);
   const [wordWrap, setWordWrap] = useState<"on" | "off">("on");
   const reportedTerminalExecution = useRef<string | null>(null);
+  const pendingPropertyFocus = useRef<FlowPropertyField | null>(null);
+  const [propertyFocusRequest, setPropertyFocusRequest] = useState(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRefs = useRef<Record<Pane, any>>({ primary: null, secondary: null });
 
@@ -208,6 +232,7 @@ export function WorkflowEditorPageContent() {
     setFolder,
     defaultInterval,
     setDefaultInterval,
+    propertyErrors,
     isDirty,
   } = active;
   const flow = active.flow;
@@ -417,10 +442,36 @@ export function WorkflowEditorPageContent() {
     [registerPage],
   );
 
+  /** Shows a pane's first invalid property, in the open modal or in the side panel, and focuses it. */
+  const revealInvalidProperty = (pane: Pane, fieldErrors: FieldErrors<FlowPropertiesFormInput>) => {
+    const field = (Object.keys(PROPERTY_INPUT_IDS) as FlowPropertyField[]).find(
+      (key) => fieldErrors[key],
+    );
+    if (!field) return;
+    // The properties shown are the active pane's.
+    if (isSplitView) setActivePane(pane);
+    if (!showPropertiesModal) {
+      setActiveSidePanel("properties");
+      setIsSidebarVisible(true);
+    }
+    pendingPropertyFocus.current = field;
+    setPropertyFocusRequest((request) => request + 1);
+  };
+
+  useEffect(() => {
+    const field = pendingPropertyFocus.current;
+    if (!field) return;
+    pendingPropertyFocus.current = null;
+    const ids = PROPERTY_INPUT_IDS[field];
+    document.getElementById(showPropertiesModal ? ids.modal : ids.side)?.focus();
+  }, [propertyFocusRequest, showPropertiesModal]);
+
   // Save the given pane's workflow; Save buttons and the palette use the active pane.
   const savePane = (pane: Pane) => {
     if (isEditorLocked) return;
-    docs[pane].save(captureJourneyContext());
+    docs[pane].save(captureJourneyContext(), (fieldErrors) =>
+      revealInvalidProperty(pane, fieldErrors),
+    );
   };
   const handleSave = () => savePane(currentPane);
 
@@ -860,7 +911,7 @@ export function WorkflowEditorPageContent() {
             className="btn btn-error"
             disabled={deleteMutation.isPending}
           >
-            <Trash2 size={16} />
+            <Trash2 data-icon="inline-start" />
             Delete Flow Metadata
           </button>
         </div>
@@ -1071,8 +1122,8 @@ export function WorkflowEditorPageContent() {
               title="Execution help"
               aria-label="Execution help"
             >
-              <CircleHelp size={16} />
-              <span className="ml-1 hidden md:inline">Execution help</span>
+              <CircleHelp data-icon="inline-start" />
+              <span className="hidden md:inline">Execution help</span>
             </button>
             <button
               type="button"
@@ -1089,8 +1140,8 @@ export function WorkflowEditorPageContent() {
               className={`btn btn-sm ${isEditorLocked ? "btn-outline" : "btn-warning"}`}
               title={isEditorLocked ? "Click to edit" : "Currently editing"}
             >
-              <Pencil size={16} />
-              <span className="ml-1">{isEditorLocked ? "Edit" : "Editing"}</span>
+              <Pencil data-icon="inline-start" />
+              <span>{isEditorLocked ? "Edit" : "Editing"}</span>
             </button>
             <button
               onClick={openExecute}
@@ -1102,11 +1153,14 @@ export function WorkflowEditorPageContent() {
               title={executeDisabledReason ?? "Execute Flow"}
             >
               {executeMutation.isPending ? (
-                <span className="loading loading-spinner loading-xs"></span>
+                <span
+                  data-icon="inline-start"
+                  className="loading loading-spinner loading-xs"
+                ></span>
               ) : (
-                <Play size={16} />
+                <Play data-icon="inline-start" />
               )}
-              <span className="ml-1">Execute</span>
+              <span>Execute</span>
             </button>
             {canCancel && (
               <button
@@ -1116,11 +1170,14 @@ export function WorkflowEditorPageContent() {
                 title="Cancel the running execution"
               >
                 {cancelMutation.isPending ? (
-                  <span className="loading loading-spinner loading-xs"></span>
+                  <span
+                    data-icon="inline-start"
+                    className="loading loading-spinner loading-xs"
+                  ></span>
                 ) : (
-                  <StopCircle size={16} />
+                  <StopCircle data-icon="inline-start" />
                 )}
-                <span className="ml-1">Cancel</span>
+                <span>Cancel</span>
               </button>
             )}
             <button
@@ -1128,8 +1185,8 @@ export function WorkflowEditorPageContent() {
               className="btn btn-sm btn-error"
               disabled={active.isSaving || deleteMutation.isPending || !ready}
             >
-              <Trash2 size={16} />
-              <span className="ml-1">Delete</span>
+              <Trash2 data-icon="inline-start" />
+              <span>Delete</span>
             </button>
             <button
               onClick={handleSave}
@@ -1137,13 +1194,14 @@ export function WorkflowEditorPageContent() {
               disabled={active.isSaving || deleteMutation.isPending || isEditorLocked || !ready}
             >
               {active.isSaving ? (
-                <span className="loading loading-spinner loading-xs"></span>
+                <span
+                  data-icon="inline-start"
+                  className="loading loading-spinner loading-xs"
+                ></span>
               ) : (
-                <>
-                  <Save size={16} />
-                  <span className="ml-1">Save</span>
-                </>
+                <Save data-icon="inline-start" />
               )}
+              <span>Save</span>
             </button>
           </div>
         </div>
@@ -1302,9 +1360,9 @@ export function WorkflowEditorPageContent() {
                       onClick={() =>
                         confirmDiscard([primary, secondary], () => router.push("/workflow/new"))
                       }
-                      className="btn btn-primary btn-xs w-full gap-1"
+                      className="btn btn-primary btn-xs w-full"
                     >
-                      <FilePlus2 size={13} />
+                      <FilePlus2 data-icon="inline-start" />
                       New Flow
                     </button>
                   </div>
@@ -1372,20 +1430,29 @@ export function WorkflowEditorPageContent() {
                         onChange={(e) => setFlowFunctionName(e.target.value)}
                       />
                     </label>
-                    <label className="form-control flex flex-col gap-1">
-                      <span className="label py-1">
+                    <div className="form-control flex flex-col gap-1">
+                      <label htmlFor="flow-side-username" className="label py-1">
                         <span className="label-text text-xs">Username *</span>
-                      </span>
+                      </label>
                       <input
                         id="flow-side-username"
                         name="flowUsername"
                         type="text"
                         placeholder="your_username"
-                        className="input input-bordered input-sm"
+                        className={`input input-bordered input-sm ${propertyErrors.username ? "input-error" : ""}`}
+                        aria-invalid={Boolean(propertyErrors.username)}
+                        aria-describedby={
+                          propertyErrors.username ? "flow-side-username-error" : undefined
+                        }
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                       />
-                    </label>
+                      {propertyErrors.username && (
+                        <p id="flow-side-username-error" className="text-xs text-error">
+                          {propertyErrors.username.message}
+                        </p>
+                      )}
+                    </div>
                     <label className="form-control flex flex-col gap-1">
                       <span className="label py-1">
                         <span className="label-text text-xs">Chip ID *</span>
@@ -1450,9 +1517,9 @@ export function WorkflowEditorPageContent() {
                     <button
                       type="button"
                       onClick={() => setShowPropertiesModal(true)}
-                      className="btn btn-outline btn-xs w-full gap-1"
+                      className="btn btn-outline btn-xs w-full"
                     >
-                      <Settings size={13} />
+                      <Settings data-icon="inline-start" />
                       Advanced Settings
                     </button>
                   </div>
@@ -1914,10 +1981,17 @@ export function WorkflowEditorPageContent() {
                     id="flow-username"
                     type="text"
                     placeholder="your_username"
-                    className="input input-bordered input-sm"
+                    className={`input input-bordered input-sm ${propertyErrors.username ? "input-error" : ""}`}
+                    aria-invalid={Boolean(propertyErrors.username)}
+                    aria-describedby={propertyErrors.username ? "flow-username-error" : undefined}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                   />
+                  {propertyErrors.username && (
+                    <p id="flow-username-error" className="mt-1 text-xs text-error">
+                      {propertyErrors.username.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-control flex flex-col gap-1">

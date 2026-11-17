@@ -159,6 +159,77 @@ a.card:hover {
 }
 
 /* ----------------------------------------
+   Icon + Label Buttons - Optical Spacing
+   ---------------------------------------- */
+
+/*
+ * An icon reads lighter than a word, so equal geometry looks lopsided. Mark the icon
+ * that is a direct child of a labeled `.btn` with data-icon="inline-start" or
+ * "inline-end". The rules below then shrink the outer padding on the icon side, size
+ * the icon from the label's font size, and tighten the icon-label gap. Height is
+ * untouched, so DaisyUI size classes keep setting the hit target. Icon-only
+ * `.btn-square` and `.btn-circle` controls are excluded.
+ */
+.btn:not(.btn-square, .btn-circle) {
+  --btn-icon-size: calc(1em + 0.125rem);
+  --btn-icon-padding: 0.75;
+}
+
+.btn:not(.btn-square, .btn-circle) > [data-icon] {
+  width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
+  flex-shrink: 0;
+}
+
+.btn:not(.btn-square, .btn-circle):has(> [data-icon]) {
+  gap: 0.375em;
+}
+
+/* An explicit horizontal padding utility on the button wins over the optical default. */
+.btn:not(.btn-square, .btn-circle, [class*="px-"], [class*="ps-"], [class*="pl-"]):has(
+    > [data-icon="inline-start"]
+  ) {
+  padding-inline-start: calc(var(--btn-p) * var(--btn-icon-padding));
+}
+
+.btn:not(.btn-square, .btn-circle, [class*="px-"], [class*="pe-"], [class*="pr-"]):has(
+    > [data-icon="inline-end"]
+  ) {
+  padding-inline-end: calc(var(--btn-p) * var(--btn-icon-padding));
+}
+
+/* A label hidden below a breakpoint leaves an icon-only button: keep the icon centered. */
+.btn:has(> .hidden) {
+  --btn-icon-padding: 1;
+}
+
+@media (width >= 40rem) {
+  .btn:has(> .hidden:is(.sm\:inline, .sm\:inline-block, .sm\:inline-flex, .sm\:block, .sm\:flex)) {
+    --btn-icon-padding: 0.75;
+  }
+}
+
+@media (width >= 48rem) {
+  .btn:has(> .hidden:is(.md\:inline, .md\:inline-block, .md\:inline-flex, .md\:block, .md\:flex)) {
+    --btn-icon-padding: 0.75;
+  }
+}
+
+@media (width >= 64rem) {
+  .btn:has(> .hidden:is(.lg\:inline, .lg\:inline-block, .lg\:inline-flex, .lg\:block, .lg\:flex)) {
+    --btn-icon-padding: 0.75;
+  }
+}
+
+/*
+ * Optical nudge, only for shapes whose visual mass sits off the box center. Lucide's
+ * play triangle leans left, so move it one grid unit (1/24 of its box) to the right.
+ */
+.btn:not(.btn-square, .btn-circle) > svg.lucide-play[data-icon] {
+  translate: 4.1667% 0;
+}
+
+/* ----------------------------------------
    Input Styles - Rich Interactive
    ---------------------------------------- */
 
@@ -192,6 +263,48 @@ a.card:hover {
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 15%, transparent);
   outline: none;
   background-color: var(--color-base-100);
+}
+
+/* ----------------------------------------
+   Checkbox, Radio, and Toggle Labels
+   ---------------------------------------- */
+
+/*
+ * A <label class="choice-field"> wraps a native checkbox, radio, or toggle and its text,
+ * so the whole label is the click target while the control keeps its DaisyUI size. The
+ * label is at least 24px tall (WCAG 2.5.8 minimum target), the control is centered on the
+ * first line of text however many lines the text wraps to, and a disabled control dims
+ * its text. The rules live in the components layer so layout utilities on the label
+ * (padding, gap, alignment, borders) still win.
+ */
+@layer components {
+  .choice-field {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    min-width: 0;
+    padding-block: max(0px, calc((1.5rem - 1lh) / 2));
+    cursor: pointer;
+  }
+
+  /* `1lh` is the label's line height, inherited by the input through `font: inherit`. */
+  .choice-field > :is(.checkbox, .radio, .toggle) {
+    flex-shrink: 0;
+    margin-block: calc((1lh - var(--size)) / 2);
+  }
+
+  .choice-field > :not(input) {
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  .choice-field:has(> input:disabled) {
+    cursor: not-allowed;
+  }
+
+  .choice-field:has(> input:disabled) > :not(input) {
+    opacity: 0.5;
+  }
 }
 
 /* ----------------------------------------
@@ -840,24 +953,25 @@ html[data-theme="dark"],
    Applies DaisyUI theme colors to react-select
    ---------------------------------------- */
 
-/* Control (main input container) */
-.css-13cymwt-control,
-.css-t3ipsp-control,
-[class$="-control"] {
+/*
+ * Control (main input container). Emotion always appends `css-<hash>-control`, so the
+ * selector does not match unrelated classes such as `form-control`. Height is owned by
+ * `getDaisySelectStyles` in `ui/src/lib/react-select-theme.ts`, which follows the DaisyUI
+ * field size tokens; hover and focus match `.input` and `.select`.
+ */
+[class*="css-"][class$="-control"] {
   background-color: var(--color-base-100) !important;
   border-color: var(--color-base-300) !important;
-  min-height: 2.5rem !important;
 }
 
-[class$="-control"]:hover {
-  border-color: var(--color-primary) !important;
+[class*="css-"][class$="-control"]:hover {
+  border-color: color-mix(in oklch, var(--color-base-content) 25%, transparent) !important;
 }
 
 /* Focused state */
-.css-t3ipsp-control,
-[class$="-control"]:focus-within {
+[class*="css-"][class$="-control"]:focus-within {
   border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 1px var(--color-primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 15%, transparent) !important;
 }
 
 /* Menu (dropdown) */

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 
-import { useEffect, useState } from "react";
-import { Brain, Check, Loader2, PenLine, X } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { twMerge } from "tailwind-merge";
+import { Ban, Brain, ChevronRight, CircleX } from "lucide-react";
 import type {
   ChatTrace as ChatTraceData,
   ToolClassification,
@@ -15,8 +16,6 @@ import { FigureStrip } from "@/components/features/chat/ChatFigures";
 import {
   ToolDetails,
   hasDetails,
-  isWorkspaceTool,
-  CODEMODE_TOOL,
   stepPreview,
   stepTitle,
   toolIcon,
@@ -147,83 +146,131 @@ function ClassificationPanel({ classification }: { classification: ToolClassific
   );
 }
 
-function ToolStepRow({
-  step,
-  now,
-  live,
-  isLast,
-}: {
-  step: Extract<TraceStep, { kind: "tool" }>;
-  now: number;
-  /** The turn is still streaming; code and output stay in view instead of folding. */
-  live: boolean;
-  isLast?: boolean;
-}) {
-  const Icon = toolIcon(step.tool);
+type ToolStep = Extract<TraceStep, { kind: "tool" }>;
+
+/** A tool call's state in words, so it never rests on the marker's color alone. */
+const TOOL_STATUS_LABEL: Record<ToolStep["status"], string> = {
+  drafting: "Preparing",
+  running: "Running",
+  done: "Done",
+  error: "Failed",
+  cancelled: "Not run",
+};
+
+/** The last line a failed call printed, to keep the failure readable while its row is folded. */
+function failureLine(step: ToolStep): string | null {
+  const failed = step.status === "error" || (step.exitCode !== undefined && step.exitCode !== 0);
+  if (!failed || !step.output) return null;
+  const lines = step.output.split("\n").filter((line) => line.trim());
+  const last = lines[lines.length - 1]?.trim();
+  if (!last) return null;
+  return last.length > 160 ? `${last.slice(0, 160)}…` : last;
+}
+
+/** Lines up content under a row's title, past its inline icon. */
+const ROW_INDENT = "pl-5.5";
+
+/** A row's chevron: shown on hover or focus, and kept while the row is open. */
+function RowChevron({ open }: { open: boolean }) {
+  return (
+    <ChevronRight
+      className={`w-3 h-3 shrink-0 text-base-content/40 transition-[transform,opacity] ${
+        open
+          ? "rotate-90 opacity-100"
+          : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+      }`}
+      aria-hidden="true"
+    />
+  );
+}
+
+function ToolStepRow({ step, now }: { step: ToolStep; now: number }) {
+  const title = stepTitle(step);
   const preview = stepPreview(step);
-  // Code written live stays open while it runs and when its output lands;
-  // folding it the moment the call starts would hide what the user just watched.
-  const stayOpen =
-    live &&
-    (isWorkspaceTool(step.tool) || step.tool === CODEMODE_TOOL || step.tool === "qdash_save_flow");
   const elapsed = (step.endedAt ?? now) - step.startedAt;
   const details = hasDetails(step);
   const drafting = step.status === "drafting";
+  const running = step.status === "running";
+  const failed = step.status === "error";
+  const cancelled = step.status === "cancelled";
+  // Every row starts folded, live or not; code and output open only on request.
+  // The row's key is its position, so the user's choice survives the draft
+  // becoming a running call and that call finishing.
+  const [userOpen, setUserOpen] = useState(false);
+  const open = details && userOpen;
+  const failure = open ? null : failureLine(step);
   // While the assistant waits on an execution, show its tasks and figures as they land.
   const waitingOn = executionIdFromArgs(step.args);
+  // One icon per row: what the tool is, or that it failed or never ran.
+  const Icon = failed ? CircleX : cancelled ? Ban : toolIcon(step.tool);
 
   return (
-    <ChainOfThoughtStep
-      isLast={isLast}
-      status={
-        step.status === "drafting" ? "running" : step.status === "cancelled" ? "idle" : step.status
-      }
-      // A call being written opens its row; a workspace step stays open for the whole live turn.
-      isStreaming={drafting && !stayOpen}
-      defaultOpen={stayOpen}
-      marker={
-        drafting ? (
-          <PenLine className="w-3 h-3" />
-        ) : step.status === "running" ? (
-          <Loader2 className="w-3 h-3 animate-spin" />
-        ) : step.status === "error" || step.status === "cancelled" ? (
-          <X className="w-3 h-3" />
-        ) : (
-          <Check className="w-3 h-3" />
-        )
-      }
-    >
+    <ChainOfThoughtStep variant="plain" open={open} onOpenChange={setUserOpen}>
       <ChainOfThoughtTrigger
-        hideChevron={!details || drafting}
+        hideChevron
         disabled={!details}
-        className={details ? "" : "cursor-default"}
+        className={`group min-w-0 gap-2 text-sm ${details ? "" : "cursor-default"}`}
+        title={title}
+        data-status={step.status}
       >
-        <Icon className="w-3.5 h-3.5 shrink-0 text-base-content/50" />
+        <Icon
+          className={`w-3.5 h-3.5 shrink-0 ${failed ? "text-error" : "text-base-content/45"}`}
+          strokeWidth={1.75}
+          aria-hidden="true"
+        />
         <span
-          className={`font-medium shrink-0 ${
-            step.status === "running" || drafting ? "loader-text-shimmer" : "text-base-content/80"
+          className={`min-w-0 truncate ${
+            running || drafting
+              ? "loader-text-shimmer"
+              : cancelled
+                ? "text-base-content/45"
+                : "text-base-content/65 group-hover:text-base-content/85"
           }`}
         >
-          {stepTitle(step)}
+          {title}
         </span>
         {preview && (
-          <span className="truncate font-mono text-xs text-base-content/40">{preview}</span>
+          <span className="min-w-0 flex-[1_1_0%] truncate text-xs text-base-content/40">
+            {preview}
+          </span>
         )}
-        <span className="ml-auto shrink-0 tabular-nums text-xs text-base-content/35">
-          {step.status === "error" ? "failed · " : step.status === "cancelled" ? "not run · " : ""}
-          {formatDuration(elapsed)}
+        {details && <RowChevron open={open} />}
+        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-xs tabular-nums text-base-content/40">
+          {failed ? (
+            <span className="text-error">Failed</span>
+          ) : cancelled ? (
+            <span>Not run</span>
+          ) : (
+            <span className="sr-only">{TOOL_STATUS_LABEL[step.status]}</span>
+          )}
+          {!drafting && !cancelled && <span>{formatDuration(elapsed)}</span>}
         </span>
       </ChainOfThoughtTrigger>
-      {step.status === "running" && step.tool === "qdash_wait_execution" && waitingOn && (
-        <ExecutionProgress executionId={waitingOn} />
+      {failure && (
+        <p
+          className={`${ROW_INDENT} mt-0.5 truncate font-mono text-xs text-error`}
+          title={failure}
+          data-testid="tool-failure-line"
+        >
+          {failure}
+        </p>
+      )}
+      {running && step.tool === "qdash_wait_execution" && waitingOn && (
+        <div className={ROW_INDENT}>
+          <ExecutionProgress executionId={waitingOn} />
+        </div>
       )}
       {step.figures && step.figures.length > 0 && (
-        <FigureStrip paths={step.figures} compact className="mt-1.5" />
+        <FigureStrip paths={step.figures} compact className={`${ROW_INDENT} mt-1.5`} />
       )}
-      {step.evaluation && <EvaluationPanel evaluation={step.evaluation} />}
-      {step.classification && <ClassificationPanel classification={step.classification} />}
+      {(step.evaluation || step.classification) && (
+        <div className={ROW_INDENT}>
+          {step.evaluation && <EvaluationPanel evaluation={step.evaluation} />}
+          {step.classification && <ClassificationPanel classification={step.classification} />}
+        </div>
+      )}
       {details && (
-        <ChainOfThoughtContent>
+        <ChainOfThoughtContent className={ROW_INDENT} contentClassName="pt-0.5 pb-1">
           <ToolDetails step={step} />
         </ChainOfThoughtContent>
       )}
@@ -235,35 +282,40 @@ function ThinkingStepRow({
   step,
   now,
   live,
-  isLast,
 }: {
   step: Extract<TraceStep, { kind: "thinking" }>;
   now: number;
   live: boolean;
-  isLast?: boolean;
 }) {
   const active = live && step.endedAt === undefined;
   const elapsed = (step.endedAt ?? now) - step.startedAt;
+  const [open, setOpen] = useState(false);
+  const hasText = Boolean(step.text);
 
   return (
-    // Open while the thought streams, folds up on its own when it ends.
-    <ChainOfThoughtStep
-      isLast={isLast}
-      status={active ? "running" : "idle"}
-      marker={<Brain className="w-3 h-3" />}
-      isStreaming={active}
-    >
-      <ChainOfThoughtTrigger hideChevron={active}>
+    // Folded like a tool row; the thought itself is one click away.
+    <ChainOfThoughtStep variant="plain" open={hasText && open} onOpenChange={setOpen}>
+      <ChainOfThoughtTrigger
+        hideChevron
+        disabled={!hasText}
+        className={`group min-w-0 gap-2 text-sm ${hasText ? "" : "cursor-default"}`}
+      >
+        <Brain
+          className="w-3.5 h-3.5 shrink-0 text-base-content/45"
+          strokeWidth={1.75}
+          aria-hidden="true"
+        />
         {active ? (
-          <Loader variant="text-shimmer" size="sm" text="Thinking" />
+          <span className="loader-text-shimmer">Thinking</span>
         ) : (
-          <span className="font-medium text-base-content/80">
+          <span className="text-base-content/65 group-hover:text-base-content/85">
             Thought for {formatDuration(elapsed)}
           </span>
         )}
+        {hasText && <RowChevron open={open} />}
       </ChainOfThoughtTrigger>
-      {step.text && (
-        <ChainOfThoughtContent>
+      {hasText && (
+        <ChainOfThoughtContent className={ROW_INDENT}>
           <div className="chat-thinking-text">{active ? step.text.slice(-1200) : step.text}</div>
         </ChainOfThoughtContent>
       )}
@@ -275,18 +327,19 @@ function TraceSteps({ steps, live }: { steps: TraceStep[]; live: boolean }) {
   const running = live && steps.some((s) => s.kind === "thinking" || s.kind === "tool");
   const now = useNow(running);
   return (
-    <ChainOfThought>
+    <ChainOfThought variant="plain">
       {steps.map((step, i) => {
         if (step.kind === "tool") {
-          return <ToolStepRow key={step.id} step={step} now={now} live={live} />;
+          // Steps are append-only within a turn; a draft ID can change when execution starts.
+          return <ToolStepRow key={`tool-${i}`} step={step} now={now} />;
         }
         if (step.kind === "thinking") {
           return <ThinkingStepRow key={`thinking-${i}`} step={step} now={now} live={live} />;
         }
         return (
-          <ChainOfThoughtStep key={`text-${i}`} marker={null} defaultOpen>
+          <ChainOfThoughtStep key={`text-${i}`} defaultOpen>
             <ChatMarkdown
-              className="text-xs text-base-content/70"
+              className="text-sm text-base-content/70"
               streaming={live && i === steps.length - 1}
             >
               {step.text}
@@ -310,13 +363,22 @@ function summarize(steps: TraceStep[]): string {
 
 /** Collapsed "Used 3 tools · 12s" summary for a finished answer. */
 export function ChatTraceSummary({ trace }: { trace: ChatTraceData }) {
-  const failed = trace.steps.some((s) => s.kind === "tool" && s.status === "error");
+  const tools = trace.steps.filter((s): s is ToolStep => s.kind === "tool");
+  // Failures stay visible on the folded summary, so they are found without opening it.
+  const failed = tools.filter((s) => s.status === "error").length;
+  const notRun = tools.filter((s) => s.status === "cancelled").length;
   return (
     <Reasoning className="mb-2">
-      <ReasoningTrigger className="chat-trace-toggle">
+      <ReasoningTrigger className="chat-trace-toggle max-w-full flex-wrap">
         <span>{summarize(trace.steps)}</span>
-        <span className="text-base-content/35">· {formatDuration(trace.durationMs)}</span>
-        {failed && <span className="text-error/70">· some steps failed</span>}
+        <span className="text-base-content/50">· {formatDuration(trace.durationMs)}</span>
+        {failed > 0 && (
+          <span className="inline-flex items-center gap-1 text-error">
+            · <CircleX className="w-3 h-3" aria-hidden="true" />
+            {failed} failed
+          </span>
+        )}
+        {notRun > 0 && <span className="text-base-content/50">· {notRun} not run</span>}
       </ReasoningTrigger>
       <ReasoningContent>
         <div className="mt-2">
@@ -333,6 +395,98 @@ export function LiveTrace({ steps }: { steps: TraceStep[] }) {
   return (
     <div className="mb-3">
       <TraceSteps steps={steps} live />
+    </div>
+  );
+}
+
+/** What an active tool call is doing, phrased as an ongoing activity. */
+function toolActivity(step: ToolStep): string {
+  const title = stepTitle(step);
+  // Tools without a phrased title fall back to their label, which names no action.
+  return title === step.label ? `Running ${step.label}` : title;
+}
+
+function activeTools(steps: TraceStep[]): ToolStep[] {
+  return steps.filter(
+    (s): s is ToolStep => s.kind === "tool" && (s.status === "drafting" || s.status === "running"),
+  );
+}
+
+function isThinking(steps: TraceStep[]): boolean {
+  return steps.some((s) => s.kind === "thinking" && s.endedAt === undefined);
+}
+
+/**
+ * The one thing the streaming turn is doing now, read from its steps: a call
+ * being written or run, a thought, or the answer. Between events it is what the
+ * server last said it was doing, or null when it has said nothing.
+ */
+export function currentActivity(steps: TraceStep[], statusMessage: string | null): string | null {
+  const active = activeTools(steps);
+  if (active.length > 1) {
+    const running = active.filter((s) => s.status === "running").length;
+    return running > 1 ? `Running ${running} tools` : toolActivity(active[active.length - 1]);
+  }
+  if (active.length === 1) return toolActivity(active[0]);
+  if (isThinking(steps)) return "Thinking";
+  const last = steps[steps.length - 1];
+  if (last?.kind === "text" && last.text) return "Writing the answer";
+  return statusMessage;
+}
+
+/** Whether a row of the live trace already shows what the turn is doing. */
+function activityShownInTrace(steps: TraceStep[]): boolean {
+  return activeTools(steps).length > 0 || isThinking(steps);
+}
+
+/**
+ * The streaming turn's footer: what it is doing now and for how long. When a
+ * trace row already shows the activity, the footer is not drawn again but its
+ * status region stays mounted and screen-reader only, so the change is still
+ * announced. The ticking timer stays out of the live region.
+ */
+export function TurnActivity({
+  steps,
+  startedAt,
+  statusMessage,
+  leading,
+  className,
+}: {
+  steps: TraceStep[];
+  startedAt: number;
+  statusMessage: string | null;
+  /** Drawn before the activity when the footer is visible, e.g. the assistant's avatar. */
+  leading?: ReactNode;
+  className?: string;
+}) {
+  const now = useNow(true);
+  const activity = currentActivity(steps, statusMessage);
+  const inTrace = activityShownInTrace(steps);
+  return (
+    <div
+      className={
+        inTrace
+          ? "sr-only"
+          : twMerge("flex min-w-0 items-center gap-2 text-xs text-base-content/50", className)
+      }
+      data-testid="turn-activity"
+      data-in-trace={inTrace}
+    >
+      {!inTrace && leading}
+      <div role="status" className="flex min-w-0 items-center">
+        {inTrace ? (
+          activity
+        ) : activity ? (
+          <Loader variant="text-shimmer" size="sm" text={activity} className="truncate" />
+        ) : (
+          <Loader variant="typing" size="sm" />
+        )}
+      </div>
+      {!inTrace && (
+        <span className="shrink-0 tabular-nums" aria-hidden="true">
+          {formatDuration(now - startedAt)}
+        </span>
+      )}
     </div>
   );
 }

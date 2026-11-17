@@ -225,16 +225,16 @@ export function QubitTaskCard({
 
         <div className="flex justify-end sm:self-stretch">
           {taskResultHref ? (
-            <Link className="btn btn-ghost btn-sm gap-1 sm:self-center" href={taskResultHref}>
-              <ExternalLink className="h-3.5 w-3.5" />
+            <Link className="btn btn-ghost btn-sm sm:self-center" href={taskResultHref}>
+              <ExternalLink data-icon="inline-start" />
               Result
             </Link>
           ) : (
             <button
-              className="btn btn-ghost btn-sm gap-1 sm:self-center"
+              className="btn btn-ghost btn-sm sm:self-center"
               onClick={() => onViewDetails(task.name)}
             >
-              <ExternalLink className="h-3.5 w-3.5" />
+              <ExternalLink data-icon="inline-start" />
               History
             </button>
           )}

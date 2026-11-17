@@ -7,11 +7,13 @@ import { ArrowRightLeft, GitBranch, Lock, ZoomIn } from "lucide-react";
 
 import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
+import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
 import { useGridLayout } from "@/hooks/useGridLayout";
+import { usePanClickGuard } from "@/hooks/usePanClickGuard";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
   buildMuxCellMap,
@@ -138,16 +140,20 @@ export function CouplingMetricsGrid({
   const [isDirectionReversed, setIsDirectionReversed] = useState(false);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
 
-  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  // Lock works for every topology, but region zoom assumes a square grid; leave it when the
+  // grid is not square.
   useEffect(() => {
-    if (!isSquareGrid && viewMode === "region") {
-      setViewMode("pan-zoom");
+    if (!isSquareGrid) {
+      setZoomMode("full");
+      setSelectedRegion(null);
+      setRegionSelectionEnabled(false);
     }
-  }, [isSquareGrid, viewMode]);
+  }, [isSquareGrid]);
 
   const { isFullscreen, toggleFullscreen } = useFullscreenPanel();
+  const panClickGuard = usePanClickGuard();
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -555,18 +561,16 @@ export function CouplingMetricsGrid({
       {/* View mode toggle */}
       <div className="flex items-center justify-between px-1 md:px-4 py-2">
         <div className="tabs tabs-boxed bg-base-200/50 p-1">
-          {isSquareGrid && (
-            <button
-              type="button"
-              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("region")}
-              title="Lock"
-              aria-label="Lock"
-            >
-              <Lock className="h-4 w-4" />
-              <span className="hidden sm:inline">Lock</span>
-            </button>
-          )}
+          <button
+            type="button"
+            className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+            onClick={() => setViewMode("region")}
+            title="Lock"
+            aria-label="Lock"
+          >
+            <Lock className="h-4 w-4" />
+            <span className="hidden sm:inline">Lock</span>
+          </button>
           <button
             type="button"
             className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
@@ -599,10 +603,10 @@ export function CouplingMetricsGrid({
           </div>
           <button
             onClick={() => setIsDirectionReversed((prev) => !prev)}
-            className={`btn btn-sm gap-1.5 ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
+            className={`btn btn-sm ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
             title={isDirectionReversed ? "Showing reverse direction" : "Showing forward direction"}
           >
-            <ArrowRightLeft className="h-3.5 w-3.5" />
+            <ArrowRightLeft data-icon="inline-start" />
             <span className="text-xs">{isDirectionReversed ? "Reverse" : "Forward"}</span>
           </button>
         </div>
@@ -631,7 +635,7 @@ export function CouplingMetricsGrid({
         className={`flex-1 relative flex justify-center ${
           viewMode === "pan-zoom"
             ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
-            : "bg-base-200/60 rounded-lg"
+            : "items-start overflow-hidden bg-base-200/60 rounded-lg"
         }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
       >
@@ -652,6 +656,7 @@ export function CouplingMetricsGrid({
           >
             <GridZoomControls isFullscreen={isFullscreen} className="top-12" />
             <TransformComponent
+              contentProps={panClickGuard}
               wrapperStyle={{ width: "100%", height: "100%" }}
               contentStyle={{
                 display: "flex",
@@ -663,7 +668,7 @@ export function CouplingMetricsGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          gridContent
+          <LockedGridScroller>{gridContent}</LockedGridScroller>
         )}
       </div>
 
@@ -712,9 +717,9 @@ export function CouplingMetricsGrid({
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
                 <LineageButton
                   target={{ parameterName: metricKey, qid: selectedCouplingInfo.couplingId }}
-                  className="btn btn-ghost btn-sm sm:btn-md gap-1"
+                  className="btn btn-ghost btn-sm sm:btn-md"
                 >
-                  <GitBranch className="h-4 w-4" />
+                  <GitBranch data-icon="inline-start" />
                   <span className="hidden sm:inline">Lineage</span>
                 </LineageButton>
                 <div className="flex gap-2">

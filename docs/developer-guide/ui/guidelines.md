@@ -147,10 +147,94 @@ A qubit or coupling id is always a `QubitTile` (`ui/src/components/ui/QubitTile.
 small square-cornered box, the same shape as a cell of the chip grid, with a status dot when the
 reference carries a status. Do not render ids as plain badges.
 
-Icons come from `lucide-react`, 16px to 18px, in the color of their text role (`text-base-content/60`
+Icons come from `lucide-react`, 16px to 18px outside buttons, in the color of their text role (`text-base-content/60`
 for meta), never in `secondary` or `accent`. Product UI does not use emoji or emoji images; `EmptyState` renders
 a lucide icon from its `emoji` name map, and toasts use lucide status icons. `UserAvatar` renders
 the user's glyph avatar locally; see [User Avatars](./architecture.md#user-avatars).
+
+## Space Icon Buttons Optically
+
+An icon next to a label reads lighter than the word, so equal geometry looks lopsided. A labeled
+`.btn` marks its leading or trailing icon with `data-icon="inline-start"` or
+`data-icon="inline-end"` on the direct child, and the shared rule in `ui/src/app/globals.css`
+applies four corrections:
+
+| Principle | Rule |
+| --- | --- |
+| Less outer padding on the icon side | The icon side gets 75% of the button's `--btn-p`; the label side keeps it |
+| Slightly smaller icons | The icon is `1em + 2px` of the button's font size: 13px on `btn-xs`, 14px on `btn-sm`, 16px on the default size |
+| Tighter icon-label gap | `0.375em`, replacing DaisyUI's fixed `0.375rem` |
+| Nudge only where the shape warrants it | Only shapes whose mass sits off center move; Lucide `Play` shifts right by one grid unit (1/24 of its box) |
+
+```tsx
+<button type="button" className="btn btn-primary btn-sm">
+  <Plus data-icon="inline-start" aria-hidden="true" />
+  Add
+</button>
+<button type="button" className="btn btn-ghost btn-sm">
+  Export
+  <ChevronDown data-icon="inline-end" aria-hidden="true" />
+</button>
+```
+
+Put the hook on a loading spinner that replaces the icon too, so the swap keeps the same size.
+Do not add `gap-*` to a hooked button or `h-*`, `w-*`, `size-*`, or `size={...}` to a hooked
+icon; the rule overrides them. Height, vertical padding, and `.btn-square` or `.btn-circle`
+icon-only controls are unchanged, so DaisyUI size classes still set the hit target. A button
+with an explicit `px-*`, `ps-*`, `pe-*`, `pl-*`, or `pr-*` utility keeps that padding. A label
+hidden below a breakpoint (`hidden sm:inline`) keeps padding symmetric while only the icon
+shows.
+
+`ui/src/lib/__tests__/buttonIconSpacing.test.ts` fails when a labeled `.btn` has an
+unhooked leading or trailing icon, or when an icon-only button carries a hook. Start-aligned rows
+(`justify-start`, `justify-between`, `justify-end`) and labels rendered only conditionally
+(`{open && <span>Label</span>}`) are exempt because the icon aligns to a list edge or can stand
+alone.
+
+## Label Checkboxes and Radios with the Whole Row
+
+A DaisyUI checkbox, radio, or toggle with visible text sits inside
+`<label className="choice-field">` as a direct child. Put checkboxes and radios before their
+text; a toggle can follow its text or sit between two state labels.
+The shared rule in `ui/src/app/globals.css` makes the whole label the click target, keeps the
+label at least 24px tall, centers the control on the first line of text however far the text
+wraps, and dims the text and shows a not-allowed cursor when the control is disabled. The control
+keeps its DaisyUI size class, so a dense list can still use `checkbox-xs` or `checkbox-sm`.
+
+```tsx
+<label className="choice-field gap-3 rounded-lg border border-base-300 p-3">
+  <input type="radio" name="mode" className="radio radio-sm" />
+  <span>
+    <span className="block font-medium">Fixed prompt</span>
+    <span className="block text-xs text-base-content/60">QDash builds the prompt</span>
+  </span>
+</label>
+```
+
+The rule sits in the components layer, so utilities on the label (`gap-*`, padding, borders,
+`items-center` for a one-line row with a trailing control) still apply. Do not combine
+`choice-field` with DaisyUI's `label` class, which keeps text on one line, and do not put
+`mt-*` or `my-*` on the control, which overrides the alignment. Give every radio group one
+`name`. A control without visible text, such as a table selection cell, takes an `aria-label`
+instead of a label.
+
+`ui/src/lib/__tests__/choiceField.test.ts` fails when a labeled checkbox, radio, or toggle is not the
+direct child of a `choice-field` label, carries a margin utility, or has no accessible name.
+
+## Size Controls That Share a Row
+
+Inputs, selects, and buttons in one row use the same DaisyUI size step: `input`, `select`, and
+`btn` together, or `input-sm`, `select-sm`, and `btn-sm` together. Icon-only buttons in that
+row use `btn-square` at the same step. Set heights with these size classes, not with `h-*`,
+`min-h-*`, or pixel values, so a theme's `--size-field` keeps the row aligned.
+
+React-Select controls take their styles from `useSelectStyles` in
+`ui/src/hooks/useSelectStyles.ts`, or from `getDaisySelectStyles` in
+`ui/src/lib/react-select-theme.ts`. A single select is `SELECT_CONTROL_HEIGHT`, the height of
+a default `input` or `btn`; a multi-select starts at that height and grows with its values. A
+call site may override colors or borders but not the control height.
+`ui/src/lib/__tests__/reactSelectTheme.test.ts` fails when a call site sets a numeric control
+height.
 
 ## Draw Charts from One Theme
 

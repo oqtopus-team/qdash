@@ -143,6 +143,27 @@ describe("useCopilotChat streaming", () => {
     ).toBe(false);
   });
 
+  it("clears superseded status messages when tool activity arrives", async () => {
+    const result = await renderChat();
+    act(() => result.current.chat.send("Read the data"));
+    await waitFor(() => expect(result.current.chat.isStreaming).toBe(true));
+    stream.push(sse("status", { message: "Compacting context" }));
+    await waitFor(() => expect(result.current.chat.statusMessage).toBe("Compacting context"));
+    stream.push(sse("tool_start", { id: "t1", tool: "read", args: { path: "data.csv" } }));
+    await waitFor(() => expect(result.current.chat.statusMessage).toBeNull());
+    stream.push(sse("tool_end", { id: "t1", tool: "read", is_error: false }));
+    await waitFor(() =>
+      expect(result.current.chat.liveTurn?.steps[0]).toMatchObject({ status: "done" }),
+    );
+    expect(result.current.chat.statusMessage).toBeNull();
+    // A genuinely newer status still appears during the same turn.
+    stream.push(sse("status", { message: "Reconnecting" }));
+    await waitFor(() => expect(result.current.chat.statusMessage).toBe("Reconnecting"));
+    stream.push(sse("delta", { text: "The data is ready" }));
+    await waitFor(() => expect(result.current.chat.statusMessage).toBeNull());
+    act(() => result.current.chat.stop());
+  });
+
   it("builds a live transcript and persists the work as a trace", async () => {
     const result = await renderChat();
 

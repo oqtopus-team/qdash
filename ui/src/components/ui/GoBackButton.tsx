@@ -4,8 +4,8 @@ export function GoBackButton() {
   return (
     <button onClick={() => window.history.back()} className="btn btn-outline btn-primary px-8">
       <svg
+        data-icon="inline-start"
         xmlns="http://www.w3.org/2000/svg"
-        className="h-5 w-5 mr-2"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"

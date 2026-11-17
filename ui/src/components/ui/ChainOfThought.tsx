@@ -9,6 +9,9 @@
  * The collapsible is the Reasoning block from this directory instead of Radix
  * Collapsible, so a step held open by `isStreaming` folds up by itself when
  * the stream ends.
+ *
+ * The `plain` variant drops the marker column and the connecting line, for a
+ * quiet list of rows that carry their own inline icon.
  */
 
 import { Children, isValidElement, cloneElement, type ReactElement, type ReactNode } from "react";
@@ -23,9 +26,13 @@ import {
   type ReasoningTriggerProps,
 } from "@/components/ui/Reasoning";
 
+export type ChainOfThoughtVariant = "timeline" | "plain";
+
 export type ChainOfThoughtStepProps = Omit<ReasoningProps, "className"> & {
-  /** What sits on the timeline: an icon, a dot, a spinner. */
-  marker: ReactNode;
+  /** What sits on the timeline: an icon, a dot, a spinner. Unused by the plain variant. */
+  marker?: ReactNode;
+  /** Set by ChainOfThought; `plain` renders no marker and no connecting line. */
+  variant?: ChainOfThoughtVariant;
   /** Colors the marker; see `.chain-marker[data-status]` in globals.css. */
   status?: "idle" | "running" | "done" | "error";
   /** Set by ChainOfThought; the last step has no connecting line. */
@@ -37,10 +44,18 @@ export function ChainOfThoughtStep({
   marker,
   status = "idle",
   isLast = false,
+  variant = "timeline",
   className,
   children,
   ...reasoning
 }: ChainOfThoughtStepProps) {
+  if (variant === "plain") {
+    return (
+      <Reasoning className={twMerge("min-w-0", className)} {...reasoning}>
+        {children}
+      </Reasoning>
+    );
+  }
   return (
     <div className={twMerge("relative flex gap-2.5", className)} data-last={isLast}>
       <div className="flex shrink-0 flex-col items-center">
@@ -68,17 +83,20 @@ export function ChainOfThoughtContent({ className, ...props }: ReasoningContentP
 export function ChainOfThought({
   children,
   className,
+  variant = "timeline",
 }: {
   children: ReactNode;
   className?: string;
+  variant?: ChainOfThoughtVariant;
 }) {
   const steps = Children.toArray(children).filter(isValidElement);
   return (
-    <ol className={twMerge("flex flex-col", className)}>
+    <ol className={twMerge("flex flex-col", variant === "plain" ? "gap-2" : "", className)}>
       {steps.map((step, index) => (
         <li key={step.key ?? index}>
           {cloneElement(step as ReactElement<ChainOfThoughtStepProps>, {
             isLast: index === steps.length - 1,
+            variant,
           })}
         </li>
       ))}

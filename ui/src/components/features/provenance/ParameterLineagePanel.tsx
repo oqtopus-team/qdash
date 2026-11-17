@@ -297,8 +297,8 @@ export function ParameterLineagePanel({
     setTrail((current) => (current.length > 1 ? current.slice(0, -1) : current));
   };
   const backButton = trail.length > 1 && (
-    <button type="button" className="btn btn-ghost btn-xs -ml-2 gap-1" onClick={goBack}>
-      <ArrowLeft className="h-3.5 w-3.5" />
+    <button type="button" className="btn btn-ghost btn-xs -ml-2" onClick={goBack}>
+      <ArrowLeft data-icon="inline-start" />
       Back to {trail[trail.length - 2].parameterName}
     </button>
   );
@@ -391,27 +391,23 @@ export function ParameterLineagePanel({
           {version.task_id && version.task_id !== currentTaskId && (
             <Link
               href={`/task-results/${encodeURIComponent(version.task_id)}`}
-              className="btn btn-ghost btn-xs gap-1"
+              className="btn btn-ghost btn-xs"
             >
-              <ExternalLink className="h-3.5 w-3.5" />
+              <ExternalLink data-icon="inline-start" />
               Task result
             </Link>
           )}
           {version.chip_id && version.execution_id && (
             <Link
               href={`/execution/${encodeURIComponent(version.chip_id)}/${encodeURIComponent(version.execution_id)}`}
-              className="btn btn-ghost btn-xs gap-1"
+              className="btn btn-ghost btn-xs"
             >
-              <ExternalLink className="h-3.5 w-3.5" />
+              <ExternalLink data-icon="inline-start" />
               Execution
             </Link>
           )}
-          <button
-            type="button"
-            className="btn btn-ghost btn-xs gap-1"
-            onClick={() => setGraphOpen(true)}
-          >
-            <GitBranch className="h-3.5 w-3.5" />
+          <button type="button" className="btn btn-ghost btn-xs" onClick={() => setGraphOpen(true)}>
+            <GitBranch data-icon="inline-start" />
             Full graph
           </button>
         </div>

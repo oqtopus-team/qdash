@@ -19,7 +19,7 @@ import {
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { ChatUiBlock } from "@/components/features/chat/ChatUiBlock";
 import { ChatMarkdown } from "@/components/features/chat/ChatMarkdown";
-import { ChatTraceSummary, LiveTrace } from "@/components/features/chat/ChatTrace";
+import { ChatTraceSummary, LiveTrace, TurnActivity } from "@/components/features/chat/ChatTrace";
 import { FigureStrip, figuresInSteps } from "@/components/features/chat/ChatFigures";
 import {
   ApprovalCard,
@@ -30,7 +30,6 @@ import {
 import { useOptionalChatDock } from "@/contexts/ChatDockContext";
 import { matchesEditTarget } from "@/lib/copilotEditTarget";
 import { ImagePreviewDialog } from "@/components/ui/ImagePreviewDialog";
-import { Loader } from "@/components/ui/Loader";
 import { QdashBotAvatar } from "@/components/ui/UserAvatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
@@ -495,20 +494,16 @@ export const AssistantMessage = memo(function AssistantMessage({
             <button
               type="button"
               onClick={onContinue}
-              className="btn btn-ghost btn-sm gap-1.5 rounded-full"
+              className="btn btn-ghost btn-sm rounded-full"
               title="Go on from where the answer ended, without sending your message again"
             >
-              <StepForward className="w-3.5 h-3.5" />
+              <StepForward data-icon="inline-start" />
               Continue
             </button>
           )}
           {isLast && canRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="btn btn-ghost btn-sm gap-1.5 rounded-full"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
+            <button type="button" onClick={onRetry} className="btn btn-ghost btn-sm rounded-full">
+              <RotateCcw data-icon="inline-start" />
               Retry
             </button>
           )}
@@ -599,9 +594,11 @@ export function LiveAssistantMessage({
       (s.kind === "tool" && (s.status === "running" || s.status === "drafting")) ||
       (s.kind === "thinking" && s.endedAt === undefined),
   );
+  const idle = !answer && !busy;
 
   return (
-    <AssistantRow className="animate-fade-in-up" aria-live="polite" aria-busy="true">
+    // The activity footer is the live region; the streaming text itself is not announced.
+    <AssistantRow className="animate-fade-in-up" aria-busy="true">
       <LiveTrace steps={work} />
       {answer && figuresInSteps(work).length > 0 && (
         <FigureStrip paths={figuresInSteps(work)} className="mb-3" />
@@ -613,20 +610,17 @@ export function LiveAssistantMessage({
           <ChatMarkdown key={i}>{block.content}</ChatMarkdown>
         ) : null,
       )}
-      {answer ? (
-        <ChatMarkdown streaming>{answer}</ChatMarkdown>
-      ) : (
-        !busy && (
-          <div className="flex items-center gap-2.5 h-7 text-sm">
-            <QdashBotAvatar size={20} className="chat-avatar-active chat-bot-mark" />
-            {statusMessage ? (
-              <Loader variant="text-shimmer" size="sm" text={statusMessage} />
-            ) : (
-              <Loader variant="typing" size="sm" />
-            )}
-          </div>
-        )
-      )}
+      {answer && <ChatMarkdown streaming>{answer}</ChatMarkdown>}
+      {/* Drawn only when no trace row already shows the activity; always announced. */}
+      <TurnActivity
+        steps={turn.steps}
+        startedAt={turn.startedAt}
+        statusMessage={statusMessage}
+        className={`h-7 gap-2.5 ${idle ? "text-sm" : "mt-1"}`}
+        leading={
+          idle ? <QdashBotAvatar size={20} className="chat-avatar-active chat-bot-mark" /> : null
+        }
+      />
     </AssistantRow>
   );
 }

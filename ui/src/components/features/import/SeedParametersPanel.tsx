@@ -566,11 +566,14 @@ export function SeedParametersPanel() {
           {selectedChip && (
             <button
               type="button"
-              className="btn btn-sm btn-ghost gap-2 self-start sm:self-auto"
+              className="btn btn-sm btn-ghost self-start sm:self-auto"
               onClick={() => void handleRefresh()}
               disabled={viewIsRefreshing}
             >
-              <RefreshCw className={`h-4 w-4 ${viewIsRefreshing ? "animate-spin" : ""}`} />
+              <RefreshCw
+                data-icon="inline-start"
+                className={viewIsRefreshing ? "animate-spin" : undefined}
+              />
               Refresh
             </button>
           )}
@@ -764,14 +767,14 @@ export function SeedParametersPanel() {
                   <button type="button" className="btn btn-primary btn-sm gap-2">
                     {importMutation.isPending ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 data-icon="inline-start" className="animate-spin" />
                         Importing...
                       </>
                     ) : (
                       <>
-                        <Database className="h-4 w-4" />
+                        <Database data-icon="inline-start" />
                         Import from YAML
-                        <ChevronDown className="h-4 w-4" />
+                        <ChevronDown data-icon="inline-end" />
                       </>
                     )}
                   </button>
@@ -1030,7 +1033,7 @@ export function SeedParametersPanel() {
                                           qubitData.qdash_value !== undefined && (
                                             <button
                                               type="button"
-                                              className="btn btn-xs btn-error btn-outline gap-1"
+                                              className="btn btn-xs btn-error btn-outline"
                                               aria-label={`Delete current ${paramName} for qubit ${qid}`}
                                               onClick={() => {
                                                 deleteMutation.reset();
@@ -1042,7 +1045,7 @@ export function SeedParametersPanel() {
                                                 });
                                               }}
                                             >
-                                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                              <Trash2 data-icon="inline-start" aria-hidden="true" />
                                               Delete
                                             </button>
                                           )}
@@ -1261,7 +1264,7 @@ export function SeedParametersPanel() {
                 >
                   {importMutation.isPending ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 data-icon="inline-start" className="animate-spin" />
                       Importing...
                     </>
                   ) : (

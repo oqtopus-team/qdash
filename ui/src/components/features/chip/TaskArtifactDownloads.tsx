@@ -142,16 +142,16 @@ export function TaskArtifactDownloads({
             </span>
           )}
           {archiveLimitExceeded ? (
-            <button type="button" className="btn btn-sm btn-outline gap-2" disabled>
-              <Download className="h-4 w-4" /> Download all (.zip)
+            <button type="button" className="btn btn-sm btn-outline" disabled>
+              <Download data-icon="inline-start" /> Download all (.zip)
             </button>
           ) : (
             <a
               href={archiveUrl(archivePaths)}
               download="artifacts.zip"
-              className="btn btn-sm btn-outline gap-2"
+              className="btn btn-sm btn-outline"
             >
-              <Download className="h-4 w-4" /> Download all (.zip)
+              <Download data-icon="inline-start" /> Download all (.zip)
             </a>
           )}
         </div>
