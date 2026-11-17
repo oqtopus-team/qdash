@@ -551,7 +551,7 @@ export function ExecutionPageContent() {
                 disabled={selectedExecutionIndex <= 0}
                 onClick={() => handleCardClick(cardData[selectedExecutionIndex - 1])}
               >
-                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                <ChevronLeft data-icon="inline-start" aria-hidden="true" />
                 Previous
               </button>
               <span className="text-xs text-base-content/60" role="status">
@@ -569,7 +569,7 @@ export function ExecutionPageContent() {
                 onClick={() => handleCardClick(cardData[selectedExecutionIndex + 1])}
               >
                 Next
-                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                <ChevronRight data-icon="inline-end" aria-hidden="true" />
               </button>
             </nav>
             <div className="p-2 sm:p-4 bg-base-100 mb-4 sm:mb-6">
@@ -588,7 +588,7 @@ export function ExecutionPageContent() {
                   href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}
                   className="btn btn-primary btn-sm sm:btn-md"
                 >
-                  <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <ExternalLink data-icon="inline-start" />
                   View Details
                 </Link>
                 {(() => {
@@ -607,7 +607,7 @@ export function ExecutionPageContent() {
                         disabled={cancelMutation.isPending}
                         className="btn btn-error btn-sm sm:btn-md"
                       >
-                        <StopCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <StopCircle data-icon="inline-start" />
                         {cancelMutation.isPending ? "Cancelling..." : "Cancel"}
                       </button>
                     )

@@ -128,22 +128,22 @@ function Verdict({ item }: { item: EvaluationItem }) {
       <span className="text-xs text-base-content/60">Do you agree?</span>
       <button
         type="button"
-        className={`btn btn-xs gap-1 ${current === true ? "btn-success" : "btn-ghost"}`}
+        className={`btn btn-xs ${current === true ? "btn-success" : "btn-ghost"}`}
         onClick={() => toggle(true)}
         disabled={setVerdict.isPending}
         aria-pressed={current === true}
       >
-        <ThumbsUp className="h-3.5 w-3.5" />
+        <ThumbsUp data-icon="inline-start" />
         Agree
       </button>
       <button
         type="button"
-        className={`btn btn-xs gap-1 ${current === false ? "btn-error" : "btn-ghost"}`}
+        className={`btn btn-xs ${current === false ? "btn-error" : "btn-ghost"}`}
         onClick={() => toggle(false)}
         disabled={setVerdict.isPending}
         aria-pressed={current === false}
       >
-        <ThumbsDown className="h-3.5 w-3.5" />
+        <ThumbsDown data-icon="inline-start" />
         Disagree
       </button>
       {current !== null && !editingNote && (
@@ -312,12 +312,12 @@ export function EvaluationCard({
             {item.planner && <span className="badge badge-sm badge-outline">via Copilot</span>}
             <span className="ml-auto flex items-center gap-1">
               {showRunLink && (
-                <Link href={`/evaluations/${item.run_id}`} className="btn btn-ghost btn-xs gap-1">
+                <Link href={`/evaluations/${item.run_id}`} className="btn btn-ghost btn-xs">
                   Run
                 </Link>
               )}
-              <Link href={`/task-results/${item.task_id}`} className="btn btn-ghost btn-xs gap-1">
-                <ExternalLink className="h-3.5 w-3.5" />
+              <Link href={`/task-results/${item.task_id}`} className="btn btn-ghost btn-xs">
+                <ExternalLink data-icon="inline-start" />
                 Result
               </Link>
             </span>

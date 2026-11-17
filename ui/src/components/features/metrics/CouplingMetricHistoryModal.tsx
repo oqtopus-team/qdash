@@ -205,10 +205,10 @@ export function CouplingMetricHistoryModal({
     <div className="flex items-center gap-2">
       <button
         onClick={handleDirectionToggle}
-        className={`btn btn-sm gap-1.5 ${isReversed ? "btn-secondary" : "btn-outline"}`}
+        className={`btn btn-sm ${isReversed ? "btn-secondary" : "btn-outline"}`}
         title={`Switch to ${isReversed ? couplingId : reversedCouplingId}`}
       >
-        <ArrowRightLeft className="h-3.5 w-3.5" />
+        <ArrowRightLeft data-icon="inline-start" />
         <span className="font-mono text-xs">{activeCouplingId}</span>
       </button>
     </div>
@@ -543,9 +543,9 @@ export function CouplingMetricHistoryModal({
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
             <LineageButton
               target={{ parameterName: metricName, qid: activeCouplingId }}
-              className="btn btn-xs btn-outline gap-1"
+              className="btn btn-xs btn-outline"
             >
-              <GitBranch className="h-3 w-3" />
+              <GitBranch data-icon="inline-start" />
               Lineage
             </LineageButton>
             {selectedHistoryItem?.task_id && (

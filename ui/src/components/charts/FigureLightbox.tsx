@@ -44,12 +44,12 @@ function LightboxControls({
         >
           {isInteractive ? (
             <>
-              <Image className="h-4 w-4" />
+              <Image data-icon="inline-start" />
               <span className="text-xs">Static</span>
             </>
           ) : (
             <>
-              <LineChart className="h-4 w-4" />
+              <LineChart data-icon="inline-start" />
               <span className="text-xs">Interactive</span>
             </>
           )}

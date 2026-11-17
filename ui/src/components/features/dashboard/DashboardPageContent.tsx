@@ -758,7 +758,7 @@ export function DashboardPageContent() {
                             : "Showing forward direction"
                         }
                       >
-                        <ArrowRightLeft className="h-3.5 w-3.5" />
+                        <ArrowRightLeft data-icon="inline-start" />
                         <span className="text-xs">
                           {isReverseCouplingDirection ? "Reverse" : "Forward"}
                         </span>
@@ -1023,7 +1023,7 @@ export function DashboardPageContent() {
                         : "Showing forward direction"
                     }
                   >
-                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                    <ArrowRightLeft data-icon="inline-start" />
                     <span className="text-xs">
                       {isReverseCouplingDirection ? "Reverse" : "Forward"}
                     </span>

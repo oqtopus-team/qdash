@@ -61,7 +61,7 @@ export function TaskResultHistoryNavigation({
     <div className="join" aria-label="Task result history navigation">
       <button
         type="button"
-        className="btn btn-sm btn-outline join-item gap-1"
+        className="btn btn-sm btn-outline join-item"
         disabled={!previousTaskId || isLoading}
         onClick={() =>
           previousTaskId && router.push(`/task-results/${encodeURIComponent(previousTaskId)}`)
@@ -69,19 +69,19 @@ export function TaskResultHistoryNavigation({
         aria-label="Previous result"
         title="Previous result for the same task and target"
       >
-        <ChevronLeft className="h-3.5 w-3.5" />
+        <ChevronLeft data-icon="inline-start" />
         <span className="hidden sm:inline">Previous</span>
       </button>
       <button
         type="button"
-        className="btn btn-sm btn-outline join-item gap-1"
+        className="btn btn-sm btn-outline join-item"
         disabled={!nextTaskId || isLoading}
         onClick={() => nextTaskId && router.push(`/task-results/${encodeURIComponent(nextTaskId)}`)}
         aria-label="Next result"
         title="Next result for the same task and target"
       >
         <span className="hidden sm:inline">Next</span>
-        <ChevronRight className="h-3.5 w-3.5" />
+        <ChevronRight data-icon="inline-end" />
       </button>
     </div>
   );

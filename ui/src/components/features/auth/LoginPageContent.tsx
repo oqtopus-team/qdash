@@ -219,7 +219,9 @@ export function LoginPageContent() {
               disabled={loading || isSubmitting}
               className="btn btn-primary mt-5 w-full"
             >
-              {loading && <Loader2 size={18} className="animate-spin" aria-hidden="true" />}
+              {loading && (
+                <Loader2 data-icon="inline-start" className="animate-spin" aria-hidden="true" />
+              )}
               {loading ? "Signing in…" : "Sign in"}
             </button>
           </form>

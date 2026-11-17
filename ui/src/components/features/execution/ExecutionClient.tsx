@@ -229,8 +229,8 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     <div className="w-full px-4 py-6">
       <div className="space-y-6">
         {/* Back navigation */}
-        <Link href="/execution" className="btn btn-ghost btn-sm gap-2 w-fit">
-          <ArrowLeft size={16} />
+        <Link href="/execution" className="btn btn-ghost btn-sm w-fit">
+          <ArrowLeft data-icon="inline-start" />
           Back to Executions
         </Link>
 
@@ -355,9 +355,9 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
                           document.body.removeChild(link);
                           URL.revokeObjectURL(url);
                         }}
-                        className="btn btn-sm btn-primary gap-2"
+                        className="btn btn-sm btn-primary"
                       >
-                        <Download size={14} />
+                        <Download data-icon="inline-start" />
                         Download JSON
                       </button>
                     </div>

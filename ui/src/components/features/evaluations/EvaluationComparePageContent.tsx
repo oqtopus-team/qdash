@@ -452,8 +452,8 @@ export function EvaluationComparePageContent() {
         </div>
       </div>
       {runA && runB && (
-        <button type="button" className="btn btn-ghost btn-sm gap-1" onClick={swap}>
-          <ArrowLeftRight className="h-4 w-4" />
+        <button type="button" className="btn btn-ghost btn-sm" onClick={swap}>
+          <ArrowLeftRight data-icon="inline-start" />
           Swap
         </button>
       )}

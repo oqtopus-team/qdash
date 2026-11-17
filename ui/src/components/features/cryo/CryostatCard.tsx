@@ -196,11 +196,11 @@ export function CryostatCard({
             />
             <div className="flex justify-end">
               <button
-                className="btn btn-sm btn-ghost gap-1"
+                className="btn btn-sm btn-ghost"
                 onClick={onCreateCooldown}
                 title="Start a new cool-down cycle"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus data-icon="inline-start" />
                 New cool-down
               </button>
             </div>
@@ -303,8 +303,8 @@ function EmptyCooldowns({ onCreate }: { onCreate: () => void }) {
         Cool-down cycles tag every calibration write with their{" "}
         <code className="font-mono">cooldown_id</code>.
       </div>
-      <button className="btn btn-sm btn-primary gap-1" onClick={onCreate}>
-        <Plus className="h-3.5 w-3.5" />
+      <button className="btn btn-sm btn-primary" onClick={onCreate}>
+        <Plus data-icon="inline-start" />
         Start a cool-down
       </button>
     </div>

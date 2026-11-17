@@ -132,9 +132,9 @@ function RoundTable({
             aria-pressed={playing}
           >
             {playing ? (
-              <Pause size={14} aria-hidden="true" />
+              <Pause data-icon="inline-start" aria-hidden="true" />
             ) : (
-              <Play size={14} aria-hidden="true" />
+              <Play data-icon="inline-start" aria-hidden="true" />
             )}
             {playing ? "Stop round order" : "Play round order"}
           </button>

@@ -509,9 +509,9 @@ export function QubitMetricHistoryModal({
           <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
             <LineageButton
               target={{ parameterName: metricName, qid: qid }}
-              className="btn btn-xs btn-outline gap-1"
+              className="btn btn-xs btn-outline"
             >
-              <GitBranch className="h-3 w-3" />
+              <GitBranch data-icon="inline-start" />
               Lineage
             </LineageButton>
             {selectedHistoryItem?.task_id && (

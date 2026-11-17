@@ -478,7 +478,7 @@ export function ChipPageContent() {
                     onClick={openCreateChipModal}
                     data-coachmark="create-chip"
                   >
-                    <Plus size={20} />
+                    <Plus data-icon="inline-start" />
                     Create Chip
                   </button>
                 </div>
@@ -548,12 +548,12 @@ export function ChipPageContent() {
                   <PageFiltersBar.Item>
                     <button
                       type="button"
-                      className="btn btn-sm btn-outline gap-1"
+                      className="btn btn-sm btn-outline"
                       onClick={() => setIsEvaluateOpen(true)}
                       disabled={!selectedChip || !selectedTask || viewMode === "mux"}
                       title="Evaluate the latest result of this task for every qubit or coupling with the calibration evaluation model"
                     >
-                      <Bot className="h-4 w-4" />
+                      <Bot data-icon="inline-start" />
                       Evaluate
                     </button>
                   </PageFiltersBar.Item>

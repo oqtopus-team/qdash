@@ -108,10 +108,10 @@ export function MetricsYamlDownloadButton({
     <button
       onClick={handleDownload}
       disabled={disabled || !chipId || !metricData || !metricConfig}
-      className="btn btn-outline btn-sm gap-2"
+      className="btn btn-outline btn-sm"
       title="Download selected metric data as YAML"
     >
-      <Download className="h-4 w-4" />
+      <Download data-icon="inline-start" />
       <span>YAML</span>
     </button>
   );

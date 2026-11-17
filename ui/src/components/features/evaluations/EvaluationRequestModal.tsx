@@ -582,14 +582,14 @@ export function EvaluationRequestModal({
           </button>
           <button
             type="button"
-            className="btn btn-sm btn-primary gap-2"
+            className="btn btn-sm btn-primary"
             onClick={submit}
             disabled={isSubmitting || (!chatting && nothingChosen)}
           >
             {isSubmitting ? (
-              <span className="loading loading-spinner loading-xs" />
+              <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
             ) : (
-              <Bot className="h-4 w-4" />
+              <Bot data-icon="inline-start" />
             )}
             {chatting ? "Open chat" : "Evaluate"}
           </button>

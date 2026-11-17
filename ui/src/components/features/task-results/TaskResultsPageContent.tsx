@@ -477,17 +477,18 @@ export function TaskResultsPageContent() {
             )}
             <button
               type="button"
-              className={`btn btn-sm gap-1 ${showMoreFilters ? "btn-neutral" : "btn-ghost"}`}
+              className={`btn btn-sm ${showMoreFilters ? "btn-neutral" : "btn-ghost"}`}
               aria-expanded={showMoreFilters}
               aria-controls="task-result-more-filters"
               onClick={() => setShowMoreFilters((value) => !value)}
             >
-              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+              <SlidersHorizontal data-icon="inline-start" aria-hidden="true" />
               More filters
               {(filters.qid || filters.message || filters.username) && (
                 <span className="badge badge-xs badge-primary">Active</span>
               )}
               <ChevronDown
+                data-icon="inline-end"
                 className={`h-3.5 w-3.5 transition-transform ${showMoreFilters ? "rotate-180" : ""}`}
                 aria-hidden="true"
               />
@@ -496,8 +497,8 @@ export function TaskResultsPageContent() {
               Apply
             </button>
             {(hasFilters || hasPendingChanges) && (
-              <button type="button" className="btn btn-ghost btn-sm gap-1" onClick={clearFilters}>
-                <XCircle className="h-4 w-4" aria-hidden="true" />
+              <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}>
+                <XCircle data-icon="inline-start" aria-hidden="true" />
                 Clear
               </button>
             )}
@@ -589,8 +590,8 @@ export function TaskResultsPageContent() {
             description="Change the status or filters, or clear them to see every result"
             emoji="magnifying-glass"
             action={
-              <button type="button" className="btn btn-sm gap-1" onClick={clearFilters}>
-                <XCircle className="h-4 w-4" aria-hidden="true" />
+              <button type="button" className="btn btn-sm" onClick={clearFilters}>
+                <XCircle data-icon="inline-start" aria-hidden="true" />
                 Clear filters
               </button>
             }

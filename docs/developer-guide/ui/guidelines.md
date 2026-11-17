@@ -147,10 +147,49 @@ A qubit or coupling id is always a `QubitTile` (`ui/src/components/ui/QubitTile.
 small square-cornered box, the same shape as a cell of the chip grid, with a status dot when the
 reference carries a status. Do not render ids as plain badges.
 
-Icons come from `lucide-react`, 16px to 18px, in the color of their text role (`text-base-content/60`
+Icons come from `lucide-react`, 16px to 18px outside buttons, in the color of their text role (`text-base-content/60`
 for meta), never in `secondary` or `accent`. Product UI does not use emoji or emoji images; `EmptyState` renders
 a lucide icon from its `emoji` name map, and toasts use lucide status icons. `UserAvatar` renders
 the user's glyph avatar locally; see [User Avatars](./architecture.md#user-avatars).
+
+## Space Icon Buttons Optically
+
+An icon next to a label reads lighter than the word, so equal geometry looks lopsided. A labeled
+`.btn` marks its leading or trailing icon with `data-icon="inline-start"` or
+`data-icon="inline-end"` on the direct child, and the shared rule in `ui/src/app/globals.css`
+applies four corrections:
+
+| Principle | Rule |
+| --- | --- |
+| Less outer padding on the icon side | The icon side gets 75% of the button's `--btn-p`; the label side keeps it |
+| Slightly smaller icons | The icon is `1em + 2px` of the button's font size: 13px on `btn-xs`, 14px on `btn-sm`, 16px on the default size |
+| Tighter icon-label gap | `0.375em`, replacing DaisyUI's fixed `0.375rem` |
+| Nudge only where the shape warrants it | Only shapes whose mass sits off center move; Lucide `Play` shifts right by one grid unit (1/24 of its box) |
+
+```tsx
+<button type="button" className="btn btn-primary btn-sm">
+  <Plus data-icon="inline-start" aria-hidden="true" />
+  Add
+</button>
+<button type="button" className="btn btn-ghost btn-sm">
+  Export
+  <ChevronDown data-icon="inline-end" aria-hidden="true" />
+</button>
+```
+
+Put the hook on a loading spinner that replaces the icon too, so the swap keeps the same size.
+Do not add `gap-*` to a hooked button or `h-*`, `w-*`, `size-*`, or `size={...}` to a hooked
+icon; the rule overrides them. Height, vertical padding, and `.btn-square` or `.btn-circle`
+icon-only controls are unchanged, so DaisyUI size classes still set the hit target. A button
+with an explicit `px-*`, `ps-*`, `pe-*`, `pl-*`, or `pr-*` utility keeps that padding. A label
+hidden below a breakpoint (`hidden sm:inline`) keeps padding symmetric while only the icon
+shows.
+
+`ui/src/lib/__tests__/buttonIconSpacing.test.ts` fails when a labeled `.btn` has an
+unhooked leading or trailing icon, or when an icon-only button carries a hook. Start-aligned rows
+(`justify-start`, `justify-between`, `justify-end`) and labels rendered only conditionally
+(`{open && <span>Label</span>}`) are exempt because the icon aligns to a list edge or can stand
+alone.
 
 ## Draw Charts from One Theme
 

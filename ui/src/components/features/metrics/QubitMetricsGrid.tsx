@@ -785,9 +785,9 @@ export function QubitMetricsGrid({
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
                 <LineageButton
                   target={{ parameterName: metricKey, qid: selectedQubitInfo.qid }}
-                  className="btn btn-ghost btn-sm sm:btn-md gap-1"
+                  className="btn btn-ghost btn-sm sm:btn-md"
                 >
-                  <GitBranch className="h-4 w-4" />
+                  <GitBranch data-icon="inline-start" />
                   <span className="hidden sm:inline">Lineage</span>
                 </LineageButton>
                 <div className="flex gap-2">

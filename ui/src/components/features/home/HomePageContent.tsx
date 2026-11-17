@@ -64,9 +64,9 @@ function SectionHeading({ id, title, description, href, linkLabel }: SectionHead
       </div>
       {/* Offset the ghost padding when stacked so the label lines up with the heading. */}
       {href && linkLabel && (
-        <Link href={href} className="btn btn-ghost btn-sm -ml-3 shrink-0 gap-1 sm:ml-0">
+        <Link href={href} className="btn btn-ghost btn-sm -ml-3 shrink-0 sm:ml-0">
           {linkLabel}
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight data-icon="inline-end" />
         </Link>
       )}
     </div>
@@ -249,10 +249,10 @@ export function HomePageContent() {
           showJourneyStart && (
             <button
               type="button"
-              className="btn btn-ghost btn-sm gap-2"
+              className="btn btn-ghost btn-sm"
               onClick={() => setJourneyStartRequested(true)}
             >
-              <GraduationCap size={18} aria-hidden="true" />
+              <GraduationCap data-icon="inline-start" aria-hidden="true" />
               First calibration guide
             </button>
           )

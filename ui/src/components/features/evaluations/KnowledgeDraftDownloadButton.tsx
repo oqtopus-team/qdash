@@ -34,15 +34,15 @@ export function KnowledgeDraftDownloadButton({
   return (
     <button
       type="button"
-      className="btn btn-xs btn-outline gap-1"
+      className="btn btn-xs btn-outline"
       onClick={download}
       disabled={downloading}
       title="The zip this run was evaluated against, as uploaded"
     >
       {downloading ? (
-        <span className="loading loading-spinner loading-xs" />
+        <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
       ) : (
-        <Download className="h-3 w-3" />
+        <Download data-icon="inline-start" />
       )}
       Download zip
     </button>

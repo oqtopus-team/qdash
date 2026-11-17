@@ -60,9 +60,9 @@ function OpenPageLink({ href }: { href: string }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="btn btn-sm btn-ghost gap-1.5 rounded-full"
+      className="btn btn-sm btn-ghost rounded-full"
     >
-      <ExternalLink className="w-3.5 h-3.5" />
+      <ExternalLink data-icon="inline-start" />
       Open page
     </a>
   );

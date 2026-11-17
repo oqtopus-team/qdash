@@ -84,11 +84,15 @@ export function FilesBulkDownloadButton({
       title="Download all config files as a ZIP archive"
     >
       {isDownloading ? (
-        <span className="loading loading-spinner loading-xs" aria-hidden="true" />
+        <span
+          data-icon="inline-start"
+          className="loading loading-spinner loading-xs"
+          aria-hidden="true"
+        />
       ) : (
-        <Download size={16} aria-hidden="true" />
+        <Download data-icon="inline-start" aria-hidden="true" />
       )}
-      <span className="ml-1 hidden sm:inline">{isDownloading ? "Downloading..." : "Download"}</span>
+      <span className="hidden sm:inline">{isDownloading ? "Downloading..." : "Download"}</span>
     </button>
   );
 }

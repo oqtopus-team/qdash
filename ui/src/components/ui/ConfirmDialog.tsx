@@ -47,7 +47,9 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={pending}
           >
-            {pending && <span className="loading loading-spinner loading-xs" />}
+            {pending && (
+              <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
+            )}
             {confirmLabel}
           </button>
         </div>

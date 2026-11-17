@@ -311,9 +311,9 @@ export function MetricNotePanel({
             </div>
             <Link
               href={forumDraftHref(chipId, targetId, cooldownId)}
-              className="btn btn-xs btn-outline gap-1"
+              className="btn btn-xs btn-outline"
             >
-              <MessageSquarePlus className="h-3.5 w-3.5" />
+              <MessageSquarePlus data-icon="inline-start" />
               New
             </Link>
           </div>
@@ -412,8 +412,8 @@ function ViewState({ existing, onEdit }: { existing?: TargetNoteEntry; onEdit: (
           <StickyNote className="h-7 w-7" />
         </div>
         <div className="text-sm text-base-content/70">No pinned summary yet.</div>
-        <button className="btn btn-sm btn-primary gap-1" onClick={onEdit} type="button">
-          <Pencil className="h-3.5 w-3.5" />
+        <button className="btn btn-sm btn-primary" onClick={onEdit} type="button">
+          <Pencil data-icon="inline-start" />
           Add summary
         </button>
       </div>
@@ -433,8 +433,8 @@ function ViewState({ existing, onEdit }: { existing?: TargetNoteEntry; onEdit: (
         {existing.updatedAt && <span>· {formatDateTime(existing.updatedAt)}</span>}
       </div>
       <div className="flex gap-2 pt-1">
-        <button className="btn btn-sm btn-primary gap-1" onClick={onEdit} type="button">
-          <Pencil className="h-3.5 w-3.5" />
+        <button className="btn btn-sm btn-primary" onClick={onEdit} type="button">
+          <Pencil data-icon="inline-start" />
           Edit
         </button>
       </div>
@@ -482,17 +482,17 @@ function EditState({
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
         <div className="flex gap-2">
-          <button className="btn btn-sm btn-ghost gap-1" onClick={onCancel} type="button">
-            <X className="h-3.5 w-3.5" />
+          <button className="btn btn-sm btn-ghost" onClick={onCancel} type="button">
+            <X data-icon="inline-start" />
             Cancel
           </button>
           <button
-            className="btn btn-sm btn-primary gap-1"
+            className="btn btn-sm btn-primary"
             onClick={onSave}
             disabled={mutationPending || (!trimmed && !existing) || isTooLong}
             type="button"
           >
-            <Save className="h-3.5 w-3.5" />
+            <Save data-icon="inline-start" />
             {mutationPending ? "Saving…" : trimmed ? "Save summary" : "Clear summary"}
           </button>
         </div>

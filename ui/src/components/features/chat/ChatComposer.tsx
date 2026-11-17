@@ -333,15 +333,15 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
               <button
                 type="button"
                 disabled={isStreaming || disabled}
-                className="btn btn-ghost btn-xs h-7 gap-1.5 rounded-lg font-normal text-base-content/60"
+                className="btn btn-ghost btn-xs h-7 rounded-lg font-normal text-base-content/60"
                 aria-label="Thinking level"
                 title="How much the model thinks before answering"
               >
-                <Brain className="w-3.5 h-3.5 shrink-0" />
+                <Brain data-icon="inline-start" className="shrink-0" />
                 <span className="truncate">
                   {thinkingLabel(thinkingChoice, thinkingModelDefault ?? null, compact)}
                 </span>
-                <ChevronDown className="w-3 h-3 shrink-0" />
+                <ChevronDown data-icon="inline-end" className="shrink-0" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" side="top">

@@ -51,10 +51,10 @@ export function ErrorCard({
         {/* Retry Button */}
         {onRetry && (
           <div className="card-actions">
-            <button className="btn btn-error btn-outline gap-2" onClick={onRetry} type="button">
+            <button className="btn btn-error btn-outline" onClick={onRetry} type="button">
               <svg
+                data-icon="inline-start"
                 xmlns="http://www.w3.org/2000/svg"
-                className="w-4 h-4"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"

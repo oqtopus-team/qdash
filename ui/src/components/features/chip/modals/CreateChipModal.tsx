@@ -470,7 +470,11 @@ export function CreateChipModal({
             >
               {createChipMutation.isPending ? (
                 <>
-                  <span className="loading loading-spinner loading-sm" aria-hidden="true"></span>
+                  <span
+                    data-icon="inline-start"
+                    className="loading loading-spinner loading-sm"
+                    aria-hidden="true"
+                  ></span>
                   Creating...
                 </>
               ) : (
