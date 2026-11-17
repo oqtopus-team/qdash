@@ -57,7 +57,7 @@ only in what they open with:
 
 ## Pi runtime authentication
 
-The API forwards the authenticated user's access token and selected `X-Project-Id` to the Pi runtime on each chat or analysis turn, including approval responses. When no project header is supplied, it uses the user's default project. An internal bearer secret authenticates API-to-runtime requests; user credentials travel in separate internal headers and are never added to model input or durable conversation state.
+The API forwards the authenticated user's access token and selected `X-Project-Id` to the Pi runtime on each chat or analysis turn, including approval responses. When no project header is supplied, it uses the user's default project. An internal bearer secret authenticates API-to-runtime requests; user credentials travel in separate internal headers and are never added to model input or durable conversation state. A chat turn on a user's own ChatGPT plan also carries that user's plan access token in `X-QDash-ChatGPT-Token`; see [ChatGPT Plan Connections](./chatgpt-plan.md).
 
 Compose starts the runtime and workspace by default. The `agent-runtime-auth` initialization
 service generates a random secret once in a dedicated volume, mounted read-only by the API and

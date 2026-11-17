@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import type { Api, Model } from "@earendil-works/pi-ai";
+import type { Api, Model, Models } from "@earendil-works/pi-ai";
 import {
   DefaultResourceLoader,
   ModelRuntime,
@@ -93,6 +93,7 @@ import {
   type PageContext,
 } from "./page-context.ts";
 import { buildSystemPrompt, buildUserInstructionsSection } from "./prompt.ts";
+import { CHATGPT_PROVIDER, createPlanCatalog, planModel, planModelIds, withPlanToken } from "./plan-models.ts";
 import { buildSkillTool, type SkillSummary } from "./skill-tool.ts";
 import { extractToolGuide, TOOL_GUIDE_SKILL } from "./tool-guide.ts";
 
@@ -217,7 +218,14 @@ export class SharedRuntime {
     /** QDash's system prompt for chats, as built at startup. */
     private readonly systemPrompt: string,
     private readonly modelCompactionOverrides: Readonly<Record<string, CompactionBudget>> = {},
+    /** OpenAI's catalog with no credential of its own, for users' ChatGPT plan turns. */
+    private readonly planCatalog: Models = createPlanCatalog(),
   ) {}
+
+  /** Model IDs a user's ChatGPT plan connection can run in chat. */
+  planModelIds(): string[] {
+    return planModelIds(this.planCatalog);
+  }
 
   /**
    * The system prompt a chat of this user gets, as the model receives it:
@@ -664,6 +672,15 @@ export class SharedRuntime {
     modelName: string | undefined,
   ): { ref: ModelRef; contextWindow: number; maxTokens: number } {
     if (!provider || !modelName) throw new Error("provider and model name are required");
+    if (provider === CHATGPT_PROVIDER) {
+      const model = planModel(this.planCatalog, modelName);
+      if (!model) throw new Error(`QDash cannot run ${modelName} on the ChatGPT plan route`);
+      return {
+        ref: { provider: CHATGPT_PROVIDER, modelId: modelName },
+        contextWindow: model.contextWindow,
+        maxTokens: model.maxTokens,
+      };
+    }
     const providerId = PROVIDER_ALIASES[provider] ?? provider;
     const model = this.modelRuntime.getModel(providerId, modelName);
     if (!model) {
@@ -701,13 +718,27 @@ export class SharedRuntime {
     }
   }
 
-  /** Open or recover the SQLite-backed root conversation for one user/session. */
-  async openSession(request: SessionRequest, auth: QDashAuth): Promise<OpenDurableSession> {
+  /**
+   * Open or recover the SQLite-backed root conversation for one user/session.
+   *
+   * `chatgptToken` is the requesting user's own ChatGPT plan token for this
+   * turn. It is required for a `chatgpt` model and used for nothing else.
+   */
+  async openSession(
+    request: SessionRequest,
+    auth: QDashAuth,
+    chatgptToken?: string,
+  ): Promise<OpenDurableSession> {
     const {
       ref: model,
       contextWindow,
       maxTokens,
     } = this.resolveModelWithLimits(request.provider, request.modelName);
+    let models: Models = this.modelRuntime;
+    if (model.provider === CHATGPT_PROVIDER) {
+      if (!chatgptToken) throw new Error("Connect ChatGPT in QDash Settings to use this model");
+      models = withPlanToken(this.modelRuntime, this.planCatalog, chatgptToken);
+    }
     const storageName = sessionStorageName(request.ownerId, request.sessionId);
     const path = join(STATE_DIR, storageName);
     const connection = await createQDashConnection(auth);
@@ -745,7 +776,7 @@ export class SharedRuntime {
       harness = await Harness.open(
         await openNodeSqliteStorage(path),
         {
-          models: this.modelRuntime,
+          models,
           registry,
           ...(workspace ? { env: workspaceEnv } : {}),
           onReport: (report) => logDurableReport(storageName, report),

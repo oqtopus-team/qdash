@@ -27,6 +27,9 @@ import type { MemberResponse, ProjectRole } from "@/schemas";
 import { getApiErrorMessage } from "@/lib/utils/apiError";
 import { copyText } from "@/lib/utils/clipboard";
 
+import { isPlanModel, providerLabel } from "@/lib/copilotModels";
+
+import { ChatGPTConnectionSettings } from "./ChatGPTConnectionSettings";
 import { CopilotInstructionsSettings } from "./CopilotInstructionsSettings";
 import { CopilotSystemPromptView } from "./CopilotSystemPromptView";
 
@@ -53,6 +56,10 @@ function CopilotSettingsPanel() {
       <div className="card-body">
         <h2 className="card-title mb-4">Copilot Settings</h2>
         <div className="flex flex-col gap-6">
+          <ChatGPTConnectionSettings />
+
+          <div className="divider my-0" />
+
           <div className="flex flex-col gap-3">
             <label className="text-sm font-medium" htmlFor="copilot-chat-model">
               Default chat model
@@ -78,7 +85,7 @@ function CopilotSettingsPanel() {
               {effective && (
                 <div className="badge badge-neutral gap-1 w-fit">
                   <Cpu className="h-3 w-3" />
-                  {effective.provider}
+                  {providerLabel(effective.provider)}
                 </div>
               )}
             </div>
@@ -88,17 +95,26 @@ function CopilotSettingsPanel() {
                 : status === "error"
                   ? "Could not load the chat models. Chats use the configured default model."
                   : options.length > 1
-                    ? "AI Chat sends your messages to this model. You can also switch it from the chat input. The choices come from chat_models in chat.yaml."
+                    ? "AI Chat sends your messages to this model. You can also switch it from the chat input. The choices come from chat_models in chat.yaml and, once connected, your ChatGPT plan."
                     : "Only one chat model is configured, so there is nothing to switch to. An operator can offer more by adding entries to chat_models in chat.yaml."}
             </p>
-            {unavailableModel && (
-              <div role="status" className="alert alert-warning alert-soft text-sm">
-                <span>
-                  Your previous choice, <span className="font-mono">{unavailableModel}</span>, is no
-                  longer configured. Chats use {selected.label} instead.
-                </span>
-              </div>
-            )}
+            {unavailableModel &&
+              (selected.unavailable && isPlanModel(selected.model) ? (
+                <div role="status" className="alert alert-warning alert-soft text-sm">
+                  <span>
+                    Your choice, <span className="font-mono">{unavailableModel}</span>, needs your
+                    ChatGPT connection, which does not offer it now. Chats fail until you connect
+                    ChatGPT again or choose another model; QDash does not switch models for you.
+                  </span>
+                </div>
+              ) : (
+                <div role="status" className="alert alert-warning alert-soft text-sm">
+                  <span>
+                    Your previous choice, <span className="font-mono">{unavailableModel}</span>, is
+                    no longer configured. Chats use {selected.label} instead.
+                  </span>
+                </div>
+              ))}
           </div>
 
           <div className="bg-base-100 rounded-lg p-4">

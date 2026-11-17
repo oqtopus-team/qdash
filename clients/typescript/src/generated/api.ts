@@ -28,6 +28,7 @@ import type {
   CancelExecutionResponse,
   CandidateGateResponse,
   ChangePassword200,
+  ChatGPTConnectionStatus,
   ChipDatesResponse,
   ChipDeletionImpactResponse,
   ChipMetricsResponse,
@@ -38,6 +39,7 @@ import type {
   CompareExecutionsParams,
   CompareSeedValues200,
   CompareSeedValuesParams,
+  CompleteChatGPTAuthorizationRequest,
   ConfigReloadResponse,
   CooldownCreateRequest,
   CooldownResponse,
@@ -75,6 +77,7 @@ import type {
   DeleteUser200,
   Device,
   DeviceTopologyRequest,
+  DisconnectChatGPTResponse,
   DownloadArtifactByPathParams,
   DownloadArtifactsAsArchiveParams,
   DownloadFiguresAsZipRequest,
@@ -263,6 +266,8 @@ import type {
   SetEvaluationVerdictRequest,
   SettingsResponse,
   SourceFileResponse,
+  StartChatGPTAuthorizationRequest,
+  StartChatGPTAuthorizationResponse,
   SubmitAgentActionRequest,
   SuccessResponse,
   TaskFileSettings,
@@ -1833,6 +1838,88 @@ const getCopilotSystemPrompt = (
  options?: SecondParameter<typeof qdashRequest<CopilotSystemPrompt>>,) => {
       return qdashRequest<CopilotSystemPrompt>(
       {url: `/copilot/system-prompt`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Connection state, account email, models and the last problem; never tokens.
+ * @summary Get the current user's ChatGPT plan connection
+ */
+const getChatGPTConnection = (
+
+ options?: SecondParameter<typeof qdashRequest<ChatGPTConnectionStatus>>,) => {
+      return qdashRequest<ChatGPTConnectionStatus>(
+      {url: `/copilot/chatgpt/connection`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Revoke the renewable session and clear the tokens; the registration is kept.
+ * @summary Disconnect the current user's ChatGPT account
+ */
+const disconnectChatGPT = (
+
+ options?: SecondParameter<typeof qdashRequest<DisconnectChatGPTResponse>>,) => {
+      return qdashRequest<DisconnectChatGPTResponse>(
+      {url: `/copilot/chatgpt/connection`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
+ * Create a one-time attempt bound to this user and return OpenAI's sign-in URL.
+ * @summary Start connecting the current user's ChatGPT account
+ */
+const startChatGPTAuthorization = (
+    startChatGPTAuthorizationRequest: StartChatGPTAuthorizationRequest,
+ options?: SecondParameter<typeof qdashRequest<StartChatGPTAuthorizationResponse>>,) => {
+      return qdashRequest<StartChatGPTAuthorizationResponse>(
+      {url: `/copilot/chatgpt/authorize`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: startChatGPTAuthorizationRequest
+    },
+      options);
+    }
+
+/**
+ * Validate the state against this user's attempt, exchange the code and store.
+ * @summary Finish connecting with the address the browser landed on
+ */
+const completeChatGPTAuthorization = (
+    completeChatGPTAuthorizationRequest: CompleteChatGPTAuthorizationRequest,
+ options?: SecondParameter<typeof qdashRequest<ChatGPTConnectionStatus>>,) => {
+      return qdashRequest<ChatGPTConnectionStatus>(
+      {url: `/copilot/chatgpt/callback`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: completeChatGPTAuthorizationRequest
+    },
+      options);
+    }
+
+/**
+ * List the account's models again with its own token.
+ * @summary Reload the models the connected ChatGPT account offers
+ */
+const refreshChatGPTModels = (
+
+ options?: SecondParameter<typeof qdashRequest<ChatGPTConnectionStatus>>,) => {
+      return qdashRequest<ChatGPTConnectionStatus>(
+      {url: `/copilot/chatgpt/models/refresh`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Record that the user saw that chats use their ChatGPT plan.
+ * @summary Dismiss the one-time ChatGPT plan confirmation
+ */
+const acknowledgeChatGPTWelcome = (
+
+ options?: SecondParameter<typeof qdashRequest<ChatGPTConnectionStatus>>,) => {
+      return qdashRequest<ChatGPTConnectionStatus>(
+      {url: `/copilot/chatgpt/welcome`, method: 'POST'
     },
       options);
     }
@@ -4923,7 +5010,7 @@ const listUserAvatars = (
       options);
     }
 
-return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,listCopilotSourceRoots,searchCopilotSource,getCopilotSourceFile,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
+return {login,registerUser,getCurrentUser,updateCurrentUserProfile,logout,changePassword,resetPassword,reloadConfigCaches,listAllUsers,getUserDetails,updateUserSettings,deleteUser,bulkImportUsers,listAllProjects,adminDeleteProject,listProjectMembersAdmin,addProjectMemberAdmin,removeProjectMemberAdmin,createProjectForUser,listProjects,createProject,getProject,updateProject,deleteProject,listProjectMembers,inviteProjectMember,updateProjectMember,removeProjectMember,transferProjectOwnership,getFigureByPath,downloadArtifactByPath,downloadArtifactsAsArchive,previewArtifactByPath,getExecutionLockStatus,checkExecutionAvailability,listExecutions,getExecutionActivity,getExecution,cancelExecution,downloadFile,downloadZipFile,getFileTree,getFileContent,saveFileContent,getFileImage,validateFileContent,getGitStatus,gitPullConfig,gitPushConfig,createAgentSession,getAgentSession,evaluateAgentCandidateGate,submitAgentAction,listAgentActions,listAgentActionCandidates,commitAgentActionCandidate,commitAgentCandidateSet,getAgentCandidateSetCommit,getAgentCandidateCommit,applyAgentCandidateCommit,getAgentAction,executeAgentAction,retryCalibrationGitHubSync,getCalibrationNote,importSeedParameters,getAvailableSeedParameters,compareSeedValues,updateCalibrationParameters,deleteCalibrationParameter,getManualEdits,getCalibrationPipelineCatalog,validateCalibrationPipeline,executeCalibrationPipeline,getCopilotConfig,listCopilotChatSessions,createCopilotChatSession,getCopilotChatSession,updateCopilotChatSession,deleteCopilotChatSession,listCopilotSourceRoots,searchCopilotSource,getCopilotSourceFile,getCopilotPreferences,updateCopilotPreferences,getCopilotSystemPrompt,getChatGPTConnection,disconnectChatGPT,startChatGPTAuthorization,completeChatGPTAuthorization,refreshChatGPTModels,acknowledgeChatGPTWelcome,getSettings,listChips,createChip,listChipConfigSources,updateChip,deleteChip,getChip,getChipDeletionImpact,getChipDates,getChipMux,listChipMuxes,getChipNote,upsertChipNote,deleteChipNote,listChipQubits,getChipQubit,reanalyzeResonatorSpectroscopy,reanalyzeQubitSpectroscopy,listChipCouplings,getChipCoupling,getChipMetricsSummary,getChipMetricHeatmap,listTasks,quickRunTask,getTaskResult,listTaskKnowledge,getTaskKnowledgeMarkdown,downloadTaskKnowledgeArchive,getTaskEvaluationPrompts,getTaskKnowledge,getTaskFileSettings,listTaskFileBackends,getBackendConfig,listTaskInfo,listTaskResults,getLatestQubitTaskResults,getHistoricalQubitTaskResults,getQubitTaskHistory,getLatestCouplingTaskResults,getHistoricalCouplingTaskResults,getCouplingTaskHistory,getTimeseriesTaskResults,reExecuteTaskResult,setTaskResultExcluded,downloadFiguresAsZip,createEvaluationRun,listEvaluationRuns,getEvaluationRun,retryEvaluationRun,cancelEvaluationRun,listEvaluations,setEvaluationVerdict,getEvaluationFigure,createKnowledgeDraft,getKnowledgeDraft,getKnowledgeDraftKnowledge,downloadKnowledgeDraftArchive,listForumCategories,createForumCategory,updateForumCategory,deleteForumCategory,listForumLabels,createForumLabel,updateForumLabel,deleteForumLabel,listForumPosts,createForumPost,getForumPost,updateForumPost,deleteForumPost,getForumPostReplies,uploadForumImage,closeForumPost,reopenForumPost,listTags,getDeviceTopology,getDeviceTopologyPlot,listBackends,saveFlow,listFlows,listFlowTemplates,getFlowTemplate,listFlowHelperFiles,getFlowHelperFile,listAllFlowSchedules,deleteFlowSchedule,updateFlowSchedule,getFlow,deleteFlow,getFlowExecutionPlan,executeFlow,moveFlow,scheduleFlow,listFlowSchedules,getMetricsConfig,getChipMetrics,getQubitMetricHistory,getCouplingMetricHistory,downloadMetricsPdf,upsertQubitNote,deleteQubitNote,createQubitNoteComment,updateQubitNoteComment,deleteQubitNoteComment,upsertQubitMetricNote,deleteQubitMetricNote,upsertCouplingNote,deleteCouplingNote,createCouplingNoteComment,updateCouplingNoteComment,deleteCouplingNoteComment,upsertCouplingMetricNote,deleteCouplingMetricNote,getTaskNote,upsertTaskNote,deleteTaskNote,getChipNotesSummary,listChipNoteEvents,listTargetNoteEvents,searchNoteEvents,listNotifications,getUnreadNotificationCount,markNotificationRead,markAllNotificationsRead,listCryostats,createCryostat,getCryostat,updateCryostat,deleteCryostat,listCooldowns,createCooldown,getCooldown,updateCooldown,deleteCooldown,assignChipToCooldown,unassignChipFromCooldown,createCooldownWiringCheckpoint,listCooldownWiringEvents,listTopologies,getTopologyById,getConfigAll,getProvenanceEntity,getProvenanceLineage,getProvenanceImpact,compareExecutions,getParameterHistory,getProvenanceStats,getRecentExecutions,getRecentChanges,getDegradationTrends,getRecalibrationRecommendations,getCurrentUserAvatar,updateCurrentUserAvatar,listUserAvatars}};
 export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['login']>>>
 export type RegisterUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['registerUser']>>>
 export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCurrentUser']>>>
@@ -5009,6 +5096,12 @@ export type GetCopilotSourceFileResult = NonNullable<Awaited<ReturnType<ReturnTy
 export type GetCopilotPreferencesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotPreferences']>>>
 export type UpdateCopilotPreferencesResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['updateCopilotPreferences']>>>
 export type GetCopilotSystemPromptResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getCopilotSystemPrompt']>>>
+export type GetChatGPTConnectionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getChatGPTConnection']>>>
+export type DisconnectChatGPTResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['disconnectChatGPT']>>>
+export type StartChatGPTAuthorizationResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['startChatGPTAuthorization']>>>
+export type CompleteChatGPTAuthorizationResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['completeChatGPTAuthorization']>>>
+export type RefreshChatGPTModelsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['refreshChatGPTModels']>>>
+export type AcknowledgeChatGPTWelcomeResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['acknowledgeChatGPTWelcome']>>>
 export type GetSettingsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['getSettings']>>>
 export type ListChipsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['listChips']>>>
 export type CreateChipResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getQDashAPI>['createChip']>>>

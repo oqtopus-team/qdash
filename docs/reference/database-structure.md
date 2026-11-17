@@ -24,8 +24,13 @@ Related model layers serve different contracts:
 | --- | --- | --- |
 | `user` | `UserDocument` | `user.py` |
 | `user_avatar` | `UserAvatarDocument` | `user_avatar.py` |
+| `chatgpt_connection` | `ChatGPTConnectionDocument` | `chatgpt_connection.py` |
+| `chatgpt_authorization_attempt` | `ChatGPTAuthorizationAttemptDocument` | `chatgpt_connection.py` |
 | `project` | `ProjectDocument` | `project.py` |
 | `project_membership` | `ProjectMembershipDocument` | `project_membership.py` |
+
+[ChatGPT plan connections](../developer-guide/copilot/chatgpt-plan.md) explains why connection
+tokens are stored only encrypted and attempts expire.
 
 ## Calibration and Hardware
 

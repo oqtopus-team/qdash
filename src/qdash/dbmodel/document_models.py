@@ -8,6 +8,10 @@ from qdash.dbmodel.agent_session import (
 )
 from qdash.dbmodel.backend import BackendDocument
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+from qdash.dbmodel.chatgpt_connection import (
+    ChatGPTAuthorizationAttemptDocument,
+    ChatGPTConnectionDocument,
+)
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.chip_note import ChipNoteDocument
@@ -71,6 +75,8 @@ def document_models() -> list[Any]:
         SlackForumThreadDocument,
         UserDocument,
         UserAvatarDocument,
+        ChatGPTConnectionDocument,
+        ChatGPTAuthorizationAttemptDocument,
         ExecutionCounterDocument,
         ProjectExecutionCounterDocument,
         ExecutionLockDocument,

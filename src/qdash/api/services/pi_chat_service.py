@@ -25,7 +25,7 @@ from qdash.copilot.prompts.task_chat import build_language_instruction, build_ta
 from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, AsyncIterable
+    from collections.abc import AsyncGenerator, AsyncIterable, Callable
 
     from qdash.copilot.config import CopilotConfig
     from qdash.copilot.contracts import ChatRequest, TaskContextBundle
@@ -152,10 +152,15 @@ class EvaluationRecorder(Protocol):
 
 @dataclass(frozen=True)
 class QDashAuth:
-    """User credentials forwarded only in internal headers, never chat payloads."""
+    """User credentials forwarded only in internal headers, never chat payloads.
+
+    ``chatgpt_access_token`` is the user's own ChatGPT plan token for this turn
+    only; the runtime keeps it in memory for the turn and never stores it.
+    """
 
     access_token: str = field(repr=False)
     project_id: str | None = None
+    chatgpt_access_token: str | None = field(default=None, repr=False)
 
     def headers(self) -> dict[str, str]:
         if not self.access_token:
@@ -163,7 +168,84 @@ class QDashAuth:
         return {
             "X-QDash-Token": self.access_token,
             **({"X-QDash-Project-Id": self.project_id} if self.project_id else {}),
+            **(
+                {"X-QDash-ChatGPT-Token": self.chatgpt_access_token}
+                if self.chatgpt_access_token
+                else {}
+            ),
         }
+
+
+# The chat model provider id for a user's own ChatGPT plan. It is not a
+# chat.yaml provider: the runtime serves it only with the turn's user token.
+CHATGPT_PROVIDER = "chatgpt"
+
+# OpenAI's documented plan-usage error codes and what the user should do.
+_PLAN_ERRORS: dict[str, str] = {
+    "subscription_sharing_usage_limit_exceeded": (
+        "ChatGPT usage limit reached. The limit may apply to your plan or to QDash; "
+        "review it in ChatGPT settings."
+    ),
+    "subscription_sharing_workplace_individual_usage_limit_exceeded": (
+        "Your ChatGPT workspace's usage limit for you is reached. Ask your workspace "
+        "admin, or review usage in ChatGPT settings."
+    ),
+    "subscription_sharing_usage_unavailable": (
+        "ChatGPT could not check your plan usage right now. Try again later."
+    ),
+    "subscription_sharing_user_unavailable": (
+        "ChatGPT account information is temporarily unavailable. Try again later."
+    ),
+    "subscription_sharing_user_not_eligible": (
+        "ChatGPT plan usage is not available for this account, workspace or policy."
+    ),
+    "subscription_sharing_invalid_user": (
+        "ChatGPT could not validate your account. Connect ChatGPT again in Settings."
+    ),
+    "subscription_sharing_unsupported_capability": (
+        "This request uses something the ChatGPT plan route does not support."
+    ),
+    "subscription_sharing_route_not_supported": ("The ChatGPT plan route rejected this request."),
+    "chatpass_v2_scope_not_authorized": (
+        "Your ChatGPT connection does not authorize this request. Connect ChatGPT again."
+    ),
+    "chatpass_v2_invalid_authorization_context": (
+        "Your ChatGPT connection does not authorize this request. Connect ChatGPT again."
+    ),
+}
+CHATGPT_USAGE_URL = "https://chatgpt.com/settings/usage"
+
+
+def plan_error(message: str) -> tuple[str, str] | None:
+    """The documented plan-usage code a runtime error names, with guidance."""
+    for code, guidance in _PLAN_ERRORS.items():
+        if code in message:
+            return code, guidance
+    return None
+
+
+_plan_models_cache: tuple[float, frozenset[str]] | None = None
+_PLAN_MODELS_TTL_SECONDS = 300.0
+
+
+async def plan_model_ids() -> frozenset[str] | None:
+    """Model IDs the runtime can run on the ChatGPT plan route; None when unknown."""
+    global _plan_models_cache
+    loop_time = asyncio.get_running_loop().time()
+    if _plan_models_cache and loop_time - _plan_models_cache[0] < _PLAN_MODELS_TTL_SECONDS:
+        return _plan_models_cache[1]
+    try:
+        async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
+            response = await client.post(
+                f"{RUNTIME_URL}/plan-models", headers=_runtime_headers(), json={}
+            )
+            response.raise_for_status()
+            ids = frozenset(str(item) for item in response.json().get("models", []))
+    except (httpx.HTTPError, RuntimeError, ValueError):
+        logger.warning("Could not read the runtime's ChatGPT plan models", exc_info=True)
+        return None
+    _plan_models_cache = (loop_time, ids)
+    return ids
 
 
 def _runtime_headers() -> dict[str, str]:
@@ -314,6 +396,7 @@ async def stream(
     images_sent: dict[str, Any] | None = None,
     recorder: EvaluationRecorder | None = None,
     opening_message: str | None = None,
+    on_plan_error: Callable[[str, str], None] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Proxy one chat turn through the Pi Agent Runtime as SSE events.
 
@@ -364,7 +447,12 @@ async def stream(
         extra_result = {"images_sent": images_sent or {}}
 
     async for event in stream_payload(
-        payload, step="run_chat", auth=auth, extra_result=extra_result, recorder=recorder
+        payload,
+        step="run_chat",
+        auth=auth,
+        extra_result=extra_result,
+        recorder=recorder,
+        on_plan_error=on_plan_error,
     ):
         yield event
 
@@ -376,6 +464,7 @@ async def stream_payload(
     auth: QDashAuth,
     extra_result: dict[str, Any] | None = None,
     recorder: EvaluationRecorder | None = None,
+    on_plan_error: Callable[[str, str], None] | None = None,
 ) -> AsyncGenerator[str, None]:
     """POST one turn to the runtime and re-emit its NDJSON as SSE.
 
@@ -405,6 +494,7 @@ async def stream_payload(
                 extra_result=extra_result,
                 step=step,
                 recorder=recorder,
+                on_plan_error=on_plan_error,
             ):
                 yield event
     except httpx.HTTPError as exc:
@@ -437,6 +527,7 @@ async def translate(
     extra_result: dict[str, Any] | None = None,
     step: str = "run_chat",
     recorder: EvaluationRecorder | None = None,
+    on_plan_error: Callable[[str, str], None] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Turn a runtime NDJSON stream into QDash SSE events.
 
@@ -589,10 +680,22 @@ async def translate(
         elif kind in ("chart", "ask", "approval", "edit"):
             pass
         elif kind == "error":
-            yield sse_event(
-                "error",
-                {"step": step, "detail": event.get("message", "Agent failed")},
-            )
+            message = str(event.get("message", "Agent failed"))
+            mapped = plan_error(message) if on_plan_error is not None else None
+            if mapped is not None and on_plan_error is not None:
+                code, guidance = mapped
+                on_plan_error(code, guidance)
+                yield sse_event(
+                    "error",
+                    {
+                        "step": step,
+                        "detail": f"{guidance} {CHATGPT_USAGE_URL}",
+                        "code": code,
+                        "usage_url": CHATGPT_USAGE_URL,
+                    },
+                )
+                return
+            yield sse_event("error", {"step": step, "detail": message})
             return
         elif kind == "done":
             if recorder is not None:

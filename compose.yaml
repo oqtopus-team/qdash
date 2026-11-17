@@ -216,6 +216,8 @@ services:
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config # Qubex backend configuration repository/data
       - api-logs:/app/logs
       - agent-runtime-auth:/run/agent-runtime-auth:ro
+      # Encrypts users' ChatGPT credentials at rest; mounted into the API only.
+      - credential-key:/run/qdash-credential-key:ro
       # Read-only source the Copilot searches when it investigates a failure
       - ./src/qdash:/app/source/qdash:ro
       - ${CALIBTASKS_PATH:-./src/qdash/workflow/calibtasks}:/app/source/qdash/workflow/calibtasks:ro
@@ -251,10 +253,14 @@ services:
       - PI_AGENT_RUNTIME_URL=http://agent-runtime:${AGENT_RUNTIME_PORT:-8002}
       - AGENT_RUNTIME_TOKEN=${AGENT_RUNTIME_TOKEN:-}
       - AGENT_RUNTIME_TOKEN_FILE=/run/agent-runtime-auth/token
+      - QDASH_CREDENTIAL_KEY=${QDASH_CREDENTIAL_KEY:-}
+      - QDASH_CREDENTIAL_KEY_FILE=/run/qdash-credential-key/key
+      - QDASH_CHATGPT_CALLBACK_PORT=${QDASH_CHATGPT_CALLBACK_PORT:-1455}
     networks:
       - custom_net
   agent-runtime-auth:
-    # Generate once per deployment; only API and runtime can read the secret.
+    # Generate once per deployment; only API and runtime can read the runtime
+    # secret, and only the API can read the credential encryption key.
     build:
       context: .
       dockerfile: ./src/qdash/api/Dockerfile
@@ -262,11 +268,19 @@ services:
     network_mode: none
     volumes:
       - agent-runtime-auth:/run/agent-runtime-auth
+      - credential-key:/run/qdash-credential-key
     command:
       - python
       - -c
       - |
-        import os, pathlib, secrets
+        import base64, os, pathlib, secrets
+        key = pathlib.Path('/run/qdash-credential-key/key')
+        if not key.exists():
+            os.umask(0o077)
+            pending = key.with_suffix('.tmp')
+            pending.write_text(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())
+            pending.chmod(0o400)
+            pending.replace(key)
         path = pathlib.Path('/run/agent-runtime-auth/token')
         if not path.exists():
             os.umask(0o077)
@@ -420,5 +434,6 @@ volumes:
   api-logs:
   agent-runtime-state:
   agent-runtime-auth:
+  credential-key:
   agent-exec-workspace:
   agent-exec-socket:

@@ -22,6 +22,23 @@ export interface ModelOption {
   resolvedModel?: ModelOverride | null;
   /** The configured reasoning effort of the model this option runs, for the thinking menu. */
   reasoningEffort?: string | null;
+  /** A remembered model that cannot run now; chats with it fail instead of switching models. */
+  unavailable?: boolean;
+}
+
+/**
+ * The provider of a user's own ChatGPT plan. Its models come from the user's
+ * connection in Settings, not from chat.yaml, and the server runs them only
+ * with that user's ChatGPT sign-in.
+ */
+const CHATGPT_PROVIDER = "chatgpt";
+export const CHATGPT_USAGE_URL = "https://chatgpt.com/settings/usage";
+
+/** A model the user's connected ChatGPT account offers. */
+export interface PlanModel {
+  slug: string;
+  display_name: string;
+  supported?: boolean;
 }
 
 const DEFAULT_CHAT_MODEL_KEY = "default";
@@ -60,6 +77,55 @@ function modelIdentity(model: ModelOverride): string {
 /** The stored key of a chat model: its identity, so a reordered config keeps the choice. */
 function chatModelKey(model: ModelOverride): string {
   return `${CHAT_MODEL_KEY_PREFIX}${modelIdentity(model)}`;
+}
+
+/** Whether a model runs on the user's own ChatGPT plan. */
+export function isPlanModel(model: ModelOverride | null | undefined): boolean {
+  return model?.provider === CHATGPT_PROVIDER;
+}
+
+/** How menus name a model's provider. */
+export function providerLabel(provider: string | null | undefined): string | undefined {
+  if (!provider) return undefined;
+  return provider === CHATGPT_PROVIDER ? "ChatGPT plan" : provider;
+}
+
+/** Menu options for the models the user's ChatGPT connection can run in chat. */
+export function buildPlanModelOptions(models: readonly PlanModel[]): ModelOption[] {
+  return models
+    .filter((model) => model.supported !== false && model.slug)
+    .map((model) => {
+      const override: ModelOverride = { provider: CHATGPT_PROVIDER, name: model.slug };
+      return {
+        key: chatModelKey(override),
+        label: model.display_name || model.slug,
+        model: override,
+        resolvedModel: override,
+        reasoningEffort: null,
+      };
+    });
+}
+
+/**
+ * A remembered ChatGPT model the connection no longer offers. It stays
+ * selected, so the next message fails with a reason instead of silently going
+ * to another model or another billing path.
+ */
+export function unavailablePlanOption(key: string): ModelOption | null {
+  const identity = chatModelIdentityOfKey(key);
+  const prefix = `${CHATGPT_PROVIDER}:`;
+  if (!identity?.startsWith(prefix)) return null;
+  const name = identity.slice(prefix.length);
+  if (!name) return null;
+  const override: ModelOverride = { provider: CHATGPT_PROVIDER, name };
+  return {
+    key,
+    label: `${name} (unavailable)`,
+    model: override,
+    resolvedModel: override,
+    reasoningEffort: null,
+    unavailable: true,
+  };
 }
 
 /** The `provider:name` a stored model key names, or null for the default and legacy keys. */

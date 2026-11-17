@@ -232,6 +232,7 @@ export default withMermaid(
               items: [
                 { text: "Architecture", link: "/developer-guide/copilot/architecture" },
                 { text: "Model Configuration", link: "/developer-guide/copilot/model-configuration" },
+                { text: "ChatGPT Plan Connections", link: "/developer-guide/copilot/chatgpt-plan" },
                 { text: "Pi Packages", link: "/developer-guide/copilot/packages" },
                 { text: "Pi Extension Design", link: "/developer-guide/copilot/extensions" },
                 { text: "Agent Platform", link: "/developer-guide/copilot/agent-platform" },

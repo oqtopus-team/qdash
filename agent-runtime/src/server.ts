@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { UserEntry, type Conversation, type Submission } from "@earendil-works/pi-durable";
 
 import { requestQDashAuth } from "./auth.ts";
+import { requestChatGPTToken } from "./plan-models.ts";
 import { parsePageContext } from "./page-context.ts";
 import { WRAP_UP_MESSAGE } from "./budget.ts";
 import { encodeLine, formatSettledDetail, toNdjsonEvents, type NdjsonEvent, type SessionEventLike } from "./events.ts";
@@ -185,6 +186,14 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
     sendJson(res, 401, { error: "QDash user authentication is required" });
     return;
   }
+  // The requesting user's own ChatGPT plan token, for this turn only.
+  let chatgptToken: string | undefined;
+  try {
+    chatgptToken = requestChatGPTToken(req.headers);
+  } catch {
+    sendJson(res, 400, { error: "Invalid ChatGPT plan credential" });
+    return;
+  }
 
   const runKey = `${ownerId}\0${conversationId}`;
   if (running.has(runKey)) {
@@ -212,6 +221,7 @@ async function handleChat(req: IncomingMessage, res: ServerResponse): Promise<vo
         ...(pageContext ? { pageContext } : {}),
       },
       auth,
+      chatgptToken,
     );
   } catch (error) {
     running.delete(runKey);
@@ -540,6 +550,14 @@ const server = createServer((req, res) => {
         ),
       )
       .catch((error: unknown) => handleRouteError(res, error, "system prompt"));
+    return;
+  }
+  if (req.method === "POST" && req.url === "/plan-models") {
+    if (!authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    sendJson(res, 200, { models: runtime.planModelIds() });
     return;
   }
   if (req.method === "POST" && req.url === "/chat/abort") {

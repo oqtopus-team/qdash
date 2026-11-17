@@ -4946,6 +4946,206 @@
         ]
       }
     },
+    "/copilot/chatgpt/connection": {
+      "get": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Get the current user's ChatGPT plan connection",
+        "description": "Connection state, account email, models and the last problem; never tokens.",
+        "operationId": "getChatGPTConnection",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatGPTConnectionStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Disconnect the current user's ChatGPT account",
+        "description": "Revoke the renewable session and clear the tokens; the registration is kept.",
+        "operationId": "disconnectChatGPT",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisconnectChatGPTResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/copilot/chatgpt/authorize": {
+      "post": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Start connecting the current user's ChatGPT account",
+        "description": "Create a one-time attempt bound to this user and return OpenAI's sign-in URL.",
+        "operationId": "startChatGPTAuthorization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartChatGPTAuthorizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartChatGPTAuthorizationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/copilot/chatgpt/callback": {
+      "post": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Finish connecting with the address the browser landed on",
+        "description": "Validate the state against this user's attempt, exchange the code and store.",
+        "operationId": "completeChatGPTAuthorization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteChatGPTAuthorizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatGPTConnectionStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/copilot/chatgpt/models/refresh": {
+      "post": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Reload the models the connected ChatGPT account offers",
+        "description": "List the account's models again with its own token.",
+        "operationId": "refreshChatGPTModels",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatGPTConnectionStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/copilot/chatgpt/welcome": {
+      "post": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Dismiss the one-time ChatGPT plan confirmation",
+        "description": "Record that the user saw that chats use their ChatGPT plan.",
+        "operationId": "acknowledgeChatGPTWelcome",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatGPTConnectionStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/settings": {
       "get": {
         "tags": [
@@ -18752,6 +18952,154 @@
         "title": "CandidateGateResponse",
         "description": "Side-effect-free deterministic decision for one candidate value."
       },
+      "ChatGPTConnectionError": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ChatGPTConnectionError",
+        "description": "The last plan-usage or sign-in problem, for Settings."
+      },
+      "ChatGPTConnectionStatus": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "Whether this QDash server can store ChatGPT connections"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_connected",
+              "connected",
+              "plan_disabled",
+              "reauth_required",
+              "signed_out"
+            ],
+            "title": "Status"
+          },
+          "can_reconnect": {
+            "type": "boolean",
+            "title": "Can Reconnect",
+            "description": "A saved registration can be signed in to again"
+          },
+          "plan_usage_enabled": {
+            "type": "boolean",
+            "title": "Plan Usage Enabled",
+            "description": "Chat requests can use the ChatGPT plan"
+          },
+          "welcome_pending": {
+            "type": "boolean",
+            "title": "Welcome Pending",
+            "description": "Show the one-time plan-usage confirmation"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "connected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connected At"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatGPTConnectionError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ChatGPTPlanModel"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "usage_url": {
+            "type": "string",
+            "title": "Usage Url",
+            "description": "Where the user reviews and limits plan usage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "status",
+          "can_reconnect",
+          "plan_usage_enabled",
+          "welcome_pending",
+          "usage_url"
+        ],
+        "title": "ChatGPTConnectionStatus",
+        "description": "The current user's connection, as Settings and the chat model menu show it."
+      },
+      "ChatGPTPlanModel": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug",
+            "description": "Model ID sent as the chat model name"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported",
+            "description": "Whether QDash's chat runtime can run this model on the plan route",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "display_name"
+        ],
+        "title": "ChatGPTPlanModel",
+        "description": "A model the connected account offers."
+      },
       "ChipConfigOptions": {
         "properties": {
           "create": {
@@ -19202,6 +19550,22 @@
         ],
         "title": "CommitAgentCandidateSetRequest",
         "description": "Commit the final accepted candidate set for one same-qubit plan."
+      },
+      "CompleteChatGPTAuthorizationRequest": {
+        "properties": {
+          "callback_url": {
+            "type": "string",
+            "maxLength": 8192,
+            "minLength": 1,
+            "title": "Callback Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "callback_url"
+        ],
+        "title": "CompleteChatGPTAuthorizationRequest",
+        "description": "The address the user's browser landed on after signing in."
       },
       "Condition": {
         "properties": {
@@ -20729,6 +21093,21 @@
         "type": "object",
         "title": "DeviceTopologyRequest",
         "description": "Request model for device topology."
+      },
+      "DisconnectChatGPTResponse": {
+        "properties": {
+          "revocation_confirmed": {
+            "type": "boolean",
+            "title": "Revocation Confirmed",
+            "description": "OpenAI confirmed that the renewable session was revoked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revocation_confirmed"
+        ],
+        "title": "DisconnectChatGPTResponse",
+        "description": "Result of signing out of ChatGPT in QDash."
       },
       "DownloadFiguresAsZipRequest": {
         "properties": {
@@ -30117,6 +30496,51 @@
         ],
         "title": "SourceSearchMatch",
         "description": "One search hit; ``line`` and ``text`` are null for a path search."
+      },
+      "StartChatGPTAuthorizationRequest": {
+        "properties": {
+          "new_account": {
+            "type": "boolean",
+            "title": "New Account",
+            "description": "Register a different ChatGPT account instead of the saved one",
+            "default": false
+          },
+          "enable_plan": {
+            "type": "boolean",
+            "title": "Enable Plan",
+            "description": "Ask for ChatGPT plan permission again after it was declined",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "StartChatGPTAuthorizationRequest",
+        "description": "Start a sign-in for the current user."
+      },
+      "StartChatGPTAuthorizationResponse": {
+        "properties": {
+          "authorization_url": {
+            "type": "string",
+            "title": "Authorization Url"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "title": "Redirect Uri",
+            "description": "The browser lands on this address after sign-in"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "authorization_url",
+          "redirect_uri",
+          "expires_at"
+        ],
+        "title": "StartChatGPTAuthorizationResponse",
+        "description": "Where to send the user's browser, and which address they bring back."
       },
       "SubmitAgentActionRequest": {
         "properties": {

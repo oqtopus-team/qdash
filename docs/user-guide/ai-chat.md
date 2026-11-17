@@ -52,9 +52,11 @@ The model picker under the message box names the model your next message goes to
 is marked **default**. Choose another model there or in **Settings → Copilot → Default chat
 model**; the two stay in step and your browser remembers the choice. The picker cannot be opened
 while an answer is streaming, or when the deployment offers only one chat model. The list of
-models comes from the deployment and is refreshed when you open a chat or **Settings**, or
-return to the window. If your chosen model is no longer offered, chats use the default and
-**Settings** says so.
+models comes from the deployment, plus the models of your own ChatGPT plan once you connect it
+(see [Use Your ChatGPT Plan](#use-your-chatgpt-plan)), and is refreshed when you open a chat or
+**Settings**, or return to the window. If your chosen deployment model is no longer offered,
+chats use the default and **Settings** says so. A chosen ChatGPT model is never replaced this
+way: until your connection offers it again, your messages fail with the reason.
 
 The **Thinking** menu next to the model picker sets how much the model reasons before it answers:
 **Auto** (the model's configured default), **Off**, **Low**, **Medium**, or **High**. The choice
@@ -69,6 +71,47 @@ composer shows when they are on.
 
 **What Copilot is told** shows the current system prompt, your appended instructions, and
 available tools. The application-owned text is read-only; change it in the deployment.
+
+## Use Your ChatGPT Plan
+
+Connect your own ChatGPT account when you want your chats answered by a ChatGPT model with the
+usage included in your ChatGPT plan or credits, instead of by a model the deployment provides.
+Each QDash user connects their own account; nobody else's chats use it. Only chat messages you
+send with a ChatGPT model use your plan. AI evaluations, forum replies, and the tools the assistant
+calls during a chat keep using the deployment's models. The models the deployment provides stay available in the model picker.
+
+1. Open **Settings → Copilot** and select **Continue with ChatGPT**.
+1. Select **Open the ChatGPT sign-in page**, sign in to ChatGPT, and approve QDash. Approve the
+   use of your ChatGPT plan; without it QDash keeps the sign-in but cannot use your plan.
+1. ChatGPT sends your browser to an address that starts with `http://127.0.0.1:1455/auth/callback`.
+   The page does not load; this is expected. Copy the whole address from the address bar.
+1. Paste it into **Address from the browser** and select **Finish connecting** within 10 minutes.
+1. Select **Got it** on **You're using your ChatGPT plan**, then choose one of your ChatGPT models
+   in the model picker or under **Default chat model**.
+
+While a ChatGPT model is selected, **Using ChatGPT plan · Manage usage** appears next to the model
+picker. **Manage usage** opens ChatGPT's usage settings, where you review your usage and limit how
+much QDash may use. When a limit is reached, the chat says **ChatGPT usage limit reached** and
+**Settings → Copilot** shows **Usage limit reached**; the limit can apply to your whole plan or to
+QDash alone. QDash does not retry or switch to another model; send the message again later or
+choose another model.
+
+| Status in **Settings → Copilot** | What to do |
+| --- | --- |
+| **Connected as** your email | Nothing; **Reload models** refreshes the list after ChatGPT adds models |
+| **Signed in, but ChatGPT plan usage is not enabled** | Select **Enable ChatGPT plan usage** and approve it |
+| **The ChatGPT session ended. Connect again.** | Select **Continue with ChatGPT**; this happens after about 30 days without use, when you remove QDash in ChatGPT's settings, or when renewing your sign-in failed in a way QDash could not confirm left it unchanged, for example a lost connection or a server error, and QDash ended it to keep it safe |
+| **Disconnected** | Select **Continue with ChatGPT**, or **Use a different account** to connect another ChatGPT account |
+| **ChatGPT connections are not set up on this QDash server** | Ask the person who runs QDash to enable them ([AI Setup](./setup/ai.md#let-users-connect-their-chatgpt-plan)) |
+
+**Disconnect** stops using your plan, signs out of the ChatGPT session, and deletes QDash's copy
+of your sign-in. If ChatGPT does not confirm the sign-out, QDash says so; remove QDash in
+ChatGPT's settings to be sure. A message already being answered when you disconnect can finish.
+Disconnecting also cancels a connection you have started but not finished. Only your most recent
+sign-in can finish; if QDash says a newer sign-in or a disconnect replaced the
+attempt, start again.
+
+How this works: [ChatGPT plan connections](../developer-guide/copilot/chatgpt-plan.md).
 
 ## Investigate a Failure
 

@@ -25,12 +25,15 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ChatGPTConnectionStatus,
+  CompleteChatGPTAuthorizationRequest,
   CopilotChatSessionResponse,
   CopilotPreferences,
   CopilotPreferencesUpdate,
   CopilotSystemPrompt,
   CreateCopilotChatSessionRequest,
   DeleteCopilotChatSession200,
+  DisconnectChatGPTResponse,
   GetCopilotConfig200,
   GetCopilotSourceFileParams,
   HTTPValidationError,
@@ -39,6 +42,8 @@ import type {
   SearchCopilotSourceParams,
   SearchSourceResponse,
   SourceFileResponse,
+  StartChatGPTAuthorizationRequest,
+  StartChatGPTAuthorizationResponse,
   UpdateCopilotChatSessionRequest
 } from '../../schemas';
 
@@ -1073,3 +1078,421 @@ export function useGetCopilotSystemPrompt<TData = Awaited<ReturnType<typeof getC
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+/**
+ * Connection state, account email, models and the last problem; never tokens.
+ * @summary Get the current user's ChatGPT plan connection
+ */
+export const getChatGPTConnection = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ChatGPTConnectionStatus>(
+      {url: `/copilot/chatgpt/connection`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetChatGPTConnectionQueryKey = () => {
+    return [
+    `/copilot/chatgpt/connection`
+    ] as const;
+    }
+
+
+export const getGetChatGPTConnectionQueryOptions = <TData = Awaited<ReturnType<typeof getChatGPTConnection>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChatGPTConnection>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChatGPTConnectionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChatGPTConnection>>> = ({ signal }) => getChatGPTConnection(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChatGPTConnection>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetChatGPTConnectionQueryResult = NonNullable<Awaited<ReturnType<typeof getChatGPTConnection>>>
+export type GetChatGPTConnectionQueryError = unknown
+
+
+export function useGetChatGPTConnection<TData = Awaited<ReturnType<typeof getChatGPTConnection>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChatGPTConnection>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getChatGPTConnection>>,
+          TError,
+          Awaited<ReturnType<typeof getChatGPTConnection>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetChatGPTConnection<TData = Awaited<ReturnType<typeof getChatGPTConnection>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChatGPTConnection>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getChatGPTConnection>>,
+          TError,
+          Awaited<ReturnType<typeof getChatGPTConnection>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetChatGPTConnection<TData = Awaited<ReturnType<typeof getChatGPTConnection>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChatGPTConnection>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the current user's ChatGPT plan connection
+ */
+
+export function useGetChatGPTConnection<TData = Awaited<ReturnType<typeof getChatGPTConnection>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChatGPTConnection>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetChatGPTConnectionQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * Revoke the renewable session and clear the tokens; the registration is kept.
+ * @summary Disconnect the current user's ChatGPT account
+ */
+export const disconnectChatGPT = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<DisconnectChatGPTResponse>(
+      {url: `/copilot/chatgpt/connection`, method: 'DELETE', signal
+    },
+      options);
+    }
+
+
+
+
+export const getDisconnectChatGPTMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectChatGPT>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof disconnectChatGPT>>, TError,void, TContext> => {
+
+const mutationKey = ['disconnectChatGPT'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof disconnectChatGPT>>, void> = () => {
+
+
+          return  disconnectChatGPT(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DisconnectChatGPTMutationResult = NonNullable<Awaited<ReturnType<typeof disconnectChatGPT>>>
+
+    export type DisconnectChatGPTMutationError = unknown
+
+    /**
+ * @summary Disconnect the current user's ChatGPT account
+ */
+export const useDisconnectChatGPT = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectChatGPT>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof disconnectChatGPT>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDisconnectChatGPTMutationOptions(options), queryClient);
+    }
+    /**
+ * Create a one-time attempt bound to this user and return OpenAI's sign-in URL.
+ * @summary Start connecting the current user's ChatGPT account
+ */
+export const startChatGPTAuthorization = (
+    startChatGPTAuthorizationRequest: StartChatGPTAuthorizationRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<StartChatGPTAuthorizationResponse>(
+      {url: `/copilot/chatgpt/authorize`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: startChatGPTAuthorizationRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getStartChatGPTAuthorizationMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startChatGPTAuthorization>>, TError,{data: StartChatGPTAuthorizationRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof startChatGPTAuthorization>>, TError,{data: StartChatGPTAuthorizationRequest}, TContext> => {
+
+const mutationKey = ['startChatGPTAuthorization'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startChatGPTAuthorization>>, {data: StartChatGPTAuthorizationRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  startChatGPTAuthorization(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartChatGPTAuthorizationMutationResult = NonNullable<Awaited<ReturnType<typeof startChatGPTAuthorization>>>
+    export type StartChatGPTAuthorizationMutationBody = StartChatGPTAuthorizationRequest
+    export type StartChatGPTAuthorizationMutationError = HTTPValidationError
+
+    /**
+ * @summary Start connecting the current user's ChatGPT account
+ */
+export const useStartChatGPTAuthorization = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startChatGPTAuthorization>>, TError,{data: StartChatGPTAuthorizationRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof startChatGPTAuthorization>>,
+        TError,
+        {data: StartChatGPTAuthorizationRequest},
+        TContext
+      > => {
+      return useMutation(getStartChatGPTAuthorizationMutationOptions(options), queryClient);
+    }
+    /**
+ * Validate the state against this user's attempt, exchange the code and store.
+ * @summary Finish connecting with the address the browser landed on
+ */
+export const completeChatGPTAuthorization = (
+    completeChatGPTAuthorizationRequest: CompleteChatGPTAuthorizationRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ChatGPTConnectionStatus>(
+      {url: `/copilot/chatgpt/callback`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: completeChatGPTAuthorizationRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getCompleteChatGPTAuthorizationMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeChatGPTAuthorization>>, TError,{data: CompleteChatGPTAuthorizationRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeChatGPTAuthorization>>, TError,{data: CompleteChatGPTAuthorizationRequest}, TContext> => {
+
+const mutationKey = ['completeChatGPTAuthorization'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeChatGPTAuthorization>>, {data: CompleteChatGPTAuthorizationRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  completeChatGPTAuthorization(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteChatGPTAuthorizationMutationResult = NonNullable<Awaited<ReturnType<typeof completeChatGPTAuthorization>>>
+    export type CompleteChatGPTAuthorizationMutationBody = CompleteChatGPTAuthorizationRequest
+    export type CompleteChatGPTAuthorizationMutationError = HTTPValidationError
+
+    /**
+ * @summary Finish connecting with the address the browser landed on
+ */
+export const useCompleteChatGPTAuthorization = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeChatGPTAuthorization>>, TError,{data: CompleteChatGPTAuthorizationRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof completeChatGPTAuthorization>>,
+        TError,
+        {data: CompleteChatGPTAuthorizationRequest},
+        TContext
+      > => {
+      return useMutation(getCompleteChatGPTAuthorizationMutationOptions(options), queryClient);
+    }
+    /**
+ * List the account's models again with its own token.
+ * @summary Reload the models the connected ChatGPT account offers
+ */
+export const refreshChatGPTModels = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ChatGPTConnectionStatus>(
+      {url: `/copilot/chatgpt/models/refresh`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getRefreshChatGPTModelsMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshChatGPTModels>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof refreshChatGPTModels>>, TError,void, TContext> => {
+
+const mutationKey = ['refreshChatGPTModels'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof refreshChatGPTModels>>, void> = () => {
+
+
+          return  refreshChatGPTModels(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RefreshChatGPTModelsMutationResult = NonNullable<Awaited<ReturnType<typeof refreshChatGPTModels>>>
+
+    export type RefreshChatGPTModelsMutationError = unknown
+
+    /**
+ * @summary Reload the models the connected ChatGPT account offers
+ */
+export const useRefreshChatGPTModels = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshChatGPTModels>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof refreshChatGPTModels>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRefreshChatGPTModelsMutationOptions(options), queryClient);
+    }
+    /**
+ * Record that the user saw that chats use their ChatGPT plan.
+ * @summary Dismiss the one-time ChatGPT plan confirmation
+ */
+export const acknowledgeChatGPTWelcome = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<ChatGPTConnectionStatus>(
+      {url: `/copilot/chatgpt/welcome`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getAcknowledgeChatGPTWelcomeMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acknowledgeChatGPTWelcome>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof acknowledgeChatGPTWelcome>>, TError,void, TContext> => {
+
+const mutationKey = ['acknowledgeChatGPTWelcome'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acknowledgeChatGPTWelcome>>, void> = () => {
+
+
+          return  acknowledgeChatGPTWelcome(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AcknowledgeChatGPTWelcomeMutationResult = NonNullable<Awaited<ReturnType<typeof acknowledgeChatGPTWelcome>>>
+
+    export type AcknowledgeChatGPTWelcomeMutationError = unknown
+
+    /**
+ * @summary Dismiss the one-time ChatGPT plan confirmation
+ */
+export const useAcknowledgeChatGPTWelcome = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acknowledgeChatGPTWelcome>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof acknowledgeChatGPTWelcome>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getAcknowledgeChatGPTWelcomeMutationOptions(options), queryClient);
+    }

@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildChatModelOptions,
   buildEvaluationModelOptions,
+  buildPlanModelOptions,
+  isPlanModel,
+  providerLabel,
   resolveChatModelOption,
+  unavailablePlanOption,
 } from "../copilotModels";
 
 describe("buildChatModelOptions", () => {
@@ -62,5 +66,35 @@ describe("buildEvaluationModelOptions", () => {
         reasoningEffort: "medium",
       },
     ]);
+  });
+});
+
+describe("ChatGPT plan models", () => {
+  it("offers only models the runtime can run, keyed by provider and slug", () => {
+    const options = buildPlanModelOptions([
+      { slug: "gpt-6.1-sol", display_name: "GPT-6.1 Sol", supported: true },
+      { slug: "legacy", display_name: "Legacy", supported: false },
+    ]);
+    expect(options).toEqual([
+      {
+        key: "model:chatgpt:gpt-6.1-sol",
+        label: "GPT-6.1 Sol",
+        model: { provider: "chatgpt", name: "gpt-6.1-sol" },
+        resolvedModel: { provider: "chatgpt", name: "gpt-6.1-sol" },
+        reasoningEffort: null,
+      },
+    ]);
+    expect(isPlanModel(options[0].model)).toBe(true);
+    expect(providerLabel("chatgpt")).toBe("ChatGPT plan");
+    expect(providerLabel("openai-compatible")).toBe("openai-compatible");
+  });
+
+  it("keeps an unavailable ChatGPT choice explicit and ignores other keys", () => {
+    expect(unavailablePlanOption("model:chatgpt:gpt-6.1-sol")).toMatchObject({
+      unavailable: true,
+      model: { provider: "chatgpt", name: "gpt-6.1-sol" },
+    });
+    expect(unavailablePlanOption("model:openai-compatible:qwen")).toBeNull();
+    expect(unavailablePlanOption("default")).toBeNull();
   });
 });

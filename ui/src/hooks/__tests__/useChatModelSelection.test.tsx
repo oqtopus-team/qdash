@@ -15,6 +15,14 @@ function serveModels(...chatModels: object[]) {
   customInstance.mockResolvedValue({ data: { enabled: true, chat_models: chatModels } });
 }
 
+/** Serve the configured models and, for the ChatGPT connection route, `plan`. */
+function servePlan(plan: object, ...chatModels: object[]) {
+  const config = { enabled: true, chat_models: chatModels.length ? chatModels : [QWEN, KIMI] };
+  customInstance.mockImplementation(async (request: { url: string }) => ({
+    data: request.url.includes("/copilot/chatgpt/") ? plan : config,
+  }));
+}
+
 function wrapper() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return ({ children }: { children: ReactNode }) => (
@@ -123,6 +131,42 @@ describe("useChatModelSelection", () => {
     await waitFor(() => expect(result.current.dock.status).toBe("ready"));
     expect(result.current.dock.selected.isConfiguredDefault).toBe(true);
     expect(result.current.dock.unavailableModel).toBeNull();
+  });
+
+  it("adds the user's own ChatGPT plan models when connected", async () => {
+    servePlan({
+      status: "connected",
+      models: [
+        { slug: "gpt-6.1-sol", display_name: "GPT-6.1 Sol", supported: true },
+        { slug: "old", display_name: "Old", supported: false },
+      ],
+    });
+    const { result } = renderHook(useTwoSurfaces, { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.dock.options).toHaveLength(3));
+    const plan = result.current.dock.options[2];
+    expect(plan).toMatchObject({
+      key: "model:chatgpt:gpt-6.1-sol",
+      label: "GPT-6.1 Sol",
+      model: { provider: "chatgpt", name: "gpt-6.1-sol" },
+    });
+    act(() => result.current.settings.select(plan.key));
+    expect(result.current.dock.selected.model).toEqual({
+      provider: "chatgpt",
+      name: "gpt-6.1-sol",
+    });
+  });
+
+  it("keeps a ChatGPT choice selected when the connection is gone instead of switching", async () => {
+    servePlan({ status: "signed_out", models: [] });
+    localStorage.setItem("qdash_chat_model_key", "model:chatgpt:gpt-6.1-sol");
+    const { result } = renderHook(useTwoSurfaces, { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.dock.status).toBe("ready"));
+    expect(result.current.dock.selected).toMatchObject({
+      unavailable: true,
+      model: { provider: "chatgpt", name: "gpt-6.1-sol" },
+    });
+    expect(result.current.dock.unavailableModel).toBe("chatgpt:gpt-6.1-sol");
+    expect(result.current.dock.options.some((option) => option.unavailable)).toBe(false);
   });
 
   it("falls back to the configured default when the list fails to load", async () => {

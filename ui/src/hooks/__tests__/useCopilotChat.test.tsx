@@ -15,6 +15,8 @@ vi.mock("@/client/copilot/copilot", () => ({
   useGetCopilotConfig: () => ({
     data: copilotConfig.current ? { data: copilotConfig.current } : undefined,
   }),
+  // No ChatGPT connection: only configured models are offered.
+  useGetChatGPTConnection: () => ({ data: undefined, isPending: false, isError: true }),
 }));
 
 function sse(event: string, data: unknown): string {

@@ -36,6 +36,8 @@ dependencies = [
     "boto3>=1.40.0",
     "prefect-client",
     "slack-sdk==3.41.0",
+    "cryptography>=46.0.0",
+    "pyjwt>=2.10.0",
 ]
 
 [tool.uv]

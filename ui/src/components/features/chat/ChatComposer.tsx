@@ -41,7 +41,12 @@ import {
   type ChatThinkingChoice,
   type ChatThinkingLevel,
 } from "@/lib/chatThinking";
-import type { ModelOption } from "@/lib/copilotModels";
+import {
+  CHATGPT_USAGE_URL,
+  isPlanModel,
+  providerLabel,
+  type ModelOption,
+} from "@/lib/copilotModels";
 import type { ChatModelListStatus } from "@/hooks/useChatModelSelection";
 
 const MAX_HEIGHT_PX = 240;
@@ -316,6 +321,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             compact={compact}
           />
         )}
+        {selected && isPlanModel(selected.resolvedModel) && (
+          <PlanUsageIndicator compact={compact} />
+        )}
         {thinkingChoice && onThinkingChange && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -400,6 +408,24 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
   );
 });
 
+/**
+ * Says that the selected model runs on the user's own ChatGPT plan, with the
+ * place to review and limit that usage.
+ */
+function PlanUsageIndicator({ compact }: { compact: boolean }) {
+  return (
+    <a
+      href={CHATGPT_USAGE_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="link link-hover shrink-0 text-xs text-base-content/60"
+      title="Manage usage in ChatGPT settings"
+    >
+      {compact ? "ChatGPT plan" : "Using ChatGPT plan · Manage usage"}
+    </a>
+  );
+}
+
 /** Why the model cannot be switched, when it cannot. */
 function fixedModelReason(status: ChatModelListStatus, optionCount: number): string | null {
   if (status === "loading") return "Loading the configured chat models";
@@ -483,7 +509,10 @@ function ModelControl({
             <span className="flex-1 min-w-0">
               <span className="block truncate">{option.label}</span>
               <span className="block text-xs text-base-content/50">
-                {[option.resolvedModel?.provider, option.isConfiguredDefault ? "default" : null]
+                {[
+                  providerLabel(option.resolvedModel?.provider),
+                  option.isConfiguredDefault ? "default" : null,
+                ]
                   .filter(Boolean)
                   .join(" · ")}
               </span>

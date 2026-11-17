@@ -22,6 +22,7 @@ from qdash.api.services.admin_service import AdminService
 from qdash.api.services.agent_session_service import AgentSessionService
 from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
+from qdash.api.services.chatgpt_connection_service import ChatGPTConnectionService
 from qdash.api.services.chip import ChipConfigScaffolder, ChipService
 from qdash.api.services.config_service import ConfigService
 from qdash.api.services.cooldown_service import CooldownService
@@ -386,6 +387,12 @@ def get_slack_notification_service() -> SlackNotificationService:
 def get_copilot_runtime() -> CopilotRuntime:
     """Get the copilot runtime instance."""
     return CopilotRuntime()
+
+
+@cached_dependency_provider
+def get_chatgpt_connection_service() -> ChatGPTConnectionService:
+    """Get the service that keeps each user's ChatGPT plan connection."""
+    return ChatGPTConnectionService()
 
 
 @cached_dependency_provider

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 from qdash.api.dependencies import (
+    get_chatgpt_connection_service,
     get_copilot_chat_session_service,
     get_copilot_investigation_service,
     get_copilot_runtime,
@@ -49,6 +50,11 @@ from qdash.api.schemas.copilot_source import (
     SourceSearchMatch,
 )
 from qdash.api.services import pi_chat_service
+from qdash.api.services.chatgpt_connection_service import (
+    ChatGPTConnectionError,
+    ChatGPTConnectionService,
+    PlanTurnToken,
+)
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
@@ -135,6 +141,34 @@ async def chat_stop(
     return ChatStopResponse(stopped=stopped)
 
 
+async def _chatgpt_turn_token(
+    service: ChatGPTConnectionService, user_id: str, model_name: str
+) -> PlanTurnToken:
+    """This user's plan token for one turn, after checking the model is theirs to use.
+
+    The token comes with the ``token_version`` it belongs to; the turn's later
+    error and success writes are fenced on that version, never a fresh lookup.
+    """
+    models = await asyncio.to_thread(service.cached_models, user_id)
+    if not any(model.get("slug") == model_name for model in models):
+        # The catalog may have changed since it was cached; list it once more.
+        models = await asyncio.to_thread(service.list_models, user_id)
+        if not any(model.get("slug") == model_name for model in models):
+            raise ChatGPTConnectionError(
+                "model_unavailable",
+                f"Your ChatGPT account does not offer {model_name}",
+                400,
+            )
+    supported = await pi_chat_service.plan_model_ids()
+    if supported is not None and model_name not in supported:
+        raise ChatGPTConnectionError(
+            "model_unsupported",
+            f"QDash cannot run {model_name} on the ChatGPT plan route yet",
+            400,
+        )
+    return await asyncio.to_thread(service.turn_token, user_id)
+
+
 def _figures_status(bundle: TaskContextBundle) -> str | None:
     """Status line for the figures a task chat opens with."""
     has_experiment = bool(bundle.image_base64)
@@ -159,6 +193,7 @@ async def chat_stream(
     investigation_service: Annotated[
         CopilotInvestigationService, Depends(get_copilot_investigation_service)
     ],
+    chatgpt_service: Annotated[ChatGPTConnectionService, Depends(get_chatgpt_connection_service)],
 ) -> StreamingResponse:
     """SSE streaming chat endpoint.
 
@@ -197,6 +232,26 @@ async def chat_stream(
             return
         chat_config = _config_with_chat_model(config, request)
 
+        # A ChatGPT model runs on the signed-in user's own plan, with a token
+        # looked up by the authenticated user, never one the browser names.
+        plan_turn: PlanTurnToken | None = None
+        on_plan_error = None
+        plan_errors: list[str] = []
+        if chat_config.model.provider == pi_chat_service.CHATGPT_PROVIDER:
+            try:
+                plan_turn = await _chatgpt_turn_token(
+                    chatgpt_service, current_user.user_id, chat_config.model.name
+                )
+            except ChatGPTConnectionError as exc:
+                yield sse_event("error", {"step": "init", "detail": exc.message, "code": exc.code})
+                return
+            user_id = current_user.user_id
+            turn_version = plan_turn.token_version
+
+            def on_plan_error(code: str, message: str) -> None:
+                plan_errors.append(code)
+                chatgpt_service.record_inference_error(user_id, turn_version, code, message)
+
         task_bundle = None
         images_sent: dict[str, Any] | None = None
         if request.task is not None:
@@ -225,6 +280,7 @@ async def chat_stream(
                 task_bundle.experiment_images,
             )
 
+        result_seen = False
         effective_project = project_id or current_user.default_project_id
         # The planner's own qcal_evaluate calls are kept as evaluations
         # (trigger "chat"), so every model judgement is on one ledger.
@@ -246,13 +302,25 @@ async def chat_stream(
             auth=pi_chat_service.QDashAuth(
                 access_token=credentials.credentials,
                 project_id=effective_project,
+                chatgpt_access_token=plan_turn.access_token if plan_turn else None,
             ),
             task=task_bundle,
             images_sent=images_sent,
             recorder=recorder,
             opening_message=investigation_message,
+            on_plan_error=on_plan_error,
         ):
+            if event.startswith("event: result"):
+                result_seen = True
             yield event
+        if plan_turn is not None and result_seen and not plan_errors:
+            # A completed plan turn clears an earlier limit or failure from Settings,
+            # only while the token set it ran on is still the stored one.
+            await asyncio.to_thread(
+                chatgpt_service.clear_inference_error,
+                current_user.user_id,
+                plan_turn.token_version,
+            )
 
     return StreamingResponse(
         event_generator(),

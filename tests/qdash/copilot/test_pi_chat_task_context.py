@@ -87,7 +87,9 @@ async def _collect(
 
     monkeypatch.setattr(pi_chat_service, "ensure_agent_session", ensure_agent_session)
 
-    async def fake_stream_payload(payload, *, step, auth, extra_result=None, recorder=None):
+    async def fake_stream_payload(
+        payload, *, step, auth, extra_result=None, recorder=None, on_plan_error=None
+    ):
         captured["auth"] = auth
         captured["payload"] = payload
         captured["step"] = step
@@ -295,7 +297,9 @@ async def test_investigation_opening_replaces_only_the_first_message(
     async def ensure_agent_session(_username: str, session_id: str) -> None:
         ensured.append(session_id)
 
-    async def fake_stream_payload(payload, *, step, auth, extra_result=None, recorder=None):
+    async def fake_stream_payload(
+        payload, *, step, auth, extra_result=None, recorder=None, on_plan_error=None
+    ):
         captured["payload"] = payload
         captured["extra_result"] = extra_result
         yield "event: result\ndata: {}\n\n"

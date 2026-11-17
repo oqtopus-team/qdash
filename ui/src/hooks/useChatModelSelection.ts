@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
-import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import { useGetChatGPTConnection, useGetCopilotConfig } from "@/client/copilot/copilot";
 import {
   levelOfEffort,
   thinkingChoiceStore,
@@ -11,17 +11,20 @@ import {
 } from "@/lib/chatThinking";
 import {
   buildChatModelOptions,
+  buildPlanModelOptions,
   chatModelChoice,
   chatModelIdentityOfKey,
   resolveChatModelOption,
+  unavailablePlanOption,
   type ModelOption,
+  type PlanModel,
 } from "@/lib/copilotModels";
 import type { StoredChoice } from "@/lib/storedChoice";
 
 export type ChatModelListStatus = "loading" | "error" | "ready";
 
 export interface ChatModelSelection {
-  /** The configured chat models, default first. */
+  /** The configured chat models, default first, then the user's ChatGPT plan models. */
   options: ModelOption[];
   /** The model the next message goes to. */
   selected: ModelOption;
@@ -29,6 +32,17 @@ export interface ChatModelSelection {
   status: ChatModelListStatus;
   /** The `provider:name` of a remembered model the current config no longer offers. */
   unavailableModel: string | null;
+}
+
+/** The models of the user's own ChatGPT connection, empty unless it is connected. */
+function planModelsOf(data: unknown): PlanModel[] {
+  if (!data || typeof data !== "object") return [];
+  const connection = data as { status?: unknown; models?: unknown };
+  if (connection.status !== "connected" || !Array.isArray(connection.models)) return [];
+  return connection.models.filter(
+    (model): model is PlanModel =>
+      !!model && typeof model === "object" && typeof (model as PlanModel).slug === "string",
+  );
 }
 
 export interface ChatThinkingSelection {
@@ -59,13 +73,34 @@ export function useChatModelSelection(): ChatModelSelection {
       refetchOnReconnect: "always",
     },
   });
+  // The user's own ChatGPT plan models; a failed lookup only means none are offered.
+  const connection = useGetChatGPTConnection({
+    query: { staleTime: 30_000, refetchOnWindowFocus: "always", retry: false },
+  });
   const config = data?.data ?? null;
   const storedKey = useStoredChoice(chatModelChoice);
-  const options = useMemo(() => buildChatModelOptions(config), [config]);
-  const selected = resolveChatModelOption(options, storedKey);
-  const status: ChatModelListStatus = config ? "ready" : isError ? "error" : "loading";
+  const planData = connection.data?.data;
+  const options = useMemo(
+    () => [...buildChatModelOptions(config), ...buildPlanModelOptions(planModelsOf(planData))],
+    [config, planData],
+  );
+  const planSettled = !connection.isPending || connection.isError;
+  const status: ChatModelListStatus = config
+    ? planSettled
+      ? "ready"
+      : "loading"
+    : isError
+      ? "error"
+      : "loading";
+  const planFallback =
+    status === "ready" && !options.some((option) => option.key === storedKey)
+      ? unavailablePlanOption(storedKey)
+      : null;
+  const selected = planFallback ?? resolveChatModelOption(options, storedKey);
   const unavailableModel =
-    status === "ready" && selected.key !== storedKey ? chatModelIdentityOfKey(storedKey) : null;
+    status === "ready" && (selected.unavailable || selected.key !== storedKey)
+      ? chatModelIdentityOfKey(storedKey)
+      : null;
   return { options, selected, select: chatModelChoice.write, status, unavailableModel };
 }
 

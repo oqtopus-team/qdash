@@ -10,6 +10,7 @@ QDash runs calibrations without AI endpoints.
 | [Deployment profile](#select-a-deployment-profile) | Chat and evaluation models specific to this deployment | No |
 | [Classifier endpoint](#add-a-classifier) | Fixed result layouts and category judgments in chat | No |
 | [Cloudflare Access service token](#authenticate-ai-endpoints-with-cloudflare-access) | Endpoints behind Cloudflare Access | Only for such endpoints |
+| [ChatGPT plan connections](#let-users-connect-their-chatgpt-plan) | Users answering their own chats with their ChatGPT plan | No |
 
 The AI runtime and its workspace start with the standard Compose stack. QDash generates their
 internal authentication; no AI Compose profile or UI enable flag is needed.
@@ -132,6 +133,33 @@ Keep an endpoint's API key if its model server requires one. Chat and evaluation
 leave the key empty when Cloudflare Access alone authenticates them. The classifier still requires
 a nonempty `CLASSIFIER_API_KEY` (or its configured suffixed variable), even with Access credentials.
 Both Access values must be set together. Leave both empty to use API keys only.
+
+## Let Users Connect Their ChatGPT Plan
+
+Each QDash user can connect their own ChatGPT account in **Settings → Copilot** and send their
+chats to ChatGPT models on their own ChatGPT plan; see
+[Use Your ChatGPT Plan](../ai-chat.md#use-your-chatgpt-plan). The deployment's chat and evaluation
+models keep working as before, and nothing else runs on a user's plan. No operator API key is
+involved, and no user's chat ever falls back to the deployment's OpenAI key or another user's
+connection.
+
+The Compose stack enables connections without configuration: it generates the key that encrypts
+users' ChatGPT sign-ins into the `credential-key` volume, which only the API mounts. Back up that
+volume with MongoDB; without it, stored connections cannot be read and every user connects again.
+The API must reach `auth.openai.com` and `api.openai.com`; an HTTPS proxy in its environment is
+used.
+
+| Variable | Meaning | Default |
+| --- | --- | --- |
+| `QDASH_CREDENTIAL_KEY` | Fernet keys, comma-separated, newest first; set only for an API started on the host, never in a `.env` that the runtime also reads | Compose: the generated key file |
+| `QDASH_CREDENTIAL_KEY_FILE` | File holding the keys instead | Compose: `/run/qdash-credential-key/key` |
+| `QDASH_CHATGPT_CALLBACK_PORT` | Port of the `http://127.0.0.1:<port>/auth/callback` address users copy back after signing in | `1455` |
+
+To rotate the key, put a new key in front of the old one, recreate `api`, and drop the old key
+once users have signed in again or refreshed. Without any key, **Settings → Copilot** tells users
+that connections are not set up. OpenAI documents ChatGPT plan usage for open-source and locally
+hosted apps; see [ChatGPT plan usage](https://developers.openai.com/siwc/token-sharing-open-source)
+for the conditions that apply to other deployments.
 
 ## Apply AI Changes
 
