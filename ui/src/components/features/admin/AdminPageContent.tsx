@@ -1191,7 +1191,12 @@ function MembersModal({
                     onClick={handleAddMembers}
                     disabled={isBulkAdding || selectedCandidateUsernames.length === 0}
                   >
-                    {isBulkAdding ? <span className="loading loading-spinner loading-sm" /> : null}
+                    {isBulkAdding ? (
+                      <span
+                        data-icon="inline-start"
+                        className="loading loading-spinner loading-sm"
+                      />
+                    ) : null}
                     Add Selected
                   </button>
                 </div>

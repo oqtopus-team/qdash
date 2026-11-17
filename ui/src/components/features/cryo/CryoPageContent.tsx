@@ -92,11 +92,8 @@ export function CryoPageContent() {
             className="mb-0"
           />
           {showNewCryostatHeaderBtn && (
-            <button
-              className="btn btn-primary btn-sm gap-1"
-              onClick={() => setNewCryostatOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
+            <button className="btn btn-primary btn-sm" onClick={() => setNewCryostatOpen(true)}>
+              <Plus data-icon="inline-start" />
               New cryostat
             </button>
           )}
@@ -114,8 +111,8 @@ export function CryoPageContent() {
                 changed.
               </div>
             </div>
-            <button type="button" className="btn btn-sm btn-ghost gap-1" onClick={retry}>
-              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            <button type="button" className="btn btn-sm btn-ghost" onClick={retry}>
+              <RotateCcw data-icon="inline-start" aria-hidden="true" />
               Retry
             </button>
           </div>
@@ -127,10 +124,10 @@ export function CryoPageContent() {
             size="lg"
             action={
               <button
-                className="btn btn-primary btn-sm gap-1 mt-3"
+                className="btn btn-primary btn-sm mt-3"
                 onClick={() => setNewCryostatOpen(true)}
               >
-                <Plus className="h-4 w-4" />
+                <Plus data-icon="inline-start" />
                 New cryostat
               </button>
             }

@@ -128,10 +128,10 @@ export function GlobalCommandPalette() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn btn-ghost btn-sm gap-2 text-base-content/60"
+        className="btn btn-ghost btn-sm text-base-content/60"
         aria-label="Open navigation search"
       >
-        <Search size={15} aria-hidden="true" />
+        <Search data-icon="inline-start" aria-hidden="true" />
         <span className="hidden sm:inline">Commands</span>
         <kbd className="hidden rounded border border-base-300 bg-base-200 px-1.5 py-0.5 text-xs font-normal md:inline">
           {shortcut}

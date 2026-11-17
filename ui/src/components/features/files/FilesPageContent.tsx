@@ -295,8 +295,8 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
               title={isEditorLocked ? "Click to edit" : "Currently editing"}
               disabled={showChanges || !selectedFile}
             >
-              <Pencil size={16} />
-              <span className="ml-1">{isEditorLocked ? "Edit" : "Editing"}</span>
+              <Pencil data-icon="inline-start" />
+              <span>{isEditorLocked ? "Edit" : "Editing"}</span>
             </button>
             <button
               onClick={handleSave}
@@ -309,8 +309,8 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
                 <>
-                  <Save size={16} />
-                  <span className="ml-1">Save</span>
+                  <Save data-icon="inline-start" />
+                  <span>Save</span>
                 </>
               )}
             </button>
@@ -347,8 +347,8 @@ export function FilesPageContent({ workspace }: { workspace: FileWorkspace }) {
                   <span className="loading loading-spinner loading-xs"></span>
                 ) : (
                   <>
-                    <Database size={16} />
-                    <span className="ml-1">Import to QDash</span>
+                    <Database data-icon="inline-start" />
+                    <span>Import to QDash</span>
                   </>
                 )}
               </button>

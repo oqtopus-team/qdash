@@ -817,14 +817,14 @@ export function QubitGrid({
                   Clear
                 </button>
                 <button
-                  className="btn btn-sm btn-primary gap-1"
+                  className="btn btn-sm btn-primary"
                   onClick={() => setIsDownloadConfirmOpen(true)}
                   disabled={selectedForDownload.size === 0 || isDownloading}
                 >
                   {isDownloading ? (
-                    <span className="loading loading-spinner loading-xs" />
+                    <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
                   ) : (
-                    <Download size={16} />
+                    <Download data-icon="inline-start" />
                   )}
                   Download
                 </button>
@@ -842,7 +842,7 @@ export function QubitGrid({
             ) : (
               <div className="flex items-center gap-2">
                 <button
-                  className="btn btn-sm btn-outline gap-2"
+                  className="btn btn-sm btn-outline"
                   onClick={() => {
                     setDownloadSelectionEnabled(true);
                     setRegionSelectionEnabled(false);
@@ -851,7 +851,7 @@ export function QubitGrid({
                   title="Select figures to download"
                   disabled={availableForDownloadCount === 0}
                 >
-                  <Download size={16} />
+                  <Download data-icon="inline-start" />
                   Download
                 </button>
               </div>

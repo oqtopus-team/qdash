@@ -64,14 +64,14 @@ function ProjectSelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="btn btn-ghost btn-sm gap-2">
+        <button type="button" className="btn btn-ghost btn-sm">
           {currentProject ? (
-            <Folder size={16} aria-hidden="true" />
+            <Folder data-icon="inline-start" aria-hidden="true" />
           ) : (
-            <FolderLock size={16} aria-hidden="true" />
+            <FolderLock data-icon="inline-start" aria-hidden="true" />
           )}
           <span className="max-w-32 truncate">{currentProject?.name ?? "No projects"}</span>
-          <ChevronDown className="h-3 w-3" aria-hidden="true" />
+          <ChevronDown data-icon="inline-end" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-80 w-64">

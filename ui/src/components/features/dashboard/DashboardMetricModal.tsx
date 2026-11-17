@@ -143,9 +143,9 @@ export function DashboardMetricModal({
           {!isCoupling && (
             <LineageButton
               target={{ parameterName: metricKey, qid: targetId }}
-              className="btn btn-ghost btn-sm sm:btn-md gap-1"
+              className="btn btn-ghost btn-sm sm:btn-md"
             >
-              <GitBranch className="h-4 w-4" />
+              <GitBranch data-icon="inline-start" />
               <span className="hidden sm:inline">Lineage</span>
             </LineageButton>
           )}

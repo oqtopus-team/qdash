@@ -44,13 +44,13 @@ function ProjectAccessState() {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           {isAdmin && (
-            <Link href="/admin" className="btn btn-primary gap-2">
-              <ShieldCheck size={16} aria-hidden="true" />
+            <Link href="/admin" className="btn btn-primary">
+              <ShieldCheck data-icon="inline-start" aria-hidden="true" />
               Open Admin
             </Link>
           )}
-          <Link href="/settings" className="btn btn-outline gap-2">
-            <Settings size={16} aria-hidden="true" />
+          <Link href="/settings" className="btn btn-outline">
+            <Settings data-icon="inline-start" aria-hidden="true" />
             Open Settings
           </Link>
         </div>

@@ -159,6 +159,77 @@ a.card:hover {
 }
 
 /* ----------------------------------------
+   Icon + Label Buttons - Optical Spacing
+   ---------------------------------------- */
+
+/*
+ * An icon reads lighter than a word, so equal geometry looks lopsided. Mark the icon
+ * that is a direct child of a labeled `.btn` with data-icon="inline-start" or
+ * "inline-end". The rules below then shrink the outer padding on the icon side, size
+ * the icon from the label's font size, and tighten the icon-label gap. Height is
+ * untouched, so DaisyUI size classes keep setting the hit target. Icon-only
+ * `.btn-square` and `.btn-circle` controls are excluded.
+ */
+.btn:not(.btn-square, .btn-circle) {
+  --btn-icon-size: calc(1em + 0.125rem);
+  --btn-icon-padding: 0.75;
+}
+
+.btn:not(.btn-square, .btn-circle) > [data-icon] {
+  width: var(--btn-icon-size);
+  height: var(--btn-icon-size);
+  flex-shrink: 0;
+}
+
+.btn:not(.btn-square, .btn-circle):has(> [data-icon]) {
+  gap: 0.375em;
+}
+
+/* An explicit horizontal padding utility on the button wins over the optical default. */
+.btn:not(.btn-square, .btn-circle, [class*="px-"], [class*="ps-"], [class*="pl-"]):has(
+    > [data-icon="inline-start"]
+  ) {
+  padding-inline-start: calc(var(--btn-p) * var(--btn-icon-padding));
+}
+
+.btn:not(.btn-square, .btn-circle, [class*="px-"], [class*="pe-"], [class*="pr-"]):has(
+    > [data-icon="inline-end"]
+  ) {
+  padding-inline-end: calc(var(--btn-p) * var(--btn-icon-padding));
+}
+
+/* A label hidden below a breakpoint leaves an icon-only button: keep the icon centered. */
+.btn:has(> .hidden) {
+  --btn-icon-padding: 1;
+}
+
+@media (width >= 40rem) {
+  .btn:has(> .hidden:is(.sm\:inline, .sm\:inline-block, .sm\:inline-flex, .sm\:block, .sm\:flex)) {
+    --btn-icon-padding: 0.75;
+  }
+}
+
+@media (width >= 48rem) {
+  .btn:has(> .hidden:is(.md\:inline, .md\:inline-block, .md\:inline-flex, .md\:block, .md\:flex)) {
+    --btn-icon-padding: 0.75;
+  }
+}
+
+@media (width >= 64rem) {
+  .btn:has(> .hidden:is(.lg\:inline, .lg\:inline-block, .lg\:inline-flex, .lg\:block, .lg\:flex)) {
+    --btn-icon-padding: 0.75;
+  }
+}
+
+/*
+ * Optical nudge, only for shapes whose visual mass sits off the box center. Lucide's
+ * play triangle leans left, so move it one grid unit (1/24 of its box) to the right.
+ */
+.btn:not(.btn-square, .btn-circle) > svg.lucide-play[data-icon] {
+  translate: 4.1667% 0;
+}
+
+/* ----------------------------------------
    Input Styles - Rich Interactive
    ---------------------------------------- */
 

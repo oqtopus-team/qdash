@@ -783,7 +783,7 @@ export function TaskDetailModal({
                       {/* Lineage of the first published parameter */}
                       <div className="mt-4 text-center">
                         <button
-                          className="btn btn-ghost btn-sm gap-2"
+                          className="btn btn-ghost btn-sm"
                           disabled={
                             !firstPublishedParameter(
                               qid,
@@ -801,7 +801,7 @@ export function TaskDetailModal({
                             )
                           }
                         >
-                          <GitBranch size={16} />
+                          <GitBranch data-icon="inline-start" />
                           Lineage
                         </button>
                       </div>

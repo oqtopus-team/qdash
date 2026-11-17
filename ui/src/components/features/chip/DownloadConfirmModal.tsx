@@ -102,7 +102,9 @@ export function DownloadConfirmModal({
             onClick={onConfirm}
             disabled={isSubmitting || selectedItemCount === 0}
           >
-            {isSubmitting ? <span className="loading loading-spinner loading-xs" /> : null}
+            {isSubmitting ? (
+              <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
+            ) : null}
             Download
           </button>
         </div>

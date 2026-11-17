@@ -32,7 +32,7 @@ export function InvestigateWithAiButton({
   return (
     <button
       type="button"
-      className={`btn btn-${size} shrink-0 gap-1 whitespace-nowrap ${className}`}
+      className={`btn btn-${size} shrink-0 whitespace-nowrap ${className}`}
       onClick={(event) => {
         // Inside a clickable card, the click must not also select the card.
         event.stopPropagation();
@@ -40,7 +40,7 @@ export function InvestigateWithAiButton({
       }}
       title="Investigate this failure with the logs and the QDash source"
     >
-      <Bot className={size === "xs" ? "h-3 w-3" : "h-4 w-4"} aria-hidden="true" />
+      <Bot data-icon="inline-start" aria-hidden="true" />
       Investigate with AI
     </button>
   );

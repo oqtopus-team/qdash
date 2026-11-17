@@ -96,8 +96,8 @@ export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskRe
           )}
         </h3>
         {!isEditing && (
-          <button onClick={() => setIsEditing(true)} className="btn btn-xs btn-ghost gap-1">
-            <Pencil className="h-3 w-3" />
+          <button onClick={() => setIsEditing(true)} className="btn btn-xs btn-ghost">
+            <Pencil data-icon="inline-start" />
             {hasNoteContent ? "Edit" : "Add note"}
           </button>
         )}
@@ -121,7 +121,7 @@ export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskRe
                 disabled={!hasNoteContent || deleteMutation.isPending}
                 title={hasNoteContent ? "Delete this note" : "No note to delete"}
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 data-icon="inline-start" />
                 Delete
               </button>
               <div className="flex gap-2">
@@ -132,7 +132,7 @@ export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskRe
                     setIsEditing(false);
                   }}
                 >
-                  <X className="h-3 w-3" />
+                  <X data-icon="inline-start" />
                   Cancel
                 </button>
                 <button
@@ -140,7 +140,7 @@ export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskRe
                   onClick={handleSave}
                   disabled={upsertMutation.isPending}
                 >
-                  <Save className="h-3 w-3" />
+                  <Save data-icon="inline-start" />
                   {upsertMutation.isPending ? "Saving…" : "Save"}
                 </button>
               </div>

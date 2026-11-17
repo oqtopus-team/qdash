@@ -495,20 +495,16 @@ export const AssistantMessage = memo(function AssistantMessage({
             <button
               type="button"
               onClick={onContinue}
-              className="btn btn-ghost btn-sm gap-1.5 rounded-full"
+              className="btn btn-ghost btn-sm rounded-full"
               title="Go on from where the answer ended, without sending your message again"
             >
-              <StepForward className="w-3.5 h-3.5" />
+              <StepForward data-icon="inline-start" />
               Continue
             </button>
           )}
           {isLast && canRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="btn btn-ghost btn-sm gap-1.5 rounded-full"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
+            <button type="button" onClick={onRetry} className="btn btn-ghost btn-sm rounded-full">
+              <RotateCcw data-icon="inline-start" />
               Retry
             </button>
           )}

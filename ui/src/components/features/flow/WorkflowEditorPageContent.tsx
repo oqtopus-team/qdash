@@ -911,7 +911,7 @@ export function WorkflowEditorPageContent() {
             className="btn btn-error"
             disabled={deleteMutation.isPending}
           >
-            <Trash2 size={16} />
+            <Trash2 data-icon="inline-start" />
             Delete Flow Metadata
           </button>
         </div>
@@ -1122,8 +1122,8 @@ export function WorkflowEditorPageContent() {
               title="Execution help"
               aria-label="Execution help"
             >
-              <CircleHelp size={16} />
-              <span className="ml-1 hidden md:inline">Execution help</span>
+              <CircleHelp data-icon="inline-start" />
+              <span className="hidden md:inline">Execution help</span>
             </button>
             <button
               type="button"
@@ -1140,8 +1140,8 @@ export function WorkflowEditorPageContent() {
               className={`btn btn-sm ${isEditorLocked ? "btn-outline" : "btn-warning"}`}
               title={isEditorLocked ? "Click to edit" : "Currently editing"}
             >
-              <Pencil size={16} />
-              <span className="ml-1">{isEditorLocked ? "Edit" : "Editing"}</span>
+              <Pencil data-icon="inline-start" />
+              <span>{isEditorLocked ? "Edit" : "Editing"}</span>
             </button>
             <button
               onClick={openExecute}
@@ -1153,11 +1153,14 @@ export function WorkflowEditorPageContent() {
               title={executeDisabledReason ?? "Execute Flow"}
             >
               {executeMutation.isPending ? (
-                <span className="loading loading-spinner loading-xs"></span>
+                <span
+                  data-icon="inline-start"
+                  className="loading loading-spinner loading-xs"
+                ></span>
               ) : (
-                <Play size={16} />
+                <Play data-icon="inline-start" />
               )}
-              <span className="ml-1">Execute</span>
+              <span>Execute</span>
             </button>
             {canCancel && (
               <button
@@ -1167,11 +1170,14 @@ export function WorkflowEditorPageContent() {
                 title="Cancel the running execution"
               >
                 {cancelMutation.isPending ? (
-                  <span className="loading loading-spinner loading-xs"></span>
+                  <span
+                    data-icon="inline-start"
+                    className="loading loading-spinner loading-xs"
+                  ></span>
                 ) : (
-                  <StopCircle size={16} />
+                  <StopCircle data-icon="inline-start" />
                 )}
-                <span className="ml-1">Cancel</span>
+                <span>Cancel</span>
               </button>
             )}
             <button
@@ -1179,8 +1185,8 @@ export function WorkflowEditorPageContent() {
               className="btn btn-sm btn-error"
               disabled={active.isSaving || deleteMutation.isPending || !ready}
             >
-              <Trash2 size={16} />
-              <span className="ml-1">Delete</span>
+              <Trash2 data-icon="inline-start" />
+              <span>Delete</span>
             </button>
             <button
               onClick={handleSave}
@@ -1188,13 +1194,14 @@ export function WorkflowEditorPageContent() {
               disabled={active.isSaving || deleteMutation.isPending || isEditorLocked || !ready}
             >
               {active.isSaving ? (
-                <span className="loading loading-spinner loading-xs"></span>
+                <span
+                  data-icon="inline-start"
+                  className="loading loading-spinner loading-xs"
+                ></span>
               ) : (
-                <>
-                  <Save size={16} />
-                  <span className="ml-1">Save</span>
-                </>
+                <Save data-icon="inline-start" />
               )}
+              <span>Save</span>
             </button>
           </div>
         </div>
@@ -1353,9 +1360,9 @@ export function WorkflowEditorPageContent() {
                       onClick={() =>
                         confirmDiscard([primary, secondary], () => router.push("/workflow/new"))
                       }
-                      className="btn btn-primary btn-xs w-full gap-1"
+                      className="btn btn-primary btn-xs w-full"
                     >
-                      <FilePlus2 size={13} />
+                      <FilePlus2 data-icon="inline-start" />
                       New Flow
                     </button>
                   </div>
@@ -1510,9 +1517,9 @@ export function WorkflowEditorPageContent() {
                     <button
                       type="button"
                       onClick={() => setShowPropertiesModal(true)}
-                      className="btn btn-outline btn-xs w-full gap-1"
+                      className="btn btn-outline btn-xs w-full"
                     >
-                      <Settings size={13} />
+                      <Settings data-icon="inline-start" />
                       Advanced Settings
                     </button>
                   </div>

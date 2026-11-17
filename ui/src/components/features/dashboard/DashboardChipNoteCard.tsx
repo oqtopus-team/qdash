@@ -86,12 +86,12 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
         </div>
         {mode === "view" && hasNote && (
           <button
-            className="btn btn-sm btn-outline gap-1"
+            className="btn btn-sm btn-outline"
             onClick={() => setMode("edit")}
             type="button"
             disabled={isLoading}
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil data-icon="inline-start" />
             Edit
           </button>
         )}
@@ -114,11 +114,11 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-base-content/60">Add a note for your team</p>
             <button
-              className="btn btn-sm btn-outline shrink-0 gap-1.5"
+              className="btn btn-sm btn-outline shrink-0"
               onClick={() => setMode("edit")}
               type="button"
             >
-              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+              <Pencil data-icon="inline-start" aria-hidden="true" />
               Add note
             </button>
           </div>
@@ -142,17 +142,17 @@ export function DashboardChipNoteCard({ chipId, noteScopeParams }: DashboardChip
               )}
             </div>
             <div className="flex justify-end gap-2">
-              <button className="btn btn-sm btn-ghost gap-1" onClick={handleCancel} type="button">
-                <X className="h-3.5 w-3.5" />
+              <button className="btn btn-sm btn-ghost" onClick={handleCancel} type="button">
+                <X data-icon="inline-start" />
                 Cancel
               </button>
               <button
-                className="btn btn-sm btn-primary gap-1"
+                className="btn btn-sm btn-primary"
                 onClick={handleSave}
                 disabled={isPending || (!draft.trim() && !hasNote)}
                 type="button"
               >
-                <Save className="h-3.5 w-3.5" />
+                <Save data-icon="inline-start" />
                 {isPending ? "Saving..." : draft.trim() ? "Save note" : "Clear note"}
               </button>
             </div>

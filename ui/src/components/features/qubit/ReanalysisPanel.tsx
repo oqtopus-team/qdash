@@ -432,11 +432,11 @@ function PanelShell({ title, children, mutation, onSubmit, onReset }: PanelShell
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              className="btn btn-sm btn-ghost gap-2"
+              className="btn btn-sm btn-ghost"
               onClick={onReset}
               disabled={mutation.isPending}
             >
-              <RotateCcw size={14} />
+              <RotateCcw data-icon="inline-start" />
               Reset
             </button>
             <button type="submit" className="btn btn-sm btn-primary" disabled={mutation.isPending}>

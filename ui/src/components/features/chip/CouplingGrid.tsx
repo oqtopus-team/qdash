@@ -816,10 +816,10 @@ export function CouplingGrid({
           <button
             type="button"
             onClick={() => setCouplingDirection(!isDirectionReversed)}
-            className={`btn btn-sm gap-1.5 ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
+            className={`btn btn-sm ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
             title={isDirectionReversed ? "Showing reverse direction" : "Showing forward direction"}
           >
-            <ArrowRightLeft className="h-3.5 w-3.5" />
+            <ArrowRightLeft data-icon="inline-start" />
             <span className="text-xs">{isDirectionReversed ? "Reverse" : "Forward"}</span>
           </button>
         </div>
@@ -847,14 +847,14 @@ export function CouplingGrid({
                   Clear
                 </button>
                 <button
-                  className="btn btn-sm btn-primary gap-1"
+                  className="btn btn-sm btn-primary"
                   onClick={() => setIsDownloadConfirmOpen(true)}
                   disabled={selectedForDownload.size === 0 || isDownloading}
                 >
                   {isDownloading ? (
-                    <span className="loading loading-spinner loading-xs" />
+                    <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
                   ) : (
-                    <Download size={16} />
+                    <Download data-icon="inline-start" />
                   )}
                   Download
                 </button>
@@ -872,7 +872,7 @@ export function CouplingGrid({
             ) : (
               <div className="flex items-center gap-2">
                 <button
-                  className="btn btn-sm btn-outline gap-2"
+                  className="btn btn-sm btn-outline"
                   onClick={() => {
                     setDownloadSelectionEnabled(true);
                     setRegionSelectionEnabled(false);
@@ -881,7 +881,7 @@ export function CouplingGrid({
                   title="Select figures to download"
                   disabled={availableForDownloadCount === 0}
                 >
-                  <Download size={16} />
+                  <Download data-icon="inline-start" />
                   Download
                 </button>
               </div>

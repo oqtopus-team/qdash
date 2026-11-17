@@ -388,8 +388,8 @@ export function TaskHistoryViewer({
                   </div>
                 </div>
 
-                <Link className="btn btn-primary btn-sm gap-1" href={taskResultHref(selectedTask)}>
-                  <ExternalLink className="h-3.5 w-3.5" />
+                <Link className="btn btn-primary btn-sm" href={taskResultHref(selectedTask)}>
+                  <ExternalLink data-icon="inline-start" />
                   Open result
                 </Link>
               </div>

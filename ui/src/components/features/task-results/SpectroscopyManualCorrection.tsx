@@ -185,8 +185,8 @@ export function SpectroscopyManualCorrection({
               </p>
             </div>
           </div>
-          <button className="btn btn-sm btn-outline shrink-0 gap-2" onClick={beginEditing}>
-            <Pencil size={14} />
+          <button className="btn btn-sm btn-outline shrink-0" onClick={beginEditing}>
+            <Pencil data-icon="inline-start" />
             Correct values
           </button>
         </div>
@@ -210,8 +210,8 @@ export function SpectroscopyManualCorrection({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {jsonFigurePaths.length > 0 && (
-            <button className="btn btn-sm btn-outline gap-2" onClick={openPicker}>
-              <Crosshair size={14} />
+            <button className="btn btn-sm btn-outline" onClick={openPicker}>
+              <Crosshair data-icon="inline-start" />
               Pick x/y from plot
             </button>
           )}

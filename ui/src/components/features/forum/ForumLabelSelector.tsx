@@ -160,10 +160,10 @@ export function ForumLabelPicker({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="btn btn-outline btn-sm gap-2 rounded-md normal-case"
+            className="btn btn-outline btn-sm rounded-md normal-case"
             disabled={disabled}
           >
-            <Tag className="h-4 w-4" />
+            <Tag data-icon="inline-start" />
             Labels
             {selectedLabels.length > 0 && (
               <span className="badge badge-sm badge-neutral">{selectedLabels.length}</span>

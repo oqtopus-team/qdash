@@ -26,8 +26,10 @@ scope, and status visible; surfaces stay flat as described in
 | Destructive confirmation | `ConfirmDialog` or shared `Dialog` |
 
 Icons supplement a visible label unless the meaning is conventional and the control has an
-accessible name. Use the size already established by neighboring controls; do not use Unicode
-symbols or emoji as interface icons.
+accessible name. Use the size already established by neighboring controls; in a labeled button,
+mark the icon with `data-icon` so the shared rule sets its size and spacing (see
+[Space Icon Buttons Optically](./guidelines.md#space-icon-buttons-optically)). Do not use
+Unicode symbols or emoji as interface icons.
 
 ## Use Semantic Color
 

@@ -251,9 +251,9 @@ function ProjectMembersPanel() {
                   type="button"
                 >
                   {copiedProjectId === projectId ? (
-                    <Check className="h-4 w-4" />
+                    <Check data-icon="inline-start" />
                   ) : (
-                    <Copy className="h-4 w-4" />
+                    <Copy data-icon="inline-start" />
                   )}
                   {copiedProjectId === projectId ? "Copied" : "Copy"}
                 </button>

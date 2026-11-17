@@ -163,7 +163,7 @@ export function AdminUsersPanel({
                 disabled={bulkAction !== null || bulkProjectCandidates.length === 0}
               >
                 {bulkAction === "create-project" ? (
-                  <span className="loading loading-spinner loading-xs" />
+                  <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
                 ) : null}
                 Create Default Projects
               </button>

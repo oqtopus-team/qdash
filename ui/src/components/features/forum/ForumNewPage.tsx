@@ -397,13 +397,13 @@ export function ForumNewPage() {
               </span>
               <button
                 type="submit"
-                className="btn btn-sm btn-primary gap-2"
+                className="btn btn-sm btn-primary"
                 disabled={isSubmitting || createMutation.isPending}
               >
                 {createMutation.isPending ? (
-                  <span className="loading loading-spinner loading-xs" />
+                  <span data-icon="inline-start" className="loading loading-spinner loading-xs" />
                 ) : (
-                  <Send className="h-4 w-4" />
+                  <Send data-icon="inline-start" />
                 )}
                 Post
               </button>

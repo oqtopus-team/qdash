@@ -603,10 +603,10 @@ export function CouplingMetricsGrid({
           </div>
           <button
             onClick={() => setIsDirectionReversed((prev) => !prev)}
-            className={`btn btn-sm gap-1.5 ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
+            className={`btn btn-sm ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
             title={isDirectionReversed ? "Showing reverse direction" : "Showing forward direction"}
           >
-            <ArrowRightLeft className="h-3.5 w-3.5" />
+            <ArrowRightLeft data-icon="inline-start" />
             <span className="text-xs">{isDirectionReversed ? "Reverse" : "Forward"}</span>
           </button>
         </div>
@@ -717,9 +717,9 @@ export function CouplingMetricsGrid({
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
                 <LineageButton
                   target={{ parameterName: metricKey, qid: selectedCouplingInfo.couplingId }}
-                  className="btn btn-ghost btn-sm sm:btn-md gap-1"
+                  className="btn btn-ghost btn-sm sm:btn-md"
                 >
-                  <GitBranch className="h-4 w-4" />
+                  <GitBranch data-icon="inline-start" />
                   <span className="hidden sm:inline">Lineage</span>
                 </LineageButton>
                 <div className="flex gap-2">
