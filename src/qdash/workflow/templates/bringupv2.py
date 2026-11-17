@@ -60,7 +60,7 @@ def bringupv2(
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
-    execution_mode: BringUpV2ExecutionMode = "sequential",
+    execution_mode: BringUpV2ExecutionMode = "parallel_by_mux",
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
@@ -72,6 +72,8 @@ def bringupv2(
     candidate set to every qubit of the MUX before the representative goes on.
     Each selected qubit of the MUX then runs, one after another,
     CheckQubitFrequencyMapping, CheckControlAmplitude, and CheckAdaptiveChevron.
+    By default the MUXes of one hardware stage run in parallel, as in the Bring-up
+    template; two qubits of one MUX are never driven at the same time.
     Each qubit's mapping is independent: QDash does not check that the selections
     of one MUX form a one-to-one mapping. A qubit's mapping fails without outputs
     unless its best-scoring candidate has quality level 3 or higher and an f01
@@ -100,11 +102,12 @@ def bringupv2(
             whether that set is still usable. Remove the MUX from ``mux_ids`` to
             skip it entirely.
         qids: Not used (for UI compatibility)
-        execution_mode: How the qubits run (default: "sequential"):
-            - "sequential": one MUX and one qubit at a time, so only one qubit is
-              driven at a time
+        execution_mode: How the qubits run (default: "parallel_by_mux", as in the
+            Bring-up template):
             - "parallel_by_mux": MUXes run in parallel within the scheduler's
               hardware stages; the qubits of one MUX run one after another
+            - "sequential": one MUX and one qubit at a time, so only one qubit is
+              driven at a time
         tags: Tags recorded on the run
         flow_name: Flow name (auto-injected)
         project_id: Project ID (auto-injected)

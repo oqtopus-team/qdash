@@ -274,13 +274,14 @@ leaves `CheckControlAmplitude` or `CheckAdaptiveChevron` to run on values from a
 failed detection skips the representative's later calls; the other qubits of that MUX still run the
 mapping, which rejects the candidate set because the failed attempt is the latest in the MUX.
 
-`execution_mode` defaults to `sequential`, which drives one qubit at a time; `parallel_by_mux` runs
-MUXes in parallel and keeps each MUX in order. The template rejects other modes, because
-`parallel_by_round` can start a later slot before its representative. `exclude_qids` follows the
-**Bring-up** template. Excluding a MUX representative runs no detection for that MUX in the run, so
-its other qubits map against whatever candidate set `CheckQubitFrequencyMapping` accepts from the
-calibration parameters, which can come from an earlier run. The task, not the template, decides
-whether that set is still usable.
+`execution_mode` defaults to `parallel_by_mux`, as in the **Bring-up** template: the MUXes of one
+hardware stage run in parallel, stages run one after another, and the qubits of each MUX run in slot
+order, so two qubits of one MUX are never driven at the same time. `sequential` drives one qubit at
+a time. The template rejects other modes, because `parallel_by_round` can start a later slot before
+its representative. `exclude_qids` follows the **Bring-up** template. Excluding a MUX representative
+runs no detection for that MUX in the run, so its other qubits map against whatever candidate set
+`CheckQubitFrequencyMapping` accepts from the calibration parameters, which can come from an earlier
+run. The task, not the template, decides whether that set is still usable.
 
 ### Replacement within the same parameter
 

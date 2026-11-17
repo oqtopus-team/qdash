@@ -565,7 +565,9 @@ def test_coherence_check_runs_one_step_with_per_target_fail_fast(
             }
 
 
-def _bringupv2_step(monkeypatch: pytest.MonkeyPatch, execution_mode: str) -> tuple[Any, Any]:
+def _bringupv2_step(
+    monkeypatch: pytest.MonkeyPatch, execution_mode: str | None = None
+) -> tuple[Any, Any]:
     import importlib
 
     template = importlib.import_module("qdash.workflow.templates.bringupv2")
@@ -582,9 +584,9 @@ def _bringupv2_step(monkeypatch: pytest.MonkeyPatch, execution_mode: str) -> tup
             captured["steps"] = steps
 
     monkeypatch.setattr(template, "CalibService", CapturingCalibService)
-    template.bringupv2(
-        username="alice", chip_id="64Q", mux_ids=[0, 1], execution_mode=execution_mode
-    )
+    # None omits execution_mode so the template's default applies.
+    mode = {} if execution_mode is None else {"execution_mode": execution_mode}
+    template.bringupv2(username="alice", chip_id="64Q", mux_ids=[0, 1], **mode)
     (step,) = captured["steps"]
     return step, captured["targets"]
 
@@ -628,7 +630,7 @@ def _run_bringupv2_sequential(
     return step, parent, ctx
 
 
-def test_bringupv2_drives_one_qubit_at_a_time_by_default(
+def test_bringupv2_sequential_drives_one_qubit_at_a_time(
     recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Sequential mode finishes each MUX's detection, then runs each qubit's calls in turn."""
@@ -700,11 +702,12 @@ def test_bringupv2_failed_detection_stops_the_representative(
     assert [name for name, qid in order if qid == "1"] == list(BRINGUPV2_QUBIT_CALLS)
 
 
-def test_bringupv2_parallel_by_mux_keeps_each_mux_in_order(
+def test_bringupv2_runs_parallel_by_mux_by_default_and_keeps_each_mux_in_order(
     recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """MUXes run in their own workers; inside one MUX the qubits still run in turn."""
-    step, targets = _bringupv2_step(monkeypatch, "parallel_by_mux")
+    """By default MUXes run in their own workers; inside one MUX the qubits still run in turn."""
+    step, targets = _bringupv2_step(monkeypatch)
+    assert step.execution_mode == "parallel_by_mux"
     _schedule(monkeypatch)
 
     step.execute(_session(), targets, StepContext())

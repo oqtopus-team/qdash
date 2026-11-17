@@ -165,9 +165,9 @@ def test_template_does_not_change_the_bringup_template() -> None:
     assert "detection_only" not in (resonator.run or {})
 
 
-def test_template_defaults_to_sequential_and_accepts_parallel_by_mux() -> None:
-    assert _step(_run()).execution_mode == "sequential"
-    assert _step(_run(execution_mode="parallel_by_mux")).execution_mode == "parallel_by_mux"
+def test_template_defaults_to_parallel_by_mux_and_accepts_sequential() -> None:
+    assert _step(_run()).execution_mode == "parallel_by_mux"
+    assert _step(_run(execution_mode="sequential")).execution_mode == "sequential"
 
 
 @pytest.mark.parametrize("mode", ["parallel_by_round", "simultaneous_spectroscopy", "manual"])
@@ -178,7 +178,7 @@ def test_template_rejects_modes_that_can_reorder_a_mux(mode: str) -> None:
 
 def test_flow_run_parameter_type_accepts_only_mux_ordered_modes() -> None:
     fn = getattr(template_module.bringupv2, "fn", template_module.bringupv2)
-    assert inspect.signature(fn).parameters["execution_mode"].default == "sequential"
+    assert inspect.signature(fn).parameters["execution_mode"].default == "parallel_by_mux"
     adapter = TypeAdapter(get_type_hints(fn)["execution_mode"])
     for mode in ("sequential", "parallel_by_mux"):
         assert adapter.validate_python(mode) == mode
