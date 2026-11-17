@@ -7,6 +7,7 @@ import { ArrowRightLeft, GitBranch, Lock, ZoomIn } from "lucide-react";
 
 import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { GridFullscreenButton } from "@/components/ui/GridFullscreenButton";
+import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/Dialog";
@@ -663,9 +664,7 @@ export function CouplingMetricsGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          <div className="min-w-0 min-h-0 flex-1 self-stretch overflow-auto flex justify-center-safe items-start">
-            {gridContent}
-          </div>
+          <LockedGridScroller>{gridContent}</LockedGridScroller>
         )}
       </div>
 

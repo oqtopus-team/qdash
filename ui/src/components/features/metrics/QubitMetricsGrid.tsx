@@ -10,6 +10,7 @@ import {
   GridFullscreenButton,
   gridFullscreenPanelClass,
 } from "@/components/ui/GridFullscreenButton";
+import { LockedGridScroller } from "@/components/ui/LockedGridScroller";
 import { LineageButton } from "@/components/features/provenance/ParameterLineageDialog";
 import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
@@ -738,9 +739,7 @@ export function QubitMetricsGrid({
             </TransformComponent>
           </TransformWrapper>
         ) : (
-          <div className="min-w-0 min-h-0 flex-1 self-stretch overflow-auto flex justify-center-safe items-start">
-            {gridContent}
-          </div>
+          <LockedGridScroller>{gridContent}</LockedGridScroller>
         )}
       </div>
 
