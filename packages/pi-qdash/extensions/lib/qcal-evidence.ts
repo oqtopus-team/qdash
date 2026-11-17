@@ -141,6 +141,8 @@ export interface QcalContext {
   /** Fitted results, shown only on request. */
   metrics?: Record<string, RecordedParameter>;
   message?: string;
+  /** Every candidate's scores when the task compared candidates, from `candidateComparison`. */
+  comparison?: string;
 }
 
 /**
@@ -165,5 +167,64 @@ export function qcalContextText(context: QcalContext): string {
   const metrics = context.metrics ? formatSettings(context.metrics) : [];
   if (metrics.length > 0) lines.push(`Fitted results: ${metrics.join("; ")}.`);
   if (context.message?.trim()) lines.push(`Task message: ${context.message.trim()}`);
+  if (context.comparison?.trim()) lines.push(context.comparison.trim());
   return lines.join("\n");
+}
+
+/** The figure metadata key and schema of the CheckQubitFrequencyMapping decision evidence. */
+export const MAPPING_EVIDENCE_META_KEY = "qubit_frequency_mapping";
+export const MAPPING_EVIDENCE_SCHEMA = "qdash.qubit_frequency_mapping.v1";
+/** The prefix of the comparison line, which the runtime keeps in the evaluation context. */
+export const CANDIDATE_COMPARISON_PREFIX = "Candidate comparison: ";
+
+function numberText(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value) ? formatNumber(value) : "-";
+}
+
+function boundedText(value: unknown, limit = 256): string {
+  if (typeof value !== "string") return "-";
+  const text = value.slice(0, limit).replace(/\s+/g, " ").trim();
+  return `${text}${value.length > limit ? "…" : ""}`;
+}
+
+/**
+ * One line with every candidate's scores from a figure that carries
+ * CheckQubitFrequencyMapping's decision evidence in its layout metadata, or
+ * undefined for any other figure. A selected mapping saves the selected
+ * candidate's figure first, so this line keeps the comparison of every
+ * candidate in the context when only that figure is shown to the model.
+ */
+export function candidateComparison(figure: unknown): string | undefined {
+  const layout = (figure as { layout?: unknown } | null)?.layout;
+  const meta = (layout as { meta?: unknown } | null)?.meta;
+  if (!meta || typeof meta !== "object") return undefined;
+  const evidence = (meta as Record<string, unknown>)[MAPPING_EVIDENCE_META_KEY];
+  if (!evidence || typeof evidence !== "object") return undefined;
+  const record = evidence as Record<string, unknown>;
+  if (record.schema !== MAPPING_EVIDENCE_SCHEMA) return undefined;
+  const rows = Array.isArray(record.candidates) ? record.candidates : [];
+  const candidates = rows
+    .slice(0, 4)
+    .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row))
+    .map((row) => {
+      let text = `candidate ${numberText(row.candidate_index)} (${boundedText(row.readout_label, 64)}, readout ${numberText(row.readout_frequency)} GHz)`;
+      if (row.status === "f01_detected") {
+        text += ` f01 ${numberText(row.f01_frequency)} GHz, moment ${numberText(row.moment)}, quality ${numberText(row.quality_level)}, rank ${numberText(row.rank)}`;
+      } else {
+        text += ` ${row.status === "error" ? `error: ${boundedText(row.error)}` : "no f01 peak"}`;
+      }
+      return row.selected === true ? `${text}, SELECTED` : text;
+    });
+  const ratio = typeof record.score_ratio === "number" && Number.isFinite(record.score_ratio) ? `, ratio ${formatNumber(record.score_ratio)}` : "";
+  const figureKind = (meta as Record<string, unknown>).qubit_frequency_mapping_figure;
+  const figureNote =
+    figureKind === "selected"
+      ? " The figure shows the selected candidate; the all-candidate summary figure follows it."
+      : "";
+  // One line: the evaluation context keeps only the line that starts with the prefix.
+  const line =
+    `outcome ${boundedText(record.outcome, 32)} (${boundedText(record.reason)}); ` +
+    `runner-up ${boundedText(record.runner_up_status, 32)}${ratio}; ${candidates.join("; ")}.` +
+    `${rows.length > 4 ? " Additional candidates omitted." : ""}${figureNote}`;
+  return `${CANDIDATE_COMPARISON_PREFIX}${line.replace(/\s+/g, " ").trim()}`;
 }

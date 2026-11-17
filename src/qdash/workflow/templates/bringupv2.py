@@ -1,16 +1,18 @@
-"""Qubit frequency mapping from multiplexed resonator candidates.
+"""Bring-up v2: map each qubit to its resonator, then calibrate its drive.
 
-This opt-in template detects the resonator candidates of each selected MUX and then
-identifies each qubit's coarse frequency and resonator with CheckQubitFrequencyMapping.
-It does not run amplitude or Chevron tasks and does not change the Bring-up template.
+This opt-in template detects the resonator candidates of each selected MUX,
+identifies each qubit's coarse frequency and resonator with
+CheckQubitFrequencyMapping, and then runs CheckControlAmplitude and
+CheckAdaptiveChevron on the published values. It does not change the Bring-up
+template.
 
 CheckQubitFrequencyMapping needs ``qubex.contrib.multiplexed_readout_qubit_spectroscopy``
-from https://github.com/amachino/qubex/pull/472. Until that pull request merges, QDash
-pins Qubex to its head commit; with a Qubex revision that lacks the helper, the mapping
+from https://github.com/amachino/qubex/pull/472, included in upstream ``develop``.
+With a Qubex revision that lacks the helper, the mapping
 task fails at run time with an error naming that prerequisite.
 
 Example:
-    qubit_frequency_mapping(
+    bringupv2(
         username="alice",
         chip_id="16Q",
         mux_ids=[0, 1],
@@ -31,7 +33,7 @@ from qdash.workflow.service.calib_service import (
 from qdash.workflow.service.steps import BringUp
 from qdash.workflow.service.targets import MuxTargets
 
-QubitFrequencyMappingExecutionMode = Literal["sequential", "parallel_by_mux"]
+BringUpV2ExecutionMode = Literal["sequential", "parallel_by_mux"]
 """Execution modes that never drive two qubits of one MUX at the same time.
 
 Both run the qubits of a MUX one after another in local slot order, so the MUX
@@ -41,7 +43,7 @@ MUX runs CheckQubitFrequencyMapping. ``parallel_by_round`` can start a later slo
 a MUX before its representative and is not accepted.
 """
 
-QUBIT_FREQUENCY_MAPPING_EXECUTION_MODES: tuple[QubitFrequencyMappingExecutionMode, ...] = (
+BRINGUPV2_EXECUTION_MODES: tuple[BringUpV2ExecutionMode, ...] = (
     "sequential",
     "parallel_by_mux",
 )
@@ -52,37 +54,43 @@ QUBIT_FREQUENCY_MAPPING_EXECUTION_MODES: tuple[QubitFrequencyMappingExecutionMod
     on_failure=[on_flow_failure],
     on_crashed=[on_flow_crashed],
 )
-def qubit_frequency_mapping(
+def bringupv2(
     username: str,
     chip_id: str,
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
-    execution_mode: QubitFrequencyMappingExecutionMode = "sequential",
+    execution_mode: BringUpV2ExecutionMode = "sequential",
     tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
 ) -> Any:
-    """Detect resonator candidates per MUX, then map each qubit to its resonator.
+    """Map each qubit of the selected MUXes to its resonator, then calibrate its drive.
 
     For each selected MUX, CheckResonatorSpectroscopy runs once on the MUX
     representative (local slot 0) with ``detection_only`` and distributes the
     candidate set to every qubit of the MUX before the representative goes on.
-    CheckQubitFrequencyMapping then runs for each selected qubit of the MUX, one
-    after another. Each qubit's mapping is independent: QDash does not check that
-    the selections of one MUX form a one-to-one mapping. A qubit fails without outputs
-    unless its best-scoring candidate has quality level 3 or higher and an f01 moment
-    at least ``min_score_ratio`` (default 2.0) times the runner-up's.
+    Each selected qubit of the MUX then runs, one after another,
+    CheckQubitFrequencyMapping, CheckControlAmplitude, and CheckAdaptiveChevron.
+    Each qubit's mapping is independent: QDash does not check that the selections
+    of one MUX form a one-to-one mapping. A qubit's mapping fails without outputs
+    unless its best-scoring candidate has quality level 3 or higher and an f01
+    moment at least ``min_score_ratio`` (default 2.0) times the runner-up's; a
+    failed call skips that qubit's later calls, so the amplitude and Chevron
+    tasks never run on values the mapping did not publish in this run.
 
-    Both calls set ``update_calibration_parameters`` to True. The mapping reads the
-    candidates from the calibration parameters, so it cannot run on candidates that
-    were not published. Requires a Qubex revision that includes
-    https://github.com/amachino/qubex/pull/472.
+    CheckResonatorSpectroscopy and CheckQubitFrequencyMapping set
+    ``update_calibration_parameters`` to True: the mapping reads the candidates
+    from the calibration parameters, and CheckControlAmplitude reads the readout
+    frequency and amplitude, control frequency, and coarse control amplitude the
+    mapping publishes. CheckControlAmplitude and CheckAdaptiveChevron keep the
+    acquisition settings of the Bring-up template. Requires a Qubex revision that
+    includes https://github.com/amachino/qubex/pull/472.
 
     Args:
         username: User name (from UI)
         chip_id: Chip ID (from UI)
-        mux_ids: MUX IDs to map (required)
+        mux_ids: MUX IDs to bring up (required)
         exclude_qids: Qubit IDs to skip, applied as in the Bring-up template.
             CheckResonatorSpectroscopy runs only on a MUX representative (local
             slot 0), so excluding one runs no detection for its MUX in this run.
@@ -110,10 +118,10 @@ def qubit_frequency_mapping(
     """
     if mux_ids is None:
         raise ValueError("mux_ids is required; select MUX targets before running this flow")
-    if execution_mode not in QUBIT_FREQUENCY_MAPPING_EXECUTION_MODES:
-        valid = ", ".join(QUBIT_FREQUENCY_MAPPING_EXECUTION_MODES)
+    if execution_mode not in BRINGUPV2_EXECUTION_MODES:
+        valid = ", ".join(BRINGUPV2_EXECUTION_MODES)
         raise ValueError(
-            f"Unknown execution_mode {execution_mode!r} for qubit frequency mapping. "
+            f"Unknown execution_mode {execution_mode!r} for Bring-up v2. "
             f"Valid execution modes: {valid}"
         )
     if exclude_qids is None:
@@ -129,8 +137,9 @@ def qubit_frequency_mapping(
         BringUp(
             execution_mode=execution_mode,
             tasks=[
-                # Both calls publish their outputs: the mapping reads the candidates from the
-                # calibration parameters, and its own result is the readout and coarse qubit values.
+                # The detection and the mapping publish their outputs: the mapping reads the
+                # candidates from the calibration parameters, and the later tasks read the
+                # readout and coarse qubit values the mapping publishes.
                 TaskCall(
                     name="CheckResonatorSpectroscopy",
                     run={
@@ -163,6 +172,20 @@ def qubit_frequency_mapping(
                         # "power_range": sweep.arange(-60, 0, 10),
                     },
                     update_calibration_parameters=True,
+                ),
+                # The same acquisition settings as the Bring-up template.
+                TaskCall(name="CheckControlAmplitude", run={"shots": 8192}),
+                # Keep this explicit so users can see and tune the adaptive Chevron
+                # acquisition condition directly from the workflow template.
+                TaskCall(
+                    name="CheckAdaptiveChevron",
+                    run={"shots": 256},
+                    # Calibration inputs normally come from the current calibration
+                    # parameters. Set a value here to override it for every qubit:
+                    # input={"coarse_control_amplitude": 0.05},
+                    # Set to False to keep the result as measurement history without
+                    # updating the current calibration parameters.
+                    # update_calibration_parameters=False,
                 ),
             ],
         )

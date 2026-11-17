@@ -116,7 +116,7 @@ Update targets are specified per output, not by classifying the entire task as e
 
 `CheckQubitFrequencyMapping` identifies a qubit's coarse frequency and its resonator in one
 measurement, without trusting the resonator assignment of `CheckResonatorSpectroscopy`. It is an
-opt-in task: only the **Qubit Frequency Mapping** template runs it, the default bringup does not,
+opt-in task: only the **Bring-up v2** template runs it, the default **Bring-up** template does not,
 and `CheckQubitSpectroscopy` is unchanged.
 
 The candidates come from `CheckResonatorSpectroscopy` with the run parameter `detection_only` set
@@ -199,21 +199,35 @@ by drive power, so it grows with the region's size and phase contrast and depend
 candidate's readout amplitude and noise level. A candidate read with a stronger
 readout or less noise can score higher for the same qubit response.
 
-Every outcome saves a summary figure first, then the marked figure of every analyzed candidate and
-the data-built raw figure of every valid candidate. The summary figure shows a table of every
-candidate (slot, readout frequency, readout amplitude and power, status or error, f01, moment,
-`quality_level`, rank, selection), each candidate's phase map with its f01 peak, the decision and
-its reason, the runner-up and ratio, and the rule. Its JSON figure carries the same evidence under
-`layout.meta["qubit_frequency_mapping"]`, including the raw moment of every candidate and the
-proposal: the values the selected candidate publishes, or the best candidate's values marked
-`published: false` on rejection. A failed task's message is one line that names the reason and every
-candidate's moment, `quality_level`, and f01.
+The figure order depends on the outcome:
+
+| Outcome | Figure order |
+| --- | --- |
+| Selected | Selected candidate's marked figure, the summary, then each candidate's marked and raw figures without the selected marked figure |
+| Rejected or ambiguous | The summary, then each candidate's marked and raw figures |
+
+Each candidate contributes a marked figure when its analysis ran and a raw figure when its data is
+valid, in candidate order.
+
+The selected candidate's figure is its own phase map with the f01 marker of the analysis and the
+coarse-amplitude line. Its title names the qid, the candidate index and readout slot, the readout
+frequency and amplitude, the f01, moment, and `quality_level`, and the runner-up margin. The
+summary figure shows a table of every candidate (slot, readout frequency, readout amplitude and
+power, status or error, f01, moment, `quality_level`, rank, selection), each candidate's phase map
+with its f01 peak, the decision and its reason, the runner-up and ratio, and the rule. Both
+figures carry the same evidence in their JSON under `layout.meta["qubit_frequency_mapping"]`,
+including the raw moment of every candidate and the proposal: the values the selected candidate
+publishes, or the best candidate's values marked `published: false` on rejection.
+`layout.meta["qubit_frequency_mapping_figure"]` is `selected` or `summary`. A failed task's message
+is one line that names the reason and every candidate's moment, `quality_level`, and f01.
 
 The decision is deterministic, and the task does not call an AI model. The existing
-[AI evaluation](../copilot/evaluation.md) of a task result reads the first figure and, in the
-evaluation context, the first line of the task message, so a completed or failed mapping result is
-ready for a reviewer to evaluate from **Ask AI** or a bulk run. The message of a completed result is
-the generic completion message, so a completed mapping is reviewed from the summary figure.
+[AI evaluation](../copilot/evaluation.md) of a task result judges the first figure, so a completed
+mapping is judged on the selected candidate's spectrum and a failed one on the summary. The
+evidence tool reads the decision evidence from the first JSON figure and adds every candidate's
+scores to the evaluation context as a `Candidate comparison:` line, so the comparison is not lost
+when the selected figure comes first. **Ask AI** on a task result opens with every figure, the
+summary included.
 
 On success the selected candidate supplies `resonator_frequency`, `readout_frequency`, and
 `readout_amplitude`. The f01 estimate supplies `coarse_qubit_frequency`, `control_frequency`,
@@ -222,27 +236,39 @@ On success the selected candidate supplies `resonator_frequency`, `readout_frequ
 inferred independently, so two qubits of one MUX can select the same candidate; QDash does not
 check that the selections form a one-to-one mapping.
 
-The helper comes from [amachino/qubex#472](https://github.com/amachino/qubex/pull/472), which is
-not merged yet. Until it merges, `[tool.uv.sources]` in the root `pyproject.toml` pins `qubex` to
-the pull request's head commit `0711dde0ca466d8c76f4ea5614af03a8422d9155` on the upstream
-repository, so the workflow environment built from `uv.lock` provides the helper. After the pull
-request merges, point the source back at the upstream `develop` branch, or at the merge commit, and
-run `uv lock --upgrade-package qubex`. With a Qubex revision that lacks the helper, the task
+The helper was added in [amachino/qubex#472](https://github.com/amachino/qubex/pull/472).
+QDash tracks upstream `develop` in `[tool.uv.sources]`; `uv.lock` records the resolved
+revision containing the helper. Run `uv lock --upgrade-package qubex` to refresh it.
+With a Qubex revision that lacks the helper, the task
 registers normally and fails at run time with an error naming that prerequisite.
 
-The **Qubit Frequency Mapping** template, `templates/qubit_frequency_mapping.py`, runs the
-pipeline for the selected `mux_ids` in one `BringUp` step. `CheckResonatorSpectroscopy` runs with
-`detection_only: true` on the representative (local slot 0) of each MUX and distributes the
-candidates to every qubit of the MUX before the representative continues. Then
-`CheckQubitFrequencyMapping` runs for each selected qubit of the MUX in slot order. Both calls set
-`update_calibration_parameters: true`, because the mapping reads the candidates from the published
-calibration parameters. `execution_mode` defaults to `sequential`, which drives one qubit at a
-time; `parallel_by_mux` runs MUXes in parallel and keeps each MUX in order. The template rejects
-other modes, because `parallel_by_round` can start a later slot before its representative.
-`exclude_qids` follows the Bring-up template. Excluding a MUX representative runs no detection for
-that MUX in the run, so its other qubits map against whatever candidate set
-`CheckQubitFrequencyMapping` accepts from the calibration parameters, which can come from an
-earlier run. The task, not the template, decides whether that set is still usable.
+The **Bring-up v2** template (ID `bringupv2`, `templates/bringupv2.py`) runs the pipeline for the
+selected `mux_ids` in one `BringUp` step:
+
+| Order | Call | Settings |
+| --- | --- | --- |
+| 1 | `CheckResonatorSpectroscopy` | `shots: 1024`, `interval: 0`, `detection_only: true`, `update_calibration_parameters: true` |
+| 2 | `CheckQubitFrequencyMapping` | `shots: 1024`, `interval: 1024`, `update_calibration_parameters: true` |
+| 3 | `CheckControlAmplitude` | `shots: 8192`, as in the **Bring-up** template |
+| 4 | `CheckAdaptiveChevron` | `shots: 256`, as in the **Bring-up** template |
+
+`CheckResonatorSpectroscopy` runs on the representative (local slot 0) of each MUX and distributes
+the candidates to every qubit of the MUX before the representative continues. Each selected qubit
+of the MUX then runs calls 2 to 4 in slot order. The first two calls publish their outputs, because
+the mapping reads the candidates from the calibration parameters and `CheckControlAmplitude` reads
+the `readout_frequency`, `readout_amplitude`, `control_frequency`, and `coarse_control_amplitude`
+the mapping publishes. A failed call skips the qubit's later calls, so a rejected mapping never
+leaves `CheckControlAmplitude` or `CheckAdaptiveChevron` to run on values from an earlier run. A
+failed detection skips the representative's later calls; the other qubits of that MUX still run the
+mapping, which rejects the candidate set because the failed attempt is the latest in the MUX.
+
+`execution_mode` defaults to `sequential`, which drives one qubit at a time; `parallel_by_mux` runs
+MUXes in parallel and keeps each MUX in order. The template rejects other modes, because
+`parallel_by_round` can start a later slot before its representative. `exclude_qids` follows the
+**Bring-up** template. Excluding a MUX representative runs no detection for that MUX in the run, so
+its other qubits map against whatever candidate set `CheckQubitFrequencyMapping` accepts from the
+calibration parameters, which can come from an earlier run. The task, not the template, decides
+whether that set is still usable.
 
 ### Replacement within the same parameter
 

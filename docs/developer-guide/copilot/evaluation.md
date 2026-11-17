@@ -115,7 +115,11 @@ its text (`evidenceContext` in `evaluate.ts`): the task, its target and status; 
 plot was taken over (`sweeps`, which pi-qdash reads from the recorded run parameters with their
 units: start, stop, points, step); the other run settings (shots, interval); and the task
 message. The fitted output parameters and the calibration inputs stay out: the model is meant
-to read the plot, and the benchmark gives it nothing but the plot and the background. The sweep
+to read the plot, and the benchmark gives it nothing but the plot and the background. When the
+first JSON figure carries `CheckQubitFrequencyMapping` decision evidence under
+`layout.meta["qubit_frequency_mapping"]`, pi-qdash adds one `Candidate comparison:` line with every
+candidate's readout slot, f01, moment, quality level, and rank, and the context keeps that line,
+so the model judging the selected candidate's figure also sees the alternatives. The sweep
 also supplies the status question's suggested-range format
 (`(<min time_range>, <max time_range>) [ns]`) when the task's knowledge states none, so the
 model answers a corrective range in the swept parameter's unit.

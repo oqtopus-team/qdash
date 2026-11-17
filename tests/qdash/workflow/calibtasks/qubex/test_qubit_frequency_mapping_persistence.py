@@ -415,18 +415,22 @@ def _mapping_history() -> TaskResultHistoryDocument:
     return doc
 
 
-def _persisted_evidence(saved: list[Any]) -> dict[str, Any]:
-    """Read the evidence back the way an evaluation reads the first JSON figure."""
+def _persisted_meta(saved: list[Any], index: int = 0) -> dict[str, Any]:
+    """Read one saved figure's metadata back from its JSON, as an evaluation reads it."""
     import json
 
-    evidence: dict[str, Any] = json.loads(saved[0].to_json())["layout"]["meta"][
-        "qubit_frequency_mapping"
-    ]
+    meta: dict[str, Any] = json.loads(saved[index].to_json())["layout"]["meta"]
+    return meta
+
+
+def _persisted_evidence(saved: list[Any]) -> dict[str, Any]:
+    """Read the evidence back the way an evaluation reads the first JSON figure."""
+    evidence: dict[str, Any] = _persisted_meta(saved)["qubit_frequency_mapping"]
     return evidence
 
 
 def test_selected_mapping_persists_reviewable_evidence(chip_qubits, tmp_path) -> None:
-    """Save the decision evidence as the first figure of a completed mapping result."""
+    """Save the selected candidate's figure first, with the evidence, then the summary."""
     saved = _run_mapping_through_executor(tmp_path, {"RQ02": 12000.0, "RQ00": 2000.0})
 
     doc = _mapping_history()
@@ -441,6 +445,14 @@ def test_selected_mapping_persists_reviewable_evidence(chip_qubits, tmp_path) ->
     assert evidence["proposal"]["published"] is True
     assert [row["moment"] for row in evidence["candidates"]] == [2000.0, None, 12000.0, None]
     assert [row["readout_frequency"] for row in evidence["candidates"]] == FREQUENCIES_A
+    first = _persisted_meta(saved, 0)
+    assert first["qubit_frequency_mapping_figure"] == "selected"
+    assert first["qdash_figure_role"] == "marked"
+    assert first["readout_label"] == "RQ02"
+    assert first["candidate_index"] == 2
+    summary = _persisted_meta(saved, 1)
+    assert summary["qubit_frequency_mapping_figure"] == "summary"
+    assert summary["qubit_frequency_mapping"] == evidence
 
 
 def test_ambiguous_mapping_persists_evidence_without_calibration(chip_qubits, tmp_path) -> None:
@@ -465,3 +477,8 @@ def test_ambiguous_mapping_persists_evidence_without_calibration(chip_qubits, tm
     assert evidence["runner_up"]["candidate_index"] == 1
     assert evidence["proposal"]["resonator_candidate_index"] == 2
     assert evidence["proposal"]["published"] is False
+    assert _persisted_meta(saved, 0)["qubit_frequency_mapping_figure"] == "summary"
+    assert all(
+        _persisted_meta(saved, index).get("qubit_frequency_mapping_figure") != "selected"
+        for index in range(len(saved))
+    )

@@ -565,12 +565,10 @@ def test_coherence_check_runs_one_step_with_per_target_fail_fast(
             }
 
 
-def _qubit_frequency_mapping_step(
-    monkeypatch: pytest.MonkeyPatch, execution_mode: str
-) -> tuple[Any, Any]:
+def _bringupv2_step(monkeypatch: pytest.MonkeyPatch, execution_mode: str) -> tuple[Any, Any]:
     import importlib
 
-    template = importlib.import_module("qdash.workflow.templates.qubit_frequency_mapping")
+    template = importlib.import_module("qdash.workflow.templates.bringupv2")
     captured: dict[str, Any] = {}
 
     class CapturingCalibService:
@@ -584,11 +582,26 @@ def _qubit_frequency_mapping_step(
             captured["steps"] = steps
 
     monkeypatch.setattr(template, "CalibService", CapturingCalibService)
-    template.qubit_frequency_mapping(
+    template.bringupv2(
         username="alice", chip_id="64Q", mux_ids=[0, 1], execution_mode=execution_mode
     )
     (step,) = captured["steps"]
     return step, captured["targets"]
+
+
+BRINGUPV2_QUBIT_CALLS = (
+    "CheckQubitFrequencyMapping",
+    "CheckControlAmplitude",
+    "CheckAdaptiveChevron",
+)
+
+
+def _bringupv2_mux_log(representative: str, member: str) -> list[tuple[str, str]]:
+    return [
+        ("CheckResonatorSpectroscopy", representative),
+        *((name, representative) for name in BRINGUPV2_QUBIT_CALLS),
+        *((name, member) for name in BRINGUPV2_QUBIT_CALLS),
+    ]
 
 
 def _assert_mux_detection_precedes_its_mappings(log: list[tuple[str, str, str, str]]) -> None:
@@ -599,13 +612,12 @@ def _assert_mux_detection_precedes_its_mappings(log: list[tuple[str, str, str, s
     assert [qid for name, qid in order if name == "CheckResonatorSpectroscopy"] == ["0", "4"]
 
 
-def test_qubit_frequency_mapping_drives_one_qubit_at_a_time_by_default(
+def _run_bringupv2_sequential(
     recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Sequential mode finishes each MUX's detection before any of its mappings."""
+) -> tuple[Any, RecordingSession, Any]:
     from qdash.workflow.service.session_context import clear_current_session, set_current_session
 
-    step, targets = _qubit_frequency_mapping_step(monkeypatch, "sequential")
+    step, targets = _bringupv2_step(monkeypatch, "sequential")
     _schedule(monkeypatch)
     parent = RecordingSession(recorder.log, recorder.fail)
     set_current_session(cast("CalibSession", parent))
@@ -613,25 +625,31 @@ def test_qubit_frequency_mapping_drives_one_qubit_at_a_time_by_default(
         ctx = step.execute(_session(), targets, StepContext())
     finally:
         clear_current_session()
+    return step, parent, ctx
+
+
+def test_bringupv2_drives_one_qubit_at_a_time_by_default(
+    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sequential mode finishes each MUX's detection, then runs each qubit's calls in turn."""
+    step, parent, ctx = _run_bringupv2_sequential(recorder, monkeypatch)
 
     # Everything runs in the parent session, one call after another.
     assert recorder.sessions == []
     assert [(task_name, qid) for _, _, task_name, qid in recorder.log] == [
-        ("CheckResonatorSpectroscopy", "0"),
-        ("CheckQubitFrequencyMapping", "0"),
-        ("CheckQubitFrequencyMapping", "1"),
-        ("CheckResonatorSpectroscopy", "4"),
-        ("CheckQubitFrequencyMapping", "4"),
-        ("CheckQubitFrequencyMapping", "5"),
+        *_bringupv2_mux_log("0", "1"),
+        *_bringupv2_mux_log("4", "5"),
     ]
     _assert_mux_detection_precedes_its_mappings(recorder.log)
-    detection = step.calls()[0]
-    assert parent.parameters["CheckResonatorSpectroscopy"] == detection.settings()
+    calls = {call.name: call for call in step.calls()}
+    for name, call in calls.items():
+        assert parent.parameters[name] == call.settings()
+    detection = calls["CheckResonatorSpectroscopy"]
     assert detection.settings()["run"]["detection_only"] == {"value": True}
     assert detection.settings()["update_calibration_parameters"] is True
-    mapping = step.calls()[1]
     assert parent.parameters["CheckQubitFrequencyMapping"]["update_calibration_parameters"] is True
-    assert parent.parameters["CheckQubitFrequencyMapping"] == mapping.settings()
+    assert parent.parameters["CheckControlAmplitude"]["run"] == {"shots": {"value": 8192}}
+    assert parent.parameters["CheckAdaptiveChevron"]["run"] == {"shots": {"value": 256}}
     result = ctx.get_step_result("bringup")
     assert isinstance(result, OneQubitResult)
     member = result.get_qubit("1")
@@ -641,11 +659,52 @@ def test_qubit_frequency_mapping_drives_one_qubit_at_a_time_by_default(
     assert skipped.reason == "not_mux_representative"
 
 
-def test_qubit_frequency_mapping_parallel_by_mux_keeps_each_mux_in_order(
+def test_bringupv2_failed_mapping_skips_that_qubits_amplitude_and_chevron(
+    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rejected mapping stops its qubit before calibrating on values it did not publish."""
+    recorder.fail.add(("CheckQubitFrequencyMapping", "1"))
+
+    _, _, ctx = _run_bringupv2_sequential(recorder, monkeypatch)
+
+    order = [(task_name, qid) for _, _, task_name, qid in recorder.log]
+    assert [name for name, qid in order if qid == "1"] == ["CheckQubitFrequencyMapping"]
+    for qid in ("0", "4", "5"):
+        assert [name for name, target in order if target == qid][-3:] == list(BRINGUPV2_QUBIT_CALLS)
+    result = ctx.get_step_result("bringup")
+    failed = result.get_qubit("1")
+    assert failed is not None
+    assert failed.status == "failed"
+    assert [(call.call_id, call.status) for call in failed.calls] == [
+        ("CheckResonatorSpectroscopy", "skipped"),
+        ("CheckQubitFrequencyMapping", "failed"),
+        ("CheckControlAmplitude", "skipped"),
+        ("CheckAdaptiveChevron", "skipped"),
+    ]
+
+
+def test_bringupv2_failed_detection_stops_the_representative(
+    recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed detection skips the representative's later calls; its MUX peers still map.
+
+    The peers' mapping runs and rejects the candidate set itself, because the failed
+    attempt is the latest producer attempt of the MUX (see the persistence tests).
+    """
+    recorder.fail.add(("CheckResonatorSpectroscopy", "0"))
+
+    _run_bringupv2_sequential(recorder, monkeypatch)
+
+    order = [(task_name, qid) for _, _, task_name, qid in recorder.log]
+    assert [name for name, qid in order if qid == "0"] == ["CheckResonatorSpectroscopy"]
+    assert [name for name, qid in order if qid == "1"] == list(BRINGUPV2_QUBIT_CALLS)
+
+
+def test_bringupv2_parallel_by_mux_keeps_each_mux_in_order(
     recorder: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """MUXes run in their own workers; inside one MUX the qubits still run in turn."""
-    step, targets = _qubit_frequency_mapping_step(monkeypatch, "parallel_by_mux")
+    step, targets = _bringupv2_step(monkeypatch, "parallel_by_mux")
     _schedule(monkeypatch)
 
     step.execute(_session(), targets, StepContext())
@@ -658,15 +717,4 @@ def test_qubit_frequency_mapping_parallel_by_mux_keeps_each_mux_in_order(
         [(task_name, qid) for _, _, task_name, qid in recorder.log if qid in group]
         for group in recorder.groups
     ]
-    assert per_mux == [
-        [
-            ("CheckResonatorSpectroscopy", "0"),
-            ("CheckQubitFrequencyMapping", "0"),
-            ("CheckQubitFrequencyMapping", "1"),
-        ],
-        [
-            ("CheckResonatorSpectroscopy", "4"),
-            ("CheckQubitFrequencyMapping", "4"),
-            ("CheckQubitFrequencyMapping", "5"),
-        ],
-    ]
+    assert per_mux == [_bringupv2_mux_log("0", "1"), _bringupv2_mux_log("4", "5")]

@@ -480,10 +480,32 @@ def _postprocess_with(task: CheckQubitFrequencyMapping, estimate) -> Any:
         return _postprocess(task, run_result)
 
 
+def _summary(result) -> go.Figure:
+    """Return the one summary figure of a mapping result."""
+    summaries = [
+        fig
+        for fig in result.figures
+        if fig.layout.meta.get("qubit_frequency_mapping_figure") == "summary"
+    ]
+    assert len(summaries) == 1
+    summary: go.Figure = summaries[0]
+    return summary
+
+
 def _evidence(result) -> dict[str, Any]:
-    """Return the decision evidence stored on the first (summary) figure."""
-    evidence: dict[str, Any] = result.figures[0].layout.meta["qubit_frequency_mapping"]
+    """Return the decision evidence stored on the summary figure."""
+    evidence: dict[str, Any] = _summary(result).layout.meta["qubit_frequency_mapping"]
     return evidence
+
+
+def _figure_kinds(result) -> list[tuple[str, str | None]]:
+    """Return each figure as (kind, readout slot): summary, selected, marked or raw."""
+    kinds: list[tuple[str, str | None]] = []
+    for fig in result.figures:
+        meta = fig.layout.meta
+        kind = meta.get("qubit_frequency_mapping_figure") or meta["qdash_figure_role"]
+        kinds.append((kind, meta.get("readout_label")))
+    return kinds
 
 
 @pytest.mark.parametrize(
@@ -714,6 +736,61 @@ def test_evidence_lists_every_candidate_for_review() -> None:
     assert evidence["proposal"]["coarse_control_amplitude"] == pytest.approx(
         result.output_parameters["coarse_control_amplitude"].value
     )
+
+
+def test_selected_candidate_figure_comes_first_then_the_summary() -> None:
+    """Show the selected candidate's marked map first, the summary second, and no duplicate."""
+    result = _postprocess_with(
+        _task_with_candidates(), _estimate({"RQ02": 10000.0, "RQ01": 1000.0})
+    )
+
+    assert result.validation_error is None
+    assert _figure_kinds(result) == [
+        ("selected", "RQ02"),
+        ("summary", None),
+        ("marked", "RQ00"),
+        ("raw", "RQ00"),
+        ("marked", "RQ01"),
+        ("raw", "RQ01"),
+        ("raw", "RQ02"),
+        ("marked", "RQ03"),
+        ("raw", "RQ03"),
+    ]
+    assert len({id(fig) for fig in result.figures}) == len(result.figures)
+    first = result.figures[0]
+    assert first.layout.meta["qdash_figure_role"] == "marked"
+    assert first.layout.meta["candidate_index"] == 2
+    title = first.layout.title.text
+    assert "qid=1" in title and "SELECTED candidate 2 (RQ02)" in title
+    assert f"readout_frequency={READOUT_FREQUENCIES[2]:.6f} GHz" in title
+    assert "moment=10000" in title and "quality_level=4" in title
+    assert "runner-up candidate 1, ratio 10" in title
+    # The f01 marker of the analysis and the coarse-amplitude line stay on the figure.
+    assert any(shape.line.color == "red" for shape in first.layout.shapes)
+    # The first figure carries the same all-candidate evidence as the summary.
+    evidence = first.layout.meta["qubit_frequency_mapping"]
+    assert evidence == _evidence(result)
+    assert [row["selected"] for row in evidence["candidates"]] == [False, False, True, False]
+
+
+@pytest.mark.parametrize(
+    ("moment_by_slot", "match"),
+    [
+        ({"RQ02": 10000.0, "RQ01": 8000.0}, "below min_score_ratio"),
+        ({}, "No readout candidate"),
+    ],
+)
+def test_rejection_keeps_the_summary_first_without_a_selected_figure(moment_by_slot, match) -> None:
+    """Keep the summary first and mark no figure selected when nothing is published."""
+    result = _postprocess_with(_task_with_candidates(), _estimate(moment_by_slot))
+
+    assert result.output_parameters == {}
+    assert match in (result.validation_error or "")
+    kinds = _figure_kinds(result)
+    assert kinds[0] == ("summary", None)
+    assert all(kind != "selected" for kind, _ in kinds)
+    assert kinds[1:] == [(role, slot) for slot in SLOTS for role in ("marked", "raw")]
+    assert "REJECTED" in result.figures[0].layout.title.text
 
 
 def test_detection_below_minimum_qubit_frequency_is_rejected() -> None:

@@ -67,7 +67,7 @@ pi-qdash tools reuse the session's profile and chip when callers omit those para
 | --- | --- |
 | Forum read tools | Compact boxed list, detail, and reply summaries. |
 | `qdash_analyze_figure_json` | Numeric summaries of Plotly scatter and heatmap traces. |
-| `qdash_build_qcal_evidence` | Task, target, sweep, and run settings as evaluation context plus the figure as image content. `includeMetrics` and `includeInputs` add fitted outputs and inputs to text; details retain all records. |
+| `qdash_build_qcal_evidence` | Task, target, sweep, and run settings as evaluation context plus the figure as image content. `includeMetrics` and `includeInputs` add fitted outputs and inputs to text; details retain all records. A figure with qubit frequency mapping evidence adds a `Candidate comparison:` line. |
 | `qdash_preview_forum_evidence_reply`, `qdash_preview_forum_image_reply` | Read-only previews of evidence or locally generated analysis images. |
 | `qdash_create_forum_evidence_reply`, `qdash_create_forum_image_reply` | Confirmation-gated replies. Image replies accept up to eight PNG, JPEG, GIF, or WebP images of at most 5 MB each. |
 | `qdash_create_forum_post`, `qdash_update_forum_post` | Confirmation-gated Forum writes. |

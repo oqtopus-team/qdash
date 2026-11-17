@@ -52,6 +52,9 @@ MULTIPLEXED_READOUT_PREREQUISITE = "https://github.com/amachino/qubex/pull/472"
 DEFAULT_MIN_SCORE_RATIO = 2.0
 MAPPING_EVIDENCE_META_KEY = "qubit_frequency_mapping"
 MAPPING_EVIDENCE_SCHEMA = "qdash.qubit_frequency_mapping.v1"
+# Names what a mapping figure shows: "selected" (the selected candidate's marked map) or
+# "summary" (every candidate and the decision).
+MAPPING_FIGURE_META_KEY = "qubit_frequency_mapping_figure"
 _PAYLOAD_FREQUENCY_ABS_TOL = 1e-9
 _PAYLOAD_AMPLITUDE_REL_TOL = 1e-9
 _AXIS_ABS_TOL = 1e-9
@@ -274,12 +277,16 @@ class CheckQubitFrequencyMapping(QubexTask):
     existing readout_frequency, so a wrong resonator assignment does not affect the
     result.
 
-    Every outcome saves a summary figure first, followed by each candidate's marked
-    and raw figures. The summary lists every candidate's moment, quality level, f01,
-    readout frequency and power, the ranking, runner-up margin, and the selection or
-    rejection reason, and carries the same evidence as JSON under
-    ``layout.meta["qubit_frequency_mapping"]``, so the existing AI evaluation of a
-    task result can review the deterministic decision.
+    When a candidate is selected, the first figure is that candidate's marked map
+    with its f01 marker, titled with the qid, the candidate's readout identity and
+    its score; the summary figure follows. Without a selection the summary figure
+    comes first. The remaining figures are each candidate's marked and raw figures in
+    candidate order, without repeating the selected marked figure. The summary lists
+    every candidate's moment, quality level, f01, readout frequency and power, the
+    ranking, runner-up margin, and the selection or rejection reason. The summary
+    and the selected figure both carry that evidence as JSON under
+    ``layout.meta["qubit_frequency_mapping"]``, so the AI evaluation of a task
+    result, which reads the first figure, keeps every candidate's evidence.
 
     The candidate set must come from a CheckResonatorSpectroscopy run with
     ``detection_only`` set, and that run must be the latest complete producer
@@ -675,11 +682,13 @@ class CheckQubitFrequencyMapping(QubexTask):
         """Select the best-scoring candidate when it passes every gate, or fail without outputs.
 
         Every candidate is analyzed from its validated phase data on the validated
-        sweep axes; the figures in the Qubex result are not used. Returns the summary
-        figure with the decision evidence first, then a marked and a raw figure, both
-        built from that data, for every analyzable candidate in candidate order,
-        whether or not a candidate is selected. On rejection the validation error is
-        one line that names the reason and every candidate's scores.
+        sweep axes; the figures in the Qubex result are not used. On selection the
+        selected candidate's marked figure comes first and the summary figure with
+        the decision evidence second; on rejection the summary comes first. A marked
+        and a raw figure, both built from that data, follow for every analyzable
+        candidate in candidate order, except the selected marked figure already
+        shown first. On rejection the validation error is one line that names the
+        reason and every candidate's scores.
         """
         payload = run_result.raw_result
         if not isinstance(payload, FrequencyMappingRunPayload):
@@ -730,9 +739,11 @@ class CheckQubitFrequencyMapping(QubexTask):
             min_quality_level=self._min_accepted_quality_level,
             proposal=proposal,
         )
-        figures.insert(0, _summary_figure(qid, evaluations, decision, evidence))
+        summary_figure = _summary_figure(qid, evaluations, decision, evidence)
         if selected is None:
-            return self._reject(f"{decision.reason} for qid={qid}: {summary}", figures)
+            return self._reject(
+                f"{decision.reason} for qid={qid}: {summary}", [summary_figure, *figures]
+            )
 
         assert selected.frequency is not None
         assert selected.repr_db is not None
@@ -749,6 +760,14 @@ class CheckQubitFrequencyMapping(QubexTask):
             annotation_position="top left",
             annotation_font_color="red",
         )
+        selected_figure = _mark_selected_figure(
+            selected.marked_figure, qid, selected, decision, evidence
+        )
+        figures = [
+            selected_figure,
+            summary_figure,
+            *(fig for fig in figures if fig is not selected_figure),
+        ]
 
         candidate = selected.readout.candidate
         outputs = copy.deepcopy(self.output_parameters)
@@ -1218,6 +1237,43 @@ def mapping_evidence(
     }
 
 
+def _mark_selected_figure(
+    fig: Any,
+    qid: str,
+    selected: _CandidateEvaluation,
+    decision: MappingDecision,
+    evidence: dict[str, Any],
+) -> Any:
+    """Title the selected candidate's marked figure and attach the decision evidence.
+
+    The title names the qid, the selected candidate's readout slot and frequency,
+    its f01 and moment score, and the runner-up margin. The figure keeps its own
+    metadata and gains the same evidence the summary figure stores, so a consumer
+    that reads only the first figure still has every candidate's scores.
+    """
+    candidate = selected.readout.candidate
+    meta = dict(fig.layout.meta) if isinstance(fig.layout.meta, dict) else {}
+    meta[MAPPING_EVIDENCE_META_KEY] = evidence
+    meta[MAPPING_FIGURE_META_KEY] = "selected"
+    fig.update_layout(
+        title={
+            "text": (
+                f"Qubit frequency mapping for qid={qid}: SELECTED candidate "
+                f"{candidate.index} ({selected.readout.readout_label})<br>"
+                f"<sup>readout_frequency={candidate.frequency:.6f} GHz, "
+                f"readout_amplitude={candidate.readout_amplitude:.6g}; "
+                f"f01={_format_score(selected.frequency)} GHz, "
+                f"moment={_format_score(selected.moment)}, "
+                f"quality_level={selected.quality_level}<br>"
+                f"{_runner_up_text(decision)}</sup>"
+            )
+        },
+        margin={"t": 120},
+        meta=meta,
+    )
+    return fig
+
+
 def _summary_figure(
     qid: str,
     evaluations: Sequence[_CandidateEvaluation],
@@ -1348,7 +1404,7 @@ def _summary_figure(
         width=max(1000, 380 * count),
         height=900,
         margin={"t": 140},
-        meta={MAPPING_EVIDENCE_META_KEY: evidence},
+        meta={MAPPING_EVIDENCE_META_KEY: evidence, MAPPING_FIGURE_META_KEY: "summary"},
         showlegend=False,
     )
     return fig

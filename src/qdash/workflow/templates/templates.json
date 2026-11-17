@@ -9,13 +9,13 @@
     "function_name": "bringup"
   },
   {
-    "id": "qubit_frequency_mapping",
-    "name": "Qubit Frequency Mapping",
-    "description": "Opt-in MUX bring-up that maps each qubit to its resonator: CheckResonatorSpectroscopy with detection_only once per MUX, then CheckQubitFrequencyMapping for each qubit of the MUX in turn. Both publish calibration parameters. Requires explicit mux_ids and a qubex revision that includes amachino/qubex#472.",
+    "id": "bringupv2",
+    "name": "Bring-up v2",
+    "description": "Opt-in MUX bring-up that maps each qubit to its resonator before calibrating its drive: CheckResonatorSpectroscopy with detection_only once per MUX, then CheckQubitFrequencyMapping, CheckControlAmplitude, and CheckAdaptiveChevron for each qubit of the MUX in turn. A failed mapping skips that qubit's later tasks. Requires explicit mux_ids and a qubex revision that includes amachino/qubex#472.",
     "category": "production",
     "backend": "qubex",
-    "filename": "qubit_frequency_mapping.py",
-    "function_name": "qubit_frequency_mapping"
+    "filename": "bringupv2.py",
+    "function_name": "bringupv2"
   },
   {
     "id": "box_setup",
