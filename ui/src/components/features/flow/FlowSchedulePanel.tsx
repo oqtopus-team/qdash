@@ -274,13 +274,13 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
             </div>
 
             <div className="form-control flex flex-col gap-1">
-              <label className="cursor-pointer label justify-start gap-2">
+              <label className="choice-field text-xs">
                 <input
                   type="checkbox"
                   className="checkbox checkbox-sm checkbox-primary"
                   {...register("isActive")}
                 />
-                <span className="label-text text-xs">Enable schedule immediately</span>
+                <span>Enable schedule immediately</span>
               </label>
               <label className="label">
                 <span className="label-text-alt text-xs">
@@ -440,6 +440,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                       <input
                         type="checkbox"
                         className="toggle toggle-success toggle-xs"
+                        aria-label="Schedule active"
                         checked={schedule.active}
                         onChange={() => handleToggleActive(schedule)}
                         disabled={updateScheduleMutation.isPending}

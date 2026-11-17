@@ -619,7 +619,7 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 </div>
               )}
 
-              <label className="label min-w-0 cursor-pointer items-start justify-start gap-3 whitespace-normal">
+              <label className="choice-field gap-3">
                 <input
                   type="checkbox"
                   className="toggle toggle-sm"
@@ -636,10 +636,10 @@ export function TaskWorkbench({ task, backend, sourceTask }: TaskWorkbenchProps)
                 </span>
               </label>
 
-              <label className="label min-w-0 cursor-pointer items-start justify-start gap-3 whitespace-normal">
+              <label className="choice-field gap-3">
                 <input
                   type="checkbox"
-                  className="toggle toggle-sm toggle-success mt-0.5 shrink-0"
+                  className="toggle toggle-sm toggle-success"
                   checked={updateCalibrationParameters}
                   onChange={(event) => setUpdateCalibrationParameters(event.target.checked)}
                 />

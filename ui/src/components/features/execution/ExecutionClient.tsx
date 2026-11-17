@@ -35,6 +35,7 @@ import { TaskMessagePanel } from "@/components/ui/TaskMessagePanel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/Tooltip";
 import { useToast } from "@/components/ui/Toast";
 import { useFullscreenPanel } from "@/hooks/useFullscreenPanel";
+import { useSelectStyles } from "@/hooks/useSelectStyles";
 
 type FilterOption = {
   value: string;
@@ -160,27 +161,16 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
     }
   }, [filterTaskName, uniqueTaskNames]);
 
+  const selectStyles = useSelectStyles<FilterOption>();
   const filterSelectStyles = useMemo<StylesConfig<FilterOption, false>>(
     () => ({
-      control: (provided) => ({
-        ...provided,
-        minHeight: 34,
-        height: 34,
-      }),
-      valueContainer: (provided) => ({
-        ...provided,
-        padding: "2px 8px",
-      }),
-      indicatorsContainer: (provided) => ({
-        ...provided,
-        height: 34,
-      }),
-      menu: (provided) => ({
-        ...provided,
+      ...selectStyles,
+      menu: (provided, state) => ({
+        ...(selectStyles.menu?.(provided, state) ?? provided),
         zIndex: 40,
       }),
     }),
-    [],
+    [selectStyles],
   );
 
   // Filter tasks based on selected filters

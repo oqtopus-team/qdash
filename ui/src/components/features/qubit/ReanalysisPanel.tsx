@@ -630,9 +630,9 @@ interface CheckboxFieldProps {
 /** Labelled checkbox wired to React Hook Form. */
 function CheckboxField({ id, label, registration }: CheckboxFieldProps) {
   return (
-    <label htmlFor={id} className="label cursor-pointer justify-start gap-3">
+    <label htmlFor={id} className="choice-field gap-3 text-xs">
       <input id={id} type="checkbox" className="checkbox checkbox-sm" {...registration} />
-      <span className="label-text text-xs font-mono">{label}</span>
+      <span className="font-mono">{label}</span>
     </label>
   );
 }

@@ -156,7 +156,7 @@ function Verdict({ item }: { item: EvaluationItem }) {
           {current === false && (
             <span className="flex w-full flex-wrap gap-2">
               {VERDICT_ISSUES.map((issue) => (
-                <label key={issue.value} className="label cursor-pointer gap-1 py-0 text-xs">
+                <label key={issue.value} className="choice-field gap-1.5 text-xs">
                   <input
                     type="checkbox"
                     className="checkbox checkbox-xs"
